@@ -82,10 +82,10 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 text_source,
                 client_field_declaration.item.parent_type.span,
             ))
-            .err();
+            .wrap_err();
         }
     }
-    .ok()
+    .wrap_ok()
 }
 
 pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
@@ -146,7 +146,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                     text_source,
                     client_pointer_declaration.item.target_type.span(),
                 ))
-                .err();
+                .wrap_err();
             }
         },
         ServerEntityName::Scalar(scalar_entity_name) => {
@@ -158,10 +158,10 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 text_source,
                 client_pointer_declaration.item.parent_type.span,
             ))
-            .err();
+            .wrap_err();
         }
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
@@ -228,7 +228,7 @@ pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>
         },
         selectable,
     )
-        .ok()
+        .wrap_ok()
 }
 
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
@@ -287,7 +287,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
             ))
         })
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
@@ -514,5 +514,5 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
         default_value: variable_definition.item.default_value,
     }
     .with_span(variable_definition.span)
-    .ok()
+    .wrap_ok()
 }

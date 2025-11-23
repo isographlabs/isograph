@@ -85,7 +85,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                             ),
                             None,
                         )
-                        .err();
+                        .wrap_err();
                     }
 
                     argument_map.arguments.swap_remove(index_of_argument);
@@ -122,7 +122,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
                         // TODO have a location
                         None,
                     )
-                    .err();
+                    .wrap_err();
                 }
                 Some((first, rest)) => {
                     modified.remove_to_field(*first, rest, primary_object_entity_name)?;
@@ -132,7 +132,7 @@ pub(crate) fn remove_field_map_item<TNetworkProtocol: NetworkProtocol>(
             }
         }
     }
-    .ok()
+    .wrap_ok()
 }
 
 #[derive(Debug)]
@@ -213,7 +213,7 @@ impl ModifiedArgument {
                                         }
                                     }),
                                 )
-                                    .some()
+                                    .wrap_some()
                             } else {
                                 None
                             }
@@ -271,7 +271,7 @@ impl ModifiedArgument {
                                         // TODO have a location
                                         None,
                                     )
-                                    .err();
+                                    .wrap_err();
                                 }
 
                                 // Cool! We found a scalar, we can remove it.
@@ -291,7 +291,7 @@ impl ModifiedArgument {
                                     // TODO have a location
                                     None,
                                 )
-                                .err();
+                                .wrap_err();
                             }
                         }
                     }
@@ -307,7 +307,7 @@ impl ModifiedArgument {
                     // TODO have a location
                     None,
                 )
-                .err();
+                .wrap_err();
             }
         };
         Ok(())

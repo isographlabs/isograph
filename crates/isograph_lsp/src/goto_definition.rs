@@ -96,7 +96,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                         })
                         .collect(),
                 )
-                .some()
+                .wrap_some()
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -269,7 +269,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
         None
     };
 
-    goto_response.ok()
+    goto_response.wrap_ok()
 }
 
 fn lsp_location_to_scalar_response(location: lsp_types::Location) -> GotoDefinitionResponse {

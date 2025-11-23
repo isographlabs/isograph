@@ -62,32 +62,34 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
                     |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
                 )?
                 .server_defined()
-                .some()
-                .ok(),
+                .wrap_some()
+                .wrap_ok(),
             None => Ok(None),
         },
         (Err(_), Ok(client)) => match client.clone() {
-            Some(client_selectable) => client_selectable.client_defined().some().ok(),
+            Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
-            (None, Some(client_selectable)) => {
-                client_selectable.clone().client_defined().some().ok()
-            }
+            (None, Some(client_selectable)) => client_selectable
+                .clone()
+                .client_defined()
+                .wrap_some()
+                .wrap_ok(),
             (Some(server_selectable), None) => server_selectable
                 .clone()
                 .map_err(
                     |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
                 )?
                 .server_defined()
-                .some()
-                .ok(),
+                .wrap_some()
+                .wrap_ok(),
             (Some(_), Some(_)) => SelectableNamedError::DuplicateDefinitions {
                 parent_object_entity_name: parent_server_object_entity_name,
                 selectable_name,
             }
-            .err(),
+            .wrap_err(),
         },
     }
 }
@@ -124,7 +126,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
                 value.map_err(
                     |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
                 )?;
-            value.server_defined().ok()
+            value.server_defined().wrap_ok()
         })
         .collect::<Vec<_>>();
 
@@ -138,11 +140,11 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
             })
             .map(|(_key, value)| {
                 let value = value.as_ref().map_err(|e| e.clone())?.clone();
-                value.client_defined().ok()
+                value.client_defined().wrap_ok()
             }),
     );
 
-    selectables.ok()
+    selectables.wrap_ok()
 }
 
 #[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]

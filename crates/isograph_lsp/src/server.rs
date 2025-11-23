@@ -45,26 +45,27 @@ use thiserror::Error;
 pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
-        text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL).some(),
+        text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
+            .wrap_some(),
         semantic_tokens_provider: SemanticTokensServerCapabilities::SemanticTokensOptions(
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 legend: semantic_token_legend(),
                 range: None,
-                full: SemanticTokensFullOptions::Bool(true).some(),
+                full: SemanticTokensFullOptions::Bool(true).wrap_some(),
             },
         )
-        .some(),
-        hover_provider: HoverProviderCapability::Simple(true).some(),
-        document_formatting_provider: OneOf::Left(true).some(),
-        definition_provider: OneOf::Left(true).some(),
+        .wrap_some(),
+        hover_provider: HoverProviderCapability::Simple(true).wrap_some(),
+        document_formatting_provider: OneOf::Left(true).wrap_some(),
+        definition_provider: OneOf::Left(true).wrap_some(),
         completion_provider: Some(Default::default()),
         ..Default::default()
     };
     let server_capabilities = serde_json::to_value(server_capabilities)?;
     let params = connection.initialize(server_capabilities)?;
 
-    serde_json::from_value::<InitializeParams>(params)?.ok()
+    serde_json::from_value::<InitializeParams>(params)?.wrap_ok()
 }
 
 /// Run the main server loop

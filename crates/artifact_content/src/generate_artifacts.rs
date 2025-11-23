@@ -126,7 +126,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    (artifact_path_and_content, stats.clone()).ok()
+    (artifact_path_and_content, stats.clone()).wrap_ok()
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
@@ -482,7 +482,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => (key.0, key.1.unchecked_conversion()).object_selected(),
             };
 
-            (client_type_name, value).some()
+            (client_type_name, value).wrap_some()
         })
     {
         // For each user-written client types, generate a param type artifact
@@ -543,10 +543,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 },
                 config.options.include_file_extensions_in_import_statements,
             )
-            .some(),
+            .wrap_some(),
             SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => {
-                    generate_link_output_type_artifact(db, client_field).some()
+                    generate_link_output_type_artifact(db, client_field).wrap_some()
                 }
                 ClientFieldVariant::UserWritten(info) => {
                     generate_eager_reader_output_type_artifact(
@@ -556,10 +556,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         info,
                         config.options.include_file_extensions_in_import_statements,
                     )
-                    .some()
+                    .wrap_some()
                 }
                 ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    generate_refetch_output_type_artifact(db, client_field).some()
+                    generate_refetch_output_type_artifact(db, client_field).wrap_some()
                 }
             },
         };
@@ -1459,7 +1459,7 @@ pub fn get_provided_arguments<'a>(
                 .iter()
                 .any(|arg| definition.name.item == arg.item.name.item);
             if user_has_supplied_argument {
-                definition.clone().some()
+                definition.clone().wrap_some()
             } else {
                 None
             }

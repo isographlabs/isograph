@@ -41,10 +41,10 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => {
-                        (*key, s.selection_set.clone().scalar_selected().ok())
+                        (*key, s.selection_set.clone().scalar_selected().wrap_ok())
                     }
                     SelectionType::Object(o) => {
-                        (*key, o.selection_set.clone().object_selected().ok())
+                        (*key, o.selection_set.clone().object_selected().wrap_ok())
                     }
                 }
             } else {
@@ -54,7 +54,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                         parent_object_entity_name: key.0,
                         client_selectable_name: key.1,
                     }
-                    .err(),
+                    .wrap_err(),
                 )
             }
         })
@@ -70,7 +70,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                     SelectionSet { selections: vec![] }
                         .with_generated_span()
                         .scalar_selected()
-                        .ok(),
+                        .wrap_ok(),
                 );
             }
         }
@@ -90,7 +90,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                         .reader_selection_set
                         .clone()
                         .scalar_selected()
-                        .ok(),
+                        .wrap_ok(),
                 );
             }
         }
@@ -154,14 +154,14 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
 
     match map.get(&(parent_server_object_entity_name, client_selectable_name)) {
         Some(result) => match result {
-            Ok(selections) => selections.clone().ok(),
-            Err(e) => e.clone().err(),
+            Ok(selections) => selections.clone().wrap_ok(),
+            Err(e) => e.clone().wrap_err(),
         },
         None => MemoizedSelectionSetError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_selectable_name,
         }
-        .err(),
+        .wrap_err(),
     }
 }
 

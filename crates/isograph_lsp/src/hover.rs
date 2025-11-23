@@ -76,7 +76,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .ok_or(LSPRuntimeError::ExpectedError)?;
 
-                format_hover_for_entity(server_object_entity).some()
+                format_hover_for_entity(server_object_entity).wrap_some()
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -91,7 +91,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                         parent_object.name,
                         parent_object.description,
                     )
-                    .some()
+                    .wrap_some()
                 } else {
                     None
                 }
@@ -108,7 +108,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                         parent_object.name,
                         parent_object.description,
                     )
-                    .some()
+                    .wrap_some()
                 } else {
                     None
                 }
@@ -129,7 +129,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             }),
             range: None,
         })
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -211,7 +211,7 @@ fn find_iso_literal_extraction_under_cursor<'a>(
                     character: diff_char,
                 },
             );
-            return (extract_item.clone(), index_of_line_char).some();
+            return (extract_item.clone(), index_of_line_char).wrap_some();
         }
 
         last_iteration_end_line_count = end_line_count;

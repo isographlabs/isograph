@@ -47,7 +47,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     errors.extend(validate_all_id_fields(db).clone());
 
     errors.extend(validated_entrypoints(db).values().flat_map(|result| {
-        ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).some()
+        ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).wrap_some()
     }));
 
     maybe_extend(&mut errors, validate_all_expose_as_fields(db));
@@ -56,14 +56,14 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         Ok(stats) => stats,
         Err(e) => {
             errors.extend(e);
-            return errors.into_iter().collect::<Vec<_>>().err();
+            return errors.into_iter().collect::<Vec<_>>().wrap_err();
         }
     };
 
     if errors.is_empty() {
         Ok(contains_iso_stats)
     } else {
-        errors.into_iter().collect::<Vec<_>>().err()
+        errors.into_iter().collect::<Vec<_>>().wrap_err()
     }
 }
 
@@ -105,7 +105,7 @@ fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
             .into_iter()
             .map(|e| ValidationError::ProcessClientFieldDeclarationError { error: e })
             .collect::<Vec<_>>()
-            .err();
+            .wrap_err();
     }
 
     Ok(contains_iso_stats)

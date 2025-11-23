@@ -72,7 +72,7 @@ pub fn parse_iso_literal(
                 entrypoint_keyword.span,
                 (&iso_literal_text).intern().into(),
             )?)
-            .ok()
+            .wrap_ok()
         }
         "field" => {
             tokens
@@ -88,7 +88,7 @@ pub fn parse_iso_literal(
                 const_export_name.as_deref(),
                 text_source,
             )?)
-            .ok()
+            .wrap_ok()
         }
         "pointer" => {
             tokens
@@ -106,11 +106,11 @@ pub fn parse_iso_literal(
                     text_source,
                 )?,
             )
-            .ok()
+            .wrap_ok()
         }
         _ => IsographLiteralParseError::ExpectedFieldOrPointerOrEntrypoint
             .with_location(Location::new(text_source, discriminator.span))
-            .err(),
+            .wrap_err(),
     }
 }
 
@@ -160,17 +160,17 @@ fn parse_iso_entrypoint_declaration(
                 entrypoint_directive_set,
                 semantic_tokens: tokens.semantic_tokens(),
             }
-            .ok()
+            .wrap_ok()
         })
         .map_err(|with_span: WithSpan<_>| with_span.to_with_location(text_source))?;
 
     if let Some(span) = tokens.remaining_token_span() {
         return IsographLiteralParseError::LeftoverTokens
             .with_location(Location::new(text_source, span))
-            .err();
+            .wrap_err();
     }
 
-    entrypoint_declaration.ok()
+    entrypoint_declaration.wrap_ok()
 }
 
 fn parse_iso_client_field_declaration(
@@ -190,10 +190,10 @@ fn parse_iso_client_field_declaration(
     if let Some(span) = tokens.remaining_token_span() {
         return IsographLiteralParseError::LeftoverTokens
             .with_location(Location::new(text_source, span))
-            .err();
+            .wrap_err();
     }
 
-    client_field_declaration.ok()
+    client_field_declaration.wrap_ok()
 }
 
 fn parse_client_field_declaration_inner(
@@ -264,7 +264,7 @@ fn parse_client_field_declaration_inner(
 
             semantic_tokens: tokens.semantic_tokens(),
         }
-        .ok()
+        .wrap_ok()
     })
 }
 
@@ -285,10 +285,10 @@ fn parse_iso_client_pointer_declaration(
     if let Some(span) = tokens.remaining_token_span() {
         return IsographLiteralParseError::LeftoverTokens
             .with_location(Location::new(text_source, span))
-            .err();
+            .wrap_err();
     }
 
-    client_pointer_declaration.ok()
+    client_pointer_declaration.wrap_ok()
 }
 
 fn parse_client_pointer_target_type(
@@ -304,7 +304,7 @@ fn parse_client_pointer_target_type(
     if keyword.item != "to" {
         return IsographLiteralParseError::ExpectedTo
             .with_span(keyword.span)
-            .err();
+            .wrap_err();
     }
 
     parse_type_annotation(tokens)
@@ -372,7 +372,7 @@ fn parse_client_pointer_declaration_inner(
 
             semantic_tokens: tokens.semantic_tokens(),
         }
-        .ok()
+        .wrap_ok()
     })
 }
 
@@ -385,7 +385,7 @@ fn parse_optional_selection_set(
         let selections = parse_optional_selection_set_inner(tokens, text_source)?;
         selections
             .map(|selections| SelectionSet { selections })
-            .ok()
+            .wrap_ok()
     })
 }
 
@@ -425,11 +425,11 @@ fn parse_optional_selection_set_inner(
                 name_or_alias: selection_name_or_alias,
             }
             .with_span(selection.span)
-            .err();
+            .wrap_err();
         }
         selections.push(selection);
     }
-    selections.some().ok()
+    selections.wrap_some().wrap_ok()
 }
 
 /// Parse a list with a delimiter. Expect an optional final delimiter.
@@ -446,7 +446,7 @@ fn parse_delimited_list<'a, TResult>(
     // Handle empty list case
     if let Ok(end_span) = tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
     {
-        return end_span.map(|_| items).ok();
+        return end_span.map(|_| items).wrap_ok();
     }
 
     loop {
@@ -455,7 +455,7 @@ fn parse_delimited_list<'a, TResult>(
         if let Ok(end_span) =
             tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
         {
-            return end_span.map(|_| items).ok();
+            return end_span.map(|_| items).wrap_ok();
         }
 
         if tokens
@@ -467,14 +467,14 @@ fn parse_delimited_list<'a, TResult>(
                 delimiter,
             }
             .with_span(tokens.peek().span)
-            .err();
+            .wrap_err();
         }
 
         // Check if the next token is the closing token (allows for trailing delimiter)
         if let Ok(end_span) =
             tokens.parse_token_of_kind(closing_token, closing_isograph_semantic_token)
         {
-            return end_span.map(|_| items).ok();
+            return end_span.map(|_| items).wrap_ok();
         }
     }
 }
@@ -485,7 +485,7 @@ fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
     } else {
         IsographLiteralParseError::ExpectedLineBreak
             .with_span(tokens.peek().span)
-            .err()
+            .wrap_err()
     }
 }
 
@@ -550,7 +550,7 @@ fn parse_selection(
                 })
             }
         }
-        .ok()
+        .wrap_ok()
     })
 }
 
@@ -575,12 +575,12 @@ fn parse_optional_alias_and_field_name(
                     semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS_POST_COLON,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?,
-            field_name_or_alias.some(),
+            field_name_or_alias.wrap_some(),
         )
     } else {
         (field_name_or_alias, None)
     };
-    (field_name, alias).ok()
+    (field_name, alias).wrap_ok()
 }
 
 fn parse_directives(
@@ -654,7 +654,7 @@ fn parse_argument(
         let value = parse_non_constant_value(tokens, text_source)?.to_with_location(text_source);
         Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
     })?;
-    argument.to_with_location(text_source).ok()
+    argument.to_with_location(text_source).wrap_ok()
 }
 
 fn parse_non_constant_value(
@@ -675,7 +675,7 @@ fn parse_non_constant_value(
                     semantic_token_legend::ST_VARIABLE,
                 )
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            name.map(NonConstantValue::Variable).ok()
+            name.map(NonConstantValue::Variable).wrap_ok()
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
@@ -693,7 +693,7 @@ fn parse_non_constant_value(
                 })
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
-            string.map(NonConstantValue::String).ok()
+            string.map(NonConstantValue::String).wrap_ok()
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
@@ -707,7 +707,7 @@ fn parse_non_constant_value(
                 .map(|number| {
                     NonConstantValue::Integer(number.parse().expect("Expected valid integer"))
                 })
-                .ok()
+                .wrap_ok()
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
@@ -732,7 +732,7 @@ fn parse_non_constant_value(
                     start: open.span.start,
                     end: entries.span.end,
                 })
-                .ok()
+                .wrap_ok()
         })?;
 
         to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
@@ -746,12 +746,12 @@ fn parse_non_constant_value(
             let span = bool_or_null.span;
 
             bool_or_null.and_then(|bool_or_null| match bool_or_null {
-                "null" => NonConstantValue::Null.ok(),
+                "null" => NonConstantValue::Null.wrap_ok(),
                 bool => match bool.parse::<bool>() {
-                    Ok(b) => NonConstantValue::Boolean(b).ok(),
+                    Ok(b) => NonConstantValue::Boolean(b).wrap_ok(),
                     Err(_) => IsographLiteralParseError::ExpectedBoolean
                         .with_span(span)
-                        .err(),
+                        .wrap_err(),
                 },
             })
         })?;
@@ -783,7 +783,7 @@ fn parse_object_entry(
 
     let value = parse_non_constant_value(tokens, text_source)?.to_with_location(text_source);
 
-    NameValuePair { name, value }.ok()
+    NameValuePair { name, value }.wrap_ok()
 }
 
 fn parse_variable_definitions(
@@ -806,7 +806,7 @@ fn parse_variable_definitions(
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
         .item
-        .ok()
+        .wrap_ok()
     } else {
         Ok(vec![])
     }
@@ -846,9 +846,9 @@ fn parse_variable_definition(
                 type_,
                 default_value,
             }
-            .ok()
+            .wrap_ok()
         })?
-        .ok()
+        .wrap_ok()
 }
 
 fn parse_optional_default_value(
@@ -868,8 +868,8 @@ fn parse_optional_default_value(
         })?;
         constant_value
             .with_location(Location::new(text_source, non_constant_value.span))
-            .some()
-            .ok()
+            .wrap_some()
+            .wrap_ok()
     } else {
         Ok(None)
     }
@@ -897,9 +897,9 @@ fn parse_type_annotation(
                 GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).boxed(),
                 )
-                .ok()
+                .wrap_ok()
             } else {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).ok()
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).wrap_ok()
             }
         })?;
 
@@ -933,12 +933,12 @@ fn parse_type_annotation(
                     ))
                     .boxed(),
                 )
-                .ok()
+                .wrap_ok()
             } else {
                 GraphQLTypeAnnotation::List(
                     GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
                 )
-                .ok()
+                .wrap_ok()
             }
         })?;
 

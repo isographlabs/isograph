@@ -95,7 +95,7 @@ impl<T> WithSpan<T> {
     }
 
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithSpan<U>, E> {
-        WithSpan::new(map(self.item)?, self.span).ok()
+        WithSpan::new(map(self.item)?, self.span).wrap_ok()
     }
 
     pub fn as_ref(&self) -> WithSpan<&T> {

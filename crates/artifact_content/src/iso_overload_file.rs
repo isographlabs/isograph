@@ -291,7 +291,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => {}
             };
 
-            value.clone().some()
+            value.clone().wrap_some()
         })
         .map(|selection_type| {
             let client_scalar_selection_directive_set = {

@@ -89,7 +89,7 @@ fn get_common_indent(source: &str) -> usize {
         if let Some((first_index, _)) = line.match_indices(is_not_whitespace).next()
             && common_indent.is_none_or(|indent| first_index < indent)
         {
-            common_indent = first_index.some()
+            common_indent = first_index.wrap_some()
         }
     }
     common_indent.unwrap_or(0)

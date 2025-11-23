@@ -45,7 +45,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name: key.0,
                         client_selectable_name: key.1,
                     }
-                    .err()
+                    .wrap_err()
                 }
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
@@ -88,7 +88,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity_name: key.0,
                     client_selectable_name: key.1.into(),
                 }
-                .err();
+                .wrap_err();
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(
@@ -96,7 +96,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         .refetch_strategy
                         .clone()
                         .scalar_selected()
-                        .ok(),
+                        .wrap_ok(),
                 );
             }
         }
@@ -140,7 +140,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     .transpose()
                     .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
                     .scalar_selected()
-                    .ok(),
+                    .wrap_ok(),
                 SelectionType::Object(refetch_strategy) => get_validated_refetch_strategy(
                     db,
                     refetch_strategy,
@@ -150,13 +150,13 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 )
                 .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
                 .object_selected()
-                .ok(),
+                .wrap_ok(),
             });
 
             (key, value)
         })
         .collect::<HashMap<_, _>>()
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -186,16 +186,16 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
                     expected_type: "a scalar",
                     actual_type: "an object",
                 }
-                .err(),
-                SelectionType::Scalar(s) => s.clone().ok(),
+                .wrap_err(),
+                SelectionType::Scalar(s) => s.clone().wrap_ok(),
             },
-            Err(e) => e.clone().err(),
+            Err(e) => e.clone().wrap_err(),
         },
         None => RefetchStrategyAccessError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_scalar_selectable_name.into(),
         }
-        .err(),
+        .wrap_err(),
     }
 }
 
@@ -223,16 +223,16 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
                     expected_type: "an object",
                     actual_type: "a scalar",
                 }
-                .err(),
-                SelectionType::Object(s) => s.clone().ok(),
+                .wrap_err(),
+                SelectionType::Object(s) => s.clone().wrap_ok(),
             },
-            Err(e) => e.clone().err(),
+            Err(e) => e.clone().wrap_err(),
         },
         None => RefetchStrategyAccessError::NotFound {
             parent_server_object_entity_name,
             selectable_name: client_object_selectable_name.into(),
         }
-        .err(),
+        .wrap_err(),
     }
 }
 #[derive(Clone, Error, Eq, PartialEq, Debug)]

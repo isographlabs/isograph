@@ -109,13 +109,13 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     {
         Some((first, rest)) => {
             if rest.is_empty() {
-                first.clone().some().ok()
+                first.clone().wrap_some().wrap_ok()
             } else {
                 MemoizedIsoLiteralError::MultipleDefinitionsFound {
                     duplicate_entity_name: parent_object_entity_name,
                     duplicate_client_selectable_name: client_selectable_name,
                 }
-                .err()
+                .wrap_err()
             }
         }
         None => {
@@ -172,7 +172,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     };
     match item {
         SelectionType::Scalar(client_field_declaration) => {
-            client_field_declaration.clone().some().ok()
+            client_field_declaration.clone().wrap_some().wrap_ok()
         }
         SelectionType::Object(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
             parent_object_entity_name,
@@ -180,7 +180,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             intended_type: "a scalar",
             actual_type: "an object",
         }
-        .err(),
+        .wrap_err(),
     }
 }
 
@@ -204,7 +204,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     };
     match item {
         SelectionType::Object(client_pointer_declaration) => {
-            client_pointer_declaration.clone().some().ok()
+            client_pointer_declaration.clone().wrap_some().wrap_ok()
         }
         SelectionType::Scalar(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
             parent_object_entity_name,
@@ -212,7 +212,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             intended_type: "an object",
             actual_type: "a scalar",
         }
-        .err(),
+        .wrap_err(),
     }
 }
 
@@ -249,7 +249,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
             {
-                return link_field.some().ok();
+                return link_field.wrap_some().wrap_ok();
             }
 
             // Awkward! We also need to check for expose fields. Ay ay ay
@@ -259,7 +259,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
                 .map(|(selectable, _)| selectable)
-                .ok();
+                .wrap_ok();
         }
     };
 
@@ -267,7 +267,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
-    scalar_selectable.clone().some().ok()
+    scalar_selectable.clone().wrap_some().wrap_ok()
 }
 
 #[memo]
@@ -290,7 +290,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(|e| MemoizedIsoLiteralError::ProcessClientFieldDeclarationError(e.clone()))?;
 
-    object_selectable.clone().some().ok()
+    object_selectable.clone().wrap_some().wrap_ok()
 }
 
 #[memo]
@@ -346,11 +346,11 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
             object
                 .map(SelectionType::Object)
                 .or(scalar.map(SelectionType::Scalar))
-                .ok()
+                .wrap_ok()
         }
-        (Ok(object_selectable), Err(_)) => object_selectable.map(SelectionType::Object).ok(),
-        (Err(_), Ok(scalar_selectable)) => scalar_selectable.map(SelectionType::Scalar).ok(),
-        (Err(e), Err(_)) => e.err(),
+        (Ok(object_selectable), Err(_)) => object_selectable.map(SelectionType::Object).wrap_ok(),
+        (Err(_), Ok(scalar_selectable)) => scalar_selectable.map(SelectionType::Scalar).wrap_ok(),
+        (Err(e), Err(_)) => e.wrap_err(),
     }
 }
 
@@ -469,5 +469,5 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 }),
         )
         .collect::<HashMap<_, _>>()
-        .ok()
+        .wrap_ok()
 }

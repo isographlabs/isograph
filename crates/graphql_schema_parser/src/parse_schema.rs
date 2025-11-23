@@ -43,7 +43,7 @@ fn parse_type_system_document(
         let type_system_definition = parse_type_system_definition(tokens)?;
         type_system_definitions.push(type_system_definition);
     }
-    GraphQLTypeSystemDocument(type_system_definitions).ok()
+    GraphQLTypeSystemDocument(type_system_definitions).wrap_ok()
 }
 
 pub fn parse_schema_extensions(
@@ -66,13 +66,13 @@ fn parse_type_system_extension_document(
                     let with_loc = parse_type_system_definition(tokens)?;
                     with_loc
                         .map(GraphQLTypeSystemExtensionOrDefinition::Definition)
-                        .ok()
+                        .wrap_ok()
                 }
                 TypeSystemDocType::Extension => {
                     let with_loc = parse_type_system_extension(tokens)?;
                     with_loc
                         .map(GraphQLTypeSystemExtensionOrDefinition::Extension)
-                        .ok()
+                        .wrap_ok()
                 }
             },
             Err(unexpected_token) => {
@@ -81,13 +81,13 @@ fn parse_type_system_extension_document(
                     format!(
                         "Expected extend, scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
                     ),
-                    Location::new(tokens.text_source, unexpected_token.span).some(),
-                ).err()
+                    Location::new(tokens.text_source, unexpected_token.span).wrap_some(),
+                ).wrap_err()
             }
         }?;
         definitions_or_extensions.push(definition_or_extension);
     }
-    GraphQLTypeSystemExtensionDocument(definitions_or_extensions).ok()
+    GraphQLTypeSystemExtensionDocument(definitions_or_extensions).wrap_ok()
 }
 
 fn parse_type_system_extension(
@@ -110,14 +110,14 @@ fn parse_type_system_extension(
                 let found_text = identifier.item;
                 Diagnostic::new(
                     format!("Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""),
-                    Location::new(tokens.text_source, identifier.span).some()
+                    Location::new(tokens.text_source, identifier.span).wrap_some()
                 )
-                .err()
+                .wrap_err()
             },
         }
     })?;
 
-    extension.to_with_location(tokens.text_source).ok()
+    extension.to_with_location(tokens.text_source).wrap_ok()
 }
 
 fn parse_type_system_definition(
@@ -151,14 +151,14 @@ fn parse_type_system_definition(
                             "Expected extend, scalar, type, interface, union, \
                             enum, input object, schema or directive, found \"{found_text}\""
                         ),
-                        Location::new(tokens.text_source, identifier.span).some(),
+                        Location::new(tokens.text_source, identifier.span).wrap_some(),
                     )
-                    .err()
+                    .wrap_err()
                 }
             }
         })?;
 
-    definition.to_with_location(tokens.text_source).ok()
+    definition.to_with_location(tokens.text_source).wrap_ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "type" keyword
@@ -181,7 +181,7 @@ fn parse_object_type_definition(
         directives,
         fields,
     }
-    .ok()
+    .wrap_ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "type" keyword
@@ -202,7 +202,7 @@ fn parse_object_type_extension(
         directives,
         fields,
     }
-    .ok()
+    .wrap_ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "interface" keyword
@@ -225,7 +225,7 @@ fn parse_interface_type_definition(
         directives,
         fields,
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn parse_input_object_type_definition(
@@ -250,7 +250,7 @@ fn parse_input_object_type_definition(
         directives,
         fields,
     }
-    .ok()
+    .wrap_ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "directive" keyword
@@ -285,7 +285,7 @@ fn parse_directive_definition(
         locations,
         description,
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn parse_directive_locations(
@@ -313,7 +313,7 @@ fn parse_directive_location(
             .map_err(|_| {
                 Diagnostic::new(
                     format!("Expected directive location, found {}", text.item),
-                    Location::new(tokens.text_source, text.span).some(),
+                    Location::new(tokens.text_source, text.span).wrap_some(),
                 )
             })
             .map(|x| x.with_span(text.span)),
@@ -323,7 +323,7 @@ fn parse_directive_location(
                 format!("Expected directive location, found {text}"),
                 diagnostic.0.location,
             )
-            .err()
+            .wrap_err()
         }
     }
 }
@@ -346,7 +346,7 @@ fn parse_enum_definition(
         directives,
         enum_value_definitions,
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn parse_enum_value_definitions(
@@ -373,14 +373,14 @@ fn parse_enum_value_definition(
             {
                 Diagnostic::new(
                     "Enum values cannot be true, false or  null.".to_string(),
-                    Location::new(tokens.text_source, enum_literal_value_str.span).some(),
+                    Location::new(tokens.text_source, enum_literal_value_str.span).wrap_some(),
                 )
-                .err()
+                .wrap_err()
             } else {
                 enum_literal_value_str
                     .map(|enum_literal_value| EnumLiteralValue::from(enum_literal_value.intern()))
                     .to_with_location(tokens.text_source)
-                    .ok()
+                    .wrap_ok()
             }
         }?;
 
@@ -391,7 +391,7 @@ fn parse_enum_value_definition(
             value,
             directives,
         }
-        .ok()
+        .wrap_ok()
     })
 }
 
@@ -415,7 +415,7 @@ fn parse_union_definition(
         directives,
         union_member_types,
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn parse_union_member_types(
@@ -455,9 +455,11 @@ fn parse_schema_definition(
 
     let first_root_operation_type = parse_root_operation_type(tokens)?;
     match first_root_operation_type.0.item {
-        RootOperationKind::Query => query_type = first_root_operation_type.1.some(),
-        RootOperationKind::Subscription => subscription_type = first_root_operation_type.1.some(),
-        RootOperationKind::Mutation => mutation_type = first_root_operation_type.1.some(),
+        RootOperationKind::Query => query_type = first_root_operation_type.1.wrap_some(),
+        RootOperationKind::Subscription => {
+            subscription_type = first_root_operation_type.1.wrap_some()
+        }
+        RootOperationKind::Mutation => mutation_type = first_root_operation_type.1.wrap_some(),
     };
 
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
@@ -483,7 +485,7 @@ fn parse_schema_definition(
         mutation: mutation_type,
         directives,
     }
-    .ok()
+    .wrap_ok()
 }
 
 fn reassign_or_error(
@@ -499,11 +501,11 @@ fn reassign_or_error(
             "Root operation types (query, subscription or mutation) \
             cannot be defined twice in a schema definition."
                 .to_string(),
-            Location::new(text_source, operation_type.0.span).some(),
+            Location::new(text_source, operation_type.0.span).wrap_some(),
         )
-        .err();
+        .wrap_err();
     }
-    *root_type = operation_type.1.some();
+    *root_type = operation_type.1.wrap_some();
     Ok(())
 }
 
@@ -522,9 +524,9 @@ fn parse_root_operation_type(
         _ => {
             return Diagnostic::new(
                 "Expected schema, mutation or subscription".to_string(),
-                Location::new(tokens.text_source, name.span).some(),
+                Location::new(tokens.text_source, name.span).wrap_some(),
             )
-            .err();
+            .wrap_err();
         }
     };
 
@@ -536,7 +538,7 @@ fn parse_root_operation_type(
         root_operation_type,
         object_name.to_with_location(tokens.text_source),
     )
-        .ok()
+        .wrap_ok()
 }
 
 /// The state of the PeekableLexer is that it has processed the "scalar" keyword
@@ -555,7 +557,7 @@ fn parse_scalar_type_definition(
         name,
         directives,
     }
-    .ok()
+    .wrap_ok()
 }
 
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
@@ -563,7 +565,7 @@ fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
 ) -> DiagnosticResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
-        parse_interfaces(tokens)?.ok()
+        parse_interfaces(tokens)?.wrap_ok()
     } else {
         Ok(vec![])
     }
@@ -645,7 +647,7 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
     tokens.parse_token_of_kind(TokenKind::Colon)?;
     let value = parse_value(tokens)?;
 
-    NameValuePair { name, value }.ok()
+    NameValuePair { name, value }.wrap_ok()
 }
 
 fn parse_constant_value(
@@ -658,12 +660,13 @@ fn parse_constant_value(
                 .and_then(|int_literal_string| {
                     int_literal_string.and_then(|raw_int_value| {
                         match raw_int_value.parse::<i64>() {
-                            Ok(value) => GraphQLConstantValue::Int(value).ok(),
+                            Ok(value) => GraphQLConstantValue::Int(value).wrap_ok(),
                             Err(_) => Diagnostic::new(
                                 format!("Invalid integer value. Received {raw_int_value}"),
-                                Location::new(tokens.text_source, int_literal_string.span).some(),
+                                Location::new(tokens.text_source, int_literal_string.span)
+                                    .wrap_some(),
                             )
-                            .err(),
+                            .wrap_err(),
                         }
                     })
                 })
@@ -676,12 +679,13 @@ fn parse_constant_value(
                 .and_then(|float_literal_string| {
                     float_literal_string.and_then(|raw_float_value| {
                         match raw_float_value.parse::<f64>() {
-                            Ok(value) => GraphQLConstantValue::Float(value.into()).ok(),
+                            Ok(value) => GraphQLConstantValue::Float(value.into()).wrap_ok(),
                             Err(_) => Diagnostic::new(
                                 format!("Invalid float value. Received {raw_float_value}."),
-                                Location::new(tokens.text_source, float_literal_string.span).some(),
+                                Location::new(tokens.text_source, float_literal_string.span)
+                                    .wrap_some(),
                             )
-                            .err(),
+                            .wrap_err(),
                         }
                     })
                 })
@@ -741,7 +745,7 @@ fn parse_constant_value(
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
                         values.push(parse_constant_value(tokens)?);
                     }
-                    GraphQLConstantValue::List(values).ok()
+                    GraphQLConstantValue::List(values).wrap_ok()
                 })
                 .map(|x| x.to_with_location(tokens.text_source))
         })?;
@@ -762,14 +766,14 @@ fn parse_constant_value(
                         let value = parse_constant_value(tokens)?;
                         values.push(NameValuePair { name, value });
                     }
-                    GraphQLConstantValue::Object(values).ok()
+                    GraphQLConstantValue::Object(values).wrap_ok()
                 })
                 .map(|x| x.to_with_location(tokens.text_source))
         })?;
 
         ControlFlow::Continue(Diagnostic::new(
             "Unable to parse constant value".to_string(),
-            Location::new(tokens.text_source, tokens.peek().span).some(),
+            Location::new(tokens.text_source, tokens.peek().span).wrap_some(),
         ))
     })
 }
@@ -802,7 +806,7 @@ fn parse_optional_fields(
     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
         fields.push(parse_field(tokens)?);
     }
-    fields.ok()
+    fields.wrap_ok()
 }
 
 fn parse_field(
@@ -836,10 +840,10 @@ fn parse_field(
                 directives,
                 is_inline_fragment: false,
             }
-            .ok()
+            .wrap_ok()
         })?
         .to_with_location(tokens.text_source)
-        .ok()
+        .wrap_ok()
 }
 
 fn parse_type_annotation<T: From<StringKey>>(
@@ -854,9 +858,9 @@ fn parse_type_annotation<T: From<StringKey>>(
                 GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).boxed(),
                 )
-                .ok()
+                .wrap_ok()
             } else {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).ok()
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).wrap_ok()
             }
         })?;
 
@@ -875,12 +879,12 @@ fn parse_type_annotation<T: From<StringKey>>(
                     ))
                     .boxed(),
                 )
-                .ok()
+                .wrap_ok()
             } else {
                 GraphQLTypeAnnotation::List(
                     GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
                 )
-                .ok()
+                .wrap_ok()
             }
         })?;
 
@@ -893,7 +897,7 @@ fn parse_type_annotation<T: From<StringKey>>(
 
         ControlFlow::Continue(Diagnostic::new(
             "Expected a type (e.g. String, [String] or String!)".to_string(),
-            Location::new(tokens.text_source, tokens.peek().span).some(),
+            Location::new(tokens.text_source, tokens.peek().span).wrap_some(),
         ))
     })
 }
@@ -913,9 +917,9 @@ fn parse_optional_enclosed_items<'a, T>(
         while tokens.parse_token_of_kind(close_token).is_err() {
             arguments.push(parse(tokens)?.to_with_location(tokens.text_source));
         }
-        arguments.ok()
+        arguments.wrap_ok()
     } else {
-        vec![].ok()
+        vec![].wrap_ok()
     }
 }
 
@@ -939,7 +943,7 @@ fn parse_argument_definition(
             default_value,
             directives,
         }
-        .ok()
+        .wrap_ok()
     })
 }
 
@@ -951,7 +955,7 @@ fn parse_optional_constant_default_value(
         return Ok(None);
     }
 
-    parse_constant_value(tokens)?.some().ok()
+    parse_constant_value(tokens)?.wrap_some().wrap_ok()
 }
 
 enum TypeSystemDocType {
@@ -964,15 +968,15 @@ fn peek_type_system_doc_type(
 ) -> Result<TypeSystemDocType, WithSpan<TokenKind>> {
     let peeked = tokens.peek();
     match peeked.item {
-        TokenKind::StringLiteral => TypeSystemDocType::Definition.ok(),
-        TokenKind::BlockStringLiteral => TypeSystemDocType::Definition.ok(),
+        TokenKind::StringLiteral => TypeSystemDocType::Definition.wrap_ok(),
+        TokenKind::BlockStringLiteral => TypeSystemDocType::Definition.wrap_ok(),
         TokenKind::Identifier => {
             let text = tokens.source(peeked.span);
             match text {
                 "extend" => TypeSystemDocType::Extension,
                 _ => TypeSystemDocType::Definition,
             }
-            .ok()
+            .wrap_ok()
         }
         _ => Err(peeked),
     }

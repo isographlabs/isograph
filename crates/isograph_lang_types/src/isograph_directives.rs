@@ -265,7 +265,7 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
                 that doesn't exist. This is indicative of a bug in Isograph.",
                 self.field_idx
             ))
-            .err(),
+            .wrap_err(),
         }
     }
 }

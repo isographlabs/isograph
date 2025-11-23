@@ -95,7 +95,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 

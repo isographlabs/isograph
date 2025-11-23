@@ -79,7 +79,7 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                                 ..Default::default()
                             })
                             .collect::<Vec<_>>()
-                            .some()
+                            .wrap_some()
                     } else {
                         None
                     }

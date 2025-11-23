@@ -79,7 +79,7 @@ impl Iterator for AccessibleClientFieldIterator {
                                 self.index += 1;
                                 return (parent_object_entity_name, client_field_name)
                                     .scalar_selected()
-                                    .some();
+                                    .wrap_some();
                             }
                         }
                     }
@@ -96,7 +96,7 @@ impl Iterator for AccessibleClientFieldIterator {
                                 // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(iterator.boxed());
                                 self.index += 1;
-                                return client_pointer_id.object_selected().some();
+                                return client_pointer_id.object_selected().wrap_some();
                             }
                             DefinitionLocation::Server(_) => {}
                         };

@@ -97,7 +97,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
     }
-    .ok()
+    .wrap_ok()
 }
 
 #[derive(Error, Debug)]

@@ -46,7 +46,7 @@ pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
             )
         }))?;
 
-    SelectionSet { selections }.with_generated_span().ok()
+    SelectionSet { selections }.with_generated_span().wrap_ok()
 }
 
 fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
@@ -67,7 +67,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
         )
         .map_err(|e| vec![e])?
         .scalar_selected()
-        .ok(),
+        .wrap_ok(),
         SelectionType::Object(object_selection) => get_validated_object_selection(
             db,
             parent_object_entity_name,
@@ -75,7 +75,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             object_selection,
         )?
         .object_selected()
-        .ok(),
+        .wrap_ok(),
     })
 }
 
@@ -123,7 +123,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                     server_field_name: scalar_selection.name.item.into(),
                 }
                 .with_location(scalar_selection.name.location)
-                .err();
+                .wrap_err();
             }
 
             let server_scalar_selectable = *server_selectable_id

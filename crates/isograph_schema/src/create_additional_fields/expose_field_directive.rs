@@ -211,7 +211,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                     )
                 }
             }
-            .ok()
+            .wrap_ok()
         })
         .collect::<Result<Vec<_>, _>>()?;
 
@@ -260,11 +260,11 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 subfields_or_inline_fragments,
             ))
-            .some(),
+            .wrap_some(),
         },
         mutation_client_scalar_selectable,
     )
-        .ok()
+        .wrap_ok()
 }
 
 /// Here, we are turning "pet" (the field_arg) to the ServerFieldId
@@ -290,7 +290,7 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
                     Diagnostic::new(
                         format!("Invalid field `{field_arg}` in @exposeField directive"),
                         // TODO this is the wrong location
-                        e.name.location.some(),
+                        e.name.location.wrap_some(),
                     )
                 })?;
 
@@ -298,14 +298,14 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
                 server_object_selectable.parent_object_entity_name,
                 server_object_selectable.name.item,
             )
-                .ok()
+                .wrap_ok()
         }
         None => Diagnostic::new(
             format!("Invalid field `{field_arg}` in @exposeField directive"),
             // TODO have a location
             None,
         )
-        .err(),
+        .wrap_err(),
     }
 }
 
@@ -360,7 +360,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
                             // TODO have a location
                             None,
                         )
-                        .err();
+                        .wrap_err();
                     }
                     SelectionType::Object(object) => {
                         current_entity_name = *object.target_object_entity.inner();
@@ -377,7 +377,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
                     // TODO have a location
                     None,
                 )
-                .err();
+                .wrap_err();
             }
         };
     }
@@ -392,5 +392,5 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
         )
         .concrete_type;
 
-    (current_entity_name, current_entity_concrete_type).ok()
+    (current_entity_name, current_entity_concrete_type).wrap_ok()
 }

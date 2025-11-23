@@ -83,13 +83,13 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithSpan<TokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
-            self.parse_token().ok()
+            self.parse_token().wrap_ok()
         } else {
             Diagnostic::new(
                 format!("Expected {expected_kind}, found {}.", found.item),
-                Location::new(self.text_source, found.span).some(),
+                Location::new(self.text_source, found.span).wrap_some(),
             )
-            .err()
+            .wrap_err()
         }
     }
 
@@ -101,7 +101,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
 
-        self.source(kind.span).with_span(kind.span).ok()
+        self.source(kind.span).with_span(kind.span).wrap_ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
@@ -110,7 +110,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithSpan<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.span).intern();
-        WithSpan::new(source.into(), kind.span).ok()
+        WithSpan::new(source.into(), kind.span).wrap_ok()
     }
 
     pub fn parse_matching_identifier(
@@ -121,20 +121,20 @@ impl<'source> PeekableLexer<'source> {
         if peeked.item == TokenKind::Identifier {
             let source = self.source(peeked.span);
             if source == identifier {
-                self.parse_token().ok()
+                self.parse_token().wrap_ok()
             } else {
                 Diagnostic::new(
                     format!("Expected {identifier}, found {source}"),
-                    Location::new(self.text_source, peeked.span).some(),
+                    Location::new(self.text_source, peeked.span).wrap_some(),
                 )
-                .err()
+                .wrap_err()
             }
         } else {
             Diagnostic::new(
                 format!("Expected identifier, found {}", peeked.item),
-                Location::new(self.text_source, peeked.span).some(),
+                Location::new(self.text_source, peeked.span).wrap_some(),
             )
-            .err()
+            .wrap_err()
         }
     }
 
@@ -145,6 +145,6 @@ impl<'source> PeekableLexer<'source> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
-        result.with_span(Span::new(start, end)).ok()
+        result.with_span(Span::new(start, end)).wrap_ok()
     }
 }

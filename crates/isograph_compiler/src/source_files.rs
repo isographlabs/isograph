@@ -218,7 +218,7 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
         content,
         text_source,
     })
-    .ok()
+    .wrap_ok()
 }
 
 fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
@@ -236,7 +236,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
         return SourceError::SchemaNotAFile {
             path: canonicalized_existing_path,
         }
-        .err();
+        .wrap_err();
     }
 
     let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
@@ -252,7 +252,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
             reason: e,
         })?
         .to_owned()
-        .ok()
+        .wrap_ok()
 }
 
 fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
@@ -264,7 +264,7 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
         let schema_extension = read_schema(db, schema_extension_path)?;
         schema_extensions.insert(schema_extension_path.relative_path, schema_extension);
     }
-    schema_extensions.ok()
+    schema_extensions.wrap_ok()
 }
 
 fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(

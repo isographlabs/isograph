@@ -51,7 +51,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Vec<OwnedServerEntity<TNetworkProtocol>>> {
     let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
-    map.get(&entity_name).cloned().unwrap_or_default().ok()
+    map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
 
 #[memo]
@@ -67,7 +67,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
         .filter_map(|x| x.as_ref().as_object())
         .map(|x| x.server_object_entity.item.clone())
         .collect::<Vec<_>>()
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -83,7 +83,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Object(o) => o.clone().some().ok(),
+                    SelectionType::Object(o) => o.clone().wrap_some().wrap_ok(),
                     SelectionType::Scalar(_) => Diagnostic::new(
                         format!(
                             "{server_object_entity_name} is a scalar, but it should be an object"
@@ -95,7 +95,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
                         .cloned()
                         .flatten(),
                     )
-                    .err(),
+                    .wrap_err(),
                 }
             } else {
                 Diagnostic::new(
@@ -106,7 +106,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
                     .cloned()
                     .flatten(),
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -138,7 +138,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
                         .cloned()
                         .flatten(),
                     )
-                    .err(),
+                    .wrap_err(),
                 }
             } else {
                 Diagnostic::new(
@@ -149,7 +149,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
                     .cloned()
                     .flatten(),
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -185,7 +185,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_object_entity =
                 server_object_entity_named(db, server_object_entity_name).to_owned()?;
             if let Some(server_object_entity) = server_object_entity {
-                server_object_entity.object_selected().some().ok()
+                server_object_entity.object_selected().wrap_some().wrap_ok()
             } else {
                 Ok(None)
             }
@@ -194,7 +194,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_scalar_entity =
                 server_scalar_entity_named(db, server_scalar_entity_name).to_owned()?;
             if let Some(server_scalar_entity) = server_scalar_entity {
-                server_scalar_entity.scalar_selected().some().ok()
+                server_scalar_entity.scalar_selected().wrap_some().wrap_ok()
             } else {
                 Ok(None)
             }
@@ -251,7 +251,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
                                 .cloned()
                                 .flatten(),
                         )
-                        .err()
+                        .wrap_err()
                     }
                 }
                 None => {
@@ -293,5 +293,5 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
             }
             None
         })
-        .ok()
+        .wrap_ok()
 }

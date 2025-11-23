@@ -194,7 +194,7 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     if !has_paren {
         return IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral
             .with_generated_location()
-            .err();
+            .wrap_err();
     }
 
     let iso_literal_extraction_result = memoized_parse_iso_literal(
@@ -213,7 +213,7 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     if is_client_field_declaration && !has_associated_js_function {
         return IsographLiteralParseError::ExpectedAssociatedJsFunction
             .with_location(Location::new(text_source, Span::todo_generated()))
-            .err();
+            .wrap_err();
     }
 
     Ok((iso_literal_extraction_result, text_source))

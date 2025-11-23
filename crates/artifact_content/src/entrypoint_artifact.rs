@@ -96,7 +96,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     generate_entrypoint_artifacts_with_client_field_traversal_result(
         db,
         entrypoint,
-        info.some(),
+        info.wrap_some(),
         &merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
@@ -297,7 +297,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             parent_object_entity_name: type_name,
             selectable_name: field_name,
         }
-        .some(),
+        .wrap_some(),
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
@@ -314,7 +314,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             parent_object_entity_name: type_name,
             selectable_name: field_name,
         }
-        .some(),
+        .wrap_some(),
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
@@ -334,7 +334,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             parent_object_entity_name: type_name,
             selectable_name: field_name,
         }
-        .some(),
+        .wrap_some(),
     });
 
     path_and_contents.extend(

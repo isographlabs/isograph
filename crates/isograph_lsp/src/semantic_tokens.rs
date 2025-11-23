@@ -92,8 +92,8 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
         result_id: None,
         data: lsp_tokens.collect(),
     })
-    .some()
-    .ok();
+    .wrap_some()
+    .wrap_ok();
 }
 
 #[derive(Debug)]
@@ -143,7 +143,7 @@ fn absolutize_relative_token<'a>(
                 semantic_token: relative_token.item,
             };
             *iterated_so_far_within_token += line_text.len() as u32;
-            token.some()
+            token.wrap_some()
         })
 }
 
@@ -167,7 +167,7 @@ fn convert_absolute_token_to_lsp_token<'a>(
         };
 
         *last_token_start = absolute_token.absolute_char_start;
-        token.some()
+        token.wrap_some()
     })
 }
 

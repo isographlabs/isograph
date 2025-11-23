@@ -55,7 +55,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                             // TODO have a location
                             None,
                         )
-                        .err();
+                        .wrap_err();
                     }
                     SelectionType::Object(object) => {
                         // TODO don't clone. When memoized functions return references with 'db lifetime,
@@ -75,12 +75,12 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                     // TODO have a location
                     None,
                 )
-                .err();
+                .wrap_err();
             }
         };
     }
 
-    path.ok()
+    path.wrap_ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

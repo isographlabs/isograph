@@ -169,19 +169,21 @@ impl TryFrom<NonConstantValue> for ConstantValue {
 
     fn try_from(value: NonConstantValue) -> Result<Self, Self::Error> {
         match value {
-            NonConstantValue::Variable(variable_name) => variable_name.err(),
-            NonConstantValue::Integer(i) => ConstantValue::Integer(i).ok(),
-            NonConstantValue::Boolean(b) => ConstantValue::Boolean(b).ok(),
-            NonConstantValue::String(s) => ConstantValue::String(s).ok(),
-            NonConstantValue::Float(f) => ConstantValue::Float(f).ok(),
-            NonConstantValue::Null => ConstantValue::Null.ok(),
-            NonConstantValue::Enum(e) => ConstantValue::Enum(e).ok(),
+            NonConstantValue::Variable(variable_name) => variable_name.wrap_err(),
+            NonConstantValue::Integer(i) => ConstantValue::Integer(i).wrap_ok(),
+            NonConstantValue::Boolean(b) => ConstantValue::Boolean(b).wrap_ok(),
+            NonConstantValue::String(s) => ConstantValue::String(s).wrap_ok(),
+            NonConstantValue::Float(f) => ConstantValue::Float(f).wrap_ok(),
+            NonConstantValue::Null => ConstantValue::Null.wrap_ok(),
+            NonConstantValue::Enum(e) => ConstantValue::Enum(e).wrap_ok(),
             NonConstantValue::List(l) => {
                 let converted_list = l
                     .into_iter()
-                    .map(|x| WithLocation::new(x.item.try_into()?, x.location).ok::<Self::Error>())
+                    .map(|x| {
+                        WithLocation::new(x.item.try_into()?, x.location).wrap_ok::<Self::Error>()
+                    })
                     .collect::<Result<Vec<_>, _>>()?;
-                ConstantValue::List(converted_list).ok()
+                ConstantValue::List(converted_list).wrap_ok()
             }
             NonConstantValue::Object(o) => {
                 let converted_object = o
@@ -194,10 +196,10 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                                 name_value_pair.value.location,
                             ),
                         }
-                        .ok::<Self::Error>()
+                        .wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                ConstantValue::Object(converted_object).ok()
+                ConstantValue::Object(converted_object).wrap_ok()
             }
         }
     }

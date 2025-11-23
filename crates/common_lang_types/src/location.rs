@@ -103,14 +103,14 @@ impl Location {
 
     pub fn span(self) -> Option<Span> {
         match self {
-            Location::Embedded(embedded) => embedded.span.some(),
+            Location::Embedded(embedded) => embedded.span.wrap_some(),
             Location::Generated => None,
         }
     }
 
     pub fn as_embedded_location(self) -> Option<EmbeddedLocation> {
         match self {
-            Location::Embedded(embedded_location) => embedded_location.some(),
+            Location::Embedded(embedded_location) => embedded_location.wrap_some(),
             Location::Generated => None,
         }
     }
@@ -170,7 +170,7 @@ impl<T> WithLocation<T> {
     }
 
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithLocation<U>, E> {
-        WithLocation::new(map(self.item)?, self.location).ok()
+        WithLocation::new(map(self.item)?, self.location).wrap_ok()
     }
 
     /// This method should not be called. It exists because in some places,
@@ -244,7 +244,7 @@ impl<T> WithEmbeddedLocation<T> {
         self,
         map: impl FnOnce(T) -> Result<U, E>,
     ) -> Result<WithEmbeddedLocation<U>, E> {
-        WithEmbeddedLocation::new(map(self.item)?, self.location).ok()
+        WithEmbeddedLocation::new(map(self.item)?, self.location).wrap_ok()
     }
 
     pub fn into_with_location(self) -> WithLocation<T> {

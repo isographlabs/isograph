@@ -53,7 +53,7 @@ pub fn read_file(
         .map_err(|e| ReadFileError::UnableToConvertToString { path, reason: e })?
         .to_owned();
 
-    (relative_path, contents).ok()
+    (relative_path, contents).wrap_ok()
 }
 
 #[expect(clippy::enum_variant_names)]

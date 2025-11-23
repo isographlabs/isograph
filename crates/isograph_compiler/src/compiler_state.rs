@@ -32,7 +32,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
             db,
             last_gc_run: Instant::now(),
         }
-        .ok()
+        .wrap_ok()
     }
 
     pub fn run_garbage_collection(&mut self) {

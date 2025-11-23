@@ -91,7 +91,7 @@ fn categorize_and_filter_events(
     if source_file_events.is_empty() {
         None
     } else {
-        source_file_events.some()
+        source_file_events.wrap_some()
     }
 }
 
@@ -208,20 +208,20 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
     if !path.starts_with(&config.artifact_directory.absolute_path) {
         if path.starts_with(&config.project_root) {
             if path.is_file() {
-                return ChangedFileKind::JavaScriptSourceFile.some();
+                return ChangedFileKind::JavaScriptSourceFile.wrap_some();
             } else {
-                return ChangedFileKind::JavaScriptSourceFolder.some();
+                return ChangedFileKind::JavaScriptSourceFolder.wrap_some();
             }
         } else if path == &config.schema.absolute_path {
-            return ChangedFileKind::Schema.some();
+            return ChangedFileKind::Schema.wrap_some();
         } else if config
             .schema_extensions
             .iter()
             .any(|x| x.absolute_path == *path)
         {
-            return ChangedFileKind::SchemaExtension.some();
+            return ChangedFileKind::SchemaExtension.wrap_some();
         } else if path == &config.config_location {
-            return ChangedFileKind::Config.some();
+            return ChangedFileKind::Config.wrap_some();
         }
     }
     None

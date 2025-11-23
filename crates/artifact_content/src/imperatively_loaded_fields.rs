@@ -183,7 +183,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
                 parent_object_entity_name: root_parent_object,
                 selectable_name: root_fetchable_field.into(),
             }
-            .some(),
+            .wrap_some(),
         },
         ArtifactPathAndContent {
             file_content: imperatively_loaded_field_file_contents,
@@ -192,7 +192,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
                 parent_object_entity_name: root_parent_object,
                 selectable_name: root_fetchable_field.into(),
             }
-            .some(),
+            .wrap_some(),
         },
     ]
 }
@@ -225,7 +225,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                     })
                     .item
                     .clone()
-                    .some()
+                    .wrap_some()
             }
         })
         .collect::<Vec<_>>()

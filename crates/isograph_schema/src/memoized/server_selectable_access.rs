@@ -157,7 +157,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     .cloned()
                     .flatten(),
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -199,7 +199,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                 .cloned()
                 .flatten(),
             )
-            .err();
+            .wrap_err();
         }
     };
 
@@ -284,7 +284,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     .cloned()
                     .flatten(),
                 )
-                .err(),
+                .wrap_err(),
             }
         }
         None => Ok(None),
@@ -319,7 +319,7 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     .cloned()
                     .flatten(),
                 )
-                .err(),
+                .wrap_err(),
             }
         }
         None => Ok(None),

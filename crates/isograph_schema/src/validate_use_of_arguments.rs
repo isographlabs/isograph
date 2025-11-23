@@ -295,7 +295,7 @@ fn validate_all_variables_are_used(
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return variable.clone().some();
+                return variable.clone().wrap_some();
             }
             None
         })
@@ -308,7 +308,7 @@ fn validate_all_variables_are_used(
             field_name: top_level_type_and_field_name.selectable_name,
         }
         .with_location(location)
-        .err();
+        .wrap_err();
     }
     Ok(())
 }
@@ -320,7 +320,7 @@ fn assert_no_missing_arguments(
     if !missing_arguments.is_empty() {
         return ValidateUseOfArgumentsError::MissingArguments { missing_arguments }
             .with_location(location)
-            .err();
+            .wrap_err();
     }
     Ok(())
 }
@@ -346,13 +346,13 @@ fn get_missing_and_provided_arguments<'a>(
 
             if let Some(selection_supplied_argument) = selection_supplied_argument {
                 ArgumentType::Provided(field_argument_definition, selection_supplied_argument)
-                    .some()
+                    .wrap_some()
             } else if field_argument_definition.default_value.is_some()
                 || field_argument_definition.type_.is_nullable()
             {
                 None
             } else {
-                ArgumentType::Missing(field_argument_definition).some()
+                ArgumentType::Missing(field_argument_definition).wrap_some()
             }
         })
 }
@@ -379,7 +379,7 @@ fn validate_no_extraneous_arguments(
                 .any(|definition| definition.name.item == arg.item.name.item);
 
             if !is_defined {
-                return arg.clone().some();
+                return arg.clone().wrap_some();
             }
             None
         })
@@ -388,7 +388,7 @@ fn validate_no_extraneous_arguments(
     if !extra_arguments.is_empty() {
         return ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments }
             .with_location(location)
-            .err();
+            .wrap_err();
     }
     Ok(())
 }
