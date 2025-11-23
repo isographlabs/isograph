@@ -70,7 +70,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), Vec<ValidationError>> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| vec![ValidationError::CreateSchemaError(e.clone())])?;
+        .map_err(|e| vec![ValidationError::Diagnostic(e.clone())])?;
 
     // TODO restructure as a .map or whatnot
     let mut errors = vec![];
@@ -143,7 +143,7 @@ pub enum ValidationError {
     CreateAdditionalFieldsError(#[from] CreateAdditionalFieldsError),
 
     #[error("{0}")]
-    CreateSchemaError(Diagnostic),
+    Diagnostic(Diagnostic),
 
     #[error("{}", message.for_display())]
     IsographLiteralParseError {
