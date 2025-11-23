@@ -10,9 +10,9 @@ use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    EntityAccessError, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
-    OwnedServerSelectable, ServerObjectSelectable, ServerScalarSelectable,
-    field_to_insert_to_server_selectable, server_scalar_entity_named,
+    ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
+    ServerObjectSelectable, ServerScalarSelectable, field_to_insert_to_server_selectable,
+    server_scalar_entity_named,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -192,7 +192,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let target_scalar_entity = selectable.target_scalar_entity.inner();
     let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(|e| ServerSelectableNamedError::EntityAccessError(e.clone()))?
         .as_ref()
         // It must exist
         .ok_or_else(|| ServerSelectableNamedError::IdFieldMustBeNonNullIdType {
@@ -255,7 +255,7 @@ pub enum ServerSelectableNamedError {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError),
+    EntityAccessError(Diagnostic),
 }
 
 #[memo]

@@ -1,5 +1,5 @@
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+    Diagnostic, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
@@ -10,9 +10,9 @@ use isograph_lang_types::{
 use thiserror::Error;
 
 use crate::{
-    ClientOrServerObjectSelectable, EntityAccessError, IsographDatabase, NetworkProtocol,
-    OwnedObjectSelectable, ScalarSelectable, Selectable, SelectableNamedError, ServerObjectEntity,
-    ServerScalarEntity, selectable_named, server_object_entity_named,
+    ClientOrServerObjectSelectable, IsographDatabase, NetworkProtocol, OwnedObjectSelectable,
+    ScalarSelectable, Selectable, SelectableNamedError, ServerObjectEntity, ServerScalarEntity,
+    selectable_named, server_object_entity_named,
 };
 
 #[impl_for_selection_type]
@@ -150,7 +150,7 @@ pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProto
 
     server_object_entity_named(db, parent_object_entity_name)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(|e| GetParentAndSelectableError::EntityAccessError(e.clone()))?
         .as_ref()
         .ok_or_else(|| GetParentAndSelectableError::ParentTypeNotDefined {
             parent_type_name: parent_object_entity_name.into(),
@@ -206,7 +206,8 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     GetParentAndSelectableError,
 > {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
-        .to_owned()?
+        .to_owned()
+        .map_err(GetParentAndSelectableError::EntityAccessError)?
         .ok_or(GetParentAndSelectableError::ParentTypeNotDefined {
             parent_type_name: parent_server_object_entity_name,
         })?;
@@ -242,7 +243,7 @@ pub enum GetParentAndSelectableError {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError),
+    EntityAccessError(Diagnostic),
 
     #[error("{0}")]
     SelectableNamedError(#[from] SelectableNamedError),

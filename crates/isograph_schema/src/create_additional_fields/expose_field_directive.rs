@@ -137,7 +137,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let top_level_schema_field_concrete_type =
         server_object_entity_named(db, payload_object_entity_name)
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
             .as_ref()
             .expect(
                 "Expected entity to exist. \
@@ -208,7 +208,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             *server_object_selectable.target_object_entity.inner(),
                         )
                         .as_ref()
-                        .map_err(|e| e.clone())?
+                        .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
@@ -385,7 +385,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
 
     let current_entity_concrete_type = server_object_entity_named(db, current_entity_name)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?
         .as_ref()
         .expect(
             "Expected entity to exist. \

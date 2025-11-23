@@ -1,4 +1,4 @@
-use crate::{EntityAccessError, ServerSelectableNamedError};
+use crate::ServerSelectableNamedError;
 use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName, StringLiteralValue};
 use intern::{Lookup, string_key::Intern};
 
@@ -79,7 +79,7 @@ pub enum CreateAdditionalFieldsError {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError),
+    EntityAccessError(Diagnostic),
 
     #[error("{0}")]
     ServerSelectableNamedError(#[from] ServerSelectableNamedError),

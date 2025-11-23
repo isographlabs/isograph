@@ -7,7 +7,6 @@ use common_lang_types::{
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerEntityName, ServerObjectEntity,
@@ -71,52 +70,43 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
         .ok()
 }
 
-#[derive(Debug, Error, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum EntityAccessError {
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
-
-    #[error("Multiple definitions of `{duplicate_entity_name}` were found")]
-    MultipleDefinitionsFound {
-        duplicate_entity_name: UnvalidatedTypeName,
-    },
-
-    #[error(
-        "{server_entity_name} is {actual_entity_type}, but it should be a {intended_entity_type}"
-    )]
-    IncorrectEntitySelectionType {
-        server_entity_name: UnvalidatedTypeName,
-        actual_entity_type: &'static str,
-        intended_entity_type: &'static str,
-    },
-}
-
 #[memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
-) -> Result<Option<ServerObjectEntity<TNetworkProtocol>>, EntityAccessError> {
+) -> DiagnosticResult<Option<ServerObjectEntity<TNetworkProtocol>>> {
     let entities = server_entities_named(db, server_object_entity_name.into())
         .as_ref()
-        .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
+        .map_err(|e| e.clone())?;
 
     match entities.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
                     SelectionType::Object(o) => o.clone().some().ok(),
-                    SelectionType::Scalar(_) => {
-                        Err(EntityAccessError::IncorrectEntitySelectionType {
-                            server_entity_name: server_object_entity_name.into(),
-                            actual_entity_type: "a scalar",
-                            intended_entity_type: "an object",
-                        })
-                    }
+                    SelectionType::Scalar(_) => Diagnostic::new(
+                        format!(
+                            "{server_object_entity_name} is a scalar, but it should be an object"
+                        ),
+                        Result::ok(
+                            entity_definition_location(db, server_object_entity_name.into())
+                                .as_ref(),
+                        )
+                        .cloned()
+                        .flatten(),
+                    )
+                    .err(),
                 }
             } else {
-                Err(EntityAccessError::MultipleDefinitionsFound {
-                    duplicate_entity_name: server_object_entity_name.into(),
-                })
+                Diagnostic::new(
+                    format!("Multiple definitions of {server_object_entity_name} were found."),
+                    Result::ok(
+                        entity_definition_location(db, server_object_entity_name.into()).as_ref(),
+                    )
+                    .cloned()
+                    .flatten(),
+                )
+                .err()
             }
         }
         None => Ok(None),
@@ -127,28 +117,39 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<Option<ServerScalarEntity<TNetworkProtocol>>, EntityAccessError> {
+) -> DiagnosticResult<Option<ServerScalarEntity<TNetworkProtocol>>> {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
         .as_ref()
-        .map_err(|e| EntityAccessError::ParseTypeSystemDocumentsError(e.clone()))?;
+        .map_err(|e| e.clone())?;
 
     match entities.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => Ok(Some(s.clone())),
-                    SelectionType::Object(_) => {
-                        Err(EntityAccessError::IncorrectEntitySelectionType {
-                            server_entity_name: server_scalar_entity_name.into(),
-                            actual_entity_type: "an object",
-                            intended_entity_type: "a scalar",
-                        })
-                    }
+                    SelectionType::Object(_) => Diagnostic::new(
+                        format!(
+                            "{server_scalar_entity_name} is an object, but it should be a scalar"
+                        ),
+                        Result::ok(
+                            entity_definition_location(db, server_scalar_entity_name.into())
+                                .as_ref(),
+                        )
+                        .cloned()
+                        .flatten(),
+                    )
+                    .err(),
                 }
             } else {
-                Err(EntityAccessError::MultipleDefinitionsFound {
-                    duplicate_entity_name: server_scalar_entity_name.into(),
-                })
+                Diagnostic::new(
+                    format!("Multiple definitions of {server_scalar_entity_name} were found"),
+                    Result::ok(
+                        entity_definition_location(db, server_scalar_entity_name.into()).as_ref(),
+                    )
+                    .cloned()
+                    .flatten(),
+                )
+                .err()
             }
         }
         None => Ok(None),
@@ -160,7 +161,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
-) -> Result<Option<JavascriptName>, EntityAccessError> {
+) -> DiagnosticResult<Option<JavascriptName>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name)
         .as_ref()
         .map_err(|e| e.clone())?
@@ -178,7 +179,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: ServerEntityName,
-) -> Result<Option<OwnedServerEntity<TNetworkProtocol>>, EntityAccessError> {
+) -> DiagnosticResult<Option<OwnedServerEntity<TNetworkProtocol>>> {
     match name {
         SelectionType::Object(server_object_entity_name) => {
             let server_object_entity =

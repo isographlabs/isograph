@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    ClientSelectableName, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
-    WithLocation, WithSpan, WithSpanPostfix,
+    ClientSelectableName, Diagnostic, ParentObjectEntityNameAndSelectableName,
+    ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -10,9 +10,9 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    AddSelectionSetsError, EntityAccessError, IsographDatabase, NetworkProtocol,
-    ObjectSelectableId, ScalarSelectableId, client_selectable_declaration_map_from_iso_literals,
-    expose_field_map, get_link_fields, get_validated_selection_set,
+    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ObjectSelectableId,
+    ScalarSelectableId, client_selectable_declaration_map_from_iso_literals, expose_field_map,
+    get_link_fields, get_validated_selection_set,
 };
 
 type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>;
@@ -181,7 +181,7 @@ pub enum MemoizedSelectionSetError {
     },
 
     #[error("{0}")]
-    EntityAccessError(#[from] EntityAccessError),
+    EntityAccessError(Diagnostic),
 
     // TODO this should be an option in the return value, not an error variant, but
     // realistically, that's super annoying.
