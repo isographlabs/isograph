@@ -1,12 +1,12 @@
 export type Query__UserPage__rawResponse = {
-  user____login___v_userLogin: ({
+  user____login___v_userLogin?: ({
     id: string,
-    name: (string | null),
+    name?: (string | null),
     repositories____first___l_10____after___l_null: {
-      edges: (ReadonlyArray<({
-        node: ({
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
-          description: (string | null),
+          description?: (string | null),
           forkCount: number,
           name: string,
           nameWithOwner: string,
@@ -25,7 +25,7 @@ export type Query__UserPage__rawResponse = {
         } | null),
       } | null)> | null),
       pageInfo: {
-        endCursor: (string | null),
+        endCursor?: (string | null),
         hasNextPage: boolean,
       },
     },
@@ -33,7 +33,7 @@ export type Query__UserPage__rawResponse = {
   viewer: {
     id: string,
     avatarUrl: string,
-    name: (string | null),
+    name?: (string | null),
   },
 }
 

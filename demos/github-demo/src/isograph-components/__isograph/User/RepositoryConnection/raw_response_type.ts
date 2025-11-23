@@ -1,12 +1,12 @@
 export type User__RepositoryConnection__rawResponse = {
-  node____id___v_id: ({
+  node____id___v_id?: ({
     __typename: "User",
     id: string,
     repositories____first___v_first____after___v_after: {
-      edges: (ReadonlyArray<({
-        node: ({
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
-          description: (string | null),
+          description?: (string | null),
           forkCount: number,
           name: string,
           nameWithOwner: string,
@@ -25,7 +25,7 @@ export type User__RepositoryConnection__rawResponse = {
         } | null),
       } | null)> | null),
       pageInfo: {
-        endCursor: (string | null),
+        endCursor?: (string | null),
         hasNextPage: boolean,
       },
     },
