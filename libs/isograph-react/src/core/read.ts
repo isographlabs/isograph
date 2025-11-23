@@ -630,7 +630,7 @@ export function readScalarFieldData(
   root: StoreLink,
   variables: Variables,
 ): ReadDataResult<
-  string | number | boolean | StoreLink | DataTypeValue[] | null
+  string | number | boolean | StoreLink | readonly DataTypeValue[] | null
 > {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
