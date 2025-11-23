@@ -219,6 +219,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
                 ),
+                // TODO use the location of the selectable
                 Result::ok(
                     entity_definition_location(db, (*target_scalar_entity_name).into()).as_ref(),
                 )

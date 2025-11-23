@@ -10,8 +10,8 @@ use crate::{
     ContainsIsoStats, CreateAdditionalFieldsError, IsographDatabase, NetworkProtocol,
     ProcessClientFieldDeclarationError, ValidateUseOfArgumentsError, ValidatedEntrypointError,
     create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    parse_iso_literals, process_iso_literals, server_selectables_map, validate_use_of_arguments,
-    validated_entrypoints,
+    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -43,6 +43,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
         &mut errors,
         validate_all_server_selectables_point_to_defined_types(db).to_owned(),
     );
+
+    errors.extend(validate_all_id_fields(db).clone());
 
     errors.extend(validated_entrypoints(db).values().flat_map(|result| {
         ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).some()
@@ -189,4 +191,26 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     } else {
         Err(errors)
     }
+}
+
+#[memo]
+fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Vec<ValidationError> {
+    let entities = match server_object_entities(db).as_ref() {
+        Ok(entities) => entities,
+        Err(e) => return vec![ValidationError::Diagnostic(e.clone())],
+    };
+
+    entities
+        .iter()
+        .flat_map(|entity| {
+            Result::err(
+                server_id_selectable(db, entity.name)
+                    .as_ref()
+                    .map_err(|e| e.clone()),
+            )
+        })
+        .map(|d| ValidationError::Diagnostic(d))
+        .collect()
 }
