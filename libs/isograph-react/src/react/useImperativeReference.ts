@@ -43,7 +43,8 @@ export function useImperativeReference<
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    TNormalizationAst
+    TNormalizationAst,
+    {}
   >,
 ): UseImperativeReferenceResult<
   TReadFromStore,

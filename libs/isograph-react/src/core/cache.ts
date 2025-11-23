@@ -35,6 +35,7 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
+  addNetworkResponseStoreLayer,
   getMutableStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
@@ -91,7 +92,8 @@ export function getOrCreateCacheForArtifact<
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    TNormalizationAst
+    TNormalizationAst,
+    {}
   >,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
@@ -910,4 +912,38 @@ function getDataIdOfNetworkResponse(
     storeKey += getStoreKeyChunkForArgument(fieldParameter, variables);
   }
   return storeKey;
+}
+
+export function writeData<
+  TReadFromStore extends UnknownTReadFromStore,
+  TRawResponseType extends NetworkResponseObject,
+>(
+  environment: IsographEnvironment,
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    unknown,
+    NormalizationAst,
+    TRawResponseType
+  >,
+  data: TRawResponseType,
+  variables: ExtractParameters<TReadFromStore>,
+) {
+  const encounteredIds: EncounteredIds = new Map();
+  environment.store = addNetworkResponseStoreLayer(environment.store);
+  normalizeData(
+    environment,
+    environment.store,
+    entrypoint.networkRequestInfo.normalizationAst.selections,
+    data,
+    variables,
+    { __link: ROOT_ID, __typename: entrypoint.concreteType },
+    new Map(),
+  );
+  logMessage(environment, () => ({
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds: encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
 }

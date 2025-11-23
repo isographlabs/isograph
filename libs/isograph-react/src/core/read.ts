@@ -344,7 +344,7 @@ export function readLoadablySelectedFieldData(
         // Fetcher
         () => {
           const fragmentReferenceAndDisposeFromEntrypoint = (
-            entrypoint: IsographEntrypoint<any, any, any>,
+            entrypoint: IsographEntrypoint<any, any, any, {}>,
           ): [FragmentReference<any, any>, CleanupFn] => {
             const readerWithRefetchQueries =
               entrypoint.readerWithRefetchQueries.kind ===

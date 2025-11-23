@@ -39,7 +39,12 @@ export function maybeMakeNetworkRequest<
   TClientFieldValue,
   TArtifact extends
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        {}
+      >,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
@@ -115,7 +120,8 @@ function retainQueryWithoutMakingNetworkRequest<
     | IsographEntrypoint<
         TReadFromStore,
         TClientFieldValue,
-        NormalizationAst | NormalizationAstLoader
+        NormalizationAst | NormalizationAstLoader,
+        {}
       >,
   variables: ExtractParameters<TReadFromStore>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
@@ -145,7 +151,12 @@ export function makeNetworkRequest<
   TClientFieldValue,
   TArtifact extends
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        {}
+      >,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   environment: IsographEnvironment,
@@ -286,7 +297,12 @@ function readDataForOnComplete<
   TClientFieldValue,
   TArtifact extends
     | RefetchQueryNormalizationArtifact
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>,
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        {}
+      >,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
 >(
   artifact: TArtifact,
@@ -393,7 +409,8 @@ function fetchNormalizationAstAndRetainArtifact<
     | IsographEntrypoint<
         TReadFromStore,
         TClientFieldValue,
-        NormalizationAst | NormalizationAstLoader
+        NormalizationAst | NormalizationAstLoader,
+        {}
       >,
   variables: ExtractParameters<TReadFromStore>,
 ): RetainedQuery {

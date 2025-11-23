@@ -8,7 +8,7 @@ import { useResult } from './useResult';
 
 export function FragmentReader<
   TResult,
-  TEntrypoint extends IsographEntrypoint<any, TResult, any>,
+  TEntrypoint extends IsographEntrypoint<any, TResult, any, {}>,
   TChildrenResult,
 >({
   fragmentReference,

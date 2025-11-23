@@ -1,3 +1,5 @@
+import type { Contravariant, PhantomData } from './brand';
+import type { NetworkResponseObject } from './cache';
 import type { UnknownTReadFromStore } from './FragmentReference';
 import type { TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
@@ -55,6 +57,7 @@ export type IsographEntrypoint<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 > = {
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
@@ -62,16 +65,23 @@ export type IsographEntrypoint<
     | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
     | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
+  readonly '~TRawResponseType'?: PhantomData<Contravariant<TRawResponseType>>;
 };
 
 export type IsographEntrypointLoader<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
+  TRawResponseType extends NetworkResponseObject,
 > = {
   readonly kind: 'EntrypointLoader';
   readonly typeAndField: string;
   readonly loader: () => Promise<
-    IsographEntrypoint<TReadFromStore, TClientFieldValue, NormalizationAst>
+    IsographEntrypoint<
+      TReadFromStore,
+      TClientFieldValue,
+      NormalizationAst,
+      TRawResponseType
+    >
   >;
 };
 
@@ -129,9 +139,15 @@ export function assertIsEntrypoint<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   value:
-    | IsographEntrypoint<TReadFromStore, TClientFieldValue, TNormalizationAst>
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >
     | ((_: any) => any)
     // Temporarily, allow any here. Once we automatically provide
     // types to entrypoints, we probably don't need this.
@@ -139,13 +155,16 @@ export function assertIsEntrypoint<
 ): asserts value is IsographEntrypoint<
   TReadFromStore,
   TClientFieldValue,
-  TNormalizationAst
+  TNormalizationAst,
+  TRawResponseType
 > {
   if (typeof value === 'function') throw new Error('Not a string');
 }
 
 export type ExtractReadFromStore<Type> =
-  Type extends IsographEntrypoint<infer X, any, any> ? X : never;
+  Type extends IsographEntrypoint<infer X, any, any, any> ? X : never;
+export type ExtractRawResponseType<Type> =
+  Type extends IsographEntrypoint<any, any, any, infer X> ? X : never;
 export type ExtractResolverResult<Type> =
-  Type extends IsographEntrypoint<any, infer X, any> ? X : never;
+  Type extends IsographEntrypoint<any, infer X, any, any> ? X : never;
 export type ExtractProps<Type> = Type extends React.FC<infer X> ? X : never;
