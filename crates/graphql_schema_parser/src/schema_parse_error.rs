@@ -1,18 +1,13 @@
-use common_lang_types::WithSpan;
+use common_lang_types::{Diagnostic, WithSpan};
 use thiserror::Error;
-
-use super::peekable_lexer::LowLevelParseError;
 
 pub(crate) type ParseResult<T> = Result<T, WithSpan<SchemaParseError>>;
 
 /// Errors tha make semantic sense when referring to parsing a GraphQL schema file
 #[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
 pub enum SchemaParseError {
-    #[error("{error}")]
-    ParseError {
-        #[from]
-        error: LowLevelParseError,
-    },
+    #[error("{0}")]
+    ParseError(#[from] Diagnostic),
 
     #[error(
         "Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
@@ -35,9 +30,6 @@ pub enum SchemaParseError {
 
     #[error("Expected a type (e.g. String, [String], or String!)")]
     ExpectedTypeAnnotation,
-
-    #[error("Expected directive location. Found {text}")]
-    ExpectedDirectiveLocation { text: String },
 
     #[error("Enum values cannot be true, false or null.")]
     EnumValueTrueFalseNull,

@@ -5,15 +5,15 @@ use prelude::Postfix;
 use crate::Location;
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-pub struct Diagnostic(Box<DiagnosticData>);
+pub struct Diagnostic(pub Box<DiagnosticData>);
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
-struct DiagnosticData {
+pub struct DiagnosticData {
     /// A human-readable message.
-    message: String,
+    pub message: String,
 
     /// The primary location where the message originated.
-    location: Option<Location>,
+    pub location: Option<Location>,
 }
 
 impl Diagnostic {

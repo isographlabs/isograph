@@ -1,8 +1,9 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, EnumLiteralValue, GraphQLInterfaceTypeName, GraphQLObjectTypeName,
-    StringLiteralValue, TextSource, WithLocation, WithSpan, WithSpanPostfix,
+    DescriptionValue, Diagnostic, EnumLiteralValue, GraphQLInterfaceTypeName,
+    GraphQLObjectTypeName, Location, StringLiteralValue, TextSource, WithLocation, WithSpan,
+    WithSpanPostfix,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -34,7 +35,7 @@ pub fn parse_schema(
     source: &str,
     text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemDocument> {
-    let mut tokens = PeekableLexer::new(source);
+    let mut tokens = PeekableLexer::new(source, text_source);
 
     parse_type_system_document(&mut tokens, text_source)
 }
@@ -55,7 +56,7 @@ pub fn parse_schema_extensions(
     source: &str,
     text_source: TextSource,
 ) -> ParseResult<GraphQLTypeSystemExtensionDocument> {
-    let mut tokens = PeekableLexer::new(source);
+    let mut tokens = PeekableLexer::new(source, text_source);
 
     parse_type_system_extension_document(&mut tokens, text_source)
 }
@@ -109,7 +110,7 @@ fn parse_type_system_extension(
 
         let identifier = tokens
             .parse_source_of_kind(TokenKind::Identifier)
-            .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+            .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
         match identifier.item {
             "type" => parse_object_type_extension(tokens, text_source)
                 .map(GraphQLTypeSystemExtension::from),
@@ -132,7 +133,7 @@ fn parse_type_system_definition(
         let description = parse_optional_description(tokens);
         let identifier = tokens
             .parse_source_of_kind(TokenKind::Identifier)
-            .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+            .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
         match identifier.item {
             "type" => parse_object_type_definition(tokens, description, text_source)
                 .map(GraphQLTypeSystemDefinition::from),
@@ -169,7 +170,7 @@ fn parse_object_type_definition(
 ) -> ParseResult<GraphQLObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
         .to_with_embedded_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
@@ -194,7 +195,7 @@ fn parse_object_type_extension(
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
         .map(|with_span| with_span.to_with_location(text_source))
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?;
 
     let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -217,7 +218,7 @@ fn parse_interface_type_definition(
 ) -> ParseResult<GraphQLInterfaceTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
         .to_with_embedded_location(text_source);
 
     let interfaces = parse_implements_interfaces_if_present(tokens, text_source)?;
@@ -241,7 +242,7 @@ fn parse_input_object_type_definition(
 ) -> ParseResult<GraphQLInputObjectTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
         .to_with_embedded_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -271,7 +272,7 @@ fn parse_directive_definition(
     let _at = tokens.parse_token_of_kind(TokenKind::At);
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|diagnostic| SchemaParseError::ParseError(diagnostic).with_generated_span())?
         .to_with_location(text_source);
 
     let arguments = parse_optional_enclosed_items(
@@ -321,22 +322,25 @@ fn parse_directive_locations(
 fn parse_directive_location(
     tokens: &mut PeekableLexer,
 ) -> ParseResult<WithSpan<DirectiveLocation>> {
+    let peek = tokens.peek();
     match tokens.parse_source_of_kind(TokenKind::Identifier) {
         Ok(text) => DirectiveLocation::from_str(text.item)
             .map_err(|_| {
-                SchemaParseError::ExpectedDirectiveLocation {
-                    text: text.item.to_string(),
-                }
+                SchemaParseError::ParseError(Diagnostic::new(
+                    format!("Expected directive location, found {}", text.item),
+                    Location::new(tokens.text_source, text.span).some(),
+                ))
                 .with_span(text.span)
             })
-            .map(|location| text.map(|_| location)),
-        Err(with_span) => {
-            let span = with_span.span;
-            with_span
-                .map(|_| SchemaParseError::ExpectedDirectiveLocation {
-                    text: tokens.source(span).to_string(),
-                })
-                .err()
+            .map(|x| x.with_span(text.span)),
+        Err(diagnostic) => {
+            let text = tokens.source(peek.span);
+            SchemaParseError::ParseError(Diagnostic::new(
+                format!("Expected directive location, found {text}"),
+                diagnostic.0.location,
+            ))
+            .with_generated_span()
+            .err()
         }
     }
 }
@@ -348,7 +352,7 @@ fn parse_enum_definition(
 ) -> ParseResult<GraphQLEnumDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|e| SchemaParseError::ParseError(e).with_generated_span())?
         .to_with_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -385,7 +389,7 @@ fn parse_enum_value_definition(
         let description = parse_optional_description(tokens);
         let enum_literal_value_str = tokens
             .parse_source_of_kind(TokenKind::Identifier)
-            .map_err(|err| err.map(SchemaParseError::from))?;
+            .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
         let value = {
             if enum_literal_value_str.item == "true"
                 || enum_literal_value_str.item == "false"
@@ -420,14 +424,14 @@ fn parse_union_definition(
 ) -> ParseResult<GraphQLUnionTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
         .to_with_embedded_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
 
     let _equal = tokens
         .parse_token_of_kind(TokenKind::Equals)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     let union_member_types = parse_union_member_types(tokens, text_source)?;
 
@@ -449,7 +453,7 @@ fn parse_union_member_types(
     let _pipe = tokens.parse_token_of_kind(TokenKind::Pipe);
     let required_first_value = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
         .to_with_location(text_source);
 
     let mut values = vec![required_first_value];
@@ -458,7 +462,7 @@ fn parse_union_member_types(
         values.push(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                 .to_with_location(text_source),
         );
     }
@@ -475,7 +479,7 @@ fn parse_schema_definition(
 
     let _open_curly = tokens
         .parse_token_of_kind(TokenKind::OpenBrace)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     let mut query_type = None;
     let mut mutation_type = None;
@@ -535,7 +539,7 @@ fn parse_root_operation_type(
 )> {
     let name = tokens
         .parse_source_of_kind(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     let root_operation_type = match name.item {
         "query" => RootOperationKind::Query.with_span(name.span),
@@ -550,11 +554,11 @@ fn parse_root_operation_type(
 
     let _colon = tokens
         .parse_token_of_kind(TokenKind::Colon)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     let object_name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     (
         root_operation_type,
@@ -571,7 +575,7 @@ fn parse_scalar_type_definition(
 ) -> ParseResult<GraphQLScalarTypeDefinition> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
         .to_with_location(text_source);
 
     let directives = parse_constant_directives(tokens, text_source)?;
@@ -613,7 +617,7 @@ fn parse_interfaces(
 
     let first_interface = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
     let mut interfaces = vec![first_interface.to_with_location(text_source)];
 
@@ -621,7 +625,7 @@ fn parse_interfaces(
         interfaces.push(
             tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                 .to_with_location(text_source),
         );
     }
@@ -638,7 +642,7 @@ fn parse_constant_directives(
         directives.push(GraphQLDirective {
             name: tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                 .to_with_embedded_location(text_source),
             arguments: parse_optional_constant_arguments(tokens, text_source)?,
         })
@@ -682,11 +686,11 @@ fn parse_constant_name_value_pair<T: From<StringKey>, TValue>(
 ) -> ParseResult<NameValuePair<T, TValue>> {
     let name = tokens
         .parse_string_key_type(TokenKind::Identifier)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
         .to_with_location(text_source);
     tokens
         .parse_token_of_kind(TokenKind::Colon)
-        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
     let value = parse_value(tokens)?;
 
     NameValuePair { name, value }.ok()
@@ -700,7 +704,7 @@ fn parse_constant_value(
         to_control_flow(|| {
             tokens
                 .parse_source_of_kind(TokenKind::IntegerLiteral)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())
                 .and_then(|int_literal_string| {
                     int_literal_string.and_then(|raw_int_value| {
                         match raw_int_value.parse::<i64>() {
@@ -719,7 +723,7 @@ fn parse_constant_value(
         to_control_flow(|| {
             tokens
                 .parse_source_of_kind(TokenKind::FloatLiteral)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())
                 .and_then(|float_literal_string| {
                     float_literal_string.and_then(|raw_float_value| {
                         match raw_float_value.parse::<f64>() {
@@ -785,7 +789,7 @@ fn parse_constant_value(
                 .with_span_result(|tokens| {
                     tokens
                         .parse_token_of_kind(TokenKind::OpenBracket)
-                        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBracket).is_err() {
                         values.push(parse_constant_value(tokens, text_source)?);
@@ -801,16 +805,17 @@ fn parse_constant_value(
                 .with_span_result(|tokens| {
                     tokens
                         .parse_token_of_kind(TokenKind::OpenBrace)
-                        .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                        .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
+
                     let mut values = vec![];
                     while tokens.parse_token_of_kind(TokenKind::CloseBrace).is_err() {
                         let name = tokens
                             .parse_string_key_type(TokenKind::Identifier)
-                            .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                            .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                             .to_with_location(text_source);
                         tokens
                             .parse_token_of_kind(TokenKind::Colon)
-                            .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                            .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                             .to_with_location(text_source);
                         let value = parse_constant_value(tokens, text_source)?;
                         values.push(NameValuePair { name, value });
@@ -868,7 +873,7 @@ fn parse_field(
             let description = parse_optional_description(tokens);
             let name = tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
                 .to_with_location(text_source);
 
             let arguments = parse_optional_enclosed_items(
@@ -881,7 +886,8 @@ fn parse_field(
 
             tokens
                 .parse_token_of_kind(TokenKind::Colon)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
+
             let type_ = parse_type_annotation(tokens)?;
 
             let directives = parse_constant_directives(tokens, text_source)?;
@@ -907,7 +913,7 @@ fn parse_type_annotation<T: From<StringKey>>(
         to_control_flow::<_, WithSpan<SchemaParseError>>(|| {
             let type_ = tokens
                 .parse_string_key_type(TokenKind::Identifier)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
             if is_non_null {
@@ -924,12 +930,12 @@ fn parse_type_annotation<T: From<StringKey>>(
             // TODO: atomically parse everything here:
             tokens
                 .parse_token_of_kind(TokenKind::OpenBracket)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
 
             let inner_type_annotation = parse_type_annotation(tokens)?;
             tokens
                 .parse_token_of_kind(TokenKind::CloseBracket)
-                .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+                .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
             let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
 
             if is_non_null {
@@ -991,11 +997,11 @@ fn parse_argument_definition(
         let description = parse_optional_description(tokens);
         let name = tokens
             .parse_string_key_type(TokenKind::Identifier)
-            .map_err(|with_span| with_span.map(SchemaParseError::from))?
+            .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?
             .to_with_location(text_source);
         tokens
             .parse_token_of_kind(TokenKind::Colon)
-            .map_err(|with_span| with_span.map(SchemaParseError::from))?;
+            .map_err(|err| SchemaParseError::ParseError(err).with_generated_span())?;
         let type_ = parse_type_annotation(tokens)?;
         let default_value = parse_optional_constant_default_value(tokens, text_source)?;
         let directives = parse_constant_directives(tokens, text_source)?;
