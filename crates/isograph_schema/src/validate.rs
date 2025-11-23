@@ -211,6 +211,6 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
                     .map_err(|e| e.clone()),
             )
         })
-        .map(|d| ValidationError::Diagnostic(d))
+        .map(ValidationError::Diagnostic)
         .collect()
 }
