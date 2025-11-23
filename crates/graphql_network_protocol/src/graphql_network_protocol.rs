@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    DirectiveName, QueryExtraInfo, QueryOperationName, QueryText, ServerObjectEntityName,
-    UnvalidatedTypeName, WithLocation, WithLocationPostfix,
+    Diagnostic, DirectiveName, QueryExtraInfo, QueryOperationName, QueryText,
+    ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{DeserializationError, from_graphql_directive};
 use graphql_schema_parser::SchemaParseError;
@@ -21,8 +21,7 @@ use thiserror::Error;
 use crate::{
     parse_graphql_schema,
     process_type_system_definition::{
-        ProcessGraphqlTypeSystemDefinitionError, process_graphql_type_extension_document,
-        process_graphql_type_system_document,
+        process_graphql_type_extension_document, process_graphql_type_system_document,
     },
     query_text::generate_query_text,
 };
@@ -124,13 +123,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         // - we need to transfer those to the original objects.
         //
         // The way we are doing this is in dire need of cleanup.
-        for (name, directives) in directives {
+        for (server_object_entity_name, directives) in directives {
             // TODO don't do O(n^2) here
             match result
                 .iter_mut()
                 .find_map(|item| match item.as_ref_mut().as_object() {
                     Some(x) => {
-                        if x.server_object_entity.item.name == name {
+                        if x.server_object_entity.item.name == server_object_entity_name {
                             Some(x)
                         } else {
                             None
@@ -159,9 +158,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 }
                 None => {
-                    return ProcessGraphqlTypeSystemDefinitionError::AttemptedToExtendUndefinedType {
-                        type_name: name,
-                    }.err()?;
+                    return Diagnostic::new(
+                        format!("Attempted to extend {server_object_entity_name}, but that type is not defined"),
+                        // TODO we should have a location here
+                        None,
+                    )
+                    .err()?;
                 }
             }
         }
@@ -267,15 +269,10 @@ pub enum ParseGraphQLTypeSystemDocumentsError {
         message: WithLocation<SchemaParseError>,
     },
 
-    #[error("{}", message.for_display())]
-    ProcessGraphQLTypeSystemDefinitionWithLocation {
-        message: WithLocation<ProcessGraphqlTypeSystemDefinitionError>,
-    },
-
     #[error("{message}")]
     ProcessGraphQLTypeSystemDefinition {
         #[from]
-        message: ProcessGraphqlTypeSystemDefinitionError,
+        message: Diagnostic,
     },
 
     #[error("Failed to deserialize {0}")]
@@ -285,14 +282,6 @@ pub enum ParseGraphQLTypeSystemDocumentsError {
 impl From<WithLocation<SchemaParseError>> for ParseGraphQLTypeSystemDocumentsError {
     fn from(value: WithLocation<SchemaParseError>) -> Self {
         Self::SchemaParse { message: value }
-    }
-}
-
-impl From<WithLocation<ProcessGraphqlTypeSystemDefinitionError>>
-    for ParseGraphQLTypeSystemDocumentsError
-{
-    fn from(value: WithLocation<ProcessGraphqlTypeSystemDefinitionError>) -> Self {
-        Self::ProcessGraphQLTypeSystemDefinitionWithLocation { message: value }
     }
 }
 

@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    GraphQLInterfaceTypeName, Location, SelectableName, ServerObjectEntityName,
-    ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation, WithLocationPostfix,
-    WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, GraphQLInterfaceTypeName, Location, SelectableName,
+    ServerObjectEntityName, ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation,
+    WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
@@ -20,7 +20,6 @@ use isograph_schema::{
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
@@ -40,7 +39,7 @@ lazy_static! {
 pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-) -> ProcessGraphqlTypeDefinitionResult<(
+) -> DiagnosticResult<(
     ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     // TODO why are we returning these?
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
@@ -214,9 +213,11 @@ pub fn process_graphql_type_system_document(
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
-                    return ProcessGraphqlTypeSystemDefinitionError::DuplicateSchemaDefinition
-                        .with_location(location)
-                        .err();
+                    return Diagnostic::new(
+                        "Duplicate schema definition".to_string(),
+                        location.some(),
+                    )
+                    .err();
                 }
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
@@ -294,7 +295,7 @@ pub fn process_graphql_type_system_document(
 pub fn process_graphql_type_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-) -> ProcessGraphqlTypeDefinitionResult<(
+) -> DiagnosticResult<(
     ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     Vec<ExposeFieldToInsert>,
@@ -331,25 +332,13 @@ pub fn process_graphql_type_extension_document(
     (outcome, directives, refetch_fields).ok()
 }
 
-pub(crate) type ProcessGraphqlTypeDefinitionResult<T> =
-    Result<T, WithLocation<ProcessGraphqlTypeSystemDefinitionError>>;
-
-#[derive(Error, Eq, PartialEq, Debug, Clone, PartialOrd, Ord)]
-pub enum ProcessGraphqlTypeSystemDefinitionError {
-    #[error("Duplicate schema definition")]
-    DuplicateSchemaDefinition,
-
-    #[error("Attempted to extend {type_name}, but that type is not defined")]
-    AttemptedToExtendUndefinedType { type_name: ServerObjectEntityName },
-}
-
 fn process_object_type_definition(
     object_type_definition: IsographObjectTypeDefinition,
     concrete_type: Option<ServerObjectEntityName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
     refetch_fields: &mut Vec<ExposeFieldToInsert>,
-) -> ProcessGraphqlTypeDefinitionResult<(
+) -> DiagnosticResult<(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
 )> {
