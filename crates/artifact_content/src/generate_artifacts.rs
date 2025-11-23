@@ -17,10 +17,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NameAndArguments,
-    NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId, SelectableTrait,
-    ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedSelection,
-    ValidatedVariableDefinition, ValidationError, WrappedSelectionMapSelection,
+    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NODE_FIELD_NAME,
+    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
+    SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, ValidationError, WrappedSelectionMapSelection,
     accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
     client_selectable_map, client_selectable_named, description, fetchable_types,
     inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
@@ -64,6 +64,7 @@ lazy_static! {
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
     pub static ref NORMALIZATION_AST_FILE_NAME: ArtifactFileName =
         "normalization_ast.ts".intern().into();
+    pub static ref RAW_RESPONSE_TYPE: ArtifactFileName = "raw_response_type.ts".intern().into();
     pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
     pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
     pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
@@ -360,6 +361,20 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                         variable_definitions_iter.collect::<Vec<_>>(),
                                     ),
                                     RefetchStrategy::UseRefetchField(_) => {
+                                        let fetchable_types_map =
+                                            fetchable_types(db).as_ref().expect(
+                                                "Expected parsing to have succeeded. \
+                                                This is indicative of a bug in Isograph.",
+                                            );
+
+                                        let query_id = fetchable_types_map
+                                            .iter()
+                                            .find(|(_, root_operation_name)| {
+                                                root_operation_name.0 == "query"
+                                            })
+                                            .expect("Expected query to be found")
+                                            .0;
+
                                         let wrapped_map = selection_map_wrapped(
                                             merged_selection_map.clone(),
                                             vec![
@@ -367,9 +382,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                                     type_to_refine_to.name,
                                                 ),
                                                 WrappedSelectionMapSelection::LinkedField {
-                                                    server_object_selectable_name: "node"
-                                                        .intern()
-                                                        .into(),
+                                                    parent_object_entity_name: *query_id,
+                                                    server_object_selectable_name: *NODE_FIELD_NAME,
                                                     arguments: vec![id_arg.clone()],
                                                     concrete_type: None,
                                                 },
