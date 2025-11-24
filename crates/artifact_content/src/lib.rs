@@ -1,6 +1,6 @@
-mod artifact_lookup_cache;
 mod eager_reader_artifact;
 mod entrypoint_artifact;
+mod file_system_state;
 mod format_parameter_type;
 pub mod generate_artifacts;
 mod imperatively_loaded_fields;
@@ -14,5 +14,5 @@ mod reader_ast;
 mod refetch_reader_artifact;
 mod ts_config;
 
-pub use artifact_lookup_cache::ArtifactLookupCache;
+pub use file_system_state::FileSystemState;
 pub use generate_artifacts::get_artifact_path_and_content;
