@@ -336,10 +336,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 ) -> Result<Vec<ObjectLiteralFieldType>, WithLocation<ValidateArgumentTypesError>> {
     let server_selectables = server_selectables_map_for_entity(db, server_object_entity_name)
         .as_ref()
-        .map_err(|e| {
-            ValidateArgumentTypesError::ParseTypeSystemDocumentsError(e.clone())
-                .with_generated_location()
-        })?;
+        .map_err(|e| ValidateArgumentTypesError::Diagnostic(e.clone()).with_generated_location())?;
 
     server_selectables
         .iter()
@@ -399,10 +396,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> ValidateArgumentTypesResult<()> {
     let object_fields = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .as_ref()
-        .map_err(|e| {
-            ValidateArgumentTypesError::ParseTypeSystemDocumentsError(e.clone())
-                .with_generated_location()
-        })?;
+        .map_err(|e| ValidateArgumentTypesError::Diagnostic(e.clone()).with_generated_location())?;
 
     let extra_fields: Vec<_> = object_literal
         .iter()
@@ -548,5 +542,5 @@ pub enum ValidateArgumentTypesError {
     },
 
     #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
+    Diagnostic(Diagnostic),
 }

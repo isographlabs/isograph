@@ -1,16 +1,15 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
-    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName, WithLocation,
-    WithSpan,
+    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    MemoizedSelectionSetError, NetworkProtocol, ObjectSelectableId, ScalarSelectableId,
-    SelectableTrait, ServerEntityName, client_scalar_selectable_named,
-    selectable_validated_reader_selection_set,
+    NetworkProtocol, ObjectSelectableId, ScalarSelectableId, SelectableTrait, ServerEntityName,
+    client_scalar_selectable_named, selectable_validated_reader_selection_set,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -189,14 +188,11 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>, MemoizedSelectionSetError>
-{
-    let selection_set = selectable_validated_reader_selection_set(
+) -> DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
+    selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,
         client_object_selectable_name.into(),
     )
-    .clone()?;
-
-    Ok(selection_set)
+    .clone()
 }

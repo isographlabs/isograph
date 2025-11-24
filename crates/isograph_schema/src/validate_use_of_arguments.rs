@@ -17,10 +17,10 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedSelectionSetError, NetworkProtocol,
-    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, selectable_validated_reader_selection_set,
-    server_object_selectable_named, server_scalar_selectable_named,
+    ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ValidatedVariableDefinition,
+    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
+    selectable_validated_reader_selection_set, server_object_selectable_named,
+    server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
     visit_selection_set::visit_selection_set,
 };
@@ -80,7 +80,14 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         client_type.name(),
     ) {
         Ok(validated_selections) => validated_selections,
-        Err(e) => return errors.push(WithLocation::new_generated(e.into())),
+        Err(new_errors) => {
+            return errors.extend(
+                new_errors
+                    .into_iter()
+                    .map(ValidateUseOfArgumentsError::Diagnostic)
+                    .map(|x| x.with_generated_location()),
+            );
+        }
     };
 
     visit_selection_set(
@@ -473,7 +480,4 @@ pub enum ValidateUseOfArgumentsError {
 
     #[error("{0}")]
     Diagnostic(Diagnostic),
-
-    #[error("{0}")]
-    MemoizedSelectionSetError(#[from] MemoizedSelectionSetError),
 }
