@@ -59,8 +59,6 @@ use crate::{
 
 lazy_static! {
     pub static ref ENTRYPOINT_FILE_NAME: ArtifactFileName = "entrypoint.ts".intern().into();
-    pub static ref ARTIFACT_LOOKUP_CACHE_FILE_NAME: ArtifactFileName =
-        ".artifact_lookup_cache.json".intern().into();
     pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
     pub static ref ISO_TS_FILE_NAME: ArtifactFileName = "iso.ts".intern().into();
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
