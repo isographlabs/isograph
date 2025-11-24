@@ -8,7 +8,7 @@ type Filepath = String;
 type FileContent = String;
 type FileHash = String;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone)]
 pub struct FileSystemState {
     state: HashMap<Filepath, (FileContent, FileHash)>,
     pub sorted_keys: BTreeSet<String>,
