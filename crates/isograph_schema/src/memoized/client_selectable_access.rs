@@ -462,7 +462,8 @@ pub fn selectable_is_wrong_type_diagnostic(
 ) -> Diagnostic {
     Diagnostic::new(
         format!(
-            "Expected `{parent_object_entity_name}.{client_selectable_name}` to be {intended_type}. But it was {actual_type}."
+            "Expected `{parent_object_entity_name}.{client_selectable_name}` to \
+            be {intended_type}. But it was {actual_type}."
         ),
         location.wrap_some(),
     )
