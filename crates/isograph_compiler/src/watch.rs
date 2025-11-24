@@ -50,10 +50,10 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
                     update_sources(&mut state.db, &changes)?;
-                    state.run_garbage_collection();
                 };
                 let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));
                 let _ = print_result(result);
+                state.run_garbage_collection();
             }
             Err(errors) => {
                 return errors
