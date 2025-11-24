@@ -1,4 +1,4 @@
-use common_lang_types::{IsoLiteralText, WithSpan};
+use common_lang_types::{IsoLiteralText, WithLocation, WithSpan};
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
@@ -15,7 +15,7 @@ pub struct EntrypointDeclaration {
     pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
     // N.B. there is no reason this can't be a server field name /shrug
     #[resolve_field]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
+    pub client_field_name: WithLocation<ClientScalarSelectableNameWrapper>,
 
     // TODO consider moving this behind a cfg flag, since this is only used
     // by the language server.

@@ -137,7 +137,11 @@ fn parse_iso_entrypoint_declaration(
                     IsographLangTokenKind::Identifier,
                     semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
                 )
-                .map(|with_span| with_span.map(ClientScalarSelectableNameWrapper))
+                .map(|with_span| {
+                    with_span
+                        .map(ClientScalarSelectableNameWrapper)
+                        .to_with_location(text_source)
+                })
                 .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
 
             let directives = parse_directives(tokens, text_source)?;
