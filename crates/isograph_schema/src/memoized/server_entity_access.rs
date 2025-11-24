@@ -84,26 +84,32 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
             if rest.is_empty() {
                 match first {
                     SelectionType::Object(o) => o.clone().wrap_some().wrap_ok(),
-                    SelectionType::Scalar(_) => Diagnostic::new(
-                        format!(
-                            "{server_object_entity_name} is a scalar, but it should be an object"
-                        ),
-                        entity_definition_location(db, server_object_entity_name.into())
-                            .as_ref()
-                            .ok()
-                            .cloned()
-                            .flatten(),
-                    )
-                    .wrap_err(),
+                    SelectionType::Scalar(_) => {
+                        let location =
+                            entity_definition_location(db, server_object_entity_name.into())
+                                .as_ref()
+                                .ok()
+                                .cloned()
+                                .flatten();
+                        entity_wrong_type_diagnostic(
+                            server_object_entity_name.into(),
+                            "a scalar",
+                            "an object",
+                            location,
+                        )
+                        .wrap_err()
+                    }
                 }
             } else {
-                Diagnostic::new(
-                    format!("Multiple definitions of {server_object_entity_name} were found."),
-                    entity_definition_location(db, server_object_entity_name.into())
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
+                let location = entity_definition_location(db, server_object_entity_name.into())
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten();
+
+                multiple_entity_definitions_found_diagnostic(
+                    server_object_entity_name.into(),
+                    location,
                 )
                 .wrap_err()
             }
@@ -126,26 +132,31 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => Ok(Some(s.clone())),
-                    SelectionType::Object(_) => Diagnostic::new(
-                        format!(
-                            "{server_scalar_entity_name} is an object, but it should be a scalar"
-                        ),
-                        entity_definition_location(db, server_scalar_entity_name.into())
-                            .as_ref()
-                            .ok()
-                            .cloned()
-                            .flatten(),
-                    )
-                    .wrap_err(),
+                    SelectionType::Object(_) => {
+                        let location =
+                            entity_definition_location(db, server_scalar_entity_name.into())
+                                .as_ref()
+                                .ok()
+                                .cloned()
+                                .flatten();
+                        entity_wrong_type_diagnostic(
+                            server_scalar_entity_name.into(),
+                            "an object",
+                            "a scalar",
+                            location,
+                        )
+                        .wrap_err()
+                    }
                 }
             } else {
-                Diagnostic::new(
-                    format!("Multiple definitions of {server_scalar_entity_name} were found"),
-                    entity_definition_location(db, server_scalar_entity_name.into())
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
+                let location = entity_definition_location(db, server_scalar_entity_name.into())
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten();
+                multiple_entity_definitions_found_diagnostic(
+                    server_scalar_entity_name.into(),
+                    location,
                 )
                 .wrap_err()
             }
@@ -243,15 +254,13 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
                     if rest.is_empty() {
                         Ok(Some(*first))
                     } else {
-                        Diagnostic::new(
-                            format!("Multiple definitions of {entity_name} were found"),
-                            entity_definition_location(db, entity_name)
-                                .as_ref()
-                                .ok()
-                                .cloned()
-                                .flatten(),
-                        )
-                        .wrap_err()
+                        let location = entity_definition_location(db, entity_name)
+                            .as_ref()
+                            .ok()
+                            .cloned()
+                            .flatten();
+                        multiple_entity_definitions_found_diagnostic(entity_name, location)
+                            .wrap_err()
                     }
                 }
                 None => {
@@ -294,4 +303,26 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
             None
         })
         .wrap_ok()
+}
+
+fn multiple_entity_definitions_found_diagnostic(
+    server_object_entity_name: UnvalidatedTypeName,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Multiple definitions of {server_object_entity_name} were found."),
+        location,
+    )
+}
+
+fn entity_wrong_type_diagnostic(
+    entity_name: UnvalidatedTypeName,
+    actual_type: &'static str,
+    intended_type: &'static str,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("{entity_name} is {actual_type}, but it should be {intended_type}"),
+        location,
+    )
 }
