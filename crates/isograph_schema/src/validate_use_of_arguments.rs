@@ -20,8 +20,7 @@ use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ValidatedVariableDefinition,
     client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
     selectable_validated_reader_selection_set, server_object_selectable_named,
-    server_scalar_selectable_named,
-    validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
+    server_scalar_selectable_named, validate_argument_types::value_satisfies_type,
     visit_selection_set::visit_selection_set,
 };
 
@@ -269,7 +268,8 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                         &field_argument_definition.type_,
                         client_type_variable_definitions,
                     )
-                    .map_err(|with_location| with_location.map(|e| e.into())),
+                    .map_err(ValidateUseOfArgumentsError::Diagnostic)
+                    .map_err(|e| e.with_generated_location()),
                 );
             }
         }
@@ -470,12 +470,6 @@ pub enum ValidateUseOfArgumentsError {
         unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
         type_name: ServerObjectEntityName,
         field_name: SelectableName,
-    },
-
-    #[error("{message}")]
-    ValidateArgumentType {
-        #[from]
-        message: ValidateArgumentTypesError,
     },
 
     #[error("{0}")]
