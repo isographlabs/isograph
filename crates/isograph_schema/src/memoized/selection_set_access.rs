@@ -17,7 +17,7 @@ use crate::{
 type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>;
 
 #[expect(clippy::type_complexity)]
-// #[memo]
+#[memo]
 pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
