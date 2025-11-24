@@ -1,7 +1,7 @@
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
-    SelectableNamedError, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, selectable_named, server_scalar_selectable_named,
+    UseRefetchFieldRefetchStrategy, ValidatedObjectSelection, ValidatedScalarSelection,
+    ValidatedSelection, selectable_named, server_scalar_selectable_named,
 };
 use common_lang_types::{
     Diagnostic, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
@@ -93,24 +93,26 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(o) => o,
     };
 
-    let location = selectable_named(
+    let selectable = selectable_named(
         db,
         parent_object_entity_name,
         scalar_selection.name.item.into(),
-    )
-    .as_ref()
-    .map_err(|e| WithLocation::new_generated(e.clone().into()))?
-    .as_ref()
-    .ok_or_else(|| {
-        AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
-            client_field_parent_type_name: type_and_field.parent_object_entity_name,
-            client_field_name: type_and_field.selectable_name,
-            field_parent_type_name: parent_object_entity_name,
-            field_name: scalar_selection.name.item.into(),
-            client_type: top_level_field_or_pointer.client_type().to_string(),
-        }
-        .with_location(scalar_selection.name.location)
-    })?;
+    );
+
+    let location = selectable
+        .as_ref()
+        .map_err(|e| WithLocation::new_generated(AddSelectionSetsError::Diagnostic(e.clone())))?
+        .as_ref()
+        .ok_or_else(|| {
+            AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
+                client_field_parent_type_name: type_and_field.parent_object_entity_name,
+                client_field_name: type_and_field.selectable_name,
+                field_parent_type_name: parent_object_entity_name,
+                field_name: scalar_selection.name.item.into(),
+                client_type: top_level_field_or_pointer.client_type().to_string(),
+            }
+            .with_location(scalar_selection.name.location)
+        })?;
 
     let associated_data = match location {
         DefinitionLocation::Server(server_selectable_id) => {
@@ -199,22 +201,29 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         db,
         parent_object_entity_name,
         object_selection.name.item.into(),
-    )
-    .as_ref()
-    .map_err(|e| vec![WithLocation::new(e.clone().into(), Location::Generated)])?
-    .as_ref()
-    .ok_or_else(|| {
-        vec![
-            AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
-                client_field_parent_type_name: type_and_field.parent_object_entity_name,
-                client_field_name: type_and_field.selectable_name,
-                field_parent_type_name: parent_object_entity_name,
-                field_name: object_selection.name.item.into(),
-                client_type: top_level_field_or_pointer.client_type().to_string(),
-            }
-            .with_location(object_selection.name.location),
-        ]
-    })?;
+    );
+
+    let selectable = selectable
+        .as_ref()
+        .map_err(|e| {
+            vec![WithLocation::new(
+                AddSelectionSetsError::Diagnostic(e.clone()),
+                Location::Generated,
+            )]
+        })?
+        .as_ref()
+        .ok_or_else(|| {
+            vec![
+                AddSelectionSetsError::SelectionTypeSelectionFieldDoesNotExist {
+                    client_field_parent_type_name: type_and_field.parent_object_entity_name,
+                    client_field_name: type_and_field.selectable_name,
+                    field_parent_type_name: parent_object_entity_name,
+                    field_name: object_selection.name.item.into(),
+                    client_type: top_level_field_or_pointer.client_type().to_string(),
+                }
+                .with_location(object_selection.name.location),
+            ]
+        })?;
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
         DefinitionLocation::Server(server_selectable) => {
@@ -415,7 +424,4 @@ pub enum AddSelectionSetsError {
 
     #[error("{0}")]
     Diagnostic(Diagnostic),
-
-    #[error("{0}")]
-    SelectableNamedError(#[from] SelectableNamedError),
 }

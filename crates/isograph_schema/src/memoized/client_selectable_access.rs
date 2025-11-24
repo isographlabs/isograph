@@ -8,7 +8,7 @@ use crate::{
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    DiagnosticResult, Location, ServerObjectEntityName,
+    DiagnosticResult, Location, SelectableName, ServerObjectEntityName,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -114,7 +114,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
                 };
                 multiple_selectable_definitions_found_diagnostic(
                     parent_object_entity_name,
-                    client_selectable_name,
+                    client_selectable_name.into(),
                     location,
                 )
                 .wrap_err()
@@ -269,7 +269,6 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-#[expect(clippy::type_complexity)]
 pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
@@ -411,7 +410,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                             };
                             multiple_selectable_definitions_found_diagnostic(
                                 *parent_object_entity_name,
-                                *client_selectable_name,
+                                (*client_selectable_name).into(),
                                 location,
                             )
                             .wrap_err()
@@ -443,14 +442,14 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         .wrap_ok()
 }
 
-fn multiple_selectable_definitions_found_diagnostic(
+pub fn multiple_selectable_definitions_found_diagnostic(
     parent_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
+    selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
     Diagnostic::new(
         format!(
-            "Multiple definitions of `{parent_object_entity_name}.{client_selectable_name}` were found"
+            "Multiple definitions of `{parent_object_entity_name}.{selectable_name}` were found"
         ),
         location.wrap_some(),
     )
