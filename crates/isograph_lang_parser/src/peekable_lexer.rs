@@ -1,5 +1,5 @@
 use crate::IsographLangTokenKind;
-use common_lang_types::{Span, WithSpan, WithSpanPostfix};
+use common_lang_types::{Span, TextSource, WithSpan, WithSpanPostfix};
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{IsographSemanticToken, semantic_token_legend};
 use logos::Logos;
@@ -14,10 +14,12 @@ pub(crate) struct PeekableLexer<'source> {
     end_index_of_last_parsed_token: u32,
     offset: u32,
     semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+
+    pub text_source: TextSource,
 }
 
 impl<'source> PeekableLexer<'source> {
-    pub fn new(source: &'source str) -> Self {
+    pub fn new(source: &'source str, text_source: TextSource) -> Self {
         // To enable fast lookahead the parser needs to store at least the 'kind' (IsographLangTokenKind)
         // of the next token: the simplest option is to store the full current token, but
         // the Parser requires an initial value. Rather than incur runtime/code overhead
@@ -34,6 +36,8 @@ impl<'source> PeekableLexer<'source> {
             end_index_of_last_parsed_token: 0,
             offset: 0,
             semantic_tokens: vec![],
+
+            text_source,
         };
 
         // Advance to the first real token before doing any work
