@@ -3,7 +3,7 @@ use std::{collections::HashMap, path::PathBuf};
 use common_lang_types::ArtifactPathAndContent;
 
 pub struct ChangedArtifacts {
-    pub committed_artifacts: HashMap<PathBuf, ArtifactPathAndContent>,
+    pub artifacts_to_write: HashMap<PathBuf, ArtifactPathAndContent>,
     pub artifacts_to_delete: Vec<PathBuf>,
     pub cleanup_artifact_directory: bool,
 }
@@ -11,7 +11,7 @@ pub struct ChangedArtifacts {
 impl ChangedArtifacts {
     pub fn new() -> Self {
         Self {
-            committed_artifacts: HashMap::new(),
+            artifacts_to_write: HashMap::new(),
             artifacts_to_delete: Vec::new(),
             cleanup_artifact_directory: true,
         }

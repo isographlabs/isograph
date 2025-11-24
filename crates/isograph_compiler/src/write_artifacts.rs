@@ -46,7 +46,7 @@ pub fn get_artifacts_to_write(
     let mut artifacts_to_disk = ChangedArtifacts::new();
 
     if file_system_state.is_empty() {
-        artifacts_to_disk.committed_artifacts = artifact_map
+        artifacts_to_disk.artifacts_to_write = artifact_map
             .into_iter()
             .map(|(_, (path, content))| (path, content))
             .collect();
@@ -57,7 +57,7 @@ pub fn get_artifacts_to_write(
         for relative_path in to_add.into_iter() {
             if let Some((absolute_path, content)) = artifact_map.remove(&relative_path) {
                 artifacts_to_disk
-                    .committed_artifacts
+                    .artifacts_to_write
                     .insert(absolute_path, content);
             }
         }
@@ -96,7 +96,7 @@ pub(crate) fn write_artifacts_to_disk(
     }
 
     let mut count = 0;
-    for (path, content) in artifacts_to_disk.committed_artifacts.iter() {
+    for (path, content) in artifacts_to_disk.artifacts_to_write.iter() {
         count += 1;
 
         let absolute_directory = path.parent().expect("path must have a parent");
