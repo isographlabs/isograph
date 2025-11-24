@@ -111,6 +111,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .iter()
             .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
@@ -139,10 +140,13 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a
     // parameter
-    let fetchable_types_map = fetchable_types(db).as_ref().expect(
-        "Expected parsing to have succeeded. \
+    let fetchable_types_map = fetchable_types(db)
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
-    );
+        )
+        .lookup(db);
 
     let root_operation_name = fetchable_types_map
         .get(&entrypoint.parent_object_entity_name)

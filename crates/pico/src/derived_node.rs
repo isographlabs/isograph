@@ -53,7 +53,6 @@ impl<Db: Database> Clone for InnerFn<Db> {
 impl<Db: Database> Copy for InnerFn<Db> {}
 
 pub struct DerivedNode<Db: Database> {
-    pub dependencies: Vec<Dependency>,
     pub inner_fn: InnerFn<Db>,
     pub value: Box<dyn DynEq>,
 }
@@ -61,7 +60,6 @@ pub struct DerivedNode<Db: Database> {
 impl<Db: Database> fmt::Debug for DerivedNode<Db> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         f.debug_struct("DerivedNode")
-            .field("dependencies", &self.dependencies)
             .field("value", &self.value)
             .finish()
     }
@@ -71,5 +69,6 @@ impl<Db: Database> fmt::Debug for DerivedNode<Db> {
 pub struct DerivedNodeRevision {
     pub time_updated: Epoch,
     pub time_verified: Epoch,
-    pub index: Index<DerivedNodeId>,
+    pub node_index: Index<DerivedNodeId>,
+    pub dependency_index: Index<Dependency>,
 }
