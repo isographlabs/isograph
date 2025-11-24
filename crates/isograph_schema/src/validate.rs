@@ -1,9 +1,8 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::Diagnostic;
+use common_lang_types::{Diagnostic, DiagnosticVecResult};
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     ContainsIsoStats, IsographDatabase, NetworkProtocol, create_new_exposed_field,
@@ -25,26 +24,23 @@ use crate::{
 #[memo]
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ContainsIsoStats, Vec<ValidationError>> {
+) -> DiagnosticVecResult<ContainsIsoStats> {
     let mut errors = BTreeSet::new();
 
-    maybe_extend(
-        &mut errors,
-        validate_use_of_arguments(db)
-            .to_owned()
-            .map_err(|e| e.into_iter().map(ValidationError::Diagnostic).collect()),
-    );
+    maybe_extend(&mut errors, validate_use_of_arguments(db));
 
     maybe_extend(
         &mut errors,
-        validate_all_server_selectables_point_to_defined_types(db).to_owned(),
+        validate_all_server_selectables_point_to_defined_types(db),
     );
 
-    errors.extend(validate_all_id_fields(db).clone());
+    errors.extend(validate_all_id_fields(db));
 
-    errors.extend(validated_entrypoints(db).values().flat_map(|result| {
-        ValidationError::Diagnostic(result.as_ref().err()?.clone()).wrap_some()
-    }));
+    errors.extend(
+        validated_entrypoints(db)
+            .values()
+            .flat_map(|result| result.as_ref().err()?.clone().wrap_some()),
+    );
 
     maybe_extend(&mut errors, validate_all_expose_as_fields(db));
 
@@ -65,10 +61,10 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<ValidationError>> {
+) -> DiagnosticVecResult<()> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| vec![ValidationError::Diagnostic(e.clone())])?;
+        .map_err(|e| vec![e.clone()])?;
 
     // TODO restructure as a .map or whatnot
     let mut errors = vec![];
@@ -77,7 +73,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
             if let Err(e) =
                 create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
             {
-                errors.push(e.wrap(ValidationError::Diagnostic));
+                errors.push(e);
             }
         }
     }
@@ -87,22 +83,13 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ContainsIsoStats, Vec<ValidationError>> {
-    let contains_iso = parse_iso_literals(db).to_owned().map_err(|errors| {
-        errors
-            .into_iter()
-            .map(ValidationError::Diagnostic)
-            .collect::<Vec<_>>()
-    })?;
+) -> DiagnosticVecResult<ContainsIsoStats> {
+    let contains_iso = parse_iso_literals(db)
+        .to_owned()
+        .map_err(|errors| errors.into_iter().collect::<Vec<_>>())?;
     let contains_iso_stats = contains_iso.stats();
 
-    if let Err(e) = process_iso_literals(db, contains_iso) {
-        return e
-            .into_iter()
-            .map(ValidationError::Diagnostic)
-            .collect::<Vec<_>>()
-            .wrap_err();
-    }
+    process_iso_literals(db, contains_iso)?;
 
     Ok(contains_iso_stats)
 }
@@ -121,22 +108,9 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Clone, Error, PartialOrd, Ord)]
-pub enum ValidationError {
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
-
-    #[error("{}", error)]
-    FieldToInsertToServerSelectableError { error: Diagnostic },
-
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
-}
-
-#[memo]
 fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<ValidationError>> {
+) -> DiagnosticVecResult<()> {
     // Note: server_selectables_map is a HashMap<_, Vec<(_, Result)>
     // That result encodes whether the field exists. So, basically, we are collecting
     // each error from that result.
@@ -146,17 +120,15 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     // materialized when we actually need to look at the referenced entity.
     let server_selectables = server_selectables_map(db)
         .as_ref()
-        .map_err(|e| ValidationError::ParseTypeSystemDocumentsError(e.clone()))
-        .map_err(|e| vec![e])?;
+        .map_err(|e| vec![e.clone()])?;
 
     let mut errors = vec![];
 
+    // TODO use iterator methods
     for selectables in server_selectables.values() {
         for (_, selectable_result) in selectables {
             if let Err(e) = selectable_result {
-                errors.push(ValidationError::FieldToInsertToServerSelectableError {
-                    error: e.clone(),
-                });
+                errors.push(e.clone());
             }
         }
     }
@@ -168,13 +140,12 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     }
 }
 
-#[memo]
 fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Vec<ValidationError> {
+) -> Vec<Diagnostic> {
     let entities = match server_object_entities(db).as_ref() {
         Ok(entities) => entities,
-        Err(e) => return vec![ValidationError::Diagnostic(e.clone())],
+        Err(e) => return vec![e.clone()],
     };
 
     entities
@@ -186,6 +157,5 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
                     .map_err(|e| e.clone()),
             )
         })
-        .map(ValidationError::Diagnostic)
         .collect()
 }

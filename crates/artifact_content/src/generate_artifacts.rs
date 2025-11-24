@@ -1,7 +1,7 @@
 use common_lang_types::{
     ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, ClientScalarSelectableName,
-    ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias, ServerObjectEntityName,
-    WithLocation, WithSpan, WithSpanPostfix, derive_display,
+    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
+    ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix, derive_display,
 };
 use core::panic;
 use graphql_lang_types::{
@@ -20,7 +20,7 @@ use isograph_schema::{
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NODE_FIELD_NAME,
     NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
     SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, ValidationError, WrappedSelectionMapSelection,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
     client_selectable_map, client_selectable_named, description, fetchable_types,
     inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
@@ -35,7 +35,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
 };
-use thiserror::Error;
 
 use crate::{
     eager_reader_artifact::{
@@ -114,12 +113,10 @@ lazy_static! {
 #[tracing::instrument]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(Vec<ArtifactPathAndContent>, ContainsIsoStats), GetArtifactPathAndContentError> {
+) -> DiagnosticVecResult<(Vec<ArtifactPathAndContent>, ContainsIsoStats)> {
     let config = db.get_isograph_config();
 
-    let stats = validate_entire_schema(db)
-        .to_owned()
-        .map_err(|errors| GetArtifactPathAndContentError::ValidationError { errors })?;
+    let stats = validate_entire_schema(db).to_owned()?;
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db);
     if let Some(header) = config.options.generated_file_header {
@@ -128,7 +125,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    (artifact_path_and_content, stats.clone()).wrap_ok()
+    (artifact_path_and_content, stats).wrap_ok()
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
@@ -1467,16 +1464,4 @@ pub fn get_provided_arguments<'a>(
             }
         })
         .collect()
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum GetArtifactPathAndContentError {
-    #[error(
-        "{}",
-        errors.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
-            output
-        })
-    )]
-    ValidationError { errors: Vec<ValidationError> },
 }

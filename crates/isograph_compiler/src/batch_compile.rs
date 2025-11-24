@@ -6,11 +6,9 @@ use crate::{
     with_duration::WithDuration,
     write_artifacts::{GenerateArtifactsError, write_artifacts_to_disk},
 };
-use artifact_content::{
-    generate_artifacts::GetArtifactPathAndContentError, get_artifact_path_and_content,
-};
+use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
@@ -87,7 +85,8 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     // system occur while we're writing and we get unpredictable results.
 
     let config = db.get_isograph_config();
-    let (artifacts, stats) = get_artifact_path_and_content(db)?;
+    let (artifacts, stats) = get_artifact_path_and_content(db)
+        .map_err(|e| BatchCompileError::Diagnostics { errors: e })?;
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
@@ -123,11 +122,8 @@ pub enum BatchCompileError {
     )]
     NotifyErrors { errors: Vec<notify::Error> },
 
-    #[error("{error}")]
-    GenerateArtifactsError {
-        #[from]
-        error: GetArtifactPathAndContentError,
-    },
+    #[error("{}", errors.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n"))]
+    Diagnostics { errors: Vec<Diagnostic> },
 }
 
 impl From<Vec<notify::Error>> for BatchCompileError {
