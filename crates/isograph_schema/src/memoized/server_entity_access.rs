@@ -305,7 +305,7 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
         .wrap_ok()
 }
 
-fn multiple_entity_definitions_found_diagnostic(
+pub fn multiple_entity_definitions_found_diagnostic(
     server_object_entity_name: UnvalidatedTypeName,
     location: Option<Location>,
 ) -> Diagnostic {
@@ -315,7 +315,7 @@ fn multiple_entity_definitions_found_diagnostic(
     )
 }
 
-fn entity_wrong_type_diagnostic(
+pub fn entity_wrong_type_diagnostic(
     entity_name: UnvalidatedTypeName,
     actual_type: &'static str,
     intended_type: &'static str,
@@ -324,5 +324,15 @@ fn entity_wrong_type_diagnostic(
     Diagnostic::new(
         format!("{entity_name} is {actual_type}, but it should be {intended_type}"),
         location,
+    )
+}
+
+pub fn entity_not_defined_diagnostic(
+    entity_name: ServerObjectEntityName,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("`{entity_name}` is not defined."),
+        location.wrap_some(),
     )
 }
