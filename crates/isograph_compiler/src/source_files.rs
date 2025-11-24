@@ -5,7 +5,7 @@ use std::{
 };
 
 use common_lang_types::{
-    AbsolutePathAndRelativePath, RelativePathToSourceFile, TextSource,
+    AbsolutePathAndRelativePath, Diagnostic, RelativePathToSourceFile, TextSource,
     relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
@@ -16,7 +16,7 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    read_files::{ReadFileError, read_file, read_files_in_folder},
+    read_files::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
 };
 
@@ -166,7 +166,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), SourceError> {
     let (relative_path, content) =
         // TODO this function should live here
-        read_file(path.to_path_buf(), db.get_current_working_directory())?;
+        read_file(path.to_path_buf(), db.get_current_working_directory()).map_err(SourceError::Diagnostic)?;
     db.insert_iso_literal(relative_path, content);
     Ok(())
 }
@@ -280,7 +280,8 @@ fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<(), SourceError> {
     for (relative_path, content) in
         // TODO this function should live here
-        read_files_in_folder(folder, db.get_current_working_directory())?
+        read_files_in_folder(folder, db.get_current_working_directory())
+                .map_err(SourceError::Diagnostic)?
     {
         db.insert_iso_literal(relative_path, content);
     }
@@ -315,9 +316,6 @@ pub enum SourceError {
     )]
     MultipleErrors { errors: Vec<SourceError> },
 
-    #[error("{error}")]
-    ReadFileError {
-        #[from]
-        error: ReadFileError,
-    },
+    #[error("{0}")]
+    Diagnostic(Diagnostic),
 }

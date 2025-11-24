@@ -2,21 +2,21 @@ use std::{
     fs::{self, DirEntry},
     io,
     path::{Path, PathBuf},
-    str::Utf8Error,
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile,
+    CurrentWorkingDirectory, DiagnosticResult, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
 use isograph_config::ISOGRAPH_FOLDER;
 use prelude::Postfix;
-use thiserror::Error;
+
+use crate::write_artifacts::unable_to_do_something_at_path_diagnostic;
 
 pub fn read_files_in_folder(
     folder: &Path,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<Vec<(RelativePathToSourceFile, String)>, ReadFileError> {
+) -> DiagnosticResult<Vec<(RelativePathToSourceFile, String)>> {
     read_dir_recursive(folder)?
         .into_iter()
         .filter(|p| {
@@ -39,44 +39,36 @@ pub fn read_files_in_folder(
 pub fn read_file(
     path: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(RelativePathToSourceFile, String), ReadFileError> {
+) -> DiagnosticResult<(RelativePathToSourceFile, String)> {
     // N.B. we have previously ensured that path is a file
-    let contents = std::fs::read(&path).map_err(|e| ReadFileError::UnableToReadFile {
-        path: path.clone(),
-        message: e.to_string(),
+    let contents = std::fs::read(&path).map_err(|e| {
+        unable_to_do_something_at_path_diagnostic(&path, &e.to_string(), "read file")
     })?;
 
     let relative_path =
         relative_path_from_absolute_and_working_directory(current_working_directory, &path);
 
     let contents = std::str::from_utf8(&contents)
-        .map_err(|e| ReadFileError::UnableToConvertToString { path, reason: e })?
+        .map_err(|e| {
+            unable_to_do_something_at_path_diagnostic(&path, &e.to_string(), "convert file to utf8")
+        })?
         .to_owned();
 
     (relative_path, contents).wrap_ok()
 }
 
-#[expect(clippy::enum_variant_names)]
-#[derive(Debug, Error)]
-pub enum ReadFileError {
-    #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
-    UnableToReadFile { path: PathBuf, message: String },
-
-    #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
-    UnableToConvertToString { path: PathBuf, reason: Utf8Error },
-
-    #[error("Unable to traverse directory.\nReason: {message}")]
-    UnableToTraverseDirectory { message: String },
-}
-
-fn read_dir_recursive(root_js_path: &Path) -> Result<Vec<PathBuf>, ReadFileError> {
+fn read_dir_recursive(root_js_path: &Path) -> DiagnosticResult<Vec<PathBuf>> {
     let mut paths = vec![];
 
     visit_dirs_skipping_isograph(root_js_path, &mut |dir_entry| {
         paths.push(dir_entry.path());
     })
-    .map_err(|e| ReadFileError::UnableToTraverseDirectory {
-        message: e.to_string(),
+    .map_err(|e| {
+        unable_to_do_something_at_path_diagnostic(
+            &root_js_path.to_path_buf(),
+            &e.to_string(),
+            "traverse directory",
+        )
     })?;
 
     Ok(paths)
