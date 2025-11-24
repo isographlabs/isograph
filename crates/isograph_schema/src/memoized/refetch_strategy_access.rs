@@ -2,7 +2,7 @@ use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -10,8 +10,8 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy,
-    ScalarSelectableId, client_selectable_declaration_map_from_iso_literals, expose_field_map,
+    IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
+    client_selectable_declaration_map_from_iso_literals, expose_field_map,
     get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
 };
 
@@ -242,11 +242,9 @@ pub enum RefetchStrategyAccessError {
     },
 
     #[error("{0}", 
-        errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
+        errors.iter().map(|error| format!("{}", error)).collect::<Vec<_>>().join("\n")
     )]
-    AddSelectionSetErrors {
-        errors: Vec<WithLocation<AddSelectionSetsError>>,
-    },
+    AddSelectionSetErrors { errors: Vec<Diagnostic> },
 
     #[error(
         "Expected `{parent_object_entity_name}.{selectable_name}` to be {expected_type}, \

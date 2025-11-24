@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{
     ClientSelectableName, Diagnostic, ParentObjectEntityNameAndSelectableName,
-    ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix,
+    ServerObjectEntityName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -10,9 +10,9 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ObjectSelectableId,
-    ScalarSelectableId, client_selectable_declaration_map_from_iso_literals, expose_field_map,
-    get_link_fields, get_validated_selection_set,
+    IsographDatabase, NetworkProtocol, ObjectSelectableId, ScalarSelectableId,
+    client_selectable_declaration_map_from_iso_literals, expose_field_map, get_link_fields,
+    get_validated_selection_set,
 };
 
 type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>;
@@ -174,11 +174,9 @@ pub enum MemoizedSelectionSetError {
     },
 
     #[error("{0}", 
-        errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
+        errors.iter().map(|error| format!("{}", error)).collect::<Vec<_>>().join("\n")
     )]
-    ValidateAddSelectionSetsResultWithMultipleErrors {
-        errors: Vec<WithLocation<AddSelectionSetsError>>,
-    },
+    ValidateAddSelectionSetsResultWithMultipleErrors { errors: Vec<Diagnostic> },
 
     #[error("{0}")]
     EntityAccessError(Diagnostic),
