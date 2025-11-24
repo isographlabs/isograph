@@ -1,7 +1,6 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{Diagnostic, WithLocation};
-use isograph_lang_parser::IsographLiteralParseError;
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
@@ -94,7 +93,7 @@ fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     let contains_iso = parse_iso_literals(db).to_owned().map_err(|errors| {
         errors
             .into_iter()
-            .map(|e| ValidationError::IsographLiteralParseError { message: e })
+            .map(ValidationError::Diagnostic)
             .collect::<Vec<_>>()
     })?;
     let contains_iso_stats = contains_iso.stats();
@@ -139,11 +138,6 @@ pub enum ValidationError {
 
     #[error("{0}")]
     Diagnostic(Diagnostic),
-
-    #[error("{}", message.for_display())]
-    IsographLiteralParseError {
-        message: WithLocation<IsographLiteralParseError>,
-    },
 }
 
 #[memo]

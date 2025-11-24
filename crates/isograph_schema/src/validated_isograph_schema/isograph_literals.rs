@@ -3,12 +3,10 @@ use crate::{
     UnprocessedSelectionSet, process_client_field_declaration, process_client_pointer_declaration,
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, DiagnosticVecResult, Location, RelativePathToSourceFile, Span,
-    TextSource, WithLocation, WithLocationPostfix, WithSpan,
+    CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
+    RelativePathToSourceFile, Span, TextSource, WithSpan,
 };
-use isograph_lang_parser::{
-    IsoLiteralExtractionResult, IsographLiteralParseError, parse_iso_literal,
-};
+use isograph_lang_parser::{IsoLiteralExtractionResult, parse_iso_literal};
 use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
 use lazy_static::lazy_static;
 use pico::SourceId;
@@ -25,8 +23,7 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
     // we are using it in crates/isograph_fixture_tests/src/main.rs.
     // We should reconsider this!
     current_working_directory: CurrentWorkingDirectory,
-) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
-{
+) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     let mut extraction_results = vec![];
 
     for iso_literal_extraction in
@@ -48,8 +45,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
-) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
-{
+) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     extract_iso_literals_from_file_content(db, relative_path_to_source_file)
         .iter()
         .map(|iso_literal_extraction| {
@@ -67,8 +63,7 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
 pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
-) -> Vec<Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>>>
-{
+) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     let IsoLiteralsSource {
         relative_path,
         content: _,
@@ -170,7 +165,7 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(IsoLiteralExtractionResult, TextSource), WithLocation<IsographLiteralParseError>> {
+) -> DiagnosticResult<(IsoLiteralExtractionResult, TextSource)> {
     let IsoLiteralExtraction {
         iso_literal_text,
         iso_literal_start_index,
@@ -180,17 +175,23 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     } = iso_literal_extraction;
     let text_source = TextSource {
         relative_path_to_source_file,
-        span: Some(Span::new(
+        span: Span::new(
             *iso_literal_start_index as u32,
             (iso_literal_start_index + iso_literal_text.len()) as u32,
-        )),
+        )
+        .wrap_some(),
         current_working_directory,
     };
 
     if !has_paren {
-        return IsographLiteralParseError::ExpectedParenthesesAroundIsoLiteral
-            .with_generated_location()
-            .wrap_err();
+        return Diagnostic::new(
+            "You must call the iso function with parentheses. \"iso`...`\" is \
+            not supported"
+                .to_string(),
+            // TODO get a better span
+            Location::new(text_source, Span::todo_generated()).wrap_some(),
+        )
+        .wrap_err();
     }
 
     let iso_literal_extraction_result = memoized_parse_iso_literal(
@@ -207,9 +208,11 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
         IsoLiteralExtractionResult::ClientFieldDeclaration(_)
     );
     if is_client_field_declaration && !has_associated_js_function {
-        return IsographLiteralParseError::ExpectedAssociatedJsFunction
-            .with_location(Location::new(text_source, Span::todo_generated()))
-            .wrap_err();
+        return Diagnostic::new(
+            "Isograph literals must be immediately called, and passed a function".to_string(),
+            Location::new(text_source, Span::todo_generated()).wrap_some(),
+        )
+        .wrap_err();
     }
 
     Ok((iso_literal_extraction_result, text_source))
@@ -277,7 +280,7 @@ pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol>(
     // TODO we should not pass the text source here! Whenever the iso literal
     // moves around the page, we break memoization, due to this parameter.
     text_source: TextSource,
-) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
+) -> DiagnosticResult<IsoLiteralExtractionResult> {
     parse_iso_literal(
         iso_literal_text,
         definition_file_path,

@@ -6,7 +6,7 @@ use common_lang_types::{DescriptionValue, WithSpan};
 use isograph_lang_types::{Description, semantic_token_legend};
 use prelude::Postfix;
 
-use crate::{IsographLangTokenKind, PeekableLexer};
+use crate::{IsographLangTokenKind, peekable_lexer::PeekableLexer};
 
 pub(crate) fn parse_optional_description(
     tokens: &mut PeekableLexer,

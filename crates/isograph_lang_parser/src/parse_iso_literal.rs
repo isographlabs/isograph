@@ -1,7 +1,8 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, IsoLiteralText, Location,
-    RelativePathToSourceFile, Span, TextSource, UnvalidatedTypeName, ValueKeyName,
-    WithEmbeddedLocation, WithLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
+    DiagnosticResult, IsoLiteralText, Location, RelativePathToSourceFile, Span, TextSource,
+    UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation, WithLocation, WithLocationPostfix,
+    WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -20,10 +21,7 @@ use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
 use std::{collections::HashSet, ops::ControlFlow};
 
-use crate::{
-    IsographLangTokenKind, IsographLiteralParseError, ParseResultWithLocation, ParseResultWithSpan,
-    PeekableLexer, parse_optional_description,
-};
+use crate::{IsographLangTokenKind, parse_optional_description, peekable_lexer::PeekableLexer};
 
 #[derive(Debug, Clone, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
@@ -50,7 +48,7 @@ pub fn parse_iso_literal(
     // TODO we should not pass the text source here! Whenever the iso literal
     // moves around the page, we break memoizaton, due to this parameter.
     text_source: TextSource,
-) -> Result<IsoLiteralExtractionResult, WithLocation<IsographLiteralParseError>> {
+) -> DiagnosticResult<IsoLiteralExtractionResult> {
     let mut tokens = PeekableLexer::new(&iso_literal_text, text_source);
     let discriminator = tokens.peek();
     let text = tokens.source(discriminator.span);
@@ -59,13 +57,10 @@ pub fn parse_iso_literal(
 
     match text {
         "entrypoint" => {
-            let entrypoint_keyword = tokens
-                .parse_source_of_kind(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_KEYWORD_USE,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
-                .map_err(|err| err.to_with_location(tokens.text_source))?;
+            let entrypoint_keyword = tokens.parse_source_of_kind(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_KEYWORD_USE,
+            )?;
             IsoLiteralExtractionResult::EntrypointDeclaration(parse_iso_entrypoint_declaration(
                 &mut tokens,
                 entrypoint_keyword.span,
@@ -74,13 +69,10 @@ pub fn parse_iso_literal(
             .wrap_ok()
         }
         "field" => {
-            tokens
-                .parse_source_of_kind(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_KEYWORD_DECLARATION,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
-                .map_err(|err| err.to_with_location(tokens.text_source))?;
+            tokens.parse_source_of_kind(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_KEYWORD_DECLARATION,
+            )?;
             IsoLiteralExtractionResult::ClientFieldDeclaration(parse_iso_client_field_declaration(
                 &mut tokens,
                 definition_file_path,
@@ -89,13 +81,10 @@ pub fn parse_iso_literal(
             .wrap_ok()
         }
         "pointer" => {
-            tokens
-                .parse_source_of_kind(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_KEYWORD_DECLARATION,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))
-                .map_err(|err| err.to_with_location(tokens.text_source))?;
+            tokens.parse_source_of_kind(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_KEYWORD_DECLARATION,
+            )?;
             IsoLiteralExtractionResult::ClientPointerDeclaration(
                 parse_iso_client_pointer_declaration(
                     &mut tokens,
@@ -105,9 +94,12 @@ pub fn parse_iso_literal(
             )
             .wrap_ok()
         }
-        _ => IsographLiteralParseError::ExpectedFieldOrPointerOrEntrypoint
-            .with_location(Location::new(tokens.text_source, discriminator.span))
-            .wrap_err(),
+        _ => Diagnostic::new(
+            "Isograph literals must start with on the keywords `field`, `pointer` or `entrypoint`"
+                .to_string(),
+            Location::new(tokens.text_source, discriminator.span).wrap_some(),
+        )
+        .wrap_err(),
     }
 }
 
@@ -115,134 +107,110 @@ fn parse_iso_entrypoint_declaration(
     tokens: &mut PeekableLexer<'_>,
     entrypoint_keyword: Span,
     iso_literal_text: IsoLiteralText,
-) -> ParseResultWithLocation<WithSpan<EntrypointDeclaration>> {
-    let entrypoint_declaration = tokens
-        .with_span_result(|tokens| {
-            let parent_type = tokens
-                .parse_string_key_type(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_SERVER_OBJECT_TYPE,
-                )
-                .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let dot = tokens
-                .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let client_field_name = tokens
-                .parse_string_key_type(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
-                )
-                .map(|with_span| {
-                    with_span
-                        .map(ClientScalarSelectableNameWrapper)
-                        .to_with_location(tokens.text_source)
-                })
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+) -> DiagnosticResult<WithSpan<EntrypointDeclaration>> {
+    let entrypoint_declaration = tokens.with_span_result(|tokens| {
+        let parent_type = tokens
+            .parse_string_key_type(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_SERVER_OBJECT_TYPE,
+            )?
+            .map(ServerObjectEntityNameWrapper);
+        let dot = tokens
+            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
+        let client_field_name = tokens
+            .parse_string_key_type(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
+            )
+            .map(|with_span| {
+                with_span
+                    .map(ClientScalarSelectableNameWrapper)
+                    .to_with_location(tokens.text_source)
+            })?;
 
-            let directives = parse_directives(tokens)?;
+        let directives = parse_directives(tokens)?;
 
-            let entrypoint_directive_set =
-                from_isograph_field_directives(&directives).map_err(|message| {
-                    IsographLiteralParseError::Diagnostic { error: message }.with_span(
-                        directives
-                            .first()
-                            .map(|x| x.span)
-                            .unwrap_or_else(Span::todo_generated),
-                    )
-                })?;
-            EntrypointDeclaration {
-                parent_type,
-                client_field_name,
-                iso_literal_text,
-                entrypoint_keyword: ().with_span(entrypoint_keyword),
-                dot: dot.map(|_| ()),
-                entrypoint_directive_set,
-                semantic_tokens: tokens.semantic_tokens(),
-            }
-            .wrap_ok()
-        })
-        .map_err(|with_span: WithSpan<_>| with_span.to_with_location(tokens.text_source))?;
+        let entrypoint_directive_set = from_isograph_field_directives(&directives)?;
+        EntrypointDeclaration {
+            parent_type,
+            client_field_name,
+            iso_literal_text,
+            entrypoint_keyword: ().with_span(entrypoint_keyword),
+            dot: dot.map(|_| ()),
+            entrypoint_directive_set,
+            semantic_tokens: tokens.semantic_tokens(),
+        }
+        .wrap_ok()
+    })?;
 
     if let Some(span) = tokens.remaining_token_span() {
-        return IsographLiteralParseError::LeftoverTokens
-            .with_location(Location::new(tokens.text_source, span))
-            .wrap_err();
+        leftover_tokens_diagnostic(Location::new(tokens.text_source, span)).wrap_err()
+    } else {
+        entrypoint_declaration.wrap_ok()
     }
-
-    entrypoint_declaration.wrap_ok()
 }
 
 fn parse_iso_client_field_declaration(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
-) -> ParseResultWithLocation<WithSpan<ClientFieldDeclaration>> {
+) -> DiagnosticResult<WithSpan<ClientFieldDeclaration>> {
     let client_field_declaration =
-        parse_client_field_declaration_inner(tokens, definition_file_path, const_export_name)
-            .map_err(|with_span| with_span.to_with_location(tokens.text_source))?;
+        parse_client_field_declaration_inner(tokens, definition_file_path, const_export_name)?;
 
     if let Some(span) = tokens.remaining_token_span() {
-        return IsographLiteralParseError::LeftoverTokens
-            .with_location(Location::new(tokens.text_source, span))
-            .wrap_err();
+        leftover_tokens_diagnostic(Location::new(tokens.text_source, span)).wrap_err()
+    } else {
+        client_field_declaration.wrap_ok()
     }
-
-    client_field_declaration.wrap_ok()
 }
 
 fn parse_client_field_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
-) -> ParseResultWithSpan<WithSpan<ClientFieldDeclaration>> {
+) -> DiagnosticResult<WithSpan<ClientFieldDeclaration>> {
     tokens.with_span_result(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
 
         let _ = tokens
-            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
         let client_field_name: WithEmbeddedLocation<ClientScalarSelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
-            )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+            )?
             .to_with_embedded_location(tokens.text_source);
 
         let variable_definitions = parse_variable_definitions(tokens)?;
 
         let directives = parse_directives(tokens)?;
 
-        let client_field_directive_set =
-            from_isograph_field_directives(&directives).map_err(|message| {
-                IsographLiteralParseError::Diagnostic { error: message }.with_span(
-                    directives
-                        .first()
-                        .map(|x| x.span)
-                        .unwrap_or_else(Span::todo_generated),
-                )
-            })?;
+        let client_field_directive_set = from_isograph_field_directives(&directives)?;
 
         let description = parse_optional_description(tokens);
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
-            IsographLiteralParseError::ExpectedSelectionSet.with_span(Span::new(0, 0))
+            expected_selection_set_diagnostic(Location::new(
+                tokens.text_source,
+                // TODO get a span
+                Span::todo_generated(),
+            ))
         })?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
-            IsographLiteralParseError::ExpectedLiteralToBeExported {
-                literal_type: "field".to_string(),
-                suggested_const_export_name: client_field_name.item.into(),
-            }
-            .with_generated_span()
+            expected_literal_to_be_exported_diagnostic(
+                "field",
+                client_field_name.item.into(),
+                // TODO use a better location
+                client_field_name.location.into(),
+            )
         })?;
 
         ClientFieldDeclaration {
@@ -265,15 +233,12 @@ fn parse_iso_client_pointer_declaration(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
-) -> ParseResultWithLocation<WithSpan<ClientPointerDeclaration>> {
+) -> DiagnosticResult<WithSpan<ClientPointerDeclaration>> {
     let client_pointer_declaration =
-        parse_client_pointer_declaration_inner(tokens, definition_file_path, const_export_name)
-            .map_err(|with_span| with_span.to_with_location(tokens.text_source))?;
+        parse_client_pointer_declaration_inner(tokens, definition_file_path, const_export_name)?;
 
     if let Some(span) = tokens.remaining_token_span() {
-        return IsographLiteralParseError::LeftoverTokens
-            .with_location(Location::new(tokens.text_source, span))
-            .wrap_err();
+        return leftover_tokens_diagnostic(Location::new(tokens.text_source, span)).wrap_err();
     }
 
     client_pointer_declaration.wrap_ok()
@@ -281,48 +246,46 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>> {
-    let keyword = tokens
-        .parse_source_of_kind(
-            IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_TO,
-        )
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+) -> DiagnosticResult<GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>> {
+    let keyword = tokens.parse_source_of_kind(
+        IsographLangTokenKind::Identifier,
+        semantic_token_legend::ST_TO,
+    )?;
 
     if keyword.item != "to" {
-        return IsographLiteralParseError::ExpectedTo
-            .with_span(keyword.span)
-            .wrap_err();
+        Diagnostic::new(
+            "Expected the keyword `to`".to_string(),
+            Location::new(tokens.text_source, keyword.span).wrap_some(),
+        )
+        .wrap_err()
+    } else {
+        parse_type_annotation(tokens).map(|with_span| {
+            with_span.map(|x| ServerObjectEntityNameWrapper(x.unchecked_conversion()))
+        })
     }
-
-    parse_type_annotation(tokens)
-        .map(|with_span| with_span.map(|x| ServerObjectEntityNameWrapper(x.unchecked_conversion())))
 }
 
 fn parse_client_pointer_declaration_inner(
     tokens: &mut PeekableLexer<'_>,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<&str>,
-) -> ParseResultWithSpan<WithSpan<ClientPointerDeclaration>> {
+) -> DiagnosticResult<WithSpan<ClientPointerDeclaration>> {
     tokens.with_span_result(|tokens| {
         let parent_type = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
 
         let _dot = tokens
-            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
         let client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
-            )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+            )?
             .to_with_embedded_location(tokens.text_source);
 
         let variable_definitions = parse_variable_definitions(tokens)?;
@@ -334,15 +297,19 @@ fn parse_client_pointer_declaration_inner(
         let description = parse_optional_description(tokens);
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
-            IsographLiteralParseError::ExpectedSelectionSet.with_span(Span::new(0, 0))
+            expected_selection_set_diagnostic(Location::new(
+                tokens.text_source,
+                // TODO get a real span!
+                Span::todo_generated(),
+            ))
         })?;
 
         let const_export_name = const_export_name.ok_or_else(|| {
-            IsographLiteralParseError::ExpectedLiteralToBeExported {
-                literal_type: "pointer".to_string(),
-                suggested_const_export_name: client_pointer_name.item.into(),
-            }
-            .with_generated_span()
+            expected_literal_to_be_exported_diagnostic(
+                "pointer",
+                client_pointer_name.item.into(),
+                client_pointer_name.location.into(),
+            )
         })?;
 
         ClientPointerDeclaration {
@@ -365,7 +332,7 @@ fn parse_client_pointer_declaration_inner(
 // Note: for now, top-level selection sets are required
 fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<Option<WithSpan<SelectionSet<(), ()>>>> {
+) -> DiagnosticResult<Option<WithSpan<SelectionSet<(), ()>>>> {
     tokens.with_span_optional_result(|tokens| {
         let selections = parse_optional_selection_set_inner(tokens)?;
         selections
@@ -377,12 +344,11 @@ fn parse_optional_selection_set(
 // TODO this should not parse an optional selection set, but a required one
 fn parse_optional_selection_set_inner(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
-    let open_brace: Result<WithSpan<IsographLangTokenKind>, WithSpan<crate::LowLevelParseError>> =
-        tokens.parse_token_of_kind(
-            IsographLangTokenKind::OpenBrace,
-            semantic_token_legend::ST_OPEN_BRACE,
-        );
+) -> DiagnosticResult<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
+    let open_brace: DiagnosticResult<WithSpan<IsographLangTokenKind>> = tokens.parse_token_of_kind(
+        IsographLangTokenKind::OpenBrace,
+        semantic_token_legend::ST_OPEN_BRACE,
+    );
     if open_brace.is_err() {
         return Ok(None);
     }
@@ -399,16 +365,15 @@ fn parse_optional_selection_set_inner(
         let selection = parse_selection(tokens)?;
         let selection_name_or_alias = selection.item.name_or_alias().item;
         if !encountered_names_or_aliases.insert(selection_name_or_alias) {
-            // We have already encountered this name or alias, so we emit
-            // an error.
-            // TODO should SelectionSet be a HashMap<SelectableNameOrAlias, ...> instead of
-            // a Vec??
-            // TODO find a way to include the location of the previous field with matching
-            // name or alias
-            return IsographLiteralParseError::DuplicateNameOrAlias {
-                name_or_alias: selection_name_or_alias,
-            }
-            .with_span(selection.span)
+            // TODO we should not error here! This should instead be a problem for a later
+            // stage, i.e. for validation.
+            return Diagnostic::new(
+                format!(
+                    "A field with name or alias `{selection_name_or_alias}` \
+                 has already been defined"
+                ),
+                Location::new(tokens.text_source, selection.span).wrap_some(),
+            )
             .wrap_err();
         }
         selections.push(selection);
@@ -419,12 +384,12 @@ fn parse_optional_selection_set_inner(
 /// Parse a list with a delimiter. Expect an optional final delimiter.
 fn parse_delimited_list<'a, TResult>(
     tokens: &mut PeekableLexer<'a>,
-    parse_item: impl Fn(&mut PeekableLexer<'a>) -> ParseResultWithSpan<TResult> + 'a,
+    parse_item: impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<TResult> + 'a,
     delimiter: IsographLangTokenKind,
     delimiter_isograph_semantic_token: IsographSemanticToken,
     closing_token: IsographLangTokenKind,
     closing_isograph_semantic_token: IsographSemanticToken,
-) -> ParseResultWithSpan<WithSpan<Vec<TResult>>> {
+) -> DiagnosticResult<WithSpan<Vec<TResult>>> {
     let mut items = vec![];
 
     // Handle empty list case
@@ -446,11 +411,10 @@ fn parse_delimited_list<'a, TResult>(
             .parse_token_of_kind(delimiter, delimiter_isograph_semantic_token)
             .is_err()
         {
-            return IsographLiteralParseError::ExpectedDelimiterOrClosingToken {
-                closing_token,
-                delimiter,
-            }
-            .with_span(tokens.peek().span)
+            return Diagnostic::new(
+                format!("Expected delimited `{delimiter}` or `{closing_token}`"),
+                Location::new(tokens.text_source, tokens.peek().span).wrap_some(),
+            )
             .wrap_err();
         }
 
@@ -463,19 +427,21 @@ fn parse_delimited_list<'a, TResult>(
     }
 }
 
-fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> ParseResultWithSpan<()> {
+fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<()> {
     if tokens.source(tokens.white_space_span()).contains('\n') {
         Ok(())
     } else {
-        IsographLiteralParseError::ExpectedLineBreak
-            .with_span(tokens.peek().span)
-            .wrap_err()
+        Diagnostic::new(
+            "Expected a line break.".to_string(),
+            Location::new(tokens.text_source, tokens.peek().span).wrap_some(),
+        )
+        .wrap_err()
     }
 }
 
 fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<WithSpan<UnvalidatedSelection>> {
+) -> DiagnosticResult<WithSpan<UnvalidatedSelection>> {
     tokens.with_span_result(|tokens| {
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
         let field_name = field_name.to_with_location(tokens.text_source);
@@ -492,15 +458,7 @@ fn parse_selection(
 
         match selection_set {
             Some(selection_set) => {
-                let object_selection_directive_set = from_isograph_field_directives(&directives)
-                    .map_err(|message| {
-                        IsographLiteralParseError::Diagnostic { error: message }.with_span(
-                            directives
-                                .first()
-                                .map(|x| x.span)
-                                .unwrap_or_else(Span::todo_generated),
-                        )
-                    })?;
+                let object_selection_directive_set = from_isograph_field_directives(&directives)?;
                 SelectionTypeContainingSelections::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
@@ -512,15 +470,8 @@ fn parse_selection(
                 })
             }
             None => {
-                let scalar_selection_directive_set = from_isograph_field_directives(&directives)
-                    .map_err(|message| {
-                        IsographLiteralParseError::Diagnostic { error: message }.with_span(
-                            directives
-                                .first()
-                                .map(|x| x.span)
-                                .unwrap_or_else(Span::todo_generated),
-                        )
-                    })?;
+                let scalar_selection_directive_set = from_isograph_field_directives(&directives)?;
+
                 SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
@@ -537,25 +488,21 @@ fn parse_selection(
 
 fn parse_optional_alias_and_field_name(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<(WithSpan<StringKey>, Option<WithSpan<StringKey>>)> {
-    let field_name_or_alias = tokens
-        .parse_string_key_type::<StringKey>(
-            IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS,
-        )
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+) -> DiagnosticResult<(WithSpan<StringKey>, Option<WithSpan<StringKey>>)> {
+    let field_name_or_alias = tokens.parse_string_key_type::<StringKey>(
+        IsographLangTokenKind::Identifier,
+        semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS,
+    )?;
     let colon = tokens.parse_token_of_kind(
         IsographLangTokenKind::Colon,
         semantic_token_legend::ST_COLON,
     );
     let (field_name, alias) = if colon.is_ok() {
         (
-            tokens
-                .parse_string_key_type(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS_POST_COLON,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?,
+            tokens.parse_string_key_type(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_SELECTION_NAME_OR_ALIAS_POST_COLON,
+            )?,
             field_name_or_alias.wrap_some(),
         )
     } else {
@@ -566,18 +513,16 @@ fn parse_optional_alias_and_field_name(
 
 fn parse_directives(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<Vec<WithSpan<IsographFieldDirective>>> {
+) -> DiagnosticResult<Vec<WithSpan<IsographFieldDirective>>> {
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(
         IsographLangTokenKind::At,
         semantic_token_legend::ST_DIRECTIVE_AT,
     ) {
-        let name = tokens
-            .parse_string_key_type(
-                IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_DIRECTIVE,
-            )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let name = tokens.parse_string_key_type(
+            IsographLangTokenKind::Identifier,
+            semantic_token_legend::ST_DIRECTIVE,
+        )?;
         let directive_span = Span::join(token.span, name.span);
 
         let arguments = parse_optional_arguments(tokens)?;
@@ -589,7 +534,7 @@ fn parse_directives(
 
 fn parse_optional_arguments(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<Vec<WithLocation<SelectionFieldArgument>>> {
+) -> DiagnosticResult<Vec<WithLocation<SelectionFieldArgument>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -615,47 +560,40 @@ fn parse_optional_arguments(
 
 fn parse_argument(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<WithLocation<SelectionFieldArgument>> {
+) -> DiagnosticResult<WithLocation<SelectionFieldArgument>> {
     let argument = tokens.with_span_result(|tokens| {
-        let name = tokens
-            .parse_string_key_type(
-                IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_ARGUMENT_NAME,
-            )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-        tokens
-            .parse_token_of_kind(
-                IsographLangTokenKind::Colon,
-                semantic_token_legend::ST_COLON,
-            )
-            .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        let name = tokens.parse_string_key_type(
+            IsographLangTokenKind::Identifier,
+            semantic_token_legend::ST_ARGUMENT_NAME,
+        )?;
+        tokens.parse_token_of_kind(
+            IsographLangTokenKind::Colon,
+            semantic_token_legend::ST_COLON,
+        )?;
         let value = parse_non_constant_value(tokens)?.to_with_location(tokens.text_source);
-        Ok::<_, WithSpan<IsographLiteralParseError>>(SelectionFieldArgument { name, value })
+        Ok(SelectionFieldArgument { name, value })
     })?;
     argument.to_with_location(tokens.text_source).wrap_ok()
 }
 
 fn parse_non_constant_value(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<WithSpan<NonConstantValue>> {
+) -> DiagnosticResult<WithSpan<NonConstantValue>> {
     from_control_flow(|| {
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let _dollar_sign = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Dollar,
-                    semantic_token_legend::ST_VARIABLE_DOLLAR,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
-            let name = tokens
-                .parse_string_key_type(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_VARIABLE,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        to_control_flow::<_, Diagnostic>(|| {
+            let _dollar_sign = tokens.parse_token_of_kind(
+                IsographLangTokenKind::Dollar,
+                semantic_token_legend::ST_VARIABLE_DOLLAR,
+            )?;
+
+            let name = tokens.parse_string_key_type(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_VARIABLE,
+            )?;
             name.map(NonConstantValue::Variable).wrap_ok()
         })?;
 
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+        to_control_flow::<_, Diagnostic>(|| {
             let string = tokens
                 .parse_source_of_kind(
                     IsographLangTokenKind::StringLiteral,
@@ -667,19 +605,16 @@ fn parse_non_constant_value(
                             .intern()
                             .into()
                     })
-                })
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+                })?;
 
             string.map(NonConstantValue::String).wrap_ok()
         })?;
 
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let number = tokens
-                .parse_source_of_kind(
-                    IsographLangTokenKind::IntegerLiteral,
-                    semantic_token_legend::ST_NUMBER_LITERAL,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        to_control_flow::<_, Diagnostic>(|| {
+            let number = tokens.parse_source_of_kind(
+                IsographLangTokenKind::IntegerLiteral,
+                semantic_token_legend::ST_NUMBER_LITERAL,
+            )?;
             number
                 .map(|number| {
                     NonConstantValue::Integer(number.parse().expect("Expected valid integer"))
@@ -687,13 +622,11 @@ fn parse_non_constant_value(
                 .wrap_ok()
         })?;
 
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let open = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::OpenBrace,
-                    semantic_token_legend::ST_OPEN_BRACE,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        to_control_flow::<_, Diagnostic>(|| {
+            let open = tokens.parse_token_of_kind(
+                IsographLangTokenKind::OpenBrace,
+                semantic_token_legend::ST_OPEN_BRACE,
+            )?;
 
             let entries = parse_delimited_list(
                 tokens,
@@ -712,13 +645,11 @@ fn parse_non_constant_value(
                 .wrap_ok()
         })?;
 
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let bool_or_null = tokens
-                .parse_source_of_kind(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_BOOL_OR_NULL,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        to_control_flow(|| {
+            let bool_or_null = tokens.parse_source_of_kind(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_BOOL_OR_NULL,
+            )?;
 
             let span = bool_or_null.span;
 
@@ -726,36 +657,37 @@ fn parse_non_constant_value(
                 "null" => NonConstantValue::Null.wrap_ok(),
                 bool => match bool.parse::<bool>() {
                     Ok(b) => NonConstantValue::Boolean(b).wrap_ok(),
-                    Err(_) => IsographLiteralParseError::ExpectedBoolean
-                        .with_span(span)
-                        .wrap_err(),
+                    Err(_) => Diagnostic::new(
+                        "Expected null or a boolean value (true or false)".to_string(),
+                        Location::new(tokens.text_source, span).wrap_some(),
+                    )
+                    .wrap_err(),
                 },
             })
         })?;
 
-        ControlFlow::Continue(
-            IsographLiteralParseError::ExpectedNonConstantValue.with_generated_span(),
-        )
+        ControlFlow::Continue(Diagnostic::new(
+            "Expected a valid value, like $foo, 42, \"bar\", true or false".to_string(),
+            // TODO get location
+            Location::Generated.wrap_some(),
+        ))
     })
 }
 
 fn parse_object_entry(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<NameValuePair<ValueKeyName, NonConstantValue>> {
+) -> DiagnosticResult<NameValuePair<ValueKeyName, NonConstantValue>> {
     let name = tokens
         .parse_string_key_type(
             IsographLangTokenKind::Identifier,
             semantic_token_legend::ST_OBJECT_LITERAL_KEY,
-        )
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+        )?
         .to_with_location(tokens.text_source);
 
-    tokens
-        .parse_token_of_kind(
-            IsographLangTokenKind::Colon,
-            semantic_token_legend::ST_COLON,
-        )
-        .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+    tokens.parse_token_of_kind(
+        IsographLangTokenKind::Colon,
+        semantic_token_legend::ST_COLON,
+    )?;
 
     let value = parse_non_constant_value(tokens)?.to_with_location(tokens.text_source);
 
@@ -764,7 +696,7 @@ fn parse_object_entry(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
+) -> DiagnosticResult<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -789,28 +721,23 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
+) -> DiagnosticResult<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
     tokens
         .with_span_result(|tokens| {
-            let _dollar = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Dollar,
-                    semantic_token_legend::ST_VARIABLE_DOLLAR,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            let _dollar = tokens.parse_token_of_kind(
+                IsographLangTokenKind::Dollar,
+                semantic_token_legend::ST_VARIABLE_DOLLAR,
+            )?;
             let name = tokens
                 .parse_string_key_type(
                     IsographLangTokenKind::Identifier,
                     semantic_token_legend::ST_VARIABLE,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?
+                )?
                 .to_with_location(tokens.text_source);
-            tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Colon,
-                    semantic_token_legend::ST_COLON,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            tokens.parse_token_of_kind(
+                IsographLangTokenKind::Colon,
+                semantic_token_legend::ST_COLON,
+            )?;
             let type_ = parse_type_annotation(tokens)?;
 
             let default_value = parse_optional_default_value(tokens)?;
@@ -827,7 +754,7 @@ fn parse_variable_definition(
 
 fn parse_optional_default_value(
     tokens: &mut PeekableLexer<'_>,
-) -> ParseResultWithSpan<Option<WithLocation<ConstantValue>>> {
+) -> DiagnosticResult<Option<WithLocation<ConstantValue>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::Equals,
@@ -837,7 +764,11 @@ fn parse_optional_default_value(
     {
         let non_constant_value = parse_non_constant_value(tokens)?;
         let constant_value: ConstantValue = non_constant_value.item.try_into().map_err(|_| {
-            IsographLiteralParseError::UnexpectedVariable.with_span(non_constant_value.span)
+            Diagnostic::new(
+                "Found a variable, like $foo, in a context where variables are not allowed"
+                    .to_string(),
+                Location::new(tokens.text_source, non_constant_value.span).wrap_some(),
+            )
         })?;
         constant_value
             .with_location(Location::new(tokens.text_source, non_constant_value.span))
@@ -850,15 +781,13 @@ fn parse_optional_default_value(
 
 fn parse_type_annotation(
     tokens: &mut PeekableLexer,
-) -> ParseResultWithSpan<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
     from_control_flow(|| {
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
-            let type_ = tokens
-                .parse_string_key_type(
-                    IsographLangTokenKind::Identifier,
-                    semantic_token_legend::ST_TYPE_ANNOTATION,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+        to_control_flow::<_, Diagnostic>(|| {
+            let type_ = tokens.parse_string_key_type(
+                IsographLangTokenKind::Identifier,
+                semantic_token_legend::ST_TYPE_ANNOTATION,
+            )?;
 
             let is_non_null = tokens
                 .parse_token_of_kind(
@@ -876,22 +805,18 @@ fn parse_type_annotation(
             }
         })?;
 
-        to_control_flow::<_, WithSpan<IsographLiteralParseError>>(|| {
+        to_control_flow::<_, Diagnostic>(|| {
             // TODO: atomically parse everything here:
-            tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::OpenBracket,
-                    semantic_token_legend::ST_TYPE_ANNOTATION,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            tokens.parse_token_of_kind(
+                IsographLangTokenKind::OpenBracket,
+                semantic_token_legend::ST_TYPE_ANNOTATION,
+            )?;
 
             let inner_type_annotation = parse_type_annotation(tokens)?;
-            tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::CloseBracket,
-                    semantic_token_legend::ST_TYPE_ANNOTATION,
-                )
-                .map_err(|with_span| with_span.map(IsographLiteralParseError::from))?;
+            tokens.parse_token_of_kind(
+                IsographLangTokenKind::CloseBracket,
+                semantic_token_legend::ST_TYPE_ANNOTATION,
+            )?;
             let is_non_null = tokens
                 .parse_token_of_kind(
                     IsographLangTokenKind::Exclamation,
@@ -922,9 +847,10 @@ fn parse_type_annotation(
         //
         // We don't get a great error message with this current approach.
 
-        ControlFlow::Continue(
-            IsographLiteralParseError::ExpectedTypeAnnotation.with_span(tokens.peek().span),
-        )
+        ControlFlow::Continue(Diagnostic::new(
+            "Expected a type (e.g. String, [String], or String!)".to_string(),
+            Location::new(tokens.text_source, tokens.peek().span).wrap_some(),
+        ))
     })
 }
 
@@ -940,4 +866,34 @@ fn from_control_flow<T, E>(control_flow: impl FnOnce() -> ControlFlow<T, E>) -> 
         ControlFlow::Break(t) => Ok(t),
         ControlFlow::Continue(e) => Err(e),
     }
+}
+
+fn leftover_tokens_diagnostic(location: Location) -> Diagnostic {
+    Diagnostic::new(
+        "Leftover tokens remaining".to_string(),
+        location.wrap_some(),
+    )
+}
+
+fn expected_selection_set_diagnostic(location: Location) -> Diagnostic {
+    Diagnostic::new(
+        "Selection sets are required. If you do not want to \
+        select any fields, write an empty selection set: {{}}"
+            .to_string(),
+        location.wrap_some(),
+    )
+}
+
+fn expected_literal_to_be_exported_diagnostic(
+    literal_type: &str,
+    suggested_const_export_name: ClientSelectableName,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!(
+            "This isograph {literal_type} literal must be exported as a named export, for example \
+            as `export const {suggested_const_export_name}`"
+        ),
+        location.wrap_some(),
+    )
 }
