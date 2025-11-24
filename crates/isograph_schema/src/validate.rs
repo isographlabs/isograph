@@ -1,15 +1,15 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{Diagnostic, WithLocation};
+use common_lang_types::Diagnostic;
 use pico_macros::memo;
 use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ContainsIsoStats, IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    ContainsIsoStats, IsographDatabase, NetworkProtocol, create_new_exposed_field,
+    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
+    server_id_selectable, server_object_entities, server_selectables_map,
+    validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -30,11 +30,9 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 
     maybe_extend(
         &mut errors,
-        validate_use_of_arguments(db).to_owned().map_err(|e| {
-            e.into_iter()
-                .map(|e| ValidationError::ValidateUseOfArgumentsError { error: e })
-                .collect()
-        }),
+        validate_use_of_arguments(db)
+            .to_owned()
+            .map_err(|e| e.into_iter().map(ValidationError::Diagnostic).collect()),
     );
 
     maybe_extend(
@@ -125,11 +123,6 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
 
 #[derive(Debug, Eq, PartialEq, Clone, Error, PartialOrd, Ord)]
 pub enum ValidationError {
-    #[error("{}", error.for_display())]
-    ValidateUseOfArgumentsError {
-        error: WithLocation<ValidateUseOfArgumentsError>,
-    },
-
     #[error("{0}")]
     ParseTypeSystemDocumentsError(Diagnostic),
 
