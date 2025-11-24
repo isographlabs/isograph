@@ -8,10 +8,9 @@ use thiserror::Error;
 
 use crate::{
     ContainsIsoStats, IsographDatabase, NetworkProtocol, ValidateUseOfArgumentsError,
-    ValidatedEntrypointError, create_new_exposed_field,
-    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
-    server_id_selectable, server_object_entities, server_selectables_map,
-    validate_use_of_arguments, validated_entrypoints,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -47,7 +46,7 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     errors.extend(validate_all_id_fields(db).clone());
 
     errors.extend(validated_entrypoints(db).values().flat_map(|result| {
-        ValidationError::ValidatedEntrypointError(result.as_ref().err()?.clone()).wrap_some()
+        ValidationError::Diagnostic(result.as_ref().err()?.clone()).wrap_some()
     }));
 
     maybe_extend(&mut errors, validate_all_expose_as_fields(db));
@@ -137,9 +136,6 @@ pub enum ValidationError {
 
     #[error("{}", error)]
     FieldToInsertToServerSelectableError { error: Diagnostic },
-
-    #[error("{0}")]
-    ValidatedEntrypointError(#[from] ValidatedEntrypointError),
 
     #[error("{0}")]
     Diagnostic(Diagnostic),

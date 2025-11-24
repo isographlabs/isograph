@@ -1,14 +1,17 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{ClientScalarSelectableName, Diagnostic, ServerObjectEntityName};
+use common_lang_types::{
+    ClientScalarSelectableName, Diagnostic, DiagnosticResult, ServerObjectEntityName,
+};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
 use pico_macros::memo;
-use thiserror::Error;
+use prelude::Postfix;
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
-    parse_iso_literal_in_source, selectable_named,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, SelectableTrait,
+    client_scalar_selectable_named, parse_iso_literal_in_source,
+    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 #[memo]
@@ -33,7 +36,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (ServerObjectEntityName, ClientScalarSelectableName),
-    Result<EntrypointDeclarationInfo, ValidatedEntrypointError>,
+    DiagnosticResult<EntrypointDeclarationInfo>,
 > {
     let entrypoints = entrypoints(db);
 
@@ -51,7 +54,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 entrypoint_declaration_info.client_field_name.item.0,
             )
             .as_ref()
-            .map_err(|e| ValidatedEntrypointError::Diagnostic(e.clone()))?
+            .map_err(Clone::clone)?
             .as_ref()
             .ok_or_else(|| {
                 // check if it has a different type
@@ -71,21 +74,24 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         DefinitionLocation::Client(SelectionType::Object(_)) => "a client pointer",
                     };
 
-                    return ValidatedEntrypointError::IncorrectType {
-                        parent_object_entity_name: entrypoint_declaration_info.parent_type.item.0,
-                        selectable_name: entrypoint_declaration_info.client_field_name.item.0,
+                    return selectable_is_wrong_type_diagnostic(
+                        entrypoint_declaration_info.parent_type.item.0,
+                        entrypoint_declaration_info.client_field_name.item.0.into(),
+                        "client field",
                         actual_type,
-                    };
+                        match selectable {
+                            DefinitionLocation::Server(s) => s.name().location,
+                            DefinitionLocation::Client(c) => c.name().location,
+                        },
+                    );
                 }
 
                 // if not
-                ValidatedEntrypointError::NotDefined {
-                    parent_object_entity_name: entrypoint_declaration_info.parent_type.item.0,
-                    client_scalar_selectable_name: entrypoint_declaration_info
-                        .client_field_name
-                        .item
-                        .0,
-                }
+                selectable_is_not_defined_diagnostic(
+                    entrypoint_declaration_info.parent_type.item.0,
+                    entrypoint_declaration_info.client_field_name.item.0.into(),
+                    entrypoint_declaration_info.client_field_name.location,
+                )
             })?;
 
             Ok(EntrypointDeclarationInfo {
@@ -111,7 +117,17 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                     (existing_result.as_ref(), value.as_ref())
                     && existing_entrypoint.directive_set != new_entrypoint.directive_set
                 {
-                    *existing_result = Err(ValidatedEntrypointError::LazyLoadInconsistentEntrypoint)
+                    *existing_result = Diagnostic::new(
+                        "Entrypoint declared lazy in one location and \
+                            declared eager in another location. Entrypoint \
+                            must be either lazy or non-lazy in all instances."
+                            .to_string(),
+                        entrypoint_declaration_info
+                            .client_field_name
+                            .location
+                            .wrap_some(),
+                    )
+                    .wrap_err()
                 }
             }
             Entry::Vacant(vacant_entry) => {
@@ -121,31 +137,4 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     }
 
     out
-}
-
-#[derive(Error, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum ValidatedEntrypointError {
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
-
-    #[error("`{parent_object_entity_name}.{client_scalar_selectable_name}` was not defined")]
-    NotDefined {
-        parent_object_entity_name: ServerObjectEntityName,
-        client_scalar_selectable_name: ClientScalarSelectableName,
-    },
-
-    #[error(
-        "Expected `{parent_object_entity_name}.{selectable_name}` to be a client field, \
-        but it was {actual_type}."
-    )]
-    IncorrectType {
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: ClientScalarSelectableName,
-        actual_type: &'static str,
-    },
-
-    #[error(
-        "Entrypoint declared lazy in one location and declared eager in another location. Entrypoint must be either lazy or non-lazy in all instances."
-    )]
-    LazyLoadInconsistentEntrypoint,
 }

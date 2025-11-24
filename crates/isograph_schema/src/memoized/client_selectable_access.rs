@@ -455,9 +455,9 @@ pub fn multiple_selectable_definitions_found_diagnostic(
     )
 }
 
-fn selectable_is_wrong_type_diagnostic(
+pub fn selectable_is_wrong_type_diagnostic(
     parent_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
+    client_selectable_name: SelectableName,
     intended_type: &'static str,
     actual_type: &'static str,
     location: Location,
@@ -466,6 +466,17 @@ fn selectable_is_wrong_type_diagnostic(
         format!(
             "Expected `{parent_object_entity_name}.{client_selectable_name}` to be {intended_type}. But it was {actual_type}."
         ),
+        location.wrap_some(),
+    )
+}
+
+pub fn selectable_is_not_defined_diagnostic(
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: SelectableName,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("`{parent_object_entity_name}.{client_selectable_name}` is not defined."),
         location.wrap_some(),
     )
 }
