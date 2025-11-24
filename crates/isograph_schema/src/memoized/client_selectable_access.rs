@@ -107,9 +107,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
                 first.clone().wrap_some().wrap_ok()
             } else {
                 let location = match first {
-                    SelectionType::Scalar(s) => {
-                        s.client_field_name.location.into_typed::<Location>()
-                    }
+                    SelectionType::Scalar(s) => s.client_field_name.location.to::<Location>(),
                     SelectionType::Object(o) => o.client_pointer_name.location.into(),
                 };
                 multiple_selectable_definitions_found_diagnostic(
@@ -404,7 +402,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                         } else {
                             let location = match first {
                                 SelectionType::Scalar(s) => {
-                                    s.client_field_name.location.into_typed::<Location>()
+                                    s.client_field_name.location.to::<Location>()
                                 }
                                 SelectionType::Object(o) => o.client_pointer_name.location.into(),
                             };

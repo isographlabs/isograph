@@ -302,7 +302,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             client_pointer_declaration
                 .client_pointer_name
                 .location
-                .into_typed::<Location>()
+                .to::<Location>()
                 .wrap_some(),
         )
         .wrap_err();

@@ -28,7 +28,7 @@ where
     }
 
     #[inline(always)]
-    fn into_typed<T>(self) -> T
+    fn to<T>(self) -> T
     where
         Self: Into<T>,
     {
