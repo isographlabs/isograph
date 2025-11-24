@@ -14,7 +14,9 @@ use crate::{
     },
 };
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
+use common_lang_types::{
+    CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult,
+};
 use isograph_compiler::{
     CompilerState, WithDuration, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
@@ -22,7 +24,7 @@ use isograph_compiler::{
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
-use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
+use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     HoverProviderCapability,
     request::{Completion, HoverRequest, SemanticTokensFullRequest},
@@ -36,11 +38,10 @@ use lsp_types::{
 };
 use prelude::Postfix;
 use std::{ops::ControlFlow, path::PathBuf};
-use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams> {
+pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
         text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
@@ -60,10 +61,15 @@ pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams>
         completion_provider: Some(Default::default()),
         ..Default::default()
     };
-    let server_capabilities = serde_json::to_value(server_capabilities)?;
-    let params = connection.initialize(server_capabilities)?;
+    let server_capabilities =
+        serde_json::to_value(server_capabilities).map_err(|e| Diagnostic::from_error(e, None))?;
+    let params = connection
+        .initialize(server_capabilities)
+        .map_err(|e| Diagnostic::from_error(e, None))?;
 
-    serde_json::from_value::<InitializeParams>(params)?.wrap_ok()
+    serde_json::from_value::<InitializeParams>(params)
+        .map_err(|e| Diagnostic::from_error(e, None))?
+        .wrap_ok()
 }
 
 /// Run the main server loop
@@ -72,10 +78,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<()> {
+) -> DiagnosticVecResult<()> {
     let mut compiler_state: CompilerState<TNetworkProtocol> =
-        CompilerState::new(config_location, current_working_directory)
-            .map_err(LSPProcessError::Diagnostic)?;
+        CompilerState::new(config_location, current_working_directory)?;
 
     eprintln!("Running server loop");
 
@@ -121,13 +126,11 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                             "{}",
                             "Config change detected.".cyan()
                         );
-                        compiler_state = CompilerState::new(
-                            config_location, current_working_directory)
-                            .map_err(LSPProcessError::Diagnostic)?;
+                        compiler_state = CompilerState::new(config_location, current_working_directory)?;
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) =
-                        create_debounced_file_watcher(&config);
+                            create_debounced_file_watcher(&config);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
                         // new DB. Namely, there's an open files hash map that needs to be transferred over.
@@ -142,8 +145,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         }
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
-                        update_sources(&mut compiler_state.db, &changes)
-                            .map_err(|e| {LSPProcessError::Diagnostics { errors: e }})?;
+                        update_sources(&mut compiler_state.db, &changes)?;
                         compiler_state.run_garbage_collection();
                     };
                 } else {
@@ -200,35 +202,6 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             }),
         },
     }
-}
-
-pub(crate) type LSPProcessResult<T> = Result<T, LSPProcessError>;
-
-#[derive(Debug, Error)]
-pub enum LSPProcessError {
-    #[error("{error}")]
-    Serde {
-        #[from]
-        error: serde_json::Error,
-    },
-
-    #[error("{error}")]
-    Io {
-        #[from]
-        error: std::io::Error,
-    },
-
-    #[error("{error}")]
-    ProtocolError {
-        #[from]
-        error: ProtocolError,
-    },
-
-    #[error("{}", errors.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))]
-    Diagnostics { errors: Vec<Diagnostic> },
-
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
 }
 
 fn bridge_crossbeam_to_tokio<T: Send + 'static>(

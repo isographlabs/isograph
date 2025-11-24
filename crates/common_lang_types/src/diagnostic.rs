@@ -57,3 +57,11 @@ impl std::error::Error for Diagnostic {}
 pub type DiagnosticResult<T> = Result<T, Diagnostic>;
 // TODO we should not do this
 pub type DiagnosticVecResult<T> = Result<T, Vec<Diagnostic>>;
+
+// We often have functions that return single Diagnostics. It's useful to be able to
+// use ? on those in functions which return Result<T, Vec<Diagnostic>>
+impl From<Diagnostic> for Vec<Diagnostic> {
+    fn from(value: Diagnostic) -> Self {
+        vec![value]
+    }
+}

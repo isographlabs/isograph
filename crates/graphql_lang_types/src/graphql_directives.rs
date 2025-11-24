@@ -8,7 +8,6 @@ use serde::{
     Deserialize, Deserializer,
     de::{self, IntoDeserializer, MapAccess, value::SeqDeserializer},
 };
-use thiserror::Error;
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]

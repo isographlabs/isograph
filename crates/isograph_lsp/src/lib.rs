@@ -1,10 +1,8 @@
 use std::path::PathBuf;
 
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_schema::NetworkProtocol;
 use lsp_server::Connection;
-
-use crate::server::LSPProcessResult;
 
 mod completion;
 mod format;
@@ -22,7 +20,7 @@ mod uri_file_path_ext;
 pub async fn start_language_server<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<()> {
+) -> DiagnosticVecResult<()> {
     let (connection, io_handles) = Connection::stdio();
     let params = server::initialize(&connection)?;
     server::run::<TNetworkProtocol>(
@@ -32,6 +30,8 @@ pub async fn start_language_server<TNetworkProtocol: NetworkProtocol>(
         current_working_directory,
     )
     .await?;
-    io_handles.join()?;
+    io_handles
+        .join()
+        .map_err(|e| Diagnostic::from_error(e, None))?;
     Ok(())
 }
