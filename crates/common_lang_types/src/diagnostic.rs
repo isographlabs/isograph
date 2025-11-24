@@ -21,6 +21,16 @@ impl Diagnostic {
     pub fn new(message: String, location: Option<Location>) -> Diagnostic {
         Diagnostic(DiagnosticData { message, location }.boxed())
     }
+
+    pub fn from_error(e: impl std::error::Error, location: Option<Location>) -> Diagnostic {
+        Diagnostic(
+            DiagnosticData {
+                message: e.to_string(),
+                location,
+            }
+            .boxed(),
+        )
+    }
 }
 
 impl Display for Diagnostic {

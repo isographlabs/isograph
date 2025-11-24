@@ -3,13 +3,13 @@ use std::{
     time::{Duration, Instant},
 };
 
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
 use isograph_config::create_config;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico::Database;
 use prelude::Postfix;
 
-use crate::{batch_compile::BatchCompileError, source_files::initialize_sources};
+use crate::source_files::initialize_sources;
 
 const GC_DURATION_SECONDS: u64 = 60;
 
@@ -23,11 +23,11 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
     pub fn new(
         config_location: &PathBuf,
         current_working_directory: CurrentWorkingDirectory,
-    ) -> Result<Self, BatchCompileError> {
+    ) -> Result<Self, Diagnostic> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
-        initialize_sources(&mut db).map_err(BatchCompileError::Diagnostic)?;
+        initialize_sources(&mut db)?;
         Self {
             db,
             last_gc_run: Instant::now(),

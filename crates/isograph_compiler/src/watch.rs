@@ -1,5 +1,5 @@
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use notify::{
@@ -15,7 +15,7 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::{info, warn};
 
 use crate::{
-    batch_compile::{BatchCompileError, compile, print_result},
+    batch_compile::{compile, print_result},
     compiler_state::CompilerState,
     source_files::update_sources,
     with_duration::WithDuration,
@@ -24,8 +24,9 @@ use crate::{
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError> {
-    let mut state = CompilerState::new(config_location, current_working_directory)?;
+) -> DiagnosticVecResult<()> {
+    let mut state =
+        CompilerState::new(config_location, current_working_directory).map_err(|e| vec![e])?;
 
     let config = state.db.get_isograph_config().clone();
 
@@ -42,21 +43,27 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                         "{}",
                         "Config change detected. Starting a full compilation.".cyan()
                     );
-                    state = CompilerState::new(config_location, current_working_directory)?;
+                    state = CompilerState::new(config_location, current_working_directory)
+                        .map_err(|e| vec![e])?;
                     file_system_watcher.stop();
                     // TODO is this a bug? Will we continue to watch the old folders? I think so.
                     (file_system_receiver, file_system_watcher) =
                         create_debounced_file_watcher(&config);
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
-                    update_sources(&mut state.db, &changes)
-                        .map_err(|errors| BatchCompileError::Diagnostics { errors })?;
+                    update_sources(&mut state.db, &changes)?;
                     state.run_garbage_collection();
                 };
                 let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));
                 let _ = print_result(result);
             }
-            Err(errors) => return Err(errors.into()),
+            Err(errors) => {
+                return errors
+                    .into_iter()
+                    .map(|e| Diagnostic::from_error(e, None))
+                    .collect::<Vec<_>>()
+                    .wrap_err();
+            }
         }
     }
     Ok(())

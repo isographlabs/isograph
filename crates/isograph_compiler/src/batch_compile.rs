@@ -6,11 +6,10 @@ use crate::{
 };
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
+use common_lang_types::{CurrentWorkingDirectory, DiagnosticVecResult};
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
-use thiserror::Error;
 use tracing::{error, info};
 
 pub struct CompilationStats {
@@ -23,15 +22,16 @@ pub struct CompilationStats {
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError> {
+) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
-    let state = CompilerState::new(config_location, current_working_directory)?;
+    let state =
+        CompilerState::new(config_location, current_working_directory).map_err(|e| vec![e])?;
     print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
 pub fn print_result(
-    result: WithDuration<Result<CompilationStats, BatchCompileError>>,
-) -> Result<(), BatchCompileError> {
+    result: WithDuration<DiagnosticVecResult<CompilationStats>>,
+) -> DiagnosticVecResult<()> {
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
@@ -41,7 +41,11 @@ pub fn print_result(
             error!(
                 "{}\n{}\n{}",
                 "Error when compiling.\n".bright_red(),
-                err,
+                // TODO don't materialize a vec here
+                err.iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
                 format!(
                     "Compilation took {}.",
                     pretty_duration(&result.elapsed_time, None)
@@ -77,17 +81,16 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 #[tracing::instrument(skip(db))]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<CompilationStats, BatchCompileError> {
+) -> DiagnosticVecResult<CompilationStats> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
 
     let config = db.get_isograph_config();
-    let (artifacts, stats) = get_artifact_path_and_content(db)
-        .map_err(|e| BatchCompileError::Diagnostics { errors: e })?;
+    let (artifacts, stats) = get_artifact_path_and_content(db)?;
     let total_artifacts_written =
         write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)
-            .map_err(BatchCompileError::Diagnostic)?;
+            .map_err(|e| vec![e])?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,
@@ -96,28 +99,4 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
         total_artifacts_written,
     }
     .wrap_ok()
-}
-
-#[derive(Error, Debug)]
-pub enum BatchCompileError {
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
-
-    #[error(
-        "{}",
-        errors.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    NotifyErrors { errors: Vec<notify::Error> },
-
-    #[error("{}", errors.iter().map(|x| x.to_string()).collect::<Vec<_>>().join("\n"))]
-    Diagnostics { errors: Vec<Diagnostic> },
-}
-
-impl From<Vec<notify::Error>> for BatchCompileError {
-    fn from(errors: Vec<notify::Error>) -> Self {
-        BatchCompileError::NotifyErrors { errors }
-    }
 }

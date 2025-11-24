@@ -16,9 +16,7 @@ use crate::{
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
 use isograph_compiler::{
-    CompilerState, WithDuration,
-    batch_compile::BatchCompileError,
-    update_sources,
+    CompilerState, WithDuration, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
@@ -76,7 +74,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     current_working_directory: CurrentWorkingDirectory,
 ) -> LSPProcessResult<()> {
     let mut compiler_state: CompilerState<TNetworkProtocol> =
-        CompilerState::new(config_location, current_working_directory)?;
+        CompilerState::new(config_location, current_working_directory)
+            .map_err(LSPProcessError::Diagnostic)?;
 
     eprintln!("Running server loop");
 
@@ -122,10 +121,13 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                             "{}",
                             "Config change detected.".cyan()
                         );
-                        compiler_state = CompilerState::new(config_location, current_working_directory)?;
+                        compiler_state = CompilerState::new(
+                            config_location, current_working_directory)
+                            .map_err(LSPProcessError::Diagnostic)?;
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
-                        (file_system_receiver, file_system_watcher) = create_debounced_file_watcher(&config);
+                        (file_system_receiver, file_system_watcher) =
+                        create_debounced_file_watcher(&config);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
                         // new DB. Namely, there's an open files hash map that needs to be transferred over.
@@ -222,14 +224,11 @@ pub enum LSPProcessError {
         error: ProtocolError,
     },
 
-    #[error("{error}")]
-    BatchCompileError {
-        #[from]
-        error: BatchCompileError,
-    },
-
     #[error("{}", errors.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))]
     Diagnostics { errors: Vec<Diagnostic> },
+
+    #[error("{0}")]
+    Diagnostic(Diagnostic),
 }
 
 fn bridge_crossbeam_to_tokio<T: Send + 'static>(
