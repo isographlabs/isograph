@@ -5,9 +5,9 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoizedIsoLiteralError,
-    NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable, client_selectable_map,
-    client_selectable_named, server_selectable_named, server_selectables_vec_for_entity,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
+    ServerObjectSelectable, ServerScalarSelectable, client_selectable_map, client_selectable_named,
+    server_selectable_named, server_selectables_vec_for_entity,
 };
 
 #[expect(clippy::type_complexity)]
@@ -53,9 +53,7 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // case 3: both are ok -> check that there aren't duplicate definitions, and return remaining one or None
 
     match (server_selectable, client_selectable) {
-        (Err(e), Err(_)) => Err(SelectableNamedError::ParseTypeSystemDocumentsError(
-            e.clone(),
-        )),
+        (Err(e), Err(_)) => Err(SelectableNamedError::Diagnostic(e.clone())),
         (Ok(server), Err(_)) => match server.clone() {
             Some(server_selectable) => server_selectable
                 .map_err(
@@ -119,7 +117,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 > {
     let mut selectables = server_selectables_vec_for_entity(db, parent_server_object_entity_name)
         .to_owned()
-        .map_err(SelectableNamedError::ParseTypeSystemDocumentsError)?
+        .map_err(SelectableNamedError::Diagnostic)?
         .into_iter()
         .map(|(_key, value)| {
             let value =
@@ -133,13 +131,13 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     selectables.extend(
         client_selectable_map(db)
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(|e| SelectableNamedError::Diagnostic(e.clone()))?
             .iter()
             .filter(|((entity_name, _selectable_name), _value)| {
                 *entity_name == parent_server_object_entity_name
             })
             .map(|(_key, value)| {
-                let value = value.as_ref().map_err(|e| e.clone())?.clone();
+                let value = value.clone().map_err(SelectableNamedError::Diagnostic)?;
                 value.client_defined().wrap_ok()
             }),
     );
@@ -162,8 +160,5 @@ pub enum SelectableNamedError {
     },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
-
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
+    Diagnostic(Diagnostic),
 }

@@ -10,9 +10,8 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    AddSelectionSetsError, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
-    ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
-    client_selectable_declaration_map_from_iso_literals, expose_field_map,
+    AddSelectionSetsError, IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy,
+    ScalarSelectableId, client_selectable_declaration_map_from_iso_literals, expose_field_map,
     get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
 };
 
@@ -32,7 +31,9 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
-    let expose_field_map = expose_field_map(db).as_ref().map_err(|e| e.clone())?;
+    let expose_field_map = expose_field_map(db)
+        .as_ref()
+        .map_err(|e| RefetchStrategyAccessError::Diagnostic(e.clone()))?;
 
     let mut out = HashMap::new();
 
@@ -233,9 +234,6 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
 pub enum RefetchStrategyAccessError {
     #[error("{0}")]
     Diagnostic(Diagnostic),
-
-    #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
 
     #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
     DuplicateDefinition {

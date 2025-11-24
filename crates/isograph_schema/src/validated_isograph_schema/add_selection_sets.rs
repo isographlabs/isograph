@@ -1,12 +1,12 @@
 use crate::{
-    IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol, ObjectSelectableId,
-    RefetchStrategy, ScalarSelectableId, SelectableNamedError, UseRefetchFieldRefetchStrategy,
-    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, selectable_named,
-    server_scalar_selectable_named,
+    IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
+    SelectableNamedError, UseRefetchFieldRefetchStrategy, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, selectable_named, server_scalar_selectable_named,
 };
 use common_lang_types::{
-    Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
-    UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
+    Diagnostic, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan,
+    WithSpanPostfix,
 };
 use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection,
@@ -414,7 +414,7 @@ pub enum AddSelectionSetsError {
     ServerFieldCannotBeSelectedLoadably { server_field_name: SelectableName },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
+    Diagnostic(Diagnostic),
 
     #[error("{0}")]
     SelectableNamedError(#[from] SelectableNamedError),

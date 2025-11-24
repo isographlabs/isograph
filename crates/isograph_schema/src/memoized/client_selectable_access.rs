@@ -8,7 +8,7 @@ use crate::{
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    ServerObjectEntityName,
+    DiagnosticResult, Location, ServerObjectEntityName,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -16,7 +16,6 @@ use isograph_lang_types::{
 };
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::parse_iso_literal_in_source;
 
@@ -94,15 +93,12 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
         .unwrap_or_default()
 }
 
-#[memo]
+// #[memo]
 pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
-) -> Result<
-    Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
-    MemoizedIsoLiteralError,
-> {
+) -> DiagnosticResult<Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>> {
     match client_selectable_declarations(db, parent_object_entity_name, client_selectable_name)
         .split_first()
     {
@@ -110,10 +106,17 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
             if rest.is_empty() {
                 first.clone().wrap_some().wrap_ok()
             } else {
-                MemoizedIsoLiteralError::MultipleDefinitionsFound {
-                    duplicate_entity_name: parent_object_entity_name,
-                    duplicate_client_selectable_name: client_selectable_name,
-                }
+                let location = match first {
+                    SelectionType::Scalar(s) => {
+                        s.client_field_name.location.into_typed::<Location>()
+                    }
+                    SelectionType::Object(o) => o.client_pointer_name.location.into(),
+                };
+                multiple_selectable_definitions_found_diagnostic(
+                    parent_object_entity_name,
+                    client_selectable_name,
+                    location,
+                )
                 .wrap_err()
             }
         }
@@ -124,45 +127,21 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[derive(Clone, Error, Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub enum MemoizedIsoLiteralError {
-    #[error(
-        "Multiple definitions of `{duplicate_entity_name}.{duplicate_client_selectable_name}` were found"
-    )]
-    MultipleDefinitionsFound {
-        duplicate_entity_name: ServerObjectEntityName,
-        duplicate_client_selectable_name: ClientSelectableName,
-    },
-
-    #[error(
-        "Expected `{parent_object_entity_name}.{client_selectable_name}` to be {intended_type}. But it was {actual_type}."
-    )]
-    SelectableIsWrongType {
-        parent_object_entity_name: ServerObjectEntityName,
-        client_selectable_name: ClientSelectableName,
-        intended_type: &'static str,
-        actual_type: &'static str,
-    },
-
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
-}
-
 #[memo]
 pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<Option<ClientFieldDeclaration>, MemoizedIsoLiteralError> {
-    let x = client_selectable_declaration(
+) -> DiagnosticResult<Option<ClientFieldDeclaration>> {
+    let selectable = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_scalar_selectable_name.into(),
-    )
-    .as_ref()
-    .map_err(|e| e.clone())?;
+    );
 
-    let item = match x {
+    let selectable = selectable.as_ref().map_err(|e| e.clone())?;
+
+    let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
@@ -170,12 +149,13 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Scalar(client_field_declaration) => {
             client_field_declaration.clone().wrap_some().wrap_ok()
         }
-        SelectionType::Object(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
+        SelectionType::Object(o) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
-            client_selectable_name: client_scalar_selectable_name.into(),
-            intended_type: "a scalar",
-            actual_type: "an object",
-        }
+            client_scalar_selectable_name.into(),
+            "a scalar",
+            "an object",
+            o.client_pointer_name.location.into(),
+        )
         .wrap_err(),
     }
 }
@@ -185,16 +165,16 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<Option<ClientPointerDeclaration>, MemoizedIsoLiteralError> {
-    let x = client_selectable_declaration(
+) -> DiagnosticResult<Option<ClientPointerDeclaration>> {
+    let selectable = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_object_selectable_name.into(),
-    )
-    .as_ref()
-    .map_err(|e| e.clone())?;
+    );
 
-    let item = match x {
+    let selectable = selectable.as_ref().map_err(|e| e.clone())?;
+
+    let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
@@ -202,12 +182,13 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(client_pointer_declaration) => {
             client_pointer_declaration.clone().wrap_some().wrap_ok()
         }
-        SelectionType::Scalar(_) => MemoizedIsoLiteralError::SelectableIsWrongType {
+        SelectionType::Scalar(s) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
-            client_selectable_name: client_object_selectable_name.into(),
-            intended_type: "an object",
-            actual_type: "a scalar",
-        }
+            client_object_selectable_name.into(),
+            "a scalar",
+            "an object",
+            s.client_field_name.location.into(),
+        )
         .wrap_err(),
     }
 }
@@ -217,7 +198,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<Option<ClientScalarSelectable<TNetworkProtocol>>, MemoizedIsoLiteralError> {
+) -> DiagnosticResult<Option<ClientScalarSelectable<TNetworkProtocol>>> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
             .as_ref()
@@ -237,9 +218,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // This is also problematic, because we really actually want a "all client fields map" fn,
             // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
             // selection_set_access.
-            let link_fields = get_link_fields_map(db)
-                .as_ref()
-                .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
+            let link_fields = get_link_fields_map(db).as_ref().map_err(Clone::clone)?;
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -261,7 +240,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     let (_, scalar_selectable) = process_client_field_declaration_inner(db, declaration)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
+        .map_err(Clone::clone)?;
 
     scalar_selectable.clone().wrap_some().wrap_ok()
 }
@@ -271,7 +250,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<Option<ClientObjectSelectable<TNetworkProtocol>>, MemoizedIsoLiteralError> {
+) -> DiagnosticResult<Option<ClientObjectSelectable<TNetworkProtocol>>> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
             .as_ref()
@@ -284,7 +263,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     let (_, object_selectable) = process_client_pointer_declaration_inner(db, declaration)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
+        .map_err(Clone::clone)?;
 
     object_selectable.clone().wrap_some().wrap_ok()
 }
@@ -295,14 +274,13 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
-) -> Result<
+) -> DiagnosticResult<
     Option<
         SelectionType<
             ClientScalarSelectable<TNetworkProtocol>,
             ClientObjectSelectable<TNetworkProtocol>,
         >,
     >,
-    MemoizedIsoLiteralError,
 > {
     // we can do this better by reordering functions in this file
     // just in general, we can do better! This is awkward!
@@ -354,7 +332,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticResult<
     HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
         (
@@ -362,19 +340,16 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
             UnprocessedClientScalarSelectableSelectionSet,
         ),
     >,
-    MemoizedIsoLiteralError,
 > {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| MemoizedIsoLiteralError::Diagnostic(e.clone()))?;
+        .map_err(Clone::clone)?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             let (unprocessed_client_scalar_selection_set, exposed_field_client_scalar_selectable) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
-                    .clone()
-                    .map_err(MemoizedIsoLiteralError::Diagnostic)?;
+                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name).clone()?;
 
             map.insert(
                 (
@@ -398,53 +373,61 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticResult<
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
-        Result<OwnedClientSelectable<TNetworkProtocol>, MemoizedIsoLiteralError>,
+        DiagnosticResult<OwnedClientSelectable<TNetworkProtocol>>,
     >,
-    MemoizedIsoLiteralError,
 > {
     let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);
 
     iso_literal_map
         .iter()
-        .map(|(key, value)| {
-            let value = (|| match value.split_first() {
-                Some((first, rest)) => {
-                    if rest.is_empty() {
-                        Ok(match first.clone() {
-                            SelectionType::Scalar(scalar_declaration) => {
-                                process_client_field_declaration_inner(db, scalar_declaration)
-                                    .clone()
-                                    .map(|(_, selectable)| selectable)
-                                    .map_err(MemoizedIsoLiteralError::Diagnostic)?
-                                    .scalar_selected()
-                            }
-                            SelectionType::Object(object_declaration) => {
-                                process_client_pointer_declaration_inner(db, object_declaration)
-                                    .clone()
-                                    .map(|(_, selectable)| selectable)
-                                    .map_err(MemoizedIsoLiteralError::Diagnostic)?
-                                    .object_selected()
-                            }
-                        })
-                    } else {
-                        Err(MemoizedIsoLiteralError::MultipleDefinitionsFound {
-                            duplicate_entity_name: key.0,
-                            duplicate_client_selectable_name: key.1,
-                        })
+        .map(
+            |((parent_object_entity_name, client_selectable_name), value)| {
+                let value = (|| match value.split_first() {
+                    Some((first, rest)) => {
+                        if rest.is_empty() {
+                            Ok(match first.clone() {
+                                SelectionType::Scalar(scalar_declaration) => {
+                                    process_client_field_declaration_inner(db, scalar_declaration)
+                                        .clone()
+                                        .map(|(_, selectable)| selectable)?
+                                        .scalar_selected()
+                                }
+                                SelectionType::Object(object_declaration) => {
+                                    process_client_pointer_declaration_inner(db, object_declaration)
+                                        .clone()
+                                        .map(|(_, selectable)| selectable)?
+                                        .object_selected()
+                                }
+                            })
+                        } else {
+                            let location = match first {
+                                SelectionType::Scalar(s) => {
+                                    s.client_field_name.location.into_typed::<Location>()
+                                }
+                                SelectionType::Object(o) => o.client_pointer_name.location.into(),
+                            };
+                            multiple_selectable_definitions_found_diagnostic(
+                                *parent_object_entity_name,
+                                *client_selectable_name,
+                                location,
+                            )
+                            .wrap_err()
+                        }
                     }
-                }
-                None => panic!("Unexpected empty vec. This is indicative of a bug in Isograph."),
-            })();
+                    None => {
+                        panic!("Unexpected empty vec. This is indicative of a bug in Isograph.")
+                    }
+                })();
 
-            (*key, value)
-        })
+                ((*parent_object_entity_name, *client_selectable_name), value)
+            },
+        )
         .chain(
             get_link_fields_map(db)
-                .clone()
-                .map_err(MemoizedIsoLiteralError::Diagnostic)?
+                .clone()?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )
@@ -458,4 +441,32 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         )
         .collect::<HashMap<_, _>>()
         .wrap_ok()
+}
+
+fn multiple_selectable_definitions_found_diagnostic(
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!(
+            "Multiple definitions of `{parent_object_entity_name}.{client_selectable_name}` were found"
+        ),
+        location.wrap_some(),
+    )
+}
+
+fn selectable_is_wrong_type_diagnostic(
+    parent_object_entity_name: ServerObjectEntityName,
+    client_selectable_name: ClientSelectableName,
+    intended_type: &'static str,
+    actual_type: &'static str,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!(
+            "Expected `{parent_object_entity_name}.{client_selectable_name}` to be {intended_type}. But it was {actual_type}."
+        ),
+        location.wrap_some(),
+    )
 }

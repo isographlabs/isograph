@@ -1,14 +1,14 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{ClientScalarSelectableName, ServerObjectEntityName};
+use common_lang_types::{ClientScalarSelectableName, Diagnostic, ServerObjectEntityName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
 use pico_macros::memo;
 use thiserror::Error;
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
-    client_scalar_selectable_named, parse_iso_literal_in_source, selectable_named,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
+    parse_iso_literal_in_source, selectable_named,
 };
 
 #[memo]
@@ -51,7 +51,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 entrypoint_declaration_info.client_field_name.item.0,
             )
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(|e| ValidatedEntrypointError::Diagnostic(e.clone()))?
             .as_ref()
             .ok_or_else(|| {
                 // check if it has a different type
@@ -126,7 +126,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 #[derive(Error, Clone, Debug, Eq, PartialEq, PartialOrd, Ord)]
 pub enum ValidatedEntrypointError {
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
+    Diagnostic(Diagnostic),
 
     #[error("`{parent_object_entity_name}.{client_scalar_selectable_name}` was not defined")]
     NotDefined {

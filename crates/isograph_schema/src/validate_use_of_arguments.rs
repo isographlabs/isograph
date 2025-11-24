@@ -1,8 +1,9 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
+    Diagnostic, FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName,
+    SelectableName, ServerObjectEntityName, VariableName, WithLocation, WithLocationPostfix,
+    WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -16,11 +17,10 @@ use prelude::Postfix;
 use thiserror::Error;
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError,
-    MemoizedSelectionSetError, NetworkProtocol, ValidatedVariableDefinition,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    selectable_validated_reader_selection_set, server_object_selectable_named,
-    server_scalar_selectable_named,
+    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedSelectionSetError, NetworkProtocol,
+    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, selectable_validated_reader_selection_set,
+    server_object_selectable_named, server_scalar_selectable_named,
     validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
     visit_selection_set::visit_selection_set,
 };
@@ -49,7 +49,11 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
     for client_selectable in client_selectable_map(db)
         .as_ref()
-        .map_err(|e| vec![WithLocation::new_generated(e.clone().into())])?
+        .map_err(|e| {
+            vec![WithLocation::new_generated(
+                ValidateUseOfArgumentsError::Diagnostic(e.clone()),
+            )]
+        })?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
@@ -468,7 +472,7 @@ pub enum ValidateUseOfArgumentsError {
     },
 
     #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
+    Diagnostic(Diagnostic),
 
     #[error("{0}")]
     MemoizedSelectionSetError(#[from] MemoizedSelectionSetError),
