@@ -93,7 +93,7 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
         .unwrap_or_default()
 }
 
-// #[memo]
+#[memo]
 pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,

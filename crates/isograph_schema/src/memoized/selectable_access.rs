@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[expect(clippy::type_complexity)]
-// #[memo]
+#[memo]
 pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
