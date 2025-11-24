@@ -64,7 +64,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticVecResult<()> {
     let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
         .as_ref()
-        .map_err(|e| vec![e.clone()])?;
+        .map_err(Clone::clone)?;
 
     // TODO restructure as a .map or whatnot
     let mut errors = vec![];
@@ -118,9 +118,7 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     // This can and should be rethought! Namely, just because the referenced entity doesn't exist
     // doesn't mean that the selectable can't be materialized. Instead, the result should be
     // materialized when we actually need to look at the referenced entity.
-    let server_selectables = server_selectables_map(db)
-        .as_ref()
-        .map_err(|e| vec![e.clone()])?;
+    let server_selectables = server_selectables_map(db).as_ref().map_err(Clone::clone)?;
 
     let mut errors = vec![];
 

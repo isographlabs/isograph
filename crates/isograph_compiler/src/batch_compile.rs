@@ -24,8 +24,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
-    let state =
-        CompilerState::new(config_location, current_working_directory).map_err(|e| vec![e])?;
+    let state = CompilerState::new(config_location, current_working_directory)?;
     print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
 }
 
@@ -89,8 +88,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let config = db.get_isograph_config();
     let (artifacts, stats) = get_artifact_path_and_content(db)?;
     let total_artifacts_written =
-        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)
-            .map_err(|e| vec![e])?;
+        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,

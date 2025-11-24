@@ -28,7 +28,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
-    let expose_field_map = expose_field_map(db).as_ref().map_err(|e| vec![e.clone()])?;
+    let expose_field_map = expose_field_map(db).as_ref().map_err(Clone::clone)?;
 
     let mut out = HashMap::new();
 

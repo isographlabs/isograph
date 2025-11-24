@@ -58,8 +58,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_name,
             top_level_field_or_pointer,
             scalar_selection,
-        )
-        .map_err(|e| vec![e])?
+        )?
         .scalar_selected()
         .wrap_ok(),
         SelectionType::Object(object_selection) => get_validated_object_selection(
@@ -205,7 +204,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let selectable = selectable
         .as_ref()
-        .map_err(|e| vec![e.clone()])?
+        .map_err(Clone::clone)?
         .as_ref()
         .ok_or_else(|| {
             vec![selection_does_not_exist_diagnostic(

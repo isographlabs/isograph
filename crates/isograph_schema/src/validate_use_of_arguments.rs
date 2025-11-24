@@ -44,7 +44,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
     for client_selectable in client_selectable_map(db)
         .as_ref()
-        .map_err(|e| vec![e.clone()])?
+        .map_err(Clone::clone)?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
