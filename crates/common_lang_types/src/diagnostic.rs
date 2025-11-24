@@ -1,6 +1,7 @@
 use std::fmt::Display;
 
 use prelude::Postfix;
+use serde::de;
 
 use crate::Location;
 
@@ -29,6 +30,15 @@ impl Display for Diagnostic {
             write!(f, "\n{}", location)?;
         }
         Ok(())
+    }
+}
+
+impl de::Error for Diagnostic {
+    fn custom<T>(msg: T) -> Self
+    where
+        T: core::fmt::Display,
+    {
+        Diagnostic::new(msg.to_string(), None)
     }
 }
 

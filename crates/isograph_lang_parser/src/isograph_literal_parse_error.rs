@@ -1,5 +1,6 @@
-use common_lang_types::{SelectableName, SelectableNameOrAlias, WithLocation, WithSpan};
-use isograph_lang_types::DeserializationError;
+use common_lang_types::{
+    Diagnostic, SelectableName, SelectableNameOrAlias, WithLocation, WithSpan,
+};
 use thiserror::Error;
 
 use crate::IsographLangTokenKind;
@@ -80,6 +81,6 @@ pub enum IsographLiteralParseError {
         delimiter: IsographLangTokenKind,
     },
 
-    #[error("Unable to process directives. Message: {message}")]
-    UnableToDeserializeDirectives { message: DeserializationError },
+    #[error("{error}")]
+    Diagnostic { error: Diagnostic },
 }

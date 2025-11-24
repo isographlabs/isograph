@@ -148,7 +148,7 @@ fn parse_iso_entrypoint_declaration(
 
             let entrypoint_directive_set =
                 from_isograph_field_directives(&directives).map_err(|message| {
-                    IsographLiteralParseError::UnableToDeserializeDirectives { message }.with_span(
+                    IsographLiteralParseError::Diagnostic { error: message }.with_span(
                         directives
                             .first()
                             .map(|x| x.span)
@@ -233,7 +233,7 @@ fn parse_client_field_declaration_inner(
 
         let client_field_directive_set =
             from_isograph_field_directives(&directives).map_err(|message| {
-                IsographLiteralParseError::UnableToDeserializeDirectives { message }.with_span(
+                IsographLiteralParseError::Diagnostic { error: message }.with_span(
                     directives
                         .first()
                         .map(|x| x.span)
@@ -515,13 +515,12 @@ fn parse_selection(
             Some(selection_set) => {
                 let object_selection_directive_set = from_isograph_field_directives(&directives)
                     .map_err(|message| {
-                        IsographLiteralParseError::UnableToDeserializeDirectives { message }
-                            .with_span(
-                                directives
-                                    .first()
-                                    .map(|x| x.span)
-                                    .unwrap_or_else(Span::todo_generated),
-                            )
+                        IsographLiteralParseError::Diagnostic { error: message }.with_span(
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(Span::todo_generated),
+                        )
                     })?;
                 SelectionTypeContainingSelections::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
@@ -536,13 +535,12 @@ fn parse_selection(
             None => {
                 let scalar_selection_directive_set = from_isograph_field_directives(&directives)
                     .map_err(|message| {
-                        IsographLiteralParseError::UnableToDeserializeDirectives { message }
-                            .with_span(
-                                directives
-                                    .first()
-                                    .map(|x| x.span)
-                                    .unwrap_or_else(Span::todo_generated),
-                            )
+                        IsographLiteralParseError::Diagnostic { error: message }.with_span(
+                            directives
+                                .first()
+                                .map(|x| x.span)
+                                .unwrap_or_else(Span::todo_generated),
+                        )
                     })?;
                 SelectionTypeContainingSelections::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
