@@ -1,28 +1,27 @@
 use std::{
     collections::BTreeMap,
     path::{Path, PathBuf},
-    str::Utf8Error,
 };
 
 use common_lang_types::{
-    AbsolutePathAndRelativePath, Diagnostic, RelativePathToSourceFile, TextSource,
-    relative_path_from_absolute_and_working_directory,
+    AbsolutePathAndRelativePath, Diagnostic, DiagnosticResult, DiagnosticVecResult,
+    RelativePathToSourceFile, TextSource, relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
 use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
     read_files::{read_file, read_files_in_folder},
     watch::{ChangedFileKind, SourceEventKind, SourceFileEvent},
+    write_artifacts::unable_to_do_something_at_path_diagnostic,
 };
 
 pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
@@ -36,7 +35,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
 pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
-) -> Result<(), SourceError> {
+) -> DiagnosticVecResult<()> {
     let errors = changes
         .iter()
         .filter_map(|(event, change_kind)| match change_kind {
@@ -50,7 +49,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
         })
         .collect::<Vec<_>>();
     if !errors.is_empty() {
-        Err(SourceError::MultipleErrors { errors })
+        errors.wrap_err()
     } else {
         Ok(())
     }
@@ -59,7 +58,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
@@ -69,15 +68,15 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
             if schema.absolute_path != *target_path {
                 db.remove(db.get_standard_sources().untracked().schema_source_id);
                 db.get_standard_sources_mut().tracked().schema_source_id = SourceId::default();
-                return Err(SourceError::SchemaNotFound);
+
+                return schema_not_found_diagnostic().wrap_err();
             }
         }
         SourceEventKind::Remove(_) => {
-            return {
-                db.remove(db.get_standard_sources().untracked().schema_source_id);
-                db.get_standard_sources_mut().tracked().schema_source_id = SourceId::default();
-                Err(SourceError::SchemaNotFound)
-            };
+            db.remove(db.get_standard_sources().untracked().schema_source_id);
+            db.get_standard_sources_mut().tracked().schema_source_id = SourceId::default();
+
+            return schema_not_found_diagnostic().wrap_err();
         }
     }
     Ok(())
@@ -86,7 +85,7 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_schema_extension(db, path)?;
@@ -121,7 +120,7 @@ fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
 fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     let absolute_and_relative =
         absolute_and_relative_paths(db.get_current_working_directory(), path.to_path_buf());
     let schema_id = read_schema(db, &absolute_and_relative)?;
@@ -135,7 +134,7 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_iso_literals(db, path)?;
@@ -163,10 +162,10 @@ fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
 fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     let (relative_path, content) =
         // TODO this function should live here
-        read_file(path.to_path_buf(), db.get_current_working_directory()).map_err(SourceError::Diagnostic)?;
+        read_file(path.to_path_buf(), db.get_current_working_directory())?;
     db.insert_iso_literal(relative_path, content);
     Ok(())
 }
@@ -174,7 +173,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(folder) => {
             read_iso_literals_from_folder(db, folder)?;
@@ -206,7 +205,7 @@ fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
 fn read_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
-) -> Result<SourceId<SchemaSource>, SourceError> {
+) -> DiagnosticResult<SourceId<SchemaSource>> {
     let content = read_schema_file(&schema_path.absolute_path)?;
     let text_source = TextSource {
         relative_path_to_source_file: schema_path.relative_path,
@@ -221,35 +220,39 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
+fn read_schema_file(path: &PathBuf) -> DiagnosticResult<String> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
     let joined = current_dir.join(path);
-    let canonicalized_existing_path =
-        joined
-            .canonicalize()
-            .map_err(|e| SourceError::UnableToLoadSchema {
-                path: joined,
-                message: e.to_string(),
-            })?;
+    let canonicalized_existing_path = joined.canonicalize().map_err(|e| {
+        unable_to_do_something_at_path_diagnostic(
+            &joined,
+            &e.to_string(),
+            "canonicalize schema path",
+        )
+    })?;
 
     if !canonicalized_existing_path.is_file() {
-        return SourceError::SchemaNotAFile {
-            path: canonicalized_existing_path,
-        }
+        return Diagnostic::new(
+            format!(
+                "Attempted to load the schema at the following path: \
+                {canonicalized_existing_path:?}, but that is not a file."
+            ),
+            None,
+        )
         .wrap_err();
     }
 
     let contents = std::fs::read(canonicalized_existing_path.clone()).map_err(|e| {
-        SourceError::UnableToReadFile {
-            path: canonicalized_existing_path.clone(),
-            message: e.to_string(),
-        }
+        unable_to_do_something_at_path_diagnostic(
+            &canonicalized_existing_path,
+            &e.to_string(),
+            "read file",
+        )
     })?;
 
     std::str::from_utf8(&contents)
-        .map_err(|e| SourceError::UnableToConvertToString {
-            path: canonicalized_existing_path.clone(),
-            reason: e,
+        .map_err(|e| {
+            unable_to_do_something_at_path_diagnostic(path, &e.to_string(), "convert to string")
         })?
         .to_owned()
         .wrap_ok()
@@ -257,7 +260,7 @@ fn read_schema_file(path: &PathBuf) -> Result<String, SourceError> {
 
 fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> Result<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>, SourceError> {
+) -> DiagnosticResult<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>> {
     let config_schema_extensions = db.get_isograph_config().schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
     for schema_extension_path in config_schema_extensions.iter() {
@@ -269,7 +272,7 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
 
 fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     let project_root = db.get_isograph_config().project_root.clone();
     read_iso_literals_from_folder(db, &project_root)
 }
@@ -277,45 +280,19 @@ fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
 fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     folder: &Path,
-) -> Result<(), SourceError> {
+) -> DiagnosticResult<()> {
     for (relative_path, content) in
         // TODO this function should live here
-        read_files_in_folder(folder, db.get_current_working_directory())
-                .map_err(SourceError::Diagnostic)?
+        read_files_in_folder(folder, db.get_current_working_directory())?
     {
         db.insert_iso_literal(relative_path, content);
     }
     Ok(())
 }
 
-#[derive(Debug, Error)]
-pub enum SourceError {
-    #[error("Unable to load schema file at path {path:?}.\nReason: {message}")]
-    UnableToLoadSchema { path: PathBuf, message: String },
-
-    #[error("Schema file not found. Cannot proceed without a schema.")]
-    SchemaNotFound,
-
-    #[error(
-        "Attempted to load the schema at the following path: {path:?}, but that is not a file."
-    )]
-    SchemaNotAFile { path: PathBuf },
-
-    #[error("Unable to read the file at the following path: {path:?}.\nReason: {message}")]
-    UnableToReadFile { path: PathBuf, message: String },
-
-    #[error("Unable to convert file {path:?} to utf8.\nDetailed reason: {reason}")]
-    UnableToConvertToString { path: PathBuf, reason: Utf8Error },
-
-    #[error(
-        "{}",
-        errors.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    MultipleErrors { errors: Vec<SourceError> },
-
-    #[error("{0}")]
-    Diagnostic(Diagnostic),
+fn schema_not_found_diagnostic() -> Diagnostic {
+    Diagnostic::new(
+        "Schema not found. Cannot proceed without a schema".to_string(),
+        None,
+    )
 }

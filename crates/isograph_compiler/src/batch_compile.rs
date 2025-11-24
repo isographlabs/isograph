@@ -1,7 +1,7 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    SourceError, compiler_state::CompilerState, with_duration::WithDuration,
+    compiler_state::CompilerState, with_duration::WithDuration,
     write_artifacts::write_artifacts_to_disk,
 };
 use artifact_content::get_artifact_path_and_content;
@@ -100,12 +100,6 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
 
 #[derive(Error, Debug)]
 pub enum BatchCompileError {
-    #[error("{error}")]
-    SourceError {
-        #[from]
-        error: SourceError,
-    },
-
     #[error("{0}")]
     Diagnostic(Diagnostic),
 

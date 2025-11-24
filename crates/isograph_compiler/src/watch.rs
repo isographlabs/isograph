@@ -49,7 +49,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                         create_debounced_file_watcher(&config);
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
-                    update_sources(&mut state.db, &changes)?;
+                    update_sources(&mut state.db, &changes)
+                        .map_err(|errors| BatchCompileError::Diagnostics { errors })?;
                     state.run_garbage_collection();
                 };
                 let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));

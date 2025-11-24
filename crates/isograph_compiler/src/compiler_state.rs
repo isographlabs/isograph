@@ -27,7 +27,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(create_config(config_location, current_working_directory));
-        initialize_sources(&mut db)?;
+        initialize_sources(&mut db).map_err(BatchCompileError::Diagnostic)?;
         Self {
             db,
             last_gc_run: Instant::now(),

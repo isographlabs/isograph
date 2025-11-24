@@ -14,9 +14,9 @@ use crate::{
     },
 };
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
 use isograph_compiler::{
-    CompilerState, SourceError, WithDuration,
+    CompilerState, WithDuration,
     batch_compile::BatchCompileError,
     update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
@@ -140,7 +140,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         }
                     } else {
                         info!("{}", "File changes detected. Starting to compile.".cyan());
-                        update_sources(&mut compiler_state.db, &changes)?;
+                        update_sources(&mut compiler_state.db, &changes)
+                            .map_err(|e| {LSPProcessError::Diagnostics { errors: e }})?;
                         compiler_state.run_garbage_collection();
                     };
                 } else {
@@ -227,11 +228,8 @@ pub enum LSPProcessError {
         error: BatchCompileError,
     },
 
-    #[error("{error}")]
-    SourceError {
-        #[from]
-        error: SourceError,
-    },
+    #[error("{}", errors.iter().map(|x| x.to_string()).collect::<Vec<_>>().join(", "))]
+    Diagnostics { errors: Vec<Diagnostic> },
 }
 
 fn bridge_crossbeam_to_tokio<T: Send + 'static>(
