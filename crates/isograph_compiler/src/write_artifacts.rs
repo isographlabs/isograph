@@ -77,7 +77,7 @@ pub fn get_artifacts_to_write(
 pub(crate) fn write_artifacts_to_disk(
     artifacts_to_disk: ChangedArtifacts,
     artifact_directory: &PathBuf,
-) ->  DiagnosticResult<usize> {
+) -> DiagnosticResult<usize> {
     if artifact_directory.exists() && artifacts_to_disk.cleanup_artifact_directory {
         fs::remove_dir_all(artifact_directory).map_err(|e| {
             unable_to_do_something_at_path_diagnostic(
@@ -89,7 +89,11 @@ pub(crate) fn write_artifacts_to_disk(
 
         fs::create_dir_all(artifact_directory).map_err(|e| {
             let message = e.to_string();
-            unable_to_do_something_at_path_diagnostic(artifact_directory, &message, "create directory")
+            unable_to_do_something_at_path_diagnostic(
+                artifact_directory,
+                &message,
+                "create directory",
+            )
         })?;
     }
 
@@ -125,13 +129,9 @@ pub(crate) fn write_artifacts_to_disk(
     }
 
     for path in artifacts_to_disk.artifacts_to_delete.iter() {
-        fs::remove_file(path).map_err(|e|
-            unable_to_do_something_at_path_diagnostic(
-                path,
-                &e.to_string(),
-                "delete file",
-            )
-        )?;
+        fs::remove_file(path).map_err(|e| {
+            unable_to_do_something_at_path_diagnostic(path, &e.to_string(), "delete file")
+        })?;
     }
 
     Ok(count)

@@ -1,7 +1,8 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    compiler_state::CompilerState, with_duration::WithDuration,
+    compiler_state::CompilerState,
+    with_duration::WithDuration,
     write_artifacts::{get_artifacts_to_write, write_artifacts_to_disk},
 };
 use artifact_content::get_artifact_path_and_content;
@@ -25,9 +26,10 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
     let mut state = CompilerState::new(config_location, current_working_directory)?;
-    print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&mut state)))
+    print_result(WithDuration::new(|| {
+        compile::<TNetworkProtocol>(&mut state)
+    }))
 }
-
 
 pub fn print_result(
     result: WithDuration<DiagnosticVecResult<CompilationStats>>,
@@ -106,4 +108,3 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     }
     .wrap_ok()
 }
-
