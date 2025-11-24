@@ -1,35 +1,34 @@
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-no-field-name.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 52,
+    Diagnostic(
+        DiagnosticData {
+            message: "Expected non-variable identifier (e.g. 'x' or 'Foo'), but found open brace ('{')",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-no-field-name.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 31,
+                                    end: 52,
+                                },
+                            ),
                         },
-                    ),
-                },
-                span: Span {
-                    start: 15,
-                    end: 16,
-                },
-            },
-        ),
-        item: ParseError {
-            error: ParseTokenKindError {
-                expected_kind: Identifier,
-                found_kind: OpenBrace,
-            },
+                        span: Span {
+                            start: 15,
+                            end: 16,
+                        },
+                    },
+                ),
+            ),
         },
-    },
+    ),
 )
 
-Expected non-variable identifier (e.g. 'x' or 'Foo'), found open brace ('{').
+Expected non-variable identifier (e.g. 'x' or 'Foo'), but found open brace ('{')
 crates/isograph_lang_parser/fixtures/field-no-field-name.input.js
 
   field Type. {

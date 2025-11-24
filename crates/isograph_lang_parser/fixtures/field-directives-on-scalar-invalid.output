@@ -1,164 +1,44 @@
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 81,
-                        },
-                    ),
-                },
-                span: Span {
-                    start: 32,
-                    end: 38,
-                },
-            },
-        ),
-        item: UnableToDeserializeDirectives {
-            message: Custom(
-                "data did not match any variant of untagged enum ScalarSelectionDirectiveSet",
-            ),
+    Diagnostic(
+        DiagnosticData {
+            message: "data did not match any variant of untagged enum ScalarSelectionDirectiveSet",
+            location: None,
         },
-    },
+    ),
 )
-
-Unable to process directives. Message: Error when deserializing.
 
 data did not match any variant of untagged enum ScalarSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
-  field Type.Name {
-    scalar @hello @there
-           ^^^^^^       
-  }
-
 ---
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 120,
-                            end: 186,
-                        },
-                    ),
-                },
-                span: Span {
-                    start: 32,
-                    end: 41,
-                },
-            },
-        ),
-        item: UnableToDeserializeDirectives {
-            message: Custom(
-                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            ),
+    Diagnostic(
+        DiagnosticData {
+            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: None,
         },
-    },
+    ),
 )
 
-Unable to process directives. Message: Error when deserializing.
-
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
-  field Type.Name {
-    linked @loadable(asdf: true) {
-           ^^^^^^^^^              
-    }
-  }
 ---
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 225,
-                            end: 290,
-                        },
-                    ),
-                },
-                span: Span {
-                    start: 32,
-                    end: 41,
-                },
-            },
-        ),
-        item: UnableToDeserializeDirectives {
-            message: Custom(
-                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            ),
+    Diagnostic(
+        DiagnosticData {
+            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: None,
         },
-    },
+    ),
 )
 
-Unable to process directives. Message: Error when deserializing.
-
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
-  field Type.Name {
-    linked @loadable @updatable {
-           ^^^^^^^^^             
-    }
-  }
 ---
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 329,
-                            end: 406,
-                        },
-                    ),
-                },
-                span: Span {
-                    start: 32,
-                    end: 41,
-                },
-            },
-        ),
-        item: UnableToDeserializeDirectives {
-            message: Custom(
-                "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            ),
+    Diagnostic(
+        DiagnosticData {
+            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: None,
         },
-    },
+    ),
 )
 
-Unable to process directives. Message: Error when deserializing.
-
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
-  field Type.Name {
-    linked @loadable(lazyLoadArtifact: 123) {
-           ^^^^^^^^^                         
-    }
-  }
 ---

@@ -14,16 +14,32 @@ Ok(
                             end: 15,
                         },
                     },
-                    client_field_name: WithSpan {
+                    client_field_name: WithLocation {
+                        location: Embedded(
+                            EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 25,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 20,
+                                },
+                            },
+                        ),
                         item: ClientScalarSelectableNameWrapper(
                             ClientScalarSelectableName(
                                 "Name",
                             ),
                         ),
-                        span: Span {
-                            start: 16,
-                            end: 20,
-                        },
                     },
                     entrypoint_keyword: WithSpan {
                         item: (),

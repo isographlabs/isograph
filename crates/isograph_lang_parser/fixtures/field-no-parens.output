@@ -1,27 +1,31 @@
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-no-parens.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 56,
+    Diagnostic(
+        DiagnosticData {
+            message: "Isograph literals must be immediately called, and passed a function",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-no-parens.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 31,
+                                    end: 56,
+                                },
+                            ),
                         },
-                    ),
-                },
-                span: Span {
-                    start: 0,
-                    end: 0,
-                },
-            },
-        ),
-        item: ExpectedAssociatedJsFunction,
-    },
+                        span: Span {
+                            start: 0,
+                            end: 0,
+                        },
+                    },
+                ),
+            ),
+        },
+    ),
 )
 
 Isograph literals must be immediately called, and passed a function
