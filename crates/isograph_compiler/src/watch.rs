@@ -30,7 +30,9 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     let config = state.db.get_isograph_config().clone();
 
     info!("{}", "Starting to compile.".cyan());
-    let _ = print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)));
+    let _ = print_result(WithDuration::new(|| {
+        compile::<TNetworkProtocol>(&mut state)
+    }));
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -52,7 +54,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                     update_sources(&mut state.db, &changes)?;
                     state.run_garbage_collection();
                 };
-                let result = WithDuration::new(|| compile::<TNetworkProtocol>(&state.db));
+                let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
                 let _ = print_result(result);
             }
             Err(errors) => return Err(errors.into()),
