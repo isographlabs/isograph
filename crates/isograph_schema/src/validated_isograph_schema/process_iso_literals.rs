@@ -4,8 +4,8 @@ use std::{
 };
 
 use crate::{IsographDatabase, NetworkProtocol};
-use common_lang_types::{RelativePathToSourceFile, TextSource, WithLocation};
-use isograph_lang_parser::{IsoLiteralExtractionResult, IsographLiteralParseError};
+use common_lang_types::{DiagnosticVecResult, RelativePathToSourceFile, TextSource};
+use isograph_lang_parser::IsoLiteralExtractionResult;
 use pico_macros::memo;
 
 use crate::parse_iso_literal_in_source;
@@ -14,7 +14,7 @@ use crate::parse_iso_literal_in_source;
 #[memo]
 pub fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<ParsedIsoLiteralsMap, Vec<WithLocation<IsographLiteralParseError>>> {
+) -> DiagnosticVecResult<ParsedIsoLiteralsMap> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
     // fully rewrite everything to be incremental.
     let mut contains_iso = ParsedIsoLiteralsMap::default();

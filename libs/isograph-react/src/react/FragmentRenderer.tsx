@@ -6,6 +6,7 @@ import {
 import { type FragmentReference } from '../core/FragmentReference';
 import { type NetworkRequestReaderOptions } from '../core/read';
 import { useResult } from './useResult';
+import type { NetworkResponseObject } from '../core/cache';
 
 export type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
   ? JSX.IntrinsicAttributes extends T
@@ -15,7 +16,13 @@ export type IsExactlyIntrinsicAttributes<T> = T extends JSX.IntrinsicAttributes
 
 export function FragmentRenderer<
   TProps extends Record<any, any>,
-  TEntrypoint extends IsographEntrypoint<any, React.FC<TProps>, any>,
+  TRawResponseType extends NetworkResponseObject,
+  TEntrypoint extends IsographEntrypoint<
+    any,
+    React.FC<TProps>,
+    any,
+    TRawResponseType
+  >,
 >(
   props: IsExactlyIntrinsicAttributes<TProps> extends true
     ? {

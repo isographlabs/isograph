@@ -1,18 +1,20 @@
 use common_lang_types::{
-    Diagnostic, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
+    DiagnosticResult, Location, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
+    WithLocation,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType,
+    DefinitionLocation, Description, ObjectSelectionPath, ScalarSelectionPath, SelectionParentType,
     SelectionSetParentType, SelectionSetPath, SelectionType, SelectionTypePostfix,
     ServerObjectEntityNameWrapper,
 };
-use thiserror::Error;
+use prelude::Postfix;
 
 use crate::{
     ClientOrServerObjectSelectable, IsographDatabase, NetworkProtocol, OwnedObjectSelectable,
-    ScalarSelectable, Selectable, SelectableNamedError, ServerObjectEntity, ServerScalarEntity,
-    selectable_named, server_object_entity_named,
+    ScalarSelectable, Selectable, SelectableTrait, ServerObjectEntity, ServerScalarEntity,
+    entity_not_defined_diagnostic, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic, selectable_named, server_object_entity_named,
 };
 
 #[impl_for_selection_type]
@@ -59,13 +61,10 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
 pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
-) -> Result<
-    (
-        ServerObjectEntity<TNetworkProtocol>,
-        ScalarSelectable<TNetworkProtocol>,
-    ),
-    GetParentAndSelectableError,
-> {
+) -> DiagnosticResult<(
+    ServerObjectEntity<TNetworkProtocol>,
+    ScalarSelectable<TNetworkProtocol>,
+)> {
     let ScalarSelectionPath { parent, inner } = scalar_path;
     let scalar_selectable_name = inner.name.item;
 
@@ -77,15 +76,25 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
         scalar_selectable_name.into(),
     )?;
 
-    let selectable =
-        selectable
-            .as_scalar()
-            .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                parent_type_name: parent.name.into(),
-                field_name: scalar_selectable_name.into(),
-                must_be: "a scalar",
-                is: "an object",
-            })?;
+    let selectable = match selectable {
+        DefinitionLocation::Server(server) => match server {
+            SelectionType::Scalar(scalar) => DefinitionLocation::Server(scalar).wrap_ok(),
+            SelectionType::Object(object) => object.name.location.wrap_err(),
+        },
+        DefinitionLocation::Client(client) => match client {
+            SelectionType::Scalar(scalar) => DefinitionLocation::Client(scalar).wrap_ok(),
+            SelectionType::Object(object) => object.name.location.wrap_err(),
+        },
+    }
+    .map_err(|location| {
+        selectable_is_wrong_type_diagnostic(
+            parent.name,
+            scalar_selectable_name.into(),
+            "a scalar",
+            "an object",
+            location,
+        )
+    })?;
 
     Ok((parent, selectable))
 }
@@ -94,13 +103,10 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
 pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
-) -> Result<
-    (
-        ServerObjectEntity<TNetworkProtocol>,
-        OwnedObjectSelectable<TNetworkProtocol>,
-    ),
-    GetParentAndSelectableError,
-> {
+) -> DiagnosticResult<(
+    ServerObjectEntity<TNetworkProtocol>,
+    OwnedObjectSelectable<TNetworkProtocol>,
+)> {
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
 
@@ -112,15 +118,20 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         object_selectable_name.into(),
     )?;
 
-    let selectable =
-        selectable
-            .as_object()
-            .ok_or_else(|| GetParentAndSelectableError::FieldWrongType {
-                parent_type_name: parent.name.into(),
-                field_name: object_selectable_name.into(),
-                must_be: "an object",
-                is: "a scalar",
-            })?;
+    let location = match &selectable {
+        DefinitionLocation::Server(server) => server.name().location,
+        DefinitionLocation::Client(client) => client.name().location,
+    };
+
+    let selectable = selectable.as_object().ok_or_else(|| {
+        selectable_is_wrong_type_diagnostic(
+            parent.name,
+            object_selectable_name.into(),
+            "an object",
+            "a scalar",
+            location,
+        )
+    })?;
 
     Ok((parent, selectable))
 }
@@ -130,7 +141,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProtocol>(
     db: &'db IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
-) -> Result<&'db ServerObjectEntity<TNetworkProtocol>, GetParentAndSelectableError> {
+) -> DiagnosticResult<&'db ServerObjectEntity<TNetworkProtocol>> {
     let parent_object_entity_name = match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
@@ -150,10 +161,14 @@ pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProto
 
     server_object_entity_named(db, parent_object_entity_name)
         .as_ref()
-        .map_err(|e| GetParentAndSelectableError::EntityAccessError(e.clone()))?
+        .map_err(Clone::clone)?
         .as_ref()
-        .ok_or_else(|| GetParentAndSelectableError::ParentTypeNotDefined {
-            parent_type_name: parent_object_entity_name.into(),
+        .ok_or_else(|| {
+            entity_not_defined_diagnostic(
+                parent_object_entity_name,
+                // TODO we can thread a location here?
+                Location::Generated,
+            )
         })
 }
 
@@ -161,13 +176,10 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
     selectable_name: SelectableName,
-) -> Result<
-    (
-        ServerObjectEntity<TNetworkProtocol>,
-        Selectable<TNetworkProtocol>,
-    ),
-    GetParentAndSelectableError,
-> {
+) -> DiagnosticResult<(
+    ServerObjectEntity<TNetworkProtocol>,
+    Selectable<TNetworkProtocol>,
+)> {
     match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_, object_selectable) =
@@ -198,53 +210,26 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityNameWrapper,
     selectable_name: SelectableName,
-) -> Result<
-    (
-        ServerObjectEntity<TNetworkProtocol>,
-        Selectable<TNetworkProtocol>,
-    ),
-    GetParentAndSelectableError,
-> {
+) -> DiagnosticResult<(
+    ServerObjectEntity<TNetworkProtocol>,
+    Selectable<TNetworkProtocol>,
+)> {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
-        .to_owned()
-        .map_err(GetParentAndSelectableError::EntityAccessError)?
-        .ok_or(GetParentAndSelectableError::ParentTypeNotDefined {
-            parent_type_name: parent_server_object_entity_name,
-        })?;
+        .to_owned()?
+        .ok_or(entity_not_defined_diagnostic(
+            parent_server_object_entity_name.0,
+            // TODO we can get a location
+            Location::Generated,
+        ))?;
 
     match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
         Some(selectable) => Ok((parent_entity, selectable)),
-        None => Err(GetParentAndSelectableError::FieldMustExist {
-            parent_type_name: parent_server_object_entity_name,
-            field_name: selectable_name,
-        }),
+        None => selectable_is_not_defined_diagnostic(
+            parent_server_object_entity_name.0,
+            selectable_name,
+            // TODO we can get a location
+            Location::Generated,
+        )
+        .wrap_err(),
     }
-}
-
-#[derive(Error, Debug)]
-pub enum GetParentAndSelectableError {
-    #[error("`{parent_type_name}` is not a type that has been defined.")]
-    ParentTypeNotDefined {
-        parent_type_name: ServerObjectEntityNameWrapper,
-    },
-
-    #[error("The field `{parent_type_name}.{field_name}` is not defined.")]
-    FieldMustExist {
-        parent_type_name: ServerObjectEntityNameWrapper,
-        field_name: SelectableName,
-    },
-
-    #[error("The field `{parent_type_name}.{field_name}` is {is}, but must be {must_be}.")]
-    FieldWrongType {
-        parent_type_name: ServerObjectEntityNameWrapper,
-        field_name: SelectableName,
-        must_be: &'static str,
-        is: &'static str,
-    },
-
-    #[error("{0}")]
-    EntityAccessError(Diagnostic),
-
-    #[error("{0}")]
-    SelectableNamedError(#[from] SelectableNamedError),
 }

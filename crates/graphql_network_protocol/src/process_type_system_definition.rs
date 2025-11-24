@@ -215,9 +215,9 @@ pub fn process_graphql_type_system_document(
                 if graphql_root_types.is_some() {
                     return Diagnostic::new(
                         "Duplicate schema definition".to_string(),
-                        location.some(),
+                        location.wrap_some(),
                     )
-                    .err();
+                    .wrap_err();
                 }
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
@@ -233,7 +233,7 @@ pub fn process_graphql_type_system_document(
                         .map(|x| x.item.into())
                         .unwrap_or_else(|| "Subscription".intern().into()),
                 }
-                .some()
+                .wrap_some()
             }
         }
     }
@@ -273,7 +273,7 @@ pub fn process_graphql_type_system_document(
                             .into(),
                     )
                     .with_generated_span()
-                    .some(),
+                    .wrap_some(),
                     name: WithLocation::new_generated(format!("as{subtype_name}").intern().into()),
 
                     graphql_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
@@ -288,7 +288,7 @@ pub fn process_graphql_type_system_document(
         }
     }
 
-    (type_system_entities, directives, refetch_fields).ok()
+    (type_system_entities, directives, refetch_fields).wrap_ok()
 }
 
 #[expect(clippy::type_complexity)]
@@ -329,7 +329,7 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    (outcome, directives, refetch_fields).ok()
+    (outcome, directives, refetch_fields).wrap_ok()
 }
 
 fn process_object_type_definition(
@@ -401,7 +401,7 @@ fn process_object_type_definition(
     if should_add_refetch_field {
         refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
-                expose_as: (*REFETCH_FIELD_NAME).some(),
+                expose_as: (*REFETCH_FIELD_NAME).wrap_some(),
                 field_map: vec![FieldMapItem {
                     from: (*ID_FIELD_NAME).unchecked_conversion(),
                     to: (*ID_FIELD_NAME).unchecked_conversion(),
@@ -419,7 +419,7 @@ fn process_object_type_definition(
                 .intern()
                 .into(),
             )
-            .some(),
+            .wrap_some(),
         });
     }
 
@@ -431,7 +431,7 @@ fn process_object_type_definition(
         },
         object_type_definition.directives,
     )
-        .ok()
+        .wrap_ok()
 }
 
 // TODO this should accept an IsographScalarTypeDefinition

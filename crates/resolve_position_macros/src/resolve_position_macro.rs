@@ -197,7 +197,7 @@ fn handle_case(
             inner_type.clone(),
             generics_map,
         ))))
-        .ok()
+        .wrap_ok()
     } else {
         Err(Error::new_spanned(
             last_segment,
@@ -287,14 +287,14 @@ fn get_resolve_field_info(
                 field_name,
                 field_type,
             }
-            .some()
-            .ok(),
+            .wrap_some()
+            .wrap_ok(),
             Err(e) => Err(e),
         }
     } else {
         Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")
             .to_compile_error()
-            .err()
+            .wrap_err()
     }
 }
 

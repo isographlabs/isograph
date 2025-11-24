@@ -138,7 +138,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .map_err(|err| {
                                     Diagnostic::new(
                                         format!("Failed to deserialize: {}", err),
-                                        Location::Generated.some(),
+                                        Location::Generated.wrap_some(),
                                     )
                                 })?;
 
@@ -156,14 +156,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         // TODO we should have a location here
                         None,
                     )
-                    .err()?;
+                    .wrap_err()?;
                 }
             }
         }
 
         extend_result_with_default_types(&mut result);
 
-        (result, graphql_root_types.into()).ok()
+        (result, graphql_root_types.into()).wrap_ok()
     }
 
     fn generate_link_type<'a>(

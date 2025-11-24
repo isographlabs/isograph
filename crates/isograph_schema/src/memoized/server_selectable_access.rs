@@ -150,14 +150,13 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
                         "Multiple definitions of \
                         `{parent_server_object_entity_name}.{server_selectable_name}` were found"
                     ),
-                    Result::ok(
-                        entity_definition_location(db, parent_server_object_entity_name.into())
-                            .as_ref(),
-                    )
-                    .cloned()
-                    .flatten(),
+                    entity_definition_location(db, parent_server_object_entity_name.into())
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -192,14 +191,13 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     "Expected `{parent_server_object_entity_name}.{selectable_name}` \
                     to be a scalar, but it was an object."
                 ),
-                Result::ok(
-                    entity_definition_location(db, parent_server_object_entity_name.into())
-                        .as_ref(),
-                )
-                .cloned()
-                .flatten(),
+                entity_definition_location(db, parent_server_object_entity_name.into())
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten(),
             )
-            .err();
+            .wrap_err();
         }
     };
 
@@ -220,11 +218,11 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     \"on_invalid_id_type\" config parameter."
                 ),
                 // TODO use the location of the selectable
-                Result::ok(
-                    entity_definition_location(db, (*target_scalar_entity_name).into()).as_ref(),
-                )
-                .cloned()
-                .flatten(),
+                entity_definition_location(db, (*target_scalar_entity_name).into())
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten(),
             )
         })?;
 
@@ -241,12 +239,11 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
                 ),
-                Result::ok(
-                    entity_definition_location(db, parent_server_object_entity_name.into())
-                        .as_ref(),
-                )
-                .cloned()
-                .flatten(),
+                entity_definition_location(db, parent_server_object_entity_name.into())
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten(),
             )
         })?;
     }
@@ -277,14 +274,13 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
                         "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
                         to be an object, but it was a scalar."
                     ),
-                    Result::ok(
-                        entity_definition_location(db, parent_server_object_entity_name.into())
-                            .as_ref(),
-                    )
-                    .cloned()
-                    .flatten(),
+                    entity_definition_location(db, parent_server_object_entity_name.into())
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 )
-                .err(),
+                .wrap_err(),
             }
         }
         None => Ok(None),
@@ -312,14 +308,13 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                         "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \
                         to be a scalar, but it was an object."
                     ),
-                    Result::ok(
-                        entity_definition_location(db, parent_server_object_entity_name.into())
-                            .as_ref(),
-                    )
-                    .cloned()
-                    .flatten(),
+                    entity_definition_location(db, parent_server_object_entity_name.into())
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 )
-                .err(),
+                .wrap_err(),
             }
         }
         None => Ok(None),

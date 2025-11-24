@@ -17,6 +17,7 @@ import { type StoreLayer } from './optimisticProxy';
 import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import { isArray } from './cache';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -69,7 +70,7 @@ export type IsographEnvironment = {
   // TODO make this a CacheMap and add GC
   readonly entrypointArtifactCache: Map<
     string,
-    PromiseWrapper<IsographEntrypoint<any, any, any>>
+    PromiseWrapper<IsographEntrypoint<any, any, any, any>>
   >;
   readonly retainedQueries: Set<RetainedQuery>;
   readonly gcBuffer: Array<RetainedQuery>;
@@ -112,7 +113,7 @@ export type DataTypeValue =
   // Singular linked fields:
   | StoreLink
   // Plural scalar and linked fields:
-  | DataTypeValue[];
+  | readonly DataTypeValue[];
 
 export type StoreRecord = {
   [index: DataId | string]: DataTypeValue;
@@ -179,7 +180,7 @@ export function createIsographStore(): BaseStoreLayerData {
 }
 
 export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
-  if (Array.isArray(link)) {
+  if (isArray(link)) {
     throw new Error('Unexpected array');
   }
   if (link == null) {
@@ -208,8 +209,8 @@ export function getLink(maybeLink: DataTypeValue): StoreLink | null {
 export function getOrLoadIsographArtifact(
   environment: IsographEnvironment,
   key: string,
-  loader: () => Promise<IsographEntrypoint<any, any, any>>,
-): PromiseWrapper<IsographEntrypoint<any, any, any>> {
+  loader: () => Promise<IsographEntrypoint<any, any, any, any>>,
+): PromiseWrapper<IsographEntrypoint<any, any, any, any>> {
   const value = environment.entrypointArtifactCache.get(key);
   if (value != null) {
     return value;

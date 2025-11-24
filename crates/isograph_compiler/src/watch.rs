@@ -1,5 +1,5 @@
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use notify::{
@@ -15,7 +15,7 @@ use tokio::{runtime::Handle, sync::mpsc::Receiver};
 use tracing::{info, warn};
 
 use crate::{
-    batch_compile::{BatchCompileError, compile, print_result},
+    batch_compile::{compile, print_result},
     compiler_state::CompilerState,
     source_files::update_sources,
     with_duration::WithDuration,
@@ -24,7 +24,7 @@ use crate::{
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError> {
+) -> DiagnosticVecResult<()> {
     let mut state = CompilerState::new(config_location, current_working_directory)?;
 
     let config = state.db.get_isograph_config().clone();
@@ -52,12 +52,18 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                 } else {
                     info!("{}", "File changes detected. Starting to compile.".cyan());
                     update_sources(&mut state.db, &changes)?;
-                    state.run_garbage_collection();
                 };
                 let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
                 let _ = print_result(result);
+                state.run_garbage_collection();
             }
-            Err(errors) => return Err(errors.into()),
+            Err(errors) => {
+                return errors
+                    .into_iter()
+                    .map(|e| Diagnostic::from_error(e, None))
+                    .collect::<Vec<_>>()
+                    .wrap_err();
+            }
         }
     }
     Ok(())
@@ -93,7 +99,7 @@ fn categorize_and_filter_events(
     if source_file_events.is_empty() {
         None
     } else {
-        source_file_events.some()
+        source_file_events.wrap_some()
     }
 }
 
@@ -210,20 +216,20 @@ fn categorize_changed_file_and_filter_changes_in_artifact_directory(
     if !path.starts_with(&config.artifact_directory.absolute_path) {
         if path.starts_with(&config.project_root) {
             if path.is_file() {
-                return ChangedFileKind::JavaScriptSourceFile.some();
+                return ChangedFileKind::JavaScriptSourceFile.wrap_some();
             } else {
-                return ChangedFileKind::JavaScriptSourceFolder.some();
+                return ChangedFileKind::JavaScriptSourceFolder.wrap_some();
             }
         } else if path == &config.schema.absolute_path {
-            return ChangedFileKind::Schema.some();
+            return ChangedFileKind::Schema.wrap_some();
         } else if config
             .schema_extensions
             .iter()
             .any(|x| x.absolute_path == *path)
         {
-            return ChangedFileKind::SchemaExtension.some();
+            return ChangedFileKind::SchemaExtension.wrap_some();
         } else if path == &config.config_location {
-            return ChangedFileKind::Config.some();
+            return ChangedFileKind::Config.wrap_some();
         }
     }
     None

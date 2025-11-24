@@ -65,7 +65,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
                 GraphQLTypeAnnotation::NonNull(non_null.and_then(f)?.boxed())
             }
         }
-        .ok()
+        .wrap_ok()
     }
 
     /// If a TypeAnnotation is of the form X!, i.e. it is a NonNull named type, then
@@ -156,7 +156,7 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
                 GraphQLNonNullTypeAnnotation::List(list.and_then(f)?)
             }
         }
-        .ok()
+        .wrap_ok()
     }
 }
 
@@ -201,7 +201,7 @@ impl<TValue> GraphQLListTypeAnnotation<TValue> {
     where
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
-        GraphQLListTypeAnnotation(self.0.and_then(f)?).ok()
+        GraphQLListTypeAnnotation(self.0.and_then(f)?).wrap_ok()
     }
 }
 

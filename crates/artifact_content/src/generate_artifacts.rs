@@ -1,7 +1,7 @@
 use common_lang_types::{
     ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, ClientScalarSelectableName,
-    ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias, ServerObjectEntityName,
-    WithLocation, WithSpan, WithSpanPostfix, derive_display,
+    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
+    ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix, derive_display,
 };
 use core::panic;
 use graphql_lang_types::{
@@ -20,7 +20,7 @@ use isograph_schema::{
     FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NODE_FIELD_NAME,
     NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
     SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, ValidationError, WrappedSelectionMapSelection,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
     client_selectable_map, client_selectable_named, description, fetchable_types,
     inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
@@ -35,7 +35,6 @@ use std::{
     collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
 };
-use thiserror::Error;
 
 use crate::{
     eager_reader_artifact::{
@@ -64,7 +63,9 @@ lazy_static! {
     pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
     pub static ref NORMALIZATION_AST_FILE_NAME: ArtifactFileName =
         "normalization_ast.ts".intern().into();
-    pub static ref RAW_RESPONSE_TYPE: ArtifactFileName = "raw_response_type.ts".intern().into();
+    pub static ref RAW_RESPONSE_TYPE: ArtifactFilePrefix = "raw_response_type".intern().into();
+    pub static ref RAW_RESPONSE_TYPE_FILE_NAME: ArtifactFileName =
+        "raw_response_type.ts".intern().into();
     pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
     pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
     pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
@@ -112,12 +113,10 @@ lazy_static! {
 #[tracing::instrument]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(Vec<ArtifactPathAndContent>, ContainsIsoStats), GetArtifactPathAndContentError> {
+) -> DiagnosticVecResult<(Vec<ArtifactPathAndContent>, ContainsIsoStats)> {
     let config = db.get_isograph_config();
 
-    let stats = validate_entire_schema(db)
-        .to_owned()
-        .map_err(|errors| GetArtifactPathAndContentError::ValidationError { errors })?;
+    let stats = validate_entire_schema(db).to_owned()?;
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db);
     if let Some(header) = config.options.generated_file_header {
@@ -126,7 +125,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
                 format!("// {header}\n{}", artifact_path_and_content.file_content);
         }
     }
-    (artifact_path_and_content, stats.clone()).ok()
+    (artifact_path_and_content, stats).wrap_ok()
 }
 
 fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
@@ -482,7 +481,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => (key.0, key.1.unchecked_conversion()).object_selected(),
             };
 
-            (client_type_name, value).some()
+            (client_type_name, value).wrap_some()
         })
     {
         // For each user-written client types, generate a param type artifact
@@ -543,10 +542,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 },
                 config.options.include_file_extensions_in_import_statements,
             )
-            .some(),
+            .wrap_some(),
             SelectionType::Scalar(client_field) => match client_field.variant {
                 ClientFieldVariant::Link => {
-                    generate_link_output_type_artifact(db, client_field).some()
+                    generate_link_output_type_artifact(db, client_field).wrap_some()
                 }
                 ClientFieldVariant::UserWritten(info) => {
                     generate_eager_reader_output_type_artifact(
@@ -556,10 +555,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         info,
                         config.options.include_file_extensions_in_import_statements,
                     )
-                    .some()
+                    .wrap_some()
                 }
                 ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    generate_refetch_output_type_artifact(db, client_field).some()
+                    generate_refetch_output_type_artifact(db, client_field).wrap_some()
                 }
             },
         };
@@ -1459,22 +1458,10 @@ pub fn get_provided_arguments<'a>(
                 .iter()
                 .any(|arg| definition.name.item == arg.item.name.item);
             if user_has_supplied_argument {
-                definition.clone().some()
+                definition.clone().wrap_some()
             } else {
                 None
             }
         })
         .collect()
-}
-
-#[derive(Error, Debug, Clone)]
-pub enum GetArtifactPathAndContentError {
-    #[error(
-        "{}",
-        errors.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{}", x));
-            output
-        })
-    )]
-    ValidationError { errors: Vec<ValidationError> },
 }

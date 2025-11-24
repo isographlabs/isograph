@@ -1,38 +1,34 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
-    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithLocation, WithSpan,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
+    DiagnosticVecResult, Location, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
-    AddSelectionSetsError, IsographDatabase, MemoizedIsoLiteralError, NetworkProtocol,
-    ObjectSelectableId, ProcessClientFieldDeclarationError, RefetchStrategy, ScalarSelectableId,
+    IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
     client_selectable_declaration_map_from_iso_literals, expose_field_map,
     get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
+    multiple_selectable_definitions_found_diagnostic, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic,
 };
 
 #[expect(clippy::type_complexity)]
 #[memo]
 pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticVecResult<
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
-        Result<
-            SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>,
-            RefetchStrategyAccessError,
-        >,
+        DiagnosticResult<SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>>,
     >,
-    RefetchStrategyAccessError,
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
-    let expose_field_map = expose_field_map(db).as_ref().map_err(|e| e.clone())?;
+    let expose_field_map = expose_field_map(db).as_ref().map_err(Clone::clone)?;
 
     let mut out = HashMap::new();
 
@@ -41,19 +37,17 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
             match out.entry(*key) {
                 Entry::Occupied(mut occupied_entry) => {
                     // TODO check for length instead
-                    *occupied_entry.get_mut() = RefetchStrategyAccessError::DuplicateDefinition {
-                        parent_object_entity_name: key.0,
-                        client_selectable_name: key.1,
-                    }
-                    .err()
+                    *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
+                        key.0,
+                        key.1.into(),
+                        Location::Generated,
+                    )
+                    .wrap_err()
                 }
                 Entry::Vacant(vacant_entry) => match item {
                     SelectionType::Scalar(_) => {
-                        let refetch_strategy = get_unvalidated_refetch_stategy(db, key.0)
-                            .map_err(|e| {
-                                RefetchStrategyAccessError::ProcessClientFieldDeclarationError(e)
-                            })
-                            .map(SelectionType::Scalar);
+                        let refetch_strategy =
+                            get_unvalidated_refetch_stategy(db, key.0).map(SelectionType::Scalar);
                         vacant_entry.insert(refetch_strategy);
                     }
                     SelectionType::Object(o) => {
@@ -61,19 +55,16 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         // For client pointers, the refetch strategy is based on the "to" object type.
                         // This is extremely weird, and we should fix this!
                         let refetch_strategy =
-                            get_unvalidated_refetch_stategy(db, o.target_type.inner().0)
-                                .map_err(|e| {
-                                    RefetchStrategyAccessError::ProcessClientFieldDeclarationError(
-                                        e,
-                                    )
-                                })
-                                .map(|item| {
+                            get_unvalidated_refetch_stategy(db, o.target_type.inner().0).map(
+                                |item| {
                                     item.expect(
-                                "Expected client object selectable to have a refetch strategy. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .object_selected()
-                                });
+                                        "Expected client object selectable \
+                                        to have a refetch strategy. \
+                                        This is indicative of a bug in Isograph.",
+                                    )
+                                    .object_selected()
+                                },
+                            );
                         vacant_entry.insert(refetch_strategy);
                     }
                 },
@@ -84,11 +75,12 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     for (key, (_, selection_set)) in expose_field_map {
         match out.entry((key.0, key.1.into())) {
             Entry::Occupied(mut occupied_entry) => {
-                *occupied_entry.get_mut() = RefetchStrategyAccessError::DuplicateDefinition {
-                    parent_object_entity_name: key.0,
-                    client_selectable_name: key.1.into(),
-                }
-                .err();
+                *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
+                    key.0,
+                    key.1.into(),
+                    Location::Generated,
+                )
+                .wrap_err();
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(
@@ -96,7 +88,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                         .refetch_strategy
                         .clone()
                         .scalar_selected()
-                        .ok(),
+                        .wrap_ok(),
                 );
             }
         }
@@ -109,24 +101,22 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<
+) -> DiagnosticVecResult<
     HashMap<
         (ServerObjectEntityName, ClientSelectableName),
-        Result<
+        DiagnosticVecResult<
             SelectionType<
                 Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
                 RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
             >,
-            RefetchStrategyAccessError,
         >,
     >,
-    RefetchStrategyAccessError,
 > {
     let map = unvalidated_refetch_strategy_map(db).clone()?;
 
     map.into_iter()
         .map(|(key, value)| {
-            let value: Result<_, RefetchStrategyAccessError> = value.and_then(|opt| match opt {
+            let value = value.map_err(|e| vec![e]).and_then(|opt| match opt {
                 SelectionType::Scalar(refetch_strategy) => refetch_strategy
                     .map(|refetch_strategy| {
                         get_validated_refetch_strategy(
@@ -137,26 +127,24 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                                 .scalar_selected(),
                         )
                     })
-                    .transpose()
-                    .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
+                    .transpose()?
                     .scalar_selected()
-                    .ok(),
+                    .wrap_ok(),
                 SelectionType::Object(refetch_strategy) => get_validated_refetch_strategy(
                     db,
                     refetch_strategy,
                     key.0,
                     ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
                         .object_selected(),
-                )
-                .map_err(|e| RefetchStrategyAccessError::AddSelectionSetErrors { errors: e })?
+                )?
                 .object_selected()
-                .ok(),
+                .wrap_ok(),
             });
 
             (key, value)
         })
         .collect::<HashMap<_, _>>()
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -166,13 +154,10 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> Result<
-    Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
-    RefetchStrategyAccessError,
-> {
+) -> DiagnosticVecResult<Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>> {
     let map = validated_refetch_strategy_map(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     match map.get(&(
         parent_server_object_entity_name,
@@ -180,22 +165,24 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
-                SelectionType::Object(_) => RefetchStrategyAccessError::IncorrectType {
-                    parent_object_entity_name: parent_server_object_entity_name,
-                    selectable_name: client_scalar_selectable_name.into(),
-                    expected_type: "a scalar",
-                    actual_type: "an object",
-                }
-                .err(),
-                SelectionType::Scalar(s) => s.clone().ok(),
+                SelectionType::Object(_) => vec![selectable_is_wrong_type_diagnostic(
+                    parent_server_object_entity_name,
+                    client_scalar_selectable_name.into(),
+                    "a scalar",
+                    "an object",
+                    Location::Generated,
+                )]
+                .wrap_err(),
+                SelectionType::Scalar(s) => s.clone().wrap_ok(),
             },
-            Err(e) => e.clone().err(),
+            Err(e) => e.clone().wrap_err(),
         },
-        None => RefetchStrategyAccessError::NotFound {
+        None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
-            selectable_name: client_scalar_selectable_name.into(),
-        }
-        .err(),
+            client_scalar_selectable_name.into(),
+            Location::Generated,
+        )]
+        .wrap_err(),
     }
 }
 
@@ -206,7 +193,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> Result<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>, RefetchStrategyAccessError> {
+) -> DiagnosticVecResult<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
     let map = validated_refetch_strategy_map(db)
         .as_ref()
         .map_err(|e| e.clone())?;
@@ -217,61 +204,23 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
-                SelectionType::Scalar(_) => RefetchStrategyAccessError::IncorrectType {
-                    parent_object_entity_name: parent_server_object_entity_name,
-                    selectable_name: client_object_selectable_name.into(),
-                    expected_type: "an object",
-                    actual_type: "a scalar",
-                }
-                .err(),
-                SelectionType::Object(s) => s.clone().ok(),
+                SelectionType::Scalar(_) => vec![selectable_is_wrong_type_diagnostic(
+                    parent_server_object_entity_name,
+                    client_object_selectable_name.into(),
+                    "an object",
+                    "a scalar",
+                    Location::Generated,
+                )]
+                .wrap_err(),
+                SelectionType::Object(s) => s.clone().wrap_ok(),
             },
-            Err(e) => e.clone().err(),
+            Err(e) => e.clone().wrap_err(),
         },
-        None => RefetchStrategyAccessError::NotFound {
+        None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
-            selectable_name: client_object_selectable_name.into(),
-        }
-        .err(),
+            client_object_selectable_name.into(),
+            Location::Generated,
+        )]
+        .wrap_err(),
     }
-}
-#[derive(Clone, Error, Eq, PartialEq, Debug)]
-pub enum RefetchStrategyAccessError {
-    #[error("{0}")]
-    ProcessClientFieldDeclarationError(WithSpan<ProcessClientFieldDeclarationError>),
-
-    #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
-
-    #[error("`{parent_object_entity_name}.{client_selectable_name}` has been defined twice.")]
-    DuplicateDefinition {
-        parent_object_entity_name: ServerObjectEntityName,
-        client_selectable_name: ClientSelectableName,
-    },
-
-    #[error("{0}", 
-        errors.iter().map(|error| format!("{}", error.for_display())).collect::<Vec<_>>().join("\n")
-    )]
-    AddSelectionSetErrors {
-        errors: Vec<WithLocation<AddSelectionSetsError>>,
-    },
-
-    #[error(
-        "Expected `{parent_object_entity_name}.{selectable_name}` to be {expected_type}, \
-        but it was {actual_type}."
-    )]
-    IncorrectType {
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: ClientSelectableName,
-        expected_type: &'static str,
-        actual_type: &'static str,
-    },
-
-    // TODO this should be an option in the return value, not an error variant, but
-    // realistically, that's super annoying.
-    #[error("`{parent_server_object_entity_name}.{selectable_name}` is not defined.")]
-    NotFound {
-        parent_server_object_entity_name: ServerObjectEntityName,
-        selectable_name: ClientSelectableName,
-    },
 }

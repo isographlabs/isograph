@@ -35,6 +35,7 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
+  addNetworkResponseStoreLayer,
   getMutableStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
@@ -86,12 +87,14 @@ export function getOrCreateCacheForArtifact<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
 >(
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<
     TReadFromStore,
     TClientFieldValue,
-    TNormalizationAst
+    TNormalizationAst,
+    TRawResponseType
   >,
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions?: FetchOptions<TClientFieldValue>,
@@ -145,15 +148,15 @@ export type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
   | NetworkResponseObject
-  | (NetworkResponseObject | null)[]
-  | (NetworkResponseScalarValue | null)[];
+  | readonly (NetworkResponseObject | null)[]
+  | readonly (NetworkResponseScalarValue | null)[];
 
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  [index: string]: undefined | NetworkResponseValue;
-  id?: DataId;
-  __typename?: TypeName;
+  readonly [index: string]: undefined | NetworkResponseValue;
+  readonly id?: DataId;
+  readonly __typename?: TypeName;
 };
 
 export function normalizeData(
@@ -508,17 +511,23 @@ function normalizeScalarField(
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
+  const existingValue = targetStoreRecord[parentRecordKey];
 
-  if (
-    networkResponseData == null ||
-    isScalarOrEmptyArray(networkResponseData)
-  ) {
-    const existingValue = targetStoreRecord[parentRecordKey];
+  if (networkResponseData == null) {
+    targetStoreRecord[parentRecordKey] = null;
+    return existingValue !== null;
+  }
+
+  if (isScalarOrEmptyArray(networkResponseData)) {
     targetStoreRecord[parentRecordKey] = networkResponseData;
     return existingValue !== networkResponseData;
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
+}
+
+export function isArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
 }
 
 /**
@@ -553,7 +562,7 @@ function normalizeLinkedField(
     );
   }
 
-  if (Array.isArray(networkResponseData)) {
+  if (isArray(networkResponseData)) {
     // TODO check astNode.plural or the like
     const dataIds: (StoreLink | null)[] = [];
     for (let i = 0; i < networkResponseData.length; i++) {
@@ -719,7 +728,9 @@ function normalizeNetworkResponseObject(
 
 function isScalarOrEmptyArray(
   data: NonNullable<NetworkResponseValue>,
-): data is NetworkResponseScalarValue | (NetworkResponseScalarValue | null)[] {
+): data is
+  | NetworkResponseScalarValue
+  | readonly (NetworkResponseScalarValue | null)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (Array.isArray(data)) {
     // This is maybe fixed in a new version of Typescript??
@@ -733,7 +744,9 @@ function isScalarOrEmptyArray(
   return isScalarValue;
 }
 
-function isNullOrEmptyArray(data: unknown): data is never[] | null[] | null {
+function isNullOrEmptyArray(
+  data: unknown,
+): data is readonly never[] | null[] | null {
   if (Array.isArray(data)) {
     if (data.length === 0) {
       return true;
@@ -908,4 +921,38 @@ function getDataIdOfNetworkResponse(
     storeKey += getStoreKeyChunkForArgument(fieldParameter, variables);
   }
   return storeKey;
+}
+
+export function writeData<
+  TReadFromStore extends UnknownTReadFromStore,
+  TRawResponseType extends NetworkResponseObject,
+>(
+  environment: IsographEnvironment,
+  entrypoint: IsographEntrypoint<
+    TReadFromStore,
+    unknown,
+    NormalizationAst,
+    TRawResponseType
+  >,
+  data: TRawResponseType,
+  variables: ExtractParameters<TReadFromStore>,
+) {
+  const encounteredIds: EncounteredIds = new Map();
+  environment.store = addNetworkResponseStoreLayer(environment.store);
+  normalizeData(
+    environment,
+    environment.store,
+    entrypoint.networkRequestInfo.normalizationAst.selections,
+    data,
+    variables,
+    { __link: ROOT_ID, __typename: entrypoint.concreteType },
+    encounteredIds,
+  );
+  logMessage(environment, () => ({
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
 }

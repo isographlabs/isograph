@@ -1,20 +1,15 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    SourceError,
-    compiler_state::CompilerState,
-    with_duration::WithDuration,
-    write_artifacts::{GenerateArtifactsError, get_artifacts_to_write, write_artifacts_to_disk},
+    compiler_state::CompilerState, with_duration::WithDuration,
+    write_artifacts::{get_artifacts_to_write, write_artifacts_to_disk},
 };
-use artifact_content::{
-    generate_artifacts::GetArtifactPathAndContentError, get_artifact_path_and_content,
-};
+use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{CurrentWorkingDirectory, DiagnosticVecResult};
 use isograph_schema::NetworkProtocol;
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
-use thiserror::Error;
 use tracing::{error, info};
 
 pub struct CompilationStats {
@@ -27,17 +22,16 @@ pub struct CompilationStats {
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> Result<(), BatchCompileError> {
+) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
     let mut state = CompilerState::new(config_location, current_working_directory)?;
-    print_result(WithDuration::new(|| {
-        compile::<TNetworkProtocol>(&mut state)
-    }))
+    print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&mut state)))
 }
 
+
 pub fn print_result(
-    result: WithDuration<Result<CompilationStats, BatchCompileError>>,
-) -> Result<(), BatchCompileError> {
+    result: WithDuration<DiagnosticVecResult<CompilationStats>>,
+) -> DiagnosticVecResult<()> {
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
@@ -47,7 +41,11 @@ pub fn print_result(
             error!(
                 "{}\n{}\n{}",
                 "Error when compiling.\n".bright_red(),
-                err,
+                // TODO don't materialize a vec here
+                err.iter()
+                    .map(|e| e.to_string())
+                    .collect::<Vec<_>>()
+                    .join("\n"),
                 format!(
                     "Compilation took {}.",
                     pretty_duration(&result.elapsed_time, None)
@@ -83,7 +81,7 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 #[tracing::instrument(skip(state))]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     state: &mut CompilerState<TNetworkProtocol>,
-) -> Result<CompilationStats, BatchCompileError> {
+) -> DiagnosticVecResult<CompilationStats> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
@@ -106,41 +104,6 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
         entrypoint_count: stats.entrypoint_count,
         total_artifacts_written,
     }
-    .ok()
+    .wrap_ok()
 }
 
-#[derive(Error, Debug)]
-pub enum BatchCompileError {
-    #[error("{error}")]
-    SourceError {
-        #[from]
-        error: SourceError,
-    },
-
-    #[error("{error}")]
-    GenerateArtifacts {
-        #[from]
-        error: GenerateArtifactsError,
-    },
-
-    #[error(
-        "{}",
-        errors.iter().fold(String::new(), |mut output, x| {
-            output.push_str(&format!("\n\n{x}"));
-            output
-        })
-    )]
-    NotifyErrors { errors: Vec<notify::Error> },
-
-    #[error("{error}")]
-    GenerateArtifactsError {
-        #[from]
-        error: GetArtifactPathAndContentError,
-    },
-}
-
-impl From<Vec<notify::Error>> for BatchCompileError {
-    fn from(errors: Vec<notify::Error>) -> Self {
-        BatchCompileError::NotifyErrors { errors }
-    }
-}

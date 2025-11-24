@@ -1,40 +1,11 @@
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 70,
-                        },
-                    ),
-                },
-                span: Span {
-                    start: 19,
-                    end: 25,
-                },
-            },
-        ),
-        item: UnableToDeserializeDirectives {
-            message: Custom(
-                "data did not match any variant of untagged enum ClientScalarSelectionDirectiveSet",
-            ),
+    Diagnostic(
+        DiagnosticData {
+            message: "data did not match any variant of untagged enum ClientScalarSelectionDirectiveSet",
+            location: None,
         },
-    },
+    ),
 )
 
-Unable to process directives. Message: Error when deserializing.
-
 data did not match any variant of untagged enum ClientScalarSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js
-
-  field Type.Name @hello @there {
-                  ^^^^^^         
-  }
-
 ---

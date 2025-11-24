@@ -1,10 +1,10 @@
-export type Query__meNameSuccessor__rawResponse = {
+export type Query__meNameSuccessor__raw_response_type = {
   me: {
     id: string,
     name: string,
-    successor: ({
+    successor?: ({
       id: string,
-      successor: ({
+      successor?: ({
         id: string,
         name: string,
       } | null),

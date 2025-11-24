@@ -344,7 +344,7 @@ export function readLoadablySelectedFieldData(
         // Fetcher
         () => {
           const fragmentReferenceAndDisposeFromEntrypoint = (
-            entrypoint: IsographEntrypoint<any, any, any>,
+            entrypoint: IsographEntrypoint<any, any, any, {}>,
           ): [FragmentReference<any, any>, CleanupFn] => {
             const readerWithRefetchQueries =
               entrypoint.readerWithRefetchQueries.kind ===
@@ -630,7 +630,7 @@ export function readScalarFieldData(
   root: StoreLink,
   variables: Variables,
 ): ReadDataResult<
-  string | number | boolean | StoreLink | DataTypeValue[] | null
+  string | number | boolean | StoreLink | readonly DataTypeValue[] | null
 > {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];

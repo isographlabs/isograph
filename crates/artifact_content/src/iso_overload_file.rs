@@ -218,7 +218,7 @@ type MatchesWhitespaceAndString<
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any, any>
+  | IsographEntrypoint<any, any, any, any>
 {\n",
             );
             content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
@@ -244,7 +244,7 @@ export function iso(_isographLiteralText: string):
 export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
-  | IsographEntrypoint<any, any, any>
+  | IsographEntrypoint<any, any, any, any>
 {
   switch (isographLiteralText) {\n",
             );
@@ -291,7 +291,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => {}
             };
 
-            value.clone().some()
+            value.clone().wrap_some()
         })
         .map(|selection_type| {
             let client_scalar_selection_directive_set = {

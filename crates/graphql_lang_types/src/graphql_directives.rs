@@ -2,13 +2,12 @@ use std::fmt;
 
 use super::{NameValuePair, write::write_arguments};
 use crate::GraphQLConstantValue;
-use common_lang_types::{DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
+use common_lang_types::{Diagnostic, DirectiveArgumentName, DirectiveName, WithEmbeddedLocation};
 use intern::Lookup;
 use serde::{
     Deserialize, Deserializer,
     de::{self, IntoDeserializer, MapAccess, value::SeqDeserializer},
 };
-use thiserror::Error;
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -27,7 +26,7 @@ impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
 
 pub fn from_graphql_directive<'a, T: Deserialize<'a>>(
     directive: &'a GraphQLDirective<GraphQLConstantValue>,
-) -> Result<T, DeserializationError> {
+) -> Result<T, Diagnostic> {
     T::deserialize(GraphQLDirectiveDeserializer { directive })
 }
 
@@ -36,23 +35,8 @@ struct GraphQLDirectiveDeserializer<'a> {
     directive: &'a GraphQLDirective<GraphQLConstantValue>,
 }
 
-#[derive(Debug, Error)]
-pub enum DeserializationError {
-    #[error("Error when deserializing.\n\n{0}")]
-    Custom(String),
-}
-
-impl de::Error for DeserializationError {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: core::fmt::Display,
-    {
-        DeserializationError::Custom(msg.to_string())
-    }
-}
-
 impl<'de> Deserializer<'de> for GraphQLDirectiveDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -83,7 +67,7 @@ impl<'a, T> NameValuePairVecDeserializer<'a, T> {
 }
 
 impl<'de, T: Lookup + Copy> MapAccess<'de> for NameValuePairVecDeserializer<'de, T> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -106,10 +90,14 @@ impl<'de, T: Lookup + Copy> MapAccess<'de> for NameValuePairVecDeserializer<'de,
                 self.field_idx += 1;
                 seed.deserialize(NameValuePairDeserializer { name_value_pair })
             }
-            _ => Err(DeserializationError::Custom(format!(
-                "Called deserialization of field value for a field with idx {} that doesn't exist. This is indicative of a bug in Isograph.",
-                self.field_idx
-            ))),
+            _ => Err(Diagnostic::new(
+                format!(
+                    "Called deserialization of field value for a field with idx {} that doesn't exist. This is indicative of a bug in Isograph.",
+                    self.field_idx
+                ),
+                // TODO we can get a location, probably!
+                None,
+            )),
         }
     }
 }
@@ -123,7 +111,7 @@ struct NameValuePairDeserializer<'a, TName, TValue> {
 }
 
 impl<'de, TName: Lookup + Copy, TValue> Deserializer<'de> for NameDeserializer<'de, TName, TValue> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -143,7 +131,7 @@ pub struct ConstantValueDeserializer<'de> {
     value: &'de GraphQLConstantValue,
 }
 
-impl<'de> IntoDeserializer<'de, DeserializationError> for &'de GraphQLConstantValue {
+impl<'de> IntoDeserializer<'de, Diagnostic> for &'de GraphQLConstantValue {
     type Deserializer = ConstantValueDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -152,7 +140,7 @@ impl<'de> IntoDeserializer<'de, DeserializationError> for &'de GraphQLConstantVa
 }
 
 impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -197,7 +185,7 @@ impl<'de> Deserializer<'de> for ConstantValueDeserializer<'de> {
 }
 
 impl<'de, TName> Deserializer<'de> for NameValuePairDeserializer<'de, TName, GraphQLConstantValue> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where

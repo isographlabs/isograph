@@ -157,7 +157,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_selectable.name().into(),
         }
-        .some(),
+        .wrap_some(),
     }];
 
     if !client_selectable.variable_definitions().is_empty() {
@@ -180,7 +180,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 parent_object_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable.name().into(),
             }
-            .some(),
+            .wrap_some(),
         });
     }
 
@@ -271,7 +271,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: server_object_selectable_name.into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 
@@ -399,7 +399,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_selectable.as_ref().name().into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 
@@ -460,7 +460,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_field.name().into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 
@@ -498,7 +498,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_field.name().into(),
         }
-        .some(),
+        .wrap_some(),
     }
 }
 

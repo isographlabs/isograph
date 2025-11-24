@@ -1,13 +1,13 @@
-use common_lang_types::{Diagnostic, SelectableName, ServerObjectEntityName};
+use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoizedIsoLiteralError,
-    NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable, client_selectable_map,
-    client_selectable_named, server_selectable_named, server_selectables_vec_for_entity,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
+    ServerObjectSelectable, ServerScalarSelectable, client_selectable_map, client_selectable_named,
+    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
+    server_selectables_vec_for_entity,
 };
 
 #[expect(clippy::type_complexity)]
@@ -16,7 +16,7 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
-) -> Result<
+) -> DiagnosticResult<
     Option<
         DefinitionLocation<
             SelectionType<
@@ -29,7 +29,6 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             >,
         >,
     >,
-    SelectableNamedError,
 > {
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
@@ -53,41 +52,36 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     // case 3: both are ok -> check that there aren't duplicate definitions, and return remaining one or None
 
     match (server_selectable, client_selectable) {
-        (Err(e), Err(_)) => Err(SelectableNamedError::ParseTypeSystemDocumentsError(
-            e.clone(),
-        )),
+        (Err(e), Err(_)) => e.clone().wrap_err(),
         (Ok(server), Err(_)) => match server.clone() {
-            Some(server_selectable) => server_selectable
-                .map_err(
-                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
-                )?
-                .server_defined()
-                .some()
-                .ok(),
+            Some(server_selectable) => server_selectable?.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Err(_), Ok(client)) => match client.clone() {
-            Some(client_selectable) => client_selectable.client_defined().some().ok(),
+            Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
-            (None, Some(client_selectable)) => {
-                client_selectable.clone().client_defined().some().ok()
-            }
-            (Some(server_selectable), None) => server_selectable
+            (None, Some(client_selectable)) => client_selectable
                 .clone()
-                .map_err(
-                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
-                )?
+                .client_defined()
+                .wrap_some()
+                .wrap_ok(),
+            (Some(server_selectable), None) => server_selectable
+                .clone()?
                 .server_defined()
-                .some()
-                .ok(),
-            (Some(_), Some(_)) => SelectableNamedError::DuplicateDefinitions {
-                parent_object_entity_name: parent_server_object_entity_name,
+                .wrap_some()
+                .wrap_ok(),
+            (Some(s), Some(_)) => multiple_selectable_definitions_found_diagnostic(
+                parent_server_object_entity_name,
                 selectable_name,
-            }
-            .err(),
+                match s.as_ref().map_err(Clone::clone)? {
+                    SelectionType::Scalar(s) => s.name.location,
+                    SelectionType::Object(o) => o.name.location,
+                },
+            )
+            .wrap_err(),
         },
     }
 }
@@ -97,9 +91,9 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> Result<
+) -> DiagnosticResult<
     Vec<
-        Result<
+        DiagnosticResult<
             DefinitionLocation<
                 SelectionType<
                     ServerScalarSelectable<TNetworkProtocol>,
@@ -110,58 +104,28 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
                     ClientObjectSelectable<TNetworkProtocol>,
                 >,
             >,
-            SelectableNamedError,
         >,
     >,
-    SelectableNamedError,
 > {
     let mut selectables = server_selectables_vec_for_entity(db, parent_server_object_entity_name)
-        .to_owned()
-        .map_err(SelectableNamedError::ParseTypeSystemDocumentsError)?
+        .to_owned()?
         .into_iter()
-        .map(|(_key, value)| {
-            let value =
-                value.map_err(
-                    |e| SelectableNamedError::FieldToInsertToServerSelectableError { error: e },
-                )?;
-            value.server_defined().ok()
-        })
+        .map(|(_key, value)| value?.server_defined().wrap_ok())
         .collect::<Vec<_>>();
 
     selectables.extend(
         client_selectable_map(db)
             .as_ref()
-            .map_err(|e| e.clone())?
+            .map_err(Clone::clone)?
             .iter()
             .filter(|((entity_name, _selectable_name), _value)| {
                 *entity_name == parent_server_object_entity_name
             })
             .map(|(_key, value)| {
-                let value = value.as_ref().map_err(|e| e.clone())?.clone();
-                value.client_defined().ok()
+                let value = value.clone()?;
+                value.client_defined().wrap_ok()
             }),
     );
 
-    selectables.ok()
-}
-
-#[derive(Error, Debug, PartialEq, Eq, Clone, PartialOrd, Ord)]
-pub enum SelectableNamedError {
-    #[error("{0}")]
-    ServerSelectableNamedError(Diagnostic),
-
-    #[error("{error}")]
-    FieldToInsertToServerSelectableError { error: Diagnostic },
-
-    #[error("`{parent_object_entity_name}.{selectable_name}` has been defined multiple times.")]
-    DuplicateDefinitions {
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: SelectableName,
-    },
-
-    #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
-
-    #[error("{0}")]
-    ParseTypeSystemDocumentsError(Diagnostic),
+    selectables.wrap_ok()
 }

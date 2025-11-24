@@ -1,10 +1,11 @@
 use crate::IsographLangTokenKind;
-use common_lang_types::{Span, WithSpan, WithSpanPostfix};
+use common_lang_types::{
+    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithSpan, WithSpanPostfix,
+};
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{IsographSemanticToken, semantic_token_legend};
 use logos::Logos;
 use prelude::Postfix;
-use thiserror::Error;
 
 pub(crate) struct PeekableLexer<'source> {
     current: WithSpan<IsographLangTokenKind>,
@@ -14,10 +15,12 @@ pub(crate) struct PeekableLexer<'source> {
     end_index_of_last_parsed_token: u32,
     offset: u32,
     semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+
+    pub text_source: TextSource,
 }
 
 impl<'source> PeekableLexer<'source> {
-    pub fn new(source: &'source str) -> Self {
+    pub fn new(source: &'source str, text_source: TextSource) -> Self {
         // To enable fast lookahead the parser needs to store at least the 'kind' (IsographLangTokenKind)
         // of the next token: the simplest option is to store the full current token, but
         // the Parser requires an initial value. Rather than incur runtime/code overhead
@@ -34,6 +37,8 @@ impl<'source> PeekableLexer<'source> {
             end_index_of_last_parsed_token: 0,
             offset: 0,
             semantic_tokens: vec![],
+
+            text_source,
         };
 
         // Advance to the first real token before doing any work
@@ -83,7 +88,7 @@ impl<'source> PeekableLexer<'source> {
             None
         } else {
             let next_token = self.parse_token(semantic_token_legend::ST_COMMENT);
-            Span::new(next_token.span.start, self.source.len() as u32).some()
+            Span::new(next_token.span.start, self.source.len() as u32).wrap_some()
         }
     }
 
@@ -106,17 +111,17 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> LowLevelParseResult<WithSpan<IsographLangTokenKind>> {
+    ) -> DiagnosticResult<WithSpan<IsographLangTokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
-            self.parse_token(isograph_semantic_token).ok()
+            self.parse_token(isograph_semantic_token).wrap_ok()
         } else {
-            LowLevelParseError::ParseTokenKindError {
+            parse_token_kind_diagnostic(
                 expected_kind,
-                found_kind: found.item,
-            }
-            .with_span(found.span)
-            .err()
+                found.item,
+                Location::new(self.text_source, found.span),
+            )
+            .wrap_err()
         }
     }
 
@@ -126,20 +131,20 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> LowLevelParseResult<WithSpan<&'source str>> {
+    ) -> DiagnosticResult<WithSpan<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
 
-        self.source(kind.span).with_span(kind.span).ok()
+        self.source(kind.span).with_span(kind.span).wrap_ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> LowLevelParseResult<WithSpan<T>> {
+    ) -> DiagnosticResult<WithSpan<T>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
         let source = self.source(kind.span).intern();
-        WithSpan::new(source.into(), kind.span).ok()
+        WithSpan::new(source.into(), kind.span).wrap_ok()
     }
 
     #[expect(dead_code)]
@@ -147,27 +152,27 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         identifier: &'static str,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> LowLevelParseResult<WithSpan<IsographLangTokenKind>> {
+    ) -> DiagnosticResult<WithSpan<IsographLangTokenKind>> {
         let peeked = self.peek();
         if peeked.item == IsographLangTokenKind::Identifier {
             let source = self.source(peeked.span);
             if source == identifier {
-                self.parse_token(isograph_semantic_token).ok()
+                self.parse_token(isograph_semantic_token).wrap_ok()
             } else {
-                LowLevelParseError::ParseMatchingIdentifierError {
-                    expected_identifier: identifier,
-                    found_text: source.to_string(),
-                }
-                .with_span(peeked.span)
-                .err()
+                parse_matching_identifier_diagnostic(
+                    identifier,
+                    source,
+                    Location::new(self.text_source, peeked.span),
+                )
+                .wrap_err()
             }
         } else {
-            LowLevelParseError::ParseTokenKindError {
-                expected_kind: IsographLangTokenKind::Identifier,
-                found_kind: peeked.item,
-            }
-            .with_span(peeked.span)
-            .err()
+            parse_token_kind_diagnostic(
+                IsographLangTokenKind::Identifier,
+                peeked.item,
+                Location::new(self.text_source, peeked.span),
+            )
+            .wrap_err()
         }
     }
 
@@ -184,7 +189,7 @@ impl<'source> PeekableLexer<'source> {
         //
         // In situations like that, call with_span_optional_result!
 
-        result.with_span(Span::new(start, end)).ok()
+        result.with_span(Span::new(start, end)).wrap_ok()
     }
 
     pub fn with_span_optional_result<T, E>(
@@ -204,7 +209,7 @@ impl<'source> PeekableLexer<'source> {
 
         result
             .map(|value| value.with_span(Span::new(start, end)))
-            .ok()
+            .wrap_ok()
     }
 
     pub fn white_space_span(&self) -> Span {
@@ -219,21 +224,24 @@ impl<'source> PeekableLexer<'source> {
     }
 }
 
-type LowLevelParseResult<T> = Result<T, WithSpan<LowLevelParseError>>;
+fn parse_token_kind_diagnostic(
+    expected: IsographLangTokenKind,
+    found: IsographLangTokenKind,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Expected {expected}, but found {found}"),
+        location.wrap_some(),
+    )
+}
 
-/// Low-level errors. If peekable_lexer could be made generic (it can't because it needs to know
-/// about EOF), these would belong in a different crate than the parser itself.
-#[derive(Error, Clone, Eq, PartialEq, Debug, PartialOrd, Ord)]
-pub enum LowLevelParseError {
-    #[error("Expected {expected_kind}, found {found_kind}.")]
-    ParseTokenKindError {
-        expected_kind: IsographLangTokenKind,
-        found_kind: IsographLangTokenKind,
-    },
-
-    #[error("Expected {expected_identifier}, found \"{found_text}\"")]
-    ParseMatchingIdentifierError {
-        expected_identifier: &'static str,
-        found_text: String,
-    },
+fn parse_matching_identifier_diagnostic(
+    expected: &str,
+    found: &str,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Expected {expected}, but found {found}"),
+        location.wrap_some(),
+    )
 }

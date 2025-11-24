@@ -5,9 +5,8 @@ use std::{
     path::PathBuf,
 };
 
-use common_lang_types::ArtifactPathAndContent;
+use common_lang_types::{ArtifactPathAndContent, Diagnostic, DiagnosticResult};
 use intern::string_key::Lookup;
-use thiserror::Error;
 
 use crate::changed_artifacts::ChangedArtifacts;
 use artifact_content::FileSystemState;
@@ -78,20 +77,19 @@ pub fn get_artifacts_to_write(
 pub(crate) fn write_artifacts_to_disk(
     artifacts_to_disk: ChangedArtifacts,
     artifact_directory: &PathBuf,
-) -> Result<usize, GenerateArtifactsError> {
+) ->  DiagnosticResult<usize> {
     if artifact_directory.exists() && artifacts_to_disk.cleanup_artifact_directory {
         fs::remove_dir_all(artifact_directory).map_err(|e| {
-            GenerateArtifactsError::UnableToDeleteDirectory {
-                path: artifact_directory.clone(),
-                message: e.to_string(),
-            }
+            unable_to_do_something_at_path_diagnostic(
+                artifact_directory,
+                &e.to_string(),
+                "delete directory",
+            )
         })?;
 
         fs::create_dir_all(artifact_directory).map_err(|e| {
-            GenerateArtifactsError::UnableToCreateDirectory {
-                path: artifact_directory.clone(),
-                message: e.to_string(),
-            }
+            let message = e.to_string();
+            unable_to_do_something_at_path_diagnostic(artifact_directory, &message, "create directory")
         })?;
     }
 
@@ -102,65 +100,53 @@ pub(crate) fn write_artifacts_to_disk(
         let absolute_directory = path.parent().expect("path must have a parent");
 
         fs::create_dir_all(&absolute_directory).map_err(|e| {
-            GenerateArtifactsError::UnableToCreateDirectory {
-                path: absolute_directory.to_path_buf().clone(),
-                message: e.to_string(),
-            }
+            unable_to_do_something_at_path_diagnostic(
+                &absolute_directory.to_path_buf(),
+                &e.to_string(),
+                "create directory",
+            )
         })?;
 
         let mut file = File::create(&path).map_err(|e| {
-            GenerateArtifactsError::UnableToWriteToArtifactFile {
-                path: path.clone(),
-                message: e.to_string(),
-            }
+            unable_to_do_something_at_path_diagnostic(
+                &absolute_directory.to_path_buf(),
+                &e.to_string(),
+                "create directory",
+            )
         })?;
 
         file.write(content.file_content.as_bytes()).map_err(|e| {
-            GenerateArtifactsError::UnableToWriteToArtifactFile {
-                path: path.clone(),
-                message: e.to_string(),
-            }
+            unable_to_do_something_at_path_diagnostic(
+                &path,
+                &e.to_string(),
+                "write contents of file",
+            )
         })?;
     }
 
     for path in artifacts_to_disk.artifacts_to_delete.iter() {
-        fs::remove_file(path).map_err(|e| GenerateArtifactsError::UnableToDeleteArtifactFile {
-            path: path.clone(),
-            message: e.to_string(),
-        })?;
+        fs::remove_file(path).map_err(|e|
+            unable_to_do_something_at_path_diagnostic(
+                path,
+                &e.to_string(),
+                "delete file",
+            )
+        )?;
     }
 
     Ok(count)
 }
 
-#[expect(clippy::enum_variant_names)]
-#[derive(Debug, Error, PartialEq, Eq, Clone)]
-pub enum GenerateArtifactsError {
-    #[error(
-        "Unable to write to artifact file at path {path:?}. \
-        Is there another instance of the Isograph compiler running?\
-        \nReason: {message:?}"
-    )]
-    UnableToWriteToArtifactFile { path: PathBuf, message: String },
-
-    #[error(
-        "Unable to create directory at path {path:?}. \
-        Is there another instance of the Isograph compiler running?\
-        \nReason: {message:?}"
-    )]
-    UnableToCreateDirectory { path: PathBuf, message: String },
-
-    #[error(
-        "Unable to delete directory at path {path:?}. \
-        Is there another instance of the Isograph compiler running?\
-        \nReason: {message:?}"
-    )]
-    UnableToDeleteDirectory { path: PathBuf, message: String },
-
-    #[error(
-        "Unable to delete artifact file at path {path:?}. \
-        Is there another instance of the Isograph compiler running?\
-        \nReason: {message:?}"
-    )]
-    UnableToDeleteArtifactFile { path: PathBuf, message: String },
+pub fn unable_to_do_something_at_path_diagnostic(
+    path: &PathBuf,
+    message: &str,
+    what: &str,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!(
+            "Unable to {what} at path {path:?}. \
+            \nReason: {message}"
+        ),
+        None,
+    )
 }

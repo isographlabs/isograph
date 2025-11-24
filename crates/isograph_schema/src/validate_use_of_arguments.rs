@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    FieldArgumentName, Location, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, FieldArgumentName, Location,
+    ParentObjectEntityNameAndSelectableName, VariableName, WithLocation, WithSpan,
 };
 
 use intern::string_key::Intern;
@@ -11,17 +11,13 @@ use isograph_lang_types::{
     SelectionType,
 };
 use lazy_static::lazy_static;
-use pico_macros::memo;
 use prelude::Postfix;
-use thiserror::Error;
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, MemoizedIsoLiteralError,
-    MemoizedSelectionSetError, NetworkProtocol, ValidatedVariableDefinition,
+    ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ValidatedVariableDefinition,
     client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
     selectable_validated_reader_selection_set, server_object_selectable_named,
-    server_scalar_selectable_named,
-    validate_argument_types::{ValidateArgumentTypesError, value_satisfies_type},
+    server_scalar_selectable_named, validate_argument_types::value_satisfies_type,
     visit_selection_set::visit_selection_set,
 };
 
@@ -41,15 +37,14 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
-#[memo]
 pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<(), Vec<WithLocation<ValidateUseOfArgumentsError>>> {
+) -> DiagnosticVecResult<()> {
     let mut errors = vec![];
 
     for client_selectable in client_selectable_map(db)
         .as_ref()
-        .map_err(|e| vec![WithLocation::new_generated(e.clone().into())])?
+        .map_err(Clone::clone)?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
@@ -66,7 +61,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_type: impl ClientScalarOrObjectSelectable,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    errors: &mut Vec<Diagnostic>,
 ) {
     let mut reachable_variables = BTreeSet::new();
 
@@ -76,7 +71,9 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         client_type.name(),
     ) {
         Ok(validated_selections) => validated_selections,
-        Err(e) => return errors.push(WithLocation::new_generated(e.into())),
+        Err(new_errors) => {
+            return errors.extend(new_errors);
+        }
     };
 
     visit_selection_set(
@@ -96,12 +93,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .as_ref()
                         .expect(
                             "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .as_ref()
                         .expect(
                             "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         );
 
                         server_scalar_selectable
@@ -164,12 +161,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
-                                This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .arguments
                     .iter()
@@ -187,12 +184,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .as_ref()
                         .expect(
                             "Expected selectable to be valid. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .as_ref()
                         .expect(
                             "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         );
 
                         client_object_selectable
@@ -232,7 +229,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    errors: &mut Vec<WithLocation<ValidateUseOfArgumentsError>>,
+    errors: &mut Vec<Diagnostic>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,
     client_type_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
@@ -257,8 +254,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                         &selection_supplied_argument.item.value,
                         &field_argument_definition.type_,
                         client_type_variable_definitions,
-                    )
-                    .map_err(|with_location| with_location.map(|e| e.into())),
+                    ),
                 );
             }
         }
@@ -288,27 +284,34 @@ fn validate_all_variables_are_used(
     used_variables: UsedVariables,
     top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> DiagnosticResult<()> {
     let unused_variables = variable_definitions
         .iter()
         .filter_map(|variable| {
             let is_used = used_variables.contains(&variable.item.name.item);
 
             if !is_used {
-                return variable.clone().some();
+                return variable.clone().wrap_some();
             }
             None
         })
         .collect::<Vec<_>>();
 
     if !unused_variables.is_empty() {
-        return ValidateUseOfArgumentsError::UnusedVariables {
-            unused_variables,
-            type_name: top_level_type_and_field_name.parent_object_entity_name,
-            field_name: top_level_type_and_field_name.selectable_name,
-        }
-        .with_location(location)
-        .err();
+        let type_name = top_level_type_and_field_name.parent_object_entity_name;
+        let field_name = top_level_type_and_field_name.selectable_name;
+        return Diagnostic::new(
+            format!(
+                "The field `{type_name}.{field_name}` has unused variables: {0}",
+                unused_variables
+                    .iter()
+                    .map(|variable| format!("${}", variable.item.name.item))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            location.wrap_some(),
+        )
+        .wrap_err();
     }
     Ok(())
 }
@@ -316,11 +319,20 @@ fn validate_all_variables_are_used(
 fn assert_no_missing_arguments(
     missing_arguments: Vec<ValidatedVariableDefinition>,
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> DiagnosticResult<()> {
     if !missing_arguments.is_empty() {
-        return ValidateUseOfArgumentsError::MissingArguments { missing_arguments }
-            .with_location(location)
-            .err();
+        return Diagnostic::new(
+            format!(
+                "This field has missing arguments: {0}",
+                missing_arguments
+                    .iter()
+                    .map(|arg| format!("${}", arg.name.item))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            location.wrap_some(),
+        )
+        .wrap_err();
     }
     Ok(())
 }
@@ -346,13 +358,13 @@ fn get_missing_and_provided_arguments<'a>(
 
             if let Some(selection_supplied_argument) = selection_supplied_argument {
                 ArgumentType::Provided(field_argument_definition, selection_supplied_argument)
-                    .some()
+                    .wrap_some()
             } else if field_argument_definition.default_value.is_some()
                 || field_argument_definition.type_.is_nullable()
             {
                 None
             } else {
-                ArgumentType::Missing(field_argument_definition).some()
+                ArgumentType::Missing(field_argument_definition).wrap_some()
             }
         })
 }
@@ -361,7 +373,7 @@ fn validate_no_extraneous_arguments(
     field_argument_definitions: &[ValidatedVariableDefinition],
     selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
     location: Location,
-) -> ValidateUseOfArgumentsResult<()> {
+) -> DiagnosticResult<()> {
     let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
         .filter_map(|arg| {
@@ -379,16 +391,25 @@ fn validate_no_extraneous_arguments(
                 .any(|definition| definition.name.item == arg.item.name.item);
 
             if !is_defined {
-                return arg.clone().some();
+                return arg.clone().wrap_some();
             }
             None
         })
         .collect();
 
     if !extra_arguments.is_empty() {
-        return ValidateUseOfArgumentsError::ExtraneousArgument { extra_arguments }
-            .with_location(location)
-            .err();
+        return Diagnostic::new(
+            format!(
+                "This field has extra arguments: {0}",
+                extra_arguments
+                    .iter()
+                    .map(|arg| format!("{}", arg.item.name))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            ),
+            location.wrap_some(),
+        )
+        .wrap_err();
     }
     Ok(())
 }
@@ -429,47 +450,4 @@ fn maybe_push_errors<E>(errors: &mut Vec<E>, result: Result<(), E>) {
     if let Err(e) = result {
         errors.push(e)
     }
-}
-
-type MissingArguments = Vec<ValidatedVariableDefinition>;
-
-type ValidateUseOfArgumentsResult<T> = Result<T, WithLocation<ValidateUseOfArgumentsError>>;
-
-#[derive(Debug, Error, PartialEq, Eq, Clone, Ord, PartialOrd)]
-pub enum ValidateUseOfArgumentsError {
-    #[error(
-        "This field has missing arguments: {0}",
-        missing_arguments.iter().map(|arg| format!("${}", arg.name.item)).collect::<Vec<_>>().join(", ")
-    )]
-    MissingArguments { missing_arguments: MissingArguments },
-
-    #[error(
-        "This field has extra arguments: {0}",
-        extra_arguments.iter().map(|arg| format!("{}", arg.item.name)).collect::<Vec<_>>().join(", ")
-    )]
-    ExtraneousArgument {
-        extra_arguments: Vec<WithLocation<SelectionFieldArgument>>,
-    },
-
-    #[error(
-        "The field `{type_name}.{field_name}` has unused variables: {0}",
-        unused_variables.iter().map(|variable| format!("${}", variable.item.name.item)).collect::<Vec<_>>().join(", ")
-    )]
-    UnusedVariables {
-        unused_variables: Vec<WithSpan<ValidatedVariableDefinition>>,
-        type_name: ServerObjectEntityName,
-        field_name: SelectableName,
-    },
-
-    #[error("{message}")]
-    ValidateArgumentType {
-        #[from]
-        message: ValidateArgumentTypesError,
-    },
-
-    #[error("{0}")]
-    MemoizedIsoLiteralError(#[from] MemoizedIsoLiteralError),
-
-    #[error("{0}")]
-    MemoizedSelectionSetError(#[from] MemoizedSelectionSetError),
 }

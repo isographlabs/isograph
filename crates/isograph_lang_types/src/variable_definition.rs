@@ -34,6 +34,6 @@ impl<TValue: Ord + Debug> VariableDefinition<TValue> {
             type_: self.type_.and_then(map)?,
             default_value: self.default_value,
         }
-        .ok()
+        .wrap_ok()
     }
 }

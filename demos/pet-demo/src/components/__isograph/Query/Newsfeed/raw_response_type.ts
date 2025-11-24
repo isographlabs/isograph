@@ -1,4 +1,4 @@
-export type Query__Newsfeed__rawResponse = {
+export type Query__Newsfeed__raw_response_type = {
   viewer: {
     id: string,
     newsfeed____skip___l_0____limit___l_6: ReadonlyArray<{
@@ -9,7 +9,7 @@ export type Query__Newsfeed__rawResponse = {
       id: string,
       author: string,
       content: string,
-      image: ({
+      image?: ({
         id: string,
       } | null),
       title: string,

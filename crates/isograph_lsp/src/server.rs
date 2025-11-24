@@ -14,17 +14,17 @@ use crate::{
     },
 };
 use colored::Colorize;
-use common_lang_types::CurrentWorkingDirectory;
+use common_lang_types::{
+    CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult,
+};
 use isograph_compiler::{
-    CompilerState, SourceError, WithDuration,
-    batch_compile::BatchCompileError,
-    update_sources,
+    CompilerState, WithDuration, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
 use log::{info, warn};
-use lsp_server::{Connection, ErrorCode, ProtocolError, Response, ResponseError};
+use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     HoverProviderCapability,
     request::{Completion, HoverRequest, SemanticTokensFullRequest},
@@ -38,33 +38,38 @@ use lsp_types::{
 };
 use prelude::Postfix;
 use std::{ops::ControlFlow, path::PathBuf};
-use thiserror::Error;
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize(connection: &Connection) -> LSPProcessResult<InitializeParams> {
+pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
-        text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL).some(),
+        text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
+            .wrap_some(),
         semantic_tokens_provider: SemanticTokensServerCapabilities::SemanticTokensOptions(
             SemanticTokensOptions {
                 work_done_progress_options: WorkDoneProgressOptions::default(),
                 legend: semantic_token_legend(),
                 range: None,
-                full: SemanticTokensFullOptions::Bool(true).some(),
+                full: SemanticTokensFullOptions::Bool(true).wrap_some(),
             },
         )
-        .some(),
-        hover_provider: HoverProviderCapability::Simple(true).some(),
-        document_formatting_provider: OneOf::Left(true).some(),
-        definition_provider: OneOf::Left(true).some(),
+        .wrap_some(),
+        hover_provider: HoverProviderCapability::Simple(true).wrap_some(),
+        document_formatting_provider: OneOf::Left(true).wrap_some(),
+        definition_provider: OneOf::Left(true).wrap_some(),
         completion_provider: Some(Default::default()),
         ..Default::default()
     };
-    let server_capabilities = serde_json::to_value(server_capabilities)?;
-    let params = connection.initialize(server_capabilities)?;
+    let server_capabilities =
+        serde_json::to_value(server_capabilities).map_err(|e| Diagnostic::from_error(e, None))?;
+    let params = connection
+        .initialize(server_capabilities)
+        .map_err(|e| Diagnostic::from_error(e, None))?;
 
-    serde_json::from_value::<InitializeParams>(params)?.ok()
+    serde_json::from_value::<InitializeParams>(params)
+        .map_err(|e| Diagnostic::from_error(e, None))?
+        .wrap_ok()
 }
 
 /// Run the main server loop
@@ -73,7 +78,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
-) -> LSPProcessResult<()> {
+) -> DiagnosticVecResult<()> {
     let mut compiler_state: CompilerState<TNetworkProtocol> =
         CompilerState::new(config_location, current_working_directory)?;
 
@@ -124,7 +129,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         compiler_state = CompilerState::new(config_location, current_working_directory)?;
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
-                        (file_system_receiver, file_system_watcher) = create_debounced_file_watcher(&config);
+                        (file_system_receiver, file_system_watcher) =
+                            create_debounced_file_watcher(&config);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
                         // new DB. Namely, there's an open files hash map that needs to be transferred over.
@@ -196,41 +202,6 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             }),
         },
     }
-}
-
-pub(crate) type LSPProcessResult<T> = Result<T, LSPProcessError>;
-
-#[derive(Debug, Error)]
-pub enum LSPProcessError {
-    #[error("{error}")]
-    Serde {
-        #[from]
-        error: serde_json::Error,
-    },
-
-    #[error("{error}")]
-    Io {
-        #[from]
-        error: std::io::Error,
-    },
-
-    #[error("{error}")]
-    ProtocolError {
-        #[from]
-        error: ProtocolError,
-    },
-
-    #[error("{error}")]
-    BatchCompileError {
-        #[from]
-        error: BatchCompileError,
-    },
-
-    #[error("{error}")]
-    SourceError {
-        #[from]
-        error: SourceError,
-    },
 }
 
 fn bridge_crossbeam_to_tokio<T: Send + 'static>(

@@ -51,7 +51,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Vec<OwnedServerEntity<TNetworkProtocol>>> {
     let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
 
-    map.get(&entity_name).cloned().unwrap_or_default().ok()
+    map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
 
 #[memo]
@@ -67,7 +67,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
         .filter_map(|x| x.as_ref().as_object())
         .map(|x| x.server_object_entity.item.clone())
         .collect::<Vec<_>>()
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -83,30 +83,35 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Object(o) => o.clone().some().ok(),
-                    SelectionType::Scalar(_) => Diagnostic::new(
-                        format!(
-                            "{server_object_entity_name} is a scalar, but it should be an object"
-                        ),
-                        Result::ok(
+                    SelectionType::Object(o) => o.clone().wrap_some().wrap_ok(),
+                    SelectionType::Scalar(_) => {
+                        let location =
                             entity_definition_location(db, server_object_entity_name.into())
-                                .as_ref(),
+                                .as_ref()
+                                .ok()
+                                .cloned()
+                                .flatten();
+                        entity_wrong_type_diagnostic(
+                            server_object_entity_name.into(),
+                            "a scalar",
+                            "an object",
+                            location,
                         )
-                        .cloned()
-                        .flatten(),
-                    )
-                    .err(),
+                        .wrap_err()
+                    }
                 }
             } else {
-                Diagnostic::new(
-                    format!("Multiple definitions of {server_object_entity_name} were found."),
-                    Result::ok(
-                        entity_definition_location(db, server_object_entity_name.into()).as_ref(),
-                    )
+                let location = entity_definition_location(db, server_object_entity_name.into())
+                    .as_ref()
+                    .ok()
                     .cloned()
-                    .flatten(),
+                    .flatten();
+
+                multiple_entity_definitions_found_diagnostic(
+                    server_object_entity_name.into(),
+                    location,
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -127,29 +132,33 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => Ok(Some(s.clone())),
-                    SelectionType::Object(_) => Diagnostic::new(
-                        format!(
-                            "{server_scalar_entity_name} is an object, but it should be a scalar"
-                        ),
-                        Result::ok(
+                    SelectionType::Object(_) => {
+                        let location =
                             entity_definition_location(db, server_scalar_entity_name.into())
-                                .as_ref(),
+                                .as_ref()
+                                .ok()
+                                .cloned()
+                                .flatten();
+                        entity_wrong_type_diagnostic(
+                            server_scalar_entity_name.into(),
+                            "an object",
+                            "a scalar",
+                            location,
                         )
-                        .cloned()
-                        .flatten(),
-                    )
-                    .err(),
+                        .wrap_err()
+                    }
                 }
             } else {
-                Diagnostic::new(
-                    format!("Multiple definitions of {server_scalar_entity_name} were found"),
-                    Result::ok(
-                        entity_definition_location(db, server_scalar_entity_name.into()).as_ref(),
-                    )
+                let location = entity_definition_location(db, server_scalar_entity_name.into())
+                    .as_ref()
+                    .ok()
                     .cloned()
-                    .flatten(),
+                    .flatten();
+                multiple_entity_definitions_found_diagnostic(
+                    server_scalar_entity_name.into(),
+                    location,
                 )
-                .err()
+                .wrap_err()
             }
         }
         None => Ok(None),
@@ -185,7 +194,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_object_entity =
                 server_object_entity_named(db, server_object_entity_name).to_owned()?;
             if let Some(server_object_entity) = server_object_entity {
-                server_object_entity.object_selected().some().ok()
+                server_object_entity.object_selected().wrap_some().wrap_ok()
             } else {
                 Ok(None)
             }
@@ -194,7 +203,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
             let server_scalar_entity =
                 server_scalar_entity_named(db, server_scalar_entity_name).to_owned()?;
             if let Some(server_scalar_entity) = server_scalar_entity {
-                server_scalar_entity.scalar_selected().some().ok()
+                server_scalar_entity.scalar_selected().wrap_some().wrap_ok()
             } else {
                 Ok(None)
             }
@@ -245,13 +254,13 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
                     if rest.is_empty() {
                         Ok(Some(*first))
                     } else {
-                        Diagnostic::new(
-                            format!("Multiple definitions of {entity_name} were found"),
-                            Result::ok(entity_definition_location(db, entity_name).as_ref())
-                                .cloned()
-                                .flatten(),
-                        )
-                        .err()
+                        let location = entity_definition_location(db, entity_name)
+                            .as_ref()
+                            .ok()
+                            .cloned()
+                            .flatten();
+                        multiple_entity_definitions_found_diagnostic(entity_name, location)
+                            .wrap_err()
                     }
                 }
                 None => {
@@ -293,5 +302,37 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
             }
             None
         })
-        .ok()
+        .wrap_ok()
+}
+
+pub fn multiple_entity_definitions_found_diagnostic(
+    server_object_entity_name: UnvalidatedTypeName,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Multiple definitions of {server_object_entity_name} were found."),
+        location,
+    )
+}
+
+pub fn entity_wrong_type_diagnostic(
+    entity_name: UnvalidatedTypeName,
+    actual_type: &'static str,
+    intended_type: &'static str,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("{entity_name} is {actual_type}, but it should be {intended_type}"),
+        location,
+    )
+}
+
+pub fn entity_not_defined_diagnostic(
+    entity_name: ServerObjectEntityName,
+    location: Location,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("`{entity_name}` is not defined."),
+        location.wrap_some(),
+    )
 }

@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
 use common_lang_types::{
-    ClientScalarSelectableName, JavascriptName, SelectableName, ServerObjectEntityName,
-    ServerScalarEntityName, ServerScalarSelectableName, ServerSelectableName,
+    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, SelectableName,
+    ServerObjectEntityName, ServerScalarEntityName, ServerScalarSelectableName,
+    ServerSelectableName,
 };
-use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, ObjectSelection, ScalarSelection, SelectionType,
@@ -15,8 +15,7 @@ use prelude::Postfix;
 
 use crate::{
     IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
-    ServerObjectSelectable, create_additional_fields::CreateAdditionalFieldsError,
-    server_selectable_named,
+    ServerObjectSelectable, server_selectable_named,
 };
 
 lazy_static! {
@@ -36,29 +35,27 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: impl Iterator<Item = ServerSelectableName>,
-) -> Result<Vec<ServerObjectSelectable<TNetworkProtocol>>, CreateAdditionalFieldsError> {
+) -> DiagnosticResult<Vec<ServerObjectSelectable<TNetworkProtocol>>> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
         let current_selectable = server_selectable_named(db, current_entity_name, selection_name)
             .as_ref()
-            .map_err(|e| CreateAdditionalFieldsError::EntityAccessError(e.clone()))?;
+            .map_err(Clone::clone)?;
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(|e| {
-                    CreateAdditionalFieldsError::FieldToInsertToServerSelectableError {
-                        error: e.clone(),
-                    }
-                })?;
+                let entity = entity.as_ref().map_err(Clone::clone)?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
-                        return CreateAdditionalFieldsError::InvalidField {
-                            field_arg: selection_name.lookup().to_string(),
-                        }
-                        .err();
+                        return Diagnostic::new(
+                            format!("Invalid field `{selection_name}` in @exposeField directive"),
+                            // TODO have a location
+                            None,
+                        )
+                        .wrap_err();
                     }
                     SelectionType::Object(object) => {
                         // TODO don't clone. When memoized functions return references with 'db lifetime,
@@ -69,16 +66,21 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             None => {
-                return CreateAdditionalFieldsError::PrimaryDirectiveFieldNotFound {
-                    primary_object_entity_name: current_entity_name,
-                    field_name: selection_name.unchecked_conversion(),
-                }
-                .err();
+                return Diagnostic::new(
+                    format!(
+                        "Error when processing @exposeField directive \
+                        on type `{current_entity_name}`. \
+                        The field `{selection_name}` is not found."
+                    ),
+                    // TODO have a location
+                    None,
+                )
+                .wrap_err();
             }
         };
     }
 
-    path.ok()
+    path.wrap_ok()
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

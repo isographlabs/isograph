@@ -1,30 +1,34 @@
 Err(
-    WithLocation {
-        location: Embedded(
-            EmbeddedLocation {
-                text_source: TextSource {
-                    current_working_directory: CurrentWorkingDirectory,
-                    relative_path_to_source_file: RelativePathToSourceFile(
-                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                    ),
-                    span: Some(
-                        Span {
-                            start: 31,
-                            end: 261,
+    Diagnostic(
+        DiagnosticData {
+            message: "Expected a line break.",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 31,
+                                    end: 261,
+                                },
+                            ),
                         },
-                    ),
-                },
-                span: Span {
-                    start: 68,
-                    end: 69,
-                },
-            },
-        ),
-        item: ExpectedLineBreak,
-    },
+                        span: Span {
+                            start: 68,
+                            end: 69,
+                        },
+                    },
+                ),
+            ),
+        },
+    ),
 )
 
-Expected a linebreak
+Expected a line break.
 crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js
     scalar
     linked {

@@ -1,8 +1,8 @@
-export type Query__RepositoryPage__rawResponse = {
-  repository____name___v_repositoryName____owner___v_repositoryOwner: ({
+export type Query__RepositoryPage__raw_response_type = {
+  repository____name___v_repositoryName____owner___v_repositoryOwner?: ({
     id: string,
     nameWithOwner: string,
-    parent: ({
+    parent?: ({
       id: string,
       name: string,
       nameWithOwner: string,
@@ -13,14 +13,14 @@ export type Query__RepositoryPage__rawResponse = {
       },
     } | null),
     pullRequests____last___v_first: {
-      edges: (ReadonlyArray<({
-        node: ({
+      edges?: (ReadonlyArray<({
+        node?: ({
           id: string,
-          author: ({
+          author?: ({
             __typename: "User",
             id: string,
             login: string,
-            twitterUsername: (string | null),
+            twitterUsername?: (string | null),
           } | null),
           closed: boolean,
           createdAt: string,
@@ -35,7 +35,7 @@ export type Query__RepositoryPage__rawResponse = {
             },
           },
           title: string,
-          totalCommentsCount: (number | null),
+          totalCommentsCount?: (number | null),
         } | null),
       } | null)> | null),
     },
@@ -45,7 +45,7 @@ export type Query__RepositoryPage__rawResponse = {
   viewer: {
     id: string,
     avatarUrl: string,
-    name: (string | null),
+    name?: (string | null),
   },
 }
 

@@ -20,6 +20,7 @@ const sidebars: SidebarsConfig = {
     'pagination',
     'mutations',
     'local-updates',
+    'external-data-sources',
     'conditional-fetching',
     'abstract-types',
     'data-driven-dependencies',

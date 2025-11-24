@@ -50,7 +50,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
                     "The field `{parent_object_entity_name}.{selectable_name}` \
                     has inner type `{target_entity_type_name}`, which does not exist"
                 ),
-                server_field_to_insert.location.some(),
+                server_field_to_insert.location.wrap_some(),
             )
         })?;
 
@@ -112,7 +112,7 @@ pub fn field_to_insert_to_server_selectable<TNetworkProtocol: NetworkProtocol>(
             .object_selected()
         }
     }
-    .ok()
+    .wrap_ok()
 }
 
 pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: NetworkProtocol>(
@@ -127,7 +127,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
         .map(|graphql_constant_value| {
             convert_graphql_constant_value_to_isograph_constant_value(graphql_constant_value.item)
                 .with_location(graphql_constant_value.location)
-                .ok()
+                .wrap_ok()
         })
         .transpose()?;
 
@@ -152,7 +152,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
                             `{parent_type_name}.{field_name}` \
                             has inner type `{input_type_name}`, which does not exist"
                         ),
-                        input_value_definition.location.some(),
+                        input_value_definition.location.wrap_some(),
                     )
                 })
         })?;
@@ -163,7 +163,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
         default_value,
     }
     .with_location(input_value_definition.location)
-    .ok()
+    .wrap_ok()
 }
 
 fn convert_graphql_constant_value_to_isograph_constant_value(

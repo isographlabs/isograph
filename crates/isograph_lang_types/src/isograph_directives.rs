@@ -1,11 +1,10 @@
-use common_lang_types::{IsographDirectiveName, WithLocation, WithSpan};
+use common_lang_types::{Diagnostic, IsographDirectiveName, WithLocation, WithSpan};
 use intern::Lookup;
 use prelude::Postfix;
 use serde::{
     Deserialize, Deserializer,
     de::{self, IntoDeserializer, MapAccess},
 };
-use thiserror::Error;
 
 use crate::{NonConstantValue, SelectionFieldArgument};
 
@@ -17,7 +16,7 @@ pub struct IsographFieldDirective {
 
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
     directives: &'a [WithSpan<IsographFieldDirective>],
-) -> Result<T, DeserializationError> {
+) -> Result<T, Diagnostic> {
     T::deserialize(IsographFieldDirectivesDeserializer { directives })
 }
 
@@ -26,23 +25,8 @@ struct IsographFieldDirectiveDeserializer<'a> {
     directive: &'a IsographFieldDirective,
 }
 
-#[derive(Debug, Error, Eq, PartialEq, Clone, PartialOrd, Ord)]
-pub enum DeserializationError {
-    #[error("Error when deserializing.\n\n{0}")]
-    Custom(String),
-}
-
-impl de::Error for DeserializationError {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: core::fmt::Display,
-    {
-        DeserializationError::Custom(msg.to_string())
-    }
-}
-
 impl<'de> Deserializer<'de> for IsographFieldDirectiveDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -80,7 +64,7 @@ impl<'a> NameValuePairVecDeserializer<'a> {
 }
 
 impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -107,11 +91,17 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
                     value: &name_value_pair.item.value.item,
                 })
             }
-            _ => Err(DeserializationError::Custom(format!(
-                "Called deserialization of field value for a field with idx {} \
-                that doesn't exist. This is indicative of a bug in Isograph.",
-                self.field_idx
-            ))),
+            _ => Diagnostic::new(
+                format!(
+                    "Unable to deserialize directive. \
+                    Called deserialization of field value for a field with index {} \
+                    that doesn't exist. This is indicative of a bug in Isograph.",
+                    self.field_idx
+                ),
+                // TODO location
+                None,
+            )
+            .wrap_err(),
         }
     }
 }
@@ -121,7 +111,7 @@ struct NameDeserializer {
 }
 
 impl<'de> Deserializer<'de> for NameDeserializer {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -141,7 +131,7 @@ pub struct NonConstantValueDeserializer<'de> {
     value: &'de NonConstantValue,
 }
 
-impl<'de> IntoDeserializer<'de, DeserializationError> for &'de NonConstantValue {
+impl<'de> IntoDeserializer<'de, Diagnostic> for &'de NonConstantValue {
     type Deserializer = NonConstantValueDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -150,7 +140,7 @@ impl<'de> IntoDeserializer<'de, DeserializationError> for &'de NonConstantValue 
 }
 
 impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -191,7 +181,7 @@ struct IsographFieldDirectivesDeserializer<'a> {
 }
 
 impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -220,26 +210,26 @@ impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
 
 struct IsographFieldDirectiveVecDeserializer<'a> {
     directives: &'a [WithSpan<IsographFieldDirective>],
-    field_idx: usize,
+    field_index: usize,
 }
 
 impl<'a> IsographFieldDirectiveVecDeserializer<'a> {
     pub fn new(directives: &'a [WithSpan<IsographFieldDirective>]) -> Self {
         Self {
-            field_idx: 0,
+            field_index: 0,
             directives,
         }
     }
 }
 
 impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
-    type Error = DeserializationError;
+    type Error = Diagnostic;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
         K: de::DeserializeSeed<'de>,
     {
-        if let Some(directive) = self.directives.get(self.field_idx) {
+        if let Some(directive) = self.directives.get(self.field_index) {
             return seed
                 .deserialize(NameDeserializer {
                     name: directive.item.name.item.lookup(),
@@ -253,19 +243,24 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
     where
         V: de::DeserializeSeed<'de>,
     {
-        match self.directives.get(self.field_idx) {
+        match self.directives.get(self.field_index) {
             Some(directive) => {
-                self.field_idx += 1;
+                self.field_index += 1;
                 seed.deserialize(IsographFieldDirectiveDeserializer {
                     directive: &directive.item,
                 })
             }
-            _ => DeserializationError::Custom(format!(
-                "Called deserialization of field value for a field with idx {} \
-                that doesn't exist. This is indicative of a bug in Isograph.",
-                self.field_idx
-            ))
-            .err(),
+            _ => Diagnostic::new(
+                format!(
+                    "Unable to deserialize directive. \
+                    Called deserialization of field value for a field with index {} \
+                    that doesn't exist. This is indicative of a bug in Isograph.",
+                    self.field_index
+                ),
+                // TODO get location
+                None,
+            )
+            .wrap_err(),
         }
     }
 }

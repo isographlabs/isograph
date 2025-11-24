@@ -1,6 +1,7 @@
 import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Image__ImageDisplay__param} from './param_type';
 import {Image__ImageDisplay__output_type} from './output_type';
+import type {Image__ImageDisplay__raw_response_type} from './raw_response_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';
@@ -9,7 +10,8 @@ const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 const artifact: IsographEntrypoint<
   Image__ImageDisplay__param,
   Image__ImageDisplay__output_type,
-  NormalizationAst
+  NormalizationAst,
+  Image__ImageDisplay__raw_response_type
 > = {
   kind: "Entrypoint",
   networkRequestInfo: {

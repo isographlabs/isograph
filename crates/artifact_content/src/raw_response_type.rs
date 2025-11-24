@@ -78,16 +78,14 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                             ),
                     },
                 );
-                // TODO: make sure undefined is treated as null when normalizing data
-                // https://github.com/isographlabs/isograph/issues/776
-                // let is_optional = matches!(
-                //     server_scalar_selectable.target_scalar_entity,
-                //     TypeAnnotation::Union(_)
-                // );
 
                 raw_response_type_inner.push_str(&format!(
-                    "{indent}{name}: {},\n",
-                    // if is_optional { "?" } else { "" },
+                    "{indent}{name}{}: {},\n",
+                    if server_scalar_selectable.target_scalar_entity.is_nullable() {
+                        "?"
+                    } else {
+                        ""
+                    },
                     print_javascript_type_declaration(&raw_type)
                 ));
             }
@@ -129,16 +127,14 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                             raw_response_type_declaration.push_str(&format!("{indent}}}"));
                             raw_response_type_declaration
                         });
-                // TODO: make sure undefined is treated as null when normalizing data
-                // https://github.com/isographlabs/isograph/issues/776
-                // let is_optional = matches!(
-                //     server_object_selectable.target_object_entity,
-                //     TypeAnnotation::Union(_)
-                // );
 
                 raw_response_type_inner.push_str(&format!(
-                    "{indent}{name}: {},\n",
-                    // if is_optional { "?" } else { "" },
+                    "{indent}{name}{}: {},\n",
+                    if server_object_selectable.target_object_entity.is_nullable() {
+                        "?"
+                    } else {
+                        ""
+                    },
                     print_javascript_type_declaration(&raw_type)
                 ));
             }

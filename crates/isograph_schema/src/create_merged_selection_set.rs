@@ -120,7 +120,7 @@ impl MergedScalarFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).some()
+            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
         }
     }
 }
@@ -141,7 +141,7 @@ impl MergedLinkedFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).some()
+            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
         }
     }
 }
@@ -1108,7 +1108,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         wrap_refetch_field_with_inline_fragment: if parent_object_entity_name
             != newly_encountered_client_scalar_selectable.parent_object_entity_name()
         {
-            parent_object_entity_name.some()
+            parent_object_entity_name.wrap_some()
         } else {
             None
         },
@@ -1241,7 +1241,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
             (*newly_encountered_client_object_selectable
                 .target_object_entity_name
                 .inner())
-            .some(),
+            .wrap_some(),
             |_| None,
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {

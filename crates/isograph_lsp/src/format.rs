@@ -56,11 +56,11 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
                 )
                 .to_owned()?,
             }
-            .some()
+            .wrap_some()
         })
         .collect::<Vec<_>>()
-        .some()
-        .ok()
+        .wrap_some()
+        .wrap_ok()
 }
 
 fn get_range_of_extraction(extraction: &IsoLiteralExtraction, content: &str) -> Range {

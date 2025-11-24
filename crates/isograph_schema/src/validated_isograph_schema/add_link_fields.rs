@@ -42,7 +42,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
             }
         })
         .collect::<Vec<_>>()
-        .ok()
+        .wrap_ok()
 }
 
 #[memo]
@@ -64,5 +64,5 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
             )
         })
         .collect::<HashMap<_, _>>()
-        .ok()
+        .wrap_ok()
 }

@@ -358,18 +358,18 @@ impl IsoLiteralCompilerVisitor<'_> {
         match iso_template_literal.artifact_type {
             ArtifactType::Entrypoint => self
                 .handle_valid_isograph_entrypoint_literal(iso_template_literal)
-                .ok(),
+                .wrap_ok(),
             ArtifactType::Field => {
                 match fn_args {
                     Some(fn_args) => {
                         if let Some((first, [])) = fn_args.split_first() {
-                            return first.expr.as_ref().clone().ok();
+                            return first.expr.as_ref().clone().wrap_ok();
                         }
                         // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                        return IsographTransformError::IsoFnCallRequiresOneArg.err();
+                        return IsographTransformError::IsoFnCallRequiresOneArg.wrap_err();
                     }
                     // iso(...)>empty<
-                    None => build_arrow_identity_expr().ok(),
+                    None => build_arrow_identity_expr().wrap_ok(),
                 }
             }
         }
