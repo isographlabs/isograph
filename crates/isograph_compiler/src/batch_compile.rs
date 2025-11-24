@@ -1,10 +1,8 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    SourceError,
-    compiler_state::CompilerState,
-    with_duration::WithDuration,
-    write_artifacts::{GenerateArtifactsError, write_artifacts_to_disk},
+    SourceError, compiler_state::CompilerState, with_duration::WithDuration,
+    write_artifacts::write_artifacts_to_disk,
 };
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
@@ -88,7 +86,8 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let (artifacts, stats) = get_artifact_path_and_content(db)
         .map_err(|e| BatchCompileError::Diagnostics { errors: e })?;
     let total_artifacts_written =
-        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)
+            .map_err(BatchCompileError::Diagnostic)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,
@@ -107,11 +106,8 @@ pub enum BatchCompileError {
         error: SourceError,
     },
 
-    #[error("{error}")]
-    GenerateArtifacts {
-        #[from]
-        error: GenerateArtifactsError,
-    },
+    #[error("{0}")]
+    Diagnostic(Diagnostic),
 
     #[error(
         "{}",
