@@ -1,10 +1,8 @@
-use common_lang_types::ArtifactPathAndContent;
+use common_lang_types::{ArtifactPath, ArtifactPathAndContent};
 use intern::string_key::Intern;
 
 pub fn generate_ts_config() -> ArtifactPathAndContent {
     ArtifactPathAndContent {
-        type_and_field: None,
-        file_name: "tsconfig.json".intern().into(),
         file_content: "{
     \"compilerOptions\": {
         \"noUnusedLocals\": false,
@@ -15,5 +13,9 @@ pub fn generate_ts_config() -> ArtifactPathAndContent {
 }"
         .to_string()
         .into(),
+        artifact_path: ArtifactPath {
+            file_name: "tsconfig.json".intern().into(),
+            type_and_field: None,
+        },
     }
 }

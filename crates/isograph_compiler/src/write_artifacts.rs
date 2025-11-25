@@ -31,7 +31,7 @@ pub(crate) fn write_artifacts_to_disk(
         // Is this better than materializing paths_and_contents sooner?
         count += 1;
 
-        let absolute_directory = match path_and_content.type_and_field {
+        let absolute_directory = match path_and_content.artifact_path.type_and_field {
             Some(type_and_field) => artifact_directory
                 .join(type_and_field.parent_object_entity_name.lookup())
                 .join(type_and_field.selectable_name.lookup()),
@@ -45,7 +45,8 @@ pub(crate) fn write_artifacts_to_disk(
             )
         })?;
 
-        let absolute_file_path = absolute_directory.join(path_and_content.file_name.lookup());
+        let absolute_file_path =
+            absolute_directory.join(path_and_content.artifact_path.file_name.lookup());
         let mut file = File::create(&absolute_file_path).map_err(|e| {
             unable_to_do_something_at_path_diagnostic(
                 &absolute_file_path,

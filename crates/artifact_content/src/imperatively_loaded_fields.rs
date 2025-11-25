@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -178,21 +178,25 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     vec![
         ArtifactPathAndContent {
             file_content: format!("export default '{query_text}';").into(),
-            file_name: query_text_file_name_with_extension,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: root_parent_object,
-                selectable_name: root_fetchable_field.into(),
-            }
-            .wrap_some(),
+            artifact_path: ArtifactPath {
+                file_name: query_text_file_name_with_extension,
+                type_and_field: ParentObjectEntityNameAndSelectableName {
+                    parent_object_entity_name: root_parent_object,
+                    selectable_name: root_fetchable_field.into(),
+                }
+                .wrap_some(),
+            },
         },
         ArtifactPathAndContent {
             file_content: imperatively_loaded_field_file_contents.into(),
-            file_name: file_name_prefix,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: root_parent_object,
-                selectable_name: root_fetchable_field.into(),
-            }
-            .wrap_some(),
+            artifact_path: ArtifactPath {
+                file_name: file_name_prefix,
+                type_and_field: ParentObjectEntityNameAndSelectableName {
+                    parent_object_entity_name: root_parent_object,
+                    selectable_name: root_fetchable_field.into(),
+                }
+                .wrap_some(),
+            },
         },
     ]
 }

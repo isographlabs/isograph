@@ -23,7 +23,11 @@ impl std::ops::Deref for FileContent {
 }
 
 pub struct ArtifactPathAndContent {
+    pub file_content: FileContent,
+    pub artifact_path: ArtifactPath,
+}
+
+pub struct ArtifactPath {
     pub type_and_field: Option<ParentObjectEntityNameAndSelectableName>,
     pub file_name: ArtifactFileName,
-    pub file_content: FileContent,
 }
