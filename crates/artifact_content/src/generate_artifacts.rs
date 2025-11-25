@@ -122,7 +122,7 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
-                format!("// {header}\n{}", artifact_path_and_content.file_content);
+                format!("// {header}\n{}", artifact_path_and_content.file_content).into();
         }
     }
     (artifact_path_and_content, stats).wrap_ok()

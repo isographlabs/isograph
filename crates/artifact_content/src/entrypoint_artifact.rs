@@ -11,8 +11,9 @@ use crate::{
     raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
-    ArtifactPathAndContent, ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName,
-    QueryOperationName, ServerObjectEntityName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, ClientScalarSelectableName,
+    ParentObjectEntityNameAndSelectableName, QueryOperationName, ServerObjectEntityName,
+    VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -291,13 +292,15 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 
     let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
     path_and_contents.push(ArtifactPathAndContent {
-        file_content: format!("export default '{query_text}';"),
-        file_name: *QUERY_TEXT_FILE_NAME,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: type_name,
-            selectable_name: field_name,
-        }
-        .wrap_some(),
+        file_content: format!("export default '{query_text}';").into(),
+        artifact_path: ArtifactPath {
+            file_name: *QUERY_TEXT_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: type_name,
+                selectable_name: field_name,
+            }
+            .wrap_some(),
+        },
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
@@ -308,33 +311,41 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             }};\n\
             export default normalizationAst;\n",
             "  ", "  "
-        ),
-        file_name: *NORMALIZATION_AST_FILE_NAME,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: type_name,
-            selectable_name: field_name,
-        }
-        .wrap_some(),
+        )
+        .into(),
+        artifact_path: ArtifactPath {
+            file_name: *NORMALIZATION_AST_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: type_name,
+                selectable_name: field_name,
+            }
+            .wrap_some(),
+        },
     });
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
             "export type {}__{}__{} = {raw_response_type}\n",
             type_name, field_name, *RAW_RESPONSE_TYPE
-        ),
-        file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
-        type_and_field: Some(ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: type_name,
-            selectable_name: field_name,
-        }),
+        )
+        .into(),
+        artifact_path: ArtifactPath {
+            file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
+            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: type_name,
+                selectable_name: field_name,
+            }),
+        },
     });
     path_and_contents.push(ArtifactPathAndContent {
-        file_content: entrypoint_file_content,
-        file_name: *ENTRYPOINT_FILE_NAME,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: type_name,
-            selectable_name: field_name,
-        }
-        .wrap_some(),
+        file_content: entrypoint_file_content.into(),
+        artifact_path: ArtifactPath {
+            file_name: *ENTRYPOINT_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: type_name,
+                selectable_name: field_name,
+            }
+            .wrap_some(),
+        },
     });
 
     path_and_contents.extend(

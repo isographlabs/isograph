@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{ArtifactPathAndContent, OperationId, QueryText};
+use common_lang_types::{ArtifactPath, ArtifactPathAndContent, OperationId, QueryText};
 use indexmap::IndexMap;
 use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsOptions;
@@ -30,9 +30,11 @@ impl PersistedDocuments<'_> {
             .unwrap_or(*PERSISTED_DOCUMENT_FILE_NAME);
 
         ArtifactPathAndContent {
-            file_content,
-            file_name,
-            type_and_field: None,
+            file_content: file_content.into(),
+            artifact_path: ArtifactPath {
+                file_name,
+                type_and_field: None,
+            },
         }
     }
 }

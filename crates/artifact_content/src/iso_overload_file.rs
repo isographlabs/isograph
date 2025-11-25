@@ -4,7 +4,9 @@ use isograph_lang_types::{ClientScalarSelectionDirectiveSet, EmptyDirectiveSet, 
 use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
-use common_lang_types::{ArtifactPathAndContent, SelectableName, ServerObjectEntityName};
+use common_lang_types::{
+    ArtifactPath, ArtifactPathAndContent, SelectableName, ServerObjectEntityName,
+};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
     IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable,
@@ -261,9 +263,11 @@ export function iso(isographLiteralText: string):
 
     imports.push_str(&content);
     ArtifactPathAndContent {
-        file_content: imports,
-        file_name: *ISO_TS_FILE_NAME,
-        type_and_field: None,
+        file_content: imports.into(),
+        artifact_path: ArtifactPath {
+            file_name: *ISO_TS_FILE_NAME,
+            type_and_field: None,
+        },
     }
 }
 

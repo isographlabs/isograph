@@ -21,14 +21,14 @@ pub fn get_artifacts_to_write(
     let mut artifact_map: HashMap<String, (PathBuf, ArtifactPathAndContent)> = HashMap::new();
 
     for path_and_content in paths_and_contents {
-        let absolute_directory = match path_and_content.type_and_field {
+        let absolute_directory = match path_and_content.artifact_path.type_and_field {
             Some(type_and_field) => artifact_directory
                 .join(type_and_field.parent_object_entity_name.lookup())
                 .join(type_and_field.selectable_name.lookup()),
             None => artifact_directory.clone(),
         };
 
-        let absolute_file_path = absolute_directory.join(path_and_content.file_name.lookup());
+        let absolute_file_path = absolute_directory.join(path_and_content.artifact_path.file_name.lookup());
 
         let relative_file_path = absolute_file_path
             .strip_prefix(artifact_directory)

@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
+    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
 };
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -151,13 +151,15 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     };
 
     let mut path_and_contents = vec![ArtifactPathAndContent {
-        file_name: *RESOLVER_READER_FILE_NAME,
-        file_content: reader_content,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_object_entity.name,
-            selectable_name: client_selectable.name().into(),
-        }
-        .wrap_some(),
+        file_content: reader_content.into(),
+        artifact_path: ArtifactPath {
+            file_name: *RESOLVER_READER_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: parent_object_entity.name,
+                selectable_name: client_selectable.name().into(),
+            }
+            .wrap_some(),
+        },
     }];
 
     if !client_selectable.variable_definitions().is_empty() {
@@ -174,13 +176,15 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
-            file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-            file_content: parameters_content,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name().into(),
-            }
-            .wrap_some(),
+            file_content: parameters_content.into(),
+            artifact_path: ArtifactPath {
+                file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
+                type_and_field: ParentObjectEntityNameAndSelectableName {
+                    parent_object_entity_name: parent_object_entity.name,
+                    selectable_name: client_selectable.name().into(),
+                }
+                .wrap_some(),
+            },
         });
     }
 
@@ -265,13 +269,15 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     );
 
     ArtifactPathAndContent {
-        file_name: *RESOLVER_READER_FILE_NAME,
-        file_content: reader_content,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_object_entity.name,
-            selectable_name: server_object_selectable_name.into(),
-        }
-        .wrap_some(),
+        file_content: reader_content.into(),
+        artifact_path: ArtifactPath {
+            file_name: *RESOLVER_READER_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: parent_object_entity.name,
+                selectable_name: server_object_selectable_name.into(),
+            }
+            .wrap_some(),
+        },
     }
 }
 
@@ -393,13 +399,15 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         }};\n",
     );
     ArtifactPathAndContent {
-        file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
-        file_content: param_type_content,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_object_entity.name,
-            selectable_name: client_selectable.as_ref().name().into(),
-        }
-        .wrap_some(),
+        file_content: param_type_content.into(),
+        artifact_path: ArtifactPath {
+            file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: parent_object_entity.name,
+                selectable_name: client_selectable.as_ref().name().into(),
+            }
+            .wrap_some(),
+        },
     }
 }
 
@@ -454,13 +462,15 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         };
 
     ArtifactPathAndContent {
-        file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        file_content: final_output_type_text,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_object_entity.name,
-            selectable_name: client_field.name().into(),
-        }
-        .wrap_some(),
+        file_content: final_output_type_text.into(),
+        artifact_path: ArtifactPath {
+            file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: parent_object_entity.name,
+                selectable_name: client_field.name().into(),
+            }
+            .wrap_some(),
+        },
     }
 }
 
@@ -492,13 +502,15 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
     );
 
     ArtifactPathAndContent {
-        file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        file_content: output_type_text,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: parent_object_entity.name,
-            selectable_name: client_field.name().into(),
-        }
-        .wrap_some(),
+        file_content: output_type_text.into(),
+        artifact_path: ArtifactPath {
+            file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
+            type_and_field: ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: parent_object_entity.name,
+                selectable_name: client_field.name().into(),
+            }
+            .wrap_some(),
+        },
     }
 }
 
