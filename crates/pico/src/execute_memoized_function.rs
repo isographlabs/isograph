@@ -84,7 +84,7 @@ pub fn execute_memoized_function<Db: Database>(
             db.get_storage()
                 .internal
                 .verify_derived_node(derived_node_id);
-            if any_dependency_changed(db, derived_node) {
+            if any_dependency_changed(db, derived_node_id) {
                 let _recalc_span = trace_span!("recalculating_due_to_dependency_change").entered();
                 update_derived_node(db, derived_node_id, derived_node.value.as_ref(), inner_fn)
             } else {
@@ -112,16 +112,20 @@ fn create_derived_node<Db: Database>(
         invoke_with_dependency_tracking(db, derived_node_id, inner_fn).expect(
             "InnerFn call cannot fail for a new derived node. This is indicative of a bug in Pico.",
         );
-    let index = db.get_storage().internal.insert_derived_node(DerivedNode {
-        dependencies: tracked_dependencies.dependencies,
-        inner_fn,
-        value,
-    });
+    let node_index = db
+        .get_storage()
+        .internal
+        .insert_derived_node(DerivedNode { inner_fn, value });
+    let dependency_index = db
+        .get_storage()
+        .internal
+        .insert_dependencies(tracked_dependencies.dependencies);
     db.get_storage().internal.insert_derived_node_revision(
         derived_node_id,
         tracked_dependencies.max_time_updated,
         db.get_storage().internal.current_epoch,
-        index,
+        node_index,
+        dependency_index,
     );
     (
         DidRecalculate::Recalculated,
@@ -148,22 +152,26 @@ fn update_derived_node<Db: Database>(
                 panic!("Expected derived_node_id_to_revision to not be empty at this time");
             };
 
+            let dependency_index = db
+                .get_storage()
+                .internal
+                .insert_dependencies(tracked_dependencies.dependencies);
+            let rev = occupied.get_mut();
+            rev.dependency_index = dependency_index;
+
             let did_recalculate = if *prev_value != *value {
                 event!(Level::TRACE, "value changed");
-                occupied.get_mut().time_updated = tracked_dependencies.max_time_updated;
+                let node_index = db
+                    .get_storage()
+                    .internal
+                    .insert_derived_node(DerivedNode { inner_fn, value });
+                rev.time_updated = tracked_dependencies.max_time_updated;
+                rev.node_index = node_index;
                 DidRecalculate::Recalculated
             } else {
                 event!(Level::TRACE, "value up-to-date");
                 DidRecalculate::ReusedMemoizedValue
             };
-
-            let index = db.get_storage().internal.insert_derived_node(DerivedNode {
-                dependencies: tracked_dependencies.dependencies,
-                inner_fn,
-                value,
-            });
-
-            occupied.get_mut().index = index;
 
             (did_recalculate, tracked_dependencies.max_time_updated)
         }
@@ -171,9 +179,14 @@ fn update_derived_node<Db: Database>(
     }
 }
 
-fn any_dependency_changed<Db: Database>(db: &Db, derived_node: &DerivedNode<Db>) -> bool {
-    derived_node
-        .dependencies
+fn any_dependency_changed<Db: Database>(db: &Db, derived_node_id: DerivedNodeId) -> bool {
+    let dependencies = db
+        .get_storage()
+        .internal
+        .get_dependencies(derived_node_id)
+        .expect("Expected dependencies to be present. This is indicative of a bug in Pico.");
+
+    dependencies
         .iter()
         .filter(|dep| dep.time_verified_or_updated != db.get_storage().internal.current_epoch)
         .any(|dependency| match dependency.node_to {

@@ -110,7 +110,7 @@ lazy_static! {
 /// output_type artifact.
 ///
 /// TODO this should go through OutputFormat
-#[tracing::instrument]
+#[tracing::instrument(skip_all)]
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<(Vec<ArtifactPathAndContent>, ContainsIsoStats)> {
@@ -360,11 +360,13 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                         variable_definitions_iter.collect::<Vec<_>>(),
                                     ),
                                     RefetchStrategy::UseRefetchField(_) => {
-                                        let fetchable_types_map =
-                                            fetchable_types(db).as_ref().expect(
+                                        let fetchable_types_map = fetchable_types(db)
+                                            .as_ref()
+                                            .expect(
                                                 "Expected parsing to have succeeded. \
                                                 This is indicative of a bug in Isograph.",
-                                            );
+                                            )
+                                            .lookup(db);
 
                                         let query_id = fetchable_types_map
                                             .iter()
@@ -424,6 +426,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     "Expected parsing to have succeeded. \
                                     This is indicative of a bug in Isograph.",
                                 )
+                                .lookup(db)
                                 .iter()
                                 .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 

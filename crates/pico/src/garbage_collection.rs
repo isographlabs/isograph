@@ -14,8 +14,9 @@ impl<Db: Database> InternalStorage<Db> {
     /// Run garbage collection, retaining retained_derived_node_ids (which represent
     /// top level function calls) and everything reachable from them.
     ///
-    /// This will create a new values for `self.derived_nodes`, `self.params`,
-    /// `self.param_id_to_index` and `self.derived_node_id_to_revision`.
+    /// This will create new values for `self.derived_nodes`, `self.params`,
+    /// `self.param_id_to_index`, `self.derived_node_id_to_revision` and
+    /// `self.derived_node_dependencies`
     ///
     /// We do not garbage collect source nodes. Those are managed by the end user.
     pub fn run_garbage_collection(
@@ -31,6 +32,7 @@ impl<Db: Database> InternalStorage<Db> {
 
         let new_params = BoxcarVec::new();
         let new_derived_nodes = BoxcarVec::new();
+        let new_dependencies = BoxcarVec::new();
         let new_param_id_to_index = DashMap::new();
         let new_derived_node_id_to_revision = DashMap::new();
 
@@ -47,33 +49,38 @@ impl<Db: Database> InternalStorage<Db> {
 
             let old_derived_node = self
                 .derived_nodes
-                .get_mut(old_derived_node_revision.index.idx)
+                .get_mut(old_derived_node_revision.node_index.idx)
                 .expect(
                     "Expected derived node to be present. This is indicative of a bug in Pico.",
                 );
 
-            add_dependencies_to_queue(
-                &mut derived_node_id_queue,
-                old_derived_node.dependencies.iter(),
-            );
+            let old_dependencies = self
+                .derived_node_dependencies
+                .get_mut(old_derived_node_revision.dependency_index.idx)
+                .expect(
+                     "Expected derived node dependencies to be present. This is indicative of a bug in Pico.",
+                );
+
+            add_dependencies_to_queue(&mut derived_node_id_queue, old_dependencies.iter());
 
             // We do this to avoid cloning the inner value
             let derived_node_value = std::mem::replace(&mut old_derived_node.value, Box::new(()));
-
             let new_derived_node = DerivedNode {
-                dependencies: old_derived_node.dependencies.clone(),
                 inner_fn: old_derived_node.inner_fn,
                 value: derived_node_value,
             };
-
             let new_index = Index::new(new_derived_nodes.push(new_derived_node));
+
+            let dependencies = std::mem::take(old_dependencies);
+            let new_dependencies_index = Index::new(new_dependencies.push(dependencies));
 
             new_derived_node_id_to_revision.insert(
                 derived_node_id,
                 DerivedNodeRevision {
                     time_updated: old_derived_node_revision.time_updated,
                     time_verified: old_derived_node_revision.time_verified,
-                    index: new_index,
+                    node_index: new_index,
+                    dependency_index: new_dependencies_index,
                 },
             );
 
@@ -117,6 +124,7 @@ impl<Db: Database> InternalStorage<Db> {
         self.derived_nodes = new_derived_nodes;
         self.param_id_to_index = new_param_id_to_index;
         self.derived_node_id_to_revision = new_derived_node_id_to_revision;
+        self.derived_node_dependencies = new_dependencies;
     }
 }
 

@@ -80,7 +80,7 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 }
 
 /// This the "workhorse" command of batch compilation.
-#[tracing::instrument(skip(state))]
+#[tracing::instrument(skip_all)]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     state: &mut CompilerState<TNetworkProtocol>,
 ) -> DiagnosticVecResult<CompilationStats> {

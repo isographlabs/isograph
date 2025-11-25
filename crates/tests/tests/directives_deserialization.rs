@@ -1,7 +1,5 @@
-use common_lang_types::{SelectableName, StringLiteralValue, TextSource};
-use graphql_lang_types::{
-    DeserializationError, GraphQLConstantValue, GraphQLDirective, from_graphql_directive,
-};
+use common_lang_types::{Diagnostic, SelectableName, StringLiteralValue, TextSource};
+use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directive};
 use intern::string_key::Intern;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem};
 use std::error::Error;
@@ -99,9 +97,9 @@ fn match_failure_message(
     match expose_field_directives {
         Ok(_) => panic!("Expected an error, but got Ok"),
         Err(e) => {
-            if let Some(deserialization_error) = e.downcast_ref::<DeserializationError>() {
+            if let Some(deserialization_error) = e.downcast_ref::<Diagnostic>() {
                 assert!(
-                    matches!(deserialization_error, DeserializationError::Custom(msg) if msg==message),
+                    deserialization_error.0.message == message,
                     "Expected DeserializationError::Custom, got {deserialization_error:?}"
                 );
             } else {
