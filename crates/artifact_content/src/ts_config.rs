@@ -13,6 +13,7 @@ pub fn generate_ts_config() -> ArtifactPathAndContent {
         \"esModuleInterop\": true
     }
 }"
-        .to_string(),
+        .to_string()
+        .into(),
     }
 }

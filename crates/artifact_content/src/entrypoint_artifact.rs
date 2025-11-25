@@ -291,7 +291,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
 
     let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
     path_and_contents.push(ArtifactPathAndContent {
-        file_content: format!("export default '{query_text}';"),
+        file_content: format!("export default '{query_text}';").into(),
         file_name: *QUERY_TEXT_FILE_NAME,
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
@@ -308,7 +308,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
             }};\n\
             export default normalizationAst;\n",
             "  ", "  "
-        ),
+        )
+        .into(),
         file_name: *NORMALIZATION_AST_FILE_NAME,
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
@@ -320,7 +321,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         file_content: format!(
             "export type {}__{}__{} = {raw_response_type}\n",
             type_name, field_name, *RAW_RESPONSE_TYPE
-        ),
+        )
+        .into(),
         file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
         type_and_field: Some(ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,
@@ -328,7 +330,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         }),
     });
     path_and_contents.push(ArtifactPathAndContent {
-        file_content: entrypoint_file_content,
+        file_content: entrypoint_file_content.into(),
         file_name: *ENTRYPOINT_FILE_NAME,
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: type_name,

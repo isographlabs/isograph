@@ -152,7 +152,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let mut path_and_contents = vec![ArtifactPathAndContent {
         file_name: *RESOLVER_READER_FILE_NAME,
-        file_content: reader_content,
+        file_content: reader_content.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_selectable.name().into(),
@@ -175,7 +175,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             format!("export type {reader_parameters_type} = {parameters_types}\n");
         path_and_contents.push(ArtifactPathAndContent {
             file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-            file_content: parameters_content,
+            file_content: parameters_content.into(),
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable.name().into(),
@@ -266,7 +266,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     ArtifactPathAndContent {
         file_name: *RESOLVER_READER_FILE_NAME,
-        file_content: reader_content,
+        file_content: reader_content.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: server_object_selectable_name.into(),
@@ -394,7 +394,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     );
     ArtifactPathAndContent {
         file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
-        file_content: param_type_content,
+        file_content: param_type_content.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_selectable.as_ref().name().into(),
@@ -455,7 +455,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        file_content: final_output_type_text,
+        file_content: final_output_type_text.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_field.name().into(),
@@ -493,7 +493,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
 
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        file_content: output_type_text,
+        file_content: output_type_text.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: parent_object_entity.name,
             selectable_name: client_field.name().into(),

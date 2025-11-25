@@ -177,7 +177,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
     vec![
         ArtifactPathAndContent {
-            file_content: format!("export default '{query_text}';"),
+            file_content: format!("export default '{query_text}';").into(),
             file_name: query_text_file_name_with_extension,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: root_parent_object,
@@ -186,7 +186,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
             .wrap_some(),
         },
         ArtifactPathAndContent {
-            file_content: imperatively_loaded_field_file_contents,
+            file_content: imperatively_loaded_field_file_contents.into(),
             file_name: file_name_prefix,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: root_parent_object,

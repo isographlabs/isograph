@@ -90,7 +90,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     ArtifactPathAndContent {
         file_name: *REFETCH_READER_FILE_NAME,
-        file_content: reader_content,
+        file_content: reader_content.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),
@@ -119,7 +119,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
     );
     ArtifactPathAndContent {
         file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-        file_content: output_type_text,
+        file_content: output_type_text.into(),
         type_and_field: ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: client_field.parent_object_entity_name,
             selectable_name: client_field.name.item.into(),

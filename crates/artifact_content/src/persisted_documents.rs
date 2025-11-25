@@ -30,7 +30,7 @@ impl PersistedDocuments<'_> {
             .unwrap_or(*PERSISTED_DOCUMENT_FILE_NAME);
 
         ArtifactPathAndContent {
-            file_content,
+            file_content: file_content.into(),
             file_name,
             type_and_field: None,
         }

@@ -261,7 +261,7 @@ export function iso(isographLiteralText: string):
 
     imports.push_str(&content);
     ArtifactPathAndContent {
-        file_content: imports,
+        file_content: imports.into(),
         file_name: *ISO_TS_FILE_NAME,
         type_and_field: None,
     }
