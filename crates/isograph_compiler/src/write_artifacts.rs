@@ -28,7 +28,8 @@ pub fn get_artifacts_to_write(
             None => artifact_directory.clone(),
         };
 
-        let absolute_file_path = absolute_directory.join(path_and_content.artifact_path.file_name.lookup());
+        let absolute_file_path =
+            absolute_directory.join(path_and_content.artifact_path.file_name.lookup());
 
         let relative_file_path = absolute_file_path
             .strip_prefix(artifact_directory)
