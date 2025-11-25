@@ -8,7 +8,7 @@ use crate::{
     execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
+    macro_fns::{get_param, init_param_vec, intern_owned_param},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -73,6 +73,7 @@ pub(crate) struct InternalStorage<Db: Database> {
     pub(crate) source_node_key_to_index: DashMap<Key, Index<SourceNode>>,
 
     pub(crate) derived_nodes: BoxcarVec<DerivedNode<Db>>,
+    pub(crate) derived_node_dependencies: BoxcarVec<Vec<Dependency>>,
     pub(crate) source_nodes: BoxcarVec<Option<SourceNode>>,
     pub(crate) params: BoxcarVec<Box<dyn Any>>,
     pub(crate) current_epoch: Epoch,
@@ -95,6 +96,7 @@ impl<Db: Database> Storage<Db> {
 
                 source_nodes: BoxcarVec::new(),
                 derived_nodes: BoxcarVec::new(),
+                derived_node_dependencies: BoxcarVec::new(),
                 params: BoxcarVec::new(),
 
                 current_epoch: Epoch::new(),
@@ -227,12 +229,25 @@ impl<Db: Database> InternalStorage<Db> {
     ) -> Option<(&DerivedNode<Db>, DerivedNodeRevision)> {
         let revision = *self.derived_node_id_to_revision.get(&derived_node_id)?;
 
-        let node = self.derived_nodes.get(revision.index.idx).expect(
+        let node = self.derived_nodes.get(revision.node_index.idx).expect(
             "indexes should always be valid. \
             This is indicative of a bug in Pico.",
         );
 
         Some((node, revision))
+    }
+
+    pub(crate) fn get_dependencies(
+        &self,
+        derived_node_id: DerivedNodeId,
+    ) -> Option<&Vec<Dependency>> {
+        let revision = *self.derived_node_id_to_revision.get(&derived_node_id)?;
+        self.derived_node_dependencies
+            .get(revision.dependency_index.idx)
+    }
+
+    pub(crate) fn insert_dependencies(&self, dependencies: Vec<Dependency>) -> Index<Dependency> {
+        Index::new(self.derived_node_dependencies.push(dependencies))
     }
 
     pub(crate) fn node_verified_in_current_epoch(&self, derived_node_id: DerivedNodeId) -> bool {
@@ -264,14 +279,16 @@ impl<Db: Database> InternalStorage<Db> {
         derived_node_id: DerivedNodeId,
         time_updated: Epoch,
         time_verified: Epoch,
-        index: Index<DerivedNodeId>,
+        node_index: Index<DerivedNodeId>,
+        dependency_index: Index<Dependency>,
     ) {
         self.derived_node_id_to_revision.insert(
             derived_node_id,
             DerivedNodeRevision {
                 time_updated,
                 time_verified,
-                index,
+                node_index,
+                dependency_index,
             },
         );
     }
@@ -366,7 +383,7 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = hash(value).into();
+    let param_id = (value as *const T as usize as u64).into();
     if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
         let idx = db
             .get_storage()

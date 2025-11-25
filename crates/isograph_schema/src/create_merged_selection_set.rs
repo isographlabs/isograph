@@ -1198,10 +1198,13 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         &newly_encountered_client_object_selectable,
     );
 
-    let fetchable_types_map = fetchable_types(db).as_ref().expect(
-        "Expected parsing to have succeeded. \
+    let fetchable_types_map = fetchable_types(db)
+        .as_ref()
+        .expect(
+            "Expected parsing to have succeeded. \
         This is indicative of a bug in Isograph.",
-    );
+        )
+        .lookup(db);
 
     let query_id = fetchable_types_map
         .iter()
@@ -1259,6 +1262,7 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
                         "Expected parsing to have succeeded. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .iter()
                     .find(|(_, root_operation_name)| root_operation_name.0 == "query")
                     .expect("Expected query to be found")
