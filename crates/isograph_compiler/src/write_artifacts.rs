@@ -7,7 +7,7 @@ use common_lang_types::{
 use artifact_content::FileSystemState;
 
 #[tracing::instrument(skip_all)]
-pub(crate) fn write_artifacts_to_disk(
+pub(crate) fn get_file_system_operations(
     paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
     file_system_state: &mut FileSystemState,
@@ -19,7 +19,7 @@ pub(crate) fn write_artifacts_to_disk(
     operations
 }
 
-#[tracing::instrument(skip(operations))]
+#[tracing::instrument(skip_all)]
 pub(crate) fn apply_file_system_operations(
     operations: Vec<FileSystemOperation>,
 ) -> DiagnosticResult<usize> {
