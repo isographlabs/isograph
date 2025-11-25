@@ -1,6 +1,7 @@
 mod absolute_and_relative_path;
 mod diagnostic;
 mod entity_and_selectable_name;
+mod file_system_operation;
 mod location;
 mod path_and_content;
 mod selectable_name;
@@ -12,6 +13,7 @@ mod text_with_carats;
 pub use absolute_and_relative_path::*;
 pub use diagnostic::*;
 pub use entity_and_selectable_name::*;
+pub use file_system_operation::*;
 pub use location::*;
 pub use path_and_content::*;
 pub use selectable_name::*;

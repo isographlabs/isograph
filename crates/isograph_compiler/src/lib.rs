@@ -1,5 +1,4 @@
 pub mod batch_compile;
-pub mod changed_artifacts;
 mod compiler_state;
 mod read_files;
 mod source_files;

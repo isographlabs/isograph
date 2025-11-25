@@ -33,7 +33,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
         Self {
             db,
             last_gc_run: Instant::now(),
-            file_system_state: FileSystemState::new(),
+            file_system_state: FileSystemState::default(),
         }
         .wrap_ok()
     }

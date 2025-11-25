@@ -3,7 +3,7 @@ use std::{path::PathBuf, time::Duration};
 use crate::{
     compiler_state::CompilerState,
     with_duration::WithDuration,
-    write_artifacts::{get_artifacts_to_write, write_artifacts_to_disk},
+    write_artifacts::{apply_file_system_operations, get_file_system_operations},
 };
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
@@ -91,14 +91,13 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let config = db.get_isograph_config();
     let (artifacts, stats) = get_artifact_path_and_content(db)?;
 
-    let artifacts_to_write = get_artifacts_to_write(
+    let file_system_operations = get_file_system_operations(
         artifacts,
         &config.artifact_directory.absolute_path,
         &mut state.file_system_state,
     );
 
-    let total_artifacts_written =
-        write_artifacts_to_disk(artifacts_to_write, &config.artifact_directory.absolute_path)?;
+    let total_artifacts_written = apply_file_system_operations(file_system_operations)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,
