@@ -11,6 +11,7 @@ use intern::string_key::Lookup;
 use crate::changed_artifacts::ChangedArtifacts;
 use artifact_content::FileSystemState;
 
+#[tracing::instrument(skip(paths_and_contents, artifact_directory, file_system_state))]
 pub fn get_artifacts_to_write(
     paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
