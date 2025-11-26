@@ -20,41 +20,40 @@ pub struct FileSystemState {
 }
 
 impl FileSystemState {
-    pub fn insert(&mut self, path_and_content: &ArtifactPathAndContent) {
-        let value = (
-            FileContent::from(path_and_content.file_content.clone()),
-            ArtifactHash::from(hash(
-                &path_and_content.file_content,
-                PersistedDocumentsHashAlgorithm::Md5,
-            )),
-        );
+    pub fn diff_empty_to_new_state(
+        new: &Self,
+        artifact_directory: &PathBuf,
+    ) -> Vec<FileSystemOperation> {
+        let mut operations: Vec<FileSystemOperation> = Vec::new();
+        operations.push(FileSystemOperation::DeleteDirectory(
+            artifact_directory.to_path_buf(),
+        ));
 
-        match &path_and_content.artifact_path.type_and_field {
-            Some(type_and_field) => {
-                self.nested_files
-                    .entry(type_and_field.parent_object_entity_name)
-                    .or_default()
-                    .entry(type_and_field.selectable_name)
-                    .or_default()
-                    .insert(path_and_content.artifact_path.file_name, value);
+        for (server_object, selectables) in &new.nested_files {
+            let server_object_path = artifact_directory.join(server_object);
+            operations.push(FileSystemOperation::CreateDirectory(
+                server_object_path.clone(),
+            ));
+
+            for (selectable, files) in selectables {
+                let selectable_path = server_object_path.join(selectable);
+                operations.push(FileSystemOperation::CreateDirectory(
+                    selectable_path.clone(),
+                ));
+
+                for (file_name, (content, _)) in files {
+                    let file_path = selectable_path.join(file_name);
+                    operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
+                }
             }
-            None => {
-                self.root_files
-                    .insert(path_and_content.artifact_path.file_name, value);
+
+            for (file_name, (content, _)) in &new.root_files {
+                let file_path = artifact_directory.join(file_name);
+                operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
             }
         }
-    }
 
-    pub fn from_artifacts(artifacts: Vec<ArtifactPathAndContent>) -> Self {
-        let mut state = Self::default();
-        for artifact in artifacts {
-            state.insert(&artifact);
-        }
-        state
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.root_files.is_empty() && self.nested_files.is_empty()
+        operations
     }
 
     // Computes filesystem operations needed to transform this state into the target state.
@@ -65,45 +64,13 @@ impl FileSystemState {
     pub fn diff(&self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
 
-        if self.is_empty() {
-            operations.push(FileSystemOperation::DeleteDirectory(
-                artifact_directory.to_path_buf(),
-            ));
-
-            for (server_object, selectables) in &new.nested_files {
-                let server_object_path = artifact_directory.join(server_object.to_string());
-                operations.push(FileSystemOperation::CreateDirectory(
-                    server_object_path.clone(),
-                ));
-
-                for (selectable, files) in selectables {
-                    let selectable_path = server_object_path.join(selectable.to_string());
-                    operations.push(FileSystemOperation::CreateDirectory(
-                        selectable_path.clone(),
-                    ));
-
-                    for (file_name, (content, _)) in files {
-                        let file_path = selectable_path.join(file_name.to_string());
-                        operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
-                    }
-                }
-
-                for (file_name, (content, _)) in &new.root_files {
-                    let file_path = artifact_directory.join(file_name.to_string());
-                    operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
-                }
-            }
-
-            return operations;
-        }
-
         let mut new_server_objects: HashSet<&ServerObjectEntityName> = HashSet::new();
         let mut new_selectables: HashSet<(&ServerObjectEntityName, &SelectableName)> =
             HashSet::new();
 
         for (server_object, selectables) in &new.nested_files {
             new_server_objects.insert(server_object);
-            let server_object_path = artifact_directory.join(server_object.to_string());
+            let server_object_path = artifact_directory.join(server_object);
 
             if !self.nested_files.contains_key(server_object) {
                 operations.push(FileSystemOperation::CreateDirectory(
@@ -113,7 +80,7 @@ impl FileSystemState {
 
             for (selectable, files) in selectables {
                 new_selectables.insert((server_object, selectable));
-                let selectable_path = server_object_path.join(selectable.to_string());
+                let selectable_path = server_object_path.join(selectable);
 
                 let should_create_dir = self
                     .nested_files
@@ -128,7 +95,7 @@ impl FileSystemState {
                 }
 
                 for (file_name, (new_content, new_hash)) in files {
-                    let file_path = selectable_path.join(file_name.to_string());
+                    let file_path = selectable_path.join(file_name);
 
                     let should_write = self
                         .nested_files
@@ -149,7 +116,7 @@ impl FileSystemState {
         }
 
         for (file_name, (new_content, new_hash)) in &new.root_files {
-            let file_path = artifact_directory.join(file_name.to_string());
+            let file_path = artifact_directory.join(file_name);
 
             let should_write = self
                 .root_files
@@ -166,10 +133,10 @@ impl FileSystemState {
         }
 
         for (server_object, selectables) in &self.nested_files {
-            let server_object_path = artifact_directory.join(server_object.to_string());
+            let server_object_path = artifact_directory.join(server_object);
 
             for (selectable, files) in selectables {
-                let selectable_path = server_object_path.join(selectable.to_string());
+                let selectable_path = server_object_path.join(selectable);
 
                 for file_name in files.keys() {
                     let exist_in_new = new
@@ -180,7 +147,7 @@ impl FileSystemState {
                         .is_some();
 
                     if !exist_in_new {
-                        let file_path = selectable_path.join(file_name.to_string());
+                        let file_path = selectable_path.join(file_name);
                         operations.push(FileSystemOperation::DeleteFile(file_path));
                     }
                 }
@@ -197,12 +164,51 @@ impl FileSystemState {
 
         for file_name in self.root_files.keys() {
             if !new.root_files.contains_key(file_name) {
-                let file_path = artifact_directory.join(file_name.to_string());
+                let file_path = artifact_directory.join(file_name);
                 operations.push(FileSystemOperation::DeleteFile(file_path));
             }
         }
 
         return operations;
+    }
+}
+
+impl From<Vec<ArtifactPathAndContent>> for FileSystemState {
+    fn from(artifacts: Vec<ArtifactPathAndContent>) -> Self {
+        let mut root_files: HashMap<ArtifactFileName, (FileContent, ArtifactHash)> = HashMap::new();
+        let mut nested_files: HashMap<
+            ServerObjectEntityName,
+            HashMap<SelectableName, HashMap<ArtifactFileName, (FileContent, ArtifactHash)>>,
+        > = HashMap::new();
+
+        for artifact in artifacts {
+            let value = (
+                FileContent::from(artifact.file_content.clone()),
+                ArtifactHash::from(hash(
+                    &artifact.file_content,
+                    PersistedDocumentsHashAlgorithm::Md5,
+                )),
+            );
+
+            match &artifact.artifact_path.type_and_field {
+                Some(type_and_field) => {
+                    nested_files
+                        .entry(type_and_field.parent_object_entity_name)
+                        .or_default()
+                        .entry(type_and_field.selectable_name)
+                        .or_default()
+                        .insert(artifact.artifact_path.file_name, value);
+                }
+                None => {
+                    root_files.insert(artifact.artifact_path.file_name, value);
+                }
+            }
+        }
+
+        FileSystemState {
+            root_files,
+            nested_files,
+        }
     }
 }
 
@@ -240,19 +246,10 @@ mod tests {
     }
 
     #[test]
-    fn test_empty_state() {
-        let state = FileSystemState::default();
-        assert!(state.is_empty());
-    }
-
-    #[test]
     fn test_insert_root_file() {
-        let mut state = FileSystemState::default();
         let artifact = create_artifact(None, None, "package.json", "{}");
+        let state = FileSystemState::from(vec![artifact]);
 
-        state.insert(&artifact);
-
-        assert!(!state.is_empty());
         assert_eq!(state.root_files.len(), 1);
         assert!(
             state
@@ -263,7 +260,6 @@ mod tests {
 
     #[test]
     fn test_insert_nested_file() {
-        let mut state = FileSystemState::default();
         let artifact = create_artifact(
             Some("User"),
             Some("name"),
@@ -271,9 +267,8 @@ mod tests {
             "query { user { name } }",
         );
 
-        state.insert(&artifact);
+        let state = FileSystemState::from(vec![artifact]);
 
-        assert!(!state.is_empty());
         assert_eq!(state.nested_files.len(), 1);
 
         let server = &ServerObjectEntityName::from("User".intern());
@@ -303,7 +298,7 @@ mod tests {
             ),
         ];
 
-        let state = FileSystemState::from_artifacts(artifacts);
+        let state = FileSystemState::from(artifacts);
 
         assert_eq!(state.root_files.len(), 1);
         assert_eq!(state.nested_files.len(), 1);
@@ -316,15 +311,12 @@ mod tests {
     #[test]
     fn test_diff_empty_to_new() {
         let old_state = FileSystemState::default();
-        let mut new_state = FileSystemState::default();
-
-        new_state.insert(&create_artifact(None, None, "root.txt", "content"));
-        new_state.insert(&create_artifact(
+        let new_state = FileSystemState::from(vec![create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
             "query",
-        ));
+        )]);
 
         let artifact_dir = PathBuf::from("/artifacts");
         let ops = old_state.diff(&new_state, &artifact_dir);
@@ -349,8 +341,8 @@ mod tests {
         let artifact1 = create_artifact(None, None, "file.txt", "content");
         let artifact2 = create_artifact(None, None, "file.txt", "content");
 
-        let old_state = FileSystemState::from_artifacts(vec![artifact1]);
-        let new_state = FileSystemState::from_artifacts(vec![artifact2]);
+        let old_state = FileSystemState::from(vec![artifact1]);
+        let new_state = FileSystemState::from(vec![artifact2]);
 
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = old_state.diff(&new_state, &artifact_dir);
@@ -363,8 +355,8 @@ mod tests {
         let old_artifact = create_artifact(None, None, "file.txt", "old content");
         let new_artifact = create_artifact(None, None, "file.txt", "new content");
 
-        let old_state = FileSystemState::from_artifacts(vec![old_artifact]);
-        let new_state = FileSystemState::from_artifacts(vec![new_artifact]);
+        let old_state = FileSystemState::from(vec![old_artifact]);
+        let new_state = FileSystemState::from(vec![new_artifact]);
 
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = old_state.diff(&new_state, &artifact_dir);
@@ -375,14 +367,10 @@ mod tests {
 
     #[test]
     fn test_diff_add_new_file() {
-        let old_state = FileSystemState::from_artifacts(vec![create_artifact(
-            None,
-            None,
-            "existing.txt",
-            "content",
-        )]);
+        let old_state =
+            FileSystemState::from(vec![create_artifact(None, None, "existing.txt", "content")]);
 
-        let new_state = FileSystemState::from_artifacts(vec![
+        let new_state = FileSystemState::from(vec![
             create_artifact(None, None, "existing.txt", "content"),
             create_artifact(None, None, "new.txt", "new content"),
         ]);
@@ -400,14 +388,13 @@ mod tests {
 
     #[test]
     fn test_diff_delete_file() {
-        let old_state = FileSystemState::from_artifacts(vec![
+        let old_state = FileSystemState::from(vec![
             create_artifact(None, None, "keep.txt", "content"),
             create_artifact(None, None, "delete.txt", "content"),
         ]);
 
-        let new_state = FileSystemState::from_artifacts(vec![create_artifact(
-            None, None, "keep.txt", "content",
-        )]);
+        let new_state =
+            FileSystemState::from(vec![create_artifact(None, None, "keep.txt", "content")]);
 
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = old_state.diff(&new_state, &artifact_dir);
@@ -422,7 +409,7 @@ mod tests {
 
     #[test]
     fn test_diff_delete_empty_directory() {
-        let old_state = FileSystemState::from_artifacts(vec![create_artifact(
+        let old_state = FileSystemState::from(vec![create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
@@ -442,14 +429,14 @@ mod tests {
 
     #[test]
     fn test_diff_nested_file_changes() {
-        let old_state = FileSystemState::from_artifacts(vec![create_artifact(
+        let old_state = FileSystemState::from(vec![create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
             "old query",
         )]);
 
-        let new_state = FileSystemState::from_artifacts(vec![create_artifact(
+        let new_state = FileSystemState::from(vec![create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
@@ -465,14 +452,14 @@ mod tests {
 
     #[test]
     fn test_diff_add_new_selectable() {
-        let old_state = FileSystemState::from_artifacts(vec![create_artifact(
+        let old_state = FileSystemState::from(vec![create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
             "query",
         )]);
 
-        let new_state = FileSystemState::from_artifacts(vec![
+        let new_state = FileSystemState::from(vec![
             create_artifact(Some("User"), Some("name"), "query.graphql", "query"),
             create_artifact(Some("User"), Some("email"), "query.graphql", "query"),
         ]);
@@ -487,14 +474,14 @@ mod tests {
 
     #[test]
     fn test_diff_complex_scenario() {
-        let old_state = FileSystemState::from_artifacts(vec![
+        let old_state = FileSystemState::from(vec![
             create_artifact(None, None, "root.txt", "old root"),
             create_artifact(Some("User"), Some("name"), "query.graphql", "old query"),
             create_artifact(Some("User"), Some("email"), "query.graphql", "delete me"),
             create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"),
         ]);
 
-        let new_state = FileSystemState::from_artifacts(vec![
+        let new_state = FileSystemState::from(vec![
             create_artifact(None, None, "root.txt", "new root"), // changed
             create_artifact(None, None, "new_root.txt", "new file"), // added
             create_artifact(Some("User"), Some("name"), "query.graphql", "new query"), // changed

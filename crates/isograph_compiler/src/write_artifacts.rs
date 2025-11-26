@@ -10,12 +10,24 @@ use artifact_content::FileSystemState;
 pub(crate) fn get_file_system_operations(
     paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
     artifact_directory: &PathBuf,
-    file_system_state: &mut FileSystemState,
+    file_system_state: &mut Option<FileSystemState>,
 ) -> Vec<FileSystemOperation> {
     let artifacts: Vec<ArtifactPathAndContent> = paths_and_contents.into_iter().collect();
-    let new_file_system_state = FileSystemState::from_artifacts(artifacts);
-    let operations = file_system_state.diff(&new_file_system_state, artifact_directory);
-    *file_system_state = new_file_system_state;
+    let new_file_system_state = FileSystemState::from(artifacts);
+    let operations = match file_system_state {
+        None => {
+            let operations = FileSystemState::diff_empty_to_new_state(
+                &new_file_system_state,
+                artifact_directory,
+            );
+            operations
+        }
+        Some(file_system_state) => {
+            let operations = file_system_state.diff(&new_file_system_state, artifact_directory);
+            operations
+        }
+    };
+    *file_system_state = Some(new_file_system_state);
     operations
 }
 
