@@ -58,9 +58,10 @@ jobs:
     strategy:
       matrix:
         target:
-          - folder: github-demo
-          - folder: pet-demo
-          - folder: vite-demo
+          - folder: demos/github-demo
+          - folder: demos/pet-demo
+          - folder: demos/vite-demo
+          - folder: libs/isograph-react
     steps:
       - uses: actions/checkout@v2
       - name: 'Download cli binary'
@@ -71,7 +72,7 @@ jobs:
       - name: Make artifact executable
         run: chmod +x ./artifacts/linux-x64/isograph_cli
       - name: 'Build project'
-        run: cd ./demos/${{ matrix.target.folder }} && ../../artifacts/linux-x64/isograph_cli --config ./isograph.config.json
+        run: cd ./${{ matrix.target.folder }} && ../../artifacts/linux-x64/isograph_cli --config ./isograph.config.json
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
