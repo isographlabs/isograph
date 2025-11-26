@@ -10,7 +10,7 @@ use isograph_lang_types::{
     ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
     TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use pico_macros::memo;
 
@@ -62,7 +62,12 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             })?;
 
     match parent_type_id {
-        ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)?,
+        ServerEntityName::Object(_) => {
+            add_client_field_to_object(db, client_field_declaration.item)
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")
+                .map(|x| x.0)?
+        }
         ServerEntityName::Scalar(scalar_entity_name) => {
             return Diagnostic::new(
                 format!(
@@ -157,18 +162,8 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_field_declaration: WithSpan<ClientFieldDeclaration>,
-) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
-    let (result, _) =
-        process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
-
-    Ok(result)
-}
-
 #[memo]
-pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
+pub fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: ClientFieldDeclaration,
 ) -> DiagnosticResult<(
@@ -232,10 +227,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
-    let fetchable_types_map = fetchable_types(db)
-        .as_ref()
-        .map_err(Clone::clone)?
-        .lookup(db);
+    let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 

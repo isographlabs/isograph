@@ -1,7 +1,7 @@
 use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
@@ -53,11 +53,11 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => e.clone().wrap_err(),
-        (Ok(server), Err(_)) => match server.clone() {
+        (Ok(server), Err(_)) => match server.note_todo("Do not clone. Use a MemoRef.").clone() {
             Some(server_selectable) => server_selectable?.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
-        (Err(_), Ok(client)) => match client.clone() {
+        (Err(_), Ok(client)) => match client.note_todo("Do not clone. Use a MemoRef.").clone() {
             Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
@@ -65,18 +65,20 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             (None, None) => Ok(None),
             (None, Some(client_selectable)) => client_selectable
                 .clone()
+                .note_todo("Do not clone. Use a MemoRef.")
                 .client_defined()
                 .wrap_some()
                 .wrap_ok(),
             (Some(server_selectable), None) => server_selectable
-                .clone()?
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")?
                 .server_defined()
                 .wrap_some()
                 .wrap_ok(),
             (Some(s), Some(_)) => multiple_selectable_definitions_found_diagnostic(
                 parent_server_object_entity_name,
                 selectable_name,
-                match s.as_ref().map_err(Clone::clone)? {
+                match s.clone_err()? {
                     SelectionType::Scalar(s) => s.name.location,
                     SelectionType::Object(o) => o.name.location,
                 },
@@ -115,14 +117,13 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 
     selectables.extend(
         client_selectable_map(db)
-            .as_ref()
-            .map_err(Clone::clone)?
+            .clone_err()?
             .iter()
             .filter(|((entity_name, _selectable_name), _value)| {
                 *entity_name == parent_server_object_entity_name
             })
             .map(|(_key, value)| {
-                let value = value.clone()?;
+                let value = value.clone().note_todo("Do not clone. Use a MemoRef.")?;
                 value.client_defined().wrap_ok()
             }),
     );

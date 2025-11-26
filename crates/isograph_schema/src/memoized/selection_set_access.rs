@@ -36,12 +36,22 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
             );
             if rest.is_empty() {
                 match first {
-                    SelectionType::Scalar(s) => {
-                        (*key, s.selection_set.clone().scalar_selected().wrap_ok())
-                    }
-                    SelectionType::Object(o) => {
-                        (*key, o.selection_set.clone().object_selected().wrap_ok())
-                    }
+                    SelectionType::Scalar(s) => (
+                        *key,
+                        s.selection_set
+                            .clone()
+                            .note_todo("Do not clone. Use a MemoRef.")
+                            .scalar_selected()
+                            .wrap_ok(),
+                    ),
+                    SelectionType::Object(o) => (
+                        *key,
+                        o.selection_set
+                            .clone()
+                            .note_todo("Do not clone. Use a MemoRef.")
+                            .object_selected()
+                            .wrap_ok(),
+                    ),
                 }
             } else {
                 (
@@ -89,6 +99,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                     selection_set
                         .reader_selection_set
                         .clone()
+                        .note_todo("Do not clone. Use a MemoRef.")
                         .scalar_selected()
                         .wrap_ok(),
                 );
@@ -156,4 +167,5 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
             This is indicative of a bug in Isograph.",
         )
         .clone()
+        .note_todo("Do not clone. Use a MemoRef.")
 }

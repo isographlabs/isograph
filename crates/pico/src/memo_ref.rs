@@ -101,11 +101,11 @@ impl<T: 'static + Clone> MemoRef<T> {
 
 impl<T: 'static, E: Clone + 'static> MemoRef<Result<T, E>> {
     pub fn try_lookup<'db>(&self, db: &'db dyn DatabaseDyn) -> Result<&'db T, E> {
-        self.lookup(db).as_ref().map_err(|e| e.clone())
+        self.lookup(db).as_ref().map_err(Clone::clone)
     }
 
     pub fn try_lookup_tracked<'db>(&self, db: &'db dyn DatabaseDyn) -> Result<&'db T, E> {
-        self.lookup_tracked(db).as_ref().map_err(|e| e.clone())
+        self.lookup_tracked(db).as_ref().map_err(Clone::clone)
     }
 }
 

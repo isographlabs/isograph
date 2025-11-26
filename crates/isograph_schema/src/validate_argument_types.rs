@@ -8,7 +8,7 @@ use graphql_lang_types::{
     GraphQLTypeAnnotation, NameValuePair,
 };
 use intern::{Lookup, string_key::StringKey};
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use isograph_lang_types::{
     NonConstantValue, SelectionType, VariableDefinition,
@@ -340,9 +340,8 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Vec<ObjectLiteralFieldType>> {
-    let server_selectables = server_selectables_map_for_entity(db, server_object_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let server_selectables =
+        server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
 
     server_selectables
         .iter()
@@ -400,9 +399,8 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
 ) -> DiagnosticResult<()> {
-    let object_fields = server_selectables_map_for_entity(db, parent_server_object_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let object_fields =
+        server_selectables_map_for_entity(db, parent_server_object_entity_name).clone_err()?;
 
     let extra_fields: Vec<_> = object_literal
         .iter()

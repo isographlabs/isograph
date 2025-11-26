@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{Diagnostic, DiagnosticVecResult};
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ContainsIsoStats, IsographDatabase, NetworkProtocol, create_new_exposed_field,
@@ -62,9 +62,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<()> {
-    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let expose_as_field_queue =
+        create_type_system_schema_with_server_selectables(db).clone_err()?;
 
     // TODO restructure as a .map or whatnot
     let mut errors = vec![];
@@ -118,7 +117,7 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     // This can and should be rethought! Namely, just because the referenced entity doesn't exist
     // doesn't mean that the selectable can't be materialized. Instead, the result should be
     // materialized when we actually need to look at the referenced entity.
-    let server_selectables = server_selectables_map(db).as_ref().map_err(Clone::clone)?;
+    let server_selectables = server_selectables_map(db).clone_err()?;
 
     let mut errors = vec![];
 
@@ -148,12 +147,6 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
 
     entities
         .iter()
-        .flat_map(|entity| {
-            Result::err(
-                server_id_selectable(db, entity.name)
-                    .as_ref()
-                    .map_err(|e| e.clone()),
-            )
-        })
+        .flat_map(|entity| Result::err(server_id_selectable(db, entity.name).clone_err()))
         .collect()
 }

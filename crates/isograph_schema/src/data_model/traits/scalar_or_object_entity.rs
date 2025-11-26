@@ -8,7 +8,7 @@ use isograph_lang_types::{
     SelectionSetParentType, SelectionSetPath, SelectionType, SelectionTypePostfix,
     ServerObjectEntityNameWrapper,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientOrServerObjectSelectable, IsographDatabase, NetworkProtocol, OwnedObjectSelectable,
@@ -160,8 +160,7 @@ pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProto
     };
 
     server_object_entity_named(db, parent_object_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?
+        .clone_err()?
         .as_ref()
         .ok_or_else(|| {
             entity_not_defined_diagnostic(

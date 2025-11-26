@@ -55,7 +55,8 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     >,
 > {
     get_link_fields(db)
-        .to_owned()?
+        .to_owned()
+        .note_todo("Do not clone. Use a MemoRef.")?
         .into_iter()
         .map(|link_selectable| {
             (

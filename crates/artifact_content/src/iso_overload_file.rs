@@ -371,11 +371,11 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 .to_owned()
                 .expect(
                     "Expected parsing to have succeeded by this point. \
-                        This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .expect(
                     "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 );
                 (client_scalar_selectable, entrypoint_declaration_info)
             },

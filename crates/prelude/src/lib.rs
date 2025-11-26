@@ -42,6 +42,36 @@ where
     {
         dbg!(self)
     }
+
+    #[inline(always)]
+    fn note_todo(self, #[allow(unused)] message: &'static str) -> Self {
+        self
+    }
+
+    #[inline(always)]
+    fn note_do_not_commit(self, #[allow(unused)] message: &'static str) -> Self {
+        self
+    }
 }
 
 impl<T> Postfix for T {}
+
+pub trait ErrClone {
+    type Target<'a>
+    where
+        Self: 'a;
+
+    fn clone_err<'a>(&'a self) -> Self::Target<'a>;
+}
+
+impl<T, E: Clone> ErrClone for Result<T, E> {
+    type Target<'a>
+        = Result<&'a T, E>
+    where
+        T: 'a,
+        E: 'a;
+
+    fn clone_err<'a>(&'a self) -> Self::Target<'a> {
+        self.as_ref().map_err(Clone::clone)
+    }
+}

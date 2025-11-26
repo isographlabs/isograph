@@ -31,8 +31,9 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
         .schema_extension_sources
         .iter()
     {
-        let extensions_document =
-            parse_schema_extensions_file(db, *schema_extension_source_id).to_owned()?;
+        let extensions_document = parse_schema_extensions_file(db, *schema_extension_source_id)
+            .to_owned()
+            .note_todo("Do not clone. Use a MemoRef.")?;
         schema_extensions.insert(*relative_path, extensions_document);
     }
 

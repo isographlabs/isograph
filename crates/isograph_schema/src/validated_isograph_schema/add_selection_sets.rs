@@ -13,7 +13,7 @@ use isograph_lang_types::{
     ScalarSelectionDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
     UnvalidatedScalarFieldSelection, UnvalidatedSelection,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 /// At this point, all selectables have been defined. So, we can validate the parsed
 /// selection set by confirming:
@@ -92,20 +92,16 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         scalar_selection.name.item.into(),
     );
 
-    let location = selectable
-        .as_ref()
-        .map_err(Clone::clone)?
-        .as_ref()
-        .ok_or_else(|| {
-            selection_does_not_exist_diagnostic(
-                top_level_field_or_pointer.client_type(),
-                type_and_field.parent_object_entity_name,
-                type_and_field.selectable_name,
-                parent_object_entity_name,
-                scalar_selection.name.item.into(),
-                scalar_selection.name.location,
-            )
-        })?;
+    let location = selectable.clone_err()?.as_ref().ok_or_else(|| {
+        selection_does_not_exist_diagnostic(
+            top_level_field_or_pointer.client_type(),
+            type_and_field.parent_object_entity_name,
+            type_and_field.selectable_name,
+            parent_object_entity_name,
+            scalar_selection.name.item.into(),
+            scalar_selection.name.location,
+        )
+    })?;
 
     let associated_data = match location {
         DefinitionLocation::Server(server_selectable_id) => {
@@ -202,20 +198,16 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         object_selection.name.item.into(),
     );
 
-    let selectable = selectable
-        .as_ref()
-        .map_err(Clone::clone)?
-        .as_ref()
-        .ok_or_else(|| {
-            vec![selection_does_not_exist_diagnostic(
-                top_level_field_or_pointer.client_type(),
-                type_and_field.parent_object_entity_name,
-                type_and_field.selectable_name,
-                parent_object_entity_name,
-                object_selection.name.item.into(),
-                object_selection.name.location,
-            )]
-        })?;
+    let selectable = selectable.clone_err()?.as_ref().ok_or_else(|| {
+        vec![selection_does_not_exist_diagnostic(
+            top_level_field_or_pointer.client_type(),
+            type_and_field.parent_object_entity_name,
+            type_and_field.selectable_name,
+            parent_object_entity_name,
+            object_selection.name.item.into(),
+            object_selection.name.location,
+        )]
+    })?;
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
         DefinitionLocation::Server(server_selectable) => {
