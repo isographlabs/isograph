@@ -15,14 +15,16 @@ pub(crate) fn get_file_system_operations(
     let new_file_system_state = FileSystemState::from(paths_and_contents);
     let operations = match file_system_state {
         None => {
-            let operations = FileSystemState::diff_empty_to_new_state(
-                &new_file_system_state,
-                artifact_directory,
-            );
+            let operations =
+                FileSystemState::recreate_all(&new_file_system_state, artifact_directory);
             operations
         }
         Some(file_system_state) => {
-            let operations = file_system_state.diff(&new_file_system_state, artifact_directory);
+            let operations = FileSystemState::diff(
+                &file_system_state,
+                &new_file_system_state,
+                artifact_directory,
+            );
             operations
         }
     };

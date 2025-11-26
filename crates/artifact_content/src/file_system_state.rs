@@ -21,16 +21,13 @@ pub struct FileSystemState {
 }
 
 impl FileSystemState {
-    pub fn diff_empty_to_new_state(
-        new: &Self,
-        artifact_directory: &PathBuf,
-    ) -> Vec<FileSystemOperation> {
+    pub fn recreate_all(state: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
         operations.push(FileSystemOperation::DeleteDirectory(
             artifact_directory.to_path_buf(),
         ));
 
-        for (server_object, selectables) in &new.nested_files {
+        for (server_object, selectables) in &state.nested_files {
             let server_object_path = artifact_directory.join(server_object);
 
             for (selectable, files) in selectables {
@@ -46,7 +43,7 @@ impl FileSystemState {
             }
         }
 
-        for (file_name, (index, _)) in &new.root_files {
+        for (file_name, (index, _)) in &state.root_files {
             let file_path = artifact_directory.join(file_name);
             operations.push(FileSystemOperation::WriteFile(file_path, index.clone()));
         }
@@ -54,12 +51,7 @@ impl FileSystemState {
         operations
     }
 
-    // Computes filesystem operations needed to transform this state into the target state.
-    // Returns operations to create, update, and delete files and directories. Files are updated
-    // only when their hash differs. If the current state is empty, emits a DeleteDirectory
-    // operation for the artifact root followed by recreation of all files. Empty directories
-    // are automatically removed after their files are deleted.
-    pub fn diff(&self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
+    pub fn diff(old: &Self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
 
         let mut new_server_objects: HashSet<ServerObjectEntityName> = HashSet::new();
@@ -74,7 +66,7 @@ impl FileSystemState {
                 new_selectables.insert((*server_object, selectable));
                 let selectable_path = server_object_path.join(selectable);
 
-                let should_create_dir = self
+                let should_create_dir = old
                     .nested_files
                     .get(server_object)
                     .and_then(|s| s.get(selectable))
@@ -89,7 +81,7 @@ impl FileSystemState {
                 for (file_name, (new_index, new_hash)) in files {
                     let file_path = selectable_path.join(file_name);
 
-                    let should_write = self
+                    let should_write = old
                         .nested_files
                         .get(server_object)
                         .and_then(|s| s.get(selectable))
@@ -108,7 +100,7 @@ impl FileSystemState {
         for (file_name, (new_index, new_hash)) in &new.root_files {
             let file_path = artifact_directory.join(file_name);
 
-            let should_write = self
+            let should_write = old
                 .root_files
                 .get(file_name)
                 .map(|(_old_content, old_hash)| old_hash != new_hash)
@@ -119,7 +111,7 @@ impl FileSystemState {
             }
         }
 
-        for (server_object, selectables) in &self.nested_files {
+        for (server_object, selectables) in &old.nested_files {
             let server_object_path = artifact_directory.join(server_object);
 
             for (selectable, files) in selectables {
@@ -149,7 +141,7 @@ impl FileSystemState {
             }
         }
 
-        for file_name in self.root_files.keys() {
+        for file_name in old.root_files.keys() {
             if !new.root_files.contains_key(file_name) {
                 let file_path = artifact_directory.join(file_name);
                 operations.push(FileSystemOperation::DeleteFile(file_path));
