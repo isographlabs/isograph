@@ -29,7 +29,7 @@ const artifact: EagerReaderArtifact<
   Query__normalizeUndefinedField__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.normalizeUndefinedField",
+  fieldName: "normalizeUndefinedField",
   resolver,
   readerAst,
   hasUpdatable: false,
