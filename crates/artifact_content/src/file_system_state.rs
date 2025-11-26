@@ -114,8 +114,18 @@ impl FileSystemState {
         for (server_object, selectables) in &old.nested_files {
             let server_object_path = artifact_directory.join(server_object);
 
+            if !new_server_objects.contains(server_object) {
+                operations.push(FileSystemOperation::DeleteDirectory(server_object_path));
+                continue;
+            }
+
             for (selectable, files) in selectables {
                 let selectable_path = server_object_path.join(selectable);
+
+                if !new_selectables.contains(&(*server_object, selectable)) {
+                    operations.push(FileSystemOperation::DeleteDirectory(selectable_path));
+                    continue;
+                }
 
                 for file_name in files.keys() {
                     let exist_in_new = new
@@ -130,14 +140,6 @@ impl FileSystemState {
                         operations.push(FileSystemOperation::DeleteFile(file_path));
                     }
                 }
-
-                if !new_selectables.contains(&(*server_object, selectable)) {
-                    operations.push(FileSystemOperation::DeleteDirectory(selectable_path));
-                }
-            }
-
-            if !new_server_objects.contains(server_object) {
-                operations.push(FileSystemOperation::DeleteDirectory(server_object_path));
             }
         }
 
@@ -148,7 +150,7 @@ impl FileSystemState {
             }
         }
 
-        return operations;
+        operations
     }
 }
 
@@ -402,10 +404,8 @@ mod tests {
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
 
-        assert_eq!(ops.len(), 3);
-        assert!(matches!(ops[0], FileSystemOperation::DeleteFile(_)));
-        assert!(matches!(ops[1], FileSystemOperation::DeleteDirectory(_)));
-        assert!(matches!(ops[2], FileSystemOperation::DeleteDirectory(_)));
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(ops[0], FileSystemOperation::DeleteDirectory(_)));
     }
 
     #[test]
@@ -497,7 +497,7 @@ mod tests {
             .count();
 
         assert!(writes >= 3); // root.txt, new_root.txt, User/name/query.graphql, Comment/text/query.graphql
-        assert_eq!(deletes, 1); // User/email/query.graphql
+        assert_eq!(deletes, 0);
         assert!(create_dirs >= 1); // Comment/text
         assert_eq!(delete_dirs, 1); // User/email directory
     }
