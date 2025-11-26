@@ -14,9 +14,11 @@ import {
   FragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import { ROOT_ID } from '../core/IsographEnvironment';
+import {
+  getOrLoadReaderWithRefetchQueries,
+  ROOT_ID,
+} from '../core/IsographEnvironment';
 import { maybeMakeNetworkRequest } from '../core/makeNetworkRequest';
-import { wrapPromise, wrapResolvedValue } from '../core/PromiseWrapper';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 export type UseImperativeReferenceResult<
@@ -64,11 +66,11 @@ export function useImperativeReference<
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
-      const readerWithRefetchQueries =
-        entrypoint.readerWithRefetchQueries.kind ===
-        'ReaderWithRefetchQueriesLoader'
-          ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
-          : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
+      const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
+        getOrLoadReaderWithRefetchQueries(
+          environment,
+          entrypoint.readerWithRefetchQueries,
+        );
       const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
         environment,
         entrypoint,
@@ -80,8 +82,8 @@ export function useImperativeReference<
         {
           kind: 'FragmentReference',
           readerWithRefetchQueries,
-          fieldName: entrypoint.fieldName,
-          readerArtifactKind: entrypoint.fieldKind,
+          fieldName,
+          readerArtifactKind,
           root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
           variables,
           networkRequest,

@@ -21,6 +21,7 @@ import {
 import {
   assertLink,
   getOrLoadIsographArtifact,
+  getOrLoadReaderWithRefetchQueries,
   IsographEnvironment,
   type DataTypeValue,
   type StoreLink,
@@ -346,11 +347,11 @@ export function readLoadablySelectedFieldData(
           const fragmentReferenceAndDisposeFromEntrypoint = (
             entrypoint: IsographEntrypoint<any, any, any, {}>,
           ): [FragmentReference<any, any>, CleanupFn] => {
-            const readerWithRefetchQueries =
-              entrypoint.readerWithRefetchQueries.kind ===
-              'ReaderWithRefetchQueriesLoader'
-                ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
-                : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
+            const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
+              getOrLoadReaderWithRefetchQueries(
+                environment,
+                entrypoint.readerWithRefetchQueries,
+              );
             const [networkRequest, disposeNetworkRequest] =
               maybeMakeNetworkRequest(
                 environment,
@@ -363,8 +364,8 @@ export function readLoadablySelectedFieldData(
             const fragmentReference: FragmentReference<any, any> = {
               kind: 'FragmentReference',
               readerWithRefetchQueries,
-              fieldName: entrypoint.fieldName,
-              readerArtifactKind: entrypoint.fieldKind,
+              fieldName,
+              readerArtifactKind,
               // TODO localVariables is not guaranteed to have an id field
               root,
               variables: localVariables,
@@ -378,7 +379,7 @@ export function readLoadablySelectedFieldData(
           } else {
             const isographArtifactPromiseWrapper = getOrLoadIsographArtifact(
               environment,
-              `${root.__typename}/${field.entrypoint.fieldName}`,
+              field.entrypoint.typeAndField,
               field.entrypoint.loader,
             );
             const state = getPromiseState(isographArtifactPromiseWrapper);
@@ -398,11 +399,12 @@ export function readLoadablySelectedFieldData(
                 | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
 
               const readerWithRefetchQueries = wrapPromise(
-                isographArtifactPromiseWrapper.promise.then((entrypoint) =>
-                  entrypoint.readerWithRefetchQueries.kind ===
-                  'ReaderWithRefetchQueriesLoader'
-                    ? entrypoint.readerWithRefetchQueries.loader()
-                    : entrypoint.readerWithRefetchQueries,
+                isographArtifactPromiseWrapper.promise.then(
+                  (entrypoint) =>
+                    getOrLoadReaderWithRefetchQueries(
+                      environment,
+                      entrypoint.readerWithRefetchQueries,
+                    ).readerWithRefetchQueries.promise,
                 ),
               );
               const networkRequest = wrapPromise(
