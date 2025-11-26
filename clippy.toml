@@ -1,1 +1,4 @@
-disallowed-methods = [{ path = "prelude::Postfix::dbg" }]
+disallowed-methods = [
+  { path = "prelude::Postfix::dbg" },
+  { path = "prelude::Postfix::note_do_not_commit" },
+]

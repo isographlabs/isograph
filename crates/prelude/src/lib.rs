@@ -42,6 +42,16 @@ where
     {
         dbg!(self)
     }
+
+    #[inline(always)]
+    fn note_todo(self, #[allow(unused)] message: &'static str) -> Self {
+        self
+    }
+
+    #[inline(always)]
+    fn note_do_not_commit(self, #[allow(unused)] message: &'static str) -> Self {
+        self
+    }
 }
 
 impl<T> Postfix for T {}
