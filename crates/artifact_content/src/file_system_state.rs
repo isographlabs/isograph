@@ -190,3 +190,315 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use common_lang_types::{
+        ArtifactPath, ParentObjectEntityNameAndSelectableName, SelectableName,
+        ServerObjectEntityName,
+    };
+    use intern::string_key::Intern;
+    use std::path::PathBuf;
+
+    fn create_artifact(
+        server: Option<&str>,
+        selectable: Option<&str>,
+        file_name: &str,
+        content: &str,
+    ) -> ArtifactPathAndContent {
+        let type_and_field = match (server, selectable) {
+            (Some(s), Some(sel)) => Some(ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: ServerObjectEntityName::from(s.intern()),
+                selectable_name: SelectableName::from(sel.intern()),
+            }),
+            _ => None,
+        };
+
+        ArtifactPathAndContent {
+            artifact_path: ArtifactPath {
+                type_and_field,
+                file_name: ArtifactFileName::from(file_name.intern()),
+            },
+            file_content: FileContent::from(content.to_string()),
+        }
+    }
+
+    #[test]
+    fn test_insert_root_file() {
+        let artifact = create_artifact(None, None, "package.json", "{}");
+        let state = FileSystemState::from(&[artifact][..]);
+
+        assert_eq!(state.root_files.len(), 1);
+        assert!(
+            state
+                .root_files
+                .contains_key(&ArtifactFileName::from("package.json".intern()))
+        );
+    }
+
+    #[test]
+    fn test_insert_nested_file() {
+        let artifact = create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "query { user { name } }",
+        );
+
+        let state = FileSystemState::from(&[artifact][..]);
+
+        assert_eq!(state.nested_files.len(), 1);
+
+        let server = &ServerObjectEntityName::from("User".intern());
+        let selectable = &SelectableName::from("name".intern());
+        let file_name = &ArtifactFileName::from("query.graphql".intern());
+
+        assert!(
+            state
+                .nested_files
+                .get(server)
+                .and_then(|s| s.get(selectable))
+                .and_then(|f| f.get(file_name))
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn test_from_artifacts() {
+        let artifacts = vec![
+            create_artifact(None, None, "schema.graphql", "type Query"),
+            create_artifact(Some("User"), Some("name"), "query.graphql", "query {}"),
+            create_artifact(
+                Some("User"),
+                Some("email"),
+                "mutation.graphql",
+                "mutation {}",
+            ),
+        ];
+
+        let state = FileSystemState::from(&artifacts[..]);
+
+        assert_eq!(state.root_files.len(), 1);
+        assert_eq!(state.nested_files.len(), 1);
+
+        let user_server = &ServerObjectEntityName::from("User".intern());
+        let selectables = state.nested_files.get(user_server).unwrap();
+        assert_eq!(selectables.len(), 2);
+    }
+
+    #[test]
+    fn test_diff_empty_to_new() {
+        let artifacts = vec![create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "query",
+        )];
+        let new_state = FileSystemState::from(&artifacts[..]);
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::recreate_all(&new_state, &artifact_dir);
+
+        assert!(matches!(ops[0], FileSystemOperation::DeleteDirectory(_)));
+
+        let create_dirs = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::CreateDirectory(_)))
+            .count();
+        let write_files = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::WriteFile(_, _)))
+            .count();
+
+        assert_eq!(create_dirs, 1);
+        assert_eq!(write_files, 1);
+    }
+
+    #[test]
+    fn test_diff_no_changes() {
+        let artifact1 = vec![create_artifact(None, None, "file.txt", "content")];
+        let artifact2 = vec![create_artifact(None, None, "file.txt", "content")];
+
+        let old_state = FileSystemState::from(&artifact1[..]); 
+        let new_state = FileSystemState::from(&artifact2[..]); 
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+        assert_eq!(ops.len(), 0);
+    }
+
+    #[test]
+    fn test_diff_file_content_() {
+        let old_artifacts = vec![create_artifact(None, None, "file.txt", "old content")];
+        let new_artifacts = vec![create_artifact(None, None, "file.txt", "new content")];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]); 
+        let new_state = FileSystemState::from(&new_artifacts[..]);
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(ops[0], FileSystemOperation::WriteFile(_, _)));
+    }
+
+    #[test]
+    fn test_diff_add_new_file() {
+        let old_artifacts = vec![create_artifact(None, None, "existing.txt", "content")];
+        let new_artifacts = vec![
+            create_artifact(None, None, "existing.txt", "content"),
+            create_artifact(None, None, "new.txt", "new content"),
+        ];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]); 
+        let new_state = FileSystemState::from(&new_artifacts[..]);
+        
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+
+        assert_eq!(ops.len(), 1);
+        if let FileSystemOperation::WriteFile(path, _) = &ops[0] {
+            assert!(path.ends_with("new.txt"));
+        } else {
+            panic!("Expected WriteFile operation");
+        }
+    }
+
+    #[test]
+    fn test_diff_delete_file() {
+        let old_artifacts = vec![
+            create_artifact(None, None, "keep.txt", "content"),
+            create_artifact(None, None, "delete.txt", "content"),
+        ];
+        let new_artifacts = vec![create_artifact(None, None, "keep.txt", "content")];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]);
+        let new_state = FileSystemState::from(&new_artifacts[..]);
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+
+        assert_eq!(ops.len(), 1);
+        if let FileSystemOperation::DeleteFile(path) = &ops[0] {
+            assert!(path.ends_with("delete.txt"));
+        } else {
+            panic!("Expected DeleteFile operation");
+        }
+    }
+
+    #[test]
+    fn test_diff_delete_empty_directory() {
+        let old_artifacts = vec![create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "query",
+        )];
+        let old_state = FileSystemState::from(&old_artifacts[..]); 
+
+        let new_state = FileSystemState::default();
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir); 
+
+        assert_eq!(ops.len(), 3);
+        assert!(matches!(ops[0], FileSystemOperation::DeleteFile(_)));
+        assert!(matches!(ops[1], FileSystemOperation::DeleteDirectory(_)));
+        assert!(matches!(ops[2], FileSystemOperation::DeleteDirectory(_)));
+    }
+
+    #[test]
+    fn test_diff_nested_file_changes() {
+        let old_artifacts = vec![create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "old query",
+        )];
+        let new_artifacts = vec![create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "new query",
+        )];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]);
+        let new_state = FileSystemState::from(&new_artifacts[..]);
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+
+        assert_eq!(ops.len(), 1);
+        assert!(matches!(ops[0], FileSystemOperation::WriteFile(_, _)));
+    }
+
+    #[test]
+    fn test_diff_add_new_selectable() {
+        let old_artifacts = vec![create_artifact(
+            Some("User"),
+            Some("name"),
+            "query.graphql",
+            "query",
+        )];
+        let new_artifacts = vec![
+            create_artifact(Some("User"), Some("name"), "query.graphql", "query"),
+            create_artifact(Some("User"), Some("email"), "query.graphql", "query"),
+        ];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]);
+        let new_state = FileSystemState::from(&new_artifacts[..]); 
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
+
+        assert_eq!(ops.len(), 2);
+        assert!(matches!(ops[0], FileSystemOperation::CreateDirectory(_)));
+        assert!(matches!(ops[1], FileSystemOperation::WriteFile(_, _)));
+    }
+
+    #[test]
+    fn test_diff_complex_scenario() {
+        let old_artifacts = vec![
+            create_artifact(None, None, "root.txt", "old root"),
+            create_artifact(Some("User"), Some("name"), "query.graphql", "old query"),
+            create_artifact(Some("User"), Some("email"), "query.graphql", "delete me"),
+            create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"),
+        ];
+        let new_artifacts = vec![
+            create_artifact(None, None, "root.txt", "new root"), 
+            create_artifact(None, None, "new_root.txt", "new file"), 
+            create_artifact(Some("User"), Some("name"), "query.graphql", "new query"), 
+            create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"), 
+            create_artifact(Some("Comment"), Some("text"), "query.graphql", "comment"), 
+        ];
+
+        let old_state = FileSystemState::from(&old_artifacts[..]);  
+        let new_state = FileSystemState::from(&new_artifacts[..]);  
+
+        let artifact_dir = PathBuf::from("/__isograph");
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);  
+
+        let writes = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::WriteFile(_, _)))
+            .count();
+        let deletes = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::DeleteFile(_)))
+            .count();
+        let create_dirs = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::CreateDirectory(_)))
+            .count();
+        let delete_dirs = ops
+            .iter()
+            .filter(|op| matches!(op, FileSystemOperation::DeleteDirectory(_)))
+            .count();
+
+        assert!(writes >= 3); // root.txt, new_root.txt, User/name/query.graphql, Comment/text/query.graphql
+        assert_eq!(deletes, 1); // User/email/query.graphql
+        assert!(create_dirs >= 1); // Comment/text
+        assert_eq!(delete_dirs, 1); // User/email directory
+    }
+}
