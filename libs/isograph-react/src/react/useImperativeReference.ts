@@ -64,11 +64,6 @@ export function useImperativeReference<
       variables: ExtractParameters<TReadFromStore>,
       fetchOptions?: FetchOptions<TClientFieldValue>,
     ) => {
-      const fieldName =
-        entrypoint.readerWithRefetchQueries.kind ===
-        'ReaderWithRefetchQueriesLoader'
-          ? entrypoint.readerWithRefetchQueries.fieldName
-          : entrypoint.readerWithRefetchQueries.readerArtifact.fieldName;
       const readerWithRefetchQueries =
         entrypoint.readerWithRefetchQueries.kind ===
         'ReaderWithRefetchQueriesLoader'
@@ -85,7 +80,8 @@ export function useImperativeReference<
         {
           kind: 'FragmentReference',
           readerWithRefetchQueries,
-          fieldName,
+          fieldName: entrypoint.fieldName,
+          readerArtifactKind: entrypoint.fieldKind,
           root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
           variables,
           networkRequest,

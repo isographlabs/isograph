@@ -24,7 +24,6 @@ export type ReaderWithRefetchQueriesLoader<
   TClientFieldValue,
 > = {
   readonly kind: 'ReaderWithRefetchQueriesLoader';
-  readonly fieldName: ComponentOrFieldName;
   readonly loader: () => Promise<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
@@ -66,6 +65,8 @@ export type IsographEntrypoint<
     | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
     | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
+  readonly fieldName: ComponentOrFieldName;
+  readonly fieldKind: 'EagerReaderArtifact' | 'ComponentReaderArtifact';
   /**
    * This field exists solely for typechecking, and will not exist at runtime.
    */
@@ -79,6 +80,9 @@ export type IsographEntrypointLoader<
 > = {
   readonly kind: 'EntrypointLoader';
   readonly fieldName: ComponentOrFieldName;
+  readonly readerArtifactKind:
+    | 'EagerReaderArtifact'
+    | 'ComponentReaderArtifact';
   readonly loader: () => Promise<
     IsographEntrypoint<
       TReadFromStore,

@@ -57,6 +57,9 @@ export type FragmentReference<
   >;
   readonly root: StoreLink;
   readonly fieldName: ComponentOrFieldName;
+  readonly readerArtifactKind:
+    | 'EagerReaderArtifact'
+    | 'ComponentReaderArtifact';
   // TODO we potentially stably copy and stringify variables a lot!
   // So, we should employ interior mutability: pretend that fragment reference
   // is immutable, but actually store something like

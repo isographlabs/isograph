@@ -28,7 +28,7 @@ export function useResult<
     partialNetworkRequestOptions,
   );
 
-  switch (readerWithRefetchQueries.readerArtifact.kind) {
+  switch (fragmentReference.readerArtifactKind) {
     case 'ComponentReaderArtifact': {
       // @ts-expect-error
       return getOrCreateCachedComponent(
@@ -63,6 +63,7 @@ export function useResult<
             }
           : undefined),
       };
+      // @ts-expect-error
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
   }
