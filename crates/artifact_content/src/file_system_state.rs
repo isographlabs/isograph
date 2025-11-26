@@ -62,16 +62,16 @@ impl FileSystemState {
     pub fn diff(&self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
 
-        let mut new_server_objects: HashSet<&ServerObjectEntityName> = HashSet::new();
-        let mut new_selectables: HashSet<(&ServerObjectEntityName, &SelectableName)> =
+        let mut new_server_objects: HashSet<ServerObjectEntityName> = HashSet::new();
+        let mut new_selectables: HashSet<(ServerObjectEntityName, &SelectableName)> =
             HashSet::new();
 
         for (server_object, selectables) in &new.nested_files {
-            new_server_objects.insert(server_object);
+            new_server_objects.insert(*server_object);
             let server_object_path = artifact_directory.join(server_object);
 
             for (selectable, files) in selectables {
-                new_selectables.insert((server_object, selectable));
+                new_selectables.insert((*server_object, selectable));
                 let selectable_path = server_object_path.join(selectable);
 
                 let should_create_dir = self
@@ -139,7 +139,7 @@ impl FileSystemState {
                     }
                 }
 
-                if !new_selectables.contains(&(server_object, selectable)) {
+                if !new_selectables.contains(&(*server_object, selectable)) {
                     operations.push(FileSystemOperation::DeleteDirectory(selectable_path));
                 }
             }
