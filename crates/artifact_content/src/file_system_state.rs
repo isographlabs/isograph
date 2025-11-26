@@ -54,87 +54,95 @@ impl FileSystemState {
     pub fn diff(old: &Self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
 
-        let mut new_server_objects = HashSet::new();
-        let mut new_selectables = HashSet::new();
+        let mut new_server_object_entity_name_set = HashSet::new();
+        let mut new_selectable_set = HashSet::new();
 
-        for (server_object, selectables) in &new.nested_files {
-            new_server_objects.insert(*server_object);
-            let server_object_path = artifact_directory.join(server_object);
+        for (new_server_object_entity_name, new_selectable_map) in &new.nested_files {
+            new_server_object_entity_name_set.insert(*new_server_object_entity_name);
+            let new_server_object_path = artifact_directory.join(*new_server_object_entity_name);
 
-            for (selectable, files) in selectables {
-                new_selectables.insert((*server_object, *selectable));
-                let selectable_path = server_object_path.join(selectable);
+            let old_selectables_for_object = old.nested_files.get(new_server_object_entity_name);
 
-                let should_create_dir = old
-                    .nested_files
-                    .get(server_object)
-                    .and_then(|s| s.get(selectable))
+            for (new_selectable, new_files) in new_selectable_map {
+                new_selectable_set.insert((*new_server_object_entity_name, *new_selectable));
+                let new_selectable_path = new_server_object_path.join(new_selectable);
+
+                let should_create_dir = old_selectables_for_object
+                    .and_then(|s| s.get(new_selectable))
                     .is_none();
 
                 if should_create_dir {
                     operations.push(FileSystemOperation::CreateDirectory(
-                        selectable_path.clone(),
+                        new_selectable_path.clone(),
                     ));
                 }
 
-                for (file_name, (new_index, new_hash)) in files {
-                    let file_path = selectable_path.join(file_name);
+                let old_files_for_selectable =
+                    old_selectables_for_object.and_then(|s| s.get(new_selectable));
 
-                    let should_write = old
-                        .nested_files
-                        .get(server_object)
-                        .and_then(|s| s.get(selectable))
-                        .and_then(|f| f.get(file_name))
+                for (new_file_name, (new_index, new_hash)) in new_files {
+                    let new_file_path = new_selectable_path.join(new_file_name);
+
+                    let old_file = old_files_for_selectable.and_then(|f| f.get(new_file_name));
+
+                    let should_write = old_file
                         .map(|(_, old_hash)| old_hash != new_hash)
                         .unwrap_or(true);
 
                     if should_write {
-                        operations
-                            .push(FileSystemOperation::WriteFile(file_path, new_index.clone()));
+                        operations.push(FileSystemOperation::WriteFile(
+                            new_file_path,
+                            new_index.clone(),
+                        ));
                     }
                 }
             }
         }
 
-        for (file_name, (new_index, new_hash)) in &new.root_files {
-            let file_path = artifact_directory.join(file_name);
+        for (new_file_name, (new_index, new_hash)) in &new.root_files {
+            let new_file_path = artifact_directory.join(new_file_name);
 
             let should_write = old
                 .root_files
-                .get(file_name)
+                .get(new_file_name)
                 .map(|(_, old_hash)| old_hash != new_hash)
                 .unwrap_or(true);
 
             if should_write {
-                operations.push(FileSystemOperation::WriteFile(file_path, new_index.clone()));
+                operations.push(FileSystemOperation::WriteFile(
+                    new_file_path,
+                    new_index.clone(),
+                ));
             }
         }
 
-        for (server_object, selectables) in &old.nested_files {
-            let server_object_path = artifact_directory.join(server_object);
+        for (old_server_object_entity_name, old_selectable_map) in &old.nested_files {
+            let old_server_object_path = artifact_directory.join(*old_server_object_entity_name);
 
-            if !new_server_objects.contains(server_object) {
-                operations.push(FileSystemOperation::DeleteDirectory(server_object_path));
+            if !new_server_object_entity_name_set.contains(old_server_object_entity_name) {
+                operations.push(FileSystemOperation::DeleteDirectory(old_server_object_path));
                 continue;
             }
 
-            for (selectable, files) in selectables {
-                let selectable_path = server_object_path.join(selectable);
+            for (old_selectable, old_files) in old_selectable_map {
+                let selectable_path = old_server_object_path.join(old_selectable);
 
-                if !new_selectables.contains(&(*server_object, *selectable)) {
+                if !new_selectable_set.contains(&(*old_server_object_entity_name, *old_selectable))
+                {
                     operations.push(FileSystemOperation::DeleteDirectory(selectable_path));
                     continue;
                 }
 
-                for file_name in files.keys() {
-                    let exist_in_new = new
-                        .nested_files
-                        .get(server_object)
-                        .and_then(|s| s.get(selectable))
-                        .and_then(|f| f.get(file_name))
-                        .is_some();
+                let new_files_for_selectable = new
+                    .nested_files
+                    .get(old_server_object_entity_name)
+                    .and_then(|s| s.get(old_selectable));
 
-                    if !exist_in_new {
+                for file_name in old_files.keys() {
+                    let new_file = new_files_for_selectable.and_then(|f| f.get(file_name));
+                    let should_delete = new_file.is_none();
+
+                    if should_delete {
                         let file_path = selectable_path.join(file_name);
                         operations.push(FileSystemOperation::DeleteFile(file_path));
                     }
