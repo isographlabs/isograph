@@ -46,11 +46,11 @@ impl FileSystemState {
                     operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
                 }
             }
+        }
 
-            for (file_name, (content, _)) in &new.root_files {
-                let file_path = artifact_directory.join(file_name);
-                operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
-            }
+        for (file_name, (content, _)) in &new.root_files {
+            let file_path = artifact_directory.join(file_name);
+            operations.push(FileSystemOperation::WriteFile(file_path, content.clone()));
         }
 
         operations
