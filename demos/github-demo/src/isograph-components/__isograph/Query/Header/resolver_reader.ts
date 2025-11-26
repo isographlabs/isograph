@@ -36,7 +36,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Query.Header",
+  fieldName: "Header",
   resolver,
   readerAst,
   hasUpdatable: false,

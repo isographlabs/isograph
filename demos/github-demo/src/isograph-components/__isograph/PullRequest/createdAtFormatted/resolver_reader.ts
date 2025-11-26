@@ -18,7 +18,7 @@ const artifact: EagerReaderArtifact<
   PullRequest__createdAtFormatted__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "PullRequest.createdAtFormatted",
+  fieldName: "createdAtFormatted",
   resolver,
   readerAst,
   hasUpdatable: false,

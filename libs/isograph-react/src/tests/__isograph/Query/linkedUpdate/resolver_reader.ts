@@ -84,7 +84,7 @@ const artifact: EagerReaderArtifact<
   Query__linkedUpdate__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Query.linkedUpdate",
+  fieldName: "linkedUpdate",
   resolver,
   readerAst,
   hasUpdatable: true,

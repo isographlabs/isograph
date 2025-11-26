@@ -17,7 +17,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Pet.MutualBestFriendSetter",
+  fieldName: "MutualBestFriendSetter",
   resolver,
   readerAst,
   hasUpdatable: false,

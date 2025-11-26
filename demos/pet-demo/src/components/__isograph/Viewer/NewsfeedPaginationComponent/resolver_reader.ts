@@ -78,7 +78,7 @@ const artifact: EagerReaderArtifact<
   Viewer__NewsfeedPaginationComponent__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Viewer.NewsfeedPaginationComponent",
+  fieldName: "NewsfeedPaginationComponent",
   resolver,
   readerAst,
   hasUpdatable: false,

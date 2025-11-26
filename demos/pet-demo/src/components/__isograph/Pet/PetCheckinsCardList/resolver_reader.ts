@@ -47,7 +47,7 @@ const artifact: EagerReaderArtifact<
   Pet__PetCheckinsCardList__output_type
 > = {
   kind: "EagerReaderArtifact",
-  fieldName: "Pet.PetCheckinsCardList",
+  fieldName: "PetCheckinsCardList",
   resolver,
   readerAst,
   hasUpdatable: false,

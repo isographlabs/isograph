@@ -109,7 +109,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "PullRequestConnection.PullRequestTable",
+  fieldName: "PullRequestTable",
   resolver,
   readerAst,
   hasUpdatable: false,

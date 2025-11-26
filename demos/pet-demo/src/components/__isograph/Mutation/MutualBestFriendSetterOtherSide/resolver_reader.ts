@@ -93,7 +93,7 @@ const artifact: ComponentReaderArtifact<
   ExtractSecondParam<typeof resolver>
 > = {
   kind: "ComponentReaderArtifact",
-  fieldName: "Mutation.MutualBestFriendSetterOtherSide",
+  fieldName: "MutualBestFriendSetterOtherSide",
   resolver,
   readerAst,
   hasUpdatable: false,
