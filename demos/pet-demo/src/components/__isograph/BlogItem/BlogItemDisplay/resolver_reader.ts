@@ -42,7 +42,6 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     entrypoint: {
       kind: "EntrypointLoader",
       typeAndField: "BlogItem__BlogItemMoreDetail",
-      readerArtifactKind: "ComponentReaderArtifact",
       loader: () => import("../../BlogItem/BlogItemMoreDetail/entrypoint").then(module => module.default),
     },
   },

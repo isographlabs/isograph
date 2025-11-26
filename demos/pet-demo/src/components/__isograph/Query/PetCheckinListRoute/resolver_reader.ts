@@ -50,7 +50,6 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         entrypoint: {
           kind: "EntrypointLoader",
           typeAndField: "Pet__PetCheckinsCardList",
-          readerArtifactKind: "EagerReaderArtifact",
           loader: () => import("../../Pet/PetCheckinsCardList/entrypoint").then(module => module.default),
         },
       },

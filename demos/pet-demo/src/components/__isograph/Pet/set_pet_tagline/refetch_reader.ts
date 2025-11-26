@@ -28,8 +28,6 @@ const resolver = (
       readerArtifact,
       nestedRefetchQueries,
     } as const),
-    readerArtifactKind: readerArtifact.kind,
-    fieldName: readerArtifact.fieldName,
     root: rootLink,
     variables,
     networkRequest,
