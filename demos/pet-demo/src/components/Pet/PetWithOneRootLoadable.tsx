@@ -16,7 +16,7 @@ export const OnlyOneRootLoadable = iso(`
     ) @loadable
   }
 `)(({ data }) => {
-  const { fragmentReference } = useClientSideDefer(data.PetFavoritePhrase);
+  const { fragmentReference } = useClientSideDefer(data.PetFavoritePhrase2);
 
   return <FragmentRenderer fragmentReference={fragmentReference} />;
 });
