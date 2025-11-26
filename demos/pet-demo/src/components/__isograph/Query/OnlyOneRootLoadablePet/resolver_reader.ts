@@ -1,13 +1,13 @@
 import type {ComponentReaderArtifact, ExtractSecondParam, ReaderAst } from '@isograph/react';
 import { Query__OnlyOneRootLoadablePet__param } from './param_type';
 import { OnlyOneRootLoadable as resolver } from '../../../Pet/PetWithOneRootLoadable';
-import Query__PetFavoritePhrase__entrypoint from '../../Query/PetFavoritePhrase/entrypoint';
+import Query__PetFavoritePhrase2__entrypoint from '../../Query/PetFavoritePhrase2/entrypoint';
 
 const readerAst: ReaderAst<Query__OnlyOneRootLoadablePet__param> = [
   {
     kind: "LoadablySelectedField",
-    alias: "PetFavoritePhrase",
-    name: "PetFavoritePhrase",
+    alias: "PetFavoritePhrase2",
+    name: "PetFavoritePhrase2",
     queryArguments: [
       [
         "id",
@@ -16,7 +16,7 @@ const readerAst: ReaderAst<Query__OnlyOneRootLoadablePet__param> = [
     ],
     refetchReaderAst: [
     ],
-    entrypoint: Query__PetFavoritePhrase__entrypoint,
+    entrypoint: Query__PetFavoritePhrase2__entrypoint,
   },
 ];
 

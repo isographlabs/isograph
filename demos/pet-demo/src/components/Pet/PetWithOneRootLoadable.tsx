@@ -11,7 +11,7 @@ export const OnlyOneRootLoadable = iso(`
   field Query.OnlyOneRootLoadablePet(
     $id: ID !
   ) @component {
-    PetFavoritePhrase(
+    PetFavoritePhrase2(
       id: $id
     ) @loadable
   }

@@ -26,3 +26,33 @@ export const PetFavoritePhrase = iso(`
     <p>{pet.fullName} has no favorite phrase!</p>
   );
 });
+
+export const PetFavoritePhrase2 = iso(`
+  field Query.PetFavoritePhrase2(
+    $id: ID !
+  ) @component
+  """
+   PetFavoritePhrase2 because we currently have a bug where we don't catch the fact
+   that an entrypoint generated via @loadable and a regular entrypoint need to have
+   identical @lazyLoad settings. Oops!
+   """
+  {
+    pet(
+      id: $id
+    ) {
+      fullName
+      favorite_phrase
+    }
+  }
+`)(({ data }) => {
+  const pet = data.pet;
+  if (pet == null) return;
+
+  return !!pet.favorite_phrase ? (
+    <p>
+      {pet.fullName} likes to say: &quot;{pet.favorite_phrase}&quot;
+    </p>
+  ) : (
+    <p>{pet.fullName} has no favorite phrase!</p>
+  );
+});

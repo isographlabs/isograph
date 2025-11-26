@@ -1,16 +1,14 @@
-import type {IsographEntrypoint, NormalizationAst, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
+import type {IsographEntrypoint, NormalizationAstLoader, RefetchQueryNormalizationArtifactWrapper} from '@isograph/react';
 import {Query__PetFavoritePhrase__param} from './param_type';
 import {Query__PetFavoritePhrase__output_type} from './output_type';
 import type {Query__PetFavoritePhrase__raw_response_type} from './raw_response_type';
-import readerResolver from './resolver_reader';
 import queryText from './query_text';
-import normalizationAst from './normalization_ast';
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
 
 const artifact: IsographEntrypoint<
   Query__PetFavoritePhrase__param,
   Query__PetFavoritePhrase__output_type,
-  NormalizationAst,
+  NormalizationAstLoader,
   Query__PetFavoritePhrase__raw_response_type
 > = {
   kind: "Entrypoint",
@@ -20,14 +18,23 @@ const artifact: IsographEntrypoint<
       kind: "Operation",
       text: queryText,
     },
-    normalizationAst,
+    normalizationAst: {
+      kind: "NormalizationAstLoader",
+      loader: () => import('./normalization_ast').then(module => module.default),
+    },
   },
   concreteType: "Query",
   readerWithRefetchQueries: {
-    kind: "ReaderWithRefetchQueries",
-    nestedRefetchQueries,
-    readerArtifact: readerResolver,
-  },
+    kind: "ReaderWithRefetchQueriesLoader",
+    fieldName: "PetFavoritePhrase",
+    readerArtifactKind: "ComponentReaderArtifact",
+    loader: () => import('./resolver_reader')
+      .then(module => ({
+        kind: "ReaderWithRefetchQueries",
+        nestedRefetchQueries,
+        readerArtifact: module.default,
+      }))
+  }
 };
 
 export default artifact;

@@ -33,6 +33,7 @@ import { type Query__PetByName__param } from './Query/PetByName/param_type';
 import { type Query__PetCheckinListRoute__param } from './Query/PetCheckinListRoute/param_type';
 import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDeferredRoute/param_type';
 import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
+import { type Query__PetFavoritePhrase2__param } from './Query/PetFavoritePhrase2/param_type';
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
 import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
@@ -234,6 +235,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetDetailRoute', T>
 ): IdentityWithParamComponent<Query__PetDetailRoute__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PetFavoritePhrase2', T>
+): IdentityWithParamComponent<Query__PetFavoritePhrase2__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.PetFavoritePhrase', T>
