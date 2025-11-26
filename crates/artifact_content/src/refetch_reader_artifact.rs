@@ -164,6 +164,8 @@ fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunct
         {indent}    readerArtifact,\n\
         {indent}    nestedRefetchQueries,\n\
         {indent}  }} as const),\n\
+        {indent}  readerArtifactKind: readerArtifact.kind,\n\
+        {indent}  fieldName: readerArtifact.fieldName,\n\
         {indent}  root: rootLink,\n\
         {indent}  variables,\n\
         {indent}  networkRequest,\n\
