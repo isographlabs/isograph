@@ -14,19 +14,12 @@ pub(crate) fn get_file_system_operations(
 ) -> Vec<FileSystemOperation> {
     let new_file_system_state = FileSystemState::from(paths_and_contents);
     let operations = match file_system_state {
-        None => {
-            let operations =
-                FileSystemState::recreate_all(&new_file_system_state, artifact_directory);
-            operations
-        }
-        Some(file_system_state) => {
-            let operations = FileSystemState::diff(
-                &file_system_state,
-                &new_file_system_state,
-                artifact_directory,
-            );
-            operations
-        }
+        None => FileSystemState::recreate_all(&new_file_system_state, artifact_directory),
+        Some(file_system_state) => FileSystemState::diff(
+            &file_system_state,
+            &new_file_system_state,
+            artifact_directory,
+        ),
     };
     *file_system_state = Some(new_file_system_state);
     operations
