@@ -12,7 +12,7 @@ pub(crate) fn get_file_system_operations(
     artifact_directory: &PathBuf,
     file_system_state: &mut Option<FileSystemState>,
 ) -> Vec<FileSystemOperation> {
-    let new_file_system_state = FileSystemState::from(paths_and_contents);
+    let new_file_system_state = paths_and_contents.into();
     let operations = match file_system_state {
         None => FileSystemState::recreate_all(&new_file_system_state, artifact_directory),
         Some(file_system_state) => FileSystemState::diff(

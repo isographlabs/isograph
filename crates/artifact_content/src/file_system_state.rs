@@ -27,25 +27,31 @@ impl FileSystemState {
             artifact_directory.to_path_buf(),
         ));
 
-        for (server_object, selectables) in &state.nested_files {
-            let server_object_path = artifact_directory.join(server_object);
+        for (new_server_object_entity_name, new_selectable_map) in &state.nested_files {
+            let new_server_object_path = artifact_directory.join(new_server_object_entity_name);
 
-            for (selectable, files) in selectables {
-                let selectable_path = server_object_path.join(selectable);
+            for (new_selectable, new_files) in new_selectable_map {
+                let new_selectable_path = new_server_object_path.join(new_selectable);
                 operations.push(FileSystemOperation::CreateDirectory(
-                    selectable_path.clone(),
+                    new_selectable_path.clone(),
                 ));
 
-                for (file_name, (index, _)) in files {
-                    let file_path = selectable_path.join(file_name);
-                    operations.push(FileSystemOperation::WriteFile(file_path, index.clone()));
+                for (new_file_name, (new_index, _)) in new_files {
+                    let new_file_path = new_selectable_path.join(new_file_name);
+                    operations.push(FileSystemOperation::WriteFile(
+                        new_file_path,
+                        new_index.clone(),
+                    ));
                 }
             }
         }
 
-        for (file_name, (index, _)) in &state.root_files {
-            let file_path = artifact_directory.join(file_name);
-            operations.push(FileSystemOperation::WriteFile(file_path, index.clone()));
+        for (new_file_name, (new_index, _)) in &state.root_files {
+            let new_file_path = artifact_directory.join(new_file_name);
+            operations.push(FileSystemOperation::WriteFile(
+                new_file_path,
+                new_index.clone(),
+            ));
         }
 
         operations
@@ -124,26 +130,25 @@ impl FileSystemState {
                 continue;
             }
 
+            let new_selectable_map_for_object = new.nested_files.get(old_server_object_entity_name);
+
             for (old_selectable, old_files) in old_selectable_map {
-                let selectable_path = old_server_object_path.join(old_selectable);
+                let old_selectable_path = old_server_object_path.join(old_selectable);
 
                 if !new_selectable_set.contains(&(*old_server_object_entity_name, *old_selectable))
                 {
-                    operations.push(FileSystemOperation::DeleteDirectory(selectable_path));
+                    operations.push(FileSystemOperation::DeleteDirectory(old_selectable_path));
                     continue;
                 }
 
-                let new_files_for_selectable = new
-                    .nested_files
-                    .get(old_server_object_entity_name)
-                    .and_then(|s| s.get(old_selectable));
+                let new_files_for_selectable =
+                    new_selectable_map_for_object.and_then(|s| s.get(old_selectable));
 
                 for file_name in old_files.keys() {
                     let new_file = new_files_for_selectable.and_then(|f| f.get(file_name));
-                    let should_delete = new_file.is_none();
 
-                    if should_delete {
-                        let file_path = selectable_path.join(file_name);
+                    if new_file.is_none() {
+                        let file_path = old_selectable_path.join(file_name);
                         operations.push(FileSystemOperation::DeleteFile(file_path));
                     }
                 }
