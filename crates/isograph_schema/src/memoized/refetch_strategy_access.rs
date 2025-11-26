@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
@@ -28,7 +28,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
-    let expose_field_map = expose_field_map(db).as_ref().map_err(Clone::clone)?;
+    let expose_field_map = expose_field_map(db).clone_err()?;
 
     let mut out = HashMap::new();
 
@@ -158,9 +158,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     parent_server_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
 ) -> DiagnosticVecResult<Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>> {
-    let map = validated_refetch_strategy_map(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let map = validated_refetch_strategy_map(db).clone_err()?;
 
     match map.get(&(
         parent_server_object_entity_name,
@@ -200,9 +198,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     parent_server_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
 ) -> DiagnosticVecResult<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
-    let map = validated_refetch_strategy_map(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let map = validated_refetch_strategy_map(db).clone_err()?;
 
     match map.get(&(
         parent_server_object_entity_name,

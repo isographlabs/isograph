@@ -16,7 +16,7 @@ use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostfix,
 };
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::parse_iso_literal_in_source;
 
@@ -143,7 +143,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
         client_scalar_selectable_name.into(),
     );
 
-    let selectable = selectable.as_ref().map_err(Clone::clone)?;
+    let selectable = selectable.clone_err()?;
 
     let item = match selectable {
         Some(item) => item,
@@ -178,7 +178,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         client_object_selectable_name.into(),
     );
 
-    let selectable = selectable.as_ref().map_err(Clone::clone)?;
+    let selectable = selectable.clone_err()?;
 
     let item = match selectable {
         Some(item) => item,
@@ -209,8 +209,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ClientScalarSelectable<TNetworkProtocol>>> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+            .clone_err()?;
 
     let declaration = match declaration {
         Some(declaration) => declaration
@@ -228,7 +227,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // This is also problematic, because we really actually want a "all client fields map" fn,
             // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
             // selection_set_access.
-            let link_fields = get_link_fields_map(db).as_ref().map_err(Clone::clone)?;
+            let link_fields = get_link_fields_map(db).clone_err()?;
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -239,8 +238,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
             // Awkward! We also need to check for expose fields. Ay ay ay
             return expose_field_map(db)
-                .as_ref()
-                .map_err(Clone::clone)?
+                .clone_err()?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
                 .map(|(selectable, _)| selectable)
@@ -248,9 +246,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let (_, scalar_selectable) = add_client_field_to_object(db, declaration)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (_, scalar_selectable) = add_client_field_to_object(db, declaration).clone_err()?;
 
     scalar_selectable
         .clone()
@@ -267,8 +263,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ClientObjectSelectable<TNetworkProtocol>>> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+            .clone_err()?;
 
     let declaration = match declaration {
         Some(declaration) => declaration
@@ -277,9 +272,8 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    let (_, object_selectable) = process_client_pointer_declaration_inner(db, declaration)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (_, object_selectable) =
+        process_client_pointer_declaration_inner(db, declaration).clone_err()?;
 
     object_selectable
         .clone()
@@ -360,9 +354,8 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
         ),
     >,
 > {
-    let expose_as_field_queue = create_type_system_schema_with_server_selectables(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let expose_as_field_queue =
+        create_type_system_schema_with_server_selectables(db).clone_err()?;
 
     let mut map = HashMap::new();
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {

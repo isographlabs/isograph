@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     IsographDatabase, NetworkProtocol, OwnedServerEntity, ServerEntityName, ServerObjectEntity,
@@ -20,9 +20,7 @@ use crate::{
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>, Diagnostic> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
 
@@ -60,7 +58,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Vec<OwnedServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).as_ref().map_err(Clone::clone)?;
+    let map = server_entity_map(db).clone_err()?;
 
     map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
@@ -69,9 +67,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<Vec<ServerObjectEntity<TNetworkProtocol>>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .iter()
@@ -91,9 +87,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<ServerObjectEntity<TNetworkProtocol>>> {
-    let entities = server_entities_named(db, server_object_entity_name.into())
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let entities = server_entities_named(db, server_object_entity_name.into()).clone_err()?;
 
     match entities.split_first() {
         Some((first, rest)) => {
@@ -143,9 +137,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> DiagnosticResult<Option<ServerScalarEntity<TNetworkProtocol>>> {
-    let entities = server_entities_named(db, server_scalar_entity_name.into())
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let entities = server_entities_named(db, server_scalar_entity_name.into()).clone_err()?;
 
     match entities.split_first() {
         Some((first, rest)) => {
@@ -196,8 +188,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> DiagnosticResult<Option<JavascriptName>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?
+        .clone_err()?
         .as_ref();
 
     let entity = match value {
@@ -240,9 +231,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
@@ -267,11 +256,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Option<ServerEntityName>> {
-    match defined_entities(db)
-        .as_ref()
-        .map_err(Clone::clone)?
-        .get(&entity_name)
-    {
+    match defined_entities(db).clone_err()?.get(&entity_name) {
         Some(items) => {
             match items.split_first() {
                 Some((first, rest)) => {
@@ -303,9 +288,7 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .iter()

@@ -9,7 +9,7 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, VariableDefinition,
 };
 
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 use serde::Deserialize;
 
 use crate::{
@@ -85,16 +85,14 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let mutation_field =
         server_selectable_named(db, parent_object_entity_name, mutation_subfield_name.into())
-            .as_ref()
-            .map_err(|e| e.clone())?
+            .clone_err()?
             .as_ref()
             // TODO propagate this errors instead of panicking
             .expect(
                 "Expected selectable to exist. \
                 This is indicative of a bug in Isograph.",
             )
-            .as_ref()
-            .map_err(|e| e.clone())?
+            .clone_err()?
             .as_ref()
             .as_object()
             // TODO propagate this errors instead of panicking
@@ -127,8 +125,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
 
     let top_level_schema_field_concrete_type =
         server_object_entity_named(db, payload_object_entity_name)
-            .as_ref()
-            .map_err(|e| e.clone())?
+            .clone_err()?
             .as_ref()
             .expect(
                 "Expected entity to exist. \
@@ -200,8 +197,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             db,
                             *server_object_selectable.target_object_entity.inner(),
                         )
-                        .as_ref()
-                        .map_err(|e| e.clone())?
+                        .clone_err()?
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
@@ -276,17 +272,12 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<(ServerObjectEntityName, ServerObjectSelectableName)> {
     let opt_field =
         server_selectable_named(db, mutation_object_entity_name, field_arg.intern().into())
-            .as_ref()
-            .map_err(|e| e.clone())?;
+            .clone_err()?;
 
     match opt_field {
         Some(s) => {
-            let server_object_selectable = s
-                .as_ref()
-                .map_err(Clone::clone)?
-                .as_ref()
-                .as_object_result()
-                .map_err(|e| {
+            let server_object_selectable =
+                s.clone_err()?.as_ref().as_object_result().map_err(|e| {
                     Diagnostic::new(
                         format!("Invalid field `{field_arg}` in @exposeField directive"),
                         // TODO this is the wrong location
@@ -345,13 +336,12 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        let current_selectable = server_selectable_named(db, current_entity_name, *selection_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+        let current_selectable =
+            server_selectable_named(db, current_entity_name, *selection_name).clone_err()?;
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(Clone::clone)?;
+                let entity = entity.clone_err()?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         let field_arg = selection_name.lookup().to_string();
@@ -383,8 +373,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     }
 
     let current_entity_concrete_type = server_object_entity_named(db, current_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?
+        .clone_err()?
         .as_ref()
         .expect(
             "Expected entity to exist. \

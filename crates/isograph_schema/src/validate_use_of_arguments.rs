@@ -11,7 +11,7 @@ use isograph_lang_types::{
     SelectionType,
 };
 use lazy_static::lazy_static;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ValidatedVariableDefinition,
@@ -43,8 +43,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     let mut errors = vec![];
 
     for client_selectable in client_selectable_map(db)
-        .as_ref()
-        .map_err(Clone::clone)?
+        .clone_err()?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {

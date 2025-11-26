@@ -1,7 +1,7 @@
 use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
 use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
@@ -78,7 +78,7 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             (Some(s), Some(_)) => multiple_selectable_definitions_found_diagnostic(
                 parent_server_object_entity_name,
                 selectable_name,
-                match s.as_ref().map_err(Clone::clone)? {
+                match s.clone_err()? {
                     SelectionType::Scalar(s) => s.name.location,
                     SelectionType::Object(o) => o.name.location,
                 },
@@ -117,8 +117,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 
     selectables.extend(
         client_selectable_map(db)
-            .as_ref()
-            .map_err(Clone::clone)?
+            .clone_err()?
             .iter()
             .filter(|((entity_name, _selectable_name), _value)| {
                 *entity_name == parent_server_object_entity_name

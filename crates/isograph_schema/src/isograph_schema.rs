@@ -11,7 +11,7 @@ use isograph_lang_types::{
     SelectionTypeContainingSelections, VariableDefinition,
 };
 use lazy_static::lazy_static;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
@@ -40,13 +40,12 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
-        let current_selectable = server_selectable_named(db, current_entity_name, selection_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+        let current_selectable =
+            server_selectable_named(db, current_entity_name, selection_name).clone_err()?;
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.as_ref().map_err(Clone::clone)?;
+                let entity = entity.clone_err()?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message

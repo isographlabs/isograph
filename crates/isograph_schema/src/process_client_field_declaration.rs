@@ -10,7 +10,7 @@ use isograph_lang_types::{
     ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
     TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use pico_macros::memo;
 
@@ -227,10 +227,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
-    let fetchable_types_map = fetchable_types(db)
-        .as_ref()
-        .map_err(Clone::clone)?
-        .lookup(db);
+    let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
 

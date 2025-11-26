@@ -6,7 +6,7 @@ use common_lang_types::{
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
@@ -30,9 +30,8 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
         )>,
     >,
 > {
-    let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (items, _fetchable_types) =
+        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     Ok(items
         .iter()
@@ -73,9 +72,8 @@ pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
         OwnedSelectableResult<TNetworkProtocol>,
     )>,
 > {
-    let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let (items, _fetchable_types) =
+        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     Ok(items
         .iter()
@@ -119,9 +117,8 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
     parent_server_object_entity_name: ServerObjectEntityName,
     server_selectable_name: ServerSelectableName,
 ) -> DiagnosticResult<Vec<OwnedSelectableResult<TNetworkProtocol>>> {
-    let map = server_selectables_map_for_entity(db, parent_server_object_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?;
+    let map =
+        server_selectables_map_for_entity(db, parent_server_object_entity_name).clone_err()?;
 
     Ok(map
         .get(&server_selectable_name)
@@ -137,8 +134,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<OwnedSelectableResult<TNetworkProtocol>>> {
     let vec =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+            .clone_err()?;
 
     match vec.split_first() {
         Some((first, rest)) => {
@@ -175,11 +171,10 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
         parent_server_object_entity_name,
         (*ID_FIELD_NAME).into(),
     )
-    .as_ref()
-    .map_err(Clone::clone)?;
+    .clone_err()?;
 
     let selectable = match selectable {
-        Some(s) => s.as_ref().map_err(Clone::clone)?,
+        Some(s) => s.clone_err()?,
         None => return Ok(None),
     };
 
@@ -205,8 +200,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 
     let target_scalar_entity_name = selectable.target_scalar_entity.inner();
     let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
-        .as_ref()
-        .map_err(Clone::clone)?
+        .clone_err()?
         .as_ref()
         // It must exist
         .ok_or_else(|| {
@@ -263,12 +257,11 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ServerObjectSelectable<TNetworkProtocol>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+            .clone_err()?;
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(Clone::clone)?;
+            let item = item.clone_err()?;
             match item.as_ref().as_object() {
                 Some(obj) => Ok(Some(obj.clone().note_todo("Do not clone. Use a MemoRef."))),
                 None => Diagnostic::new(
@@ -297,12 +290,11 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ServerScalarSelectable<TNetworkProtocol>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
-            .as_ref()
-            .map_err(Clone::clone)?;
+            .clone_err()?;
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(Clone::clone)?;
+            let item = item.clone_err()?;
             match item.as_ref().as_scalar() {
                 Some(scalar) => Ok(Some(scalar.clone().note_todo("Do not clone"))),
                 None => Diagnostic::new(
