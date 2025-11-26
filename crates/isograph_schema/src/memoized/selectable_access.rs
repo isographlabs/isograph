@@ -53,11 +53,11 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => e.clone().wrap_err(),
-        (Ok(server), Err(_)) => match server.clone() {
+        (Ok(server), Err(_)) => match server.note_todo("Do not clone. Use a MemoRef.").clone() {
             Some(server_selectable) => server_selectable?.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
-        (Err(_), Ok(client)) => match client.clone() {
+        (Err(_), Ok(client)) => match client.note_todo("Do not clone. Use a MemoRef.").clone() {
             Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
@@ -65,11 +65,13 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             (None, None) => Ok(None),
             (None, Some(client_selectable)) => client_selectable
                 .clone()
+                .note_todo("Do not clone. Use a MemoRef.")
                 .client_defined()
                 .wrap_some()
                 .wrap_ok(),
             (Some(server_selectable), None) => server_selectable
-                .clone()?
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")?
                 .server_defined()
                 .wrap_some()
                 .wrap_ok(),
@@ -122,7 +124,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
                 *entity_name == parent_server_object_entity_name
             })
             .map(|(_key, value)| {
-                let value = value.clone()?;
+                let value = value.clone().note_todo("Do not clone. Use a MemoRef.")?;
                 value.client_defined().wrap_ok()
             }),
     );

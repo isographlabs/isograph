@@ -2,9 +2,10 @@ use std::collections::HashMap;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    OwnedClientSelectable, UnprocessedClientScalarSelectableSelectionSet, create_new_exposed_field,
+    OwnedClientSelectable, UnprocessedClientScalarSelectableSelectionSet,
+    add_client_field_to_object, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
-    process_client_field_declaration_inner, process_client_pointer_declaration_inner,
+    process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
@@ -90,6 +91,7 @@ pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
     client_selectable_declaration_map_from_iso_literals(db)
         .get(&(parent_object_entity_name, client_selectable_name))
         .cloned()
+        .note_todo("Do not clone. Use a MemoRef.")
         .unwrap_or_default()
 }
 
@@ -104,7 +106,11 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     {
         Some((first, rest)) => {
             if rest.is_empty() {
-                first.clone().wrap_some().wrap_ok()
+                first
+                    .clone()
+                    .note_todo("Do not clone. Use a MemoRef.")
+                    .wrap_some()
+                    .wrap_ok()
             } else {
                 let location = match first {
                     SelectionType::Scalar(s) => s.client_field_name.location.to::<Location>(),
@@ -137,16 +143,18 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
         client_scalar_selectable_name.into(),
     );
 
-    let selectable = selectable.as_ref().map_err(|e| e.clone())?;
+    let selectable = selectable.as_ref().map_err(Clone::clone)?;
 
     let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
     match item {
-        SelectionType::Scalar(client_field_declaration) => {
-            client_field_declaration.clone().wrap_some().wrap_ok()
-        }
+        SelectionType::Scalar(client_field_declaration) => client_field_declaration
+            .clone()
+            .note_todo("Do not clone. Use a MemoRef.")
+            .wrap_some()
+            .wrap_ok(),
         SelectionType::Object(o) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
             client_scalar_selectable_name.into(),
@@ -170,16 +178,18 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
         client_object_selectable_name.into(),
     );
 
-    let selectable = selectable.as_ref().map_err(|e| e.clone())?;
+    let selectable = selectable.as_ref().map_err(Clone::clone)?;
 
     let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
     match item {
-        SelectionType::Object(client_pointer_declaration) => {
-            client_pointer_declaration.clone().wrap_some().wrap_ok()
-        }
+        SelectionType::Object(client_pointer_declaration) => client_pointer_declaration
+            .clone()
+            .note_todo("Do not clone. Use a MemoRef.")
+            .wrap_some()
+            .wrap_ok(),
         SelectionType::Scalar(s) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
             client_object_selectable_name.into(),
@@ -200,10 +210,12 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(Clone::clone)?;
 
     let declaration = match declaration {
-        Some(declaration) => declaration.clone(),
+        Some(declaration) => declaration
+            .clone()
+            .note_todo("Do not clone. Use a MemoRef."),
         None => {
             // This is an awkward situation! We didn't find any client scalar selectable defined
             // by an iso literal. But, we still need to check for linked fields.
@@ -228,7 +240,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // Awkward! We also need to check for expose fields. Ay ay ay
             return expose_field_map(db)
                 .as_ref()
-                .map_err(|e| e.clone())?
+                .map_err(Clone::clone)?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
                 .map(|(selectable, _)| selectable)
@@ -236,11 +248,15 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let (_, scalar_selectable) = process_client_field_declaration_inner(db, declaration)
+    let (_, scalar_selectable) = add_client_field_to_object(db, declaration)
         .as_ref()
         .map_err(Clone::clone)?;
 
-    scalar_selectable.clone().wrap_some().wrap_ok()
+    scalar_selectable
+        .clone()
+        .note_todo("Do not clone. Use a MemoRef.")
+        .wrap_some()
+        .wrap_ok()
 }
 
 #[memo]
@@ -252,10 +268,12 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(Clone::clone)?;
 
     let declaration = match declaration {
-        Some(declaration) => declaration.clone(),
+        Some(declaration) => declaration
+            .clone()
+            .note_todo("Do not clone. Use a MemoRef."),
         None => return Ok(None),
     };
 
@@ -263,7 +281,11 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .map_err(Clone::clone)?;
 
-    object_selectable.clone().wrap_some().wrap_ok()
+    object_selectable
+        .clone()
+        .note_todo("Do not clone. Use a MemoRef.")
+        .wrap_some()
+        .wrap_ok()
 }
 
 #[memo]
@@ -346,7 +368,9 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
         for expose_as_field in expose_as_fields_to_insert {
             let (unprocessed_client_scalar_selection_set, exposed_field_client_scalar_selectable) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name).clone()?;
+                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
+                    .clone()
+                    .note_todo("Do not clone. Use a MemoRef.")?;
 
             map.insert(
                 (
@@ -385,20 +409,27 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 let value = (|| match value.split_first() {
                     Some((first, rest)) => {
                         if rest.is_empty() {
-                            Ok(match first.clone() {
-                                SelectionType::Scalar(scalar_declaration) => {
-                                    process_client_field_declaration_inner(db, scalar_declaration)
+                            Ok(
+                                match first.note_todo("Do not clone. Use a MemoRef.").clone() {
+                                    SelectionType::Scalar(scalar_declaration) => {
+                                        add_client_field_to_object(db, scalar_declaration)
+                                            .clone()
+                                            .note_todo("Do not clone. Use a MemoRef.")
+                                            .map(|(_, selectable)| selectable)?
+                                            .scalar_selected()
+                                    }
+                                    SelectionType::Object(object_declaration) => {
+                                        process_client_pointer_declaration_inner(
+                                            db,
+                                            object_declaration,
+                                        )
                                         .clone()
-                                        .map(|(_, selectable)| selectable)?
-                                        .scalar_selected()
-                                }
-                                SelectionType::Object(object_declaration) => {
-                                    process_client_pointer_declaration_inner(db, object_declaration)
-                                        .clone()
+                                        .note_todo("Do not clone. Use a MemoRef.")
                                         .map(|(_, selectable)| selectable)?
                                         .object_selected()
-                                }
-                            })
+                                    }
+                                },
+                            )
                         } else {
                             let location = match first {
                                 SelectionType::Scalar(s) => {
@@ -424,13 +455,15 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         )
         .chain(
             get_link_fields_map(db)
-                .clone()?
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
         )
         .chain(
             expose_field_map(db)
-                .clone()?
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
                 .map(|(key, (selectable, _))| {
                     ((key.0, key.1.into()), Ok(selectable.scalar_selected()))

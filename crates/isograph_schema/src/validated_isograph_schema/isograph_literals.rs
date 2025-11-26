@@ -78,7 +78,11 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
     let iso_literals_source_id = db.get_iso_literal(relative_path_to_source_file)?;
-    Some(read_iso_literals_source(db, iso_literals_source_id).to_owned())
+    Some(
+        read_iso_literals_source(db, iso_literals_source_id)
+            .to_owned()
+            .note_todo("Do not clone. Use a MemoRef."),
+    )
 }
 
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
@@ -100,7 +104,7 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
 
     IsoLiteralsSource {
         relative_path: *relative_path,
-        content: content.clone(),
+        content: content.clone().note_todo("Do not clone. Use a MemoRef."),
     }
 }
 
@@ -201,7 +205,8 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
         const_export_name.clone(),
         text_source,
     )
-    .to_owned()?;
+    .to_owned()
+    .note_todo("Do not clone. Use a MemoRef.")?;
 
     let is_client_field_declaration = matches!(
         &iso_literal_extraction_result,

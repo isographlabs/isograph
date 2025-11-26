@@ -7,6 +7,7 @@ use crate::{IsographDatabase, NetworkProtocol};
 use common_lang_types::{DiagnosticVecResult, RelativePathToSourceFile, TextSource};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use pico_macros::memo;
+use prelude::Postfix;
 
 use crate::parse_iso_literal_in_source;
 
@@ -20,7 +21,10 @@ pub fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
     let mut contains_iso = ParsedIsoLiteralsMap::default();
     let mut iso_literal_parse_errors = vec![];
     for (relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
-        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
+        for literal in parse_iso_literal_in_source(db, *iso_literals_source_id)
+            .to_owned()
+            .note_todo("Do not clone. Use a MemoRef.")
+        {
             match literal {
                 Ok(iso_literal) => {
                     contains_iso

@@ -22,7 +22,7 @@ pub fn entrypoints<TNetworkProtocol: NetworkProtocol>(
     for (_relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
         for result in parse_iso_literal_in_source(db, *iso_literals_source_id) {
             if let Ok((IsoLiteralExtractionResult::EntrypointDeclaration(e), _)) = result {
-                out.push(e.item.clone());
+                out.push(e.item.clone().note_todo("Do not clone. Use a MemoRef."));
             }
             // intentionally ignore non-entrypoints
         }

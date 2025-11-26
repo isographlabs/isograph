@@ -62,7 +62,12 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             })?;
 
     match parent_type_id {
-        ServerEntityName::Object(_) => add_client_field_to_object(db, client_field_declaration)?,
+        ServerEntityName::Object(_) => {
+            add_client_field_to_object(db, client_field_declaration.item)
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")
+                .map(|x| x.0)?
+        }
         ServerEntityName::Scalar(scalar_entity_name) => {
             return Diagnostic::new(
                 format!(
@@ -157,18 +162,8 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_field_declaration: WithSpan<ClientFieldDeclaration>,
-) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
-    let (result, _) =
-        process_client_field_declaration_inner(db, client_field_declaration.item).to_owned()?;
-
-    Ok(result)
-}
-
 #[memo]
-pub fn process_client_field_declaration_inner<TNetworkProtocol: NetworkProtocol>(
+pub fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: ClientFieldDeclaration,
 ) -> DiagnosticResult<(

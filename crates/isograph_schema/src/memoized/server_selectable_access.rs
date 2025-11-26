@@ -32,7 +32,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 > {
     let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     Ok(items
         .iter()
@@ -75,7 +75,7 @@ pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
 > {
     let (items, _fetchable_types) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     Ok(items
         .iter()
@@ -121,7 +121,7 @@ pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Vec<OwnedSelectableResult<TNetworkProtocol>>> {
     let map = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     Ok(map
         .get(&server_selectable_name)
@@ -138,12 +138,14 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let vec =
         server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(Clone::clone)?;
 
     match vec.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
-                Ok(Some(first.clone()))
+                Ok(Some(
+                    first.clone().note_todo("Do not clone. Use a MemoRef."),
+                ))
             } else {
                 Diagnostic::new(
                     format!(
@@ -174,10 +176,10 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
         (*ID_FIELD_NAME).into(),
     )
     .as_ref()
-    .map_err(|e| e.clone())?;
+    .map_err(Clone::clone)?;
 
     let selectable = match selectable {
-        Some(s) => s.as_ref().map_err(|e| e.clone())?,
+        Some(s) => s.as_ref().map_err(Clone::clone)?,
         None => return Ok(None),
     };
 
@@ -204,7 +206,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let target_scalar_entity_name = selectable.target_scalar_entity.inner();
     let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(Clone::clone)?
         .as_ref()
         // It must exist
         .ok_or_else(|| {
@@ -262,13 +264,13 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(Clone::clone)?;
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| e.clone())?;
+            let item = item.as_ref().map_err(Clone::clone)?;
             match item.as_ref().as_object() {
-                Some(obj) => Ok(Some(obj.clone())),
+                Some(obj) => Ok(Some(obj.clone().note_todo("Do not clone. Use a MemoRef."))),
                 None => Diagnostic::new(
                     format!(
                         "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
@@ -296,13 +298,13 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .as_ref()
-            .map_err(|e| e.clone())?;
+            .map_err(Clone::clone)?;
 
     match item {
         Some(item) => {
-            let item = item.as_ref().map_err(|e| e.clone())?;
+            let item = item.as_ref().map_err(Clone::clone)?;
             match item.as_ref().as_scalar() {
-                Some(scalar) => Ok(Some(scalar.clone())),
+                Some(scalar) => Ok(Some(scalar.clone().note_todo("Do not clone"))),
                 None => Diagnostic::new(
                     format!(
                         "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \

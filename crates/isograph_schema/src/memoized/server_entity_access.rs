@@ -22,20 +22,31 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
 ) -> Result<HashMap<UnvalidatedTypeName, Vec<OwnedServerEntity<TNetworkProtocol>>>, Diagnostic> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
 
     for item in outcome.iter() {
         match item {
-            SelectionType::Scalar(s) => server_entities
-                .entry(s.item.name.into())
-                .or_default()
-                .push(s.item.clone().scalar_selected()),
+            SelectionType::Scalar(s) => {
+                server_entities.entry(s.item.name.into()).or_default().push(
+                    s.item
+                        .clone()
+                        .note_todo("Do not clone. Use a MemoRef.")
+                        .scalar_selected(),
+                )
+            }
             SelectionType::Object(outcome) => server_entities
                 .entry(outcome.server_object_entity.item.name.into())
                 .or_default()
-                .push(outcome.server_object_entity.item.clone().object_selected()),
+                .push(
+                    outcome
+                        .server_object_entity
+                        .item
+                        .clone()
+                        .note_todo("Do not clone. Use a MemoRef.")
+                        .object_selected(),
+                ),
         }
     }
 
@@ -49,7 +60,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Vec<OwnedServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).as_ref().map_err(|e| e.clone())?;
+    let map = server_entity_map(db).as_ref().map_err(Clone::clone)?;
 
     map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
@@ -60,12 +71,17 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Vec<ServerObjectEntity<TNetworkProtocol>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     outcome
         .iter()
         .filter_map(|x| x.as_ref().as_object())
-        .map(|x| x.server_object_entity.item.clone())
+        .map(|x| {
+            x.server_object_entity
+                .item
+                .clone()
+                .note_todo("Do not clone. Use a MemoRef.")
+        })
         .collect::<Vec<_>>()
         .wrap_ok()
 }
@@ -77,13 +93,17 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ServerObjectEntity<TNetworkProtocol>>> {
     let entities = server_entities_named(db, server_object_entity_name.into())
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     match entities.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Object(o) => o.clone().wrap_some().wrap_ok(),
+                    SelectionType::Object(o) => o
+                        .clone()
+                        .note_todo("Do not clone. Use a MemoRef.")
+                        .wrap_some()
+                        .wrap_ok(),
                     SelectionType::Scalar(_) => {
                         let location =
                             entity_definition_location(db, server_object_entity_name.into())
@@ -125,13 +145,17 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ServerScalarEntity<TNetworkProtocol>>> {
     let entities = server_entities_named(db, server_scalar_entity_name.into())
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     match entities.split_first() {
         Some((first, rest)) => {
             if rest.is_empty() {
                 match first {
-                    SelectionType::Scalar(s) => Ok(Some(s.clone())),
+                    SelectionType::Scalar(s) => s
+                        .clone()
+                        .note_todo("Do not clone. Use a MemoRef.")
+                        .wrap_some()
+                        .wrap_ok(),
                     SelectionType::Object(_) => {
                         let location =
                             entity_definition_location(db, server_scalar_entity_name.into())
@@ -173,7 +197,7 @@ pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<JavascriptName>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(Clone::clone)?
         .as_ref();
 
     let entity = match value {
@@ -218,7 +242,7 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
@@ -245,7 +269,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<ServerEntityName>> {
     match defined_entities(db)
         .as_ref()
-        .map_err(|e| e.clone())?
+        .map_err(Clone::clone)?
         .get(&entity_name)
     {
         Some(items) => {
@@ -281,7 +305,7 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<Option<Location>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db)
         .as_ref()
-        .map_err(|e| e.clone())?;
+        .map_err(Clone::clone)?;
 
     outcome
         .iter()
