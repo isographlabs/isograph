@@ -31,9 +31,6 @@ impl FileSystemState {
 
         for (server_object, selectables) in &new.nested_files {
             let server_object_path = artifact_directory.join(server_object);
-            operations.push(FileSystemOperation::CreateDirectory(
-                server_object_path.clone(),
-            ));
 
             for (selectable, files) in selectables {
                 let selectable_path = server_object_path.join(selectable);
@@ -72,11 +69,6 @@ impl FileSystemState {
             new_server_objects.insert(server_object);
             let server_object_path = artifact_directory.join(server_object);
 
-            if !self.nested_files.contains_key(server_object) {
-                operations.push(FileSystemOperation::CreateDirectory(
-                    server_object_path.clone(),
-                ));
-            }
 
             for (selectable, files) in selectables {
                 new_selectables.insert((server_object, selectable));
