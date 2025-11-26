@@ -52,6 +52,7 @@ pub struct FieldTraversalResult {
     pub merged_selection_map: MergedSelectionMap,
     // TODO change this to Option<SelectionSet>?
     pub was_ever_selected_loadably: bool,
+    pub reachable_entity_names: BTreeSet<ServerObjectEntityName>,
 }
 
 lazy_static! {

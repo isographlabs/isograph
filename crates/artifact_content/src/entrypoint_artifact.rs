@@ -42,6 +42,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
+    reachable_entities: &mut BTreeSet<ServerObjectEntityName>,
 ) -> Vec<ArtifactPathAndContent> {
     let entrypoint = client_scalar_selectable_named(
         db,
@@ -74,6 +75,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
+        reachable_entity_names,
         ..
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,

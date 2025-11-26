@@ -1,0 +1,1 @@
+export default {field: "petId", typeName: "Pet"}

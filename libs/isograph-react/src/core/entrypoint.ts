@@ -69,6 +69,7 @@ export type IsographEntrypoint<
     | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
     | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
+  readonly reachableTypes: ReadonlyArray<{ field: string; typeName: string }>;
   /**
    * This field exists solely for typechecking, and will not exist at runtime.
    */

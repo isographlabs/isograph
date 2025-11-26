@@ -5,7 +5,12 @@ import type {Query__HomeRoute__raw_response_type} from './raw_response_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';
+import petCanonicalId from '../../Pet/canonical_id'
 const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
+
+const reachableTypes = [
+  petCanonicalId,
+]
 
 const artifact: IsographEntrypoint<
   Query__HomeRoute__param,
@@ -28,6 +33,7 @@ const artifact: IsographEntrypoint<
     nestedRefetchQueries,
     readerArtifact: readerResolver,
   },
+  reachableTypes,
 };
 
 export default artifact;

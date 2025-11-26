@@ -2,6 +2,7 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
     JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
+    ServerScalarSelectableName,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 
@@ -30,6 +31,14 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub concrete_type: Option<ServerObjectEntityName>,
 
     pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
+    pub directive_set: ServerDirectiveSet,
+}
+
+pub struct ServerDirectiveSet {
+    canonical_id_directive: CanonicalIdDirective,
+}
+struct CanonicalIdDirective {
+    field_name: ServerScalarSelectableName,
 }
 
 pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
