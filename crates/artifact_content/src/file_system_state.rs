@@ -320,8 +320,8 @@ mod tests {
         let artifact1 = vec![create_artifact(None, None, "file.txt", "content")];
         let artifact2 = vec![create_artifact(None, None, "file.txt", "content")];
 
-        let old_state = FileSystemState::from(&artifact1[..]); 
-        let new_state = FileSystemState::from(&artifact2[..]); 
+        let old_state = FileSystemState::from(&artifact1[..]);
+        let new_state = FileSystemState::from(&artifact2[..]);
 
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
@@ -333,7 +333,7 @@ mod tests {
         let old_artifacts = vec![create_artifact(None, None, "file.txt", "old content")];
         let new_artifacts = vec![create_artifact(None, None, "file.txt", "new content")];
 
-        let old_state = FileSystemState::from(&old_artifacts[..]); 
+        let old_state = FileSystemState::from(&old_artifacts[..]);
         let new_state = FileSystemState::from(&new_artifacts[..]);
 
         let artifact_dir = PathBuf::from("/__isograph");
@@ -351,9 +351,9 @@ mod tests {
             create_artifact(None, None, "new.txt", "new content"),
         ];
 
-        let old_state = FileSystemState::from(&old_artifacts[..]); 
+        let old_state = FileSystemState::from(&old_artifacts[..]);
         let new_state = FileSystemState::from(&new_artifacts[..]);
-        
+
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
 
@@ -395,12 +395,12 @@ mod tests {
             "query.graphql",
             "query",
         )];
-        let old_state = FileSystemState::from(&old_artifacts[..]); 
+        let old_state = FileSystemState::from(&old_artifacts[..]);
 
         let new_state = FileSystemState::default();
 
         let artifact_dir = PathBuf::from("/__isograph");
-        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir); 
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
 
         assert_eq!(ops.len(), 3);
         assert!(matches!(ops[0], FileSystemOperation::DeleteFile(_)));
@@ -447,7 +447,7 @@ mod tests {
         ];
 
         let old_state = FileSystemState::from(&old_artifacts[..]);
-        let new_state = FileSystemState::from(&new_artifacts[..]); 
+        let new_state = FileSystemState::from(&new_artifacts[..]);
 
         let artifact_dir = PathBuf::from("/__isograph");
         let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
@@ -466,18 +466,18 @@ mod tests {
             create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"),
         ];
         let new_artifacts = vec![
-            create_artifact(None, None, "root.txt", "new root"), 
-            create_artifact(None, None, "new_root.txt", "new file"), 
-            create_artifact(Some("User"), Some("name"), "query.graphql", "new query"), 
-            create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"), 
-            create_artifact(Some("Comment"), Some("text"), "query.graphql", "comment"), 
+            create_artifact(None, None, "root.txt", "new root"),
+            create_artifact(None, None, "new_root.txt", "new file"),
+            create_artifact(Some("User"), Some("name"), "query.graphql", "new query"),
+            create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"),
+            create_artifact(Some("Comment"), Some("text"), "query.graphql", "comment"),
         ];
 
-        let old_state = FileSystemState::from(&old_artifacts[..]);  
-        let new_state = FileSystemState::from(&new_artifacts[..]);  
+        let old_state = FileSystemState::from(&old_artifacts[..]);
+        let new_state = FileSystemState::from(&new_artifacts[..]);
 
         let artifact_dir = PathBuf::from("/__isograph");
-        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);  
+        let ops = FileSystemState::diff(&old_state, &new_state, &artifact_dir);
 
         let writes = ops
             .iter()
