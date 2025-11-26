@@ -31,7 +31,7 @@ export type EagerReaderArtifact<
   TClientFieldValue,
 > = {
   readonly kind: 'EagerReaderArtifact';
-  readonly fieldName: string;
+  readonly fieldName: ComponentOrFieldName;
   readonly readerAst: ReaderAst<TReadFromStore>;
   readonly resolver: (
     data: ResolverFirstParameter<TReadFromStore>,
@@ -151,7 +151,7 @@ export type LoadablySelectedField = {
   readonly queryArguments: Arguments | null;
   readonly refetchReaderAst: ReaderAst<any>;
 
-  // TODO we should not type these as any
+  // TODO we should not type these as any.
   readonly entrypoint:
     | IsographEntrypoint<any, any, any, any>
     | IsographEntrypointLoader<any, any, any>;

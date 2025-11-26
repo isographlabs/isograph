@@ -17,15 +17,15 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    DefinitionLocationPostfix, EmptyDirectiveSet, EntrypointDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
+    ClientScalarSelectionDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
+    EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
 };
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
-    MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, ServerObjectEntity, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, client_scalar_selectable_named,
+    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable,
+    EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
+    Format, IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey,
+    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, ServerObjectEntity,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
@@ -288,8 +288,18 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         &operation_text,
         parent_object_entity,
         &refetch_query_artifact_import,
+        entrypoint.name.item,
         concrete_object_entity.name,
         &directive_set,
+        match entrypoint.variant {
+            ClientFieldVariant::UserWritten(info) => info.client_field_directive_set,
+            ClientFieldVariant::ImperativelyLoadedField(_) => {
+                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+            }
+            ClientFieldVariant::Link => {
+                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+            }
+        },
     );
 
     let raw_response_type = generate_raw_response_type(db, merged_selection_map, 0);
@@ -440,14 +450,17 @@ fn generate_refetch_query_artifact_import(
     RefetchQueryArtifactImport(output)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
+    field_name: ClientScalarSelectableName,
     concrete_type: ServerObjectEntityName,
     directive_set: &EntrypointDirectiveSet,
+    field_directive_set: ClientScalarSelectionDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
@@ -493,11 +506,21 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         let reader_resolver_file_path =
             format!("'./{resolver_reader_file_name}{ts_file_extension}'");
         match directive_set {
-            EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.reader => (
-                "".to_string(),
-                format!(
-                    "{indent}readerWithRefetchQueries: {{\n\
+            EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.reader => {
+                let reader_artifact_kind =
+                    if let ClientScalarSelectionDirectiveSet::None(_) = field_directive_set {
+                        "EagerReaderArtifact"
+                    } else {
+                        "ComponentReaderArtifact"
+                    };
+
+                (
+                    "".to_string(),
+                    format!(
+                        "{indent}readerWithRefetchQueries: {{\n\
                      {indent}  kind: \"ReaderWithRefetchQueriesLoader\",\n\
+                     {indent}  fieldName: \"{field_name}\",\n\
+                     {indent}  readerArtifactKind: \"{reader_artifact_kind}\",\n\
                      {indent}  loader: () => import({reader_resolver_file_path})\n\
                      {indent}    .then(module => ({{\n\
                      {indent}      kind: \"ReaderWithRefetchQueries\",\n\
@@ -505,8 +528,9 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
                      {indent}      readerArtifact: module.default,\n\
                      {indent}    }}))\n\
                      {indent}}}"
-                ),
-            ),
+                    ),
+                )
+            }
             _ => (
                 format!("import readerResolver from {reader_resolver_file_path};\n"),
                 format!(

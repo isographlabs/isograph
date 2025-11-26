@@ -28,25 +28,23 @@ export function useResult<
     partialNetworkRequestOptions,
   );
 
-  maybeUnwrapNetworkRequest(
-    fragmentReference.networkRequest,
-    networkRequestOptions,
-  );
-  const readerWithRefetchQueries = readPromise(
-    fragmentReference.readerWithRefetchQueries,
-  );
-
-  switch (readerWithRefetchQueries.readerArtifact.kind) {
+  switch (fragmentReference.readerArtifactKind) {
     case 'ComponentReaderArtifact': {
       // @ts-expect-error
       return getOrCreateCachedComponent(
         environment,
-        readerWithRefetchQueries.readerArtifact.fieldName,
         fragmentReference,
         networkRequestOptions,
       );
     }
     case 'EagerReaderArtifact': {
+      maybeUnwrapNetworkRequest(
+        fragmentReference.networkRequest,
+        networkRequestOptions,
+      );
+      const readerWithRefetchQueries = readPromise(
+        fragmentReference.readerWithRefetchQueries,
+      );
       const data = useReadAndSubscribe(
         fragmentReference,
         networkRequestOptions,
@@ -60,12 +58,12 @@ export function useResult<
               startUpdate: getOrCreateCachedStartUpdate(
                 environment,
                 fragmentReference,
-                readerWithRefetchQueries.readerArtifact.fieldName,
                 networkRequestOptions,
               ),
             }
           : undefined),
       };
+      // @ts-expect-error
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
   }

@@ -1,9 +1,12 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
+import { isArray } from './cache';
 import {
   IsographEntrypoint,
   IsographOperation,
   IsographPersistedOperation,
+  type ReaderWithRefetchQueries,
+  type ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
 import {
   FragmentReference,
@@ -14,10 +17,13 @@ import {
 import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
 import { type StoreLayer } from './optimisticProxy';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import {
+  PromiseWrapper,
+  wrapPromise,
+  wrapResolvedValue,
+} from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
-import { isArray } from './cache';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -218,4 +224,33 @@ export function getOrLoadIsographArtifact(
   const wrapped = wrapPromise(loader());
   environment.entrypointArtifactCache.set(key, wrapped);
   return wrapped;
+}
+
+export function getOrLoadReaderWithRefetchQueries(
+  _environment: IsographEnvironment,
+  readerWithRefetchQueries:
+    | ReaderWithRefetchQueries<any, any>
+    | ReaderWithRefetchQueriesLoader<any, any>,
+): {
+  readerWithRefetchQueries: PromiseWrapper<ReaderWithRefetchQueries<any, any>>;
+  fieldName: string;
+  readerArtifactKind: 'EagerReaderArtifact' | 'ComponentReaderArtifact';
+} {
+  switch (readerWithRefetchQueries.kind) {
+    case 'ReaderWithRefetchQueries':
+      return {
+        readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+        fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
+        readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
+      };
+    case 'ReaderWithRefetchQueriesLoader':
+      return {
+        // TODO: cache promise wrapper
+        readerWithRefetchQueries: wrapPromise(
+          readerWithRefetchQueries.loader(),
+        ),
+        fieldName: readerWithRefetchQueries.fieldName,
+        readerArtifactKind: readerWithRefetchQueries.readerArtifactKind,
+      };
+  }
 }

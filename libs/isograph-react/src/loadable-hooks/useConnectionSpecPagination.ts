@@ -134,7 +134,6 @@ export function useConnectionSpecPagination<
               startUpdate: getOrCreateCachedStartUpdate(
                 environment,
                 fragmentReference,
-                readerWithRefetchQueries.readerArtifact.fieldName,
                 networkRequestOptions,
               ),
             }

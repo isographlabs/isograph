@@ -26,6 +26,8 @@ const artifact: IsographEntrypoint<
   concreteType: "Query",
   readerWithRefetchQueries: {
     kind: "ReaderWithRefetchQueriesLoader",
+    fieldName: "PetFavoritePhrase",
+    readerArtifactKind: "ComponentReaderArtifact",
     loader: () => import('./resolver_reader')
       .then(module => ({
         kind: "ReaderWithRefetchQueries",

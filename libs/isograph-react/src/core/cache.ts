@@ -26,6 +26,7 @@ import {
   DataTypeValue,
   FragmentSubscription,
   getLink,
+  getOrLoadReaderWithRefetchQueries,
   ROOT_ID,
   StoreLink,
   StoreRecord,
@@ -39,7 +40,6 @@ import {
   getMutableStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
-import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
@@ -113,11 +113,11 @@ export function getOrCreateCacheForArtifact<
       break;
   }
   const factory = () => {
-    const readerWithRefetchQueries =
-      entrypoint.readerWithRefetchQueries.kind ===
-      'ReaderWithRefetchQueriesLoader'
-        ? wrapPromise(entrypoint.readerWithRefetchQueries.loader())
-        : wrapResolvedValue(entrypoint.readerWithRefetchQueries);
+    const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
+      getOrLoadReaderWithRefetchQueries(
+        environment,
+        entrypoint.readerWithRefetchQueries,
+      );
     const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
       environment,
       entrypoint,
@@ -132,6 +132,8 @@ export function getOrCreateCacheForArtifact<
       {
         kind: 'FragmentReference',
         readerWithRefetchQueries,
+        fieldName,
+        readerArtifactKind,
         root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
         variables,
         networkRequest: networkRequest,

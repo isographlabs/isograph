@@ -43,11 +43,10 @@ export function getOrCreateCachedStartUpdate<
 >(
   environment: IsographEnvironment,
   fragmentReference: FragmentReference<TReadFromStore, unknown>,
-  eagerResolverName: string,
   networkRequestOptions: NetworkRequestReaderOptions,
 ): ExtractStartUpdate<TReadFromStore> {
   return (environment.eagerReaderCache[
-    stableIdForFragmentReference(fragmentReference, eagerResolverName)
+    stableIdForFragmentReference(fragmentReference)
   ] ??= createStartUpdate(
     environment,
     fragmentReference,

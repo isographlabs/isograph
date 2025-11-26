@@ -1,7 +1,7 @@
 import type { Contravariant, PhantomData } from './brand';
 import type { NetworkResponseObject } from './cache';
 import type { UnknownTReadFromStore } from './FragmentReference';
-import type { TypeName } from './IsographEnvironment';
+import type { ComponentOrFieldName, TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
 
@@ -24,6 +24,10 @@ export type ReaderWithRefetchQueriesLoader<
   TClientFieldValue,
 > = {
   readonly kind: 'ReaderWithRefetchQueriesLoader';
+  readonly fieldName: ComponentOrFieldName;
+  readonly readerArtifactKind:
+    | 'EagerReaderArtifact'
+    | 'ComponentReaderArtifact';
   readonly loader: () => Promise<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
@@ -78,6 +82,9 @@ export type IsographEntrypointLoader<
 > = {
   readonly kind: 'EntrypointLoader';
   readonly typeAndField: string;
+  readonly readerArtifactKind:
+    | 'EagerReaderArtifact'
+    | 'ComponentReaderArtifact';
   readonly loader: () => Promise<
     IsographEntrypoint<
       TReadFromStore,
