@@ -231,7 +231,11 @@ export function getOrLoadReaderWithRefetchQueries(
   readerWithRefetchQueries:
     | ReaderWithRefetchQueries<any, any>
     | ReaderWithRefetchQueriesLoader<any, any>,
-) {
+): {
+  readerWithRefetchQueries: PromiseWrapper<ReaderWithRefetchQueries<any, any>>;
+  fieldName: string;
+  readerArtifactKind: 'EagerReaderArtifact' | 'ComponentReaderArtifact';
+} {
   switch (readerWithRefetchQueries.kind) {
     case 'ReaderWithRefetchQueries':
       return {
