@@ -82,7 +82,6 @@ export type IsographEntrypointLoader<
 > = {
   readonly kind: 'EntrypointLoader';
   readonly typeAndField: string;
-  readonly fieldName: ComponentOrFieldName;
   readonly readerArtifactKind:
     | 'EagerReaderArtifact'
     | 'ComponentReaderArtifact';

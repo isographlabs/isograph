@@ -430,7 +430,7 @@ export function readLoadablySelectedFieldData(
               const fragmentReference: FragmentReference<any, any> = {
                 kind: 'FragmentReference',
                 readerWithRefetchQueries,
-                fieldName: field.entrypoint.fieldName,
+                fieldName: field.name,
                 readerArtifactKind: field.entrypoint.readerArtifactKind,
                 // TODO localVariables is not guaranteed to have an id field
                 root,

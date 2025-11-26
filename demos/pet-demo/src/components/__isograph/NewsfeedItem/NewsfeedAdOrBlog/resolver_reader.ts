@@ -31,7 +31,8 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         ],
         entrypoint: {
           kind: "EntrypointLoader",
-          fieldName: "AdItemDisplay",
+          typeAndField: "AdItem__AdItemDisplay",
+          readerArtifactKind: "ComponentReaderArtifact",
           loader: () => import("../../AdItem/AdItemDisplay/entrypoint").then(module => module.default),
         },
       },

@@ -4,9 +4,9 @@ use common_lang_types::{
     ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
-    DefinitionLocation, EmptyDirectiveSet, LoadableDirectiveParameters,
-    ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypeContainingSelections, SelectionTypePostfix,
+    ClientScalarSelectionDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
+    LoadableDirectiveParameters, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
+    SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments,
@@ -530,11 +530,26 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     } else {
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
         let field_parent_type = client_field.type_and_field.parent_object_entity_name;
-        let field_name = client_field.name.item;
+        let field_directive_set = match client_field.variant {
+            ClientFieldVariant::UserWritten(info) => info.client_field_directive_set,
+            ClientFieldVariant::ImperativelyLoadedField(_) => {
+                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+            }
+            ClientFieldVariant::Link => {
+                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+            }
+        };
+        let reader_artifact_kind =
+            if let ClientScalarSelectionDirectiveSet::None(_) = field_directive_set {
+                "EagerReaderArtifact"
+            } else {
+                "ComponentReaderArtifact"
+            };
         format!(
             "{{\n\
             {indent_3}kind: \"EntrypointLoader\",\n\
-            {indent_3}fieldName: \"{field_name}\",\n\
+            {indent_3}typeAndField: \"{type_and_field}\",\n\
+            {indent_3}readerArtifactKind: \"{reader_artifact_kind}\",\n\
             {indent_3}loader: () => import(\"../../{field_parent_type}/{name}/entrypoint\").then(module => module.default),\n\
             {indent_2}}}"
         )

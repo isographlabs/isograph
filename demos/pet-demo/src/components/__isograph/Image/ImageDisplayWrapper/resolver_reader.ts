@@ -19,7 +19,8 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
     ],
     entrypoint: {
       kind: "EntrypointLoader",
-      fieldName: "ImageDisplay",
+      typeAndField: "Image__ImageDisplay",
+      readerArtifactKind: "ComponentReaderArtifact",
       loader: () => import("../../Image/ImageDisplay/entrypoint").then(module => module.default),
     },
   },

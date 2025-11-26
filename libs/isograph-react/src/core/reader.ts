@@ -150,10 +150,8 @@ export type LoadablySelectedField = {
   readonly name: string;
   readonly queryArguments: Arguments | null;
   readonly refetchReaderAst: ReaderAst<any>;
-  readonly fieldName: ComponentOrFieldName;
-  readonly fieldKind: 'EagerReaderArtifact' | 'ComponentReaderArtifact';
 
-  // TODO we should not type these as any
+  // TODO we should not type these as any.
   readonly entrypoint:
     | IsographEntrypoint<any, any, any, any>
     | IsographEntrypointLoader<any, any, any>;
