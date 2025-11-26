@@ -147,6 +147,7 @@ dependencies = [
  "lazy_static",
  "md-5",
  "pathdiff",
+ "pico",
  "prelude",
  "serde",
  "serde_json",

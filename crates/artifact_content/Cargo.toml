@@ -10,6 +10,7 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_config = { path = "../isograph_config" }
+pico = { path = "../pico" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 prelude = { path = "../prelude" }
 indexmap = { workspace = true }

@@ -8,12 +8,11 @@ use artifact_content::FileSystemState;
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn get_file_system_operations(
-    paths_and_contents: impl IntoIterator<Item = ArtifactPathAndContent>,
+    paths_and_contents: &[ArtifactPathAndContent],
     artifact_directory: &PathBuf,
     file_system_state: &mut Option<FileSystemState>,
 ) -> Vec<FileSystemOperation> {
-    let artifacts: Vec<ArtifactPathAndContent> = paths_and_contents.into_iter().collect();
-    let new_file_system_state = FileSystemState::from(artifacts);
+    let new_file_system_state = FileSystemState::from(paths_and_contents);
     let operations = match file_system_state {
         None => {
             let operations = FileSystemState::diff_empty_to_new_state(
@@ -33,13 +32,12 @@ pub(crate) fn get_file_system_operations(
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn apply_file_system_operations(
-    operations: Vec<FileSystemOperation>,
+    operations: &[FileSystemOperation],
+    artifacts: &[ArtifactPathAndContent],
 ) -> DiagnosticResult<usize> {
     let mut count = 0;
 
     for operation in operations {
-        count += 1;
-
         match operation {
             FileSystemOperation::DeleteDirectory(path) => {
                 if path.exists() {
@@ -53,6 +51,7 @@ pub(crate) fn apply_file_system_operations(
                 }
             }
             FileSystemOperation::CreateDirectory(path) => {
+                count += 1;
                 fs::create_dir_all(path.clone()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(
                         &path,
@@ -62,6 +61,10 @@ pub(crate) fn apply_file_system_operations(
                 })?;
             }
             FileSystemOperation::WriteFile(path, content) => {
+                let content = &artifacts
+                    .get(content.idx)
+                    .expect("index should be valid for artifacts vec")
+                    .file_content;
                 fs::write(path.clone(), content.as_bytes()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(
                         &path,

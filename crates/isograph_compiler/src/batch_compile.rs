@@ -92,12 +92,13 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let (artifacts, stats) = get_artifact_path_and_content(db)?;
 
     let file_system_operations = get_file_system_operations(
-        artifacts,
+        &artifacts,
         &config.artifact_directory.absolute_path,
         &mut state.file_system_state,
     );
 
-    let total_artifacts_written = apply_file_system_operations(file_system_operations)?;
+    let total_artifacts_written =
+        apply_file_system_operations(&file_system_operations, &artifacts)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,
