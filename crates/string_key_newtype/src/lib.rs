@@ -63,6 +63,12 @@ macro_rules! string_key_newtype {
                 *self == other.lookup()
             }
         }
+
+        impl AsRef<std::path::Path> for $named {
+            fn as_ref(&self) -> &std::path::Path {
+                intern::Lookup::lookup(*self).as_ref()
+            }
+        }
     };
 }
 
