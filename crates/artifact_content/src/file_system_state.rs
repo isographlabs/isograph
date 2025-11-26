@@ -103,7 +103,7 @@ impl FileSystemState {
             let should_write = old
                 .root_files
                 .get(file_name)
-                .map(|(_old_content, old_hash)| old_hash != new_hash)
+                .map(|(_, old_hash)| old_hash != new_hash)
                 .unwrap_or(true);
 
             if should_write {
