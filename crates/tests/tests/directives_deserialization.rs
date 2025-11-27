@@ -1,7 +1,7 @@
 use common_lang_types::{Diagnostic, SelectableName, StringLiteralValue, TextSource};
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directive};
 use intern::string_key::Intern;
-use isograph_schema::{ExposeFieldDirective, FieldMapItem};
+use isograph_schema::{ExposeFieldDirective, FieldMapItem, ID_FIELD_NAME};
 use std::error::Error;
 
 use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
@@ -45,7 +45,7 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
     let set_tagline_mutation = ExposeFieldDirective::new(
         Some(SelectableName::from("set_puppy_tagline".intern())),
         vec![FieldMapItem {
-            from: StringLiteralValue::from("id".intern()),
+            from: ID_FIELD_NAME.unchecked_conversion(),
             to: StringLiteralValue::from("input.id".intern()),
         }],
         StringLiteralValue::from("set_pet_tagline.pet".intern()),
@@ -63,7 +63,7 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
     let set_tagline_mutation = ExposeFieldDirective::new(
         None,
         vec![FieldMapItem {
-            from: StringLiteralValue::from("id".intern()),
+            from: ID_FIELD_NAME.unchecked_conversion(),
             to: StringLiteralValue::from("input.id".intern()),
         }],
         StringLiteralValue::from("set_pet_tagline.pet".intern()),
@@ -81,8 +81,8 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
     let set_pet_best_friend = ExposeFieldDirective::new(
         None,
         vec![FieldMapItem {
-            from: StringLiteralValue::from("id".intern()),
-            to: StringLiteralValue::from("id".intern()),
+            from: ID_FIELD_NAME.unchecked_conversion(),
+            to: ID_FIELD_NAME.unchecked_conversion(),
         }],
         StringLiteralValue::from("set_pet_best_friend.pet".intern()),
     );

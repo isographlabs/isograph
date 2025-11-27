@@ -4,7 +4,6 @@ use common_lang_types::{
     RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
     UnvalidatedTypeName, VariableName, WithSpan, WithSpanPostfix,
 };
-use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
     ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
@@ -406,8 +405,8 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
 
 pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
     vec![ArgumentKeyAndValue {
-        key: "id".intern().into(),
-        value: NonConstantValue::Variable("id".intern().into()),
+        key: ID_FIELD_NAME.unchecked_conversion(),
+        value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
     }]
 }
 

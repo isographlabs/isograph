@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, GraphQLInterfaceTypeName, Location, SelectableName,
-    ServerObjectEntityName, ServerScalarSelectableName, Span, UnvalidatedTypeName, WithLocation,
-    WithLocationPostfix, WithSpan, WithSpanPostfix,
+    ServerObjectEntityName, Span, UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan,
+    WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
@@ -14,7 +14,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionTypePostfix};
 use isograph_schema::{
-    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
+    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, ID_FIELD_NAME,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
     STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
@@ -27,7 +27,6 @@ use crate::{
 };
 
 lazy_static! {
-    static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
     static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
@@ -403,8 +402,8 @@ fn process_object_type_definition(
             expose_field_directive: ExposeFieldDirective {
                 expose_as: (*REFETCH_FIELD_NAME).wrap_some(),
                 field_map: vec![FieldMapItem {
-                    from: (*ID_FIELD_NAME).unchecked_conversion(),
-                    to: (*ID_FIELD_NAME).unchecked_conversion(),
+                    from: ID_FIELD_NAME.unchecked_conversion(),
+                    to: ID_FIELD_NAME.unchecked_conversion(),
                 }],
                 field: format!("node.as{}", object_type_definition.name.item)
                     .intern()
