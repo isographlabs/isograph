@@ -17,16 +17,17 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME, NODE_FIELD_NAME,
-    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ScalarSelectableId,
-    SelectableTrait, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_fields, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, client_selectable_named, description, fetchable_types,
-    inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
-    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
-    server_scalar_entity_javascript_name, server_scalar_selectable_named, validate_entire_schema,
-    validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
+    FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, LINK_FIELD_NAME,
+    NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
+    ScalarSelectableId, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, accessible_client_fields, client_object_selectable_named,
+    client_scalar_selectable_named, client_selectable_map, client_selectable_named, description,
+    fetchable_types, inline_fragment_reader_selection_set, output_type_annotation,
+    selectable_named, selection_map_wrapped, server_object_entity_named,
+    server_object_selectable_named, server_scalar_entity_javascript_name,
+    server_scalar_selectable_named, validate_entire_schema, validated_entrypoints,
+    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, ObjectSelectableId};
 use lazy_static::lazy_static;
@@ -291,15 +292,17 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 true,
                                 config.options.include_file_extensions_in_import_statements,
                                 &[FieldMapItem {
-                                    from: "id".intern().into(),
-                                    to: "id".intern().into(),
+                                    from: ID_FIELD_NAME.unchecked_conversion(),
+                                    to: ID_FIELD_NAME.unchecked_conversion(),
                                 }],
                             ));
 
                             // Everything about this is quite sus
                             let id_arg = ArgumentKeyAndValue {
-                                key: "id".intern().into(),
-                                value: NonConstantValue::Variable("id".intern().into()),
+                                key: ID_FIELD_NAME.unchecked_conversion(),
+                                value: NonConstantValue::Variable(
+                                    ID_FIELD_NAME.unchecked_conversion(),
+                                ),
                             };
 
                             let type_to_refine_to = &server_object_entity_named(
@@ -323,7 +326,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 .map(|variable_definition| &variable_definition.item);
 
                             let id_var = ValidatedVariableDefinition {
-                                name: WithLocation::new_generated("id".intern().into()),
+                                name: WithLocation::new_generated(
+                                    ID_FIELD_NAME.unchecked_conversion(),
+                                ),
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(

@@ -96,7 +96,7 @@ pub struct NameAndArguments {
 
 impl NameAndArguments {
     pub fn normalization_key(&self) -> NormalizationKey {
-        if self.name == "id" {
+        if self.name == *ID_FIELD_NAME {
             NormalizationKey::Id
         } else {
             NormalizationKey::ServerField(self.clone())

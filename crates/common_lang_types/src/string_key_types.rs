@@ -4,7 +4,7 @@ use string_key_newtype::{
     string_key_one_way_conversion,
 };
 
-use crate::{ClientScalarSelectableName, SelectableName};
+use crate::{ClientScalarSelectableName, SelectableName, ServerScalarSelectableName};
 
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
@@ -96,6 +96,7 @@ string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 string_key_equality!(FieldArgumentName, VariableName);
+string_key_equality!(ServerScalarSelectableName, VariableName);
 
 string_key_newtype!(ArtifactFilePrefix);
 string_key_newtype!(ArtifactFileName);

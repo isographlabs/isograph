@@ -7,10 +7,11 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{SelectionType, VariableDefinition};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ImperativelyLoadedFieldVariant,
-    IsographDatabase, MergedSelectionMap, NetworkProtocol, OwnedClientSelectable,
-    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
-    WrappedSelectionMapSelection, client_selectable_named, fetchable_types, selection_map_wrapped,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ID_FIELD_NAME,
+    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
+    OwnedClientSelectable, PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath,
+    ServerEntityName, WrappedSelectionMapSelection, client_selectable_named, fetchable_types,
+    selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -210,7 +211,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|variable_name| {
             // HACK
-            if *variable_name == "id" {
+            if *variable_name == *ID_FIELD_NAME {
                 None
             } else {
                 entrypoint

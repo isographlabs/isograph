@@ -1233,8 +1233,8 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         parent_object_entity_name: *query_id,
         server_object_selectable_name: *NODE_FIELD_NAME,
         arguments: vec![ArgumentKeyAndValue {
-            key: "id".intern().into(),
-            value: NonConstantValue::Variable("id".intern().into()),
+            key: ID_FIELD_NAME.unchecked_conversion(),
+            value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
         }],
         concrete_type: None,
     });
@@ -1399,7 +1399,7 @@ fn merge_server_scalar_field(
     let scalar_field_name = scalar_field_selection.name.item;
     let normalization_key = if scalar_field_name == *TYPENAME_FIELD_NAME {
         NormalizationKey::Discriminator
-    } else if scalar_field_name == "id" {
+    } else if scalar_field_name == *ID_FIELD_NAME {
         NormalizationKey::Id
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
@@ -1583,7 +1583,7 @@ fn get_aliased_mutation_field_name(
 
 pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
-        name: WithLocation::new_generated((*ID_FIELD_NAME).unchecked_conversion()),
+        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
         type_: GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                 (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),

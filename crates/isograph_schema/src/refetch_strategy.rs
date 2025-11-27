@@ -3,14 +3,13 @@ use std::{collections::BTreeSet, fmt::Debug};
 use common_lang_types::{
     ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
 };
-use intern::string_key::Intern;
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
     SelectionTypeContainingSelections,
 };
 
 use crate::{
-    MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
+    ID_FIELD_NAME, MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
     get_reachable_variables, selection_map_wrapped,
 };
 
@@ -126,7 +125,7 @@ impl GenerateRefetchQueryImpl {
 
 pub fn id_selection() -> UnprocessedSelection {
     SelectionTypeContainingSelections::Scalar(ScalarSelection {
-        name: WithLocation::new_generated("id".intern().into()),
+        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         associated_data: (),

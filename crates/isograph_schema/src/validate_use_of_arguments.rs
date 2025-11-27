@@ -5,7 +5,6 @@ use common_lang_types::{
     ParentObjectEntityNameAndSelectableName, VariableName, WithLocation, WithSpan,
 };
 
-use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
     SelectionType,
@@ -14,17 +13,17 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientScalarOrObjectSelectable, IsographDatabase, NetworkProtocol, ValidatedVariableDefinition,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    selectable_validated_reader_selection_set, server_object_selectable_named,
-    server_scalar_selectable_named, validate_argument_types::value_satisfies_type,
-    visit_selection_set::visit_selection_set,
+    ClientScalarOrObjectSelectable, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
+    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, selectable_validated_reader_selection_set,
+    server_object_selectable_named, server_scalar_selectable_named,
+    validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
 };
 
 type UsedVariables = BTreeSet<VariableName>;
 
 lazy_static! {
-    static ref ID: FieldArgumentName = "id".intern().into();
+    static ref ID: FieldArgumentName = ID_FIELD_NAME.unchecked_conversion();
 }
 
 /// For all client types, validate that
