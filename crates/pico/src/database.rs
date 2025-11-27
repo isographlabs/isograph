@@ -223,16 +223,23 @@ impl<Db: Database> InternalStorage<Db> {
             .map(|(node, _)| node)
     }
 
+    pub(crate) fn get_derived_node_from_derived_node_revision(
+        &self,
+        revision: &DerivedNodeRevision,
+    ) -> &DerivedNode<Db> {
+        self.derived_nodes.get(revision.node_index.idx).expect(
+            "Indexes should always be valid. \
+            This is indicative of a bug in Pico.",
+        )
+    }
+
     pub(crate) fn get_derived_node_and_revision(
         &self,
         derived_node_id: DerivedNodeId,
     ) -> Option<(&DerivedNode<Db>, DerivedNodeRevision)> {
         let revision = *self.derived_node_id_to_revision.get(&derived_node_id)?;
 
-        let node = self.derived_nodes.get(revision.node_index.idx).expect(
-            "indexes should always be valid. \
-            This is indicative of a bug in Pico.",
-        );
+        let node = self.get_derived_node_from_derived_node_revision(&revision);
 
         Some((node, revision))
     }
