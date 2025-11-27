@@ -26,7 +26,7 @@ use isograph_schema::NetworkProtocol;
 use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
-    HoverProviderCapability,
+    CompletionOptions, HoverProviderCapability,
     request::{Completion, HoverRequest, SemanticTokensFullRequest},
 };
 use lsp_types::{
@@ -58,7 +58,10 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
         hover_provider: HoverProviderCapability::Simple(true).wrap_some(),
         document_formatting_provider: OneOf::Left(true).wrap_some(),
         definition_provider: OneOf::Left(true).wrap_some(),
-        completion_provider: Some(Default::default()),
+        completion_provider: Some(CompletionOptions {
+            trigger_characters: Some(vec!["\n".to_string()]),
+            ..Default::default()
+        }),
         ..Default::default()
     };
     let server_capabilities =
