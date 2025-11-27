@@ -1,14 +1,16 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName,
-    QueryText, ServerObjectEntityName, UnvalidatedTypeName, WithLocationPostfix,
+    Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName, QueryText,
+    ServerObjectEntityName, UnvalidatedTypeName, WithLocationPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
-    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition, server_object_entity_named
+    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition,
+    server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
@@ -131,8 +133,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     None => None,
                 }) {
                 Some(outcome) => {
-                    let server_object_entity_directives: ServerObjectEntityDirectives = from_graphql_directives(&directives)
-                        .map_err(|err| {
+                    let server_object_entity_directives: ServerObjectEntityDirectives =
+                        from_graphql_directives(&directives).map_err(|err| {
                             Diagnostic::new(
                                 format!("Failed to deserialize: {}", err),
                                 Location::Generated.wrap_some(),
@@ -146,7 +148,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             description: None,
                         });
                     }
-
                 }
                 None => {
                     return Diagnostic::new(
