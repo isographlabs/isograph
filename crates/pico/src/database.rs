@@ -490,14 +490,17 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
         }
         Entry::Occupied(mut occupied) => {
             let revision = occupied.get_mut();
+
+            // Note: we cannot call internal.get_derived_node(derived_node_id) here, because
+            // - have a mutable reference to the item in the dashmap via
+            //   derived_node_id_to_revision.entry(derived_node_id), and
+            // - get_derived_node calls derived_node_id_to_revision.get(derived_node_id)
+            //
+            // This will deadlock.
             let existing_node = db
                 .get_storage()
                 .internal
-                .get_derived_node(derived_node_id)
-                .expect(
-                    "Indexes should always be valid. \
-                    This is indicative of a bug in Pico.",
-                );
+                .get_derived_node_from_derived_node_revision(revision);
 
             let existing_ptr = existing_node
                 .value
