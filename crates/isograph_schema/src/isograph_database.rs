@@ -84,7 +84,10 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
         &self,
         file: RelativePathToSourceFile,
     ) -> Option<SourceId<OpenFileSource>> {
-        self.get_open_file_map().untracked().0.get(&file).cloned()
+        // TODO this really should be untracked, or at minimum,
+        // untracked (if the value is Some), and tracked (otherwise).
+        // See [this issue](https://github.com/isographlabs/isograph/issues/787)
+        self.get_open_file_map().tracked().0.get(&file).cloned()
     }
 
     pub fn remove_schema_extension(
