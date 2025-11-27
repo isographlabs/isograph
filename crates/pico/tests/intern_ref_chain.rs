@@ -51,8 +51,7 @@ fn intern_ref_chain() {
         &"General theory"
     );
 
-    // Unfortunately, we do not short circuit, but we should find a way to!
-    assert_eq!(BOOK_COUNTER.load(Ordering::SeqCst), 2);
+    assert_eq!(BOOK_COUNTER.load(Ordering::SeqCst), 1);
 }
 
 #[memo]

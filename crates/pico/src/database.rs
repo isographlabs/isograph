@@ -8,7 +8,7 @@ use crate::{
     execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, init_param_vec, intern_owned_param},
+    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -390,16 +390,83 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = (value as *const T as usize as u64).into();
-    if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
-        let idx = db
-            .get_storage()
-            .internal
-            .params
-            .push(Box::new(RawPtr::from_ref(value)));
-        v.insert(Index::new(idx));
-    }
-    intern_from_param(db, param_id, MemoRefKind::RawPtr)
+    let param_id = hash(value).into();
+
+    let mut param_ids = init_param_vec();
+    param_ids.push(param_id);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+
+    let new_ptr = RawPtr::from_ref(value);
+    let current_epoch = db.get_storage().internal.current_epoch;
+    let time_updated = match db
+        .get_storage()
+        .internal
+        .derived_node_id_to_revision
+        .entry(derived_node_id)
+    {
+        Entry::Vacant(vacant) => {
+            let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                inner_fn: InnerFn::new(|_, _| {
+                    unreachable!("intern_ref derived node should never be executed")
+                }),
+                value: Box::new(new_ptr),
+            });
+
+            let dependency_index = db.get_storage().internal.insert_dependencies(Vec::new());
+
+            vacant.insert(DerivedNodeRevision {
+                time_updated: current_epoch,
+                time_verified: current_epoch,
+                node_index,
+                dependency_index,
+            });
+
+            current_epoch
+        }
+        Entry::Occupied(mut occupied) => {
+            let revision = occupied.get_mut();
+            let existing_node = db
+                .get_storage()
+                .internal
+                .get_derived_node(derived_node_id)
+                .expect(
+                    "Indexes should always be valid. \
+                    This is indicative of a bug in Pico.",
+                );
+
+            let existing_ptr = existing_node
+                .value
+                .as_ref()
+                .as_any()
+                .downcast_ref::<RawPtr<T>>()
+                .expect("Unexpected memoized value type. This is indicative of a bug in Pico.");
+
+            let value_changed = !unsafe { existing_ptr.as_ref().dyn_eq(value) };
+            let pointer_changed = *existing_ptr != new_ptr;
+
+            if pointer_changed {
+                let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                    inner_fn: existing_node.inner_fn,
+                    value: Box::new(new_ptr),
+                });
+                revision.node_index = node_index;
+            }
+
+            if value_changed {
+                revision.time_updated = current_epoch;
+            }
+
+            revision.time_verified = current_epoch;
+            revision.time_updated
+        }
+    };
+
+    db.get_storage().register_dependency_in_parent_memoized_fn(
+        NodeKind::Derived(derived_node_id),
+        time_updated,
+    );
+
+    MemoRef::new_with_kind(derived_node_id, MemoRefKind::RawPtr)
 }
 
 fn intern_from_param<Db: Database, T: Clone + DynEq>(

@@ -211,23 +211,35 @@ fn derived_node_changed_since<Db: Database>(
     derived_node_id: DerivedNodeId,
     since: Epoch,
 ) -> bool {
-    let inner_fn =
-        if let Some(derived_node) = db.get_storage().internal.get_derived_node(derived_node_id) {
-            if let Some(rev) = db
-                .get_storage()
-                .internal
-                .get_derived_node_revision(derived_node_id)
-            {
-                if rev.time_updated > since {
-                    return true;
-                }
-            } else {
+    let inner_fn = if let Some(derived_node) =
+        db.get_storage().internal.get_derived_node(derived_node_id)
+    {
+        if let Some(rev) = db
+            .get_storage()
+            .internal
+            .get_derived_node_revision(derived_node_id)
+        {
+            if rev.time_updated > since {
                 return true;
             }
-            derived_node.inner_fn
+            // a derived node produced by `intern_ref` call does not have
+            // dependencies and its `inner_fn` should never be called
+            if db
+                .get_storage()
+                .internal
+                .get_dependencies(derived_node_id)
+                .expect("Expected dependencies to be present. This is indicative of a bug in Pico.")
+                .is_empty()
+            {
+                return false;
+            }
         } else {
             return true;
-        };
+        }
+        derived_node.inner_fn
+    } else {
+        return true;
+    };
     let did_recalculate = execute_memoized_function(db, derived_node_id, inner_fn);
     matches!(
         did_recalculate,
