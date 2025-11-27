@@ -205,10 +205,7 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common_lang_types::{
-        ArtifactPath, ParentObjectEntityNameAndSelectableName, SelectableName,
-        ServerObjectEntityName,
-    };
+    use common_lang_types::{ArtifactPath, ParentObjectEntityNameAndSelectableName};
     use intern::string_key::Intern;
     use std::path::PathBuf;
 
@@ -220,8 +217,8 @@ mod tests {
     ) -> ArtifactPathAndContent {
         let type_and_field = match (server, selectable) {
             (Some(s), Some(sel)) => Some(ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: ServerObjectEntityName::from(s.intern()),
-                selectable_name: SelectableName::from(sel.intern()),
+                parent_object_entity_name: s.intern().into(),
+                selectable_name: sel.intern().into(),
             }),
             _ => None,
         };
@@ -231,7 +228,7 @@ mod tests {
                 type_and_field,
                 file_name: file_name.intern().into(),
             },
-            file_content: FileContent::from(content.to_string()),
+            file_content: content.to_string().into(),
         }
     }
 
@@ -244,7 +241,7 @@ mod tests {
         assert!(
             state
                 .root_files
-                .contains_key(&ArtifactFileName::from("package.json".intern()))
+                .contains_key(&"package.json".intern().into())
         );
     }
 
@@ -261,16 +258,16 @@ mod tests {
 
         assert_eq!(state.nested_files.len(), 1);
 
-        let server = &ServerObjectEntityName::from("User".intern());
-        let selectable = SelectableName::from("name".intern());
-        let file_name = &ArtifactFileName::from("query.graphql".intern());
+        let server = "User".intern().into();
+        let selectable = "name".intern().into();
+        let file_name = "query.graphql".intern().into();
 
         assert!(
             state
                 .nested_files
-                .get(server)
+                .get(&server)
                 .and_then(|s| s.get(&selectable))
-                .and_then(|f| f.get(file_name))
+                .and_then(|f| f.get(&file_name))
                 .is_some()
         );
     }
@@ -293,8 +290,8 @@ mod tests {
         assert_eq!(state.root_files.len(), 1);
         assert_eq!(state.nested_files.len(), 1);
 
-        let user_server = &ServerObjectEntityName::from("User".intern());
-        let selectables = state.nested_files.get(user_server).unwrap();
+        let user_server = "User".intern().into();
+        let selectables = state.nested_files.get(&user_server).unwrap();
         assert_eq!(selectables.len(), 2);
     }
 
