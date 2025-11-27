@@ -1,18 +1,16 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DirectiveName, Location, QueryExtraInfo, QueryOperationName,
+    Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName,
     QueryText, ServerObjectEntityName, UnvalidatedTypeName, WithLocationPostfix,
 };
-use graphql_lang_types::from_graphql_directive;
+use graphql_lang_types::from_graphql_directives;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
-    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RootOperationName, ValidatedVariableDefinition, server_object_entity_named,
+    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition, server_object_entity_named
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
-use lazy_static::lazy_static;
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -23,10 +21,6 @@ use crate::{
     },
     query_text::generate_query_text,
 };
-
-lazy_static! {
-    static ref EXPOSE_FIELD_DIRECTIVE: DirectiveName = "exposeField".intern().into();
-}
 
 pub(crate) struct GraphQLRootTypes {
     pub query: ServerObjectEntityName,
@@ -137,23 +131,22 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     None => None,
                 }) {
                 Some(outcome) => {
-                    for directive in directives {
-                        if directive.name.item == *EXPOSE_FIELD_DIRECTIVE {
-                            let expose_field_directive = from_graphql_directive(&directive)
-                                .map_err(|err| {
-                                    Diagnostic::new(
-                                        format!("Failed to deserialize: {}", err),
-                                        Location::Generated.wrap_some(),
-                                    )
-                                })?;
+                    let server_object_entity_directives: ServerObjectEntityDirectives = from_graphql_directives(&directives)
+                        .map_err(|err| {
+                            Diagnostic::new(
+                                format!("Failed to deserialize: {}", err),
+                                Location::Generated.wrap_some(),
+                            )
+                        })?;
 
-                            outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
-                                expose_field_directive,
-                                parent_object_name: outcome.server_object_entity.item.name,
-                                description: None,
-                            });
-                        }
+                    for expose_field_directive in server_object_entity_directives.expose_field {
+                        outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
+                            expose_field_directive,
+                            parent_object_name: outcome.server_object_entity.item.name,
+                            description: None,
+                        });
                     }
+
                 }
                 None => {
                     return Diagnostic::new(
