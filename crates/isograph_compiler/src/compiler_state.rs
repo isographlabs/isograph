@@ -10,6 +10,7 @@ use pico::Database;
 use prelude::Postfix;
 
 use crate::source_files::initialize_sources;
+use artifact_content::FileSystemState;
 
 const GC_DURATION_SECONDS: u64 = 60;
 
@@ -17,6 +18,7 @@ const GC_DURATION_SECONDS: u64 = 60;
 pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
     pub db: IsographDatabase<TNetworkProtocol>,
     pub last_gc_run: Instant,
+    pub file_system_state: Option<FileSystemState>,
 }
 
 impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
@@ -31,6 +33,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
         Self {
             db,
             last_gc_run: Instant::now(),
+            file_system_state: None,
         }
         .wrap_ok()
     }

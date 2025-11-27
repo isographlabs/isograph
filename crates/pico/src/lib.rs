@@ -19,6 +19,7 @@ pub use database::*;
 pub use derived_node::*;
 pub use dyn_eq::*;
 pub use execute_memoized_function::*;
+pub use index::*;
 pub use intern::*;
 pub use memo_ref::*;
 pub use raw_ptr::*;

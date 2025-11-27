@@ -1,13 +1,14 @@
 use std::{path::PathBuf, time::Duration};
 
 use crate::{
-    compiler_state::CompilerState, with_duration::WithDuration,
-    write_artifacts::write_artifacts_to_disk,
+    compiler_state::CompilerState,
+    with_duration::WithDuration,
+    write_artifacts::{apply_file_system_operations, get_file_system_operations},
 };
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, DiagnosticVecResult};
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::NetworkProtocol;
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
 use tracing::{error, info};
@@ -24,8 +25,10 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
-    let state = CompilerState::new(config_location, current_working_directory)?;
-    print_result(WithDuration::new(|| compile::<TNetworkProtocol>(&state.db)))
+    let mut state = CompilerState::new(config_location, current_working_directory)?;
+    print_result(WithDuration::new(|| {
+        compile::<TNetworkProtocol>(&mut state)
+    }))
 }
 
 pub fn print_result(
@@ -79,16 +82,23 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 /// This the "workhorse" command of batch compilation.
 #[tracing::instrument(skip_all)]
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+    state: &mut CompilerState<TNetworkProtocol>,
 ) -> DiagnosticVecResult<CompilationStats> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
-
+    let db = &state.db;
     let config = db.get_isograph_config();
     let (artifacts, stats) = get_artifact_path_and_content(db)?;
+
+    let file_system_operations = get_file_system_operations(
+        &artifacts,
+        &config.artifact_directory.absolute_path,
+        &mut state.file_system_state,
+    );
+
     let total_artifacts_written =
-        write_artifacts_to_disk(artifacts, &config.artifact_directory.absolute_path)?;
+        apply_file_system_operations(&file_system_operations, &artifacts)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,
