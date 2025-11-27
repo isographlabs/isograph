@@ -8,7 +8,7 @@ use crate::{
     execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, init_param_vec, intern_owned_param},
+    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -386,20 +386,155 @@ pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T
     intern_from_param(db, param_id, MemoRefKind::Value)
 }
 
+/// In this function, we create a [`MemoRef`], which is a wrapper around a pointer.
+///
+/// We want to ensure several things:
+/// - that when the MemoRef is read (via `memo_ref.lookup(db)`), the value it points to has
+///   not been garbage collected, and
+/// - that when a function reads the MemoRef, the time_updated of the derived node revision of
+///   the MemoRef is the epoch when the MemoRef was initially created (i.e. to the first epoch when
+///   `db.intern_ref(&value)` was called for a particular value.) This allows for short circuiting.
+///
+/// This is trickier than it sounds, because we can have multiple MemoRef's that point to identical
+/// data, but which is held in different memory locations. In particular, consider the following
+/// scenario:
+///
+/// fn get_tuple(db) {
+///   (db.get_source(), "identical value".to_string())
+/// }
+/// fn get_memo_ref_to_second_item_in_tuple(db) {
+///   db.intern_ref(&get_tuple().1) // returns a MemoRef to &"identical value".to_string()
+/// }
+/// fn outer_fn_1() {
+///   let memo_ref = get_memo_ref_to_second_item_in_tuple(db);
+///   memo_ref.lookup(db);
+/// }
+/// fn outer_fn_2() {
+///   let memo_ref = get_memo_ref_to_second_item_in_tuple(db);
+///   memo_ref.lookup(db);
+/// }
+///
+/// - dependency graph: source <- get_tuple <- get_memo_ref_to_second_item_in_tuple <-- outer_fn_1
+/// - dependency graph: source <- get_tuple <- get_memo_ref_to_second_item_in_tuple <-- outer_fn_2
+///
+/// - epoch 0
+/// - call outer_fn_1. All functions executed.
+/// - update source, enter epoch 1
+/// - call outer_fn_1.
+///   - outer_fn is checked
+///     - get_memo_ref_to_second_item_in_tuple is checked
+///       - get_tuple is checked; its dependencies have changed, so it is re-executed
+///     - get_memo_ref_to_second_item's dependencies have changed, so it is re-executed
+///       - however, the derived node revision of the memo_ref continues to have time_updated: 0
+///   - outer_fn_1's dependencies have *not* changed, so we short circuit
+/// - GC everything from epoch 0
+/// - call outer_fn_2
+///   - check get_memo_ref_to_second_item_in_tuple. It has been verified in the current epoch
+///     (and its dependencies have not changed), so reuse the existing value. (*)
+///   - outer_fn_2 calls `memo_ref.lookup(db)`
+///
+/// Uh oh! What data does the memo ref point to? It better point to the tuple created during epoch 1.
+///
+/// In other words, "reuse the existing value" is not quite right. We must return a MemoRef that points
+/// to data from epoch 1, but indicate (to pico) that it has not changed since epoch 0. i.e. we employ
+/// interior mutability to give the illusion that this is the same MemoRef.
+///
+/// This is achieved as follows:
+/// - A MemoRef's identity (param_id) is based on the value it points to, i.e. not the the memory
+///   address it points to. So the MemoRef's created in get_memo_ref_to_second_item_in_tuple in various
+///   epochs have the same identity.
+/// - If a MemoRef is created and already exists, then we silently mutate the MemoRef to point to the
+///   memory address of whatever was most recently passed in.
+/// - The derived node revision of the MemoRef's time_updated remains unchanged, i.e. it remains the
+///   epoch from when the MemoRef (with a given identity) was created.
+///
+/// Note that if we call `db.intern_ref(different_value)`, then this MemoRef has a different identity,
+/// so there are no problems there.
 pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: &T,
 ) -> MemoRef<T> {
-    let param_id = (value as *const T as usize as u64).into();
-    if let Entry::Vacant(v) = db.get_storage().internal.param_id_to_index.entry(param_id) {
-        let idx = db
-            .get_storage()
-            .internal
-            .params
-            .push(Box::new(RawPtr::from_ref(value)));
-        v.insert(Index::new(idx));
-    }
-    intern_from_param(db, param_id, MemoRefKind::RawPtr)
+    // the param_id (identity) of the MemoRef is the hash of the value, *not* of the memory address.
+    let param_id = hash(value).into();
+
+    let mut param_ids = init_param_vec();
+    param_ids.push(param_id);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+
+    let new_ptr = RawPtr::from_ref(value);
+    let current_epoch = db.get_storage().internal.current_epoch;
+    let time_updated = match db
+        .get_storage()
+        .internal
+        .derived_node_id_to_revision
+        .entry(derived_node_id)
+    {
+        Entry::Vacant(vacant) => {
+            let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                inner_fn: InnerFn::new(|_, _| {
+                    unreachable!("intern_ref derived node should never be executed")
+                }),
+                value: Box::new(new_ptr),
+            });
+
+            let dependency_index = db.get_storage().internal.insert_dependencies(Vec::new());
+
+            vacant.insert(DerivedNodeRevision {
+                time_updated: current_epoch,
+                time_verified: current_epoch,
+                node_index,
+                dependency_index,
+            });
+
+            current_epoch
+        }
+        Entry::Occupied(mut occupied) => {
+            let revision = occupied.get_mut();
+
+            // Note: we cannot call internal.get_derived_node(derived_node_id) here, because
+            // - have a mutable reference to the item in the dashmap via
+            //   derived_node_id_to_revision.entry(derived_node_id), and
+            // - get_derived_node calls derived_node_id_to_revision.get(derived_node_id)
+            //
+            // This will deadlock.
+            let existing_node = db
+                .get_storage()
+                .internal
+                .get_derived_node_from_derived_node_revision(revision);
+
+            let existing_ptr = existing_node
+                .value
+                .as_ref()
+                .as_any()
+                .downcast_ref::<RawPtr<T>>()
+                .expect("Unexpected memoized value type. This is indicative of a bug in Pico.");
+
+            let pointer_changed = *existing_ptr != new_ptr;
+            if pointer_changed {
+                // If we get here, then we have called db.intern_ref(&value) with a value pointing to a new
+                // memory location, but with an identical value.
+                //
+                // Here, we mutate the revision to point to a DerivedNode which points to the new memory address.
+                //
+                // We do *not* update the time_updated, though.
+                let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                    inner_fn: existing_node.inner_fn,
+                    value: Box::new(new_ptr),
+                });
+                revision.node_index = node_index;
+            }
+
+            revision.time_verified = current_epoch;
+            revision.time_updated
+        }
+    };
+
+    db.get_storage().register_dependency_in_parent_memoized_fn(
+        NodeKind::Derived(derived_node_id),
+        time_updated,
+    );
+
+    MemoRef::new_with_kind(derived_node_id, MemoRefKind::RawPtr)
 }
 
 fn intern_from_param<Db: Database, T: Clone + DynEq>(
