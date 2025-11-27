@@ -1,7 +1,7 @@
 use pico::Index;
 use std::{
     collections::{HashMap, HashSet},
-    path::PathBuf,
+    path::Path,
 };
 
 use crate::operation_text::hash;
@@ -12,6 +12,7 @@ use common_lang_types::{
 use isograph_config::PersistedDocumentsHashAlgorithm;
 
 #[derive(Debug, Clone, Default)]
+#[expect(clippy::type_complexity)]
 pub struct FileSystemState {
     root_files: HashMap<ArtifactFileName, (Index<FileContent>, ArtifactHash)>,
     nested_files: HashMap<
@@ -21,7 +22,7 @@ pub struct FileSystemState {
 }
 
 impl FileSystemState {
-    pub fn recreate_all(state: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
+    pub fn recreate_all(state: &Self, artifact_directory: &Path) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
         operations.push(FileSystemOperation::DeleteDirectory(
             artifact_directory.to_path_buf(),
@@ -57,7 +58,7 @@ impl FileSystemState {
         operations
     }
 
-    pub fn diff(old: &Self, new: &Self, artifact_directory: &PathBuf) -> Vec<FileSystemOperation> {
+    pub fn diff(old: &Self, new: &Self, artifact_directory: &Path) -> Vec<FileSystemOperation> {
         let mut operations: Vec<FileSystemOperation> = Vec::new();
 
         let mut new_server_object_entity_name_set = HashSet::new();
@@ -72,19 +73,14 @@ impl FileSystemState {
             for (new_selectable, new_files) in new_selectable_map {
                 new_selectable_set.insert((*new_server_object_entity_name, *new_selectable));
                 let new_selectable_path = new_server_object_path.join(new_selectable);
+                let old_files_for_selectable =
+                    old_selectables_for_object.and_then(|s| s.get(new_selectable));
 
-                let should_create_dir = old_selectables_for_object
-                    .and_then(|s| s.get(new_selectable))
-                    .is_none();
-
-                if should_create_dir {
+                if old_files_for_selectable.is_none() {
                     operations.push(FileSystemOperation::CreateDirectory(
                         new_selectable_path.clone(),
                     ));
                 }
-
-                let old_files_for_selectable =
-                    old_selectables_for_object.and_then(|s| s.get(new_selectable));
 
                 for (new_file_name, (new_index, new_hash)) in new_files {
                     let new_file_path = new_selectable_path.join(new_file_name);
@@ -166,6 +162,7 @@ impl FileSystemState {
     }
 }
 
+#[expect(clippy::type_complexity)]
 impl From<&[ArtifactPathAndContent]> for FileSystemState {
     fn from(artifacts: &[ArtifactPathAndContent]) -> Self {
         let mut root_files = HashMap::new();
@@ -232,7 +229,7 @@ mod tests {
         ArtifactPathAndContent {
             artifact_path: ArtifactPath {
                 type_and_field,
-                file_name: ArtifactFileName::from(file_name.intern()),
+                file_name: file_name.intern().into(),
             },
             file_content: FileContent::from(content.to_string()),
         }

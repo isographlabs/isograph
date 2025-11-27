@@ -1,4 +1,7 @@
-use std::{fs, path::PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use common_lang_types::{
     ArtifactPathAndContent, Diagnostic, DiagnosticResult, FileSystemOperation,
@@ -9,14 +12,14 @@ use artifact_content::FileSystemState;
 #[tracing::instrument(skip_all)]
 pub(crate) fn get_file_system_operations(
     paths_and_contents: &[ArtifactPathAndContent],
-    artifact_directory: &PathBuf,
+    artifact_directory: &Path,
     file_system_state: &mut Option<FileSystemState>,
 ) -> Vec<FileSystemOperation> {
     let new_file_system_state = paths_and_contents.into();
     let operations = match file_system_state {
         None => FileSystemState::recreate_all(&new_file_system_state, artifact_directory),
         Some(file_system_state) => FileSystemState::diff(
-            &file_system_state,
+            file_system_state,
             &new_file_system_state,
             artifact_directory,
         ),
@@ -38,7 +41,7 @@ pub(crate) fn apply_file_system_operations(
                 if path.exists() {
                     fs::remove_dir_all(path.clone()).map_err(|e| {
                         unable_to_do_something_at_path_diagnostic(
-                            &path,
+                            path,
                             &e.to_string(),
                             "delete directory",
                         )
@@ -49,7 +52,7 @@ pub(crate) fn apply_file_system_operations(
                 count += 1;
                 fs::create_dir_all(path.clone()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(
-                        &path,
+                        path,
                         &e.to_string(),
                         "create directory",
                     )
@@ -62,7 +65,7 @@ pub(crate) fn apply_file_system_operations(
                     .file_content;
                 fs::write(path.clone(), content.as_bytes()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(
-                        &path,
+                        path,
                         &e.to_string(),
                         "write contents of file",
                     )
@@ -70,7 +73,7 @@ pub(crate) fn apply_file_system_operations(
             }
             FileSystemOperation::DeleteFile(path) => {
                 fs::remove_file(path.clone()).map_err(|e| {
-                    unable_to_do_something_at_path_diagnostic(&path, &e.to_string(), "delete file")
+                    unable_to_do_something_at_path_diagnostic(path, &e.to_string(), "delete file")
                 })?;
             }
         }
