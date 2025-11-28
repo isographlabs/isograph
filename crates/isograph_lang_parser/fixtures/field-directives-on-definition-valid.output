@@ -52,10 +52,12 @@ Ok(
                             end: 35,
                         },
                     },
-                    client_field_directive_set: Component(
-                        ComponentDirectiveSet {
-                            component: ComponentDirectiveParameters,
-                        },
+                    client_scalar_selectable_directive_set: Ok(
+                        Component(
+                            ComponentDirectiveSet {
+                                component: ComponentDirectiveParameters,
+                            },
+                        ),
                     ),
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(

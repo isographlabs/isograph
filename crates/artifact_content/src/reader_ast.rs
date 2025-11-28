@@ -540,8 +540,13 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         let field_parent_type = client_scalar_selectable
             .type_and_field()
             .parent_object_entity_name;
-        let field_directive_set = match client_scalar_selectable.variant {
-            ClientFieldVariant::UserWritten(info) => info.client_scalar_selectable_directive_set,
+        let field_directive_set = match &client_scalar_selectable.variant {
+            ClientFieldVariant::UserWritten(info) => {
+                info.client_scalar_selectable_directive_set.clone().expect(
+                    "Expected directive set to have been validated. \
+                    This is indicative of a bug in Isograph.",
+                )
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }

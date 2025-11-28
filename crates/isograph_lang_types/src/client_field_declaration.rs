@@ -1,5 +1,6 @@
 use common_lang_types::{
-    ConstExportName, RelativePathToSourceFile, UnvalidatedTypeName, WithEmbeddedLocation, WithSpan,
+    ConstExportName, Diagnostic, RelativePathToSourceFile, UnvalidatedTypeName,
+    WithEmbeddedLocation, WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
@@ -26,7 +27,8 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
-    pub client_scalar_selectable_directive_set: ClientScalarSelectableDirectiveSet,
+    pub client_scalar_selectable_directive_set:
+        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 

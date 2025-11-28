@@ -105,8 +105,10 @@ Ok(
                             end: 54,
                         },
                     },
-                    client_field_directive_set: None(
-                        EmptyDirectiveSet,
+                    client_scalar_selectable_directive_set: Ok(
+                        None(
+                            EmptyDirectiveSet,
+                        ),
                     ),
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(

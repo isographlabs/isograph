@@ -1,14 +1,15 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{Diagnostic, DiagnosticVecResult};
+use isograph_lang_types::SelectionType;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ContainsIsoStats, IsographDatabase, NetworkProtocol, create_new_exposed_field,
-    create_type_system_schema_with_server_selectables, parse_iso_literals, process_iso_literals,
-    server_id_selectable, server_object_entities, server_selectables_map,
-    validate_use_of_arguments, validated_entrypoints,
+    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, client_selectable_map,
+    create_new_exposed_field, create_type_system_schema_with_server_selectables,
+    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -43,6 +44,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     );
 
     maybe_extend(&mut errors, validate_all_expose_as_fields(db));
+
+    errors.extend(validate_scalar_selectable_directive_sets(db));
 
     let contains_iso_stats = match validate_all_iso_literals(db) {
         Ok(stats) => stats,
@@ -83,9 +86,7 @@ fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
 fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
-    let contains_iso = parse_iso_literals(db)
-        .to_owned()
-        .map_err(|errors| errors.into_iter().collect::<Vec<_>>())?;
+    let contains_iso = parse_iso_literals(db).to_owned()?;
     let contains_iso_stats = contains_iso.stats();
 
     process_iso_literals(db, contains_iso)?;
@@ -148,5 +149,39 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
     entities
         .iter()
         .flat_map(|entity| Result::err(server_id_selectable(db, entity.name).clone_err()))
+        .collect()
+}
+
+fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Vec<Diagnostic> {
+    let selectables = match client_selectable_map(db) {
+        Ok(s) => s,
+        Err(e) => return vec![e.clone()],
+    };
+
+    selectables
+        .values()
+        .flat_map(|x| {
+            let selection = match x {
+                Ok(x) => x,
+                Err(e) => return Some(e.clone()),
+            };
+
+            match selection {
+                SelectionType::Scalar(s) => {
+                    if let ClientFieldVariant::UserWritten(u) = &s.variant {
+                        if let Err(e) = &u.client_scalar_selectable_directive_set {
+                            return Some(e.clone());
+                        }
+                    }
+                }
+                SelectionType::Object(_) => {
+                    // Intentionally do nothing
+                }
+            }
+
+            None
+        })
         .collect()
 }

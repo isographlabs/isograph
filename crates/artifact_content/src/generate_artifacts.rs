@@ -239,11 +239,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     db,
                     &client_object_selectable.object_selected(),
                     config,
-                    UserWrittenClientTypeInfo {
+                    &UserWrittenClientTypeInfo {
                         const_export_name: client_object_selectable.info.const_export_name,
                         file_path: client_object_selectable.info.file_path,
                         client_scalar_selectable_directive_set:
-                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}),
+                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}).wrap_ok(),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
@@ -277,7 +277,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             db,
                             &client_scalar_selectable.scalar_selected(),
                             config,
-                            *info,
+                            info,
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
                             traversal_state.has_updatable,
@@ -538,43 +538,46 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     This is indicative of a bug in Isograph.",
                 );
 
-        let artifact_path_and_content = match client_selectable {
-            SelectionType::Object(client_object_selectable) => {
-                generate_eager_reader_output_type_artifact(
-                    db,
-                    &client_object_selectable.object_selected(),
-                    config,
-                    UserWrittenClientTypeInfo {
-                        const_export_name: client_object_selectable.info.const_export_name,
-                        file_path: client_object_selectable.info.file_path,
-                        client_scalar_selectable_directive_set:
-                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}),
-                    },
-                    config.options.include_file_extensions_in_import_statements,
-                )
-                .wrap_some()
-            }
-            SelectionType::Scalar(client_scalar_selectable) => match client_scalar_selectable
-                .variant
-            {
-                ClientFieldVariant::Link => {
-                    generate_link_output_type_artifact(db, client_scalar_selectable).wrap_some()
-                }
-                ClientFieldVariant::UserWritten(info) => {
+        let artifact_path_and_content =
+            match client_selectable {
+                SelectionType::Object(client_object_selectable) => {
                     generate_eager_reader_output_type_artifact(
                         db,
-                        &client_scalar_selectable.scalar_selected(),
+                        &client_object_selectable.object_selected(),
                         config,
-                        info,
+                        &UserWrittenClientTypeInfo {
+                            const_export_name: client_object_selectable.info.const_export_name,
+                            file_path: client_object_selectable.info.file_path,
+                            client_scalar_selectable_directive_set:
+                                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
+                                    .wrap_ok(),
+                        },
                         config.options.include_file_extensions_in_import_statements,
                     )
                     .wrap_some()
                 }
-                ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    generate_refetch_output_type_artifact(db, client_scalar_selectable).wrap_some()
-                }
-            },
-        };
+                SelectionType::Scalar(client_scalar_selectable) => match &client_scalar_selectable
+                    .variant
+                {
+                    ClientFieldVariant::Link => {
+                        generate_link_output_type_artifact(db, client_scalar_selectable).wrap_some()
+                    }
+                    ClientFieldVariant::UserWritten(info) => {
+                        generate_eager_reader_output_type_artifact(
+                            db,
+                            &client_scalar_selectable.scalar_selected(),
+                            config,
+                            info,
+                            config.options.include_file_extensions_in_import_statements,
+                        )
+                        .wrap_some()
+                    }
+                    ClientFieldVariant::ImperativelyLoadedField(_) => {
+                        generate_refetch_output_type_artifact(db, client_scalar_selectable)
+                            .wrap_some()
+                    }
+                },
+            };
 
         if let Some(path_and_content) = artifact_path_and_content {
             path_and_contents.push(path_and_content);
@@ -731,7 +734,13 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
                 &client_scalar_selectable.parent_object_entity_name,
             ))
         }
-        ClientFieldVariant::UserWritten(info) => match info.client_scalar_selectable_directive_set {
+        ClientFieldVariant::UserWritten(info) => match info
+            .client_scalar_selectable_directive_set
+            .clone()
+            .expect(
+                "Expected client scalar selectable directive set to have been validated. \
+                This is indicative of a bug in Isograph.",
+            ) {
             ClientScalarSelectableDirectiveSet::None(_) => {
                 ClientScalarSelectableOutputType("ReturnType<typeof resolver>".to_string())
             }

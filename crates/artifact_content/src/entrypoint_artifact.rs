@@ -294,8 +294,13 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         entrypoint.name.item,
         concrete_object_entity.name,
         &directive_set,
-        match entrypoint.variant {
-            ClientFieldVariant::UserWritten(info) => info.client_scalar_selectable_directive_set,
+        match &entrypoint.variant {
+            ClientFieldVariant::UserWritten(info) => {
+                info.client_scalar_selectable_directive_set.clone().expect(
+                    "Expected directive set to have been validated by now. \
+                    This is indicative of a bug in Isograph.",
+                )
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }

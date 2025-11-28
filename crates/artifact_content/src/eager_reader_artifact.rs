@@ -36,13 +36,13 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     db: &IsographDatabase<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
-    info: UserWrittenClientTypeInfo,
+    info: &UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
     has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
-    let user_written_component_variant = info.client_scalar_selectable_directive_set;
+    let user_written_component_variant = info.client_scalar_selectable_directive_set.clone();
 
     let parent_object_entity =
         &server_object_entity_named(db, client_selectable.parent_object_entity_name())
@@ -84,7 +84,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     );
 
     let function_import_statement =
-        generate_function_import_statement(config, info, file_extensions);
+        generate_function_import_statement(config, &info, file_extensions);
 
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
@@ -96,8 +96,10 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     );
 
     let reader_content = if let ClientScalarSelectableDirectiveSet::None(_) =
-        user_written_component_variant
-    {
+        user_written_component_variant.expect(
+            "Expected component variant to be valid. \
+            This is indicative of a bug in Isograph.",
+        ) {
         let eager_reader_name = client_selectable.name();
         let reader_output_type = format!(
             "{}__{}__output_type",
@@ -416,7 +418,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     db: &IsographDatabase<TNetworkProtocol>,
     client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
-    info: UserWrittenClientTypeInfo,
+    info: &UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
@@ -434,7 +436,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             .lookup(db);
 
     let function_import_statement =
-        generate_function_import_statement(config, info, file_extensions);
+        generate_function_import_statement(config, &info, file_extensions);
 
     let client_scalar_selectable_output_type = match client_selectable {
         SelectionType::Object(_) => {
@@ -455,8 +457,10 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     );
 
     let final_output_type_text = if let ClientScalarSelectableDirectiveSet::None(_) =
-        info.client_scalar_selectable_directive_set
-    {
+        info.client_scalar_selectable_directive_set.clone().expect(
+            "Expected directive set to have been validated. \
+            This is indicative of a bug in Isograph.",
+        ) {
         output_type_text
     } else {
         format!(
@@ -523,7 +527,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
 /// Example: import { PetUpdater as resolver } from '../../../PetUpdater';
 fn generate_function_import_statement(
     config: &CompilerConfig,
-    target_field_info: UserWrittenClientTypeInfo,
+    target_field_info: &UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ClientScalarSelectableFunctionImportStatement {
     // artifact directory includes __isograph, so artifact_directory.join("Type/Field")

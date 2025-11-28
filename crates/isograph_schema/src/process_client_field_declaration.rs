@@ -365,12 +365,13 @@ pub struct ImperativelyLoadedFieldVariant {
     pub top_level_schema_field_arguments: Vec<ValidatedVariableDefinition>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
-    pub client_scalar_selectable_directive_set: ClientScalarSelectableDirectiveSet,
+    pub client_scalar_selectable_directive_set:
+        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -392,7 +393,8 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
         client_scalar_selectable_directive_set: client_field_declaration
-            .client_scalar_selectable_directive_set,
+            .client_scalar_selectable_directive_set
+            .clone(),
     })
 }
 

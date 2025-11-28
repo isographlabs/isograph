@@ -192,7 +192,7 @@ fn parse_client_field_declaration_inner(
 
         let directives = parse_directives(tokens)?;
 
-        let client_field_directive_set = from_isograph_field_directives(&directives)?;
+        let client_field_directive_set = from_isograph_field_directives(&directives);
 
         let description = parse_optional_description(tokens);
 
