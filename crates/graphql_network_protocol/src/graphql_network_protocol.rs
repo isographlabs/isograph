@@ -148,6 +148,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             description: None,
                         });
                     }
+
+                    if server_object_entity_directives.canonical_id.is_some() {
+                        panic!(
+                            "Canonical ID directive is not supported yet. It's under development."
+                        );
+                    }
                 }
                 None => {
                     return Diagnostic::new(
