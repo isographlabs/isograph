@@ -74,7 +74,8 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .map_err(|_| LSPRuntimeError::ExpectedError)?
                     .as_ref()
-                    .ok_or(LSPRuntimeError::ExpectedError)?;
+                    .ok_or(LSPRuntimeError::ExpectedError)?
+                    .lookup(db);
 
                 format_hover_for_entity(server_object_entity).wrap_some()
             }
@@ -83,6 +84,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
+                    let parent_object = parent_object.lookup(db);
                     hover_text_for_selectable(
                         selectable.variant_name(),
                         selectable.name().item,
@@ -100,6 +102,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
                 {
+                    let parent_object = parent_object.lookup(db);
                     hover_text_for_selectable(
                         selectable.variant_name(),
                         selectable.name().item,

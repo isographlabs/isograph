@@ -1,9 +1,9 @@
 use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue};
+use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, SelectionType};
 use isograph_schema::{
     Format, IsographDatabase, MergedSelectionMap, MergedServerSelection, RootOperationName,
-    ServerScalarOrObjectEntity, ValidatedVariableDefinition, server_entity_named,
+    ValidatedVariableDefinition, server_entity_named,
 };
 
 use crate::GraphQLNetworkProtocol;
@@ -61,7 +61,10 @@ fn write_variables_to_string<'a>(
                         "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
                     );
-                schema_input_type.name().into()
+                match schema_input_type {
+                    SelectionType::Scalar(s) => s.lookup(db).name.into(),
+                    SelectionType::Object(o) => o.lookup(db).name.into(),
+                }
             });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
         // We should find a way to make WithLocation not impl display, without making error's hard

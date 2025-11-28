@@ -54,7 +54,8 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
@@ -212,7 +213,8 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
     let concrete_type =
         &server_object_entity_named(db, *server_object_selectable.target_object_entity.inner())
@@ -226,6 +228,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
+            .lookup(db)
             .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -296,7 +299,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     .expect(
         "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     let mut param_type_imports = BTreeSet::new();
     let mut loadable_fields = BTreeSet::new();
@@ -425,7 +429,8 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
@@ -485,7 +490,8 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
     let client_field_output_type = generate_output_type(db, client_field);
 

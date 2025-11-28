@@ -185,7 +185,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
         if let Some(concrete_type) = server_object_entity.concrete_type {
             return format!("Link<\"{concrete_type}\">");
@@ -235,13 +236,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
     pub subtypes: Vec<UnvalidatedTypeName>,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum GraphQLSchemaOriginalDefinitionType {
     InputObject,
     Object,

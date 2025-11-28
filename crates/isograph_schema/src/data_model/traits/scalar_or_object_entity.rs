@@ -8,7 +8,8 @@ use isograph_lang_types::{
     SelectionSetParentType, SelectionSetPath, SelectionType, SelectionTypePostfix,
     ServerObjectEntityNameWrapper,
 };
-use prelude::{ErrClone, Postfix};
+use pico::MemoRef;
+use prelude::Postfix;
 
 use crate::{
     ClientOrServerObjectSelectable, IsographDatabase, NetworkProtocol, OwnedObjectSelectable,
@@ -62,7 +63,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    ServerObjectEntity<TNetworkProtocol>,
+    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
     ScalarSelectable<TNetworkProtocol>,
 )> {
     let ScalarSelectionPath { parent, inner } = scalar_path;
@@ -88,7 +89,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     }
     .map_err(|location| {
         selectable_is_wrong_type_diagnostic(
-            parent.name,
+            parent.lookup(db).name,
             scalar_selectable_name.into(),
             "a scalar",
             "an object",
@@ -104,7 +105,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    ServerObjectEntity<TNetworkProtocol>,
+    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
     OwnedObjectSelectable<TNetworkProtocol>,
 )> {
     let ObjectSelectionPath { parent, inner } = object_path;
@@ -125,7 +126,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 
     let selectable = selectable.as_object().ok_or_else(|| {
         selectable_is_wrong_type_diagnostic(
-            parent.name,
+            parent.lookup(db).name,
             object_selectable_name.into(),
             "an object",
             "a scalar",
@@ -138,10 +139,10 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 
 // For a selection set, you are not hovering on an individual selection, so it doesn't make sense to
 // get a selectable! Just the enclosing object entity.
-pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProtocol>(
-    db: &'db IsographDatabase<TNetworkProtocol>,
+pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
-) -> DiagnosticResult<&'db ServerObjectEntity<TNetworkProtocol>> {
+) -> DiagnosticResult<MemoRef<ServerObjectEntity<TNetworkProtocol>>> {
     let parent_object_entity_name = match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
@@ -160,8 +161,7 @@ pub fn get_parent_for_selection_set_path<'a, 'db, TNetworkProtocol: NetworkProto
     };
 
     server_object_entity_named(db, parent_object_entity_name)
-        .clone_err()?
-        .as_ref()
+        .clone()?
         .ok_or_else(|| {
             entity_not_defined_diagnostic(
                 parent_object_entity_name,
@@ -176,7 +176,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     selection_set_path: &SelectionSetPath<'a>,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    ServerObjectEntity<TNetworkProtocol>,
+    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
     Selectable<TNetworkProtocol>,
 )> {
     match &selection_set_path.parent {
@@ -210,11 +210,11 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     parent_server_object_entity_name: ServerObjectEntityNameWrapper,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    ServerObjectEntity<TNetworkProtocol>,
+    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
     Selectable<TNetworkProtocol>,
 )> {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
-        .to_owned()?
+        .clone()?
         .ok_or(entity_not_defined_diagnostic(
             parent_server_object_entity_name.0,
             // TODO we can get a location

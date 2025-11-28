@@ -225,7 +225,12 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let options = &db.get_isograph_config().options;
 
     // And must have the right inner type
-    if target_scalar_entity.name != *ID_ENTITY_NAME {
+    if target_scalar_entity
+        .lookup(db)
+        .name
+        .note_todo("Compare with *target_scalar_entity_name here")
+        != *ID_ENTITY_NAME
+    {
         options.on_invalid_id_type.on_failure(|| {
             let strong_field_name = *ID_FIELD_NAME;
             Diagnostic::new(

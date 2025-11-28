@@ -82,8 +82,8 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                         .iter()
                         .flat_map(|entity| {
                             let name = match entity {
-                                SelectionType::Scalar(s) => s.name.into(),
-                                SelectionType::Object(o) => o.name.into(),
+                                SelectionType::Scalar(s) => s.lookup(db).name.into(),
+                                SelectionType::Object(o) => o.lookup(db).name.into(),
                             };
                             let location =
                                 entity_definition_location(db, name).to_owned().ok()??;

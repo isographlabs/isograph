@@ -55,7 +55,8 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                 if let Ok(parent_object_entity) =
                     get_parent_for_selection_set_path(db, &selection_set_path)
                 {
-                    if let Ok(map) = selectables_for_entity(db, parent_object_entity.name).as_ref()
+                    if let Ok(map) =
+                        selectables_for_entity(db, parent_object_entity.lookup(db).name).as_ref()
                     {
                         map.iter()
                             .flat_map(|result| result.as_ref().ok())
