@@ -1,10 +1,10 @@
 use common_lang_types::{Diagnostic, SelectableName, StringLiteralValue, TextSource};
-use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directive};
+use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directives};
+use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
 use intern::string_key::Intern;
+use isograph_schema::ServerObjectEntityDirectives;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem, ID_FIELD_NAME};
 use std::error::Error;
-
-use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
 
 fn unwrap_directive(
     extension_or_definition: GraphQLTypeSystemExtensionOrDefinition,
@@ -30,11 +30,11 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
         .collect::<Result<Vec<_>, _>>()?;
     let directives: Vec<GraphQLDirective<GraphQLConstantValue>> =
         directives.into_iter().flatten().collect();
-    let expose_field_directives: Result<Vec<ExposeFieldDirective>, _> = directives
-        .into_iter()
-        .map(|directive| from_graphql_directive::<ExposeFieldDirective>(&directive))
-        .collect();
-    Ok(expose_field_directives?)
+
+    let server_object_entity_directives: ServerObjectEntityDirectives =
+        from_graphql_directives(&directives)?;
+
+    Ok(server_object_entity_directives.expose_field)
 }
 
 #[test]

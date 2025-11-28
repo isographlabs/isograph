@@ -1,4 +1,4 @@
-use std::fmt;
+use std::{collections::HashSet, fmt};
 
 use super::{NameValuePair, write::write_arguments};
 use crate::GraphQLConstantValue;
@@ -6,7 +6,7 @@ use common_lang_types::{Diagnostic, DirectiveArgumentName, DirectiveName, WithEm
 use intern::Lookup;
 use serde::{
     Deserialize, Deserializer,
-    de::{self, IntoDeserializer, MapAccess, value::SeqDeserializer},
+    de::{self, IntoDeserializer, MapAccess, SeqAccess, value::SeqDeserializer},
 };
 
 // TODO maybe this should be NameAndArguments and a field should be the same thing...?
@@ -24,10 +24,146 @@ impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
     }
 }
 
-pub fn from_graphql_directive<'a, T: Deserialize<'a>>(
-    directive: &'a GraphQLDirective<GraphQLConstantValue>,
+pub fn from_graphql_directives<'a, T: Deserialize<'a>>(
+    directives: &'a [GraphQLDirective<GraphQLConstantValue>],
 ) -> Result<T, Diagnostic> {
-    T::deserialize(GraphQLDirectiveDeserializer { directive })
+    T::deserialize(GraphQLDirectivesDeserializer::new(directives))
+}
+
+#[derive(Debug)]
+struct GraphQLDirectivesDeserializer<'a> {
+    directives: &'a [GraphQLDirective<GraphQLConstantValue>],
+    directive_names: Vec<DirectiveName>,
+    current_index: usize,
+}
+
+impl<'a> GraphQLDirectivesDeserializer<'a> {
+    fn new(directives: &'a [GraphQLDirective<GraphQLConstantValue>]) -> Self {
+        let mut seen = HashSet::new();
+
+        let directive_names = directives
+            .iter()
+            .map(|d| d.name.item)
+            .filter(|name| seen.insert(*name))
+            .collect();
+
+        Self {
+            directives,
+            directive_names,
+            current_index: 0,
+        }
+    }
+}
+
+impl<'de> Deserializer<'de> for GraphQLDirectivesDeserializer<'de> {
+    type Error = Diagnostic;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_map(self)
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf option unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+impl<'de> MapAccess<'de> for GraphQLDirectivesDeserializer<'de> {
+    type Error = Diagnostic;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        if let Some(name) = self.directive_names.get(self.current_index) {
+            let name_str = name.lookup();
+            seed.deserialize(name_str.into_deserializer()).map(Some)
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let name = self.directive_names[self.current_index];
+        self.current_index += 1;
+
+        let matching_directives = self
+            .directives
+            .iter()
+            .filter(|d| d.name.item == name)
+            .collect();
+
+        seed.deserialize(DirectiveValueDeserializer {
+            directives: matching_directives,
+            current_index: 0,
+        })
+    }
+}
+
+struct DirectiveValueDeserializer<'a> {
+    directives: Vec<&'a GraphQLDirective<GraphQLConstantValue>>,
+    current_index: usize,
+}
+
+impl<'de> Deserializer<'de> for DirectiveValueDeserializer<'de> {
+    type Error = Diagnostic;
+
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        visitor.visit_seq(self)
+    }
+
+    fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::Visitor<'de>,
+    {
+        match self.directives.len() {
+            0 => visitor.visit_none(),
+            1 => visitor.visit_some(GraphQLDirectiveDeserializer {
+                directive: self.directives[0],
+            }),
+            _ => Err(Diagnostic::new(
+                format!(
+                    "Expected at most one @{} directive, but found {}",
+                    self.directives[0].name.item.lookup(),
+                    self.directives.len()
+                ),
+                None,
+            )),
+        }
+    }
+
+    serde::forward_to_deserialize_any! {
+        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
+        bytes byte_buf unit unit_struct newtype_struct seq tuple
+        tuple_struct map struct enum identifier ignored_any
+    }
+}
+
+impl<'de> SeqAccess<'de> for DirectiveValueDeserializer<'de> {
+    type Error = Diagnostic;
+
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if let Some(&directive) = self.directives.get(self.current_index) {
+            self.current_index += 1;
+            seed.deserialize(GraphQLDirectiveDeserializer { directive })
+                .map(Some)
+        } else {
+            Ok(None)
+        }
+    }
 }
 
 #[derive(Debug)]
