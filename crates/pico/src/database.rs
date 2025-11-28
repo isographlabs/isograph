@@ -491,40 +491,43 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
         Entry::Occupied(mut occupied) => {
             let revision = occupied.get_mut();
 
-            // Note: we cannot call internal.get_derived_node(derived_node_id) here, because
-            // - have a mutable reference to the item in the dashmap via
-            //   derived_node_id_to_revision.entry(derived_node_id), and
-            // - get_derived_node calls derived_node_id_to_revision.get(derived_node_id)
-            //
-            // This will deadlock.
-            let existing_node = db
-                .get_storage()
-                .internal
-                .get_derived_node_from_derived_node_revision(revision);
-
-            let existing_ptr = existing_node
-                .value
-                .as_ref()
-                .as_any()
-                .downcast_ref::<RawPtr<T>>()
-                .expect("Unexpected memoized value type. This is indicative of a bug in Pico.");
-
-            let pointer_changed = *existing_ptr != new_ptr;
-            if pointer_changed {
-                // If we get here, then we have called db.intern_ref(&value) with a value pointing to a new
-                // memory location, but with an identical value.
+            if revision.time_verified != current_epoch {
+                // Note: we cannot call internal.get_derived_node(derived_node_id) here, because
+                // - have a mutable reference to the item in the dashmap via
+                //   derived_node_id_to_revision.entry(derived_node_id), and
+                // - get_derived_node calls derived_node_id_to_revision.get(derived_node_id)
                 //
-                // Here, we mutate the revision to point to a DerivedNode which points to the new memory address.
-                //
-                // We do *not* update the time_updated, though.
-                let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
-                    inner_fn: existing_node.inner_fn,
-                    value: Box::new(new_ptr),
-                });
-                revision.node_index = node_index;
+                // This will deadlock.
+                let existing_node = db
+                    .get_storage()
+                    .internal
+                    .get_derived_node_from_derived_node_revision(revision);
+
+                let existing_ptr = existing_node
+                    .value
+                    .as_ref()
+                    .as_any()
+                    .downcast_ref::<RawPtr<T>>()
+                    .expect("Unexpected memoized value type. This is indicative of a bug in Pico.");
+
+                let pointer_changed = *existing_ptr != new_ptr;
+                if pointer_changed {
+                    // If we get here, then we have called db.intern_ref(&value) with a value pointing to a new
+                    // memory location, but with an identical value.
+                    //
+                    // Here, we mutate the revision to point to a DerivedNode which points to the new memory address.
+                    //
+                    // We do *not* update the time_updated, though.
+                    let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                        inner_fn: existing_node.inner_fn,
+                        value: Box::new(new_ptr),
+                    });
+                    revision.node_index = node_index;
+                }
+
+                revision.time_verified = current_epoch;
             }
 
-            revision.time_verified = current_epoch;
             revision.time_updated
         }
     };
