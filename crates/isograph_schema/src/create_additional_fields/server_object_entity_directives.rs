@@ -3,7 +3,7 @@ use crate::create_additional_fields::expose_field_directive::ExposeFieldDirectiv
 use serde::Deserialize;
 
 #[derive(Deserialize, Debug, Clone, Default)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
+#[serde(rename_all = "camelCase")]
 pub struct ServerObjectEntityDirectives {
     #[serde(default)]
     pub expose_field: Vec<ExposeFieldDirective>,
