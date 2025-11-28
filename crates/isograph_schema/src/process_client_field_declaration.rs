@@ -14,7 +14,7 @@ use prelude::{ErrClone, Postfix};
 use pico_macros::memo;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
+    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, IsographDatabase,
     NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
@@ -229,11 +229,14 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
-        let id_field =
-            server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
-                // TODO don't call to_owned
-                .to_owned()?
-                .transpose()?;
+        let id_field = server_selectable_named(
+            db,
+            parent_object_entity_name,
+            TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name).into(),
+        )
+        // TODO don't call to_owned
+        .to_owned()?
+        .transpose()?;
 
         let query_id = fetchable_types_map
             .iter()
@@ -245,7 +248,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 SelectionSet {
-                    selections: vec![id_selection()],
+                    selections: vec![id_selection(db, parent_object_entity_name)],
                 }
                 .with_generated_span(),
                 *query_id,
@@ -254,7 +257,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     WrappedSelectionMapSelection::LinkedField {
                         parent_object_entity_name: *query_id,
                         server_object_selectable_name: *NODE_FIELD_NAME,
-                        arguments: id_top_level_arguments(),
+                        arguments: id_top_level_arguments(db, parent_object_entity_name),
                         concrete_type: None,
                     },
                 ],
@@ -342,7 +345,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             parent_object_entity_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: SelectionSet {
-                selections: vec![id_selection()],
+                selections: vec![id_selection(db, parent_object_entity_name)],
             }
             .with_generated_span(),
         },
@@ -398,10 +401,14 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
     })
 }
 
-pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
+pub fn id_top_level_arguments<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: ServerObjectEntityName,
+) -> Vec<ArgumentKeyAndValue> {
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name);
     vec![ArgumentKeyAndValue {
-        key: ID_FIELD_NAME.unchecked_conversion(),
-        value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
+        key: id_field_name.unchecked_conversion(),
+        value: NonConstantValue::Variable(id_field_name.unchecked_conversion()),
     }]
 }
 

@@ -153,7 +153,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                                 initial_variable_context,
                             ),
                         }
-                        .normalization_key(),
+                        .normalization_key(db),
                         ServerObjectSelectableVariant::InlineFragment => {
                             NormalizationKey::InlineFragment(
                                 *server_object_selectable.target_object_entity.inner(),
@@ -981,7 +981,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                         initial_variable_context,
                                     ),
                                 }
-                                .normalization_key(),
+                                .normalization_key(db),
                                 ServerObjectSelectableVariant::InlineFragment => {
                                     NormalizationKey::InlineFragment(
                                         *server_object_selectable.target_object_entity.inner(),

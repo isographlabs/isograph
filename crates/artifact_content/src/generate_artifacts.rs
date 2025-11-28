@@ -17,14 +17,14 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase,
-    LINK_FIELD_NAME, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
-    RefetchStrategy, ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_scalar_selectables,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
-    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
+    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, IsographDatabase, LINK_FIELD_NAME,
+    NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
+    ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    accessible_client_scalar_selectables, client_object_selectable_named,
+    client_scalar_selectable_named, client_selectable_map, client_selectable_named, description,
+    fetchable_types, inline_fragment_reader_selection_set, output_type_annotation,
+    selectable_named, selection_map_wrapped, server_object_entity_named,
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named, validate_entire_schema, validated_entrypoints,
     validated_refetch_strategy_for_client_scalar_selectable_named,
@@ -283,6 +283,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             traversal_state.has_updatable,
                         ));
 
+                        let id_field_name = TNetworkProtocol::get_id_field_name(
+                            db,
+                            &client_scalar_selectable.parent_object_entity_name(),
+                        );
+
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(
                                 db,
@@ -291,16 +296,16 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 true,
                                 config.options.include_file_extensions_in_import_statements,
                                 &[FieldMapItem {
-                                    from: ID_FIELD_NAME.unchecked_conversion(),
-                                    to: ID_FIELD_NAME.unchecked_conversion(),
+                                    from: id_field_name.unchecked_conversion(),
+                                    to: id_field_name.unchecked_conversion(),
                                 }],
                             ));
 
                             // Everything about this is quite sus
                             let id_arg = ArgumentKeyAndValue {
-                                key: ID_FIELD_NAME.unchecked_conversion(),
+                                key: id_field_name.unchecked_conversion(),
                                 value: NonConstantValue::Variable(
-                                    ID_FIELD_NAME.unchecked_conversion(),
+                                    id_field_name.unchecked_conversion(),
                                 ),
                             };
 
@@ -327,7 +332,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let id_var = ValidatedVariableDefinition {
                                 name: WithLocation::new_generated(
-                                    ID_FIELD_NAME.unchecked_conversion(),
+                                    id_field_name.unchecked_conversion(),
                                 ),
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(

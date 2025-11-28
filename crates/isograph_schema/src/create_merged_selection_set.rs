@@ -22,9 +22,9 @@ use prelude::Postfix;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, ObjectSelectableId, PathToRefetchField, ScalarSelectableId,
-    ServerEntityName, ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ID_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments,
+    NetworkProtocol, ObjectSelectableId, PathToRefetchField, ScalarSelectableId, ServerEntityName,
+    ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
     ValidatedObjectSelection, ValidatedScalarSelection, VariableContext,
     client_object_selectable_named, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
@@ -554,6 +554,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                 match &scalar_field_selection.associated_data {
                     DefinitionLocation::Server(_) => {
                         merge_server_scalar_field(
+                            db,
                             scalar_field_selection,
                             parent_map,
                             variable_context,
@@ -815,7 +816,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 &object_selection.arguments,
                 variable_context,
             )
-            .normalization_key();
+            .normalization_key(db);
 
             merge_traversal_state
                 .traversal_path
@@ -1239,12 +1240,13 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             target_server_object_entity.name,
         ));
     }
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &target_server_object_entity_name);
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
         parent_object_entity_name: *query_id,
         server_object_selectable_name: *NODE_FIELD_NAME,
         arguments: vec![ArgumentKeyAndValue {
-            key: ID_FIELD_NAME.unchecked_conversion(),
-            value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
+            key: id_field_name.unchecked_conversion(),
+            value: NonConstantValue::Variable(id_field_name.unchecked_conversion()),
         }],
         concrete_type: None,
     });
@@ -1259,7 +1261,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
-            top_level_schema_field_arguments: id_arguments(),
+            top_level_schema_field_arguments: id_arguments(db, target_server_object_entity_name),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
             // primary_field_info: None,
@@ -1392,7 +1394,8 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     );
 }
 
-fn merge_server_scalar_field(
+fn merge_server_scalar_field<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
@@ -1409,7 +1412,9 @@ fn merge_server_scalar_field(
     let scalar_field_name = scalar_field_selection.name.item;
     let normalization_key = if scalar_field_name == *TYPENAME_FIELD_NAME {
         NormalizationKey::Discriminator
-    } else if scalar_field_name == *ID_FIELD_NAME {
+    } else if scalar_field_name
+        == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)
+    {
         NormalizationKey::Id
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
@@ -1591,9 +1596,13 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
+pub fn id_arguments<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: ServerObjectEntityName,
+) -> Vec<VariableDefinition<ServerEntityName>> {
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name);
     vec![VariableDefinition {
-        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
+        name: WithLocation::new_generated(id_field_name.unchecked_conversion()),
         type_: GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                 (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),
