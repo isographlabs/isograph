@@ -2,15 +2,16 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, UnvalidatedTypeName, WithLocationPostfix,
+    ServerObjectEntityName, ServerScalarSelectableName, StringLiteralValue, UnvalidatedTypeName,
+    WithLocationPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
-    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition,
-    server_object_entity_named,
+    ExposeFieldToInsert, Format, ID_FIELD_NAME, MergedSelectionMap, NetworkProtocol,
+    ParseTypeSystemOutcome, RootOperationName, ServerObjectEntity, ServerObjectEntityDirectives,
+    ValidatedVariableDefinition, server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
@@ -71,6 +72,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
         let (mut result, mut directives, mut refetch_fields) =
             process_graphql_type_system_document(
+                db,
                 type_system_document
                     .to_owned(db)
                     .note_todo("Do not clone. Use a MemoRef."),
@@ -80,6 +82,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for type_system_extension_document in type_system_extension_documents.values() {
             let (outcome, objects_and_directives, new_refetch_fields) =
                 process_graphql_type_extension_document(
+                    db,
                     type_system_extension_document
                         .to_owned(db)
                         .note_todo("Do not clone. Use a MemoRef."),
@@ -234,12 +237,38 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             {indent}}}"
         ))
     }
+
+    fn get_id_field_name(
+        db: &IsographDatabase<GraphQLNetworkProtocol>,
+        entity_name: &ServerObjectEntityName,
+    ) -> ServerScalarSelectableName {
+        let entity = server_object_entity_named(db, *entity_name)
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .lookup(db);
+        match entity
+            .network_protocol_associated_data
+            .canonical_id_field_name
+        {
+            Some(canonical_id) => canonical_id.unchecked_conversion(),
+            None => *ID_FIELD_NAME,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
     pub subtypes: Vec<UnvalidatedTypeName>,
+    pub canonical_id_field_name: Option<StringLiteralValue>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

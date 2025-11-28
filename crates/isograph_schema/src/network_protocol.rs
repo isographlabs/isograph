@@ -2,7 +2,8 @@ use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     Diagnostic, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ServerObjectEntityName, ServerScalarSelectableName, ServerSelectableName, UnvalidatedTypeName,
+    WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::{Description, SelectionType};
@@ -56,6 +57,11 @@ pub trait NetworkProtocol:
         operation_name: ServerObjectEntityName,
         indentation_level: u8,
     ) -> QueryExtraInfo;
+
+    fn get_id_field_name(
+        db: &IsographDatabase<Self>,
+        entity_name: &ServerObjectEntityName,
+    ) -> ServerScalarSelectableName;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

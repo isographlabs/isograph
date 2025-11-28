@@ -14,9 +14,10 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionTypePostfix};
 use isograph_schema::{
-    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, ID_FIELD_NAME,
-    IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
-    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
+    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, IsographDatabase,
+    IsographObjectTypeDefinition, NetworkProtocol, ParseTypeSystemOutcome,
+    ProcessObjectTypeDefinitionOutcome, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
+    ServerScalarEntity, TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -36,6 +37,7 @@ lazy_static! {
 
 #[expect(clippy::type_complexity)]
 pub fn process_graphql_type_system_document(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> DiagnosticResult<(
@@ -79,11 +81,13 @@ pub fn process_graphql_type_system_document(
                 let object_type_definition = object_type_definition.into();
 
                 let (object_definition_outcome, new_directives) = process_object_type_definition(
+                    db,
                     object_type_definition,
                     concrete_type,
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                         subtypes: vec![],
+                        canonical_id_field_name: None,
                     },
                     GraphQLObjectDefinitionType::Object,
                     &mut refetch_fields,
@@ -109,12 +113,14 @@ pub fn process_graphql_type_system_document(
                 let interface_name = interface_type_definition.name.item.unchecked_conversion();
                 let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
+                        db,
                         interface_type_definition.into(),
                         None,
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::Interface,
                             subtypes: vec![],
+                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
@@ -138,6 +144,7 @@ pub fn process_graphql_type_system_document(
                     .unchecked_conversion();
                 let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
+                        db,
                         input_object_type_definition.into(),
                         // Shouldn't really matter what we pass here
                         concrete_type,
@@ -145,6 +152,7 @@ pub fn process_graphql_type_system_document(
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                             subtypes: vec![],
+                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
@@ -177,6 +185,7 @@ pub fn process_graphql_type_system_document(
                 // TODO do something reasonable here, once we add support for type refinements.
                 let (process_object_type_definition_outcome, new_directives) =
                     process_object_type_definition(
+                        db,
                         IsographObjectTypeDefinition {
                             description: union_definition
                                 .description
@@ -190,6 +199,7 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: vec![],
+                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
@@ -292,6 +302,7 @@ pub fn process_graphql_type_system_document(
 
 #[expect(clippy::type_complexity)]
 pub fn process_graphql_type_extension_document(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
 ) -> DiagnosticResult<(
@@ -315,6 +326,7 @@ pub fn process_graphql_type_extension_document(
     }
 
     let (outcome, mut directives, refetch_fields) = process_graphql_type_system_document(
+        db,
         GraphQLTypeSystemDocument(definitions),
         graphql_root_types,
     )?;
@@ -332,6 +344,7 @@ pub fn process_graphql_type_extension_document(
 }
 
 fn process_object_type_definition(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     object_type_definition: IsographObjectTypeDefinition,
     concrete_type: Option<ServerObjectEntityName>,
     associated_data: GraphQLSchemaObjectAssociatedData,
@@ -398,12 +411,15 @@ fn process_object_type_definition(
     }
 
     if should_add_refetch_field {
+        let id_field_name =
+            GraphQLNetworkProtocol::get_id_field_name(db, &object_type_definition.name.item);
+
         refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
                 expose_as: (*REFETCH_FIELD_NAME).wrap_some(),
                 field_map: vec![FieldMapItem {
-                    from: ID_FIELD_NAME.unchecked_conversion(),
-                    to: ID_FIELD_NAME.unchecked_conversion(),
+                    from: id_field_name.unchecked_conversion(),
+                    to: id_field_name.unchecked_conversion(),
                 }],
                 field: format!("node.as{}", object_type_definition.name.item)
                     .intern()
