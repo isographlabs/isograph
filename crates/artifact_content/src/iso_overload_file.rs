@@ -22,18 +22,20 @@ fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
     let formatted_field = format!(
         "entrypoint {}.{}",
         validated_client_field
-            .type_and_field
+            .type_and_field()
             .parent_object_entity_name,
-        validated_client_field.type_and_field.selectable_name
+        validated_client_field.type_and_field().selectable_name
     );
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-        validated_client_field.type_and_field.underscore_separated(),
         validated_client_field
-            .type_and_field
+            .type_and_field()
+            .underscore_separated(),
+        validated_client_field
+            .type_and_field()
             .parent_object_entity_name,
-        validated_client_field.type_and_field.selectable_name,
+        validated_client_field.type_and_field().selectable_name,
         file_extensions.ts()
     );
 
@@ -43,7 +45,9 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
         formatted_field,
-        validated_client_field.type_and_field.underscore_separated(),
+        validated_client_field
+            .type_and_field()
+            .underscore_separated(),
     ));
     (import, s)
 }
@@ -237,7 +241,7 @@ export function iso(_isographLiteralText: string):
                             "    case '{}':
       return entrypoint_{};\n",
                             entrypoint_declaration_info.iso_literal_text,
-                            field.type_and_field.underscore_separated()
+                            field.type_and_field().underscore_separated()
                         )
                     });
 
@@ -383,15 +387,15 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
         .collect::<Vec<_>>();
     entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
         match client_field_1
-            .type_and_field
+            .type_and_field()
             .parent_object_entity_name
-            .cmp(&client_field_2.type_and_field.parent_object_entity_name)
+            .cmp(&client_field_2.type_and_field().parent_object_entity_name)
         {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
             Ordering::Equal => sort_field_name(
-                client_field_1.type_and_field.selectable_name,
-                client_field_2.type_and_field.selectable_name,
+                client_field_1.type_and_field().selectable_name,
+                client_field_2.type_and_field().selectable_name,
             ),
         }
     });

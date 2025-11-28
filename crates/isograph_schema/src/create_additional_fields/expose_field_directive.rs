@@ -1,7 +1,7 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, ServerObjectSelectableName, ServerSelectableName, StringLiteralValue,
-    WithLocation, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, SelectableName, ServerObjectEntityName,
+    ServerObjectSelectableName, ServerSelectableName, StringLiteralValue, WithLocation,
+    WithSpanPostfix,
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
@@ -234,11 +234,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             field_map: field_map.clone(),
         }),
         variable_definitions: vec![],
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name
-                .unchecked_conversion(), // e.g. Pet
-            selectable_name: client_field_scalar_selection_name, // set_pet_best_friend
-        },
         parent_object_entity_name: maybe_abstract_parent_object_entity_name,
         network_protocol: std::marker::PhantomData,
     };

@@ -5,8 +5,7 @@ use crate::{
     server_object_entities,
 };
 use common_lang_types::{
-    ClientScalarSelectableName, DiagnosticResult, ParentObjectEntityNameAndSelectableName,
-    ServerObjectEntityName, WithLocationPostfix,
+    ClientScalarSelectableName, DiagnosticResult, ServerObjectEntityName, WithLocationPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
@@ -34,10 +33,6 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
-                    selectable_name: field_name.into(),
-                    parent_object_entity_name: object.name,
-                },
                 network_protocol: std::marker::PhantomData,
             }
         })

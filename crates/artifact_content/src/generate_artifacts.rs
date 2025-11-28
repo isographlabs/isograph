@@ -16,10 +16,10 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, ClientSelectableId, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, LINK_FIELD_NAME,
-    NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
-    ScalarSelectableId, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant,
+    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectableId,
+    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase,
+    LINK_FIELD_NAME, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
+    RefetchStrategy, ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant,
     UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, accessible_client_fields, client_object_selectable_named,
     client_scalar_selectable_named, client_selectable_map, client_selectable_named, description,
@@ -939,12 +939,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 name_or_alias,
                 match object_selectable {
                     DefinitionLocation::Client(client_pointer) => {
-                        loadable_fields.insert(client_pointer.type_and_field);
+                        loadable_fields.insert(client_pointer.type_and_field());
 
                         print_javascript_type_declaration(&type_annotation.map(&mut |target| {
                             format!(
                                 "LoadableField<{}__param, {target}>",
-                                client_pointer.type_and_field.underscore_separated(),
+                                client_pointer.type_and_field().underscore_separated(),
                             )
                         }))
                     }
@@ -993,18 +993,18 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
         ClientFieldVariant::Link
         | ClientFieldVariant::UserWritten(_)
         | ClientFieldVariant::ImperativelyLoadedField(_) => {
-            nested_client_field_imports.insert(client_scalar_selectable.type_and_field);
+            nested_client_field_imports.insert(client_scalar_selectable.type_and_field());
             let inner_output_type = format!(
                 "{}__output_type",
                 client_scalar_selectable
-                    .type_and_field
+                    .type_and_field()
                     .underscore_separated()
             );
             let output_type = match scalar_field_selection.scalar_selection_directive_set {
                 ScalarSelectionDirectiveSet::Updatable(_)
                 | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
                 ScalarSelectionDirectiveSet::Loadable(_) => {
-                    loadable_fields.insert(client_scalar_selectable.type_and_field);
+                    loadable_fields.insert(client_scalar_selectable.type_and_field());
                     let provided_arguments = get_provided_arguments(
                         client_scalar_selectable
                             .variable_definitions
@@ -1020,7 +1020,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
                         format!(
                             ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
                             client_scalar_selectable
-                                .type_and_field
+                                .type_and_field()
                                 .underscore_separated(),
                             get_loadable_field_type_from_arguments(db, provided_arguments)
                         )
@@ -1033,7 +1033,7 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
                         {provided_args_type}\n\
                         {}>",
                         client_scalar_selectable
-                            .type_and_field
+                            .type_and_field()
                             .underscore_separated(),
                         "  ".repeat(indentation_level as usize),
                     )

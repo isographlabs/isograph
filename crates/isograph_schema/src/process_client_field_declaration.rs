@@ -1,8 +1,8 @@
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    Diagnostic, DiagnosticResult, Location, ParentObjectEntityNameAndSelectableName,
-    RelativePathToSourceFile, SelectableName, ServerObjectEntityName, TextSource,
-    UnvalidatedTypeName, VariableName, WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, Location, RelativePathToSourceFile, SelectableName,
+    ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithSpan,
+    WithSpanPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -196,10 +196,6 @@ pub fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
                 )
             })
             .collect::<Result<_, _>>()?,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: client_field_declaration.parent_type.item.0,
-            selectable_name: client_scalar_selectable_name.0.into(),
-        },
 
         parent_object_entity_name: client_field_declaration.parent_type.item.0,
         network_protocol: std::marker::PhantomData,
@@ -327,10 +323,6 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
                 )
             })
             .collect::<Result<_, _>>()?,
-        type_and_field: ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name,
-            selectable_name: client_pointer_name.into(),
-        },
 
         parent_object_entity_name,
         target_object_entity_name: TypeAnnotation::from_graphql_type_annotation(

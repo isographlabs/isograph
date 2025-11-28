@@ -37,7 +37,10 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
-        self.type_and_field
+        ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: self.parent_object_entity_name,
+            selectable_name: self.name.item.into(),
+        }
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
@@ -65,7 +68,10 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
-        self.type_and_field
+        ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: self.parent_object_entity_name,
+            selectable_name: self.name.item.into(),
+        }
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
@@ -93,7 +99,10 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
-        self.type_and_field
+        ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: self.parent_object_entity_name,
+            selectable_name: self.name.item.into(),
+        }
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
@@ -121,7 +130,10 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
-        self.type_and_field
+        ParentObjectEntityNameAndSelectableName {
+            parent_object_entity_name: self.parent_object_entity_name,
+            selectable_name: self.name.item.into(),
+        }
     }
 
     fn parent_object_entity_name(&self) -> ServerObjectEntityName {
