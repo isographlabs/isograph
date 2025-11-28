@@ -150,10 +150,21 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         });
                     }
 
+                    // comment out this block for development
                     if server_object_entity_directives.canonical_id.is_some() {
                         panic!(
                             "Canonical ID directive is not supported yet. It's under development."
                         );
+                    }
+
+                    if let Some(canonical_id_field_name) =
+                        server_object_entity_directives.canonical_id
+                    {
+                        outcome
+                            .server_object_entity
+                            .item
+                            .network_protocol_associated_data
+                            .canonical_id_field_name = Some(canonical_id_field_name.field_name);
                     }
                 }
                 None => {
@@ -252,6 +263,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 This is indicative of a bug in Isograph.",
             )
             .lookup(db);
+
         match entity
             .network_protocol_associated_data
             .canonical_id_field_name
