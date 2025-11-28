@@ -54,7 +54,63 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for ClientScalarSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> ClientSelectableName {
+        self.name.item.into()
+    }
+
+    fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
+        self.type_and_field
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+        &self.variable_definitions
+    }
+
+    fn client_type(&self) -> &'static str {
+        "field"
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
+{
+    fn description(&self) -> Option<Description> {
+        self.description
+    }
+
+    fn name(&self) -> ClientSelectableName {
+        self.name.item.into()
+    }
+
+    fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
+        self.type_and_field
+    }
+
+    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+        self.parent_object_entity_name
+    }
+
+    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+        &self.variable_definitions
+    }
+
+    fn client_type(&self) -> &'static str {
+        "pointer"
+    }
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
+    for ClientObjectSelectable<TNetworkProtocol>
 {
     fn description(&self) -> Option<Description> {
         self.description
