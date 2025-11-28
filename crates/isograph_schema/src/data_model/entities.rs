@@ -10,7 +10,6 @@ use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
-    // TODO make this a WithLocation or just an Option<Description>
     pub description: Option<Description>,
     pub name: ServerScalarEntityName,
     pub javascript_name: JavascriptName,
