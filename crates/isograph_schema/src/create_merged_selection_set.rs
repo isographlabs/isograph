@@ -816,7 +816,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 &object_selection.arguments,
                 variable_context,
             )
-            .normalization_key(db);
+            .normalization_key(db, parent_object_entity_name);
 
             merge_traversal_state
                 .traversal_path

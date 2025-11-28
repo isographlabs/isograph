@@ -98,8 +98,9 @@ impl NameAndArguments {
     pub fn normalization_key<TNetworkProtocol: NetworkProtocol>(
         &self,
         db: &IsographDatabase<TNetworkProtocol>,
+        parent_object_entity_name: ServerObjectEntityName,
     ) -> NormalizationKey {
-        if self.name == TNetworkProtocol::get_id_field_name(db, &self.name.unchecked_conversion()) {
+        if self.name == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name) {
             NormalizationKey::Id
         } else {
             NormalizationKey::ServerField(self.clone())
