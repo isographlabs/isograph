@@ -150,7 +150,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
 
                     if let Some(_) = server_object_entity_directives.canonical_id {
-                        panic!("Canonical ID directive is not supported yet. It's under development.");
+                        panic!(
+                            "Canonical ID directive is not supported yet. It's under development."
+                        );
                     }
                 }
                 None => {
