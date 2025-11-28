@@ -27,12 +27,32 @@ impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
 pub fn from_graphql_directives<'a, T: Deserialize<'a>>(
     directives: &'a [GraphQLDirective<GraphQLConstantValue>],
 ) -> Result<T, Diagnostic> {
-    T::deserialize(GraphQLDirectivesDeserializer { directives })
+    T::deserialize(GraphQLDirectivesDeserializer::new(directives))
 }
 
 #[derive(Debug)]
 struct GraphQLDirectivesDeserializer<'a> {
     directives: &'a [GraphQLDirective<GraphQLConstantValue>],
+    directive_names: Vec<DirectiveName>,
+    current_index: usize,
+}
+
+impl<'a> GraphQLDirectivesDeserializer<'a> {
+    fn new(directives: &'a [GraphQLDirective<GraphQLConstantValue>]) -> Self {
+        let mut seen = HashSet::new();
+
+        let directive_names = directives
+            .iter()
+            .map(|d| d.name.item)
+            .filter(|name| seen.insert(*name))
+            .collect();
+
+        Self {
+            directives,
+            directive_names,
+            current_index: 0,
+        }
+    }
 }
 
 impl<'de> Deserializer<'de> for GraphQLDirectivesDeserializer<'de> {
@@ -42,7 +62,7 @@ impl<'de> Deserializer<'de> for GraphQLDirectivesDeserializer<'de> {
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_map(GraphQLDirectivesMapAccess::new(self.directives))
+        visitor.visit_map(self)
     }
 
     serde::forward_to_deserialize_any! {
@@ -52,30 +72,7 @@ impl<'de> Deserializer<'de> for GraphQLDirectivesDeserializer<'de> {
     }
 }
 
-struct GraphQLDirectivesMapAccess<'a> {
-    directives: &'a [GraphQLDirective<GraphQLConstantValue>],
-    directive_names: Vec<DirectiveName>,
-    current_index: usize,
-}
-
-impl<'a> GraphQLDirectivesMapAccess<'a> {
-    fn new(directives: &'a [GraphQLDirective<GraphQLConstantValue>]) -> Self {
-        let mut names = Vec::new();
-        let mut seen = HashSet::new();
-        for directive in directives {
-            if seen.insert(directive.name.item) {
-                names.push(directive.name.item);
-            }
-        }
-        Self {
-            directives,
-            directive_names: names,
-            current_index: 0,
-        }
-    }
-}
-
-impl<'de> MapAccess<'de> for GraphQLDirectivesMapAccess<'de> {
+impl<'de> MapAccess<'de> for GraphQLDirectivesDeserializer<'de> {
     type Error = Diagnostic;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
@@ -97,33 +94,32 @@ impl<'de> MapAccess<'de> for GraphQLDirectivesMapAccess<'de> {
         let name = self.directive_names[self.current_index];
         self.current_index += 1;
 
-        let matching_directives: Vec<_> = self
+        let matching_directives = self
             .directives
             .iter()
             .filter(|d| d.name.item == name)
             .collect();
 
-        seed.deserialize(DirectiveVecDeserializer {
+        seed.deserialize(DirectiveValueDeserializer {
             directives: matching_directives,
+            current_index: 0,
         })
     }
 }
 
-struct DirectiveVecDeserializer<'a> {
+struct DirectiveValueDeserializer<'a> {
     directives: Vec<&'a GraphQLDirective<GraphQLConstantValue>>,
+    current_index: usize,
 }
 
-impl<'de> Deserializer<'de> for DirectiveVecDeserializer<'de> {
+impl<'de> Deserializer<'de> for DirectiveValueDeserializer<'de> {
     type Error = Diagnostic;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        visitor.visit_seq(DirectiveSeqAccess {
-            directives: self.directives,
-            current_index: 0,
-        })
+        visitor.visit_seq(self)
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -153,12 +149,7 @@ impl<'de> Deserializer<'de> for DirectiveVecDeserializer<'de> {
     }
 }
 
-struct DirectiveSeqAccess<'a> {
-    directives: Vec<&'a GraphQLDirective<GraphQLConstantValue>>,
-    current_index: usize,
-}
-
-impl<'de> SeqAccess<'de> for DirectiveSeqAccess<'de> {
+impl<'de> SeqAccess<'de> for DirectiveValueDeserializer<'de> {
     type Error = Diagnostic;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
@@ -167,7 +158,6 @@ impl<'de> SeqAccess<'de> for DirectiveSeqAccess<'de> {
     {
         if let Some(&directive) = self.directives.get(self.current_index) {
             self.current_index += 1;
-            // Reuse the existing directive deserializer which treats arguments as a map
             seed.deserialize(GraphQLDirectiveDeserializer { directive })
                 .map(Some)
         } else {

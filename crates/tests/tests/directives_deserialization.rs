@@ -34,7 +34,6 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
     let server_object_entity_directives: ServerObjectEntityDirectives =
         from_graphql_directives(&directives)?;
 
-
     Ok(server_object_entity_directives.expose_field)
 }
 
