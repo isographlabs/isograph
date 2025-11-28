@@ -152,7 +152,7 @@ mod test {
                 }
             }
 
-            return Self::ResolvedNode::Parent(self.path(parent));
+            Self::ResolvedNode::Parent(self.path(parent))
         }
     }
 
@@ -173,7 +173,7 @@ mod test {
                 }
             }
 
-            return Self::ResolvedNode::Child(self.path(parent));
+            Self::ResolvedNode::Child(self.path(parent))
         }
     }
 

@@ -24,7 +24,7 @@ fn side_chain() {
         value: "asdf".to_string(),
     });
 
-    assert_eq!(*capitalized_first_letter(&db, input_id.clone()), 'A');
+    assert_eq!(*capitalized_first_letter(&db, input_id), 'A');
     assert_eq!(FIRST_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(CAPITALIZED_LETTER_COUNTER.load(Ordering::SeqCst), 1);
     assert_eq!(UNCHANGED_SUBTREE.load(Ordering::SeqCst), 1);

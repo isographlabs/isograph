@@ -274,7 +274,7 @@ mod tests {
 
     #[test]
     fn test_from_artifacts() {
-        let artifacts = vec![
+        let artifacts = [
             create_artifact(None, None, "schema.graphql", "type Query"),
             create_artifact(Some("User"), Some("name"), "query.graphql", "query {}"),
             create_artifact(
@@ -297,7 +297,7 @@ mod tests {
 
     #[test]
     fn test_diff_empty_to_new() {
-        let artifacts = vec![create_artifact(
+        let artifacts = [create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
@@ -325,8 +325,8 @@ mod tests {
 
     #[test]
     fn test_diff_no_changes() {
-        let artifact1 = vec![create_artifact(None, None, "file.txt", "content")];
-        let artifact2 = vec![create_artifact(None, None, "file.txt", "content")];
+        let artifact1 = [create_artifact(None, None, "file.txt", "content")];
+        let artifact2 = [create_artifact(None, None, "file.txt", "content")];
 
         let old_state = FileSystemState::from(&artifact1[..]);
         let new_state = FileSystemState::from(&artifact2[..]);
@@ -338,8 +338,8 @@ mod tests {
 
     #[test]
     fn test_diff_file_content_() {
-        let old_artifacts = vec![create_artifact(None, None, "file.txt", "old content")];
-        let new_artifacts = vec![create_artifact(None, None, "file.txt", "new content")];
+        let old_artifacts = [create_artifact(None, None, "file.txt", "old content")];
+        let new_artifacts = [create_artifact(None, None, "file.txt", "new content")];
 
         let old_state = FileSystemState::from(&old_artifacts[..]);
         let new_state = FileSystemState::from(&new_artifacts[..]);
@@ -353,8 +353,8 @@ mod tests {
 
     #[test]
     fn test_diff_add_new_file() {
-        let old_artifacts = vec![create_artifact(None, None, "existing.txt", "content")];
-        let new_artifacts = vec![
+        let old_artifacts = [create_artifact(None, None, "existing.txt", "content")];
+        let new_artifacts = [
             create_artifact(None, None, "existing.txt", "content"),
             create_artifact(None, None, "new.txt", "new content"),
         ];
@@ -375,11 +375,11 @@ mod tests {
 
     #[test]
     fn test_diff_delete_file() {
-        let old_artifacts = vec![
+        let old_artifacts = [
             create_artifact(None, None, "keep.txt", "content"),
             create_artifact(None, None, "delete.txt", "content"),
         ];
-        let new_artifacts = vec![create_artifact(None, None, "keep.txt", "content")];
+        let new_artifacts = [create_artifact(None, None, "keep.txt", "content")];
 
         let old_state = FileSystemState::from(&old_artifacts[..]);
         let new_state = FileSystemState::from(&new_artifacts[..]);
@@ -397,7 +397,7 @@ mod tests {
 
     #[test]
     fn test_diff_delete_empty_directory() {
-        let old_artifacts = vec![create_artifact(
+        let old_artifacts = [create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
@@ -416,13 +416,13 @@ mod tests {
 
     #[test]
     fn test_diff_nested_file_changes() {
-        let old_artifacts = vec![create_artifact(
+        let old_artifacts = [create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
             "old query",
         )];
-        let new_artifacts = vec![create_artifact(
+        let new_artifacts = [create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
@@ -441,13 +441,13 @@ mod tests {
 
     #[test]
     fn test_diff_add_new_selectable() {
-        let old_artifacts = vec![create_artifact(
+        let old_artifacts = [create_artifact(
             Some("User"),
             Some("name"),
             "query.graphql",
             "query",
         )];
-        let new_artifacts = vec![
+        let new_artifacts = [
             create_artifact(Some("User"), Some("name"), "query.graphql", "query"),
             create_artifact(Some("User"), Some("email"), "query.graphql", "query"),
         ];
@@ -465,13 +465,13 @@ mod tests {
 
     #[test]
     fn test_diff_complex_scenario() {
-        let old_artifacts = vec![
+        let old_artifacts = [
             create_artifact(None, None, "root.txt", "old root"),
             create_artifact(Some("User"), Some("name"), "query.graphql", "old query"),
             create_artifact(Some("User"), Some("email"), "query.graphql", "delete me"),
             create_artifact(Some("Post"), Some("title"), "query.graphql", "post query"),
         ];
-        let new_artifacts = vec![
+        let new_artifacts = [
             create_artifact(None, None, "root.txt", "new root"),
             create_artifact(None, None, "new_root.txt", "new file"),
             create_artifact(Some("User"), Some("name"), "query.graphql", "new query"),
