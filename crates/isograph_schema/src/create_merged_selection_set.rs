@@ -72,7 +72,7 @@ pub struct RootRefetchedPath {
 pub enum MergedServerSelection {
     ScalarField(MergedScalarFieldSelection),
     LinkedField(MergedLinkedFieldSelection),
-    ClientPointer(MergedLinkedFieldSelection),
+    ClientObjectSelectable(MergedLinkedFieldSelection),
     // TODO does this belong? This is very GraphQL specific.
     InlineFragment(MergedInlineFragmentSelection),
 }
@@ -81,7 +81,7 @@ impl MergedServerSelection {
     pub fn reachable_variables(&self) -> BTreeSet<VariableName> {
         match self {
             MergedServerSelection::ScalarField(field) => get_variables(&field.arguments).collect(),
-            MergedServerSelection::ClientPointer(field)
+            MergedServerSelection::ClientObjectSelectable(field)
             | MergedServerSelection::LinkedField(field) => get_variables(&field.arguments)
                 .chain(
                     field
@@ -223,7 +223,7 @@ pub struct ScalarClientFieldTraversalState {
     traversal_path: Vec<NormalizationKey>,
 
     /// Client fields that are directly accessed by this client field
-    pub accessible_client_fields: HashSet<ClientSelectableId>,
+    pub accessible_client_scalar_selectables: HashSet<ClientSelectableId>,
     pub has_updatable: bool,
 }
 
@@ -232,7 +232,7 @@ impl ScalarClientFieldTraversalState {
         Self {
             refetch_paths: BTreeMap::new(),
             traversal_path: vec![],
-            accessible_client_fields: HashSet::new(),
+            accessible_client_scalar_selectables: HashSet::new(),
             has_updatable: false,
         }
     }
@@ -286,8 +286,8 @@ pub fn current_target_merged_selections<'a>(
             MergedServerSelection::LinkedField(linked_field) => {
                 parent_selection_map = &linked_field.selection_map;
             }
-            MergedServerSelection::ClientPointer(client_pointer) => {
-                parent_selection_map = &client_pointer.selection_map;
+            MergedServerSelection::ClientObjectSelectable(client_object_selectable) => {
+                parent_selection_map = &client_object_selectable.selection_map;
             }
             MergedServerSelection::InlineFragment(inline_fragment) => {
                 parent_selection_map = &inline_fragment.selection_map;
@@ -337,8 +337,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                             ),
                         })
                     }
-                    MergedServerSelection::ClientPointer(linked_field_selection) => {
-                        MergedServerSelection::ClientPointer(MergedLinkedFieldSelection {
+                    MergedServerSelection::ClientObjectSelectable(linked_field_selection) => {
+                        MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
                             concrete_type: linked_field_selection.concrete_type,
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
@@ -395,8 +395,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                             )
                         }
                     }
-                    MergedServerSelection::ClientPointer(target_linked_field) => {
-                        if let MergedServerSelection::ClientPointer(child_linked_field) =
+                    MergedServerSelection::ClientObjectSelectable(target_linked_field) => {
+                        if let MergedServerSelection::ClientObjectSelectable(child_linked_field) =
                             new_server_field_selection
                         {
                             transform_and_merge_child_selection_map_into_parent_map(
@@ -658,7 +658,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             newly_encountered_client_object_selectable_name,
                         );
 
-                        insert_client_pointer_into_refetch_paths(
+                        insert_client_object_selectable_into_refetch_paths(
                             db,
                             parent_map,
                             encountered_client_type_map,
@@ -751,7 +751,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
             match inline_fragment {
                 MergedServerSelection::ScalarField(_)
-                | MergedServerSelection::ClientPointer(_)
+                | MergedServerSelection::ClientObjectSelectable(_)
                 | MergedServerSelection::LinkedField(_) => {
                     panic!(
                         "Expected inline fragment. \
@@ -899,7 +899,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         variable_context,
                     );
                 }
-                MergedServerSelection::ClientPointer(_)
+                MergedServerSelection::ClientObjectSelectable(_)
                 | MergedServerSelection::ScalarField(_)
                 | MergedServerSelection::InlineFragment(_) => {
                     panic!(
@@ -956,25 +956,29 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         &object_selection.arguments,
     );
 
-    merge_traversal_state.accessible_client_fields.insert(
-        (
-            parent_object_entity_name,
-            newly_encountered_client_object_selectable_name,
-        )
-            .object_selected(),
-    );
+    merge_traversal_state
+        .accessible_client_scalar_selectables
+        .insert(
+            (
+                parent_object_entity_name,
+                newly_encountered_client_object_selectable_name,
+            )
+                .object_selected(),
+        );
 
     // this is theoretically wrong, we should be adding this to the client pointer
     // traversal state instead of it's parent, but it works out the same
-    merge_traversal_state.accessible_client_fields.insert(
-        (
-            *newly_encountered_client_object_selectable
-                .target_object_entity_name
-                .inner(),
-            *LINK_FIELD_NAME,
-        )
-            .scalar_selected(),
-    );
+    merge_traversal_state
+        .accessible_client_scalar_selectables
+        .insert(
+            (
+                *newly_encountered_client_object_selectable
+                    .target_object_entity_name
+                    .inner(),
+                *LINK_FIELD_NAME,
+            )
+                .scalar_selected(),
+        );
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1079,13 +1083,15 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         },
     }
 
-    merge_traversal_state.accessible_client_fields.insert(
-        (
-            *parent_object_entity_name,
-            *newly_encountered_scalar_client_selectable_name,
-        )
-            .scalar_selected(),
-    );
+    merge_traversal_state
+        .accessible_client_scalar_selectables
+        .insert(
+            (
+                *parent_object_entity_name,
+                *newly_encountered_scalar_client_selectable_name,
+            )
+                .scalar_selected(),
+        );
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1171,7 +1177,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 }
 
 #[expect(clippy::too_many_arguments)]
-fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
+fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -1297,8 +1303,8 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         .traversal_path
         .push(normalization_key.clone());
 
-    let client_pointer = parent_map.entry(normalization_key).or_insert_with(|| {
-        MergedServerSelection::ClientPointer(MergedLinkedFieldSelection {
+    let client_object_selectable = parent_map.entry(normalization_key).or_insert_with(|| {
+        MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
             parent_object_entity_name,
             concrete_type: target_server_object_entity.concrete_type,
             name: object_selection.name.item,
@@ -1313,11 +1319,11 @@ fn insert_client_pointer_into_refetch_paths<TNetworkProtocol: NetworkProtocol>(
         })
     });
 
-    match client_pointer {
-        MergedServerSelection::ClientPointer(existing_client_pointer) => {
+    match client_object_selectable {
+        MergedServerSelection::ClientObjectSelectable(existing_client_object_selectable) => {
             merge_validated_selections_into_selection_map(
                 db,
-                &mut existing_client_pointer.selection_map,
+                &mut existing_client_object_selectable.selection_map,
                 target_server_object_entity,
                 &object_selection.selection_set,
                 merge_traversal_state,
@@ -1423,7 +1429,7 @@ fn merge_server_scalar_field(
                 MergedServerSelection::LinkedField(_) => {
                     panic!("Unexpected linked field, probably a bug in Isograph");
                 }
-                MergedServerSelection::ClientPointer(_) => {
+                MergedServerSelection::ClientObjectSelectable(_) => {
                     panic!("Unexpected client pointer, probably a bug in Isograph");
                 }
                 MergedServerSelection::InlineFragment(_) => {
@@ -1471,7 +1477,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
                         // TODO check that the existing server field matches the one we
                         // would create.
                     }
-                    MergedServerSelection::ClientPointer(_) => {
+                    MergedServerSelection::ClientObjectSelectable(_) => {
                         panic!("Unexpected client pointer for id, probably a bug in Isograph");
                     }
                     MergedServerSelection::LinkedField(_) => {

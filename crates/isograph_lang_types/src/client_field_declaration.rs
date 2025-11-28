@@ -7,8 +7,8 @@ use resolve_position_macros::ResolvePosition;
 use std::fmt::Debug;
 
 use crate::{
-    ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper,
-    ClientScalarSelectionDirectiveSet, IsographFieldDirective, IsographSemanticToken,
+    ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
+    ClientScalarSelectableNameWrapper, IsographFieldDirective, IsographSemanticToken,
     ObjectSelectionPath, SelectionTypeContainingSelections, ServerObjectEntityNameWrapper,
     VariableDefinition, isograph_resolved_node::IsographResolvedNode,
     string_key_wrappers::Description,
@@ -26,7 +26,7 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
-    pub client_field_directive_set: ClientScalarSelectionDirectiveSet,
+    pub client_scalar_selectable_directive_set: ClientScalarSelectableDirectiveSet,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
     pub definition_path: RelativePathToSourceFile,
 

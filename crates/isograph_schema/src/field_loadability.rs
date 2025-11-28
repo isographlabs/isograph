@@ -22,10 +22,10 @@ pub enum Loadability<'a> {
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
 pub fn categorize_field_loadability<'a, TNetworkProtocol: NetworkProtocol>(
-    client_field: &'a ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &'a ClientScalarSelectable<TNetworkProtocol>,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
-    match &client_field.variant {
+    match &client_scalar_selectable.variant {
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ScalarSelectionDirectiveSet::None(_) => None,

@@ -4,7 +4,7 @@ use common_lang_types::{
     ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
-    ClientScalarSelectionDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
+    ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
     LoadableDirectiveParameters, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
     SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
@@ -325,43 +325,43 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
     parent_variable_context: &VariableContext,
 ) -> String {
-    let client_field_variable_context = parent_variable_context.child_variable_context(
+    let client_scalar_selectable_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
-        &client_field.variable_definitions,
+        &client_scalar_selectable.variable_definitions,
         &scalar_field_selection.scalar_selection_directive_set,
     );
 
     match categorize_field_loadability(
-        client_field,
+        client_scalar_selectable,
         &scalar_field_selection.scalar_selection_directive_set,
     ) {
         Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
             loadably_selected_field_ast_node(
                 db,
-                client_field,
+                client_scalar_selectable,
                 reader_imports,
                 indentation_level,
                 scalar_field_selection,
-                &client_field_variable_context,
+                &client_scalar_selectable_variable_context,
                 loadable_directive_parameters,
             )
         }
         Some(Loadability::ImperativelyLoadedField(_)) => imperatively_loaded_variant_ast_node(
-            client_field,
+            client_scalar_selectable,
             reader_imports,
             root_refetched_paths,
             path,
             indentation_level,
             scalar_field_selection,
         ),
-        None => match client_field.variant {
+        None => match client_scalar_selectable.variant {
             ClientFieldVariant::Link => {
                 link_variant_ast_node(scalar_field_selection, indentation_level)
             }
@@ -370,11 +370,11 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                     db,
                     scalar_field_selection,
                     indentation_level,
-                    client_field,
+                    client_scalar_selectable,
                     path,
                     root_refetched_paths,
                     reader_imports,
-                    &client_field_variable_context,
+                    &client_scalar_selectable_variable_context,
                     parent_variable_context,
                 )
             }
@@ -403,11 +403,11 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
     indentation_level: u8,
-    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    nested_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
-    client_field_variable_context: &VariableContext,
+    client_scalar_selectable_variable_context: &VariableContext,
     initial_variable_context: &VariableContext,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
@@ -416,16 +416,17 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     // Note: this is confusing. We're using the parent context to determine the
     // arguments **to** the client field (below), and the child context (here) for
     // the refetch paths **within** the client field.
-    let paths_to_refetch_field_in_client_field = refetched_paths_for_client_field(
-        db,
-        nested_client_field,
-        path,
-        client_field_variable_context,
-    );
+    let paths_to_refetch_field_in_client_scalar_selectable =
+        refetched_paths_for_client_scalar_selectable(
+            db,
+            nested_client_scalar_selectable,
+            path,
+            client_scalar_selectable_variable_context,
+        );
 
     let nested_refetch_queries = get_nested_refetch_query_text(
         root_refetched_paths,
-        &paths_to_refetch_field_in_client_field,
+        &paths_to_refetch_field_in_client_scalar_selectable,
     );
 
     let arguments = get_serialized_field_arguments(
@@ -444,11 +445,13 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 
     let reader_artifact_import_name = format!(
         "{}__resolver_reader",
-        nested_client_field.type_and_field().underscore_separated()
+        nested_client_scalar_selectable
+            .type_and_field()
+            .underscore_separated()
     );
 
     reader_imports.insert((
-        nested_client_field.type_and_field(),
+        nested_client_scalar_selectable.type_and_field(),
         ImportedFileCategory::ResolverReader,
     ));
 
@@ -464,7 +467,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
-    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    nested_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
@@ -477,11 +480,13 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 
     let refetch_reader_artifact_import_name = format!(
         "{}__refetch_reader",
-        nested_client_field.type_and_field().underscore_separated()
+        nested_client_scalar_selectable
+            .type_and_field()
+            .underscore_separated()
     );
 
     reader_imports.insert((
-        nested_client_field.type_and_field(),
+        nested_client_scalar_selectable.type_and_field(),
         ImportedFileCategory::RefetchReader,
     ));
 
@@ -509,11 +514,11 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
 
 fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
     scalar_field_selection: &ValidatedScalarSelection,
-    client_field_variable_context: &VariableContext,
+    client_scalar_selectable_variable_context: &VariableContext,
     loadable_directive_parameters: &LoadableDirectiveParameters,
 ) -> String {
     let name = scalar_field_selection.name.item;
@@ -521,27 +526,31 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let type_and_field = client_field.type_and_field().underscore_separated();
+    let type_and_field = client_scalar_selectable
+        .type_and_field()
+        .underscore_separated();
     let entrypoint_text = if !loadable_directive_parameters.lazy_load_artifact {
         reader_imports.insert((
-            client_field.type_and_field(),
+            client_scalar_selectable.type_and_field(),
             ImportedFileCategory::Entrypoint,
         ));
         format!("{type_and_field}__entrypoint")
     } else {
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
-        let field_parent_type = client_field.type_and_field().parent_object_entity_name;
-        let field_directive_set = match client_field.variant {
-            ClientFieldVariant::UserWritten(info) => info.client_field_directive_set,
+        let field_parent_type = client_scalar_selectable
+            .type_and_field()
+            .parent_object_entity_name;
+        let field_directive_set = match client_scalar_selectable.variant {
+            ClientFieldVariant::UserWritten(info) => info.client_scalar_selectable_directive_set,
             ClientFieldVariant::ImperativelyLoadedField(_) => {
-                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }
             ClientFieldVariant::Link => {
-                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }
         };
         let reader_artifact_kind =
-            if let ClientScalarSelectionDirectiveSet::None(_) = field_directive_set {
+            if let ClientScalarSelectableDirectiveSet::None(_) = field_directive_set {
                 "EagerReaderArtifact"
             } else {
                 "ComponentReaderArtifact"
@@ -562,15 +571,15 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 .arguments
                 .iter()
                 .map(|x| x.item.into_key_and_value()),
-            client_field_variable_context,
+            client_scalar_selectable_variable_context,
         ),
         indentation_level + 1,
     );
 
     let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
         db,
-        client_field.parent_object_entity_name,
-        client_field.name.item,
+        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.name.item,
     )
     .as_ref()
     .expect(
@@ -592,7 +601,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         indentation_level + 1,
         // This is weird!
         &Default::default(),
-        client_field_variable_context,
+        client_scalar_selectable_variable_context,
     );
 
     // N.B. additional_reader_imports will be empty for now, but at some point, we may have
@@ -655,7 +664,7 @@ fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     indentation_level: u8,
-    nested_client_field_imports: &mut ReaderImports,
+    nested_client_scalar_selectable_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
     root_refetched_paths: &RefetchedPathsMap,
     path: &mut Vec<NormalizationKey>,
@@ -667,7 +676,7 @@ fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
             db,
             item,
             indentation_level + 1,
-            nested_client_field_imports,
+            nested_client_scalar_selectable_imports,
             root_refetched_paths,
             path,
             initial_variable_context,
@@ -680,10 +689,10 @@ fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
 
 fn get_nested_refetch_query_text(
     root_refetched_paths: &RefetchedPathsMap,
-    paths_to_refetch_fields_in_client_field: &[PathToRefetchField],
+    paths_to_refetch_fields_in_client_scalar_selectable: &[PathToRefetchField],
 ) -> String {
     let mut s = "[".to_string();
-    for nested_refetch_query in paths_to_refetch_fields_in_client_field.iter() {
+    for nested_refetch_query in paths_to_refetch_fields_in_client_scalar_selectable.iter() {
         let mut found_at_least_one = false;
         for index in root_refetched_paths
             .keys()
@@ -742,26 +751,26 @@ pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     root_refetched_paths: &RefetchedPathsMap,
     initial_variable_context: &VariableContext,
 ) -> (ReaderAst, ReaderImports) {
-    let mut client_field_imports = BTreeSet::new();
+    let mut client_scalar_selectable_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(
         db,
         selection_set,
         indentation_level,
-        &mut client_field_imports,
+        &mut client_scalar_selectable_imports,
         root_refetched_paths,
         // TODO we are not starting at the root when generating ASTs for reader artifacts
         // (and in theory some entrypoints).
         &mut vec![],
         initial_variable_context,
     );
-    (reader_ast, client_field_imports)
+    (reader_ast, client_scalar_selectable_imports)
 }
 
-fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
+fn refetched_paths_for_client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    nested_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    nested_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
-    client_field_variable_context: &VariableContext,
+    client_scalar_selectable_variable_context: &VariableContext,
 ) -> Vec<PathToRefetchField> {
     // Here, path is acting as a prefix. We will receive (for example) foo.bar, and
     // the client field may have a refetch query at baz.__refetch. In this case,
@@ -771,12 +780,12 @@ fn refetched_paths_for_client_field<TNetworkProtocol: NetworkProtocol>(
         db,
         &client_scalar_selectable_selection_set_for_parent_query(
             db,
-            nested_client_field.parent_object_entity_name,
-            nested_client_field.name.item,
+            nested_client_scalar_selectable.parent_object_entity_name,
+            nested_client_scalar_selectable.name.item,
         )
         .expect("Expected selection set to be valid."),
         path,
-        client_field_variable_context,
+        client_scalar_selectable_variable_context,
     );
 
     let mut paths: Vec<_> = path_set.into_iter().collect();

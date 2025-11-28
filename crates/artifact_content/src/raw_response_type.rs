@@ -138,7 +138,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                     print_javascript_type_declaration(&raw_type)
                 ));
             }
-            MergedServerSelection::ClientPointer(_) => {}
+            MergedServerSelection::ClientObjectSelectable(_) => {}
             MergedServerSelection::InlineFragment(inline_fragment) => {
                 let mut raw_response_type = String::new();
                 let mut inline_fragment_selection_map = BTreeMap::new();

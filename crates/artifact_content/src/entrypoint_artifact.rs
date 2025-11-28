@@ -17,7 +17,7 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    ClientScalarSelectionDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
+    ClientScalarSelectableDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
     EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
 };
 use isograph_schema::{
@@ -95,7 +95,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         &initial_variable_context(&entrypoint.scalar_selected()),
     );
 
-    generate_entrypoint_artifacts_with_client_field_traversal_result(
+    generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result(
         db,
         entrypoint,
         info.wrap_some(),
@@ -122,7 +122,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::too_many_arguments)]
-pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
+pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -295,12 +295,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_field_traversal_result<
         concrete_object_entity.name,
         &directive_set,
         match entrypoint.variant {
-            ClientFieldVariant::UserWritten(info) => info.client_field_directive_set,
+            ClientFieldVariant::UserWritten(info) => info.client_scalar_selectable_directive_set,
             ClientFieldVariant::ImperativelyLoadedField(_) => {
-                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }
             ClientFieldVariant::Link => {
-                ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }
         },
     );
@@ -463,7 +463,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     field_name: ClientScalarSelectableName,
     concrete_type: ServerObjectEntityName,
     directive_set: &EntrypointDirectiveSet,
-    field_directive_set: ClientScalarSelectionDirectiveSet,
+    field_directive_set: ClientScalarSelectableDirectiveSet,
 ) -> String {
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
@@ -511,7 +511,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
         match directive_set {
             EntrypointDirectiveSet::LazyLoad(directive_set) if directive_set.lazy_load.reader => {
                 let reader_artifact_kind =
-                    if let ClientScalarSelectionDirectiveSet::None(_) = field_directive_set {
+                    if let ClientScalarSelectableDirectiveSet::None(_) = field_directive_set {
                         "EagerReaderArtifact"
                     } else {
                         "ComponentReaderArtifact"

@@ -1,4 +1,4 @@
-mod accessible_client_fields_iterator;
+mod accessible_client_scalar_selectables_iterator;
 mod create_additional_fields;
 mod create_merged_selection_set;
 mod data_model;
@@ -20,7 +20,7 @@ mod validated_isograph_schema;
 mod variable_context;
 mod visit_selection_set;
 
-pub use accessible_client_fields_iterator::*;
+pub use accessible_client_scalar_selectables_iterator::*;
 pub use create_additional_fields::*;
 pub use create_merged_selection_set::*;
 pub use data_model::*;

@@ -4,7 +4,7 @@ use crate::EmptyDirectiveSet;
 
 #[derive(Deserialize, Debug, Clone, PartialEq, PartialOrd, Ord, Eq, Copy, Hash)]
 #[serde(rename_all = "camelCase", untagged)]
-pub enum ClientScalarSelectionDirectiveSet {
+pub enum ClientScalarSelectableDirectiveSet {
     Component(ComponentDirectiveSet),
     None(EmptyDirectiveSet),
 }

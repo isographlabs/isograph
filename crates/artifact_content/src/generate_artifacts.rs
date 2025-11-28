@@ -9,7 +9,7 @@ use graphql_lang_types::{
 };
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectionDirectiveSet, DefinitionLocation,
+    ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, NonConstantValue,
     ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypeContainingSelections,
@@ -21,10 +21,10 @@ use isograph_schema::{
     LINK_FIELD_NAME, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
     RefetchStrategy, ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant,
     UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_fields, client_object_selectable_named,
-    client_scalar_selectable_named, client_selectable_map, client_selectable_named, description,
-    fetchable_types, inline_fragment_reader_selection_set, output_type_annotation,
-    selectable_named, selection_map_wrapped, server_object_entity_named,
+    WrappedSelectionMapSelection, accessible_client_scalar_selectables,
+    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
+    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
+    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named, validate_entire_schema, validated_entrypoints,
     validated_refetch_strategy_for_client_scalar_selectable_named,
@@ -45,7 +45,7 @@ use crate::{
     },
     entrypoint_artifact::{
         generate_entrypoint_artifacts,
-        generate_entrypoint_artifacts_with_client_field_traversal_result,
+        generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result,
     },
     format_parameter_type::format_parameter_type,
     import_statements::{ParamTypeImports, UpdatableImports},
@@ -242,9 +242,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     UserWrittenClientTypeInfo {
                         const_export_name: client_object_selectable.info.const_export_name,
                         file_path: client_object_selectable.info.file_path,
-                        client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        ),
+                        client_scalar_selectable_directive_set:
+                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
@@ -437,7 +436,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 .find(|(_, root_operation_name)| root_operation_name.0 == "query");
 
                             path_and_contents.extend(
-                                generate_entrypoint_artifacts_with_client_field_traversal_result(
+                                generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result(
                                     db,
                                     client_scalar_selectable,
                                     None,
@@ -506,14 +505,16 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             }) => {
                 // If this user-written client field is reachable from an entrypoint,
                 // we've already noted the accessible client fields
-                encountered_output_types.extend(traversal_state.accessible_client_fields.iter())
+                encountered_output_types
+                    .extend(traversal_state.accessible_client_scalar_selectables.iter())
             }
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_field_id in accessible_client_fields(db, user_written_client_type)
+                for nested_client_scalar_selectable_id in
+                    accessible_client_scalar_selectables(db, user_written_client_type)
                 {
-                    encountered_output_types.insert(nested_client_field_id);
+                    encountered_output_types.insert(nested_client_scalar_selectable_id);
                 }
             }
         }
@@ -538,28 +539,31 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 );
 
         let artifact_path_and_content = match client_selectable {
-            SelectionType::Object(client_pointer) => generate_eager_reader_output_type_artifact(
-                db,
-                &client_pointer.object_selected(),
-                config,
-                UserWrittenClientTypeInfo {
-                    const_export_name: client_pointer.info.const_export_name,
-                    file_path: client_pointer.info.file_path,
-                    client_field_directive_set: ClientScalarSelectionDirectiveSet::None(
-                        EmptyDirectiveSet {},
-                    ),
-                },
-                config.options.include_file_extensions_in_import_statements,
-            )
-            .wrap_some(),
-            SelectionType::Scalar(client_field) => match client_field.variant {
+            SelectionType::Object(client_object_selectable) => {
+                generate_eager_reader_output_type_artifact(
+                    db,
+                    &client_object_selectable.object_selected(),
+                    config,
+                    UserWrittenClientTypeInfo {
+                        const_export_name: client_object_selectable.info.const_export_name,
+                        file_path: client_object_selectable.info.file_path,
+                        client_scalar_selectable_directive_set:
+                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}),
+                    },
+                    config.options.include_file_extensions_in_import_statements,
+                )
+                .wrap_some()
+            }
+            SelectionType::Scalar(client_scalar_selectable) => match client_scalar_selectable
+                .variant
+            {
                 ClientFieldVariant::Link => {
-                    generate_link_output_type_artifact(db, client_field).wrap_some()
+                    generate_link_output_type_artifact(db, client_scalar_selectable).wrap_some()
                 }
                 ClientFieldVariant::UserWritten(info) => {
                     generate_eager_reader_output_type_artifact(
                         db,
-                        &client_field.scalar_selected(),
+                        &client_scalar_selectable.scalar_selected(),
                         config,
                         info,
                         config.options.include_file_extensions_in_import_statements,
@@ -567,7 +571,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     .wrap_some()
                 }
                 ClientFieldVariant::ImperativelyLoadedField(_) => {
-                    generate_refetch_output_type_artifact(db, client_field).wrap_some()
+                    generate_refetch_output_type_artifact(db, client_scalar_selectable).wrap_some()
                 }
             },
         };
@@ -717,19 +721,21 @@ fn get_serialized_field_argument(
 
 pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
-) -> ClientFieldOutputType {
-    let variant = &client_field.variant;
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+) -> ClientScalarSelectableOutputType {
+    let variant = &client_scalar_selectable.variant;
     match variant {
-        ClientFieldVariant::Link => ClientFieldOutputType(TNetworkProtocol::generate_link_type(
-            db,
-            &client_field.parent_object_entity_name,
-        )),
-        ClientFieldVariant::UserWritten(info) => match info.client_field_directive_set {
-            ClientScalarSelectionDirectiveSet::None(_) => {
-                ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
+        ClientFieldVariant::Link => {
+            ClientScalarSelectableOutputType(TNetworkProtocol::generate_link_type(
+                db,
+                &client_scalar_selectable.parent_object_entity_name,
+            ))
+        }
+        ClientFieldVariant::UserWritten(info) => match info.client_scalar_selectable_directive_set {
+            ClientScalarSelectableDirectiveSet::None(_) => {
+                ClientScalarSelectableOutputType("ReturnType<typeof resolver>".to_string())
             }
-            ClientScalarSelectionDirectiveSet::Component(_) => ClientFieldOutputType(
+            ClientScalarSelectableDirectiveSet::Component(_) => ClientScalarSelectableOutputType(
                 "(React.FC<CombineWithIntrinsicAttributes<ExtractSecondParam<typeof resolver>>>)"
                     .to_string(),
             ),
@@ -737,71 +743,76 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
         ClientFieldVariant::ImperativelyLoadedField(_) => {
             // TODO - we should not type params as any, but instead use some generated type
             // N.B. the string is a stable id for deduplicating
-            ClientFieldOutputType("(params?: any) => [string, () => void]".to_string())
+            ClientScalarSelectableOutputType("(params?: any) => [string, () => void]".to_string())
         }
     }
 }
 
-pub(crate) fn generate_client_field_parameter_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_scalar_selectable_parameter_type<
+    TNetworkProtocol: NetworkProtocol,
+>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-    nested_client_field_imports: &mut ParamTypeImports,
+    nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
-) -> ClientFieldParameterType {
+) -> ClientScalarSelectableParameterType {
     // TODO use unwraps
-    let mut client_field_parameter_type = "{\n".to_string();
+    let mut client_scalar_selectable_parameter_type = "{\n".to_string();
 
     for selection in selection_map.item.selections.iter() {
         write_param_type_from_selection(
             db,
-            &mut client_field_parameter_type,
+            &mut client_scalar_selectable_parameter_type,
             selection,
-            nested_client_field_imports,
+            nested_client_scalar_selectable_imports,
             loadable_fields,
             indentation_level + 1,
         );
     }
-    client_field_parameter_type.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
+    client_scalar_selectable_parameter_type
+        .push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    ClientFieldParameterType(client_field_parameter_type)
+    ClientScalarSelectableParameterType(client_scalar_selectable_parameter_type)
 }
 
-pub(crate) fn generate_client_field_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
+pub(crate) fn generate_client_scalar_selectable_updatable_data_type<
+    TNetworkProtocol: NetworkProtocol,
+>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
-    nested_client_field_imports: &mut ParamTypeImports,
+    nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
     updatable_fields: &mut UpdatableImports,
-) -> ClientFieldUpdatableDataType {
+) -> ClientScalarSelectableUpdatableDataType {
     // TODO use unwraps
 
-    let mut client_field_updatable_data_type = "{\n".to_string();
+    let mut client_scalar_selectable_updatable_data_type = "{\n".to_string();
 
     for selection in selection_map.item.selections.iter() {
         write_updatable_data_type_from_selection(
             db,
-            &mut client_field_updatable_data_type,
+            &mut client_scalar_selectable_updatable_data_type,
             selection,
-            nested_client_field_imports,
+            nested_client_scalar_selectable_imports,
             loadable_fields,
             indentation_level + 1,
             updatable_fields,
         );
     }
 
-    client_field_updatable_data_type
+    client_scalar_selectable_updatable_data_type
         .push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
 
-    ClientFieldUpdatableDataType(client_field_updatable_data_type)
+    ClientScalarSelectableUpdatableDataType(client_scalar_selectable_updatable_data_type)
 }
 
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    nested_client_field_imports: &mut ParamTypeImports,
+    nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
 ) {
@@ -861,18 +872,19 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                DefinitionLocation::Client((parent_object_entity_name, client_field_name)) => {
-                    write_param_type_from_client_field(
-                        db,
-                        query_type_declaration,
-                        nested_client_field_imports,
-                        loadable_fields,
-                        indentation_level,
-                        scalar_field_selection,
-                        parent_object_entity_name,
-                        client_field_name,
-                    )
-                }
+                DefinitionLocation::Client((
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
+                )) => write_param_type_from_client_scalar_selectable(
+                    db,
+                    query_type_declaration,
+                    nested_client_scalar_selectable_imports,
+                    loadable_fields,
+                    indentation_level,
+                    scalar_field_selection,
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
+                ),
             }
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
@@ -925,10 +937,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 output_type_annotation(&object_selectable)
                     .clone()
                     .map(&mut |_| {
-                        generate_client_field_parameter_type(
+                        generate_client_scalar_selectable_parameter_type(
                             db,
                             &linked_field.selection_set,
-                            nested_client_field_imports,
+                            nested_client_scalar_selectable_imports,
                             loadable_fields,
                             indentation_level,
                         )
@@ -938,13 +950,15 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 "readonly {}: {},\n",
                 name_or_alias,
                 match object_selectable {
-                    DefinitionLocation::Client(client_pointer) => {
-                        loadable_fields.insert(client_pointer.type_and_field());
+                    DefinitionLocation::Client(client_object_selectable) => {
+                        loadable_fields.insert(client_object_selectable.type_and_field());
 
                         print_javascript_type_declaration(&type_annotation.map(&mut |target| {
                             format!(
                                 "LoadableField<{}__param, {target}>",
-                                client_pointer.type_and_field().underscore_separated(),
+                                client_object_selectable
+                                    .type_and_field()
+                                    .underscore_separated(),
                             )
                         }))
                     }
@@ -957,10 +971,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
+fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_type_declaration: &mut String,
-    nested_client_field_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
+    nested_client_scalar_selectable_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
@@ -993,7 +1007,8 @@ fn write_param_type_from_client_field<TNetworkProtocol: NetworkProtocol>(
         ClientFieldVariant::Link
         | ClientFieldVariant::UserWritten(_)
         | ClientFieldVariant::ImperativelyLoadedField(_) => {
-            nested_client_field_imports.insert(client_scalar_selectable.type_and_field());
+            nested_client_scalar_selectable_imports
+                .insert(client_scalar_selectable.type_and_field());
             let inner_output_type = format!(
                 "{}__output_type",
                 client_scalar_selectable
@@ -1054,7 +1069,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
-    nested_client_field_imports: &mut ParamTypeImports,
+    nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
     updatable_fields: &mut UpdatableImports,
@@ -1129,16 +1144,19 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         }
                     }
                 }
-                DefinitionLocation::Client((parent_object_entity_name, client_field_id)) => {
-                    write_param_type_from_client_field(
+                DefinitionLocation::Client((
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
+                )) => {
+                    write_param_type_from_client_scalar_selectable(
                         db,
                         query_type_declaration,
-                        nested_client_field_imports,
+                        nested_client_scalar_selectable_imports,
                         loadable_fields,
                         indentation_level,
                         scalar_field_selection,
                         parent_object_entity_name,
-                        client_field_id,
+                        client_scalar_selectable_name,
                     );
                 }
             }
@@ -1193,10 +1211,10 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 output_type_annotation(&object_selectable)
                     .clone()
                     .map(&mut |_| {
-                        generate_client_field_updatable_data_type(
+                        generate_client_scalar_selectable_updatable_data_type(
                             db,
                             &linked_field.selection_set,
-                            nested_client_field_imports,
+                            nested_client_scalar_selectable_imports,
                             loadable_fields,
                             indentation_level,
                             updatable_fields,
@@ -1231,7 +1249,7 @@ fn write_getter_and_setter(
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
     output_type_annotation: &TypeAnnotation<ServerObjectEntityName>,
-    type_annotation: &TypeAnnotation<ClientFieldUpdatableDataType>,
+    type_annotation: &TypeAnnotation<ClientScalarSelectableUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(
         "get {}(): {},\n",
@@ -1430,20 +1448,20 @@ fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
 }
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct ClientFieldParameterType(pub String);
-derive_display!(ClientFieldParameterType);
+pub(crate) struct ClientScalarSelectableParameterType(pub String);
+derive_display!(ClientScalarSelectableParameterType);
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub(crate) struct ClientFieldUpdatableDataType(pub String);
-derive_display!(ClientFieldUpdatableDataType);
+pub(crate) struct ClientScalarSelectableUpdatableDataType(pub String);
+derive_display!(ClientScalarSelectableUpdatableDataType);
 
 #[derive(Debug)]
-pub(crate) struct ClientFieldFunctionImportStatement(pub String);
-derive_display!(ClientFieldFunctionImportStatement);
+pub(crate) struct ClientScalarSelectableFunctionImportStatement(pub String);
+derive_display!(ClientScalarSelectableFunctionImportStatement);
 
 #[derive(Debug)]
-pub(crate) struct ClientFieldOutputType(pub String);
-derive_display!(ClientFieldOutputType);
+pub(crate) struct ClientScalarSelectableOutputType(pub String);
+derive_display!(ClientScalarSelectableOutputType);
 
 #[derive(Debug)]
 pub(crate) struct ReaderAst(pub String);

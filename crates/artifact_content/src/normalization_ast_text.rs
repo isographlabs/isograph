@@ -69,7 +69,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
                 {indent}}},\n"
             )
         }
-        MergedServerSelection::ClientPointer(_) => "".to_string(),
+        MergedServerSelection::ClientObjectSelectable(_) => "".to_string(),
         MergedServerSelection::InlineFragment(inline_fragment) => {
             let MergedInlineFragmentSelection {
                 type_to_refine_to,

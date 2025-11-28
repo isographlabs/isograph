@@ -219,7 +219,7 @@ fn parse_client_field_declaration_inner(
             description,
             selection_set,
             definition_path: definition_file_path,
-            client_field_directive_set,
+            client_scalar_selectable_directive_set: client_field_directive_set,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
 

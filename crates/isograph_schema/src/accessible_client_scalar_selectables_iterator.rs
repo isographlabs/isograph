@@ -14,7 +14,7 @@ use crate::{
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_fields<TNetworkProtocol: NetworkProtocol>(
+pub fn accessible_client_scalar_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_type: &OwnedClientSelectable<TNetworkProtocol>,
 ) -> impl Iterator<Item = ClientSelectableId> {
@@ -91,12 +91,12 @@ impl Iterator for AccessibleClientFieldIterator {
                         };
 
                         match linked_field.associated_data {
-                            DefinitionLocation::Client(client_pointer_id) => {
+                            DefinitionLocation::Client(client_object_selectable_id) => {
                                 // TODO: include pointer target link type
                                 // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(iterator.boxed());
                                 self.index += 1;
-                                return client_pointer_id.object_selected().wrap_some();
+                                return client_object_selectable_id.object_selected().wrap_some();
                             }
                             DefinitionLocation::Server(_) => {}
                         };

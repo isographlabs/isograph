@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectionDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
+    ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
     TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
 use prelude::{ErrClone, Postfix};
@@ -62,7 +62,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 
     match parent_type_id {
         ServerEntityName::Object(_) => {
-            add_client_field_to_object(db, client_field_declaration.item)
+            add_client_scalar_selectable_to_entity(db, client_field_declaration.item)
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")
                 .map(|x| x.0)?
@@ -162,7 +162,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn add_client_field_to_object<TNetworkProtocol: NetworkProtocol>(
+pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: ClientFieldDeclaration,
 ) -> DiagnosticResult<(
@@ -370,7 +370,7 @@ pub struct UserWrittenClientTypeInfo {
     // TODO use a shared struct
     pub const_export_name: ConstExportName,
     pub file_path: RelativePathToSourceFile,
-    pub client_field_directive_set: ClientScalarSelectionDirectiveSet,
+    pub client_scalar_selectable_directive_set: ClientScalarSelectableDirectiveSet,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -391,7 +391,8 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
     ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
         const_export_name: client_field_declaration.const_export_name,
         file_path: client_field_declaration.definition_path,
-        client_field_directive_set: client_field_declaration.client_field_directive_set,
+        client_scalar_selectable_directive_set: client_field_declaration
+            .client_scalar_selectable_directive_set,
     })
 }
 

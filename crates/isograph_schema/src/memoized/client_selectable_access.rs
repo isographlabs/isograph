@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
     OwnedClientSelectable, UnprocessedClientScalarSelectableSelectionSet,
-    add_client_field_to_object, create_new_exposed_field,
+    add_client_scalar_selectable_to_entity, create_new_exposed_field,
     create_type_system_schema_with_server_selectables, get_link_fields_map,
     process_client_pointer_declaration_inner,
 };
@@ -246,7 +246,8 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
-    let (_, scalar_selectable) = add_client_field_to_object(db, declaration).clone_err()?;
+    let (_, scalar_selectable) =
+        add_client_scalar_selectable_to_entity(db, declaration).clone_err()?;
 
     scalar_selectable
         .clone()
@@ -405,11 +406,14 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                             Ok(
                                 match first.note_todo("Do not clone. Use a MemoRef.").clone() {
                                     SelectionType::Scalar(scalar_declaration) => {
-                                        add_client_field_to_object(db, scalar_declaration)
-                                            .clone()
-                                            .note_todo("Do not clone. Use a MemoRef.")
-                                            .map(|(_, selectable)| selectable)?
-                                            .scalar_selected()
+                                        add_client_scalar_selectable_to_entity(
+                                            db,
+                                            scalar_declaration,
+                                        )
+                                        .clone()
+                                        .note_todo("Do not clone. Use a MemoRef.")
+                                        .map(|(_, selectable)| selectable)?
+                                        .scalar_selected()
                                     }
                                     SelectionType::Object(object_declaration) => {
                                         process_client_pointer_declaration_inner(

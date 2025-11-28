@@ -13,7 +13,7 @@ use prelude::Postfix;
 
 use crate::{
     generate_artifacts::{
-        ClientFieldFunctionImportStatement, REFETCH_READER_FILE_NAME,
+        ClientScalarSelectableFunctionImportStatement, REFETCH_READER_FILE_NAME,
         RESOLVER_OUTPUT_TYPE_FILE_NAME, generate_output_type,
     },
     import_statements::reader_imports_to_import_statement,
@@ -22,7 +22,7 @@ use crate::{
 
 pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
     file_extensions: GenerateFileExtensionsOption,
@@ -35,8 +35,8 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
         db,
-        client_field.parent_object_entity_name,
-        client_field.name.item,
+        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.name.item,
     )
     .as_ref()
     .expect(
@@ -51,8 +51,8 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let selection_set_for_parent_query = client_scalar_selectable_selection_set_for_parent_query(
         db,
-        client_field.parent_object_entity_name,
-        client_field.name.item,
+        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.name.item,
     )
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -67,7 +67,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         },
         0,
         refetched_paths,
-        &initial_variable_context(&client_field.scalar_selected()),
+        &initial_variable_context(&client_scalar_selectable.scalar_selected()),
     );
 
     let reader_import_statement =
@@ -93,8 +93,8 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         artifact_path: ArtifactPath {
             file_name: *REFETCH_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: client_field.parent_object_entity_name,
-                selectable_name: client_field.name.item.into(),
+                parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
+                selectable_name: client_scalar_selectable.name.item.into(),
             }
             .wrap_some(),
         },
@@ -103,15 +103,17 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
 pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
-    let client_field_output_type = generate_output_type(db, client_field);
+    let client_scalar_selectable_output_type = generate_output_type(db, client_scalar_selectable);
 
     let output_type_text = {
-        let output_type = client_field_output_type;
+        let output_type = client_scalar_selectable_output_type;
         format!(
             "export type {}__{}__output_type = {};",
-            client_field.parent_object_entity_name, client_field.name.item, output_type
+            client_scalar_selectable.parent_object_entity_name,
+            client_scalar_selectable.name.item,
+            output_type
         )
     };
     let output_type_text = format!(
@@ -124,18 +126,20 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: client_field.parent_object_entity_name,
-                selectable_name: client_field.name.item.into(),
+                parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
+                selectable_name: client_scalar_selectable.name.item.into(),
             }
             .wrap_some(),
         },
     }
 }
 
-fn generate_function_import_statement(read_out_data: String) -> ClientFieldFunctionImportStatement {
+fn generate_function_import_statement(
+    read_out_data: String,
+) -> ClientScalarSelectableFunctionImportStatement {
     let indent = "  ";
     // TODO: use better type than Link<any>
-    ClientFieldFunctionImportStatement(format!(
+    ClientScalarSelectableFunctionImportStatement(format!(
         "{read_out_data}\n\
         import {{ makeNetworkRequest, wrapResolvedValue, type IsographEnvironment, \
         type Link, type TopLevelReaderArtifact, \

@@ -1,6 +1,6 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{ClientScalarSelectionDirectiveSet, EmptyDirectiveSet, SelectionType};
+use isograph_lang_types::{ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, SelectionType};
 use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
@@ -16,26 +16,26 @@ use isograph_schema::{
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
 fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
-    validated_client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let formatted_field = format!(
         "entrypoint {}.{}",
-        validated_client_field
+        client_scalar_selectable
             .type_and_field()
             .parent_object_entity_name,
-        validated_client_field.type_and_field().selectable_name
+        client_scalar_selectable.type_and_field().selectable_name
     );
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-        validated_client_field
+        client_scalar_selectable
             .type_and_field()
             .underscore_separated(),
-        validated_client_field
+        client_scalar_selectable
             .type_and_field()
             .parent_object_entity_name,
-        validated_client_field.type_and_field().selectable_name,
+        client_scalar_selectable.type_and_field().selectable_name,
         file_extensions.ts()
     );
 
@@ -45,7 +45,7 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
         formatted_field,
-        validated_client_field
+        client_scalar_selectable
             .type_and_field()
             .underscore_separated(),
     ));
@@ -55,7 +55,7 @@ export function iso<T>(
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
     client_type_and_variant: (
         OwnedClientSelectable<TNetworkProtocol>,
-        ClientScalarSelectionDirectiveSet,
+        ClientScalarSelectableDirectiveSet,
     ),
     file_extensions: GenerateFileExtensionsOption,
     link_types: &mut BTreeSet<ServerObjectEntityName>,
@@ -81,7 +81,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         type_and_field.parent_object_entity_name,
         type_and_field.selectable_name
     );
-    if matches!(variant, ClientScalarSelectionDirectiveSet::Component(_)) {
+    if matches!(variant, ClientScalarSelectableDirectiveSet::Component(_)) {
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -90,8 +90,8 @@ export function iso<T>(
             formatted_field,
             type_and_field.underscore_separated(),
         ));
-    } else if let SelectionType::Object(client_pointer) = client_type {
-        link_types.insert(*client_pointer.target_object_entity_name.inner());
+    } else if let SelectionType::Object(client_object_selectable) = client_type {
+        link_types.insert(*client_object_selectable.target_object_entity_name.inner());
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -100,15 +100,16 @@ export function iso<T>(
             formatted_field,
             type_and_field.underscore_separated(),
             print_javascript_type_declaration(
-                &client_pointer.target_object_entity_name.clone().map(
-                    &mut |target_object_entity_name| {
+                &client_object_selectable
+                    .target_object_entity_name
+                    .clone()
+                    .map(&mut |target_object_entity_name| {
                         let link_field_name = *LINK_FIELD_NAME;
                         format!(
                             "{}__{link_field_name}__output_type",
                             &target_object_entity_name
                         )
-                    }
-                )
+                    })
             )
         ));
     } else {
@@ -279,7 +280,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<(
     OwnedClientSelectable<TNetworkProtocol>,
-    ClientScalarSelectionDirectiveSet,
+    ClientScalarSelectableDirectiveSet,
 )> {
     let mut client_types = client_selectable_map(db)
         .as_ref()
@@ -307,16 +308,16 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                     SelectionType::Scalar(scalar) => match &scalar.variant {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
-                        ) => user_written_client_type_info.client_field_directive_set,
+                        ) => user_written_client_type_info.client_scalar_selectable_directive_set,
                         isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => {
-                            ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
                         }
                         isograph_schema::ClientFieldVariant::Link => {
-                            ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
                         }
                     },
                     SelectionType::Object(_) => {
-                        ClientScalarSelectionDirectiveSet::None(EmptyDirectiveSet {})
+                        ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
                     }
                 }
             };
@@ -385,20 +386,25 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
             },
         )
         .collect::<Vec<_>>();
-    entrypoints.sort_by(|(client_field_1, _), (client_field_2, _)| {
-        match client_field_1
-            .type_and_field()
-            .parent_object_entity_name
-            .cmp(&client_field_2.type_and_field().parent_object_entity_name)
-        {
-            Ordering::Less => Ordering::Less,
-            Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => sort_field_name(
-                client_field_1.type_and_field().selectable_name,
-                client_field_2.type_and_field().selectable_name,
-            ),
-        }
-    });
+    entrypoints.sort_by(
+        |(client_scalar_selectable_1, _), (client_scalar_selectable_2, _)| {
+            match client_scalar_selectable_1
+                .type_and_field()
+                .parent_object_entity_name
+                .cmp(
+                    &client_scalar_selectable_2
+                        .type_and_field()
+                        .parent_object_entity_name,
+                ) {
+                Ordering::Less => Ordering::Less,
+                Ordering::Greater => Ordering::Greater,
+                Ordering::Equal => sort_field_name(
+                    client_scalar_selectable_1.type_and_field().selectable_name,
+                    client_scalar_selectable_2.type_and_field().selectable_name,
+                ),
+            }
+        },
+    );
     entrypoints
 }
 

@@ -3,7 +3,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
-use isograph_lang_types::{ClientScalarSelectionDirectiveSet, SelectionSet, SelectionType};
+use isograph_lang_types::{ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
     LINK_FIELD_NAME, NetworkProtocol, ObjectSelectableId, OwnedClientSelectable,
@@ -18,11 +18,12 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::{
     generate_artifacts::{
-        ClientFieldFunctionImportStatement, ClientFieldOutputType, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE, RESOLVER_PARAM_TYPE_FILE_NAME,
-        RESOLVER_PARAMETERS_TYPE_FILE_NAME, RESOLVER_READER_FILE_NAME,
-        generate_client_field_parameter_type, generate_client_field_updatable_data_type,
-        generate_output_type, generate_parameters,
+        ClientScalarSelectableFunctionImportStatement, ClientScalarSelectableOutputType,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE,
+        RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
+        RESOLVER_READER_FILE_NAME, generate_client_scalar_selectable_parameter_type,
+        generate_client_scalar_selectable_updatable_data_type, generate_output_type,
+        generate_parameters,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -41,7 +42,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
-    let user_written_component_variant = info.client_field_directive_set;
+    let user_written_component_variant = info.client_scalar_selectable_directive_set;
 
     let parent_object_entity =
         &server_object_entity_named(db, client_selectable.parent_object_entity_name())
@@ -94,7 +95,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         client_selectable.name()
     );
 
-    let reader_content = if let ClientScalarSelectionDirectiveSet::None(_) =
+    let reader_content = if let ClientScalarSelectableDirectiveSet::None(_) =
         user_written_component_variant
     {
         let eager_reader_name = client_selectable.name();
@@ -319,14 +320,14 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         )
         .expect("Expected selection set to be valid."),
     };
-    let client_field_parameter_type = generate_client_field_parameter_type(
+    let client_scalar_selectable_parameter_type = generate_client_scalar_selectable_parameter_type(
         db,
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
     );
-    let updatable_data_type = generate_client_field_updatable_data_type(
+    let updatable_data_type = generate_client_scalar_selectable_updatable_data_type(
         db,
         &selection_set_for_parent_query,
         &mut param_type_imports,
@@ -393,7 +394,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         {loadable_field_imports}\
         {parameters_import}\n\
         export type {reader_param_type} = {{\n\
-        {indent}readonly data: {client_field_parameter_type},\n\
+        {indent}readonly data: {client_scalar_selectable_parameter_type},\n\
         {indent}readonly parameters: {parameters_type},\n\
         {start_update_type}\
         }};\n",
@@ -413,13 +414,13 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
 
 pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientSelectable<TNetworkProtocol>,
+    client_selectable: &ClientSelectable<TNetworkProtocol>,
     config: &CompilerConfig,
     info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
-        &server_object_entity_named(db, client_field.parent_object_entity_name())
+        &server_object_entity_named(db, client_selectable.parent_object_entity_name())
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -435,11 +436,13 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     let function_import_statement =
         generate_function_import_statement(config, info, file_extensions);
 
-    let client_field_output_type = match client_field {
+    let client_scalar_selectable_output_type = match client_selectable {
         SelectionType::Object(_) => {
-            ClientFieldOutputType("ReturnType<typeof resolver>".to_string())
+            ClientScalarSelectableOutputType("ReturnType<typeof resolver>".to_string())
         }
-        SelectionType::Scalar(client_field) => generate_output_type(db, client_field),
+        SelectionType::Scalar(client_scalar_selectable) => {
+            generate_output_type(db, client_scalar_selectable)
+        }
     };
 
     let output_type_text = format!(
@@ -447,20 +450,21 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         {function_import_statement}\n\
         export type {}__{}__output_type = {};",
         parent_object_entity.name,
-        client_field.name(),
-        client_field_output_type
+        client_selectable.name(),
+        client_scalar_selectable_output_type
     );
 
-    let final_output_type_text =
-        if let ClientScalarSelectionDirectiveSet::None(_) = info.client_field_directive_set {
-            output_type_text
-        } else {
-            format!(
-                "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
+    let final_output_type_text = if let ClientScalarSelectableDirectiveSet::None(_) =
+        info.client_scalar_selectable_directive_set
+    {
+        output_type_text
+    } else {
+        format!(
+            "import type {{ ExtractSecondParam, CombineWithIntrinsicAttributes }} \
                 from '@isograph/react';\n\
                 {output_type_text}\n",
-            )
-        };
+        )
+    };
 
     ArtifactPathAndContent {
         file_content: final_output_type_text.into(),
@@ -468,7 +472,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_field.name().into(),
+                selectable_name: client_selectable.name().into(),
             }
             .wrap_some(),
         },
@@ -477,10 +481,10 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
 
 pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
-        &server_object_entity_named(db, client_field.parent_object_entity_name())
+        &server_object_entity_named(db, client_scalar_selectable.parent_object_entity_name())
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -493,14 +497,14 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             )
             .lookup(db);
 
-    let client_field_output_type = generate_output_type(db, client_field);
+    let client_scalar_selectable_output_type = generate_output_type(db, client_scalar_selectable);
 
     let output_type_text = format!(
         "import type {{ Link }} from '@isograph/react';\n\
         export type {}__{}__output_type = {};",
         parent_object_entity.name,
-        client_field.name(),
-        client_field_output_type
+        client_scalar_selectable.name(),
+        client_scalar_selectable_output_type
     );
 
     ArtifactPathAndContent {
@@ -509,7 +513,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_field.name().into(),
+                selectable_name: client_scalar_selectable.name().into(),
             }
             .wrap_some(),
         },
@@ -521,7 +525,7 @@ fn generate_function_import_statement(
     config: &CompilerConfig,
     target_field_info: UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
-) -> ClientFieldFunctionImportStatement {
+) -> ClientScalarSelectableFunctionImportStatement {
     // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
     // is a directory "two levels deep" within the artifact_directory.
     //
@@ -535,10 +539,10 @@ fn generate_function_import_statement(
     // Anyway, TODO do better.
     let relative_path_to_current_artifact =
         PathBuf::from(config.artifact_directory.relative_path.lookup()).join("Type/Field");
-    let relative_path_to_client_field = target_field_info.file_path.lookup();
+    let relative_path_to_client_scalar_selectable = target_field_info.file_path.lookup();
 
     let relative_path = pathdiff::diff_paths(
-        relative_path_to_client_field,
+        relative_path_to_client_scalar_selectable,
         relative_path_to_current_artifact,
     )
     .expect("Relative path should work");
@@ -563,7 +567,7 @@ fn generate_function_import_statement(
     };
 
     let const_export_name = target_field_info.const_export_name;
-    ClientFieldFunctionImportStatement(format!(
+    ClientScalarSelectableFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{file_name}';"
     ))
 }
