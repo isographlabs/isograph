@@ -589,6 +589,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "console_error_panic_hook"
+version = "0.1.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a06aeb73f470f66dcdbf7223caeebb85984942f22f1adb2a088cf9668146bbbc"
+dependencies = [
+ "cfg-if",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "convert_case"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1694,6 +1704,20 @@ dependencies = [
  "resolve_position",
  "resolve_position_macros",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "isograph_lang_parser_wasm"
+version = "0.4.3"
+dependencies = [
+ "common_lang_types",
+ "console_error_panic_hook",
+ "intern",
+ "isograph_lang_parser",
+ "isograph_lang_types",
+ "serde",
+ "serde_json",
+ "wasm-bindgen",
 ]
 
 [[package]]
@@ -4258,6 +4282,7 @@ checksum = "1edc8929d7499fc4e8f0be2262a241556cfc54a0bea223790e71446f2aab1ef5"
 dependencies = [
  "cfg-if",
  "once_cell",
+ "rustversion",
  "wasm-bindgen-macro",
 ]
 
