@@ -11,7 +11,13 @@
     },
     "compile-libs": {
       "dependsOn": ["^compile-libs"],
-      "outputs": ["dist/**"]
+      "outputs": ["dist/**", "package.json"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "$TURBO_ROOT$/tsdown.config.ts",
+        "$TURBO_ROOT$/tsconfig.json",
+        "$TURBO_ROOT$/tsconfig.build.json"
+      ]
     },
     "//#build-compiler": {
       "inputs": ["crates/**", "relay-crates/**", "Cargo.*"],
