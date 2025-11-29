@@ -46,7 +46,9 @@
     "sanity-check": "./scripts/sanity-check.sh",
     "generate-fixture-tests": "cargo run --bin generate_isograph_fixtures -- --dir ./crates/isograph_lang_parser/fixtures/",
     "fix-line-endings": "git diff $(git merge-base main HEAD) --name-only | xargs -I {} dos2unix {}",
-    "latest-published-version": "pnpm view @isograph/react dist-tags.main"
+    "latest-published-version": "pnpm view @isograph/react dist-tags.main",
+    "build-parser-wasm": "wasm-pack build crates/isograph_lang_parser_wasm --target bundler && mv crates/isograph_lang_parser_wasm/pkg/* libs/isograph-parser-wasm/",
+    "watch-parser-wasm": "bacon -j build-parser-wasm"
   },
   "license": "MIT",
   "repository": {
