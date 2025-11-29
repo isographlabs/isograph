@@ -16,7 +16,4 @@ export default defineConfig({
       '@iso': path.resolve(__dirname, './src/components/__isograph/iso.ts'),
     },
   },
-  optimizeDeps: {
-    include: ['@isograph/react'],
-  },
 });

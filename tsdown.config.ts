@@ -5,10 +5,7 @@ export default defineConfig({
   dts: {
     sourcemap: true,
   },
-  exports: {
-    devExports: true,
-    unbundle: true,
-  },
+  exports: true,
   logLevel: 'error',
   unbundle: true,
   format: ['commonjs', 'esm'],
