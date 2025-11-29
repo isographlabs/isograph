@@ -811,8 +811,8 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         &server_object_selectable.initial_variable_context(),
                     );
                 }
-            }
-            .wrap_ok()
+            };
+            Ok(())
         }
         ServerObjectSelectableVariant::LinkedField => {
             let normalization_key = create_transformed_name_and_arguments(
@@ -903,8 +903,8 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         encountered_client_type_map,
                         variable_context,
                     )?;
+                    Ok(())
                 }
-                .wrap_ok(),
                 MergedServerSelection::ClientObjectSelectable(_)
                 | MergedServerSelection::ScalarField(_)
                 | MergedServerSelection::InlineFragment(_) => {
