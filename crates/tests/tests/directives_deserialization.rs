@@ -42,14 +42,17 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
     let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid_as.graphql"
     ))?;
-    let set_tagline_mutation = ExposeFieldDirective::new(
-        Some(SelectableName::from("set_puppy_tagline".intern())),
-        vec![FieldMapItem {
-            from: ID_FIELD_NAME.unchecked_conversion(),
-            to: StringLiteralValue::from("input.id".intern()),
-        }],
-        StringLiteralValue::from("set_pet_tagline.pet".intern()),
-    );
+    let expose_as = Some(SelectableName::from("set_puppy_tagline".intern()));
+    let field_map = vec![FieldMapItem {
+        from: ID_FIELD_NAME.unchecked_conversion(),
+        to: StringLiteralValue::from("input.id".intern()),
+    }];
+    let field = StringLiteralValue::from("set_pet_tagline.pet".intern());
+    let set_tagline_mutation = ExposeFieldDirective {
+        expose_as,
+        field_map,
+        field,
+    };
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
     Ok(())
@@ -60,14 +63,16 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
     let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
-    let set_tagline_mutation = ExposeFieldDirective::new(
-        None,
-        vec![FieldMapItem {
-            from: ID_FIELD_NAME.unchecked_conversion(),
-            to: StringLiteralValue::from("input.id".intern()),
-        }],
-        StringLiteralValue::from("set_pet_tagline.pet".intern()),
-    );
+    let field_map = vec![FieldMapItem {
+        from: ID_FIELD_NAME.unchecked_conversion(),
+        to: StringLiteralValue::from("input.id".intern()),
+    }];
+    let field = StringLiteralValue::from("set_pet_tagline.pet".intern());
+    let set_tagline_mutation = ExposeFieldDirective {
+        expose_as: None,
+        field_map,
+        field,
+    };
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
     Ok(())
@@ -78,14 +83,16 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
     let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
-    let set_pet_best_friend = ExposeFieldDirective::new(
-        None,
-        vec![FieldMapItem {
-            from: ID_FIELD_NAME.unchecked_conversion(),
-            to: ID_FIELD_NAME.unchecked_conversion(),
-        }],
-        StringLiteralValue::from("set_pet_best_friend.pet".intern()),
-    );
+    let field_map = vec![FieldMapItem {
+        from: ID_FIELD_NAME.unchecked_conversion(),
+        to: ID_FIELD_NAME.unchecked_conversion(),
+    }];
+    let field = StringLiteralValue::from("set_pet_best_friend.pet".intern());
+    let set_pet_best_friend = ExposeFieldDirective {
+        expose_as: None,
+        field_map,
+        field,
+    };
     assert_eq!(expose_field_directives[1], set_pet_best_friend);
     Ok(())
 }

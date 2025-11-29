@@ -40,20 +40,6 @@ pub struct ExposeFieldDirective {
     pub field: StringLiteralValue,
 }
 
-impl ExposeFieldDirective {
-    pub fn new(
-        expose_as: Option<SelectableName>,
-        field_map: Vec<FieldMapItem>,
-        field: StringLiteralValue,
-    ) -> Self {
-        Self {
-            expose_as,
-            field_map,
-            field,
-        }
-    }
-}
-
 pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     expose_field_to_insert: &ExposeFieldToInsert,

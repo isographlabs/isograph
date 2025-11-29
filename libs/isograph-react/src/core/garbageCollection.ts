@@ -10,7 +10,7 @@ import {
   type StoreLink,
   type TypeName,
 } from './IsographEnvironment';
-import type { StoreLayer } from './optimisticProxy';
+import type { BaseStoreLayer } from './optimisticProxy';
 import {
   NOT_SET,
   type PromiseWrapper,
@@ -63,6 +63,10 @@ export function retainQuery(
 }
 
 export function garbageCollectEnvironment(environment: IsographEnvironment) {
+  if (environment.store.kind !== 'BaseStoreLayer') {
+    return;
+  }
+
   const retainedQueries: RetainedQueryWithNormalizationAst[] = [];
   for (const query of environment.retainedQueries) {
     if (!isRetainedQueryWithNormalizationAst(query)) {
@@ -78,31 +82,27 @@ export function garbageCollectEnvironment(environment: IsographEnvironment) {
     retainedQueries.push(query);
   }
 
-  let node: StoreLayer | null = environment.store;
-  while (node !== null) {
-    garbageCollectLayer(retainedQueries, node.data);
-    node = node.parentStoreLayer;
-  }
+  garbageCollectBaseStoreLayer(retainedQueries, environment.store);
 }
 
-export function garbageCollectLayer(
+export function garbageCollectBaseStoreLayer(
   retainedQueries: RetainedQueryWithNormalizationAst[],
-  dataLayer: StoreLayerData,
+  baseStoreLayer: BaseStoreLayer,
 ) {
   const retainedIds: RetainedIds = {};
 
   for (const query of retainedQueries) {
-    recordReachableIds(dataLayer, query, retainedIds);
+    recordReachableIds(baseStoreLayer.data, query, retainedIds);
   }
 
-  for (const typeName in dataLayer) {
-    const dataById = dataLayer[typeName];
+  for (const typeName in baseStoreLayer.data) {
+    const dataById = baseStoreLayer.data[typeName];
     if (dataById == null) continue;
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
     if (retainedTypeIds == undefined || retainedTypeIds.size == 0) {
-      delete dataLayer[typeName];
+      delete baseStoreLayer.data[typeName];
       continue;
     }
 
@@ -113,7 +113,7 @@ export function garbageCollectLayer(
     }
 
     if (Object.keys(dataById).length === 0) {
-      delete dataLayer[typeName];
+      delete baseStoreLayer.data[typeName];
     }
   }
 }
