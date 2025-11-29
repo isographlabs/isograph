@@ -13,7 +13,7 @@ pub static ISOGRAPH_FOLDER: &str = "__isograph";
 
 use std::error::Error;
 
-/// This struct is the internal representation of the schema. It
+/// This struct is the internal representation of the config. It
 /// is a transformed version of IsographProjectConfig.
 #[derive(Debug, Clone, Singleton, Eq, PartialEq)]
 pub struct CompilerConfig {
