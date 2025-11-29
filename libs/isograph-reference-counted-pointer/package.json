@@ -30,16 +30,10 @@
   "sideEffects": false,
   "module": "./dist/index.mjs",
   "exports": {
-    ".": "./src/index.ts",
+    ".": {
+      "import": "./dist/index.mjs",
+      "require": "./dist/index.js"
+    },
     "./package.json": "./package.json"
-  },
-  "publishConfig": {
-    "exports": {
-      ".": {
-        "import": "./dist/index.mjs",
-        "require": "./dist/index.js"
-      },
-      "./package.json": "./package.json"
-    }
   }
 }

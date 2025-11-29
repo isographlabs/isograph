@@ -1,6 +1,4 @@
 /** @type {import('next').NextConfig} */
-const nextConfig = {
-  transpilePackages: ['@isograph/react'],
-};
+const nextConfig = {};
 
 module.exports = nextConfig;
