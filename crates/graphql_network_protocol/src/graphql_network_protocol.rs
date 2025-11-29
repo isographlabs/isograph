@@ -2,16 +2,15 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerScalarSelectableName, StringLiteralValue, UnvalidatedTypeName,
-    WithLocationPostfix,
+    ServerObjectEntityName, ServerScalarSelectableName, UnvalidatedTypeName, WithLocationPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
-    ExposeFieldToInsert, Format, ID_FIELD_NAME, MergedSelectionMap, NetworkProtocol,
-    ParseTypeSystemOutcome, RootOperationName, ServerObjectEntityDirectives,
-    ValidatedVariableDefinition, server_object_entity_named,
+    ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition,
+    server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
@@ -142,14 +141,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             )
                         })?;
 
-                    for expose_field_directive in server_object_entity_directives.expose_field {
-                        outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
-                            expose_field_directive,
-                            parent_object_name: outcome.server_object_entity.item.name,
-                            description: None,
-                        });
-                    }
-
                     // comment out this block for development
                     if server_object_entity_directives.canonical_id.is_some() {
                         panic!(
@@ -157,15 +148,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         );
                     }
 
-                    if let Some(canonical_id_field_name) =
-                        server_object_entity_directives.canonical_id
+                    for expose_field_directive in
+                        server_object_entity_directives.expose_field.clone()
                     {
-                        outcome
-                            .server_object_entity
-                            .item
-                            .network_protocol_associated_data
-                            .canonical_id_field_name = Some(canonical_id_field_name.field_name);
+                        outcome.expose_fields_to_insert.push(ExposeFieldToInsert {
+                            expose_field_directive,
+                            parent_object_name: outcome.server_object_entity.item.name,
+                            description: None,
+                        });
                     }
+
+                    outcome
+                        .server_object_entity
+                        .item
+                        .server_object_entity_directives = server_object_entity_directives;
                 }
                 None => {
                     return Diagnostic::new(
@@ -264,13 +260,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             )
             .lookup(db);
 
-        match entity
-            .network_protocol_associated_data
-            .canonical_id_field_name
-        {
-            Some(canonical_id) => canonical_id.unchecked_conversion(),
-            None => *ID_FIELD_NAME,
-        }
+        entity.canonical_id_field_name()
     }
 }
 
@@ -278,7 +268,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
     pub subtypes: Vec<UnvalidatedTypeName>,
-    pub canonical_id_field_name: Option<StringLiteralValue>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

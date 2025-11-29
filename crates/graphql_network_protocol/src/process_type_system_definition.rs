@@ -14,9 +14,10 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionTypePostfix};
 use isograph_schema::{
-    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, ID_FIELD_NAME,
+    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
-    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
+    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerObjectEntityDirectives, ServerScalarEntity,
+    TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -84,10 +85,10 @@ pub fn process_graphql_type_system_document(
                     GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                         subtypes: vec![],
-                        canonical_id_field_name: None,
                     },
                     GraphQLObjectDefinitionType::Object,
                     &mut refetch_fields,
+                    None,
                 )?;
 
                 directives
@@ -116,10 +117,10 @@ pub fn process_graphql_type_system_document(
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::Interface,
                             subtypes: vec![],
-                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
+                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -147,10 +148,10 @@ pub fn process_graphql_type_system_document(
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                             subtypes: vec![],
-                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
+                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -193,10 +194,10 @@ pub fn process_graphql_type_system_document(
                         GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: vec![],
-                            canonical_id_field_name: None,
                         },
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
+                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -341,6 +342,7 @@ fn process_object_type_definition(
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
     refetch_fields: &mut Vec<ExposeFieldToInsert>,
+    server_object_entity_directives: Option<ServerObjectEntityDirectives>,
 ) -> DiagnosticResult<(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
@@ -348,15 +350,13 @@ fn process_object_type_definition(
     let should_add_refetch_field = type_definition_type.is_concrete()
         && type_definition_type.is_output_type()
         && type_implements_node(&object_type_definition);
-    let canonical_id_field_name = associated_data
-        .canonical_id_field_name
-        .map(|id| id.unchecked_conversion())
-        .unwrap_or(*ID_FIELD_NAME);
+
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
         concrete_type,
         network_protocol_associated_data: associated_data,
+        server_object_entity_directives: server_object_entity_directives.unwrap_or_default(),
     }
     .with_location(object_type_definition.name.location.into());
 
@@ -406,6 +406,7 @@ fn process_object_type_definition(
     }
 
     if should_add_refetch_field {
+        let canonical_id_field_name = server_object_entity.item.canonical_id_field_name();
         refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
                 expose_as: (*REFETCH_FIELD_NAME).wrap_some(),

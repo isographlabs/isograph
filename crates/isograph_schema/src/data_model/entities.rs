@@ -2,11 +2,15 @@ use std::{collections::BTreeMap, marker::PhantomData};
 
 use common_lang_types::{
     JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
+    ServerScalarSelectableName,
 };
 use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
 use pico::MemoRef;
 
-use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
+use crate::{
+    ClientSelectableId, ID_FIELD_NAME, NetworkProtocol, ServerObjectEntityDirectives,
+    ServerSelectableId,
+};
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
@@ -28,8 +32,18 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     ///
     /// This is a GraphQL-ism! We should get rid of it.
     pub concrete_type: Option<ServerObjectEntityName>,
-
+    pub server_object_entity_directives: ServerObjectEntityDirectives,
     pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerObjectEntity<TNetworkProtocol> {
+    pub fn canonical_id_field_name(&self) -> ServerScalarSelectableName {
+        self.server_object_entity_directives
+            .canonical_id
+            .as_ref()
+            .map(|canonical_id| canonical_id.field_name.unchecked_conversion())
+            .unwrap_or_else(|| *ID_FIELD_NAME)
+    }
 }
 
 pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
