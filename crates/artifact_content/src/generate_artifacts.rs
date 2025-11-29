@@ -286,7 +286,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         let id_field_name = TNetworkProtocol::get_id_field_name(
                             db,
                             &client_scalar_selectable.parent_object_entity_name(),
-                        );
+                        )
+                        .expect("Expected id field name to be valid.");
 
                         if *was_ever_selected_loadably {
                             path_and_contents.push(generate_refetch_reader_artifact(

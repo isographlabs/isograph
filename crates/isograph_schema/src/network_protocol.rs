@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Diagnostic, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
     ServerObjectEntityName, ServerScalarSelectableName, ServerSelectableName, UnvalidatedTypeName,
     WithLocation, WithSpan,
 };
@@ -61,7 +61,7 @@ pub trait NetworkProtocol:
     fn get_id_field_name(
         db: &IsographDatabase<Self>,
         entity_name: &ServerObjectEntityName,
-    ) -> ServerScalarSelectableName;
+    ) -> DiagnosticResult<ServerScalarSelectableName>;
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]

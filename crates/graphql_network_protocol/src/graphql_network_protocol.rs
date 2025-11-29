@@ -246,21 +246,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     fn get_id_field_name(
         db: &IsographDatabase<GraphQLNetworkProtocol>,
         server_object_entity_name: &ServerObjectEntityName,
-    ) -> ServerScalarSelectableName {
+    ) -> DiagnosticResult<ServerScalarSelectableName> {
         let entity = server_object_entity_named(db, *server_object_entity_name)
             .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
+            .map_err(|e| e.clone())?  // Propagate error instead of expect
             .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
+            .ok_or_else(|| {
+                Diagnostic::new(
+                    format!("Entity {server_object_entity_name} not found when determining ID field name"),
+                    None,
+                )
+            })?
             .lookup(db);
 
-        entity.canonical_id_field_name()
+        entity.canonical_id_field_name().wrap_ok()
     }
 }
 

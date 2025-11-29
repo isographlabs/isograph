@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName,
-    ServerObjectEntityName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, DiagnosticResult,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -87,7 +87,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         parent_object_entity_name,
         reachable_variables,
         client_selectable,
-    );
+    )
+    .expect("Expected used variable definitions to be valid.");
 
     for variable_definition in top_level_schema_field_arguments.iter() {
         definitions_of_used_variables.push(VariableDefinition {
@@ -212,12 +213,12 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     entity_name: ServerObjectEntityName,
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &OwnedClientSelectable<TNetworkProtocol>,
-) -> Vec<VariableDefinition<ServerEntityName>> {
+) -> DiagnosticResult<Vec<VariableDefinition<ServerEntityName>>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
             // HACK
-            if *variable_name == TNetworkProtocol::get_id_field_name(db, &entity_name) {
+            if *variable_name == TNetworkProtocol::get_id_field_name(db, &entity_name).unwrap() {
                 None
             } else {
                 entrypoint
@@ -241,4 +242,5 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             }
         })
         .collect::<Vec<_>>()
+        .wrap_ok()
 }

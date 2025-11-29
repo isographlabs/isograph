@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
+    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
     ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
     ServerScalarSelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
     WithSpanPostfix,
@@ -500,7 +500,8 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
         &mut traversal_state,
         encountered_client_type_map,
         variable_context,
-    );
+    )
+    .expect("Expected merge to succeed.");
 
     FieldTraversalResult {
         traversal_state,
@@ -547,7 +548,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-) {
+) -> DiagnosticResult<()> {
     for validated_selection in validated_selections.item.selections.iter() {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
@@ -560,7 +561,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             variable_context,
                             merge_traversal_state,
                             parent_object_entity.name,
-                        );
+                        )?;
                     }
                     DefinitionLocation::Client((
                         parent_object_entity_name,
@@ -668,7 +669,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             newly_encountered_client_object_selectable,
                             object_selection,
                             variable_context,
-                        );
+                        )?;
                     }
                     DefinitionLocation::Server((
                         field_parent_object_entity_name,
@@ -686,7 +687,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             object_selection_parent_object_entity,
                             field_parent_object_entity_name,
                             field_object_selectable_name,
-                        );
+                        )?;
                     }
                 }
 
@@ -696,6 +697,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     }
 
     select_typename_and_id_fields_in_merged_selection(db, parent_map, parent_object_entity);
+
+    Ok(())
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -711,7 +714,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     field_parent_object_entity_name: ServerObjectEntityName,
     field_server_object_selectable_name: ServerObjectSelectableName,
-) {
+) -> DiagnosticResult<()> {
     if let ObjectSelectionDirectiveSet::Updatable(_) =
         object_selection.object_selection_directive_set
     {
@@ -784,7 +787,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         merge_traversal_state,
                         encountered_client_type_map,
                         variable_context,
-                    );
+                    )?;
                     merge_validated_selections_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
@@ -793,7 +796,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         merge_traversal_state,
                         encountered_client_type_map,
                         variable_context,
-                    );
+                    )?;
 
                     create_merged_selection_map_for_field_and_insert_into_global_map(
                         db,
@@ -809,6 +812,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                     );
                 }
             }
+            .wrap_ok()
         }
         ServerObjectSelectableVariant::LinkedField => {
             let normalization_key = create_transformed_name_and_arguments(
@@ -816,7 +820,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 &object_selection.arguments,
                 variable_context,
             )
-            .normalization_key(db, parent_object_entity_name);
+            .normalization_key(db, parent_object_entity_name)?;
 
             merge_traversal_state
                 .traversal_path
@@ -898,8 +902,9 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         merge_traversal_state,
                         encountered_client_type_map,
                         variable_context,
-                    );
+                    )?;
                 }
+                .wrap_ok(),
                 MergedServerSelection::ClientObjectSelectable(_)
                 | MergedServerSelection::ScalarField(_)
                 | MergedServerSelection::InlineFragment(_) => {
@@ -1187,7 +1192,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
-) {
+) -> DiagnosticResult<()> {
     let target_server_object_entity_name = *newly_encountered_client_object_selectable
         .target_object_entity_name
         .inner();
@@ -1240,7 +1245,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             target_server_object_entity.name,
         ));
     }
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &target_server_object_entity_name);
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &target_server_object_entity_name)?;
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
         parent_object_entity_name: *query_id,
         server_object_selectable_name: *NODE_FIELD_NAME,
@@ -1261,7 +1266,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         ),
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
-            top_level_schema_field_arguments: id_arguments(db, target_server_object_entity_name),
+            top_level_schema_field_arguments: id_arguments(db, target_server_object_entity_name)?,
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
             // primary_field_info: None,
@@ -1331,7 +1336,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
                 merge_traversal_state,
                 encountered_client_field_map,
                 variable_context,
-            );
+            )?;
         }
         MergedServerSelection::LinkedField(_)
         | MergedServerSelection::ScalarField(_)
@@ -1342,6 +1347,8 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             )
         }
     }
+
+    Ok(())
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -1401,7 +1408,7 @@ fn merge_server_scalar_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     parent_object_entity_name: ServerObjectEntityName,
-) {
+) -> DiagnosticResult<()> {
     if let ScalarSelectionDirectiveSet::Updatable(_) =
         scalar_field_selection.scalar_selection_directive_set
     {
@@ -1413,7 +1420,7 @@ fn merge_server_scalar_field<TNetworkProtocol: NetworkProtocol>(
     let normalization_key = if scalar_field_name == *TYPENAME_FIELD_NAME {
         NormalizationKey::Discriminator
     } else if scalar_field_name
-        == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)
+        == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)?
     {
         NormalizationKey::Id
     } else {
@@ -1458,6 +1465,8 @@ fn merge_server_scalar_field<TNetworkProtocol: NetworkProtocol>(
             ));
         }
     }
+
+    Ok(())
 }
 
 fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
@@ -1599,8 +1608,8 @@ fn get_aliased_mutation_field_name(
 pub fn id_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: ServerObjectEntityName,
-) -> Vec<VariableDefinition<ServerEntityName>> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name);
+) -> DiagnosticResult<Vec<VariableDefinition<ServerEntityName>>> {
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name)?;
     vec![VariableDefinition {
         name: WithLocation::new_generated(id_field_name.unchecked_conversion()),
         type_: GraphQLTypeAnnotation::NonNull(
@@ -1611,6 +1620,7 @@ pub fn id_arguments<TNetworkProtocol: NetworkProtocol>(
         ),
         default_value: None,
     }]
+    .wrap_ok()
 }
 
 pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(

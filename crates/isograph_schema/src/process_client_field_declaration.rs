@@ -232,7 +232,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         let id_field = server_selectable_named(
             db,
             parent_object_entity_name,
-            TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name).into(),
+            TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)?.into(),
         )
         // TODO don't call to_owned
         .to_owned()?
@@ -248,7 +248,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
             // Assume that if we have an id field, this implements Node
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 SelectionSet {
-                    selections: vec![id_selection(db, parent_object_entity_name)],
+                    selections: vec![id_selection(db, parent_object_entity_name).unwrap()],
                 }
                 .with_generated_span(),
                 *query_id,
@@ -257,7 +257,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                     WrappedSelectionMapSelection::LinkedField {
                         parent_object_entity_name: *query_id,
                         server_object_selectable_name: *NODE_FIELD_NAME,
-                        arguments: id_top_level_arguments(db, parent_object_entity_name),
+                        arguments: id_top_level_arguments(db, parent_object_entity_name).unwrap(),
                         concrete_type: None,
                     },
                 ],
@@ -345,7 +345,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             parent_object_entity_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: SelectionSet {
-                selections: vec![id_selection(db, parent_object_entity_name)],
+                selections: vec![id_selection(db, parent_object_entity_name)?],
             }
             .with_generated_span(),
         },
@@ -404,12 +404,12 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
 pub fn id_top_level_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: ServerObjectEntityName,
-) -> Vec<ArgumentKeyAndValue> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name);
-    vec![ArgumentKeyAndValue {
+) -> DiagnosticResult<Vec<ArgumentKeyAndValue>> {
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name)?;
+    Ok(vec![ArgumentKeyAndValue {
         key: id_field_name.unchecked_conversion(),
         value: NonConstantValue::Variable(id_field_name.unchecked_conversion()),
-    }]
+    }])
 }
 
 pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(

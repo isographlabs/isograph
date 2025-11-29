@@ -99,11 +99,11 @@ impl NameAndArguments {
         &self,
         db: &IsographDatabase<TNetworkProtocol>,
         parent_object_entity_name: ServerObjectEntityName,
-    ) -> NormalizationKey {
-        if self.name == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name) {
-            NormalizationKey::Id
+    ) -> DiagnosticResult<NormalizationKey> {
+        if self.name == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)? {
+            NormalizationKey::Id.wrap_ok()
         } else {
-            NormalizationKey::ServerField(self.clone())
+            NormalizationKey::ServerField(self.clone()).wrap_ok()
         }
     }
 }

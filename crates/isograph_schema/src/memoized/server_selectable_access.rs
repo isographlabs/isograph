@@ -166,7 +166,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &parent_server_object_entity_name);
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, &parent_server_object_entity_name)?;
     let selectable =
         server_selectable_named(db, parent_server_object_entity_name, id_field_name.into())
             .clone_err()?;
@@ -229,11 +229,9 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
         != *ID_ENTITY_NAME
     {
         options.on_invalid_id_type.on_failure(|| {
-            let strong_field_name =
-                TNetworkProtocol::get_id_field_name(db, &parent_server_object_entity_name);
             Diagnostic::new(
                 format!(
-                    "The `{strong_field_name}` field on \
+                    "The `{id_field_name}` field on \
                     `{parent_server_object_entity_name}` must have type `ID!`.\n\
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
