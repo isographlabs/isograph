@@ -217,8 +217,10 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
+            let id_field_name = TNetworkProtocol::get_id_field_name(db, entity_name)
+                .expect("Expected id field name to be valid.");
             // HACK
-            if *variable_name == TNetworkProtocol::get_id_field_name(db, entity_name).unwrap() {
+            if *variable_name == id_field_name {
                 None
             } else {
                 entrypoint

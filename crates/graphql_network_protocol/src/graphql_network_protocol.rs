@@ -7,14 +7,14 @@ use intern::string_key::Intern;
 use isograph_lang_types::SelectionTypePostfix;
 use isograph_schema::{
     ExposeFieldToInsert, Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RootOperationName, ServerObjectEntityDirectives, ValidatedVariableDefinition,
-    server_object_entity_named,
+    ProcessObjectTypeDefinitionOutcome, RootOperationName, ServerObjectEntityDirectives,
+    ValidatedVariableDefinition, server_object_entity_named,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
 use prelude::ErrClone;
 use prelude::Postfix;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashMap};
 
 use crate::{
     parse_graphql_schema,
@@ -114,40 +114,37 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .expect("Expected query type to be found.");
         query.expose_fields_to_insert.extend(refetch_fields);
 
+        let mut entity_map: HashMap<
+            ServerObjectEntityName,
+            &mut ProcessObjectTypeDefinitionOutcome<Self>,
+        > = HashMap::new();
+
+        for item in result.iter_mut() {
+            if let Some(outcome) = item.as_ref_mut().as_object() {
+                entity_map.insert(outcome.server_object_entity.item.name, outcome);
+            }
+        }
+
         // - in the extension document, you may have added directives to objects, e.g. @expose
         // - we need to transfer those to the original objects.
         //
         // The way we are doing this is in dire need of cleanup.
-        for (server_object_entity_name, directives) in directives {
-            // TODO don't do O(n^2) here
-            match result
-                .iter_mut()
-                .find_map(|item| match item.as_ref_mut().as_object() {
-                    Some(x) => {
-                        if x.server_object_entity.item.name == server_object_entity_name {
-                            Some(x)
-                        } else {
-                            None
-                        }
-                    }
-                    None => None,
-                }) {
+        for (server_object_entity_name, directives_vec) in directives {
+            let server_object_entity_directives: ServerObjectEntityDirectives =
+                from_graphql_directives(&directives_vec).map_err(|err| {
+                    Diagnostic::new(
+                        format!("Failed to deserialize: {}", err),
+                        Location::Generated.wrap_some(),
+                    )
+                })?;
+
+            // comment out this block for development
+            if server_object_entity_directives.canonical_id.is_some() {
+                panic!("Canonical ID directive is not supported yet. It's under development.");
+            }
+
+            match entity_map.get_mut(&server_object_entity_name) {
                 Some(outcome) => {
-                    let server_object_entity_directives: ServerObjectEntityDirectives =
-                        from_graphql_directives(&directives).map_err(|err| {
-                            Diagnostic::new(
-                                format!("Failed to deserialize: {}", err),
-                                Location::Generated.wrap_some(),
-                            )
-                        })?;
-
-                    // comment out this block for development
-                    if server_object_entity_directives.canonical_id.is_some() {
-                        panic!(
-                            "Canonical ID directive is not supported yet. It's under development."
-                        );
-                    }
-
                     for expose_field_directive in
                         server_object_entity_directives.expose_field.clone()
                     {
