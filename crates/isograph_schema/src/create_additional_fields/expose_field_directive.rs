@@ -38,6 +38,7 @@ pub struct ExposeFieldDirective {
     #[serde(default)]
     pub field_map: Vec<FieldMapItem>,
     pub field: StringLiteralValue,
+    pub limit_to: Option<Vec<StringLiteralValue>>,
 }
 
 pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
@@ -52,6 +53,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         expose_as,
         field_map,
         field,
+        limit_to,
     } = &expose_field_to_insert.expose_field_directive;
 
     // HACK: we're essentially splitting the field arg by . and keeping the same

@@ -408,6 +408,7 @@ fn process_object_type_definition(
                 field: format!("node.as{}", object_type_definition.name.item)
                     .intern()
                     .into(),
+                limit_to: None,
             },
             parent_object_name: object_type_definition.name.item,
             description: Description(
