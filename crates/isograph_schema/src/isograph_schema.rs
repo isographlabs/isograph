@@ -95,11 +95,15 @@ pub struct NameAndArguments {
 }
 
 impl NameAndArguments {
-    pub fn normalization_key(&self) -> NormalizationKey {
-        if self.name == *ID_FIELD_NAME {
-            NormalizationKey::Id
+    pub fn normalization_key<TNetworkProtocol: NetworkProtocol>(
+        &self,
+        db: &IsographDatabase<TNetworkProtocol>,
+        parent_object_entity_name: ServerObjectEntityName,
+    ) -> DiagnosticResult<NormalizationKey> {
+        if self.name == TNetworkProtocol::get_id_field_name(db, parent_object_entity_name)? {
+            NormalizationKey::Id.wrap_ok()
         } else {
-            NormalizationKey::ServerField(self.clone())
+            NormalizationKey::ServerField(self.clone()).wrap_ok()
         }
     }
 }

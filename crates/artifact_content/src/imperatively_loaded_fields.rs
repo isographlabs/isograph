@@ -1,17 +1,17 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, DiagnosticResult,
+    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{SelectionType, VariableDefinition};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ID_FIELD_NAME,
-    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
-    OwnedClientSelectable, PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath,
-    ServerEntityName, WrappedSelectionMapSelection, client_selectable_named, fetchable_types,
-    selection_map_wrapped,
+    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ImperativelyLoadedFieldVariant,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, OwnedClientSelectable,
+    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
+    WrappedSelectionMapSelection, client_selectable_named, fetchable_types, selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -82,8 +82,13 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     }
 
     // TODO we need to extend this with variables used in subfields_or_inline_fragments
-    let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, client_selectable);
+    let mut definitions_of_used_variables = get_used_variable_definitions(
+        db,
+        parent_object_entity_name,
+        reachable_variables,
+        client_selectable,
+    )
+    .expect("Expected used variable definitions to be valid.");
 
     for variable_definition in top_level_schema_field_arguments.iter() {
         definitions_of_used_variables.push(VariableDefinition {
@@ -204,14 +209,18 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 }
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: ServerObjectEntityName,
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &OwnedClientSelectable<TNetworkProtocol>,
-) -> Vec<VariableDefinition<ServerEntityName>> {
+) -> DiagnosticResult<Vec<VariableDefinition<ServerEntityName>>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
+            let id_field_name = TNetworkProtocol::get_id_field_name(db, entity_name)
+                .expect("Expected id field name to be valid.");
             // HACK
-            if *variable_name == *ID_FIELD_NAME {
+            if *variable_name == id_field_name {
                 None
             } else {
                 entrypoint
@@ -235,4 +244,5 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
             }
         })
         .collect::<Vec<_>>()
+        .wrap_ok()
 }

@@ -1,7 +1,7 @@
 use std::{collections::BTreeSet, fmt::Debug};
 
 use common_lang_types::{
-    ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
+    DiagnosticResult, ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
@@ -9,8 +9,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ID_FIELD_NAME, MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
-    get_reachable_variables, selection_map_wrapped,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, UnprocessedSelection,
+    WrappedSelectionMapSelection, get_reachable_variables, selection_map_wrapped,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone)]
@@ -123,13 +123,18 @@ impl GenerateRefetchQueryImpl {
     }
 }
 
-pub fn id_selection() -> UnprocessedSelection {
-    SelectionTypeContainingSelections::Scalar(ScalarSelection {
-        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
+pub fn id_selection<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: ServerObjectEntityName,
+) -> DiagnosticResult<UnprocessedSelection> {
+    Ok(SelectionTypeContainingSelections::Scalar(ScalarSelection {
+        name: WithLocation::new_generated(
+            TNetworkProtocol::get_id_field_name(db, entity_name)?.unchecked_conversion(),
+        ),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         associated_data: (),
         arguments: vec![],
     })
-    .with_generated_span()
+    .with_generated_span())
 }

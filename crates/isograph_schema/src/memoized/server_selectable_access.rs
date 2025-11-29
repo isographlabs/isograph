@@ -9,7 +9,7 @@ use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
 
 use crate::{
-    ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
+    ID_ENTITY_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
     ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
     field_to_insert_to_server_selectable, server_scalar_entity_named,
 };
@@ -166,12 +166,10 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
-    let selectable = server_selectable_named(
-        db,
-        parent_server_object_entity_name,
-        (*ID_FIELD_NAME).into(),
-    )
-    .clone_err()?;
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, parent_server_object_entity_name)?;
+    let selectable =
+        server_selectable_named(db, parent_server_object_entity_name, id_field_name.into())
+            .clone_err()?;
 
     let selectable = match selectable {
         Some(s) => s.clone_err()?,
@@ -182,7 +180,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let selectable = match selectable {
         SelectionType::Scalar(s) => s,
         SelectionType::Object(_) => {
-            let selectable_name = *ID_FIELD_NAME;
+            let selectable_name: ServerSelectableName = id_field_name.into();
             return Diagnostic::new(
                 format!(
                     "Expected `{parent_server_object_entity_name}.{selectable_name}` \
@@ -204,7 +202,6 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         // It must exist
         .ok_or_else(|| {
-            let id_field_name = *ID_FIELD_NAME;
             Diagnostic::new(
                 // TODO: it doesn't seem like this error is actually suppresable (here).
                 format!(
@@ -232,10 +229,9 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
         != *ID_ENTITY_NAME
     {
         options.on_invalid_id_type.on_failure(|| {
-            let strong_field_name = *ID_FIELD_NAME;
             Diagnostic::new(
                 format!(
-                    "The `{strong_field_name}` field on \
+                    "The `{id_field_name}` field on \
                     `{parent_server_object_entity_name}` must have type `ID!`.\n\
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."

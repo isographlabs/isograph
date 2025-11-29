@@ -14,9 +14,10 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{Description, SelectionTypePostfix};
 use isograph_schema::{
-    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, ID_FIELD_NAME,
+    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert,
     IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
-    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
+    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerObjectEntityDirectives, ServerScalarEntity,
+    TYPENAME_FIELD_NAME,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -344,11 +345,13 @@ fn process_object_type_definition(
     let should_add_refetch_field = type_definition_type.is_concrete()
         && type_definition_type.is_output_type()
         && type_implements_node(&object_type_definition);
+
     let server_object_entity = ServerObjectEntity {
         description: object_type_definition.description.map(|d| d.item),
         name: object_type_definition.name.item,
         concrete_type,
         network_protocol_associated_data: associated_data,
+        server_object_entity_directives: ServerObjectEntityDirectives::default(),
     }
     .with_location(object_type_definition.name.location.into());
 
@@ -398,12 +401,13 @@ fn process_object_type_definition(
     }
 
     if should_add_refetch_field {
+        let canonical_id_field_name = server_object_entity.item.canonical_id_field_name();
         refetch_fields.push(ExposeFieldToInsert {
             expose_field_directive: ExposeFieldDirective {
                 expose_as: (*REFETCH_FIELD_NAME).wrap_some(),
                 field_map: vec![FieldMapItem {
-                    from: ID_FIELD_NAME.unchecked_conversion(),
-                    to: ID_FIELD_NAME.unchecked_conversion(),
+                    from: canonical_id_field_name.unchecked_conversion(),
+                    to: canonical_id_field_name.unchecked_conversion(),
                 }],
                 field: format!("node.as{}", object_type_definition.name.item)
                     .intern()

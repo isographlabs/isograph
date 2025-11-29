@@ -170,10 +170,10 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
 
             match selection {
                 SelectionType::Scalar(s) => {
-                    if let ClientFieldVariant::UserWritten(u) = &s.variant {
-                        if let Err(e) = &u.client_scalar_selectable_directive_set {
-                            return Some(e.clone());
-                        }
+                    if let ClientFieldVariant::UserWritten(u) = &s.variant
+                        && let Err(e) = &u.client_scalar_selectable_directive_set
+                    {
+                        return Some(e.clone());
                     }
                 }
                 SelectionType::Object(_) => {
