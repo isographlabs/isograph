@@ -88,7 +88,6 @@ pub fn process_graphql_type_system_document(
                     },
                     GraphQLObjectDefinitionType::Object,
                     &mut refetch_fields,
-                    None,
                 )?;
 
                 directives
@@ -120,7 +119,6 @@ pub fn process_graphql_type_system_document(
                         },
                         GraphQLObjectDefinitionType::Interface,
                         &mut refetch_fields,
-                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -151,7 +149,6 @@ pub fn process_graphql_type_system_document(
                         },
                         GraphQLObjectDefinitionType::InputObject,
                         &mut refetch_fields,
-                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -197,7 +194,6 @@ pub fn process_graphql_type_system_document(
                         },
                         GraphQLObjectDefinitionType::Union,
                         &mut refetch_fields,
-                        None,
                     )?;
 
                 type_system_entities.push(process_object_type_definition_outcome.object_selected());
@@ -342,7 +338,6 @@ fn process_object_type_definition(
     associated_data: GraphQLSchemaObjectAssociatedData,
     type_definition_type: GraphQLObjectDefinitionType,
     refetch_fields: &mut Vec<ExposeFieldToInsert>,
-    server_object_entity_directives: Option<ServerObjectEntityDirectives>,
 ) -> DiagnosticResult<(
     ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
     Vec<GraphQLDirective<GraphQLConstantValue>>,
@@ -356,7 +351,7 @@ fn process_object_type_definition(
         name: object_type_definition.name.item,
         concrete_type,
         network_protocol_associated_data: associated_data,
-        server_object_entity_directives: server_object_entity_directives.unwrap_or_default(),
+        server_object_entity_directives: ServerObjectEntityDirectives::default(),
     }
     .with_location(object_type_definition.name.location.into());
 
