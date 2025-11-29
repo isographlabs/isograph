@@ -218,7 +218,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|variable_name| {
             // HACK
-            if *variable_name == TNetworkProtocol::get_id_field_name(db, &entity_name).unwrap() {
+            if *variable_name == TNetworkProtocol::get_id_field_name(db, entity_name).unwrap() {
                 None
             } else {
                 entrypoint

@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use common_lang_types::{
     Diagnostic, DiagnosticResult, Location, QueryExtraInfo, QueryOperationName, QueryText,
     ServerObjectEntityName, ServerScalarSelectableName, UnvalidatedTypeName, WithLocationPostfix,
@@ -14,7 +12,9 @@ use isograph_schema::{
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
+use prelude::ErrClone;
 use prelude::Postfix;
+use std::collections::BTreeMap;
 
 use crate::{
     parse_graphql_schema,
@@ -245,11 +245,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn get_id_field_name(
         db: &IsographDatabase<GraphQLNetworkProtocol>,
-        server_object_entity_name: &ServerObjectEntityName,
+        server_object_entity_name: ServerObjectEntityName,
     ) -> DiagnosticResult<ServerScalarSelectableName> {
-        let entity = server_object_entity_named(db, *server_object_entity_name)
-            .as_ref()
-            .map_err(|e| e.clone())?  // Propagate error instead of expect
+        let entity = server_object_entity_named(db, server_object_entity_name)
+            .clone_err()?
             .as_ref()
             .ok_or_else(|| {
                 Diagnostic::new(

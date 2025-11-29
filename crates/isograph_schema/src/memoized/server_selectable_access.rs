@@ -166,7 +166,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &parent_server_object_entity_name)?;
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, parent_server_object_entity_name)?;
     let selectable =
         server_selectable_named(db, parent_server_object_entity_name, id_field_name.into())
             .clone_err()?;

@@ -1245,7 +1245,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             target_server_object_entity.name,
         ));
     }
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &target_server_object_entity_name)?;
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, target_server_object_entity_name)?;
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
         parent_object_entity_name: *query_id,
         server_object_selectable_name: *NODE_FIELD_NAME,
@@ -1420,7 +1420,7 @@ fn merge_server_scalar_field<TNetworkProtocol: NetworkProtocol>(
     let normalization_key = if scalar_field_name == *TYPENAME_FIELD_NAME {
         NormalizationKey::Discriminator
     } else if scalar_field_name
-        == TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)?
+        == TNetworkProtocol::get_id_field_name(db, parent_object_entity_name)?
     {
         NormalizationKey::Id
     } else {
@@ -1609,7 +1609,7 @@ pub fn id_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Vec<VariableDefinition<ServerEntityName>>> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name)?;
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, entity_name)?;
     vec![VariableDefinition {
         name: WithLocation::new_generated(id_field_name.unchecked_conversion()),
         type_: GraphQLTypeAnnotation::NonNull(

@@ -60,7 +60,7 @@ pub trait NetworkProtocol:
 
     fn get_id_field_name(
         db: &IsographDatabase<Self>,
-        entity_name: &ServerObjectEntityName,
+        entity_name: ServerObjectEntityName,
     ) -> DiagnosticResult<ServerScalarSelectableName>;
 }
 

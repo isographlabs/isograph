@@ -129,7 +129,7 @@ pub fn id_selection<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<UnprocessedSelection> {
     Ok(SelectionTypeContainingSelections::Scalar(ScalarSelection {
         name: WithLocation::new_generated(
-            TNetworkProtocol::get_id_field_name(db, &entity_name)?.unchecked_conversion(),
+            TNetworkProtocol::get_id_field_name(db, entity_name)?.unchecked_conversion(),
         ),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),

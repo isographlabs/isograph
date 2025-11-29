@@ -232,7 +232,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         let id_field = server_selectable_named(
             db,
             parent_object_entity_name,
-            TNetworkProtocol::get_id_field_name(db, &parent_object_entity_name)?.into(),
+            TNetworkProtocol::get_id_field_name(db, parent_object_entity_name)?.into(),
         )
         // TODO don't call to_owned
         .to_owned()?
@@ -405,7 +405,7 @@ pub fn id_top_level_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Vec<ArgumentKeyAndValue>> {
-    let id_field_name = TNetworkProtocol::get_id_field_name(db, &entity_name)?;
+    let id_field_name = TNetworkProtocol::get_id_field_name(db, entity_name)?;
     Ok(vec![ArgumentKeyAndValue {
         key: id_field_name.unchecked_conversion(),
         value: NonConstantValue::Variable(id_field_name.unchecked_conversion()),
