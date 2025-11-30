@@ -413,7 +413,15 @@ pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T
 
             current_epoch
         }
-        Entry::Occupied(occupied) => occupied.get().time_updated,
+        Entry::Occupied(mut occupied) => {
+            let revision = occupied.get_mut();
+
+            if revision.time_verified != current_epoch {
+                revision.time_verified = current_epoch;
+            }
+
+            revision.time_updated
+        }
     };
 
     db.get_storage().register_dependency_in_parent_memoized_fn(
