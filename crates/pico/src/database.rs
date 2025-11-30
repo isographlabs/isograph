@@ -5,10 +5,9 @@ use crate::{
     dependency::{Dependency, DependencyStack, NodeKind},
     dyn_eq::DynEq,
     epoch::Epoch,
-    execute_memoized_function,
     index::Index,
     intern::{Key, ParamId},
-    macro_fns::{get_param, hash, init_param_vec, intern_owned_param},
+    macro_fns::{hash, init_param_vec},
     source::{Source, SourceId, SourceNode},
 };
 use boxcar::Vec as BoxcarVec;
@@ -382,8 +381,47 @@ impl<Db: Database> Default for Storage<Db> {
 }
 
 pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T) -> MemoRef<T> {
-    let param_id = intern_owned_param(db, value);
-    intern_from_param(db, param_id, MemoRefKind::Value)
+    let param_id = hash(&value).into();
+    let mut param_ids = init_param_vec();
+    param_ids.push(param_id);
+    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
+
+    let current_epoch = db.get_storage().internal.current_epoch;
+
+    let time_updated = match db
+        .get_storage()
+        .internal
+        .derived_node_id_to_revision
+        .entry(derived_node_id)
+    {
+        Entry::Vacant(vacant) => {
+            let node_index = db.get_storage().internal.insert_derived_node(DerivedNode {
+                inner_fn: InnerFn::new(|_, _| {
+                    unreachable!("interned derived node should never be executed")
+                }),
+                value: Box::new(value),
+            });
+
+            let dependency_index = db.get_storage().internal.insert_dependencies(Vec::new());
+
+            vacant.insert(DerivedNodeRevision {
+                time_updated: current_epoch,
+                time_verified: current_epoch,
+                node_index,
+                dependency_index,
+            });
+
+            current_epoch
+        }
+        Entry::Occupied(occupied) => occupied.get().time_updated,
+    };
+
+    db.get_storage().register_dependency_in_parent_memoized_fn(
+        NodeKind::Derived(derived_node_id),
+        time_updated,
+    );
+
+    MemoRef::new(derived_node_id)
 }
 
 /// In this function, we create a [`MemoRef`], which is a wrapper around a pointer.
@@ -538,32 +576,4 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
     );
 
     MemoRef::new_with_kind(derived_node_id, MemoRefKind::RawPtr)
-}
-
-fn intern_from_param<Db: Database, T: Clone + DynEq>(
-    db: &Db,
-    param_id: ParamId,
-    kind: MemoRefKind,
-) -> MemoRef<T> {
-    let mut param_ids = init_param_vec();
-    param_ids.push(param_id);
-    let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
-    let inner_fn = match kind {
-        MemoRefKind::Value => InnerFn::new(|db, derived_node_id| {
-            let param_ref = get_param(db, derived_node_id.params[0])?;
-            let param = param_ref
-                .downcast_ref::<T>()
-                .expect("Unexpected param type. This is indicative of a bug in Pico.");
-            Some(Box::new(param.clone()))
-        }),
-        MemoRefKind::RawPtr => InnerFn::new(|db, derived_node_id| {
-            let param_ref = get_param(db, derived_node_id.params[0])?;
-            let param = param_ref
-                .downcast_ref::<RawPtr<T>>()
-                .expect("Unexpected param type. This is indicative of a bug in Pico.");
-            Some(Box::new(*param))
-        }),
-    };
-    execute_memoized_function(db, derived_node_id, inner_fn);
-    MemoRef::new_with_kind(derived_node_id, kind)
 }
