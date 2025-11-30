@@ -5,7 +5,11 @@ import {
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import type { IsographComponentFunction } from '../core/IsographEnvironment';
+import type {
+  IsographComponentFunction,
+  PayloadError,
+  PayloadErrorExtensions,
+} from '../core/IsographEnvironment';
 import { logMessage } from '../core/logging';
 import { readPromise } from '../core/PromiseWrapper';
 import {
@@ -39,7 +43,31 @@ export function useReadAndSubscribe<
     setReadOutDataAndRecords,
     readerAst,
   );
+
+  if (readOutDataAndRecords.errors != null) {
+    const errors = readOutDataAndRecords.errors.map(
+      (error) => new GraphqlError(error),
+    );
+    if (errors.length > 1) {
+      throw new AggregateError(errors);
+    }
+    throw errors[0];
+  }
+
   return readOutDataAndRecords.item;
+}
+
+class GraphqlError extends Error implements PayloadError {
+  locations?: { line: number; column: number }[];
+  path?: (string | number)[];
+  extensions?: PayloadErrorExtensions;
+  constructor(error: PayloadError) {
+    super(error.message);
+    this.name = 'GraphqlError';
+    if (error.path != null) this.path = error.path;
+    if (error.locations != null) this.locations = error.locations;
+    if (error.extensions != null) this.extensions = error.extensions;
+  }
 }
 
 export function useSubscribeToMultiple<
