@@ -1,5 +1,5 @@
 import { iso } from '@iso';
-import { beforeEach, describe, expect, test, vi } from 'vitest';
+import { beforeEach, describe, expect, test, vi, vitest } from 'vitest';
 
 import { normalizeData } from '../core/cache';
 import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
@@ -19,6 +19,8 @@ import {
 } from '../core/read';
 import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import type { Query__errors__param } from './__isograph/Query/errors/param_type';
+import type { Query__errorsClientField__param } from './__isograph/Query/errorsClientField/param_type';
+import type { Query__errorsClientPointer__param } from './__isograph/Query/errorsClientPointer/param_type';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
 function ok<T extends DataTypeValue>(
@@ -255,6 +257,50 @@ export const errorsSecond = iso(`
   }
 `)(() => {});
 const errorsSecondEntrypoint = iso(`entrypoint Query.errorsSecond`);
+
+let errorsClientFieldFieldMock = vitest.fn();
+
+export const errorsClientFieldField = iso(`
+  field Economist.errorsClientFieldField {
+    id
+    nickname
+  }
+`)(errorsClientFieldFieldMock);
+
+export const errorsClientField = iso(`
+  field Query.errorsClientField($id: ID!) {
+    node(id: $id) {
+      asEconomist {
+        errorsClientFieldField
+      } 
+    }
+  }
+`)(() => {});
+const errorsClientFieldEntrypoint = iso(`entrypoint Query.errorsClientField`);
+
+let errorsClientPointerFieldMock = vitest.fn();
+
+export const errorsClientPointerField = iso(`
+  pointer Economist.errorsClientPointerField to Economist {
+    id
+    nickname
+  }
+`)(errorsClientPointerFieldMock);
+
+export const errorsClientPointer = iso(`
+  field Query.errorsClientPointer($id: ID!) {
+    node(id: $id) {
+      asEconomist {
+        errorsClientPointerField {
+          id
+        }
+      } 
+    }
+  }
+`)(() => {});
+const errorsClientPointerEntrypoint = iso(
+  `entrypoint Query.errorsClientPointer`,
+);
 
 describe('errors', () => {
   describe('normalizeData', () => {
@@ -668,6 +714,129 @@ describe('errors', () => {
         ],
       });
     });
+
+    test('returns null for client field with error', () => {
+      const store: BaseStoreLayerData = {
+        Economist: {
+          1: {
+            __typename: ok('Economist'),
+            id: ok('1'),
+            nickname: err([
+              {
+                message: 'Missing name',
+                path: ['node____id___v_id', 'nickname'],
+              },
+            ]),
+          },
+        },
+        Query: {
+          [ROOT_ID]: {
+            node____id___1: ok({
+              __link: '1',
+              __typename: 'Economist',
+            }),
+          },
+        },
+      };
+      const environment = createIsographEnvironment(
+        store,
+        vi.fn().mockRejectedValue(new Error('Fetch failed')),
+      );
+      const [_cacheItem, item, _disposeOfTemporaryRetain] =
+        getOrCreateCacheForArtifact(environment, errorsClientFieldEntrypoint, {
+          id: '1',
+        }).getOrPopulateAndTemporaryRetain();
+
+      const data = readButDoNotEvaluate(environment, item, {
+        suspendIfInFlight: true,
+        throwOnNetworkError: false,
+      });
+
+      expect(errorsClientFieldFieldMock).not.toBeCalled();
+      expect(data).toStrictEqual<
+        WithEncounteredRecords<Query__errorsClientField__param>
+      >({
+        encounteredRecords: new Map([
+          ['Query', new Set([ROOT_ID])],
+          ['Economist', new Set(['1'])],
+        ]),
+        item: {
+          node: {
+            asEconomist: { errorsClientFieldField: null },
+          },
+        },
+        errors: [
+          {
+            message: 'Missing name',
+            path: ['node____id___v_id', 'nickname'],
+          },
+        ],
+      });
+    });
+
+    test('returns null for client pointer with error', () => {
+      const store: BaseStoreLayerData = {
+        Economist: {
+          1: {
+            __typename: ok('Economist'),
+            id: ok('1'),
+            nickname: err([
+              {
+                message: 'Missing name',
+                path: ['node____id___v_id', 'nickname'],
+              },
+            ]),
+          },
+        },
+        Query: {
+          [ROOT_ID]: {
+            node____id___1: ok({
+              __link: '1',
+              __typename: 'Economist',
+            }),
+          },
+        },
+      };
+      const environment = createIsographEnvironment(
+        store,
+        vi.fn().mockRejectedValue(new Error('Fetch failed')),
+      );
+      const [_cacheItem, item, _disposeOfTemporaryRetain] =
+        getOrCreateCacheForArtifact(
+          environment,
+          errorsClientPointerEntrypoint,
+          {
+            id: '1',
+          },
+        ).getOrPopulateAndTemporaryRetain();
+
+      const data = readButDoNotEvaluate(environment, item, {
+        suspendIfInFlight: true,
+        throwOnNetworkError: false,
+      });
+
+      expect(errorsClientPointerFieldMock).not.toBeCalled();
+      expect(data).toStrictEqual<
+        WithEncounteredRecords<Query__errorsClientPointer__param>
+      >({
+        encounteredRecords: new Map([
+          ['Query', new Set([ROOT_ID])],
+          ['Economist', new Set(['1'])],
+        ]),
+        item: {
+          node: {
+            asEconomist: { errorsClientPointerField: null },
+          },
+        },
+        errors: [
+          {
+            message: 'Missing name',
+            path: ['node____id___v_id', 'nickname'],
+          },
+        ],
+      });
+    });
+
     test('reads no errors', () => {
       const store: BaseStoreLayerData = {
         Query: {
