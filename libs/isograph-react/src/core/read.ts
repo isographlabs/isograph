@@ -132,16 +132,19 @@ export function readButDoNotEvaluate<
 export type ReadDataResultSuccess<Data> = {
   readonly kind: 'Success';
   readonly data: Data;
+  readonly errors: PayloadErrors | undefined;
+};
+
+type ReadDataResultMissingData = {
+  readonly kind: 'MissingData';
+  readonly reason: string;
+  readonly nestedReason?: ReadDataResultMissingData;
+  readonly recordLink: StoreLink;
 };
 
 export type ReadDataResult<Data> =
   | ReadDataResultSuccess<Data>
-  | {
-      readonly kind: 'MissingData';
-      readonly reason: string;
-      readonly nestedReason?: ReadDataResult<unknown>;
-      readonly recordLink: StoreLink;
-    };
+  | ReadDataResultMissingData;
 
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
@@ -171,11 +174,12 @@ function readData<TReadFromStore>(
     return {
       kind: 'Success',
       data: null as any,
+      errors: undefined,
     };
   }
 
   let target: { [index: string]: any } = {};
-
+  let errors: PayloadErrors | undefined = undefined;
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
@@ -183,6 +187,11 @@ function readData<TReadFromStore>(
 
         if (data.kind === 'MissingData') {
           return data;
+        }
+        if (errors == null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
         }
         target[field.alias ?? field.fieldName] = data.data;
         break;
@@ -216,6 +225,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        if (errors == null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias ?? field.fieldName] = data.data;
         break;
       }
@@ -232,6 +246,11 @@ function readData<TReadFromStore>(
         );
         if (data.kind === 'MissingData') {
           return data;
+        }
+        if (errors == null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
         }
         target[field.alias] = data.data;
         break;
@@ -250,6 +269,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        if (errors == null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias] = data.data;
         break;
       }
@@ -266,6 +290,11 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
+        if (errors == null) {
+          errors = data.errors;
+        } else if (data.errors) {
+          errors.push(...data.errors);
+        }
         target[field.alias] = data.data;
         break;
       }
@@ -281,6 +310,7 @@ function readData<TReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+    errors,
   };
 }
 
@@ -316,6 +346,7 @@ export function readLoadablySelectedFieldData(
 
   return {
     kind: 'Success',
+    errors: refetchReaderParams.errors,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -597,6 +628,15 @@ export function readResolverFieldData(
           recordLink: data.recordLink,
         };
       }
+
+      if (data.errors != null) {
+        return {
+          kind: 'Success',
+          data: null,
+          errors: data.errors,
+        };
+      }
+
       const firstParameter = {
         data: data.data,
         parameters: variables,
@@ -610,12 +650,14 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
+        errors: undefined,
         data: field.readerArtifact.resolver(firstParameter),
       };
     }
     case 'ComponentReaderArtifact': {
       return {
         kind: 'Success',
+        errors: undefined,
         data: getOrCreateCachedComponent(
           environment,
           fragment,
@@ -636,9 +678,7 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadDataResult<
-  string | number | boolean | StoreLink | readonly DataTypeValue[] | null
-> {
+): ReadDataResult<DataTypeValue> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
@@ -650,7 +690,10 @@ export function readScalarFieldData(
       recordLink: root,
     };
   }
-  return { kind: 'Success', data: value };
+  if (value.kind === 'Errors') {
+    return { kind: 'Success', data: null, errors: value.errors };
+  }
+  return { kind: 'Success', data: value.value, errors: value.errors };
 }
 
 export function readLinkedFieldData(
@@ -679,6 +722,14 @@ export function readLinkedFieldData(
           'Missing data for ' + storeRecordName + ' on root ' + root.__link,
         nestedReason: data,
         recordLink: data.recordLink,
+      };
+    }
+
+    if (data.errors != null) {
+      return {
+        kind: 'Success',
+        data: null,
+        errors: data.errors,
       };
     }
 
@@ -720,12 +771,17 @@ export function readLinkedFieldData(
           }
         : undefined),
     });
-    value = condition;
+    value = {
+      kind: 'Data',
+      value: condition,
+      errors: undefined,
+    };
   }
 
-  if (Array.isArray(value)) {
+  if (value?.kind === 'Data' && Array.isArray(value.value)) {
+    let errors: PayloadErrors | undefined = undefined;
     const results = [];
-    for (const item of value) {
+    for (const item of value.value) {
       const link = assertLink(item);
       if (link === undefined) {
         return {
@@ -767,6 +823,11 @@ export function readLinkedFieldData(
             recordLink: result.recordLink,
           };
         }
+        if (errors == null) {
+          errors = result.errors;
+        } else if (result.errors) {
+          errors.push(...result.errors);
+        }
         results.push(result.data);
         continue;
       }
@@ -786,14 +847,20 @@ export function readLinkedFieldData(
           recordLink: result.recordLink,
         };
       }
+      if (errors == null) {
+        errors = result.errors;
+      } else if (result.errors) {
+        errors.push(...result.errors);
+      }
       results.push(result.data);
     }
     return {
       kind: 'Success',
       data: results,
+      errors,
     };
   }
-  let link = assertLink(value);
+  let link = value?.kind === 'Data' ? assertLink(value.value) : null;
 
   if (link === undefined) {
     // TODO make this configurable, and also generated and derived from the schema
@@ -834,6 +901,7 @@ export function readLinkedFieldData(
     return {
       kind: 'Success',
       data: null,
+      errors: value?.errors,
     };
   }
 
@@ -907,6 +975,13 @@ export function readClientPointerData(
       recordLink: refetchReaderParams.recordLink,
     };
   }
+  if (refetchReaderParams.errors != null) {
+    return {
+      kind: 'Success',
+      data: null,
+      errors: refetchReaderParams.errors,
+    };
+  }
 
   const refetchQuery = nestedRefetchQueries[field.refetchQueryIndex];
   if (refetchQuery == null) {
@@ -919,6 +994,7 @@ export function readClientPointerData(
 
   return {
     kind: 'Success',
+    errors: undefined,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -1049,6 +1125,13 @@ export function readImperativelyLoadedField(
       recordLink: data.recordLink,
     };
   } else {
+    if (data.errors != null) {
+      return {
+        kind: 'Success',
+        data: null,
+        errors: data.errors,
+      };
+    }
     const { refetchQueryIndex } = field;
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
@@ -1063,6 +1146,7 @@ export function readImperativelyLoadedField(
     // use the resolver reader AST to get the resolver parameters.
     return {
       kind: 'Success',
+      errors: undefined,
       data: (args: any) => [
         // Stable id
         root.__typename + ':' + root.__link + '__' + field.name,
