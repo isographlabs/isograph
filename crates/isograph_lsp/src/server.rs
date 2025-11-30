@@ -8,6 +8,7 @@ use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
+    references::on_references,
     semantic_tokens::on_semantic_token_full_request,
     text_document::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
@@ -27,7 +28,7 @@ use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     CompletionOptions, HoverProviderCapability,
-    request::{Completion, HoverRequest, SemanticTokensFullRequest},
+    request::{Completion, HoverRequest, References, SemanticTokensFullRequest},
 };
 use lsp_types::{
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
@@ -62,6 +63,7 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
             trigger_characters: Some(vec!["\n".to_string()]),
             ..Default::default()
         }),
+        references_provider: OneOf::Left(true).wrap_some(),
         ..Default::default()
     };
     let server_capabilities =
@@ -187,6 +189,7 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             .on_request_sync::<Formatting>(on_format)?
             .on_request_sync::<GotoDefinition>(on_goto_definition)?
             .on_request_sync::<Completion>(on_completion)?
+            .on_request_sync::<References>(on_references)?
             .request();
 
         // If we have gotten here, we have not handled the request
