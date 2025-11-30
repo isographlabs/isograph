@@ -1,4 +1,8 @@
 import type { IsographEntrypoint } from '@isograph/react';
+import { type Economist__errorsClientFieldField__param } from './Economist/errorsClientFieldField/param_type';
+import { type Economist__errorsClientPointerField__param } from './Economist/errorsClientPointerField/param_type';
+import { type Query__errorsClientField__param } from './Query/errorsClientField/param_type';
+import { type Query__errorsClientPointer__param } from './Query/errorsClientPointer/param_type';
 import { type Query__errorsSecond__param } from './Query/errorsSecond/param_type';
 import { type Query__errors__param } from './Query/errors/param_type';
 import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
@@ -9,6 +13,9 @@ import { type Query__nodeField__param } from './Query/nodeField/param_type';
 import { type Query__normalizeUndefinedField__param } from './Query/normalizeUndefinedField/param_type';
 import { type Query__startUpdate__param } from './Query/startUpdate/param_type';
 import { type Query__subquery__param } from './Query/subquery/param_type';
+import { type Economist____link__output_type } from './Economist/__link/output_type';
+import entrypoint_Query__errorsClientField from '../__isograph/Query/errorsClientField/entrypoint';
+import entrypoint_Query__errorsClientPointer from '../__isograph/Query/errorsClientPointer/entrypoint';
 import entrypoint_Query__errorsSecond from '../__isograph/Query/errorsSecond/entrypoint';
 import entrypoint_Query__errors from '../__isograph/Query/errors/entrypoint';
 import entrypoint_Query__linkedUpdate from '../__isograph/Query/linkedUpdate/entrypoint';
@@ -69,6 +76,22 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Economist.errorsClientFieldField', T>
+): IdentityWithParam<Economist__errorsClientFieldField__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'pointer Economist.errorsClientPointerField', T>
+): IdentityWithParam<Economist__errorsClientPointerField__param, (Economist____link__output_type | null)>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsClientField', T>
+): IdentityWithParam<Query__errorsClientField__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsClientPointer', T>
+): IdentityWithParam<Query__errorsClientPointer__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.errorsSecond', T>
 ): IdentityWithParam<Query__errorsSecond__param>;
 
@@ -107,6 +130,14 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.subquery', T>
 ): IdentityWithParam<Query__subquery__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientField', T>
+): typeof entrypoint_Query__errorsClientField;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientPointer', T>
+): typeof entrypoint_Query__errorsClientPointer;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsSecond', T>
