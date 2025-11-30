@@ -16,18 +16,17 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectableId,
-    FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase,
-    LINK_FIELD_NAME, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey,
-    RefetchStrategy, ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedSelection, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_scalar_selectables,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    client_selectable_named, description, fetchable_types, inline_fragment_reader_selection_set,
-    output_type_annotation, selectable_named, selection_map_wrapped, server_object_entity_named,
-    server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, validate_entire_schema, validated_entrypoints,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
+    FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, LINK_FIELD_NAME,
+    NODE_FIELD_NAME, NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
+    ScalarSelectableId, ServerEntityName, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    ValidatedSelection, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, client_selectable_named, description, fetchable_types,
+    inline_fragment_reader_selection_set, output_type_annotation, selectable_named,
+    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
+    server_scalar_entity_javascript_name, server_scalar_selectable_named, validate_entire_schema,
+    validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use isograph_schema::{ContainsIsoStats, ObjectSelectableId};
 use lazy_static::lazy_static;
@@ -135,7 +134,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
     let config = db.get_isograph_config();
     let mut encountered_client_type_map = BTreeMap::new();
     let mut path_and_contents = vec![];
-    let mut encountered_output_types = HashSet::<ClientSelectableId>::new();
+    let mut encountered_output_types = HashSet::new();
     let mut persisted_documents =
         config
             .options
@@ -511,10 +510,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             None => {
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
-                for nested_client_scalar_selectable_id in
-                    accessible_client_scalar_selectables(db, user_written_client_type)
+                for nested_client_selectable_id in
+                    accessible_client_selectables(db, user_written_client_type)
                 {
-                    encountered_output_types.insert(nested_client_scalar_selectable_id);
+                    encountered_output_types.insert(nested_client_selectable_id);
                 }
             }
         }

@@ -14,7 +14,7 @@ use crate::{
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_scalar_selectables<TNetworkProtocol: NetworkProtocol>(
+pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_type: &OwnedClientSelectable<TNetworkProtocol>,
 ) -> impl Iterator<Item = ClientSelectableId> {
@@ -34,21 +34,21 @@ pub fn accessible_client_scalar_selectables<TNetworkProtocol: NetworkProtocol>(
         .expect("Expected selection set to be valid"),
     };
 
-    AccessibleClientFieldIterator {
+    AccessibleClientSelectableIterator {
         selection_set,
         index: 0,
         sub_iterator: None,
     }
 }
 
-struct AccessibleClientFieldIterator {
+struct AccessibleClientSelectableIterator {
     // TODO have a reference
     selection_set: WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator>>,
+    sub_iterator: Option<Box<AccessibleClientSelectableIterator>>,
 }
 
-impl Iterator for AccessibleClientFieldIterator {
+impl Iterator for AccessibleClientSelectableIterator {
     type Item = ClientSelectableId;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -84,7 +84,7 @@ impl Iterator for AccessibleClientFieldIterator {
                         }
                     }
                     SelectionTypeContainingSelections::Object(linked_field) => {
-                        let mut iterator = AccessibleClientFieldIterator {
+                        let mut iterator = AccessibleClientSelectableIterator {
                             selection_set: linked_field.selection_set.clone(),
                             index: 0,
                             sub_iterator: None,
