@@ -52,6 +52,7 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
         expose_as,
         field_map,
         field,
+        limit_to: None,
     };
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
@@ -72,6 +73,7 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
         expose_as: None,
         field_map,
         field,
+        limit_to: None,
     };
 
     assert_eq!(expose_field_mutations[0], set_tagline_mutation);
@@ -92,6 +94,7 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
         expose_as: None,
         field_map,
         field,
+        limit_to: None,
     };
     assert_eq!(expose_field_directives[1], set_pet_best_friend);
     Ok(())
