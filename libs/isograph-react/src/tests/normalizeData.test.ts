@@ -18,6 +18,7 @@ import {
 import { iso } from './__isograph/iso';
 import type { Query__errors__param } from './__isograph/Query/errors/param_type';
 import type { Query__errorsClientField__param } from './__isograph/Query/errorsClientField/param_type';
+import type { Query__errorsClientFieldComponent__param } from './__isograph/Query/errorsClientFieldComponent/param_type';
 import type { Query__errorsClientPointer__param } from './__isograph/Query/errorsClientPointer/param_type';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
@@ -276,6 +277,27 @@ export const errorsClientField = iso(`
 `)(() => {});
 const errorsClientFieldEntrypoint = iso(`entrypoint Query.errorsClientField`);
 
+let errorsClientFieldComponentFieldMock = vitest.fn();
+
+export const errorsClientFieldComponentField = iso(`
+  field Economist.errorsClientFieldComponentField @component {
+    id
+    nickname
+  }
+`)(errorsClientFieldComponentFieldMock);
+
+export const errorsClientFieldComponent = iso(`
+  field Query.errorsClientFieldComponent($id: ID!) {
+    node(id: $id) {
+      asEconomist {
+        errorsClientFieldComponentField
+      } 
+    }
+  }
+`)(() => {});
+// prettier-ignore
+const errorsClientFieldComponentEntrypoint = iso(`entrypoint Query.errorsClientFieldComponent`);
+
 let errorsClientPointerFieldMock = vitest.fn();
 
 export const errorsClientPointerField = iso(`
@@ -296,9 +318,8 @@ export const errorsClientPointer = iso(`
     }
   }
 `)(() => {});
-const errorsClientPointerEntrypoint = iso(
-  `entrypoint Query.errorsClientPointer`,
-);
+// prettier-ignore
+const errorsClientPointerEntrypoint = iso(`entrypoint Query.errorsClientPointer`);
 
 describe('errors', () => {
   describe('normalizeData', () => {
@@ -713,7 +734,7 @@ describe('errors', () => {
       });
     });
 
-    test('returns null for client field with error', () => {
+    test('reads null for client field with error', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           1: {
@@ -772,7 +793,67 @@ describe('errors', () => {
       });
     });
 
-    test('returns null for client pointer with error', () => {
+    test('reads client field component with error', () => {
+      const store: BaseStoreLayerData = {
+        Economist: {
+          1: {
+            __typename: ok('Economist'),
+            id: ok('1'),
+            nickname: err([
+              {
+                message: 'Missing name',
+                path: ['node____id___v_id', 'nickname'],
+              },
+            ]),
+          },
+        },
+        Query: {
+          [ROOT_ID]: {
+            node____id___1: ok({
+              __link: '1',
+              __typename: 'Economist',
+            }),
+          },
+        },
+      };
+      const environment = createIsographEnvironment(
+        store,
+        vi.fn().mockRejectedValue(new Error('Fetch failed')),
+      );
+      const [_cacheItem, item, _disposeOfTemporaryRetain] =
+        getOrCreateCacheForArtifact(
+          environment,
+          errorsClientFieldComponentEntrypoint,
+          {
+            id: '1',
+          },
+        ).getOrPopulateAndTemporaryRetain();
+
+      const data = readButDoNotEvaluate(environment, item, {
+        suspendIfInFlight: true,
+        throwOnNetworkError: false,
+      });
+
+      expect(errorsClientFieldComponentFieldMock).not.toBeCalled();
+      expect(data).toStrictEqual<
+        WithEncounteredRecords<Query__errorsClientFieldComponent__param>
+      >({
+        encounteredRecords: new Map([
+          ['Query', new Set([ROOT_ID])],
+          ['Economist', new Set(['1'])],
+        ]),
+        item: {
+          node: {
+            asEconomist: {
+              errorsClientFieldComponentField: expect.any(Function),
+            },
+          },
+        },
+        errors: undefined,
+      });
+    });
+
+    test('reads null for client pointer with error', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           1: {
