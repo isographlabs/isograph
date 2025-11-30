@@ -1,4 +1,4 @@
-use common_lang_types::WithSpan;
+use common_lang_types::{WithLocation, WithLocationPostfix, WithSpan};
 use isograph_lang_types::{
     DefinitionLocation, SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
@@ -17,7 +17,7 @@ use isograph_lang_types::SelectionType;
 pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_type: &OwnedClientSelectable<TNetworkProtocol>,
-) -> impl Iterator<Item = ClientSelectableId> {
+) -> impl Iterator<Item = WithLocation<ClientSelectableId>> {
     let selection_set = match selection_type {
         SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
             db,
@@ -49,7 +49,7 @@ struct AccessibleClientSelectableIterator {
 }
 
 impl Iterator for AccessibleClientSelectableIterator {
-    type Item = ClientSelectableId;
+    type Item = WithLocation<ClientSelectableId>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -66,8 +66,8 @@ impl Iterator for AccessibleClientSelectableIterator {
 
             if let Some(selection) = item {
                 match &selection.item {
-                    SelectionTypeContainingSelections::Scalar(scalar) => {
-                        match scalar.associated_data {
+                    SelectionTypeContainingSelections::Scalar(scalar_selection) => {
+                        match scalar_selection.associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
@@ -79,24 +79,28 @@ impl Iterator for AccessibleClientSelectableIterator {
                                 self.index += 1;
                                 return (parent_object_entity_name, client_field_name)
                                     .scalar_selected()
+                                    .with_location(scalar_selection.name.location)
                                     .wrap_some();
                             }
                         }
                     }
-                    SelectionTypeContainingSelections::Object(linked_field) => {
+                    SelectionTypeContainingSelections::Object(object_selection) => {
                         let mut iterator = AccessibleClientSelectableIterator {
-                            selection_set: linked_field.selection_set.clone(),
+                            selection_set: object_selection.selection_set.clone(),
                             index: 0,
                             sub_iterator: None,
                         };
 
-                        match linked_field.associated_data {
+                        match object_selection.associated_data {
                             DefinitionLocation::Client(client_object_selectable_id) => {
                                 // TODO: include pointer target link type
                                 // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(iterator.boxed());
                                 self.index += 1;
-                                return client_object_selectable_id.object_selected().wrap_some();
+                                return client_object_selectable_id
+                                    .object_selected()
+                                    .with_location(object_selection.name.location)
+                                    .wrap_some();
                             }
                             DefinitionLocation::Server(_) => {}
                         };

@@ -513,7 +513,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 for nested_client_selectable_id in
                     accessible_client_selectables(db, user_written_client_type)
                 {
-                    encountered_output_types.insert(nested_client_selectable_id);
+                    encountered_output_types.insert(nested_client_selectable_id.item);
                 }
             }
         }
