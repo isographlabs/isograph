@@ -1,0 +1,174 @@
+Ok(
+    (
+        EntrypointDeclaration(
+            WithSpan {
+                item: EntrypointDeclaration {
+                    parent_type: WithSpan {
+                        item: ServerObjectEntityNameWrapper(
+                            ServerObjectEntityName(
+                                "Query",
+                            ),
+                        ),
+                        span: Span {
+                            start: 11,
+                            end: 16,
+                        },
+                    },
+                    client_field_name: WithLocation {
+                        location: Embedded(
+                            EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-with-long-name.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 46,
+                                            end: 82,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 17,
+                                    end: 36,
+                                },
+                            },
+                        ),
+                        item: ClientScalarSelectableNameWrapper(
+                            ClientScalarSelectableName(
+                                "errorsClientPointer",
+                            ),
+                        ),
+                    },
+                    entrypoint_keyword: WithSpan {
+                        item: (),
+                        span: Span {
+                            start: 0,
+                            end: 10,
+                        },
+                    },
+                    dot: WithSpan {
+                        item: (),
+                        span: Span {
+                            start: 16,
+                            end: 17,
+                        },
+                    },
+                    iso_literal_text: IsoLiteralText(
+                        "entrypoint Query.errorsClientPointer",
+                    ),
+                    entrypoint_directive_set: None(
+                        EmptyDirectiveSet,
+                    ),
+                    semantic_tokens: [
+                        WithSpan {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 10,
+                            },
+                        },
+                        WithSpan {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    2,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            span: Span {
+                                start: 11,
+                                end: 16,
+                            },
+                        },
+                        WithSpan {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            span: Span {
+                                start: 16,
+                                end: 17,
+                            },
+                        },
+                        WithSpan {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    13,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            span: Span {
+                                start: 17,
+                                end: 36,
+                            },
+                        },
+                    ],
+                },
+                span: Span {
+                    start: 11,
+                    end: 36,
+                },
+            },
+        ),
+        TextSource {
+            current_working_directory: CurrentWorkingDirectory,
+            relative_path_to_source_file: RelativePathToSourceFile(
+                "crates/isograph_lang_parser/fixtures/entrypoint-with-long-name.input.js",
+            ),
+            span: Some(
+                Span {
+                    start: 46,
+                    end: 82,
+                },
+            ),
+        },
+    ),
+)
