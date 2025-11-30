@@ -21,24 +21,23 @@ use crate::{
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<HashMap<UnvalidatedTypeName, Vec<MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _fetchable_types) =
+        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
 
-    for item in outcome.iter() {
-        match item {
-            SelectionType::Scalar(s) => server_entities
-                .entry(s.item.name.into())
-                .or_default()
-                .push(db.intern_ref(&s.item).scalar_selected()),
-            SelectionType::Object(outcome) => server_entities
-                .entry(outcome.server_object_entity.item.name.into())
-                .or_default()
-                .push(
-                    db.intern_ref(&outcome.server_object_entity.item)
-                        .object_selected(),
-                ),
-        }
+    for with_location in outcome.server_scalar_entities.iter().flatten() {
+        server_entities
+            .entry(with_location.item.name.into())
+            .or_default()
+            .push(db.intern_ref(&with_location.item).scalar_selected());
+    }
+
+    for with_location in outcome.server_object_entities.iter().flatten() {
+        server_entities
+            .entry(with_location.item.name.into())
+            .or_default()
+            .push(db.intern_ref(&with_location.item).object_selected())
     }
 
     Ok(server_entities)
@@ -63,13 +62,11 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .server_object_entities
         .iter()
-        .filter_map(|x| x.as_ref().as_object())
-        .map(|x| {
-            x.server_object_entity
-                .item
-                .clone()
-                .note_todo("Do not clone. Use a MemoRef.")
+        .filter_map(|x| match x {
+            Ok(object) => Some(object.item.clone()),
+            Err(_) => None,
         })
         .collect::<Vec<_>>()
         .wrap_ok()
@@ -213,6 +210,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 // TODO define this in terms of server_entities_vec??
+// What is this for??? This is a useless function.
 #[memo]
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -221,17 +219,18 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
-    for defined_entity in outcome.iter() {
-        match defined_entity {
-            SelectionType::Object(outcome) => defined_entities
-                .entry(outcome.server_object_entity.item.name.into())
-                .or_default()
-                .push(outcome.server_object_entity.item.name.object_selected()),
-            SelectionType::Scalar(server_scalar_entity) => defined_entities
-                .entry(server_scalar_entity.item.name.into())
-                .or_default()
-                .push(server_scalar_entity.item.name.scalar_selected()),
-        }
+    for scalar in outcome.server_scalar_entities.iter().flatten() {
+        defined_entities
+            .entry(scalar.item.name.into())
+            .or_default()
+            .push(scalar.item.name.scalar_selected());
+    }
+
+    for object in outcome.server_object_entities.iter().flatten() {
+        defined_entities
+            .entry(object.item.name.into())
+            .or_default()
+            .push(object.item.name.object_selected());
     }
 
     Ok(defined_entities)
@@ -277,23 +276,25 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .server_object_entities
         .iter()
-        .find_map(|item| {
-            match item {
-                SelectionType::Scalar(s) => {
-                    let name: UnvalidatedTypeName = s.item.name.into();
-                    if name == entity_name {
-                        return Some(s.location);
-                    }
-                }
-                SelectionType::Object(o) => {
-                    let name: UnvalidatedTypeName = o.server_object_entity.item.name.into();
-                    if name == entity_name {
-                        return Some(o.server_object_entity.location);
-                    }
-                }
+        .find_map(|result| {
+            if let Ok(with_location) = result
+                && with_location.item.name == entity_name
+            {
+                return Some(with_location.location);
             }
             None
+        })
+        .or_else(|| {
+            outcome.server_scalar_entities.iter().find_map(|result| {
+                if let Ok(with_location) = result
+                    && with_location.item.name == entity_name
+                {
+                    return Some(with_location.location);
+                }
+                None
+            })
         })
         .wrap_ok()
 }

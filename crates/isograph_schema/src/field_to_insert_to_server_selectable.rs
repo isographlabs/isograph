@@ -125,7 +125,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
         .item
         .default_value
         .map(|graphql_constant_value| {
-            convert_graphql_constant_value_to_isograph_constant_value(graphql_constant_value.item)
+            to_isograph_constant_value(graphql_constant_value.item)
                 .with_location(graphql_constant_value.location)
                 .wrap_ok()
         })
@@ -166,9 +166,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
     .wrap_ok()
 }
 
-pub fn convert_graphql_constant_value_to_isograph_constant_value(
-    graphql_constant_value: GraphQLConstantValue,
-) -> ConstantValue {
+pub fn to_isograph_constant_value(graphql_constant_value: GraphQLConstantValue) -> ConstantValue {
     match graphql_constant_value {
         GraphQLConstantValue::Int(i) => ConstantValue::Integer(i),
         GraphQLConstantValue::Boolean(b) => ConstantValue::Boolean(b),
@@ -179,10 +177,7 @@ pub fn convert_graphql_constant_value_to_isograph_constant_value(
         GraphQLConstantValue::List(l) => {
             let converted_list = l
                 .into_iter()
-                .map(|x| {
-                    convert_graphql_constant_value_to_isograph_constant_value(x.item)
-                        .with_location(x.location)
-                })
+                .map(|x| to_isograph_constant_value(x.item).with_location(x.location))
                 .collect::<Vec<_>>();
             ConstantValue::List(converted_list)
         }
@@ -191,10 +186,8 @@ pub fn convert_graphql_constant_value_to_isograph_constant_value(
                 .into_iter()
                 .map(|name_value_pair| NameValuePair {
                     name: name_value_pair.name,
-                    value: convert_graphql_constant_value_to_isograph_constant_value(
-                        name_value_pair.value.item,
-                    )
-                    .with_location(name_value_pair.value.location),
+                    value: to_isograph_constant_value(name_value_pair.value.item)
+                        .with_location(name_value_pair.value.location),
                 })
                 .collect::<Vec<_>>();
             ConstantValue::Object(converted_object)

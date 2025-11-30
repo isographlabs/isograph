@@ -1,23 +1,46 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Diagnostic, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
+    QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
+    UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
-use isograph_lang_types::{Description, SelectionType};
+use isograph_lang_types::Description;
 
 use crate::{
-    ExposeFieldDirective, MergedSelectionMap, RootOperationName, ServerObjectEntity,
-    ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ClientScalarSelectable, ExposeFieldDirective, MergedSelectionMap, RefetchStrategy,
+    RootOperationName, ServerObjectEntity, ServerObjectSelectable, ServerScalarEntity,
+    ServerScalarSelectable, ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
 
-pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
-    SelectionType<
-        WithLocation<ServerScalarEntity<TNetworkProtocol>>,
-        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
+pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
+    // TODO these should all be MemoRef
+    pub server_scalar_entities:
+        Vec<DiagnosticResult<WithLocation<ServerScalarEntity<TNetworkProtocol>>>>,
+    pub server_object_entities:
+        Vec<DiagnosticResult<WithLocation<ServerObjectEntity<TNetworkProtocol>>>>,
+    pub server_scalar_selectables:
+        Vec<DiagnosticResult<WithLocation<ServerScalarSelectable<TNetworkProtocol>>>>,
+    pub server_object_selectables:
+        Vec<DiagnosticResult<WithLocation<ServerObjectSelectable<TNetworkProtocol>>>>,
+
+    // expose_as fields...
+    pub client_scalar_selectables:
+        Vec<DiagnosticResult<WithLocation<ClientScalarSelectable<TNetworkProtocol>>>>,
+    pub client_scalar_refetch_strategies: Vec<
+        DiagnosticResult<
+            WithLocation<(
+                ServerObjectEntityName,
+                ClientScalarSelectableName,
+                UnvalidatedRefetchStrategy,
+            )>,
+        >,
     >,
->;
+}
 
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
@@ -27,14 +50,11 @@ pub trait NetworkProtocol:
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> &Result<
-        (
-            ParseTypeSystemOutcome<Self>,
-            // TODO just seems awkward that we return fetchable types
-            BTreeMap<ServerObjectEntityName, RootOperationName>,
-        ),
-        Diagnostic,
-    >;
+    ) -> &DiagnosticResult<(
+        ParseTypeSystemOutcome<Self>,
+        // TODO just seems awkward that we return fetchable types
+        BTreeMap<ServerObjectEntityName, RootOperationName>,
+    )>;
 
     fn generate_query_text<'a>(
         db: &IsographDatabase<Self>,

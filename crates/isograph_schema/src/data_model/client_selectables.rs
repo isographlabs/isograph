@@ -26,7 +26,7 @@ pub type OwnedClientSelectable<TNetworkProtocol> = SelectionType<
 
 /// The struct formally known as a client field, and declared with the field keyword
 /// in iso literals.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientScalarSelectableName>,

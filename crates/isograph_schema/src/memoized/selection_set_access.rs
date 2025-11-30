@@ -9,8 +9,8 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ObjectSelectableId, ScalarSelectableId,
-    client_selectable_declaration_map_from_iso_literals, expose_field_map, get_link_fields,
+    IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
+    client_selectable_declaration_map_from_iso_literals, get_link_fields,
     get_validated_selection_set, multiple_selectable_definitions_found_diagnostic,
 };
 
@@ -90,23 +90,26 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
         }
     }
 
-    // And we must also do it for expose fields. Ay ay ay
-    match expose_field_map(db) {
-        Ok(expose_field_map) => {
-            for (key, (_, selection_set)) in expose_field_map {
+    if let Ok(outcome) = TNetworkProtocol::parse_type_system_documents(db) {
+        let expose_fields = &outcome.0.client_scalar_refetch_strategies;
+
+        // And we must also do it for expose fields. Ay ay ay
+        for with_location in expose_fields.iter().flatten() {
+            let (parent_object_entity_name, selectable_name, refetch_strategy) =
+                &with_location.item;
+
+            if let RefetchStrategy::UseRefetchField(refetch_strategy) = refetch_strategy {
                 map.insert(
-                    (key.0, key.1.into()),
-                    selection_set
-                        .reader_selection_set
+                    (*parent_object_entity_name, (*selectable_name).into()),
+                    refetch_strategy
+                        .refetch_selection_set
                         .clone()
                         .note_todo("Do not clone. Use a MemoRef.")
+                        .note_todo("This seems really wonky and wrong")
                         .scalar_selected()
                         .wrap_ok(),
                 );
             }
-        }
-        Err(_) => {
-            // TODO don't silently ignore this error.
         }
     }
 
@@ -162,10 +165,8 @@ pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtoc
     let map = memoized_validated_reader_selection_set_map(db);
 
     map.get(&(parent_server_object_entity_name, client_selectable_name))
-        .expect(
-            "Expected selectable to have been defined. \
-            This is indicative of a bug in Isograph.",
-        )
+        .unwrap_or_else(|| panic!("Expected selectable to have been defined. \
+            This is indicative of a bug in Isograph. {parent_server_object_entity_name}.{client_selectable_name}"))
         .clone()
         .note_todo("Do not clone. Use a MemoRef.")
 }

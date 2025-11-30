@@ -7,7 +7,6 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, client_selectable_map,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
     parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
     server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
@@ -43,8 +42,6 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
             .flat_map(|result| result.as_ref().err()?.clone().wrap_some()),
     );
 
-    maybe_extend(&mut errors, validate_all_expose_as_fields(db));
-
     errors.extend(validate_scalar_selectable_directive_sets(db));
 
     let contains_iso_stats = match validate_all_iso_literals(db) {
@@ -62,27 +59,6 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticVecResult<()> {
-    let expose_as_field_queue =
-        create_type_system_schema_with_server_selectables(db).clone_err()?;
-
-    // TODO restructure as a .map or whatnot
-    let mut errors = vec![];
-    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
-        for expose_as_field in expose_as_fields_to_insert {
-            if let Err(e) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
-            {
-                errors.push(e);
-            }
-        }
-    }
-
-    is_empty_or_ok(errors)
-}
-
 fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
@@ -92,14 +68,6 @@ fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     process_iso_literals(db, contains_iso)?;
 
     Ok(contains_iso_stats)
-}
-
-fn is_empty_or_ok<E>(errors: Vec<E>) -> Result<(), Vec<E>> {
-    if errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(())
-    }
 }
 
 fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>) {
