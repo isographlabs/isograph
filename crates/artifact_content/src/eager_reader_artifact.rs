@@ -84,7 +84,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     );
 
     let function_import_statement =
-        generate_function_import_statement(config, &info, file_extensions);
+        generate_function_import_statement(config, info, file_extensions);
 
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
@@ -436,7 +436,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             .lookup(db);
 
     let function_import_statement =
-        generate_function_import_statement(config, &info, file_extensions);
+        generate_function_import_statement(config, info, file_extensions);
 
     let client_scalar_selectable_output_type = match client_selectable {
         SelectionType::Object(_) => {
