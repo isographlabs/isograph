@@ -72,27 +72,12 @@ pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
         OwnedSelectableResult<TNetworkProtocol>,
     )>,
 > {
-    let (items, _fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let map = server_selectables_map(db).clone_err()?;
 
-    Ok(items
-        .iter()
-        .flat_map(|selection_type| selection_type.as_ref().as_object())
-        .filter(|o| o.server_object_entity.item.name == parent_server_object_entity_name)
-        .flat_map(|o| {
-            o.fields_to_insert.iter().map(|field_to_insert| {
-                (
-                    field_to_insert.item.name.item,
-                    field_to_insert_to_server_selectable(
-                        db,
-                        parent_server_object_entity_name,
-                        field_to_insert,
-                    )
-                    .map(|x| x.map_scalar(|(scalar, _)| scalar)),
-                )
-            })
-        })
-        .collect())
+    map.get(&parent_server_object_entity_name)
+        .cloned()
+        .unwrap_or_default()
+        .wrap_ok()
 }
 
 #[memo]
