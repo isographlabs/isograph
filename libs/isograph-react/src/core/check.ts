@@ -108,10 +108,10 @@ function checkFromRecord(
             kind: 'MissingData',
             record: recordLink,
           };
-        } else if (linkedValue == null) {
+        } else if (linkedValue.kind === 'Errors' || linkedValue.value == null) {
           continue;
-        } else if (Array.isArray(linkedValue)) {
-          arrayItemsLoop: for (const item of linkedValue) {
+        } else if (Array.isArray(linkedValue.value)) {
+          arrayItemsLoop: for (const item of linkedValue.value) {
             const link = getLink(item);
             if (link == null) {
               throw new Error(
@@ -145,7 +145,7 @@ function checkFromRecord(
             }
           }
         } else {
-          const link = getLink(linkedValue);
+          const link = getLink(linkedValue.value);
           if (link == null) {
             throw new Error(
               'Unexpected non-link in the Isograph store. ' +
@@ -183,14 +183,17 @@ function checkFromRecord(
       case 'InlineFragment': {
         const existingRecordTypename = record['__typename'];
 
-        if (existingRecordTypename == null) {
+        if (
+          existingRecordTypename?.kind === 'Errors' ||
+          existingRecordTypename == null
+        ) {
           return {
             kind: 'MissingData',
             record: recordLink,
           };
         }
 
-        if (existingRecordTypename === normalizationAstNode.type) {
+        if (existingRecordTypename.value === normalizationAstNode.type) {
           const result = checkFromRecord(
             environment,
             normalizationAstNode.selections,
