@@ -15,6 +15,7 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
+  type DataTypeValue,
   type IsographEnvironment,
   type StoreLink,
 } from './IsographEnvironment';
@@ -207,9 +208,16 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             return data.data;
           },
           field.isUpdatable
-            ? (newValue) => {
+            ? (newValue: DataTypeValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
-                storeRecord[storeRecordName] = newValue;
+                storeRecord[storeRecordName] = {
+                  kind: 'Data',
+                  value: newValue,
+                  errors:
+                    newValue === null
+                      ? undefined
+                      : storeRecord[storeRecordName]?.errors,
+                };
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
                   root.__typename,
@@ -259,11 +267,20 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
-                  storeRecord[storeRecordName] = newValue.map((node) =>
-                    assertLink(node?.__link),
-                  );
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    errors: undefined,
+                    value: newValue.map((node) => assertLink(node?.__link)),
+                  };
                 } else {
-                  storeRecord[storeRecordName] = assertLink(newValue?.__link);
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    errors:
+                      newValue === null
+                        ? undefined
+                        : storeRecord[storeRecordName]?.errors,
+                    value: assertLink(newValue?.__link),
+                  };
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -345,5 +362,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+    errors: undefined,
   };
 }
