@@ -10,6 +10,7 @@
 **/next-env.d.ts
 **/*.d.ts
 **/.DS_Store
+**/.idea
 **/.swc/**
 
 # the built binary is downloaded into this folder during CI
