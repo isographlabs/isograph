@@ -139,12 +139,6 @@ export type DataTypeValue =
 export type WithErrorsData<T extends DataTypeValue> = {
   readonly kind: 'Data';
   readonly value: T;
-  /**
-   * A field can be null with errors and have a value depending on it's nested fields
-   * 1. if a nested field is non null and has a error it bubbles up to this parent field
-   * 2. in another query which is not selecting this nested field the parent field can resolve correctly
-   */
-  readonly errors: PayloadErrors | undefined;
 };
 
 export type WithErrors<T extends DataTypeValue> =

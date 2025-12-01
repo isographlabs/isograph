@@ -799,7 +799,6 @@ export function readLinkedFieldData(
     value = {
       kind: 'Data',
       value: condition,
-      errors: undefined,
     };
   }
 
@@ -934,7 +933,7 @@ export function readLinkedFieldData(
     return {
       kind: 'Success',
       data: null,
-      errors: value?.errors,
+      errors: value?.kind === 'Errors' ? value?.errors : undefined,
     };
   }
 

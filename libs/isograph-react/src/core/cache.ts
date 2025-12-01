@@ -323,7 +323,6 @@ function normalizeScalarField(
     targetStoreRecord[parentRecordKey] = {
       kind: 'Data',
       value: null,
-      errors: undefined,
     };
     return (
       existingValue?.kind === 'Errors' ||
@@ -336,7 +335,6 @@ function normalizeScalarField(
     targetStoreRecord[parentRecordKey] = {
       kind: 'Data',
       value: networkResponseData,
-      errors: targetStoreRecord[parentRecordKey]?.errors,
     };
     return (
       existingValue?.kind === 'Errors' ||
@@ -384,7 +382,6 @@ function normalizeLinkedField(
     targetParentRecord[parentRecordKey] = {
       kind: 'Data',
       value: null,
-      errors: undefined,
     };
     return (
       existingValue?.kind === 'Errors' ||
@@ -442,7 +439,6 @@ function normalizeLinkedField(
     targetParentRecord[parentRecordKey] = {
       kind: 'Data',
       value: dataIds,
-      errors: targetParentRecord[parentRecordKey]?.errors,
     };
     return (
       existingValue?.kind === 'Errors' ||
@@ -478,7 +474,6 @@ function normalizeLinkedField(
         __link: newStoreRecordId,
         __typename,
       },
-      errors: targetParentRecord[parentRecordKey]?.errors,
     };
 
     const link =
