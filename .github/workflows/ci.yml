@@ -504,3 +504,8 @@ jobs:
         run: pnpm --filter './libs/*' publish --no-git-checks --tag latest
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
+
+    deploy-isograph-extension:
+    name: Deploy Isograph Extension
+    uses: ./.github/workflows/release-isograph-extension.yml
+    needs: [all-checks-passed]
