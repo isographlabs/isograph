@@ -83,8 +83,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                 This is indicative of a bug in Isograph.",
             );
 
-    let payload_object_type_annotation = &mutation_field.target_object_entity;
-    let payload_object_entity_name = *payload_object_type_annotation.inner();
+    let payload_object_entity_name = *(&mutation_field.target_object_entity).inner();
 
     let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item.into());
     let top_level_schema_field_parent_object_entity_name = mutation_field.parent_object_entity_name;
