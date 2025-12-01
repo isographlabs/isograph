@@ -1,4 +1,4 @@
-use common_lang_types::WithSpan;
+use common_lang_types::{WithLocation, WithLocationPostfix, WithSpan};
 use isograph_lang_types::{
     DefinitionLocation, SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
 };
@@ -14,10 +14,10 @@ use crate::{
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_scalar_selectables<TNetworkProtocol: NetworkProtocol>(
+pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_type: &OwnedClientSelectable<TNetworkProtocol>,
-) -> impl Iterator<Item = ClientSelectableId> {
+) -> impl Iterator<Item = WithLocation<ClientSelectableId>> {
     let selection_set = match selection_type {
         SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
             db,
@@ -34,22 +34,22 @@ pub fn accessible_client_scalar_selectables<TNetworkProtocol: NetworkProtocol>(
         .expect("Expected selection set to be valid"),
     };
 
-    AccessibleClientFieldIterator {
+    AccessibleClientSelectableIterator {
         selection_set,
         index: 0,
         sub_iterator: None,
     }
 }
 
-struct AccessibleClientFieldIterator {
+struct AccessibleClientSelectableIterator {
     // TODO have a reference
     selection_set: WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientFieldIterator>>,
+    sub_iterator: Option<Box<AccessibleClientSelectableIterator>>,
 }
 
-impl Iterator for AccessibleClientFieldIterator {
-    type Item = ClientSelectableId;
+impl Iterator for AccessibleClientSelectableIterator {
+    type Item = WithLocation<ClientSelectableId>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -66,8 +66,8 @@ impl Iterator for AccessibleClientFieldIterator {
 
             if let Some(selection) = item {
                 match &selection.item {
-                    SelectionTypeContainingSelections::Scalar(scalar) => {
-                        match scalar.associated_data {
+                    SelectionTypeContainingSelections::Scalar(scalar_selection) => {
+                        match scalar_selection.associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
@@ -79,24 +79,28 @@ impl Iterator for AccessibleClientFieldIterator {
                                 self.index += 1;
                                 return (parent_object_entity_name, client_field_name)
                                     .scalar_selected()
+                                    .with_location(scalar_selection.name.location)
                                     .wrap_some();
                             }
                         }
                     }
-                    SelectionTypeContainingSelections::Object(linked_field) => {
-                        let mut iterator = AccessibleClientFieldIterator {
-                            selection_set: linked_field.selection_set.clone(),
+                    SelectionTypeContainingSelections::Object(object_selection) => {
+                        let mut iterator = AccessibleClientSelectableIterator {
+                            selection_set: object_selection.selection_set.clone(),
                             index: 0,
                             sub_iterator: None,
                         };
 
-                        match linked_field.associated_data {
+                        match object_selection.associated_data {
                             DefinitionLocation::Client(client_object_selectable_id) => {
                                 // TODO: include pointer target link type
                                 // https://github.com/isographlabs/isograph/issues/719
                                 self.sub_iterator = Some(iterator.boxed());
                                 self.index += 1;
-                                return client_object_selectable_id.object_selected().wrap_some();
+                                return client_object_selectable_id
+                                    .object_selected()
+                                    .with_location(object_selection.name.location)
+                                    .wrap_some();
                             }
                             DefinitionLocation::Server(_) => {}
                         };

@@ -29,8 +29,10 @@ export const normalizeUndefinedField = iso(`
     }
   }
 `)(() => {});
-// prettier-ignore
-const normalizeUndefinedFieldEntrypoint = iso(`entrypoint Query.normalizeUndefinedField`);
+
+const normalizeUndefinedFieldEntrypoint = iso(
+  `entrypoint Query.normalizeUndefinedField`,
+);
 
 describe('normalize undefined field', () => {
   test('should normalize scalar field to null', () => {

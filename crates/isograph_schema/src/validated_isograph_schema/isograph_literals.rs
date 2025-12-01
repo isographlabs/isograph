@@ -225,7 +225,8 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
 
 lazy_static! {
     static ref EXTRACT_ISO_LITERAL: Regex =
-        Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?`([^`]+)`(\))?(\()?").unwrap();
+        Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?\s*`([^`]+)`,?\s*(\))?(\()?")
+            .unwrap();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
