@@ -146,6 +146,21 @@ export type ReadDataResult<Data> =
   | ReadDataResultSuccess<Data>
   | ReadDataResultMissingData;
 
+export type ReadFieldResultSuccess<Data> = {
+  readonly kind: 'Success';
+  readonly data: Data;
+};
+
+export type ReadFieldResultError = {
+  readonly kind: 'Error';
+  readonly errors: PayloadErrors;
+};
+
+export type ReadFieldResult<Data> =
+  | ReadFieldResultSuccess<Data>
+  | ReadFieldResultError
+  | ReadDataResultMissingData;
+
 function readData<TReadFromStore>(
   environment: IsographEnvironment,
   ast: ReaderAst<TReadFromStore>,
@@ -185,15 +200,21 @@ function readData<TReadFromStore>(
       case 'Scalar': {
         const data = readScalarFieldData(field, storeRecord, root, variables);
 
-        if (data.kind === 'MissingData') {
-          return data;
+        switch (data.kind) {
+          case 'MissingData':
+            return data;
+          case 'Error':
+            if (errors == null) {
+              errors = data.errors;
+            } else {
+              errors.push(...data.errors);
+            }
+            target[field.alias ?? field.fieldName] = null;
+            break;
+          case 'Success':
+            target[field.alias ?? field.fieldName] = data.data;
+            break;
         }
-        if (errors == null) {
-          errors = data.errors;
-        } else if (data.errors) {
-          errors.push(...data.errors);
-        }
-        target[field.alias ?? field.fieldName] = data.data;
         break;
       }
       case 'Link': {
@@ -227,7 +248,7 @@ function readData<TReadFromStore>(
         }
         if (errors == null) {
           errors = data.errors;
-        } else if (data.errors) {
+        } else if (data.errors != null) {
           errors.push(...data.errors);
         }
         target[field.alias ?? field.fieldName] = data.data;
@@ -244,15 +265,21 @@ function readData<TReadFromStore>(
           networkRequestOptions,
           mutableEncounteredRecords,
         );
-        if (data.kind === 'MissingData') {
-          return data;
+        switch (data.kind) {
+          case 'MissingData':
+            return data;
+          case 'Error':
+            if (errors == null) {
+              errors = data.errors;
+            } else {
+              errors.push(...data.errors);
+            }
+            target[field.alias] = null;
+            break;
+          case 'Success':
+            target[field.alias] = data.data;
+            break;
         }
-        if (errors == null) {
-          errors = data.errors;
-        } else if (data.errors) {
-          errors.push(...data.errors);
-        }
-        target[field.alias] = data.data;
         break;
       }
       case 'Resolver': {
@@ -266,15 +293,21 @@ function readData<TReadFromStore>(
           networkRequestOptions,
           mutableEncounteredRecords,
         );
-        if (data.kind === 'MissingData') {
-          return data;
+        switch (data.kind) {
+          case 'MissingData':
+            return data;
+          case 'Error':
+            if (errors == null) {
+              errors = data.errors;
+            } else {
+              errors.push(...data.errors);
+            }
+            target[field.alias] = null;
+            break;
+          case 'Success':
+            target[field.alias] = data.data;
+            break;
         }
-        if (errors == null) {
-          errors = data.errors;
-        } else if (data.errors) {
-          errors.push(...data.errors);
-        }
-        target[field.alias] = data.data;
         break;
       }
       case 'LoadablySelectedField': {
@@ -287,15 +320,21 @@ function readData<TReadFromStore>(
           networkRequestOptions,
           mutableEncounteredRecords,
         );
-        if (data.kind === 'MissingData') {
-          return data;
+        switch (data.kind) {
+          case 'MissingData':
+            return data;
+          case 'Error':
+            if (errors == null) {
+              errors = data.errors;
+            } else {
+              errors.push(...data.errors);
+            }
+            target[field.alias] = null;
+            break;
+          case 'Success':
+            target[field.alias] = data.data;
+            break;
         }
-        if (errors == null) {
-          errors = data.errors;
-        } else if (data.errors) {
-          errors.push(...data.errors);
-        }
-        target[field.alias] = data.data;
         break;
       }
     }
@@ -315,7 +354,7 @@ export function readLoadablySelectedFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<unknown> {
+): ReadFieldResult<unknown> {
   const refetchReaderParams = readData(
     environment,
     field.refetchReaderAst,
@@ -337,9 +376,15 @@ export function readLoadablySelectedFieldData(
     };
   }
 
+  if (refetchReaderParams.errors != null) {
+    return {
+      kind: 'Error',
+      errors: refetchReaderParams.errors,
+    };
+  }
+
   return {
     kind: 'Success',
-    errors: refetchReaderParams.errors,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -568,7 +613,7 @@ export function readResolverFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<unknown> {
+): ReadFieldResult<unknown> {
   const usedRefetchQueries = field.usedRefetchQueries;
   const resolverRefetchQueries = usedRefetchQueries.map((index) => {
     const resolverRefetchQuery = nestedRefetchQueries[index];
@@ -619,8 +664,7 @@ export function readResolverFieldData(
 
       if (data.errors != null) {
         return {
-          kind: 'Success',
-          data: null,
+          kind: 'Error',
           errors: data.errors,
         };
       }
@@ -638,14 +682,12 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        errors: undefined,
         data: field.readerArtifact.resolver(firstParameter),
       };
     }
     case 'ComponentReaderArtifact': {
       return {
         kind: 'Success',
-        errors: undefined,
         data: getOrCreateCachedComponent(
           environment,
           fragment,
@@ -661,7 +703,7 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadDataResult<DataTypeValue> {
+): ReadFieldResult<DataTypeValue> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
@@ -674,9 +716,9 @@ export function readScalarFieldData(
     };
   }
   if (value.kind === 'Errors') {
-    return { kind: 'Success', data: null, errors: value.errors };
+    return { kind: 'Error', errors: value.errors };
   }
-  return { kind: 'Success', data: value.value, errors: value.errors };
+  return { kind: 'Success', data: value.value };
 }
 
 export function readLinkedFieldData(
@@ -792,26 +834,34 @@ export function readLinkedFieldData(
           nestedRefetchQueries,
           readData,
         );
-        if (result.kind === 'MissingData') {
-          return {
-            kind: 'MissingData',
-            reason:
-              'Missing data for ' +
-              storeRecordName +
-              ' on root ' +
-              root.__link +
-              '. Link is ' +
-              JSON.stringify(item),
-            nestedReason: result,
-            recordLink: result.recordLink,
-          };
+
+        switch (result.kind) {
+          case 'MissingData':
+            return {
+              kind: 'MissingData',
+              reason:
+                'Missing data for ' +
+                storeRecordName +
+                ' on root ' +
+                root.__link +
+                '. Link is ' +
+                JSON.stringify(item),
+              nestedReason: result,
+              recordLink: result.recordLink,
+            };
+          case 'Error':
+            if (errors == null) {
+              errors = result.errors;
+            } else if (result.errors != null) {
+              errors.push(...result.errors);
+            }
+            results.push(null);
+            break;
+          case 'Success':
+            results.push(result.data);
+            break;
         }
-        if (errors == null) {
-          errors = result.errors;
-        } else if (result.errors) {
-          errors.push(...result.errors);
-        }
-        results.push(result.data);
+
         continue;
       }
 
@@ -832,7 +882,7 @@ export function readLinkedFieldData(
       }
       if (errors == null) {
         errors = result.errors;
-      } else if (result.errors) {
+      } else if (result.errors != null) {
         errors.push(...result.errors);
       }
       results.push(result.data);
@@ -897,16 +947,29 @@ export function readLinkedFieldData(
       nestedRefetchQueries,
       readData,
     );
-    if (data.kind === 'MissingData') {
-      return {
-        kind: 'MissingData',
-        reason:
-          'Missing data for ' + storeRecordName + ' on root ' + root.__link,
-        nestedReason: data,
-        recordLink: data.recordLink,
-      };
+
+    switch (data.kind) {
+      case 'MissingData':
+        return {
+          kind: 'MissingData',
+          reason:
+            'Missing data for ' + storeRecordName + ' on root ' + root.__link,
+          nestedReason: data,
+          recordLink: data.recordLink,
+        };
+      case 'Error':
+        return {
+          kind: 'Success',
+          data: null,
+          errors: data.errors,
+        };
+      case 'Success':
+        return {
+          kind: 'Success',
+          data: data.data,
+          errors: undefined,
+        };
     }
-    return data;
   }
   const data = readData(field.selections, link);
   if (data.kind === 'MissingData') {
@@ -936,7 +999,7 @@ export function readClientPointerData(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
   ) => ReadDataResult<object>,
-): ReadDataResult<unknown> {
+): ReadFieldResult<unknown> {
   const refetchReaderParams = readData(
     [
       {
@@ -958,10 +1021,10 @@ export function readClientPointerData(
       recordLink: refetchReaderParams.recordLink,
     };
   }
+
   if (refetchReaderParams.errors != null) {
     return {
-      kind: 'Success',
-      data: null,
+      kind: 'Error',
       errors: refetchReaderParams.errors,
     };
   }
@@ -977,7 +1040,6 @@ export function readClientPointerData(
 
   return {
     kind: 'Success',
-    errors: undefined,
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
@@ -1084,7 +1146,7 @@ export function readImperativelyLoadedField(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<unknown> {
+): ReadFieldResult<unknown> {
   // First, we read the data using the refetch reader AST (i.e. read out the
   // id field).
   const data = readData(
@@ -1107,14 +1169,12 @@ export function readImperativelyLoadedField(
       nestedReason: data,
       recordLink: data.recordLink,
     };
+  } else if (data.errors != null) {
+    return {
+      kind: 'Error',
+      errors: data.errors,
+    };
   } else {
-    if (data.errors != null) {
-      return {
-        kind: 'Success',
-        data: null,
-        errors: data.errors,
-      };
-    }
     const { refetchQueryIndex } = field;
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
     if (refetchQuery == null) {
@@ -1129,7 +1189,6 @@ export function readImperativelyLoadedField(
     // use the resolver reader AST to get the resolver parameters.
     return {
       kind: 'Success',
-      errors: undefined,
       data: (args: any) => [
         // Stable id
         root.__typename + ':' + root.__link + '__' + field.name,
