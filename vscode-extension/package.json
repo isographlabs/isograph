@@ -1,8 +1,8 @@
 {
-  "name": "06b47bf4-a175-44c5-9c5f-52daf4cd2a64",
-  "displayName": "06b47bf4-a175-44c5-9c5f-52daf4cd2a64",
+  "name": "isograph",
+  "displayName": "Isograph",
   "version": "0.0.4",
-  "description": "06b47bf4-a175-44c5-9c5f-52daf4cd2a64-powered IDE experience",
+  "description": "Isograph-powered IDE experience",
   "repository": {
     "type": "git",
     "url": "https://github.com/isographlabs/isograph",
