@@ -29,6 +29,7 @@ import {
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
+  assertNever,
   readImperativelyLoadedField,
   readLinkedFieldData,
   readLoadablySelectedFieldData,
@@ -202,10 +203,17 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               root,
               variables,
             );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
+            switch (data.kind) {
+              case 'MissingData':
+                throw new Error(data.reason);
+              case 'Error':
+                return null;
+              case 'Success':
+                return data.data;
+              default: {
+                assertNever(data);
+              }
             }
-            return data.data;
           },
           field.isUpdatable
             ? (newValue: DataTypeValue) => {
@@ -213,10 +221,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                 storeRecord[storeRecordName] = {
                   kind: 'Data',
                   value: newValue,
-                  errors:
-                    newValue === null
-                      ? undefined
-                      : storeRecord[storeRecordName]?.errors,
                 };
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -269,16 +273,11 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                 if (Array.isArray(newValue)) {
                   storeRecord[storeRecordName] = {
                     kind: 'Data',
-                    errors: undefined,
                     value: newValue.map((node) => assertLink(node?.__link)),
                   };
                 } else {
                   storeRecord[storeRecordName] = {
                     kind: 'Data',
-                    errors:
-                      newValue === null
-                        ? undefined
-                        : storeRecord[storeRecordName]?.errors,
                     value: assertLink(newValue?.__link),
                   };
                 }
@@ -304,10 +303,17 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
@@ -323,10 +329,17 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
@@ -341,10 +354,18 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
