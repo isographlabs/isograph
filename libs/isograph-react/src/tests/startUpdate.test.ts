@@ -15,14 +15,10 @@ import { iso } from './__isograph/iso';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 
-function ok<T extends DataTypeValue>(
-  value: T,
-  errors?: PayloadErrors,
-): WithErrorsData<T> {
+function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   return {
     kind: 'Data',
     value,
-    errors,
   };
 }
 
