@@ -17,7 +17,6 @@ import {
   type DataTypeValue,
   getLink,
   type IsographEnvironment,
-  type PayloadError,
   type PayloadErrorPath,
   type PayloadErrors,
   ROOT_ID,
@@ -75,9 +74,7 @@ function joinPayloadErrorPath(
   return (path?.join('.') ?? '') as PayloadErrorPathJoined;
 }
 
-export type ErrorsByPath = Partial<
-  Record<PayloadErrorPathJoined, PayloadErrors>
->;
+export type ErrorsByPath = Map<PayloadErrorPathJoined, PayloadErrors>;
 
 export function normalizeData(
   environment: IsographEnvironment,
@@ -101,10 +98,10 @@ export function normalizeData(
 
   const newStoreRecord = getMutableStoreRecordProxy(storeLayer, root);
 
-  const errorsByPath: ErrorsByPath = groupBy<
-    PayloadError,
-    PayloadErrorPathJoined
-  >(networkResponse.errors ?? [], (error) => joinPayloadErrorPath(error.path));
+  const errorsByPath: ErrorsByPath = groupBy(
+    networkResponse.errors ?? [],
+    (error) => joinPayloadErrorPath(error.path),
+  );
 
   const path: PayloadErrorPath[] = [];
 
@@ -128,13 +125,14 @@ function groupBy<V, K extends string | number | symbol>(
   arr: readonly V[],
   keyFn: (v: V) => K,
 ) {
-  const result: Partial<Record<K, [V, ...V[]]>> = {};
+  const result: Map<K, [V, ...V[]]> = new Map();
   for (const el of arr) {
     const key = keyFn(el);
-    if (result[key] != null) {
-      result[key].push(el);
+    const entry = result.get(key);
+    if (entry != null) {
+      entry.push(el);
     } else {
-      result[key] = [el];
+      result.set(key, [el]);
     }
   }
   return result;
@@ -282,9 +280,7 @@ export function insertEmptySetIfMissing<K, V>(map: Map<K, Set<V>>, key: K) {
 function findErrors(errorsByPath: ErrorsByPath, path: PayloadErrorPath[]) {
   const joinedPath = joinPayloadErrorPath(path);
   let errors: PayloadErrors | undefined = undefined;
-  for (const [errorPath, suberrors] of Object.entries(errorsByPath) as Iterable<
-    [PayloadErrorPathJoined, PayloadErrors]
-  >) {
+  for (const [errorPath, suberrors] of errorsByPath) {
     if (suberrors != null && errorPath.startsWith(joinedPath)) {
       if (errors == null) {
         errors = suberrors;
