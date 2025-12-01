@@ -508,4 +508,7 @@ jobs:
   deploy-isograph-extension:
     name: Deploy Isograph Extension
     uses: ./.github/workflows/release-isograph-extension.yml
+    with:
+      vs-marketplace-token: ${{ secrets.VS_MARKETPLACE_TOKEN }}
+      open-vsx-token: ${{ secrets.OPEN_VSX_TOKEN }}
     needs: [all-checks-passed]
