@@ -505,7 +505,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
-    deploy-isograph-extension:
+  deploy-isograph-extension:
     name: Deploy Isograph Extension
     uses: ./.github/workflows/release-isograph-extension.yml
     needs: [all-checks-passed]
