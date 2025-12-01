@@ -507,5 +507,6 @@ jobs:
 
   deploy-isograph-extension:
     name: Deploy Isograph Extension
+    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     uses: ./.github/workflows/release-isograph-extension.yml
     needs: [all-checks-passed]
