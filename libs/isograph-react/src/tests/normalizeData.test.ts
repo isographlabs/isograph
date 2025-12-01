@@ -22,14 +22,10 @@ import type { Query__errorsClientFieldComponent__param } from './__isograph/Quer
 import type { Query__errorsClientPointer__param } from './__isograph/Query/errorsClientPointer/param_type';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
-function ok<T extends DataTypeValue>(
-  value: T,
-  errors?: PayloadErrors,
-): WithErrorsData<T> {
+function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   return {
     kind: 'Data',
     value,
-    errors,
   };
 }
 
@@ -605,18 +601,10 @@ describe('errors', () => {
       expect(store).toStrictEqual<BaseStoreLayerData>({
         Query: {
           [ROOT_ID]: {
-            node____id___1: ok(
-              {
-                __typename: 'Economist',
-                __link: '1',
-              },
-              [
-                {
-                  message: 'Missing name',
-                  path: ['node____id___v_id', 'name'],
-                },
-              ],
-            ),
+            node____id___1: ok({
+              __typename: 'Economist',
+              __link: '1',
+            }),
           },
         },
         Economist: {
@@ -674,18 +662,10 @@ describe('errors', () => {
         },
         Query: {
           [ROOT_ID]: {
-            node____id___1: ok(
-              {
-                __typename: 'Economist',
-                __link: '1',
-              },
-              [
-                {
-                  message: 'Missing name',
-                  path: ['node____id___v_id', 'name'],
-                },
-              ],
-            ),
+            node____id___1: ok({
+              __typename: 'Economist',
+              __link: '1',
+            }),
           },
         },
       });
@@ -920,18 +900,10 @@ describe('errors', () => {
       const store: BaseStoreLayerData = {
         Query: {
           [ROOT_ID]: {
-            node____id___1: ok(
-              {
-                __typename: 'Economist',
-                __link: '1',
-              },
-              [
-                {
-                  message: 'Missing name',
-                  path: ['node____id___v_id', 'name'],
-                },
-              ],
-            ),
+            node____id___1: ok({
+              __typename: 'Economist',
+              __link: '1',
+            }),
           },
         },
         Economist: {
