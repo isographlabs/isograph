@@ -166,7 +166,7 @@ pub fn graphql_input_value_definition_to_variable_definition<TNetworkProtocol: N
     .wrap_ok()
 }
 
-fn convert_graphql_constant_value_to_isograph_constant_value(
+pub fn convert_graphql_constant_value_to_isograph_constant_value(
     graphql_constant_value: GraphQLConstantValue,
 ) -> ConstantValue {
     match graphql_constant_value {
