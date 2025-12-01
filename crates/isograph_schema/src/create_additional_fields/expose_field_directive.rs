@@ -91,8 +91,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
     let payload_object_entity_name = *payload_object_type_annotation.inner();
 
     let client_field_scalar_selection_name = expose_as.unwrap_or(mutation_field.name.item.into());
-    // TODO what is going on here. Should mutation_field have a checked way of converting to LinkedField?
-    let top_level_schema_field_name = mutation_field.name.item.unchecked_conversion();
     let top_level_schema_field_parent_object_entity_name = mutation_field.parent_object_entity_name;
     let mutation_field_arguments = mutation_field.arguments.clone();
     let description = expose_field_to_insert
@@ -200,7 +198,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         .collect::<Result<Vec<_>, _>>()?;
 
     subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
-        top_level_schema_field_name,
+        mutation_subfield_name,
         &top_level_schema_field_arguments,
         top_level_schema_field_concrete_type,
         top_level_schema_field_parent_object_entity_name,
