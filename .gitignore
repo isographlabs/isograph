@@ -21,3 +21,5 @@ artifacts
 **/swc_isograph_plugin.wasm
 
 **/.claude/**
+
+**/.idea/**
