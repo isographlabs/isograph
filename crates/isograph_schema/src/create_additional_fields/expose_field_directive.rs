@@ -6,7 +6,7 @@ use common_lang_types::{
 use intern::{Lookup, string_key::Intern};
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet, SelectionType,
-    SelectionTypeContainingSelections, VariableDefinition,
+    SelectionTypeContainingSelections,
 };
 
 use prelude::{ErrClone, Postfix};
@@ -15,17 +15,13 @@ use serde::Deserialize;
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ExposeFieldToInsert,
     ImperativelyLoadedFieldVariant, IsographDatabase, NetworkProtocol, RefetchStrategy,
-    ServerEntityName, ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
-    WrappedSelectionMapSelection, create_additional_fields::argument_map::remove_field_map_item,
-    generate_refetch_field_strategy, get_object_selections_path,
+    ServerObjectSelectableVariant, UnprocessedClientScalarSelectableSelectionSet,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy, get_object_selections_path,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
     server_selectable_named,
 };
 
-use super::{
-    argument_map::ArgumentMap,
-    create_additional_fields_error::{FieldMapItem, ProcessedFieldMapItem},
-};
+use super::create_additional_fields_error::FieldMapItem;
 
 // TODO move to graphql_network_protocol crate
 #[derive(Deserialize, Eq, PartialEq, Debug, Hash, Clone)]
@@ -97,16 +93,6 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
         .description
         .or(mutation_field.description);
 
-    let processed_field_map_items = skip_arguments_contained_in_field_map(
-        db,
-        mutation_field_arguments.clone(),
-        payload_object_entity_name,
-        expose_field_to_insert.parent_object_name,
-        client_field_scalar_selection_name,
-        // TODO don't clone
-        field_map.clone(),
-    )?;
-
     let top_level_schema_field_concrete_type =
         server_object_entity_named(db, payload_object_entity_name)
             .clone_err()?
@@ -125,14 +111,14 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             &primary_field_name_selection_parts,
         )?;
 
-    let fields = processed_field_map_items
+    let fields = field_map
         .iter()
         .map(|field_map_item| {
             let scalar_field_selection = ScalarSelection {
                 name: WithLocation::new_generated(
                     // TODO make this no-op
                     // TODO split on . here; we should be able to have from: "best_friend.id" or whatnot.
-                    field_map_item.0.from.unchecked_conversion(),
+                    field_map_item.from.unchecked_conversion(),
                 ),
                 reader_alias: None,
                 associated_data: (),
@@ -279,34 +265,6 @@ fn parse_mutation_subfield_id<TNetworkProtocol: NetworkProtocol>(
         )
         .wrap_err(),
     }
-}
-
-fn skip_arguments_contained_in_field_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
-    primary_type_name: ServerObjectEntityName,
-    mutation_object_name: ServerObjectEntityName,
-    mutation_field_name: SelectableName,
-    field_map_items: Vec<FieldMapItem>,
-) -> DiagnosticResult<Vec<ProcessedFieldMapItem>> {
-    let mut processed_field_map_items = Vec::with_capacity(field_map_items.len());
-    // TODO
-    // We need to create entirely new arguments, which are the existing arguments minus
-    // any paths that are in the field map.
-    let mut argument_map = ArgumentMap::new(arguments);
-
-    for field_map_item in field_map_items {
-        processed_field_map_items.push(remove_field_map_item(
-            db,
-            &mut argument_map,
-            field_map_item,
-            primary_type_name,
-            mutation_object_name,
-            mutation_field_name,
-        )?);
-    }
-
-    Ok(processed_field_map_items)
 }
 
 fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
