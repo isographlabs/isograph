@@ -103,12 +103,11 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             .lookup(db)
             .concrete_type;
 
-    let (maybe_abstract_parent_object_entity_name, primary_field_concrete_type) =
-        traverse_object_selections(
-            db,
-            payload_object_entity_name,
-            &primary_field_name_selection_parts,
-        )?;
+    let target_parent_object_entity_name = traverse_object_selections(
+        db,
+        payload_object_entity_name,
+        &primary_field_name_selection_parts,
+    )?;
 
     let fields = field_map
         .iter()
@@ -158,7 +157,7 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
                             .parent_object_entity_name,
                         server_object_selectable_name: server_object_selectable.name.item,
                         arguments: vec![],
-                        concrete_type: primary_field_concrete_type,
+                        concrete_type: Some(target_parent_object_entity_name),
                     }
                 }
                 ServerObjectSelectableVariant::InlineFragment => {
@@ -203,14 +202,14 @@ pub fn create_new_exposed_field<TNetworkProtocol: NetworkProtocol>(
             field_map: field_map.clone(),
         }),
         variable_definitions: vec![],
-        parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+        parent_object_entity_name: target_parent_object_entity_name,
         network_protocol: std::marker::PhantomData,
     };
 
     (
         UnprocessedClientScalarSelectableSelectionSet {
             client_scalar_selectable_name: mutation_field_client_field_name,
-            parent_object_entity_name: maybe_abstract_parent_object_entity_name,
+            parent_object_entity_name: target_parent_object_entity_name,
             reader_selection_set: SelectionSet { selections: vec![] }.with_generated_span(),
             refetch_strategy: RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 SelectionSet {
@@ -270,7 +269,7 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
     selections: &[ServerSelectableName],
-) -> DiagnosticResult<(ServerObjectEntityName, Option<ServerObjectEntityName>)> {
+) -> DiagnosticResult<ServerObjectEntityName> {
     let mut current_entity_name = root_object_name;
 
     for selection_name in selections {
@@ -320,5 +319,17 @@ fn traverse_object_selections<TNetworkProtocol: NetworkProtocol>(
         .lookup(db)
         .concrete_type;
 
-    (current_entity_name, current_entity_concrete_type).wrap_ok()
+    // i.e. if we are abstract
+    if current_entity_concrete_type.is_none() {
+        return Diagnostic::new(
+            format!(
+                "Error when processing @exposeField directive. \
+                The target entity must be concrete, but it is abstract."
+            ),
+            None,
+        )
+        .wrap_err();
+    }
+
+    current_entity_name.wrap_ok()
 }
