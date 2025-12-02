@@ -13,6 +13,9 @@ Fetch a pet by id
 Don't use this field. It's for testing.
     */
     readonly topLevelField: ({
+      /**
+A discriminant for the TopLevelField type
+      */
       readonly __typename: "TopLevelField",
     } | null),
   },

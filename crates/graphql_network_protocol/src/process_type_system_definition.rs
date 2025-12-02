@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, GraphQLInterfaceTypeName, Location, SelectableName,
-    ServerObjectEntityName, Span, UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan,
-    WithSpanPostfix,
+    DescriptionValue, Diagnostic, DiagnosticResult, GraphQLInterfaceTypeName, Location,
+    SelectableName, ServerObjectEntityName, Span, UnvalidatedTypeName, WithLocation,
+    WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
@@ -376,7 +376,15 @@ fn process_object_type_definition(
     if type_definition_type.has_typename_field() {
         fields_to_insert.push(
             FieldToInsert {
-                description: None,
+                description: format!(
+                    "A discriminant for the {} type",
+                    object_type_definition.name.item
+                )
+                .intern()
+                .to::<DescriptionValue>()
+                .wrap(Description)
+                .with_generated_span()
+                .wrap_some(),
                 name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::Generated),
                 graphql_type: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
