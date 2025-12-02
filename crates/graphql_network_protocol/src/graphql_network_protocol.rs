@@ -75,14 +75,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         define_default_graphql_types(&mut outcome);
 
         let mut graphql_root_types = None;
+        let mut directives = HashMap::new();
+        let mut fields_to_process = vec![];
+        let mut supertype_to_subtype_map = BTreeMap::new();
 
         let (type_system_document, type_system_extension_documents) = parse_graphql_schema(db)
             .to_owned()
             .note_todo("Do not clone. Use a MemoRef.")?;
-
-        let mut directives = HashMap::new();
-        let mut fields_to_process = vec![];
-        let mut supertype_to_subtype_map = BTreeMap::new();
 
         process_graphql_type_system_document(
             type_system_document
@@ -98,8 +97,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for type_system_extension_document in type_system_extension_documents.values() {
             process_graphql_type_system_extension_document(
                 type_system_extension_document
-                    .lookup(db)
-                    .clone()
+                    .to_owned(db)
                     .note_todo("Don't clone, use a MemoRef"),
                 &mut graphql_root_types,
                 &mut outcome,
@@ -109,6 +107,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             )?;
         }
 
+        // Note: we need to know whether a field points to an object entity or scalar entity, and we
+        // do not have that information when we first encounter that field. So, we accumulate fields
+        // and handle them now. A future refactor will get rid of this: selectables will all be the
+        // the same struct, and you will have to do a follow up request for the target entity to
+        // know whether it is an object or scalar selectable.
         for (parent_object_entity_name, field) in fields_to_process {
             let target: ServerObjectEntityName = (*field.item.type_.inner()).unchecked_conversion();
 
@@ -134,6 +137,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 with_location.map(|arg| VariableDefinition {
                                     name: arg.name.map(|x| x.unchecked_conversion()),
                                     type_: arg.type_.map(|x| {
+                                        // Another linear scan!
                                         if is_object_entity(&outcome, x.unchecked_conversion()) {
                                             x.unchecked_conversion::<ServerObjectEntityName>()
                                                 .object_selected()
@@ -235,7 +239,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             }
 
             // for interfaces, we need to go back and assign their subtypes. This is weird! And we shouldn't
-            // do it this way.
+            // do it this way. This should also be a follow up request, i.e. interfaces should not contain
+            // info on what their concrete types are.
             let abstract_entity = outcome
                 .server_object_entities
                 .iter_mut()
@@ -346,7 +351,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     concrete_type: Some(target_parent_object_entity.name)
                                         .note_todo(
                                             "This is 100% a bug when there are \
-                                            multiple items in parts_reversed",
+                                            multiple items in parts_reversed, or this \
+                                            field is ignored.",
                                         ),
                                 }
                             }
@@ -376,6 +382,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             client_selection_name: client_field_scalar_selection_name
                                 .unchecked_conversion(),
                             root_object_entity_name: parent_object_entity_name,
+                            // This is fishy! subfields_or_inline_fragments is cloned and stored in multiple locations,
+                            // but presumably we could access it from one location only
                             subfields_or_inline_fragments: subfields_or_inline_fragments.clone(),
                             field_map: expose_field_directive.field_map,
                             top_level_schema_field_arguments,
@@ -559,6 +567,7 @@ fn define_default_graphql_types(outcome: &mut ParseTypeSystemOutcome<GraphQLNetw
     );
 }
 
+// This function should not exist
 fn is_object_entity(
     outcome: &ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     target: ServerObjectEntityName,
@@ -578,6 +587,7 @@ fn traverse_selections_and_return_path<'a>(
     Vec<&'a ServerObjectSelectable<GraphQLNetworkProtocol>>,
     &'a ServerObjectEntity<GraphQLNetworkProtocol>,
 )> {
+    // TODO do not do a linear scan
     let mut current_entity = outcome
         .server_object_entities
         .iter()
