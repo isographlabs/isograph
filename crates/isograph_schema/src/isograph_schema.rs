@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use common_lang_types::{
     ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, SelectableName,
     ServerObjectEntityName, ServerScalarEntityName, ServerScalarSelectableName,
-    ServerSelectableName,
+    ServerSelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -25,6 +25,7 @@ lazy_static! {
     pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
     pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
     pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
+    pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
 }
 

@@ -20,9 +20,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ImperativelyLoadedFieldVariant, NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy,
-    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, ServerScalarSelectable,
-    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, NODE_FIELD_NAME, ParseTypeSystemOutcome,
+    RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity,
+    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -105,8 +106,8 @@ pub fn process_graphql_type_system_document(
                         parent_object_entity_name: server_object_entity_name,
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: vec![ArgumentKeyAndValue {
-                            key: "id".intern().into(),
-                            value: NonConstantValue::Variable("id".intern().into()),
+                            key: (*ID_FIELD_NAME).unchecked_conversion(),
+                            value: NonConstantValue::Variable(*ID_VARIABLE_NAME),
                         }],
                         // None -> node is not concrete.
                         // Note that this doesn't matter!

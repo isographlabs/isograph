@@ -14,11 +14,11 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, Format, ImperativelyLoadedFieldVariant,
-    MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RefetchStrategy,
-    RootOperationName, ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ServerScalarSelectable, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    ClientFieldVariant, ClientScalarSelectable, Format, ID_ENTITY_NAME,
+    ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
+    RefetchStrategy, RootOperationName, ServerObjectEntity, ServerObjectEntityDirectives,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
+    ValidatedVariableDefinition, WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
     to_isograph_constant_value,
 };
@@ -518,7 +518,7 @@ fn define_default_graphql_types(outcome: &mut ParseTypeSystemOutcome<GraphQLNetw
     outcome.server_scalar_entities.push(
         ServerScalarEntity {
             description: None,
-            name: "ID".intern().into(),
+            name: *ID_ENTITY_NAME,
             javascript_name: "string".intern().into(),
             network_protocol: std::marker::PhantomData,
         }
