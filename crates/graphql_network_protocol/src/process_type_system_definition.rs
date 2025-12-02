@@ -59,9 +59,11 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name = object_type_definition.name.item.into();
                 outcome.server_object_entities.push(
                     ServerObjectEntity {
-                        description: object_type_definition
-                            .description
-                            .map(|x| Description(x.item.unchecked_conversion())),
+                        description: object_type_definition.description.map(|x| {
+                            x.item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
                         name: server_object_entity_name,
                         concrete_type: Some(object_type_definition.name.item.into()),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
@@ -163,9 +165,11 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name = interface_definition.name.item.into();
                 outcome.server_object_entities.push(
                     ServerObjectEntity {
-                        description: interface_definition
-                            .description
-                            .map(|x| Description(x.item.unchecked_conversion())),
+                        description: interface_definition.description.map(|x| {
+                            x.item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
                         name: server_object_entity_name,
                         concrete_type: None,
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
@@ -201,9 +205,11 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name = input_object_definition.name.item.into();
                 outcome.server_object_entities.push(
                     ServerObjectEntity {
-                        description: input_object_definition
-                            .description
-                            .map(|x| Description(x.item.unchecked_conversion())),
+                        description: input_object_definition.description.map(|x| {
+                            x.item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
                         name: server_object_entity_name,
                         concrete_type: Some(input_object_definition.name.item.into()),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
@@ -251,13 +257,16 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name = union_definition.name.item.into();
                 outcome.server_object_entities.push(
                     ServerObjectEntity {
-                        description: union_definition
-                            .description
-                            .map(|x| Description(x.item.unchecked_conversion())),
+                        description: union_definition.description.map(|x| {
+                            x.item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
                         name: server_object_entity_name,
                         concrete_type: None,
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
+                            // We also re-assign this later... weird.
                             subtypes: union_definition
                                 .union_member_types
                                 .iter()
