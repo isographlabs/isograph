@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fmt::Debug};
+use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
@@ -13,7 +13,7 @@ use crate::{
     get_reachable_variables, selection_map_wrapped,
 };
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub enum RefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -77,7 +77,7 @@ pub fn generate_refetch_field_strategy<
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
     TSelectionTypeSelectionLinkedFieldAssociatedData,
@@ -104,7 +104,7 @@ pub struct UseRefetchFieldRefetchStrategy<
     pub generate_refetch_query: GenerateRefetchQueryImpl,
 }
 
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct GenerateRefetchQueryImpl {
     pub subfields: Vec<WrappedSelectionMapSelection>,
 }

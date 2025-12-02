@@ -2,9 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    OwnedClientSelectable, UnprocessedClientScalarSelectableSelectionSet,
-    add_client_scalar_selectable_to_entity, create_new_exposed_field,
-    create_type_system_schema_with_server_selectables, get_link_fields_map,
+    OwnedClientSelectable, add_client_scalar_selectable_to_entity, get_link_fields_map,
     process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
@@ -241,7 +239,6 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .clone_err()?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
-                .map(|(selectable, _)| selectable)
                 .wrap_ok();
         }
     };
@@ -342,41 +339,27 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
     HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
-        (
-            ClientScalarSelectable<TNetworkProtocol>,
-            UnprocessedClientScalarSelectableSelectionSet,
-        ),
+        ClientScalarSelectable<TNetworkProtocol>,
     >,
 > {
-    let expose_as_field_queue =
-        create_type_system_schema_with_server_selectables(db).clone_err()?;
+    let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let expose_as_field_queue = &outcome.0.client_scalar_selectables;
 
     let mut map = HashMap::new();
-    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
-        for expose_as_field in expose_as_fields_to_insert {
-            let (unprocessed_client_scalar_selection_set, exposed_field_client_scalar_selectable) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
-                    .clone()
-                    .note_todo("Do not clone. Use a MemoRef.")?;
-
-            map.insert(
-                (
-                    exposed_field_client_scalar_selectable.parent_object_entity_name,
-                    exposed_field_client_scalar_selectable.name.item,
-                ),
-                (
-                    exposed_field_client_scalar_selectable,
-                    unprocessed_client_scalar_selection_set,
-                ),
-            );
-        }
+    for with_location in expose_as_field_queue.iter().flatten() {
+        map.insert(
+            (
+                with_location.item.parent_object_entity_name,
+                with_location.item.name.item,
+            ),
+            with_location.item.clone(),
+        );
     }
 
     Ok(map)
@@ -462,9 +445,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
-                .map(|(key, (selectable, _))| {
-                    ((key.0, key.1.into()), Ok(selectable.scalar_selected()))
-                }),
+                .map(|(key, selectable)| ((key.0, key.1.into()), Ok(selectable.scalar_selected()))),
         )
         .collect::<HashMap<_, _>>()
         .wrap_ok()

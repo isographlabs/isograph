@@ -416,7 +416,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     key.0.linked_fields.insert(
                                         0,
                                         NormalizationKey::ServerField(NameAndArguments {
-                                            name: "node".intern().into(),
+                                            name: (*NODE_FIELD_NAME).into(),
                                             arguments: vec![id_arg.clone()],
                                         }),
                                     );

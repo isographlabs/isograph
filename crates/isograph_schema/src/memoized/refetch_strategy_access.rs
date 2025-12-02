@@ -10,10 +10,9 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
-    client_selectable_declaration_map_from_iso_literals, expose_field_map,
-    get_unvalidated_refetch_stategy, get_validated_refetch_strategy,
-    multiple_selectable_definitions_found_diagnostic, selectable_is_not_defined_diagnostic,
-    selectable_is_wrong_type_diagnostic,
+    client_selectable_declaration_map_from_iso_literals, get_unvalidated_refetch_stategy,
+    get_validated_refetch_strategy, multiple_selectable_definitions_found_diagnostic,
+    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic,
 };
 
 #[expect(clippy::type_complexity)]
@@ -28,7 +27,6 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 > {
     // TODO use a "list of iso declarations" fn
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
-    let expose_field_map = expose_field_map(db).clone_err()?;
 
     let mut out = HashMap::new();
 
@@ -72,22 +70,25 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    for (key, (_, selection_set)) in expose_field_map {
-        match out.entry((key.0, key.1.into())) {
+    let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let expose_fields = &outcome.0.client_scalar_refetch_strategies;
+
+    for with_location in expose_fields.iter().flatten() {
+        let (parent_object_entity_name, selectable_name, refetch_strategy) = &with_location.item;
+        match out.entry((*parent_object_entity_name, (*selectable_name).into())) {
             Entry::Occupied(mut occupied_entry) => {
                 *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
-                    key.0,
-                    key.1.into(),
-                    Location::Generated,
+                    *parent_object_entity_name,
+                    (*selectable_name).into(),
+                    with_location.location,
                 )
                 .wrap_err();
             }
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(
-                    selection_set
-                        .refetch_strategy
+                    refetch_strategy
                         .clone()
-                        .note_todo("Do not clone. Use a MemoRef.")
+                        .wrap_some()
                         .scalar_selected()
                         .wrap_ok(),
                 );

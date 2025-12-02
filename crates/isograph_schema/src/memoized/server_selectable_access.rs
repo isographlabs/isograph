@@ -3,7 +3,7 @@ use std::collections::HashMap;
 use common_lang_types::{
     Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
 };
-use isograph_lang_types::SelectionType;
+use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
@@ -11,7 +11,7 @@ use prelude::{ErrClone as _, Postfix};
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
     ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
-    field_to_insert_to_server_selectable, server_scalar_entity_named,
+    server_scalar_entity_named,
 };
 
 type OwnedSelectableResult<TNetworkProtocol> =
@@ -24,38 +24,44 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticResult<
     HashMap<
         ServerObjectEntityName,
+        // TODO return Vec<OwnedSelectable>
         Vec<(
             ServerSelectableName,
             OwnedSelectableResult<TNetworkProtocol>,
         )>,
     >,
 > {
-    let (items, _fetchable_types) =
+    let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
-    Ok(items
-        .iter()
-        .flat_map(|selection_type| selection_type.as_ref().as_object())
-        .map(|object_outcome| {
-            let fields = object_outcome
-                .fields_to_insert
-                .iter()
-                .map(|field_to_insert| {
-                    (
-                        field_to_insert.item.name.item,
-                        field_to_insert_to_server_selectable(
-                            db,
-                            object_outcome.server_object_entity.item.name,
-                            field_to_insert,
-                        )
-                        .map(|x| x.map_scalar(|(scalar, _)| scalar)),
-                    )
-                })
-                .collect();
+    let mut server_selectables: HashMap<_, Vec<_>> = HashMap::new();
 
-            (object_outcome.server_object_entity.item.name, fields)
-        })
-        .collect())
+    for with_location in outcome.server_scalar_selectables.iter().flatten() {
+        server_selectables
+            .entry(with_location.item.parent_object_entity_name)
+            .or_default()
+            .push((
+                with_location.item.name.item.into(),
+                with_location.item.clone().scalar_selected().wrap_ok(),
+            ));
+    }
+
+    for with_location in outcome.server_object_selectables.iter().flatten() {
+        server_selectables
+            .entry(with_location.item.parent_object_entity_name)
+            .or_default()
+            .push((
+                with_location.item.name.item.into(),
+                with_location
+                    .item
+                    .clone()
+                    .object_selected()
+                    .note_todo("There is no need to make this a result!")
+                    .wrap_ok(),
+            ))
+    }
+
+    Ok(server_selectables)
 }
 
 /// A vector of all server selectables that are defined in the type system schema
