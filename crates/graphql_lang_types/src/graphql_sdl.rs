@@ -116,6 +116,7 @@ pub struct GraphQLObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithEmbeddedLocation<GraphQLObjectTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
@@ -124,6 +125,7 @@ pub struct GraphQLObjectTypeDefinition {
 pub struct GraphQLObjectTypeExtension {
     pub name: WithLocation<GraphQLObjectTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
@@ -132,6 +134,7 @@ pub struct GraphQLObjectTypeExtension {
 pub struct GraphQLScalarTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithLocation<ServerScalarEntityName>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
@@ -140,6 +143,7 @@ pub struct GraphQLInterfaceTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithEmbeddedLocation<GraphQLInterfaceTypeName>,
     pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
 }
@@ -148,6 +152,7 @@ pub struct GraphQLInterfaceTypeDefinition {
 pub struct GraphQLInputObjectTypeDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
     pub name: WithEmbeddedLocation<GraphQLInterfaceTypeName>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
     pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
 }
@@ -158,6 +163,7 @@ pub struct GraphQLSchemaDefinition {
     pub query: Option<WithLocation<GraphQLObjectTypeName>>,
     pub subscription: Option<WithLocation<GraphQLObjectTypeName>>,
     pub mutation: Option<WithLocation<GraphQLObjectTypeName>>,
+    // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
