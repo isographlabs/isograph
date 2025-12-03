@@ -8,6 +8,10 @@ use pico::MemoRef;
 
 use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
 
+// TODO Scalar and Object entities should be a single struct, with all the extra info
+// held in a network_protocol_associated_data field. (Some of that data, like the javascript_name,
+// is independent of the network protocol, but actually relates to the RuntimeLanguage, but
+// we do not (yet) have that as a generic.)
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
