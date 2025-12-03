@@ -25,6 +25,7 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
+    // TODO do we need to intern here? Probably no advantage to that!
     db.intern_value(
         outcome
             .entities
@@ -47,7 +48,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).clone_err()?.lookup(db);
+    let map = server_entity_map(db).to_owned()?.lookup(db);
 
     map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
