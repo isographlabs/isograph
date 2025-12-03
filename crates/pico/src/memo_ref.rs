@@ -1,3 +1,6 @@
+// Uh... I couldn't figure out what line to put this on.
+#![expect(clippy::derived_hash_with_manual_eq)]
+
 use std::marker::PhantomData;
 
 use intern::InternId;

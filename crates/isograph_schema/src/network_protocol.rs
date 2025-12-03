@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
+    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo,
     QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
@@ -19,7 +19,7 @@ type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
     pub entities:
-        BTreeMap<UnvalidatedTypeName, Vec<WithLocation<MemoRefServerEntity<TNetworkProtocol>>>>,
+        BTreeMap<UnvalidatedTypeName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
 
     // TODO these should all be MemoRef
     pub server_object_selectables:
@@ -39,6 +39,12 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
             )>,
         >,
     >,
+
+    /// e.g. if there are multiple entities with the same name
+    ///
+    /// These will not prevent the LSP from working, but should prevent artifact
+    /// generation from starting.
+    pub non_fatal_validation_errors: Vec<Diagnostic>,
 }
 
 pub trait NetworkProtocol:

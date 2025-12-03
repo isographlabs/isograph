@@ -8,12 +8,12 @@ use common_lang_types::{Span, relative_path_from_absolute_and_working_directory}
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
-    DefinitionLocation, IsographResolvedNode, SelectionType,
+    DefinitionLocation, IsographResolvedNode,
 };
 use isograph_schema::{
     IsoLiteralsSource, IsographDatabase, NetworkProtocol, client_object_selectable_named,
     entity_definition_location, get_parent_and_selectable_for_object_path,
-    get_parent_and_selectable_for_scalar_path, server_entities_named,
+    get_parent_and_selectable_for_scalar_path,
 };
 use isograph_schema::{
     client_scalar_selectable_named, process_iso_literal_extraction,
@@ -72,29 +72,21 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
-                let server_entities = match server_entities_named(db, entity.inner.0.into()) {
-                    Ok(s) => s,
-                    Err(_) => return Err(LSPRuntimeError::ExpectedError),
-                };
+                let location = entity_definition_location(db, entity.inner.0.into())
+                    .to_owned()
+                    .ok()
+                    .ok_or(LSPRuntimeError::ExpectedError)?
+                    .ok_or(LSPRuntimeError::ExpectedError)?;
 
-                GotoDefinitionResponse::Array(
-                    server_entities
-                        .iter()
-                        .flat_map(|entity| {
-                            let name = match entity {
-                                SelectionType::Scalar(s) => s.lookup(db).name.into(),
-                                SelectionType::Object(o) => o.lookup(db).name.into(),
-                            };
-                            let location =
-                                entity_definition_location(db, name).to_owned().ok()??;
-
-                            isograph_location_to_lsp_location(
-                                db,
-                                location.as_embedded_location()?,
-                                &db.get_schema_source().content,
-                            )
-                        })
-                        .collect(),
+                GotoDefinitionResponse::Scalar(
+                    isograph_location_to_lsp_location(
+                        db,
+                        location
+                            .as_embedded_location()
+                            .ok_or(LSPRuntimeError::ExpectedError)?,
+                        &db.get_schema_source().content,
+                    )
+                    .ok_or(LSPRuntimeError::ExpectedError)?,
                 )
                 .wrap_some()
             }

@@ -1,10 +1,11 @@
+use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
     ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo,
     QueryOperationName, QueryText, ScalarSelectableName, ServerObjectEntityName,
     ServerObjectSelectableName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
-    WithLocationPostfix, WithSpanPostfix,
+    WithLocation, WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -29,8 +30,8 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::process_type_system_definition::{
-    get_typename_selectable, process_graphql_type_system_document,
-    process_graphql_type_system_extension_document,
+    get_typename_selectable, multiple_entity_definitions_found_diagnostic,
+    process_graphql_type_system_document, process_graphql_type_system_extension_document,
 };
 use crate::{parse_graphql_schema, query_text::generate_query_text};
 
@@ -75,7 +76,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         BTreeMap<ServerObjectEntityName, RootOperationName>,
     )> {
         let mut outcome = ParseTypeSystemOutcome::default();
-        define_default_graphql_types(db, &mut outcome);
+        define_default_graphql_types(db, &mut outcome)?;
 
         let mut graphql_root_types = None;
         let mut directives = HashMap::new();
@@ -124,33 +125,31 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .name
                 .item
                 .to::<ServerObjectEntityName>();
-            outcome
-                .entities
-                .entry(server_object_entity_name.into())
-                .or_default()
-                .push(
-                    ServerObjectEntity {
-                        description: interface_definition.description.map(|description_value| {
-                            description_value
-                                .item
-                                .unchecked_conversion::<DescriptionValue>()
-                                .wrap(Description)
-                        }),
-                        name: server_object_entity_name,
-                        concrete_type: None,
-                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                            original_definition_type:
-                                GraphQLSchemaOriginalDefinitionType::Interface,
-                            subtypes: supertype_to_subtype_map
-                                .get(&server_object_entity_name.into())
-                                .cloned()
-                                .unwrap_or_default(),
-                        },
-                    }
-                    .interned_value(db)
-                    .object_selected()
-                    .with_location(with_location.location),
-                );
+
+            insert_or_multiple_definition_diagnostic(
+                &mut outcome.entities,
+                server_object_entity_name.into(),
+                ServerObjectEntity {
+                    description: interface_definition.description.map(|description_value| {
+                        description_value
+                            .item
+                            .unchecked_conversion::<DescriptionValue>()
+                            .wrap(Description)
+                    }),
+                    name: server_object_entity_name,
+                    concrete_type: None,
+                    network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
+                        subtypes: supertype_to_subtype_map
+                            .get(&server_object_entity_name.into())
+                            .cloned()
+                            .unwrap_or_default(),
+                    },
+                }
+                .interned_value(db)
+                .object_selected()
+                .with_location(with_location.location),
+            )?;
 
             directives
                 .entry(server_object_entity_name)
@@ -367,7 +366,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let top_level_schema_field_concrete_type = outcome
                     .entities
                     .get(&payload_object_entity_name.into())
-                    .and_then(|entities| entities.first())
                     .and_then(|entity| entity.item.as_object())
                     .expect("Expected entity to exist and to be an object.")
                     .lookup(db)
@@ -591,82 +589,74 @@ impl GraphQLSchemaOriginalDefinitionType {
 fn define_default_graphql_types(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-) {
-    outcome
-        .entities
-        .entry((*ID_ENTITY_NAME).into())
-        .or_default()
-        .push(
-            ServerScalarEntity {
-                description: None,
-                name: *ID_ENTITY_NAME,
-                javascript_name: "string".intern().into(),
-                network_protocol: std::marker::PhantomData,
-            }
-            .interned_value(db)
-            .scalar_selected()
-            .with_generated_location(),
-        );
-    outcome
-        .entities
-        .entry((*STRING_ENTITY_NAME).into())
-        .or_default()
-        .push(
-            ServerScalarEntity {
-                description: None,
-                name: *STRING_ENTITY_NAME,
-                javascript_name: *STRING_JAVASCRIPT_TYPE,
-                network_protocol: std::marker::PhantomData,
-            }
-            .interned_value(db)
-            .scalar_selected()
-            .with_generated_location(),
-        );
-    outcome
-        .entities
-        .entry((*BOOLEAN_ENTITY_NAME).into())
-        .or_default()
-        .push(
-            ServerScalarEntity {
-                description: None,
-                name: *BOOLEAN_ENTITY_NAME,
-                javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
-                network_protocol: std::marker::PhantomData,
-            }
-            .interned_value(db)
-            .scalar_selected()
-            .with_generated_location(),
-        );
-    outcome
-        .entities
-        .entry((*FLOAT_ENTITY_NAME).into())
-        .or_default()
-        .push(
-            ServerScalarEntity {
-                description: None,
-                name: *FLOAT_ENTITY_NAME,
-                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
-                network_protocol: std::marker::PhantomData,
-            }
-            .interned_value(db)
-            .scalar_selected()
-            .with_generated_location(),
-        );
-    outcome
-        .entities
-        .entry((*INT_ENTITY_NAME).into())
-        .or_default()
-        .push(
-            ServerScalarEntity {
-                description: None,
-                name: *INT_ENTITY_NAME,
-                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
-                network_protocol: std::marker::PhantomData,
-            }
-            .interned_value(db)
-            .scalar_selected()
-            .with_generated_location(),
-        );
+) -> DiagnosticResult<()> {
+    insert_or_multiple_definition_diagnostic(
+        &mut outcome.entities,
+        (*ID_ENTITY_NAME).into(),
+        ServerScalarEntity {
+            description: None,
+            name: *ID_ENTITY_NAME,
+            javascript_name: "string".intern().into(),
+            network_protocol: std::marker::PhantomData,
+        }
+        .interned_value(db)
+        .scalar_selected()
+        .with_generated_location(),
+    )?;
+    insert_or_multiple_definition_diagnostic(
+        &mut outcome.entities,
+        (*STRING_ENTITY_NAME).into(),
+        ServerScalarEntity {
+            description: None,
+            name: *STRING_ENTITY_NAME,
+            javascript_name: *STRING_JAVASCRIPT_TYPE,
+            network_protocol: std::marker::PhantomData,
+        }
+        .interned_value(db)
+        .scalar_selected()
+        .with_generated_location(),
+    )?;
+    insert_or_multiple_definition_diagnostic(
+        &mut outcome.entities,
+        (*BOOLEAN_ENTITY_NAME).into(),
+        ServerScalarEntity {
+            description: None,
+            name: *BOOLEAN_ENTITY_NAME,
+            javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
+            network_protocol: std::marker::PhantomData,
+        }
+        .interned_value(db)
+        .scalar_selected()
+        .with_generated_location(),
+    )?;
+    insert_or_multiple_definition_diagnostic(
+        &mut outcome.entities,
+        (*FLOAT_ENTITY_NAME).into(),
+        ServerScalarEntity {
+            description: None,
+            name: *FLOAT_ENTITY_NAME,
+            javascript_name: *NUMBER_JAVASCRIPT_TYPE,
+            network_protocol: std::marker::PhantomData,
+        }
+        .interned_value(db)
+        .scalar_selected()
+        .with_generated_location(),
+    )?;
+    insert_or_multiple_definition_diagnostic(
+        &mut outcome.entities,
+        (*INT_ENTITY_NAME).into(),
+        ServerScalarEntity {
+            description: None,
+            name: *INT_ENTITY_NAME,
+            javascript_name: *NUMBER_JAVASCRIPT_TYPE,
+            network_protocol: std::marker::PhantomData,
+        }
+        .interned_value(db)
+        .scalar_selected()
+        .with_generated_location(),
+    )?;
+
+    ().wrap_ok()
 }
 
 fn is_object_entity(
@@ -676,7 +666,6 @@ fn is_object_entity(
     outcome
         .entities
         .get(&target.into())
-        .and_then(|entities| entities.first())
         .and_then(|entity| entity.item.as_object())
         .is_some()
 }
@@ -694,7 +683,6 @@ fn traverse_selections_and_return_path<'a>(
     let mut current_entity = outcome
         .entities
         .get(&payload_object_entity_name.into())
-        .and_then(|entities| entities.first())
         .and_then(|entity| entity.item.as_object())
         .ok_or_else(|| {
             Diagnostic::new(
@@ -734,7 +722,6 @@ fn traverse_selections_and_return_path<'a>(
         current_entity = outcome
             .entities
             .get(&next_entity_name.into())
-            .and_then(|entities| entities.first())
             .and_then(|entity| entity.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
@@ -750,4 +737,21 @@ fn traverse_selections_and_return_path<'a>(
     }
 
     (output, current_entity.lookup(db)).wrap_ok()
+}
+
+// TODO make this generic over value, too
+pub(crate) fn insert_or_multiple_definition_diagnostic<Value>(
+    map: &mut BTreeMap<UnvalidatedTypeName, WithLocation<Value>>,
+    key: UnvalidatedTypeName,
+    item: WithLocation<Value>,
+) -> DiagnosticResult<()> {
+    match map.entry(key) {
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(item);
+            ().wrap_ok()
+        }
+        Entry::Occupied(_) => {
+            multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()).wrap_err()
+        }
+    }
 }
