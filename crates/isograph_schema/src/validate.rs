@@ -44,6 +44,10 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 
     errors.extend(validate_scalar_selectable_directive_sets(db));
 
+    if let Ok((outcome, _)) = TNetworkProtocol::parse_type_system_documents(db) {
+        errors.extend(outcome.non_fatal_validation_errors.clone());
+    }
+
     let contains_iso_stats = match validate_all_iso_literals(db) {
         Ok(stats) => stats,
         Err(e) => {
