@@ -24,7 +24,7 @@ pub trait Database: DatabaseDyn + Sized {
     fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
     /// Because `T` is a `Singleton`, unlike `get` this does not require `id: SourceId<T>`
     fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
-    fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
+    fn intern_value<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
     fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T>;
     fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T>;
     fn remove<T>(&mut self, id: SourceId<T>);
@@ -380,7 +380,10 @@ impl<Db: Database> Default for Storage<Db> {
     }
 }
 
-pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T) -> MemoRef<T> {
+pub fn intern_value<Db: Database, T: Clone + Hash + DynEq + 'static>(
+    db: &Db,
+    value: T,
+) -> MemoRef<T> {
     let param_id = hash(&value).into();
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
