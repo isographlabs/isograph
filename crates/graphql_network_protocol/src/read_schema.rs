@@ -37,7 +37,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
         schema_extensions.insert(*relative_path, extensions_document);
     }
 
-    (db.intern_value(schema), schema_extensions).wrap_ok()
+    (schema.interned_value(db), schema_extensions).wrap_ok()
 }
 
 #[memo]
@@ -52,5 +52,5 @@ pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
     } = db.get(schema_extension_source_id);
     let schema_extensions = parse_schema_extensions(content, *text_source)?;
 
-    db.intern_value(schema_extensions).wrap_ok()
+    schema_extensions.interned_value(db).wrap_ok()
 }

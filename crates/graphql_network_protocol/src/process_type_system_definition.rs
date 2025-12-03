@@ -26,7 +26,6 @@ use isograph_schema::{
     generate_refetch_field_strategy,
 };
 use lazy_static::lazy_static;
-use pico::Database;
 use prelude::Postfix;
 
 use crate::{
@@ -68,7 +67,7 @@ pub fn process_graphql_type_system_document(
                     .entry(server_object_entity_name.into())
                     .or_default()
                     .push(
-                        db.intern_value(ServerObjectEntity {
+                        ServerObjectEntity {
                             description: object_type_definition.description.map(
                                 |description_value| {
                                     description_value
@@ -84,7 +83,8 @@ pub fn process_graphql_type_system_document(
                                     GraphQLSchemaOriginalDefinitionType::Object,
                                 subtypes: vec![],
                             },
-                        })
+                        }
+                        .interned_value(db)
                         .object_selected()
                         .with_location(location),
                     );
@@ -166,7 +166,7 @@ pub fn process_graphql_type_system_document(
                     .entry(scalar_type_definition.name.item.unchecked_conversion())
                     .or_default()
                     .push(
-                        db.intern_value(ServerScalarEntity {
+                        ServerScalarEntity {
                             description: scalar_type_definition
                                 .description
                                 .map(|with_span| with_span.item.into()),
@@ -174,7 +174,8 @@ pub fn process_graphql_type_system_document(
                             // TODO allow customization here
                             javascript_name: *STRING_JAVASCRIPT_TYPE,
                             network_protocol: std::marker::PhantomData,
-                        })
+                        }
+                        .interned_value(db)
                         .scalar_selected()
                         .with_location(location),
                     )
@@ -192,7 +193,7 @@ pub fn process_graphql_type_system_document(
                     .entry(server_object_entity_name.into())
                     .or_default()
                     .push(
-                        db.intern_value(ServerObjectEntity {
+                        ServerObjectEntity {
                             description: input_object_definition.description.map(
                                 |description_value| {
                                     description_value
@@ -208,7 +209,8 @@ pub fn process_graphql_type_system_document(
                                     GraphQLSchemaOriginalDefinitionType::InputObject,
                                 subtypes: vec![],
                             },
-                        })
+                        }
+                        .interned_value(db)
                         .object_selected()
                         .with_location(location),
                     );
@@ -235,7 +237,7 @@ pub fn process_graphql_type_system_document(
                     .entry(enum_definition.name.item.into())
                     .or_default()
                     .push(
-                        db.intern_value(ServerScalarEntity {
+                        ServerScalarEntity {
                             description: enum_definition
                                 .description
                                 .map(|with_span| with_span.item.into()),
@@ -243,7 +245,8 @@ pub fn process_graphql_type_system_document(
                             // TODO allow customization here
                             javascript_name: *STRING_JAVASCRIPT_TYPE,
                             network_protocol: std::marker::PhantomData,
-                        })
+                        }
+                        .interned_value(db)
                         .scalar_selected()
                         .with_location(location),
                     )
@@ -256,7 +259,7 @@ pub fn process_graphql_type_system_document(
                     .entry(server_object_entity_name.into())
                     .or_default()
                     .push(
-                        db.intern_value(ServerObjectEntity {
+                        ServerObjectEntity {
                             description: union_definition.description.map(|description_value| {
                                 description_value
                                     .item
@@ -274,7 +277,8 @@ pub fn process_graphql_type_system_document(
                                     .map(|entity_name| entity_name.item.unchecked_conversion())
                                     .collect(),
                             },
-                        })
+                        }
+                        .interned_value(db)
                         .object_selected()
                         .with_location(location),
                     );

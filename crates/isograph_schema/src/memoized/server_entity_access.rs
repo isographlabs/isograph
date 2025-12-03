@@ -25,20 +25,18 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
-    // TODO do we need to intern here? Probably no advantage to that!
-    db.intern_value(
-        outcome
-            .entities
-            .iter()
-            .map(|(entity_name, entities)| {
-                (
-                    *entity_name,
-                    entities.iter().map(|entity| entity.item).collect(),
-                )
-            })
-            .collect(),
-    )
-    .wrap_ok()
+    outcome
+        .entities
+        .iter()
+        .map(|(entity_name, entities)| {
+            (
+                *entity_name,
+                entities.iter().map(|entity| entity.item).collect(),
+            )
+        })
+        .collect::<BTreeMap<_, _>>()
+        .interned_value(db)
+        .wrap_ok()
 }
 
 // TODO consider adding a memoized function that creates a map of entities (maybe

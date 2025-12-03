@@ -175,8 +175,7 @@ impl<Db: Database> Storage<Db> {
     pub fn run_garbage_collection(&mut self) {
         self.assert_empty_dependency_stack();
 
-        let top_level_function_calls =
-            std::mem::replace(&mut self.top_level_calls, BoxcarVec::new());
+        let top_level_function_calls = std::mem::take(&mut self.top_level_calls);
 
         for derived_node_id in top_level_function_calls {
             self.top_level_call_lru_cache.put(derived_node_id, ());

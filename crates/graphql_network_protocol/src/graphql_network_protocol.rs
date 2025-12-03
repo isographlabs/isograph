@@ -25,7 +25,6 @@ use isograph_schema::{
     to_isograph_constant_value,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
-use pico::Database;
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -130,7 +129,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .entry(server_object_entity_name.into())
                 .or_default()
                 .push(
-                    db.intern_value(ServerObjectEntity {
+                    ServerObjectEntity {
                         description: interface_definition.description.map(|description_value| {
                             description_value
                                 .item
@@ -147,7 +146,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .cloned()
                                 .unwrap_or_default(),
                         },
-                    })
+                    }
+                    .interned_value(db)
                     .object_selected()
                     .with_location(with_location.location),
                 );
@@ -598,12 +598,13 @@ fn define_default_graphql_types(
         .entry((*ID_ENTITY_NAME).into())
         .or_default()
         .push(
-            db.intern_value(ServerScalarEntity {
+            ServerScalarEntity {
                 description: None,
                 name: *ID_ENTITY_NAME,
                 javascript_name: "string".intern().into(),
                 network_protocol: std::marker::PhantomData,
-            })
+            }
+            .interned_value(db)
             .scalar_selected()
             .with_generated_location(),
         );
@@ -612,12 +613,13 @@ fn define_default_graphql_types(
         .entry((*STRING_ENTITY_NAME).into())
         .or_default()
         .push(
-            db.intern_value(ServerScalarEntity {
+            ServerScalarEntity {
                 description: None,
                 name: *STRING_ENTITY_NAME,
                 javascript_name: *STRING_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
-            })
+            }
+            .interned_value(db)
             .scalar_selected()
             .with_generated_location(),
         );
@@ -626,12 +628,13 @@ fn define_default_graphql_types(
         .entry((*BOOLEAN_ENTITY_NAME).into())
         .or_default()
         .push(
-            db.intern_value(ServerScalarEntity {
+            ServerScalarEntity {
                 description: None,
                 name: *BOOLEAN_ENTITY_NAME,
                 javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
-            })
+            }
+            .interned_value(db)
             .scalar_selected()
             .with_generated_location(),
         );
@@ -640,12 +643,13 @@ fn define_default_graphql_types(
         .entry((*FLOAT_ENTITY_NAME).into())
         .or_default()
         .push(
-            db.intern_value(ServerScalarEntity {
+            ServerScalarEntity {
                 description: None,
                 name: *FLOAT_ENTITY_NAME,
                 javascript_name: *NUMBER_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
-            })
+            }
+            .interned_value(db)
             .scalar_selected()
             .with_generated_location(),
         );
@@ -654,12 +658,13 @@ fn define_default_graphql_types(
         .entry((*INT_ENTITY_NAME).into())
         .or_default()
         .push(
-            db.intern_value(ServerScalarEntity {
+            ServerScalarEntity {
                 description: None,
                 name: *INT_ENTITY_NAME,
                 javascript_name: *NUMBER_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
-            })
+            }
+            .interned_value(db)
             .scalar_selected()
             .with_generated_location(),
         );
