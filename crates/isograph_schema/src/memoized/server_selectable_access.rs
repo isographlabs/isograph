@@ -242,7 +242,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 
     // TODO disallow [ID] etc, ID, etc.
 
-    Ok(Some(db.intern_ref(selectable)))
+    selectable.interned_ref(db).wrap_some().wrap_ok()
 }
 
 #[memo]
