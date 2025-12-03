@@ -22,10 +22,10 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .map(|object| {
             let field_name = *LINK_FIELD_NAME;
-            let parent_object_entity_name = object.name;
+            let parent_object_entity_name = object.lookup(db).name;
             ClientScalarSelectable {
                 description: Some(Description(
-                    format!("A store Link for the {} type.", object.name)
+                    format!("A store Link for the {} type.", parent_object_entity_name)
                         .intern()
                         .into(),
                 )),

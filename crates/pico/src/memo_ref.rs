@@ -4,14 +4,14 @@ use intern::InternId;
 
 use crate::{DatabaseDyn, DerivedNodeId, ParamId, RawPtr, dependency::NodeKind};
 
-#[derive(Debug)]
+#[derive(Debug, Hash)]
 pub struct MemoRef<T> {
     pub(crate) derived_node_id: DerivedNodeId,
     kind: MemoRefKind,
     phantom: PhantomData<T>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum MemoRefKind {
     Value,
     RawPtr,

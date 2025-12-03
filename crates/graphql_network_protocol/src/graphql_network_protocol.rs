@@ -14,20 +14,24 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, Format, ID_ENTITY_NAME,
-    ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RefetchStrategy, RootOperationName, ServerObjectEntity, ServerObjectEntityDirectives,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
+    FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
+    MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
+    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE,
+    ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ServerScalarSelectable, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
     to_isograph_constant_value,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
+use pico::Database;
 use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::process_type_system_definition::{
-    process_graphql_type_system_document, process_graphql_type_system_extension_document,
+    get_typename_selectable, process_graphql_type_system_document,
+    process_graphql_type_system_extension_document,
 };
 use crate::{parse_graphql_schema, query_text::generate_query_text};
 
@@ -72,18 +76,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         BTreeMap<ServerObjectEntityName, RootOperationName>,
     )> {
         let mut outcome = ParseTypeSystemOutcome::default();
-        define_default_graphql_types(&mut outcome);
+        define_default_graphql_types(db, &mut outcome);
 
         let mut graphql_root_types = None;
         let mut directives = HashMap::new();
         let mut fields_to_process = vec![];
         let mut supertype_to_subtype_map = BTreeMap::new();
+        let mut interfaces_to_process = vec![];
 
         let (type_system_document, type_system_extension_documents) = parse_graphql_schema(db)
             .to_owned()
             .note_todo("Do not clone. Use a MemoRef.")?;
 
         process_graphql_type_system_document(
+            db,
             type_system_document
                 .to_owned(db)
                 .note_todo("Do not clone. Use a MemoRef."),
@@ -92,10 +98,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             &mut directives,
             &mut fields_to_process,
             &mut supertype_to_subtype_map,
+            &mut interfaces_to_process,
         )?;
 
         for type_system_extension_document in type_system_extension_documents.values() {
             process_graphql_type_system_extension_document(
+                db,
                 type_system_extension_document
                     .to_owned(db)
                     .note_todo("Don't clone, use a MemoRef"),
@@ -104,7 +112,63 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 &mut directives,
                 &mut fields_to_process,
                 &mut supertype_to_subtype_map,
+                &mut interfaces_to_process,
             )?;
+        }
+
+        // We process interfaces later, because we need to know all of the subtypes that an interface
+        // implements. In an ideal world, this info would not be part of the ServerObjectEntity struct,
+        // and we should make that refactor.
+        for with_location in interfaces_to_process {
+            let interface_definition = with_location.item;
+            let server_object_entity_name = interface_definition
+                .name
+                .item
+                .to::<ServerObjectEntityName>();
+            outcome
+                .entities
+                .entry(server_object_entity_name.into())
+                .or_default()
+                .push(
+                    db.intern_value(ServerObjectEntity {
+                        description: interface_definition.description.map(|description_value| {
+                            description_value
+                                .item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
+                        name: server_object_entity_name,
+                        concrete_type: None,
+                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                            original_definition_type:
+                                GraphQLSchemaOriginalDefinitionType::Interface,
+                            subtypes: supertype_to_subtype_map
+                                .get(&server_object_entity_name.into())
+                                .cloned()
+                                .unwrap_or_default(),
+                        },
+                    })
+                    .object_selected()
+                    .with_location(with_location.location),
+                );
+
+            directives
+                .entry(server_object_entity_name)
+                .or_default()
+                .extend(interface_definition.directives);
+
+            for field in interface_definition.fields {
+                fields_to_process.push((server_object_entity_name, field));
+            }
+
+            outcome.server_scalar_selectables.push(
+                get_typename_selectable(server_object_entity_name, with_location.location, None)
+                    .with_location(with_location.location)
+                    .wrap_ok(),
+            );
+
+            // I don't think interface-to-interface refinement is handled correctly, let's just
+            // ignore it for now.
         }
 
         // Note: we need to know whether a field points to an object entity or scalar entity, and we
@@ -123,9 +187,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .item
                             .description
                             .map(|with_span| with_span.item.into()),
-                        name: field.item.name.map(|x| x.unchecked_conversion()),
+                        name: field.item.name.map(|name| name.unchecked_conversion()),
                         target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                            field.item.type_.clone().map(|x| x.unchecked_conversion()),
+                            field
+                                .item
+                                .type_
+                                .clone()
+                                .map(|entity_name| entity_name.unchecked_conversion()),
                         ),
                         object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
                         parent_object_entity_name,
@@ -135,14 +203,21 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 with_location.map(|arg| VariableDefinition {
-                                    name: arg.name.map(|x| x.unchecked_conversion()),
-                                    type_: arg.type_.map(|x| {
+                                    name: arg.name.map(|input_value_name| {
+                                        input_value_name.unchecked_conversion()
+                                    }),
+                                    type_: arg.type_.map(|input_type_name| {
                                         // Another linear scan!
-                                        if is_object_entity(&outcome, x.unchecked_conversion()) {
-                                            x.unchecked_conversion::<ServerObjectEntityName>()
+                                        if is_object_entity(
+                                            &outcome,
+                                            input_type_name.unchecked_conversion(),
+                                        ) {
+                                            input_type_name
+                                                .unchecked_conversion::<ServerObjectEntityName>()
                                                 .object_selected()
                                         } else {
-                                            x.unchecked_conversion::<ServerScalarEntityName>()
+                                            input_type_name
+                                                .unchecked_conversion::<ServerScalarEntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -164,7 +239,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .item
                             .description
                             .map(|with_span| with_span.item.into()),
-                        name: field.item.name.map(|x| x.unchecked_conversion()),
+                        name: field.item.name.map(|name| name.unchecked_conversion()),
                         parent_object_entity_name,
                         arguments: field
                             .item
@@ -172,13 +247,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 with_location.map(|arg| VariableDefinition {
-                                    name: arg.name.map(|x| x.unchecked_conversion()),
-                                    type_: arg.type_.map(|x| {
-                                        if is_object_entity(&outcome, x.unchecked_conversion()) {
-                                            x.unchecked_conversion::<ServerObjectEntityName>()
+                                    name: arg.name.map(|input_value_name| {
+                                        input_value_name.unchecked_conversion()
+                                    }),
+                                    type_: arg.type_.map(|input_type_name| {
+                                        if is_object_entity(
+                                            &outcome,
+                                            input_type_name.unchecked_conversion(),
+                                        ) {
+                                            input_type_name
+                                                .unchecked_conversion::<ServerObjectEntityName>()
                                                 .object_selected()
                                         } else {
-                                            x.unchecked_conversion::<ServerScalarEntityName>()
+                                            input_type_name
+                                                .unchecked_conversion::<ServerScalarEntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -190,7 +272,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .collect(),
                         phantom_data: std::marker::PhantomData,
                         target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                            field.item.type_.clone().map(|x| x.unchecked_conversion()),
+                            field
+                                .item
+                                .type_
+                                .clone()
+                                .map(|entity_name| entity_name.unchecked_conversion()),
                         ),
                         javascript_type_override: None,
                     }
@@ -237,21 +323,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .wrap_ok(),
                 )
             }
-
-            // for interfaces, we need to go back and assign their subtypes. This is weird! And we shouldn't
-            // do it this way. This should also be a follow up request, i.e. interfaces should not contain
-            // info on what their concrete types are.
-            let abstract_entity = outcome
-                .server_object_entities
-                .iter_mut()
-                .filter_map(|x| x.as_mut().ok())
-                .find(|x| x.item.name == abstract_parent_entity_name)
-                .expect("Expected item to be found");
-
-            abstract_entity
-                .item
-                .network_protocol_associated_data
-                .subtypes = concrete_child_entity_names;
         }
 
         // exposeField directives -> fields
@@ -276,8 +347,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_field = &outcome
                     .server_object_selectables
                     .iter()
-                    .filter_map(|x| x.as_ref().ok())
-                    .find(|x| x.item.name.item == mutation_subfield_name)
+                    .filter_map(|server_object_selectable_result| {
+                        server_object_selectable_result.as_ref().ok()
+                    })
+                    .find(|server_object_selectable| {
+                        server_object_selectable.item.name.item == mutation_subfield_name
+                    })
                     .ok_or_else(|| Diagnostic::new("Mutation field not found".to_string(), None))?
                     .item;
 
@@ -291,17 +366,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_field_arguments = mutation_field.arguments.clone();
 
                 let top_level_schema_field_concrete_type = outcome
-                    .server_object_entities
-                    .iter()
-                    .filter_map(|x| x.as_ref().ok())
-                    .find(|x| x.item.name == payload_object_entity_name)
-                    .note_todo("Do not do a linear scan, use a hash map")
-                    .expect("Expected entity to exist.")
-                    .item
+                    .entities
+                    .get(&payload_object_entity_name.into())
+                    .and_then(|entities| entities.first())
+                    .and_then(|entity| entity.item.as_object())
+                    .expect("Expected entity to exist and to be an object.")
+                    .lookup(db)
                     .concrete_type;
 
                 let (mut parts_reversed, target_parent_object_entity) =
                     traverse_selections_and_return_path(
+                        db,
                         &outcome,
                         payload_object_entity_name,
                         &primary_field_name_selection_parts,
@@ -333,7 +408,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                 let top_level_schema_field_arguments = mutation_field_arguments
                     .into_iter()
-                    .map(|x| x.item)
+                    .map(|variable_definition| variable_definition.item)
                     .collect::<Vec<_>>();
 
                 let mut subfields_or_inline_fragments = parts_reversed
@@ -514,72 +589,96 @@ impl GraphQLSchemaOriginalDefinitionType {
     }
 }
 
-fn define_default_graphql_types(outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>) {
-    outcome.server_scalar_entities.push(
-        ServerScalarEntity {
-            description: None,
-            name: *ID_ENTITY_NAME,
-            javascript_name: "string".intern().into(),
-            network_protocol: std::marker::PhantomData,
-        }
-        .with_generated_location()
-        .wrap_ok(),
-    );
-    outcome.server_scalar_entities.push(
-        ServerScalarEntity {
-            description: None,
-            name: "String".intern().into(),
-            javascript_name: "string".intern().into(),
-            network_protocol: std::marker::PhantomData,
-        }
-        .with_generated_location()
-        .wrap_ok(),
-    );
-    outcome.server_scalar_entities.push(
-        ServerScalarEntity {
-            description: None,
-            name: "Boolean".intern().into(),
-            javascript_name: "boolean".intern().into(),
-            network_protocol: std::marker::PhantomData,
-        }
-        .with_generated_location()
-        .wrap_ok(),
-    );
-    outcome.server_scalar_entities.push(
-        ServerScalarEntity {
-            description: None,
-            name: "Float".intern().into(),
-            javascript_name: "number".intern().into(),
-            network_protocol: std::marker::PhantomData,
-        }
-        .with_generated_location()
-        .wrap_ok(),
-    );
-    outcome.server_scalar_entities.push(
-        ServerScalarEntity {
-            description: None,
-            name: "Int".intern().into(),
-            javascript_name: "number".intern().into(),
-            network_protocol: std::marker::PhantomData,
-        }
-        .with_generated_location()
-        .wrap_ok(),
-    );
+fn define_default_graphql_types(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
+    outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+) {
+    outcome
+        .entities
+        .entry((*ID_ENTITY_NAME).into())
+        .or_default()
+        .push(
+            db.intern_value(ServerScalarEntity {
+                description: None,
+                name: *ID_ENTITY_NAME,
+                javascript_name: "string".intern().into(),
+                network_protocol: std::marker::PhantomData,
+            })
+            .scalar_selected()
+            .with_generated_location(),
+        );
+    outcome
+        .entities
+        .entry((*STRING_ENTITY_NAME).into())
+        .or_default()
+        .push(
+            db.intern_value(ServerScalarEntity {
+                description: None,
+                name: *STRING_ENTITY_NAME,
+                javascript_name: *STRING_JAVASCRIPT_TYPE,
+                network_protocol: std::marker::PhantomData,
+            })
+            .scalar_selected()
+            .with_generated_location(),
+        );
+    outcome
+        .entities
+        .entry((*BOOLEAN_ENTITY_NAME).into())
+        .or_default()
+        .push(
+            db.intern_value(ServerScalarEntity {
+                description: None,
+                name: *BOOLEAN_ENTITY_NAME,
+                javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
+                network_protocol: std::marker::PhantomData,
+            })
+            .scalar_selected()
+            .with_generated_location(),
+        );
+    outcome
+        .entities
+        .entry((*FLOAT_ENTITY_NAME).into())
+        .or_default()
+        .push(
+            db.intern_value(ServerScalarEntity {
+                description: None,
+                name: *FLOAT_ENTITY_NAME,
+                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
+                network_protocol: std::marker::PhantomData,
+            })
+            .scalar_selected()
+            .with_generated_location(),
+        );
+    outcome
+        .entities
+        .entry((*INT_ENTITY_NAME).into())
+        .or_default()
+        .push(
+            db.intern_value(ServerScalarEntity {
+                description: None,
+                name: *INT_ENTITY_NAME,
+                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
+                network_protocol: std::marker::PhantomData,
+            })
+            .scalar_selected()
+            .with_generated_location(),
+        );
 }
 
-// This function should not exist
 fn is_object_entity(
     outcome: &ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     target: ServerObjectEntityName,
 ) -> bool {
     outcome
-        .server_object_entities
-        .iter()
-        .filter_map(|x| x.as_ref().ok())
-        .any(|object_entity| object_entity.item.name == target)
+        .entities
+        .get(&target.into())
+        .and_then(|entities| entities.first())
+        .and_then(|entity| entity.item.as_object())
+        .is_some()
 }
 
 fn traverse_selections_and_return_path<'a>(
+    db: &'a IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &'a ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     payload_object_entity_name: ServerObjectEntityName,
     primary_field_selection_name_parts: &[ServerSelectableName],
@@ -589,10 +688,10 @@ fn traverse_selections_and_return_path<'a>(
 )> {
     // TODO do not do a linear scan
     let mut current_entity = outcome
-        .server_object_entities
-        .iter()
-        .filter_map(|x| x.as_ref().ok())
-        .find(|x| x.item.name == payload_object_entity_name)
+        .entities
+        .get(&payload_object_entity_name.into())
+        .and_then(|entities| entities.first())
+        .and_then(|entity| entity.item.as_object())
         .ok_or_else(|| {
             Diagnostic::new(
                 format!(
@@ -609,9 +708,11 @@ fn traverse_selections_and_return_path<'a>(
         let selection = outcome
             .server_object_selectables
             .iter()
-            .filter_map(|x| x.as_ref().ok())
-            .find(|x| {
-                x.item.name.item
+            .filter_map(|server_object_selectable_result| {
+                server_object_selectable_result.as_ref().ok()
+            })
+            .find(|server_object_selectable| {
+                server_object_selectable.item.name.item
                     == (*selection_name).unchecked_conversion::<ServerObjectSelectableName>()
             })
             .ok_or_else(|| {
@@ -627,10 +728,10 @@ fn traverse_selections_and_return_path<'a>(
         let next_entity_name = *selection.item.target_object_entity.inner();
 
         current_entity = outcome
-            .server_object_entities
-            .iter()
-            .filter_map(|x| x.as_ref().ok())
-            .find(|x| x.item.name == next_entity_name)
+            .entities
+            .get(&next_entity_name.into())
+            .and_then(|entities| entities.first())
+            .and_then(|entity| entity.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
@@ -644,5 +745,5 @@ fn traverse_selections_and_return_path<'a>(
         output.push(&selection.item);
     }
 
-    (output, &current_entity.item).wrap_ok()
+    (output, current_entity.lookup(db)).wrap_ok()
 }
