@@ -157,17 +157,20 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
+    eprintln!("sid selectable 0");
     let selectable = server_selectable_named(
         db,
         parent_server_object_entity_name,
         (*ID_FIELD_NAME).into(),
     )
     .clone_err()?;
+    eprintln!("sid selectable 1");
 
     let selectable = match selectable {
         Some(s) => s.clone_err()?,
         None => return Ok(None),
     };
+    eprintln!("sid selectable 2");
 
     // TODO check if it is a client field...
     let selectable = match selectable {
@@ -188,9 +191,12 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
             .wrap_err();
         }
     };
+    eprintln!("sid selectable 3");
 
     let target_scalar_entity_name = selectable.target_scalar_entity.inner();
+    eprintln!("sid selectable 3.5");
     let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
+        .dbg()
         .clone_err()?
         .as_ref()
         // It must exist
@@ -213,6 +219,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
+    eprintln!("sid selectable 4");
     let options = &db.get_isograph_config().options;
 
     // And must have the right inner type
@@ -239,6 +246,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
     }
+    eprintln!("sid selectable 5");
 
     // TODO disallow [ID] etc, ID, etc.
 

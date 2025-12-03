@@ -25,24 +25,30 @@ use crate::{
 pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
+    eprintln!("ves 0");
     let mut errors = BTreeSet::new();
 
     maybe_extend(&mut errors, validate_use_of_arguments(db));
+    eprintln!("ves 1");
 
     maybe_extend(
         &mut errors,
         validate_all_server_selectables_point_to_defined_types(db),
     );
+    eprintln!("ves 2");
 
     errors.extend(validate_all_id_fields(db));
+    eprintln!("ves 3");
 
     errors.extend(
         validated_entrypoints(db)
             .values()
             .flat_map(|result| result.as_ref().err()?.clone().wrap_some()),
     );
+    eprintln!("ves 4");
 
     errors.extend(validate_scalar_selectable_directive_sets(db));
+    eprintln!("ves 5");
 
     let contains_iso_stats = match validate_all_iso_literals(db) {
         Ok(stats) => stats,
@@ -109,15 +115,19 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
 fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<Diagnostic> {
+    eprintln!("id fields 1");
     let entities = match server_object_entities(db).as_ref() {
         Ok(entities) => entities,
         Err(e) => return vec![e.clone()],
     };
 
+    eprintln!("entities len {:?}", entities.len());
     entities
         .iter()
         .flat_map(|entity| {
+            eprintln!("id fields 2");
             server_id_selectable(db, entity.lookup(db).name)
+                .dbg()
                 .clone_err()
                 .err()
         })

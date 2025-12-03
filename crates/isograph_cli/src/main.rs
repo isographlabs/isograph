@@ -33,6 +33,7 @@ async fn start_compiler(
     compile_command: CompileCommand,
     current_working_directory: CurrentWorkingDirectory,
 ) {
+    eprintln!("about to run {:?}", &compile_command);
     let config_location = compile_command
         .config
         .unwrap_or("./isograph.config.json".into());
@@ -56,12 +57,11 @@ async fn start_compiler(
                 std::process::exit(1);
             }
         };
-    } else if compile_and_print::<GraphQLNetworkProtocol>(
-        &config_location,
-        current_working_directory,
-    )
-    .is_err()
+    } else if let Err(e) =
+        compile_and_print::<GraphQLNetworkProtocol>(&config_location, current_working_directory)
     {
+        eprintln!("exit 1");
+        eprintln!("{:?}", e);
         std::process::exit(1);
     }
 }

@@ -22,9 +22,11 @@ fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     MemoRef<BTreeMap<UnvalidatedTypeName, Vec<MemoRefServerEntity<TNetworkProtocol>>>>,
     Diagnostic,
 > {
+    eprintln!("entity map");
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
+    eprintln!("entity map 2");
     db.intern_ref(
         &outcome
             .entities
@@ -47,8 +49,10 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).clone_err()?.lookup(db);
+    eprintln!("entities named");
+    let map = server_entity_map(db).clone_err().dbg()?.lookup(db);
 
+    eprintln!("entities named 2 {:?}", map);
     map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
 
@@ -121,10 +125,13 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: ServerScalarEntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarEntity<TNetworkProtocol>>>> {
+    eprintln!("entity named");
     let entities = server_entities_named(db, server_scalar_entity_name.into()).clone_err()?;
 
+    eprintln!("entity named 1");
     match entities.split_first() {
         Some((first, rest)) => {
+            eprintln!("entity named 2");
             if rest.is_empty() {
                 match first {
                     SelectionType::Scalar(s) => (*s)
@@ -148,6 +155,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
                     }
                 }
             } else {
+                eprintln!("entity named 3");
                 let location = entity_definition_location(db, server_scalar_entity_name.into())
                     .as_ref()
                     .ok()

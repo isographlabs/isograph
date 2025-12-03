@@ -13,6 +13,7 @@ use prelude::Postfix;
 use pretty_duration::pretty_duration;
 use tracing::{error, info};
 
+#[derive(Debug)]
 pub struct CompilationStats {
     pub client_field_count: usize,
     pub client_pointer_count: usize,
@@ -24,16 +25,18 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
-    info!("{}", "Starting to compile.".cyan());
+    info!("{}", "Starting to compile!!!.".cyan());
     let mut state = CompilerState::new(config_location, current_working_directory)?;
     print_result(WithDuration::new(|| {
-        compile::<TNetworkProtocol>(&mut state)
+        eprintln!("Calc");
+        compile::<TNetworkProtocol>(&mut state).dbg()
     }))
 }
 
 pub fn print_result(
     result: WithDuration<DiagnosticVecResult<CompilationStats>>,
 ) -> DiagnosticVecResult<()> {
+    eprintln!("printing result");
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
@@ -84,13 +87,16 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 pub fn compile<TNetworkProtocol: NetworkProtocol>(
     state: &mut CompilerState<TNetworkProtocol>,
 ) -> DiagnosticVecResult<CompilationStats> {
+    eprintln!("compile");
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file
     // system occur while we're writing and we get unpredictable results.
     let db = &state.db;
     let config = db.get_isograph_config();
-    let (artifacts, stats) = get_artifact_path_and_content(db)?;
+    eprintln!("compile 0.5");
+    let (artifacts, stats) = get_artifact_path_and_content(db).dbg()?;
 
+    eprintln!("compile 1");
     let file_system_operations = get_file_system_operations(
         &artifacts,
         &config.artifact_directory.absolute_path,
@@ -100,6 +106,7 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
     let total_artifacts_written =
         apply_file_system_operations(&file_system_operations, &artifacts)?;
 
+    eprintln!("compile 2");
     CompilationStats {
         client_field_count: stats.client_field_count,
         client_pointer_count: stats.client_pointer_count,

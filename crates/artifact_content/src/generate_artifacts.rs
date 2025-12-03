@@ -114,17 +114,21 @@ lazy_static! {
 pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<(Vec<ArtifactPathAndContent>, ContainsIsoStats)> {
+    eprintln!("gapc 0");
     let config = db.get_isograph_config();
 
-    let stats = validate_entire_schema(db).to_owned()?;
+    eprintln!("gapc 0.5");
+    let stats = validate_entire_schema(db).dbg().to_owned()?;
 
     let mut artifact_path_and_content = get_artifact_path_and_content_impl(db);
+    eprintln!("gapc 1");
     if let Some(header) = config.options.generated_file_header {
         for artifact_path_and_content in artifact_path_and_content.iter_mut() {
             artifact_path_and_content.file_content =
                 format!("// {header}\n{}", artifact_path_and_content.file_content).into();
         }
     }
+    eprintln!("gapc 2");
     (artifact_path_and_content, stats).wrap_ok()
 }
 
