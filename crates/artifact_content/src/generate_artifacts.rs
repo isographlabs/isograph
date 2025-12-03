@@ -198,7 +198,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 match &server_object_selectable.object_selectable_variant {
                     ServerObjectSelectableVariant::LinkedField => {}
@@ -845,7 +846,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .expect(
                         "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                    );
+                    )
+                    .lookup(db);
 
                     write_optional_description(
                         server_scalar_selectable.description,
@@ -934,7 +936,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     );
 
             write_optional_description(
-                description(&object_selectable),
+                description(db, &object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
@@ -942,7 +944,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                output_type_annotation(&object_selectable)
+                output_type_annotation(db, &object_selectable)
                     .clone()
                     .map(&mut |_| {
                         generate_client_scalar_selectable_parameter_type(
@@ -1103,7 +1105,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .expect(
                         "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                    );
+                    )
+                    .lookup(db);
 
                     write_optional_description(
                         server_scalar_selectable.description,
@@ -1208,7 +1211,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     );
 
             write_optional_description(
-                description(&object_selectable),
+                description(db, &object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
@@ -1216,7 +1219,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                output_type_annotation(&object_selectable)
+                output_type_annotation(db, &object_selectable)
                     .clone()
                     .map(&mut |_| {
                         generate_client_scalar_selectable_updatable_data_type(
@@ -1236,7 +1239,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
-                        output_type_annotation(&object_selectable),
+                        output_type_annotation(db, &object_selectable),
                         &type_annotation,
                     );
                 }

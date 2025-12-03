@@ -598,18 +598,24 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         ),
                     };
 
-                let target_object_entity_name =
-                    *selectable_named(db, parent_object_entity_name, selectable_name)
-                        .clone() // TODO don't clone
-                        .expect("Expected selectable to be valid.")
-                        .expect(
-                            "Expected selectable to exist. \
+                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
+                    .clone() // TODO don't clone
+                    .expect("Expected selectable to be valid.")
+                    .expect(
+                        "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect("Expected selectable to be object.")
-                        .target_object_entity_name()
-                        .inner();
+                    )
+                    .as_object()
+                    .expect("Expected selectable to be object.");
+
+                let target_object_entity_name = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        s.lookup(db).target_object_entity.inner().dereference()
+                    }
+                    DefinitionLocation::Client(c) => {
+                        c.target_object_entity_name.inner().dereference()
+                    }
+                };
 
                 let object_selection_parent_object_entity =
                     &server_object_entity_named(db, target_object_entity_name)
@@ -725,13 +731,14 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     .as_ref()
     .expect(
         "Expected validation to have succeeded. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
         "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-    );
+        This is indicative of a bug in Isograph.",
+    )
+    .lookup(db);
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
@@ -846,18 +853,24 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         ),
                     };
 
-                let concrete_object_entity_name =
-                    *selectable_named(db, parent_object_entity_name, selectable_name)
-                        .clone() // TODO don't clone
-                        .expect("Expected selectable to be valid.")
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect("Expected selectable to be object.")
-                        .target_object_entity_name()
-                        .inner();
+                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
+                    .clone() // TODO don't clone
+                    .expect("Expected selectable to be valid.")
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_object()
+                    .expect("Expected selectable to be object.");
+
+                let concrete_object_entity_name = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        s.lookup(db).target_object_entity.inner().dereference()
+                    }
+                    DefinitionLocation::Client(o) => {
+                        o.target_object_entity_name.inner().dereference()
+                    }
+                };
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()

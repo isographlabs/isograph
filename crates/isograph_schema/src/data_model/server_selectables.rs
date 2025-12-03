@@ -7,6 +7,7 @@ use common_lang_types::{
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
 };
+use pico::MemoRef;
 
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
@@ -95,4 +96,9 @@ pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
 pub type OwnedServerSelectable<TNetworkProtocol> = SelectionType<
     ServerScalarSelectable<TNetworkProtocol>,
     ServerObjectSelectable<TNetworkProtocol>,
+>;
+
+pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<
+    MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
 >;

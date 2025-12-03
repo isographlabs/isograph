@@ -97,7 +97,8 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         server_scalar_selectable
                             .arguments
@@ -166,6 +167,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .arguments
                     .iter()
                     .map(|x| x.item.clone())

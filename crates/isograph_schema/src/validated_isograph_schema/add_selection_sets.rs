@@ -1,7 +1,7 @@
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
     UseRefetchFieldRefetchStrategy, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, selectable_named, server_scalar_selectable_named,
+    ValidatedSelection, selectable_named,
 };
 use common_lang_types::{
     Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
@@ -120,7 +120,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                 .wrap_err();
             }
 
-            let server_scalar_selectable = *server_selectable_id
+            let server_scalar_selectable = server_selectable_id
                 .as_ref()
                 .as_scalar_result()
                 .as_ref()
@@ -136,7 +136,8 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         "a scalar",
                         scalar_selection.name.location,
                     )
-                })?;
+                })?
+                .lookup(db);
 
             (
                 server_scalar_selectable.parent_object_entity_name,
@@ -211,26 +212,12 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
         DefinitionLocation::Server(server_selectable) => {
-            let server_object_selectable = *server_selectable
+            let server_object_selectable = server_selectable
                 .as_ref()
                 .as_object_result()
                 .as_ref()
                 .map_err(|server_scalar_selectable| {
-                    let server_scalar_selectable = server_scalar_selectable_named(
-                        db,
-                        server_scalar_selectable.parent_object_entity_name,
-                        (server_scalar_selectable.name.item).into(),
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                    );
+                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
 
                     vec![selection_wrong_selection_type_diagnostic(
                         top_level_field_or_pointer.client_type(),
@@ -242,7 +229,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         "an object",
                         server_scalar_selectable.name.location,
                     )]
-                })?;
+                })?
+                .lookup(db);
 
             (
                 (

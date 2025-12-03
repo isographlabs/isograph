@@ -345,23 +345,18 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 
     server_selectables
         .iter()
-        .filter_map(|(field_name, selectables)| {
-            let first_selectable = selectables
-                .first()
-                .as_ref()
-                .expect("Expected at least one selectable")
-                .as_ref()
-                .ok()?;
-
-            let iso_type_annotation = match first_selectable.as_ref() {
+        .filter_map(|(field_name, selectable)| {
+            let iso_type_annotation = match selectable.as_ref() {
                 SelectionType::Scalar(server_scalar_selectable) => {
-                    let field_type_annotation = &server_scalar_selectable.target_scalar_entity;
+                    let field_type_annotation =
+                        &server_scalar_selectable.lookup(db).target_scalar_entity;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Scalar)
                 }
                 SelectionType::Object(server_object_selectable) => {
-                    let field_type_annotation = &server_object_selectable.target_object_entity;
+                    let field_type_annotation =
+                        &server_object_selectable.lookup(db).target_object_entity;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Object)

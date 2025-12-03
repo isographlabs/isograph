@@ -72,6 +72,15 @@ where
     {
         db.intern_ref(self)
     }
+
+    #[inline(always)]
+    fn dereference(self) -> <Self as std::ops::Deref>::Target
+    where
+        Self: std::ops::Deref,
+        <Self as std::ops::Deref>::Target: Copy,
+    {
+        *self
+    }
 }
 
 impl<T> Postfix for T {}

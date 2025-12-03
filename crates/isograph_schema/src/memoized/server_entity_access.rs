@@ -16,7 +16,7 @@ use crate::{
 
 /// This function just drops the locations
 #[memo]
-fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
+pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Result<MemoRef<BTreeMap<UnvalidatedTypeName, MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic>
 {

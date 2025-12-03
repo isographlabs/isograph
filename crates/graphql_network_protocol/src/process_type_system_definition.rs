@@ -26,11 +26,13 @@ use isograph_schema::{
     generate_refetch_field_strategy,
 };
 use lazy_static::lazy_static;
+use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    GraphQLSchemaOriginalDefinitionType, insert_or_multiple_definition_diagnostic,
+    GraphQLSchemaOriginalDefinitionType, insert_entity_or_multiple_definition_diagnostic,
+    insert_selectable_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {
@@ -63,7 +65,7 @@ pub fn process_graphql_type_system_document(
                     .name
                     .item
                     .to::<ServerObjectEntityName>();
-                insert_or_multiple_definition_diagnostic(
+                insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name.into(),
                     ServerObjectEntity {
@@ -85,8 +87,11 @@ pub fn process_graphql_type_system_document(
                     .with_location(location),
                 )?;
 
-                outcome.server_scalar_selectables.push(
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.server_selectables,
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
                     get_typename_selectable(
+                        db,
                         server_object_entity_name,
                         location,
                         format!("\"{}\"", server_object_entity_name)
@@ -94,9 +99,9 @@ pub fn process_graphql_type_system_document(
                             .to::<JavascriptName>()
                             .wrap_some(),
                     )
-                    .with_location(location)
-                    .wrap_ok(),
-                );
+                    .scalar_selected()
+                    .with_location(location),
+                )?;
 
                 directives
                     .entry(server_object_entity_name)
@@ -157,7 +162,7 @@ pub fn process_graphql_type_system_document(
                 }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                insert_or_multiple_definition_diagnostic(
+                insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     scalar_type_definition.name.item.into(),
                     ServerScalarEntity {
@@ -183,7 +188,7 @@ pub fn process_graphql_type_system_document(
                     .item
                     .to::<ServerObjectEntityName>();
 
-                insert_or_multiple_definition_diagnostic(
+                insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name.into(),
                     ServerObjectEntity {
@@ -225,7 +230,7 @@ pub fn process_graphql_type_system_document(
                 // but it might choose to allow-list them.
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
-                insert_or_multiple_definition_diagnostic(
+                insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     enum_definition.name.item.into(),
                     ServerScalarEntity {
@@ -246,7 +251,7 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name =
                     union_definition.name.item.to::<ServerObjectEntityName>();
 
-                insert_or_multiple_definition_diagnostic(
+                insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name.into(),
                     ServerObjectEntity {
@@ -288,11 +293,13 @@ pub fn process_graphql_type_system_document(
                     );
 
                 // unions do not implement interfaces
-                outcome.server_scalar_selectables.push(
-                    get_typename_selectable(server_object_entity_name, location, None)
-                        .with_location(location)
-                        .wrap_ok(),
-                );
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.server_selectables,
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
+                    get_typename_selectable(db, server_object_entity_name, location, None)
+                        .scalar_selected()
+                        .with_location(location),
+                )?;
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
@@ -395,10 +402,11 @@ fn get_refetch_selectable(
 }
 
 pub(crate) fn get_typename_selectable(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     server_object_entity_name: ServerObjectEntityName,
     location: Location,
     javascript_type_override: Option<JavascriptName>,
-) -> ServerScalarSelectable<GraphQLNetworkProtocol> {
+) -> MemoRef<ServerScalarSelectable<GraphQLNetworkProtocol>> {
     ServerScalarSelectable {
         description: format!("A discriminant for the {} type", server_object_entity_name)
             .intern()
@@ -413,6 +421,7 @@ pub(crate) fn get_typename_selectable(
         arguments: vec![],
         phantom_data: std::marker::PhantomData,
     }
+    .interned_value(db)
 }
 
 #[expect(clippy::too_many_arguments)]

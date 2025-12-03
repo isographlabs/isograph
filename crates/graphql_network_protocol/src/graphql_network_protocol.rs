@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
     ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo,
-    QueryOperationName, QueryText, ScalarSelectableName, ServerObjectEntityName,
+    QueryOperationName, QueryText, ScalarSelectableName, SelectableName, ServerObjectEntityName,
     ServerObjectSelectableName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
     WithLocation, WithLocationPostfix, WithSpanPostfix,
 };
@@ -17,12 +17,13 @@ use isograph_lang_types::{
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
     FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
-    MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
-    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE,
-    ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ServerScalarSelectable, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments, server_object_entity_named,
+    MemoRefServerEntity, MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol,
+    ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME,
+    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerObjectEntityDirectives,
+    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
+    TYPENAME_FIELD_NAME, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    multiple_selectable_definitions_found_diagnostic, server_object_entity_named,
     to_isograph_constant_value,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
@@ -126,7 +127,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .item
                 .to::<ServerObjectEntityName>();
 
-            insert_or_multiple_definition_diagnostic(
+            insert_entity_or_multiple_definition_diagnostic(
                 &mut outcome.entities,
                 server_object_entity_name.into(),
                 ServerObjectEntity {
@@ -160,11 +161,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 fields_to_process.push((server_object_entity_name, field));
             }
 
-            outcome.server_scalar_selectables.push(
-                get_typename_selectable(server_object_entity_name, with_location.location, None)
-                    .with_location(with_location.location)
-                    .wrap_ok(),
-            );
+            insert_selectable_or_multiple_definition_diagnostic(
+                &mut outcome.server_selectables,
+                (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
+                get_typename_selectable(
+                    db,
+                    server_object_entity_name,
+                    with_location.location,
+                    None,
+                )
+                .scalar_selected()
+                .with_location(with_location.location),
+            )?;
 
             // I don't think interface-to-interface refinement is handled correctly, let's just
             // ignore it for now.
@@ -178,8 +186,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (parent_object_entity_name, field) in fields_to_process {
             let target: ServerObjectEntityName = (*field.item.type_.inner()).unchecked_conversion();
 
-            if is_object_entity(&outcome, target) {
-                outcome.server_object_selectables.push(
+            if is_object_entity(&outcome.entities, target) {
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.server_selectables,
+                    (parent_object_entity_name, field.item.name.item.into()),
                     ServerObjectSelectable {
                         description: field
                             .item
@@ -207,7 +217,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     type_: arg.type_.map(|input_type_name| {
                                         // Another linear scan!
                                         if is_object_entity(
-                                            &outcome,
+                                            &outcome.entities,
                                             input_type_name.unchecked_conversion(),
                                         ) {
                                             input_type_name
@@ -227,11 +237,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .collect(),
                         phantom_data: std::marker::PhantomData,
                     }
-                    .with_location(field.location)
-                    .wrap_ok(),
-                );
+                    .interned_value(db)
+                    .object_selected()
+                    .with_location(field.location),
+                )?;
             } else {
-                outcome.server_scalar_selectables.push(
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.server_selectables,
+                    (parent_object_entity_name, field.item.name.item.into()),
                     ServerScalarSelectable {
                         description: field
                             .item
@@ -250,7 +263,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     }),
                                     type_: arg.type_.map(|input_type_name| {
                                         if is_object_entity(
-                                            &outcome,
+                                            &outcome.entities,
                                             input_type_name.unchecked_conversion(),
                                         ) {
                                             input_type_name
@@ -278,16 +291,22 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         ),
                         javascript_type_override: None,
                     }
-                    .with_location(field.location)
-                    .wrap_ok(),
-                )
+                    .interned_value(db)
+                    .scalar_selected()
+                    .with_location(field.location),
+                )?;
             }
         }
 
         // asConcreteType fields
         for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
             for concrete_child_entity_name in concrete_child_entity_names.iter() {
-                outcome.server_object_selectables.push(
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.server_selectables,
+                    (
+                        abstract_parent_entity_name.unchecked_conversion(),
+                        format!("as{concrete_child_entity_name}").intern().into(),
+                    ),
                     ServerObjectSelectable {
                         description: format!(
                             "A client pointer for the {} type.",
@@ -317,9 +336,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         arguments: vec![],
                         phantom_data: std::marker::PhantomData,
                     }
-                    .with_generated_location()
-                    .wrap_ok(),
-                )
+                    .interned_value(db)
+                    .object_selected()
+                    .with_generated_location(),
+                )?;
             }
         }
 
@@ -342,17 +362,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .collect::<Vec<ServerSelectableName>>();
 
                 let mutation_subfield_name: ServerObjectSelectableName = field.intern().into();
+
                 let mutation_field = &outcome
-                    .server_object_selectables
-                    .iter()
-                    .filter_map(|server_object_selectable_result| {
-                        server_object_selectable_result.as_ref().ok()
+                    .server_selectables
+                    .values()
+                    .filter_map(|x| x.item.as_object())
+                    .find_map(|server_object_selectable| {
+                        let object = server_object_selectable.lookup(db);
+                        if object.name.item == mutation_subfield_name {
+                            Some(object)
+                        } else {
+                            None
+                        }
                     })
-                    .find(|server_object_selectable| {
-                        server_object_selectable.item.name.item == mutation_subfield_name
-                    })
-                    .ok_or_else(|| Diagnostic::new("Mutation field not found".to_string(), None))?
-                    .item;
+                    .ok_or_else(|| Diagnostic::new("Mutation field not found".to_string(), None))?;
 
                 let payload_object_entity_name = *mutation_field.target_object_entity.inner();
 
@@ -590,7 +613,7 @@ fn define_default_graphql_types(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
 ) -> DiagnosticResult<()> {
-    insert_or_multiple_definition_diagnostic(
+    insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*ID_ENTITY_NAME).into(),
         ServerScalarEntity {
@@ -603,7 +626,7 @@ fn define_default_graphql_types(
         .scalar_selected()
         .with_generated_location(),
     )?;
-    insert_or_multiple_definition_diagnostic(
+    insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*STRING_ENTITY_NAME).into(),
         ServerScalarEntity {
@@ -616,7 +639,7 @@ fn define_default_graphql_types(
         .scalar_selected()
         .with_generated_location(),
     )?;
-    insert_or_multiple_definition_diagnostic(
+    insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*BOOLEAN_ENTITY_NAME).into(),
         ServerScalarEntity {
@@ -629,7 +652,7 @@ fn define_default_graphql_types(
         .scalar_selected()
         .with_generated_location(),
     )?;
-    insert_or_multiple_definition_diagnostic(
+    insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*FLOAT_ENTITY_NAME).into(),
         ServerScalarEntity {
@@ -642,7 +665,7 @@ fn define_default_graphql_types(
         .scalar_selected()
         .with_generated_location(),
     )?;
-    insert_or_multiple_definition_diagnostic(
+    insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*INT_ENTITY_NAME).into(),
         ServerScalarEntity {
@@ -660,11 +683,13 @@ fn define_default_graphql_types(
 }
 
 fn is_object_entity(
-    outcome: &ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+    entities: &BTreeMap<
+        UnvalidatedTypeName,
+        WithLocation<MemoRefServerEntity<GraphQLNetworkProtocol>>,
+    >,
     target: ServerObjectEntityName,
 ) -> bool {
-    outcome
-        .entities
+    entities
         .get(&target.into())
         .and_then(|entity| entity.item.as_object())
         .is_some()
@@ -687,60 +712,60 @@ fn traverse_selections_and_return_path<'a>(
         .ok_or_else(|| {
             Diagnostic::new(
                 format!(
-                    "Invalid @exposeField directive. Entity {} not found.",
+                    "Invalid @exposeField directive. Entity {} \
+                    not found or is not an object.",
                     payload_object_entity_name
                 ),
                 None,
             )
-        })?;
+        })?
+        .lookup(db);
 
     let mut output = vec![];
 
     for selection_name in primary_field_selection_name_parts {
-        let selection = outcome
-            .server_object_selectables
-            .iter()
-            .filter_map(|server_object_selectable_result| {
-                server_object_selectable_result.as_ref().ok()
-            })
-            .find(|server_object_selectable| {
-                server_object_selectable.item.name.item
-                    == (*selection_name).unchecked_conversion::<ServerObjectSelectableName>()
-            })
+        let selectable = outcome
+            .server_selectables
+            .get(&(current_entity.name, selection_name.dereference().into()))
+            .and_then(|x| x.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
-                        "Invalid @exposeField directive. Field {} not found",
+                        "Invalid @exposeField directive. Field {} \
+                        not found or is not an object field.",
                         selection_name
                     ),
                     None,
                 )
-            })?;
+            })?
+            .lookup(db);
 
-        let next_entity_name = *selection.item.target_object_entity.inner();
+        let next_entity_name = selectable.target_object_entity.inner().dereference().into();
 
         current_entity = outcome
             .entities
-            .get(&next_entity_name.into())
+            .get(&next_entity_name)
             .and_then(|entity| entity.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
-                        "Invalid @exposeField directive. Entity {} not found.",
+                        "Invalid @exposeField directive. Entity {} \
+                        not found or is a not an object.",
                         next_entity_name
                     ),
                     None,
                 )
-            })?;
+            })?
+            .lookup(db);
 
-        output.push(&selection.item);
+        output.push(selectable);
     }
 
-    (output, current_entity.lookup(db)).wrap_ok()
+    (output, current_entity).wrap_ok()
 }
 
 // TODO make this generic over value, too
-pub(crate) fn insert_or_multiple_definition_diagnostic<Value>(
+pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
     map: &mut BTreeMap<UnvalidatedTypeName, WithLocation<Value>>,
     key: UnvalidatedTypeName,
     item: WithLocation<Value>,
@@ -752,6 +777,23 @@ pub(crate) fn insert_or_multiple_definition_diagnostic<Value>(
         }
         Entry::Occupied(_) => {
             multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()).wrap_err()
+        }
+    }
+}
+
+// TODO make this generic over value, too
+pub(crate) fn insert_selectable_or_multiple_definition_diagnostic<Value>(
+    map: &mut BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<Value>>,
+    key: (ServerObjectEntityName, SelectableName),
+    item: WithLocation<Value>,
+) -> DiagnosticResult<()> {
+    match map.entry(key) {
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(item);
+            ().wrap_ok()
+        }
+        Entry::Occupied(_) => {
+            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location).wrap_err()
         }
     }
 }

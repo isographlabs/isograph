@@ -231,9 +231,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     } else {
         let id_field =
             server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
-                // TODO don't call to_owned
-                .to_owned()?
-                .transpose()?;
+                .clone_err()?;
 
         let query_id = fetchable_types_map
             .iter()

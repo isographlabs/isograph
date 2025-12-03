@@ -5,10 +5,11 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, OwnedServerSelectable, ServerEntityName,
+    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, ServerEntityName,
     server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, server_selectables_vec_for_entity,
+    server_scalar_selectable_named, server_selectables_map_for_entity,
 };
+use prelude::Postfix;
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
@@ -55,19 +56,19 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             let mut s = "{\n".to_string();
 
             for (name, server_selectable) in
-                server_selectables_vec_for_entity(db, parent_object_entity_name)
+                server_selectables_map_for_entity(db, parent_object_entity_name)
                     .as_ref()
                     .expect(
                         "Expected type system document to be valid. \
-                    This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
             {
-                let server_selectable = server_selectable.as_ref().expect(
-                    "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
+                let field_type = format_field_definition(
+                    db,
+                    name,
+                    server_selectable.dereference(),
+                    indentation_level + 1,
                 );
-                let field_type =
-                    format_field_definition(db, name, server_selectable, indentation_level + 1);
                 s.push_str(&field_type)
             }
 
@@ -93,11 +94,12 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: &ServerSelectableName,
-    server_selectable: &OwnedServerSelectable<TNetworkProtocol>,
+    server_selectable: MemoRefServerSelectable<TNetworkProtocol>,
     indentation_level: u8,
 ) -> String {
     let (is_optional, selection_type) = match server_selectable {
         SelectionType::Scalar(server_scalar_selectable) => {
+            let server_scalar_selectable = server_scalar_selectable.lookup(db);
             let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
             let server_scalar_selectable_name = server_scalar_selectable.name.item;
             let server_scalar_selectable = server_scalar_selectable_named(
@@ -108,13 +110,14 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .as_ref()
             .expect(
                 "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .as_ref()
             .expect(
                 "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-            );
+                This is indicative of a bug in Isograph.",
+            )
+            .lookup(db);
 
             (
                 is_nullable(&server_scalar_selectable.target_scalar_entity),
@@ -125,6 +128,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             )
         }
         SelectionType::Object(server_object_selectable) => {
+            let server_object_selectable = server_object_selectable.lookup(db);
             let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
             let server_object_selectable_name = server_object_selectable.name.item;
             let server_object_selectable = server_object_selectable_named(
@@ -141,7 +145,8 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
             (
                 is_nullable(&server_object_selectable.target_object_entity),
                 server_object_selectable

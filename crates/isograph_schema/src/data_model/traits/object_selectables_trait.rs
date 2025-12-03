@@ -4,6 +4,7 @@ use common_lang_types::{
 };
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
+use pico::MemoRef;
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
@@ -12,10 +13,11 @@ pub type ObjectSelectableId = DefinitionLocation<
     (ServerObjectEntityName, ClientObjectSelectableName),
 >;
 
+// This is poorly named... its not owned!
 pub type OwnedObjectSelectable<TNetworkProtocol> = DefinitionLocation<
     // HACK: Note the owned server selectable
     // This is fixable when memoized functions can return references with 'db lifetime
-    ServerObjectSelectable<TNetworkProtocol>,
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
     ClientObjectSelectable<TNetworkProtocol>,
 >;
 
