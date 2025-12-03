@@ -179,7 +179,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (parent_object_entity_name, field) in fields_to_process {
             let target: ServerObjectEntityName = (*field.item.type_.inner()).unchecked_conversion();
 
-            // TODO don't do an O(n^2) search, we can avoid this by accumulating hashmaps instead of vectors.
             if is_object_entity(&outcome, target) {
                 outcome.server_object_selectables.push(
                     ServerObjectSelectable {
