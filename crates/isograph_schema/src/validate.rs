@@ -116,7 +116,11 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
 
     entities
         .iter()
-        .flat_map(|entity| Result::err(server_id_selectable(db, entity.name).clone_err()))
+        .flat_map(|entity| {
+            server_id_selectable(db, entity.lookup(db).name)
+                .clone_err()
+                .err()
+        })
         .collect()
 }
 
