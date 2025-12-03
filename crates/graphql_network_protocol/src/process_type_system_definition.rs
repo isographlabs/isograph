@@ -69,11 +69,14 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .push(
                         db.intern_value(ServerObjectEntity {
-                            description: object_type_definition.description.map(|x| {
-                                x.item
-                                    .unchecked_conversion::<DescriptionValue>()
-                                    .wrap(Description)
-                            }),
+                            description: object_type_definition.description.map(
+                                |description_value| {
+                                    description_value
+                                        .item
+                                        .unchecked_conversion::<DescriptionValue>()
+                                        .wrap(Description)
+                                },
+                            ),
                             name: server_object_entity_name,
                             concrete_type: Some(object_type_definition.name.item.into()),
                             network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
@@ -190,11 +193,14 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .push(
                         db.intern_value(ServerObjectEntity {
-                            description: input_object_definition.description.map(|x| {
-                                x.item
-                                    .unchecked_conversion::<DescriptionValue>()
-                                    .wrap(Description)
-                            }),
+                            description: input_object_definition.description.map(
+                                |description_value| {
+                                    description_value
+                                        .item
+                                        .unchecked_conversion::<DescriptionValue>()
+                                        .wrap(Description)
+                                },
+                            ),
                             name: server_object_entity_name,
                             concrete_type: Some(input_object_definition.name.item.into()),
                             network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
@@ -251,8 +257,9 @@ pub fn process_graphql_type_system_document(
                     .or_default()
                     .push(
                         db.intern_value(ServerObjectEntity {
-                            description: union_definition.description.map(|x| {
-                                x.item
+                            description: union_definition.description.map(|description_value| {
+                                description_value
+                                    .item
                                     .unchecked_conversion::<DescriptionValue>()
                                     .wrap(Description)
                             }),
@@ -264,7 +271,7 @@ pub fn process_graphql_type_system_document(
                                 subtypes: union_definition
                                     .union_member_types
                                     .iter()
-                                    .map(|x| x.item.unchecked_conversion())
+                                    .map(|entity_name| entity_name.item.unchecked_conversion())
                                     .collect(),
                             },
                         })
@@ -284,7 +291,7 @@ pub fn process_graphql_type_system_document(
                         union_definition
                             .union_member_types
                             .iter()
-                            .map(|x| x.item.to::<UnvalidatedTypeName>()),
+                            .map(|entity_name| entity_name.item.to::<UnvalidatedTypeName>()),
                     );
 
                 // unions do not implement interfaces
@@ -305,15 +312,15 @@ pub fn process_graphql_type_system_document(
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
                         .query
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item.into())
                         .unwrap_or_else(|| "Query".intern().into()),
                     mutation: schema_definition
                         .mutation
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item.into())
                         .unwrap_or_else(|| "Mutation".intern().into()),
                     subscription: schema_definition
                         .subscription
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item.into())
                         .unwrap_or_else(|| "Subscription".intern().into()),
                 }
                 .wrap_some()

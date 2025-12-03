@@ -114,6 +114,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             )?;
         }
 
+        // We process interfaces later, because we need to know all of the subtypes that an interface
+        // implements. In an ideal world, this info would not be part of the ServerObjectEntity struct,
+        // and we should make that refactor.
         for with_location in interfaces_to_process {
             let interface_definition = with_location.item;
             let server_object_entity_name = interface_definition
@@ -126,8 +129,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .or_default()
                 .push(
                     db.intern_value(ServerObjectEntity {
-                        description: interface_definition.description.map(|x| {
-                            x.item
+                        description: interface_definition.description.map(|description_value| {
+                            description_value
+                                .item
                                 .unchecked_conversion::<DescriptionValue>()
                                 .wrap(Description)
                         }),
@@ -181,9 +185,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .item
                             .description
                             .map(|with_span| with_span.item.into()),
-                        name: field.item.name.map(|x| x.unchecked_conversion()),
+                        name: field.item.name.map(|name| name.unchecked_conversion()),
                         target_object_entity: TypeAnnotation::from_graphql_type_annotation(
-                            field.item.type_.clone().map(|x| x.unchecked_conversion()),
+                            field
+                                .item
+                                .type_
+                                .clone()
+                                .map(|entity_name| entity_name.unchecked_conversion()),
                         ),
                         object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
                         parent_object_entity_name,
@@ -193,14 +201,21 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 with_location.map(|arg| VariableDefinition {
-                                    name: arg.name.map(|x| x.unchecked_conversion()),
-                                    type_: arg.type_.map(|x| {
+                                    name: arg.name.map(|input_value_name| {
+                                        input_value_name.unchecked_conversion()
+                                    }),
+                                    type_: arg.type_.map(|input_type_name| {
                                         // Another linear scan!
-                                        if is_object_entity(&outcome, x.unchecked_conversion()) {
-                                            x.unchecked_conversion::<ServerObjectEntityName>()
+                                        if is_object_entity(
+                                            &outcome,
+                                            input_type_name.unchecked_conversion(),
+                                        ) {
+                                            input_type_name
+                                                .unchecked_conversion::<ServerObjectEntityName>()
                                                 .object_selected()
                                         } else {
-                                            x.unchecked_conversion::<ServerScalarEntityName>()
+                                            input_type_name
+                                                .unchecked_conversion::<ServerScalarEntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -222,7 +237,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .item
                             .description
                             .map(|with_span| with_span.item.into()),
-                        name: field.item.name.map(|x| x.unchecked_conversion()),
+                        name: field.item.name.map(|name| name.unchecked_conversion()),
                         parent_object_entity_name,
                         arguments: field
                             .item
@@ -230,13 +245,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 with_location.map(|arg| VariableDefinition {
-                                    name: arg.name.map(|x| x.unchecked_conversion()),
-                                    type_: arg.type_.map(|x| {
-                                        if is_object_entity(&outcome, x.unchecked_conversion()) {
-                                            x.unchecked_conversion::<ServerObjectEntityName>()
+                                    name: arg.name.map(|input_value_name| {
+                                        input_value_name.unchecked_conversion()
+                                    }),
+                                    type_: arg.type_.map(|input_type_name| {
+                                        if is_object_entity(
+                                            &outcome,
+                                            input_type_name.unchecked_conversion(),
+                                        ) {
+                                            input_type_name
+                                                .unchecked_conversion::<ServerObjectEntityName>()
                                                 .object_selected()
                                         } else {
-                                            x.unchecked_conversion::<ServerScalarEntityName>()
+                                            input_type_name
+                                                .unchecked_conversion::<ServerScalarEntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -248,7 +270,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .collect(),
                         phantom_data: std::marker::PhantomData,
                         target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
-                            field.item.type_.clone().map(|x| x.unchecked_conversion()),
+                            field
+                                .item
+                                .type_
+                                .clone()
+                                .map(|entity_name| entity_name.unchecked_conversion()),
                         ),
                         javascript_type_override: None,
                     }
@@ -319,8 +345,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_field = &outcome
                     .server_object_selectables
                     .iter()
-                    .filter_map(|x| x.as_ref().ok())
-                    .find(|x| x.item.name.item == mutation_subfield_name)
+                    .filter_map(|server_object_selectable_result| {
+                        server_object_selectable_result.as_ref().ok()
+                    })
+                    .find(|server_object_selectable| {
+                        server_object_selectable.item.name.item == mutation_subfield_name
+                    })
                     .ok_or_else(|| Diagnostic::new("Mutation field not found".to_string(), None))?
                     .item;
 
@@ -336,9 +366,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let top_level_schema_field_concrete_type = outcome
                     .entities
                     .get(&payload_object_entity_name.into())
-                    .and_then(|x| x.first())
-                    .and_then(|x| x.item.as_object())
-                    .expect("Expected entity to exist.")
+                    .and_then(|entities| entities.first())
+                    .and_then(|entity| entity.item.as_object())
+                    .expect("Expected entity to exist and to be an object.")
                     .lookup(db)
                     .concrete_type;
 
@@ -376,7 +406,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                 let top_level_schema_field_arguments = mutation_field_arguments
                     .into_iter()
-                    .map(|x| x.item)
+                    .map(|variable_definition| variable_definition.item)
                     .collect::<Vec<_>>();
 
                 let mut subfields_or_inline_fragments = parts_reversed
@@ -640,8 +670,8 @@ fn is_object_entity(
     outcome
         .entities
         .get(&target.into())
-        .and_then(|x| x.first())
-        .and_then(|x| x.item.as_object())
+        .and_then(|entities| entities.first())
+        .and_then(|entity| entity.item.as_object())
         .is_some()
 }
 
@@ -658,8 +688,8 @@ fn traverse_selections_and_return_path<'a>(
     let mut current_entity = outcome
         .entities
         .get(&payload_object_entity_name.into())
-        .and_then(|x| x.first())
-        .and_then(|x| x.item.as_object())
+        .and_then(|entities| entities.first())
+        .and_then(|entity| entity.item.as_object())
         .ok_or_else(|| {
             Diagnostic::new(
                 format!(
@@ -676,9 +706,11 @@ fn traverse_selections_and_return_path<'a>(
         let selection = outcome
             .server_object_selectables
             .iter()
-            .filter_map(|x| x.as_ref().ok())
-            .find(|x| {
-                x.item.name.item
+            .filter_map(|server_object_selectable_result| {
+                server_object_selectable_result.as_ref().ok()
+            })
+            .find(|server_object_selectable| {
+                server_object_selectable.item.name.item
                     == (*selection_name).unchecked_conversion::<ServerObjectSelectableName>()
             })
             .ok_or_else(|| {
@@ -696,8 +728,8 @@ fn traverse_selections_and_return_path<'a>(
         current_entity = outcome
             .entities
             .get(&next_entity_name.into())
-            .and_then(|x| x.first())
-            .and_then(|x| x.item.as_object())
+            .and_then(|entities| entities.first())
+            .and_then(|entity| entity.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
