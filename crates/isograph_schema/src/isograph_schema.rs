@@ -27,6 +27,8 @@ lazy_static! {
     pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
     pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+    pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
+    pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

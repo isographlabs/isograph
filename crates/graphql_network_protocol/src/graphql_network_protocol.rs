@@ -14,11 +14,13 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, Format, ID_ENTITY_NAME,
-    ImperativelyLoadedFieldVariant, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome,
-    RefetchStrategy, RootOperationName, ServerObjectEntity, ServerObjectEntityDirectives,
-    ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
+    FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
+    MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
+    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE,
+    ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
+    ServerObjectSelectableVariant, ServerScalarSelectable, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments, server_object_entity_named,
     to_isograph_constant_value,
 };
@@ -607,13 +609,13 @@ fn define_default_graphql_types(
         );
     outcome
         .entities
-        .entry("String".intern().into())
+        .entry((*STRING_ENTITY_NAME).into())
         .or_default()
         .push(
             db.intern_value(ServerScalarEntity {
                 description: None,
-                name: "String".intern().into(),
-                javascript_name: "string".intern().into(),
+                name: *STRING_ENTITY_NAME,
+                javascript_name: *STRING_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
             })
             .scalar_selected()
@@ -621,13 +623,13 @@ fn define_default_graphql_types(
         );
     outcome
         .entities
-        .entry("Boolean".intern().into())
+        .entry((*BOOLEAN_ENTITY_NAME).into())
         .or_default()
         .push(
             db.intern_value(ServerScalarEntity {
                 description: None,
-                name: "Boolean".intern().into(),
-                javascript_name: "boolean".intern().into(),
+                name: *BOOLEAN_ENTITY_NAME,
+                javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
             })
             .scalar_selected()
@@ -635,13 +637,13 @@ fn define_default_graphql_types(
         );
     outcome
         .entities
-        .entry("Float".intern().into())
+        .entry((*FLOAT_ENTITY_NAME).into())
         .or_default()
         .push(
             db.intern_value(ServerScalarEntity {
                 description: None,
-                name: "Float".intern().into(),
-                javascript_name: "number".intern().into(),
+                name: *FLOAT_ENTITY_NAME,
+                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
             })
             .scalar_selected()
@@ -649,13 +651,13 @@ fn define_default_graphql_types(
         );
     outcome
         .entities
-        .entry("Int".intern().into())
+        .entry((*INT_ENTITY_NAME).into())
         .or_default()
         .push(
             db.intern_value(ServerScalarEntity {
                 description: None,
-                name: "Int".intern().into(),
-                javascript_name: "number".intern().into(),
+                name: *INT_ENTITY_NAME,
+                javascript_name: *NUMBER_JAVASCRIPT_TYPE,
                 network_protocol: std::marker::PhantomData,
             })
             .scalar_selected()

@@ -1,7 +1,7 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo,
+    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
     QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
