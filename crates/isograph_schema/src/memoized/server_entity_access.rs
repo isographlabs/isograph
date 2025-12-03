@@ -1,8 +1,8 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, JavascriptName, Location, ServerObjectEntityName,
-    ServerScalarEntityName, UnvalidatedTypeName,
+    ServerScalarEntityName, UnvalidatedTypeName, WithLocation,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
@@ -14,33 +14,30 @@ use crate::{
     ServerScalarEntity,
 };
 
-/// N.B. we should normally not materialize a map here. However, parse_type_system_documents
-/// already fully parses the schema, so until that's refactored, there isn't much upside in
-/// not materializing a map here.
+/// This function just drops the locations
 #[memo]
 fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<HashMap<UnvalidatedTypeName, Vec<MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
+) -> Result<
+    MemoRef<BTreeMap<UnvalidatedTypeName, Vec<MemoRefServerEntity<TNetworkProtocol>>>>,
+    Diagnostic,
+> {
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
-    let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
-
-    for with_location in outcome.server_scalar_entities.iter().flatten() {
-        server_entities
-            .entry(with_location.item.name.into())
-            .or_default()
-            .push(db.intern_ref(&with_location.item).scalar_selected());
-    }
-
-    for with_location in outcome.server_object_entities.iter().flatten() {
-        server_entities
-            .entry(with_location.item.name.into())
-            .or_default()
-            .push(db.intern_ref(&with_location.item).object_selected())
-    }
-
-    Ok(server_entities)
+    db.intern_ref(
+        &outcome
+            .entities
+            .iter()
+            .map(|(entity_name, entities)| {
+                (
+                    *entity_name,
+                    entities.iter().map(|entity| entity.item).collect(),
+                )
+            })
+            .collect(),
+    )
+    .wrap_ok()
 }
 
 // TODO consider adding a memoized function that creates a map of entities (maybe
@@ -50,7 +47,7 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: UnvalidatedTypeName,
 ) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).clone_err()?;
+    let map = server_entity_map(db).clone_err()?.lookup(db);
 
     map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
 }
@@ -58,15 +55,16 @@ pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<ServerObjectEntity<TNetworkProtocol>>> {
+) -> DiagnosticResult<Vec<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
-        .server_object_entities
+        .entities
         .iter()
-        .filter_map(|x| match x {
-            Ok(object) => Some(object.item.clone()),
-            Err(_) => None,
+        .flat_map(|(_, value)| value)
+        .filter_map(|x| match x.item {
+            SelectionType::Object(object) => Some(object),
+            _ => None,
         })
         .collect::<Vec<_>>()
         .wrap_ok()
@@ -211,7 +209,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 
 // TODO define this in terms of server_entities_vec??
 // What is this for??? This is a useless function.
-#[memo]
+// #[memo]
 pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>> {
@@ -219,18 +217,30 @@ pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
 
     let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
 
-    for scalar in outcome.server_scalar_entities.iter().flatten() {
-        defined_entities
-            .entry(scalar.item.name.into())
-            .or_default()
-            .push(scalar.item.name.scalar_selected());
-    }
+    for (_, items) in outcome.entities.iter() {
+        for with_location in items {
+            let (name, name_selection) = match with_location.item {
+                SelectionType::Scalar(s) => {
+                    let scalar = s.lookup(db);
+                    (
+                        scalar.name.into(),
+                        scalar.name.to::<ServerScalarEntityName>().scalar_selected(),
+                    )
+                }
+                SelectionType::Object(o) => {
+                    let object = o.lookup(db);
+                    (
+                        object.name.into(),
+                        object.name.to::<ServerObjectEntityName>().object_selected(),
+                    )
+                }
+            };
 
-    for object in outcome.server_object_entities.iter().flatten() {
-        defined_entities
-            .entry(object.item.name.into())
-            .or_default()
-            .push(object.item.name.object_selected());
+            defined_entities
+                .entry(name)
+                .or_default()
+                .push(name_selection);
+        }
     }
 
     Ok(defined_entities)
@@ -276,26 +286,10 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
-        .server_object_entities
-        .iter()
-        .find_map(|result| {
-            if let Ok(with_location) = result
-                && with_location.item.name == entity_name
-            {
-                return Some(with_location.location);
-            }
-            None
-        })
-        .or_else(|| {
-            outcome.server_scalar_entities.iter().find_map(|result| {
-                if let Ok(with_location) = result
-                    && with_location.item.name == entity_name
-                {
-                    return Some(with_location.location);
-                }
-                None
-            })
-        })
+        .entities
+        .get(&entity_name)
+        .and_then(|x| x.first())
+        .map(|x| x.location)
         .wrap_ok()
 }
 

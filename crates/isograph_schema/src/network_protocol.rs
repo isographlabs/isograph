@@ -1,32 +1,32 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
+    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo,
     QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
-use isograph_lang_types::Description;
+use isograph_lang_types::{Description, SelectionType};
 
 use crate::{
-    ClientScalarSelectable, ExposeFieldDirective, MergedSelectionMap, RefetchStrategy,
-    RootOperationName, ServerObjectEntity, ServerObjectSelectable, ServerScalarEntity,
-    ServerScalarSelectable, ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ClientScalarSelectable, ExposeFieldDirective, MemoRefServerEntity, MergedSelectionMap,
+    RefetchStrategy, RootOperationName, ServerObjectEntity, ServerObjectSelectable,
+    ServerScalarEntity, ServerScalarSelectable, ValidatedVariableDefinition,
+    isograph_database::IsographDatabase,
 };
 
 type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
+    pub entities:
+        BTreeMap<UnvalidatedTypeName, Vec<WithLocation<MemoRefServerEntity<TNetworkProtocol>>>>,
+
     // TODO these should all be MemoRef
-    pub server_scalar_entities:
-        Vec<DiagnosticResult<WithLocation<ServerScalarEntity<TNetworkProtocol>>>>,
-    pub server_object_entities:
-        Vec<DiagnosticResult<WithLocation<ServerObjectEntity<TNetworkProtocol>>>>,
-    pub server_scalar_selectables:
-        Vec<DiagnosticResult<WithLocation<ServerScalarSelectable<TNetworkProtocol>>>>,
     pub server_object_selectables:
         Vec<DiagnosticResult<WithLocation<ServerObjectSelectable<TNetworkProtocol>>>>,
+    pub server_scalar_selectables:
+        Vec<DiagnosticResult<WithLocation<ServerScalarSelectable<TNetworkProtocol>>>>,
 
     // expose_as fields...
     pub client_scalar_selectables:
@@ -40,6 +40,12 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
             )>,
         >,
     >,
+
+    // This should contain errors that
+    // 1. do not prevent us from proceeding, and
+    // 2. are not associated with a specific entity/selectable, but
+    // 3. should stop us from generating artifacts.
+    pub errors: Vec<Diagnostic>,
 }
 
 pub trait NetworkProtocol:

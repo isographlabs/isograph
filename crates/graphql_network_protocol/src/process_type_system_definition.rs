@@ -20,12 +20,13 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, NODE_FIELD_NAME, ParseTypeSystemOutcome,
-    RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity,
-    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
+    ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
+    ServerScalarEntity, ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy,
 };
 use lazy_static::lazy_static;
+use pico::Database;
 use prelude::Postfix;
 
 use crate::{
@@ -42,6 +43,7 @@ lazy_static! {
 }
 
 pub fn process_graphql_type_system_document(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
@@ -57,23 +59,29 @@ pub fn process_graphql_type_system_document(
         match type_system_definition {
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                 let server_object_entity_name = object_type_definition.name.item.into();
-                outcome.server_object_entities.push(
-                    ServerObjectEntity {
-                        description: object_type_definition.description.map(|x| {
-                            x.item
-                                .unchecked_conversion::<DescriptionValue>()
-                                .wrap(Description)
-                        }),
-                        name: server_object_entity_name,
-                        concrete_type: Some(object_type_definition.name.item.into()),
-                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
-                            subtypes: vec![],
-                        },
-                    }
-                    .with_location(location)
-                    .wrap_ok(),
-                );
+                outcome
+                    .entities
+                    .entry(server_object_entity_name)
+                    .or_default()
+                    .push(
+                        db.intern(ServerObjectEntity {
+                            description: object_type_definition.description.map(|x| {
+                                x.item
+                                    .unchecked_conversion::<DescriptionValue>()
+                                    .wrap(Description)
+                            }),
+                            name: server_object_entity_name,
+                            concrete_type: Some(object_type_definition.name.item.into()),
+                            network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                                original_definition_type:
+                                    GraphQLSchemaOriginalDefinitionType::Object,
+                                subtypes: vec![],
+                            },
+                        })
+                        .wrap_ok()
+                        .object_selected()
+                        .with_location(location),
+                    );
 
                 outcome.server_scalar_selectables.push(
                     get_typename_selectable(
