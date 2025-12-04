@@ -213,10 +213,13 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             }
 
             // Awkward! We also need to check for expose fields. Ay ay ay
-            return expose_field_map(db)
+            return client_selectables_defined_by_network_protocol(db)
                 .clone_err()?
-                .get(&(parent_object_entity_name, client_scalar_selectable_name))
-                .cloned()
+                .get(&(
+                    parent_object_entity_name,
+                    client_scalar_selectable_name.into(),
+                ))
+                .and_then(|x| x.as_scalar())
                 .wrap_ok();
         }
     };
@@ -300,31 +303,21 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 // TODO this function seems quite useless!
-pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
+pub fn client_selectables_defined_by_network_protocol<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
-    HashMap<
-        (ServerObjectEntityName, ClientScalarSelectableName),
-        MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
-    >,
+    HashMap<(ServerObjectEntityName, SelectableName), MemoRefClientSelectable<TNetworkProtocol>>,
 > {
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
 
-    let mut map = HashMap::new();
-    for memo_ref in expose_as_field_queue
+    expose_as_field_queue
         .iter()
-        .filter_map(|(_key, value)| value.item.as_client())
-        .filter_map(|x| x.as_scalar())
-    {
-        let item = memo_ref.lookup(db);
-        map.insert((item.parent_object_entity_name, item.name.item), memo_ref);
-    }
-
-    Ok(map)
+        .filter_map(|(key, value)| value.item.as_client().map(|val| (*key, val)))
+        .collect::<HashMap<_, _>>()
+        .wrap_ok()
 }
 
 // TODO use this as a source for the other functions, especially for
@@ -376,15 +369,10 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 .map(|(key, value)| ((key.0, key.1), value.scalar_selected().wrap_ok())),
         )
         .chain(
-            expose_field_map(db)
-                .clone_err()?
-                .iter()
-                .map(|(key, selectable)| {
-                    (
-                        (key.0, key.1.into()),
-                        selectable.dereference().scalar_selected().wrap_ok(),
-                    )
-                }),
+            client_selectables_defined_by_network_protocol(db)
+                .to_owned()?
+                .into_iter()
+                .map(|(key, value)| (key, value.wrap_ok())),
         )
         .collect::<HashMap<_, _>>()
         .wrap_ok()
