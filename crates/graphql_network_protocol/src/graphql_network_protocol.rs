@@ -86,15 +86,12 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         let mut supertype_to_subtype_map = BTreeMap::new();
         let mut interfaces_to_process = vec![];
 
-        let (type_system_document, type_system_extension_documents) = parse_graphql_schema(db)
-            .to_owned()
-            .note_todo("Do not clone. Use a MemoRef.")?;
+        let (type_system_document, type_system_extension_documents) =
+            parse_graphql_schema(db).to_owned()?;
 
         process_graphql_type_system_document(
             db,
-            type_system_document
-                .to_owned(db)
-                .note_todo("Do not clone. Use a MemoRef."),
+            type_system_document,
             &mut graphql_root_types,
             &mut outcome,
             &mut directives,
@@ -102,7 +99,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             &mut supertype_to_subtype_map,
             &mut interfaces_to_process,
             &mut non_fatal_diagnostics,
-        )?;
+        );
 
         for type_system_extension_document in type_system_extension_documents.values() {
             process_graphql_type_system_extension_document(
@@ -117,7 +114,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 &mut supertype_to_subtype_map,
                 &mut interfaces_to_process,
                 &mut non_fatal_diagnostics,
-            )?;
+            );
         }
 
         // We process interfaces later, because we need to know all of the subtypes that an interface
@@ -352,7 +349,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         }
 
         // exposeField directives -> fields
-        for (parent_object_entity_name, directives) in directives {
+        'exposeField: for (parent_object_entity_name, directives) in directives {
             let result = from_graphql_directives::<ServerObjectEntityDirectives>(&directives)?;
             for expose_field_directive in result.expose_field {
                 // HACK: we're essentially splitting the field arg by . and keeping the same
@@ -371,7 +368,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                 let mutation_subfield_name: ServerObjectSelectableName = field.intern().into();
 
-                let mutation_field = &outcome
+                let mutation_field = match outcome
                     .server_selectables
                     .values()
                     .filter_map(|x| x.item.as_object())
@@ -382,8 +379,16 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         } else {
                             None
                         }
-                    })
-                    .ok_or_else(|| Diagnostic::new("Mutation field not found".to_string(), None))?;
+                    }) {
+                    Some(s) => s,
+                    None => {
+                        non_fatal_diagnostics.push(Diagnostic::new(
+                            "Mutation field not found".to_string(),
+                            None,
+                        ));
+                        continue 'exposeField;
+                    }
+                };
 
                 let payload_object_entity_name = *mutation_field.target_object_entity.inner();
 
@@ -403,12 +408,19 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .concrete_type;
 
                 let (mut parts_reversed, target_parent_object_entity) =
-                    traverse_selections_and_return_path(
+                    match traverse_selections_and_return_path(
                         db,
                         &outcome,
                         payload_object_entity_name,
                         &primary_field_name_selection_parts,
-                    )?;
+                    ) {
+                        Ok(ok) => ok,
+                        Err(e) => {
+                            non_fatal_diagnostics.push(e);
+                            continue 'exposeField;
+                        }
+                    };
+
                 let target_parent_object_entity_name = target_parent_object_entity.name;
                 parts_reversed.reverse();
 

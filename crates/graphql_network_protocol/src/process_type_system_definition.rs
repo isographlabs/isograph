@@ -1,10 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult,
-    GraphQLInterfaceTypeName, JavascriptName, Location, ScalarSelectableName,
-    ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation, WithLocationPostfix,
-    WithSpanPostfix,
+    ClientScalarSelectableName, DescriptionValue, Diagnostic, GraphQLInterfaceTypeName,
+    JavascriptName, Location, ScalarSelectableName, ServerObjectEntityName, UnvalidatedTypeName,
+    VariableName, WithLocation, WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
@@ -54,7 +53,7 @@ pub fn process_graphql_type_system_document(
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
-) -> DiagnosticResult<()> {
+) {
     for with_location in type_system_document.0 {
         let WithLocation {
             location,
@@ -335,8 +334,6 @@ pub fn process_graphql_type_system_document(
             }
         }
     }
-
-    ().wrap_ok()
 }
 
 fn refetch_selectable_refetch_strategy(
@@ -443,7 +440,7 @@ pub fn process_graphql_type_system_extension_document(
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
-) -> DiagnosticResult<()> {
+) {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
 
@@ -469,7 +466,7 @@ pub fn process_graphql_type_system_extension_document(
         supertype_to_subtype_map,
         interfaces_to_process,
         non_fatal_diagnostics,
-    )?;
+    );
 
     for extension in extensions {
         match extension.item {
@@ -481,8 +478,6 @@ pub fn process_graphql_type_system_extension_document(
             }
         }
     }
-
-    ().wrap_ok()
 }
 
 type UnvalidatedTypeRefinementMap = BTreeMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;

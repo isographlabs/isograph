@@ -10,10 +10,11 @@ use prelude::Postfix;
 
 #[expect(clippy::type_complexity)]
 #[memo]
+// TODO add error recovery and the non_fatal_diagnostics vec
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<(
-    MemoRef<GraphQLTypeSystemDocument>,
+    GraphQLTypeSystemDocument,
     BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
 )> {
     let SchemaSource {
@@ -37,7 +38,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
         schema_extensions.insert(*relative_path, extensions_document);
     }
 
-    (schema.interned_value(db), schema_extensions).wrap_ok()
+    (schema, schema_extensions).wrap_ok()
 }
 
 #[memo]
