@@ -22,7 +22,7 @@ use isograph_schema::{
     ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
     ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
     ServerScalarEntity, ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy,
+    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
 use pico::MemoRef;
@@ -31,7 +31,6 @@ use prelude::Postfix;
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
     GraphQLSchemaOriginalDefinitionType, insert_entity_or_multiple_definition_diagnostic,
-    insert_selectable_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {

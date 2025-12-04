@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
@@ -7,7 +7,7 @@ use crate::{
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    DiagnosticResult, Location, SelectableName, ServerObjectEntityName,
+    DiagnosticResult, Location, SelectableName, ServerObjectEntityName, WithLocation,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -489,4 +489,21 @@ pub fn selectable_is_not_defined_diagnostic(
         format!("`{parent_object_entity_name}.{client_selectable_name}` is not defined."),
         location.wrap_some(),
     )
+}
+
+// TODO make this generic over value, too
+pub fn insert_selectable_or_multiple_definition_diagnostic<Value>(
+    map: &mut BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<Value>>,
+    key: (ServerObjectEntityName, SelectableName),
+    item: WithLocation<Value>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
+    match map.entry(key) {
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(item);
+        }
+        Entry::Occupied(_) => non_fatal_diagnostics.push(
+            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location),
+        ),
+    }
 }

@@ -8,7 +8,6 @@ use pico::{MemoRef, SourceId};
 use pico_macros::memo;
 use prelude::Postfix;
 
-#[expect(clippy::type_complexity)]
 #[memo]
 // TODO add error recovery and the non_fatal_diagnostics vec
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(

@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
     ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo,
-    QueryOperationName, QueryText, ScalarSelectableName, SelectableName, ServerObjectEntityName,
+    QueryOperationName, QueryText, ScalarSelectableName, ServerObjectEntityName,
     ServerObjectSelectableName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
     WithLocation, WithLocationPostfix, WithNonFatalDiagnostics, WithSpanPostfix,
 };
@@ -23,7 +23,7 @@ use isograph_schema::{
     ServerObjectSelectable, ServerObjectSelectableVariant, ServerScalarSelectable,
     TYPENAME_FIELD_NAME, ValidatedVariableDefinition, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
-    multiple_selectable_definitions_found_diagnostic, server_object_entity_named,
+    insert_selectable_or_multiple_definition_diagnostic, server_object_entity_named,
     to_isograph_constant_value,
 };
 use isograph_schema::{IsographDatabase, ServerScalarEntity};
@@ -68,6 +68,7 @@ pub struct GraphQLNetworkProtocol {}
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
 
+    #[expect(clippy::type_complexity)]
     #[memo]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
@@ -805,23 +806,6 @@ pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
         }
         Entry::Occupied(_) => non_fatal_diagnostics.push(
             multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()),
-        ),
-    }
-}
-
-// TODO make this generic over value, too
-pub(crate) fn insert_selectable_or_multiple_definition_diagnostic<Value>(
-    map: &mut BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<Value>>,
-    key: (ServerObjectEntityName, SelectableName),
-    item: WithLocation<Value>,
-    non_fatal_diagnostics: &mut Vec<Diagnostic>,
-) {
-    match map.entry(key) {
-        Entry::Vacant(vacant_entry) => {
-            vacant_entry.insert(item);
-        }
-        Entry::Occupied(_) => non_fatal_diagnostics.push(
-            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location),
         ),
     }
 }

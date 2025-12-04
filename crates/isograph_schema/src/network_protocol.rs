@@ -46,6 +46,7 @@ pub trait NetworkProtocol:
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
+    #[expect(clippy::type_complexity)]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> &DiagnosticResult<(
