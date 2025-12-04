@@ -2,21 +2,10 @@ use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation};
 use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
 use isograph_lang_types::{DefinitionLocation, Description, VariableDefinition};
 
-use crate::{
-    MemoRefServerSelectable, OwnedClientSelectable, OwnedServerSelectable, ServerEntityName,
-};
+use crate::{MemoRefServerSelectable, OwnedClientSelectable, ServerEntityName};
 
-pub type Selectable<TNetworkProtocol> = DefinitionLocation<
-    OwnedServerSelectable<TNetworkProtocol>,
-    OwnedClientSelectable<TNetworkProtocol>,
->;
 pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
     MemoRefServerSelectable<TNetworkProtocol>,
-    OwnedClientSelectable<TNetworkProtocol>,
->;
-
-pub type OwnedSelectable<TNetworkProtocol> = DefinitionLocation<
-    OwnedServerSelectable<TNetworkProtocol>,
     OwnedClientSelectable<TNetworkProtocol>,
 >;
 
