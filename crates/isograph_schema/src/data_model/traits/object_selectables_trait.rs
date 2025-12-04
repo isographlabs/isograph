@@ -1,7 +1,4 @@
-use common_lang_types::{
-    ClientObjectSelectableName, ObjectSelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName,
-};
+use common_lang_types::{SelectableName, ServerObjectEntityName};
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 use pico::MemoRef;
@@ -9,8 +6,8 @@ use pico::MemoRef;
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
 pub type ObjectSelectableId = DefinitionLocation<
-    (ServerObjectEntityName, ServerObjectSelectableName),
-    (ServerObjectEntityName, ClientObjectSelectableName),
+    (ServerObjectEntityName, SelectableName),
+    (ServerObjectEntityName, SelectableName),
 >;
 
 // This is poorly named... its not owned!
@@ -36,7 +33,7 @@ pub type MemoRefObjectSelectable<TNetworkProtocol> = DefinitionLocation<
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> ObjectSelectableName;
+    fn name(&self) -> SelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
     fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName>;
 }
@@ -48,7 +45,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -68,7 +65,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -88,7 +85,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -108,7 +105,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 

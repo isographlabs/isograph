@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
-    QueryOperationName, QueryText, SelectableName, ServerObjectEntityName, ServerSelectableName,
-    UnvalidatedTypeName, WithLocation, WithNonFatalDiagnostics, WithSpan,
+    DiagnosticResult, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation,
+    WithNonFatalDiagnostics, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -30,7 +30,7 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
         DiagnosticResult<
             WithLocation<(
                 ServerObjectEntityName,
-                ClientScalarSelectableName,
+                SelectableName,
                 UnvalidatedRefetchStrategy,
             )>,
         >,
@@ -85,7 +85,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
-    pub name: WithLocation<ServerSelectableName>,
+    pub name: WithLocation<SelectableName>,
     pub graphql_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     /// An override type for the typename field. Normally, the JavaScript type is
     /// acquired by going through graphql_type.inner(), but there is no separate

@@ -1,8 +1,7 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    JavascriptName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarSelectableName, WithLocation,
+    JavascriptName, SelectableName, ServerObjectEntityName, ServerScalarEntityName, WithLocation,
 };
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
@@ -14,7 +13,7 @@ use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSele
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ServerScalarSelectableName>,
+    pub name: WithLocation<SelectableName>,
 
     pub target_scalar_entity: TypeAnnotation<ServerScalarEntityName>,
     /// Normally, we look up the JavaScript type to use by going through the
@@ -51,7 +50,7 @@ impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ServerObjectSelectableName>,
+    pub name: WithLocation<SelectableName>,
 
     pub target_object_entity: TypeAnnotation<ServerObjectEntityName>,
 
@@ -84,8 +83,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
 
 // TODO rename
 pub type ServerSelectableId = SelectionType<
-    (ServerObjectEntityName, ServerScalarSelectableName),
-    (ServerObjectEntityName, ServerObjectSelectableName),
+    (ServerObjectEntityName, SelectableName),
+    (ServerObjectEntityName, SelectableName),
 >;
 
 pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<

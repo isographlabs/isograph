@@ -11,9 +11,8 @@ use crate::{
     raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ClientScalarSelectableName,
-    ParentObjectEntityNameAndSelectableName, QueryOperationName, ServerObjectEntityName,
-    VariableName,
+    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName,
+    QueryOperationName, SelectableName, ServerObjectEntityName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -37,7 +36,7 @@ use std::collections::BTreeSet;
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    entrypoint_scalar_selectable_name: ClientScalarSelectableName,
+    entrypoint_scalar_selectable_name: SelectableName,
     info: &EntrypointDeclarationInfo,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -283,7 +282,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .map(|info| info.directive_set)
         .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {}));
 
-    let field_name = query_name.into();
+    let field_name = query_name.unchecked_conversion();
     let type_name = parent_object_entity.name;
 
     let entrypoint_file_content = entrypoint_file_content(
@@ -466,7 +465,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
-    field_name: ClientScalarSelectableName,
+    field_name: SelectableName,
     concrete_type: ServerObjectEntityName,
     directive_set: &EntrypointDirectiveSet,
     field_directive_set: ClientScalarSelectableDirectiveSet,

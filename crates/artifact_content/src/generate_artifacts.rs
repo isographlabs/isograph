@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, ClientScalarSelectableName,
-    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableNameOrAlias,
+    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DiagnosticVecResult,
+    ParentObjectEntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
     ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix, derive_display,
 };
 use core::panic;
@@ -993,7 +993,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     indentation_level: u8,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    client_scalar_selectable_name: SelectableName,
 ) {
     let client_scalar_selectable = client_scalar_selectable_named(
         db,

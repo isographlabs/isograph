@@ -6,8 +6,7 @@ use crate::{
     process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    DiagnosticResult, Location, SelectableName, ServerObjectEntityName, WithLocation,
+    Diagnostic, DiagnosticResult, Location, SelectableName, ServerObjectEntityName, WithLocation,
     WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
@@ -105,7 +104,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
 pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
+    client_selectable_name: SelectableName,
 ) -> Option<MemoRefDeclaration> {
     client_selectable_declaration_map_from_iso_literals(db)
         .item
@@ -117,7 +116,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientFieldDeclaration>>> {
     let selectable = client_selectable_declaration(
         db,
@@ -148,7 +147,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientObjectSelectableName,
+    client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientPointerDeclaration>>> {
     let selectable = client_selectable_declaration(
         db,
@@ -180,7 +179,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientScalarSelectable<TNetworkProtocol>>>> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
@@ -234,7 +233,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientObjectSelectableName,
+    client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientObjectSelectable<TNetworkProtocol>>>> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
@@ -255,7 +254,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
+    client_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRefClientSelectable<TNetworkProtocol>>> {
     // we can do this better by reordering functions in this file
     // just in general, we can do better! This is awkward!

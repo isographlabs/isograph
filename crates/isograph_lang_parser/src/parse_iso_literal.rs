@@ -1,8 +1,7 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    DiagnosticResult, IsoLiteralText, Location, RelativePathToSourceFile, Span, TextSource,
-    UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation, WithLocation, WithLocationPostfix,
-    WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, IsoLiteralText, Location, RelativePathToSourceFile,
+    SelectableName, Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation,
+    WithLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -181,7 +180,7 @@ fn parse_client_field_declaration_inner(
         let _ = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
-        let client_field_name: WithEmbeddedLocation<ClientScalarSelectableName> = tokens
+        let client_field_name: WithEmbeddedLocation<SelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
@@ -281,7 +280,7 @@ fn parse_client_pointer_declaration_inner(
         let _dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
-        let client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableName> = tokens
+        let client_pointer_name: WithEmbeddedLocation<SelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
@@ -886,7 +885,7 @@ fn expected_selection_set_diagnostic(location: Location) -> Diagnostic {
 
 fn expected_literal_to_be_exported_diagnostic(
     literal_type: &str,
-    suggested_const_export_name: ClientSelectableName,
+    suggested_const_export_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
     Diagnostic::new(

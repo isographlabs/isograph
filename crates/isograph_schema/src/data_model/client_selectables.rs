@@ -1,9 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ServerObjectEntityName, WithLocation,
-    WithSpan,
-};
+use common_lang_types::{SelectableName, ServerObjectEntityName, WithLocation, WithSpan};
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 use pico::MemoRef;
 
@@ -11,8 +8,8 @@ use crate::{ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenCl
 
 // TODO rename
 pub type ClientSelectableId = SelectionType<
-    (ServerObjectEntityName, ClientScalarSelectableName),
-    (ServerObjectEntityName, ClientObjectSelectableName),
+    (ServerObjectEntityName, SelectableName),
+    (ServerObjectEntityName, SelectableName),
 >;
 
 pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
@@ -30,7 +27,7 @@ pub type MemoRefClientSelectable<TNetworkProtocol> = SelectionType<
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ClientScalarSelectableName>,
+    pub name: WithLocation<SelectableName>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
@@ -46,7 +43,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ClientObjectSelectableName>,
+    pub name: WithLocation<SelectableName>,
     pub target_object_entity_name: TypeAnnotation<ServerObjectEntityName>,
 
     pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,

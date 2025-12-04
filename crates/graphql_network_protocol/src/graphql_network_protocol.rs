@@ -2,9 +2,8 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo,
-    QueryOperationName, QueryText, ScalarSelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
+    DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo, QueryOperationName, QueryText,
+    SelectableName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
     WithLocation, WithLocationPostfix, WithNonFatalDiagnostics, WithSpanPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
@@ -327,7 +326,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         .wrap_some(),
                         name: format!("as{}", concrete_child_entity_name)
                             .intern()
-                            .to::<ServerObjectSelectableName>()
+                            .to::<SelectableName>()
                             .with_generated_location(),
                         target_object_entity: TypeAnnotation::Union(UnionTypeAnnotation {
                             variants: {
@@ -370,9 +369,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 );
                 let primary_field_name_selection_parts = path
                     .map(|x| x.intern().into())
-                    .collect::<Vec<ServerSelectableName>>();
+                    .collect::<Vec<SelectableName>>();
 
-                let mutation_subfield_name: ServerObjectSelectableName = field.intern().into();
+                let mutation_subfield_name: SelectableName = field.intern().into();
 
                 let mutation_field = match outcome
                     .selectables
@@ -438,7 +437,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         ScalarSelection {
                             name: field_map_item
                                 .from
-                                .unchecked_conversion::<ScalarSelectableName>()
+                                .unchecked_conversion::<SelectableName>()
                                 .with_generated_location(),
                             reader_alias: None,
                             associated_data: (),
@@ -497,7 +496,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_client_scalar_selectable = ClientScalarSelectable {
                     description: mutation_field.description,
                     name: client_field_scalar_selection_name
-                        .unchecked_conversion::<ClientScalarSelectableName>()
+                        .unchecked_conversion::<SelectableName>()
                         .with_generated_location(),
                     variant: ClientFieldVariant::ImperativelyLoadedField(
                         ImperativelyLoadedFieldVariant {
@@ -533,8 +532,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 outcome.client_scalar_refetch_strategies.push(
                     (
                         target_parent_object_entity_name,
-                        client_field_scalar_selection_name
-                            .unchecked_conversion::<ClientScalarSelectableName>(),
+                        client_field_scalar_selection_name.unchecked_conversion::<SelectableName>(),
                         RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                             SelectionSet {
                                 selections: fields.to_vec(),
@@ -742,7 +740,7 @@ fn traverse_selections_and_return_path<'a>(
     db: &'a IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &'a ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     payload_object_entity_name: ServerObjectEntityName,
-    primary_field_selection_name_parts: &[ServerSelectableName],
+    primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
     Vec<&'a ServerObjectSelectable<GraphQLNetworkProtocol>>,
     &'a ServerObjectEntity<GraphQLNetworkProtocol>,

@@ -1,9 +1,8 @@
 use std::fmt::Debug;
 
 use common_lang_types::{
-    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, SelectableName,
-    ServerObjectEntityName, ServerScalarEntityName, ServerScalarSelectableName,
-    ServerSelectableName, VariableName,
+    Diagnostic, DiagnosticResult, JavascriptName, SelectableName, ServerObjectEntityName,
+    ServerScalarEntityName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -24,7 +23,7 @@ lazy_static! {
     pub static ref INT_ENTITY_NAME: ServerScalarEntityName = "Int".intern().into();
     pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
     pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
-    pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
+    pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
     pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
     pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
@@ -37,7 +36,7 @@ pub struct RootOperationName(pub &'static str);
 pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: ServerObjectEntityName,
-    selections: impl Iterator<Item = ServerSelectableName>,
+    selections: impl Iterator<Item = SelectableName>,
 ) -> DiagnosticResult<Vec<ServerObjectSelectable<TNetworkProtocol>>> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
@@ -86,7 +85,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: SelectionType<ClientScalarSelectableName, NameAndArguments>,
+    pub field_name: SelectionType<SelectableName, NameAndArguments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -122,6 +121,6 @@ pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 
 pub type ScalarSelectableId = DefinitionLocation<
-    (ServerObjectEntityName, ServerScalarSelectableName),
-    (ServerObjectEntityName, ClientScalarSelectableName),
+    (ServerObjectEntityName, SelectableName),
+    (ServerObjectEntityName, SelectableName),
 >;

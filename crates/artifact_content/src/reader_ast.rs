@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan, WithSpanPostfix,
+    ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
@@ -732,7 +732,7 @@ fn get_nested_refetch_query_text(
 fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
     outer_path: &[NormalizationKey],
-    imperatively_fetchable_field_name: ClientScalarSelectableName,
+    imperatively_fetchable_field_name: SelectableName,
 ) -> usize {
     paths
         .iter()

@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use common_lang_types::ServerSelectableName;
+use common_lang_types::SelectableName;
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
@@ -93,7 +93,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
 
 fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    name: &ServerSelectableName,
+    name: &SelectableName,
     server_selectable: MemoRefServerSelectable<TNetworkProtocol>,
     indentation_level: u8,
 ) -> String {

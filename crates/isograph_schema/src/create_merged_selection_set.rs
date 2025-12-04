@@ -1,10 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
-    ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarSelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
-    WithSpanPostfix,
+    SelectableName, ServerObjectEntityName, VariableName, WithLocation, WithLocationPostfix,
+    WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -41,7 +39,7 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<(ServerObjectEntityName, ServerObjectSelectableName), ClientSelectableId>,
+    DefinitionLocation<(ServerObjectEntityName, SelectableName), ClientSelectableId>,
     FieldTraversalResult,
 >;
 
@@ -55,15 +53,15 @@ pub struct FieldTraversalResult {
 }
 
 lazy_static! {
-    pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
-    pub static ref NODE_FIELD_NAME: ServerObjectSelectableName = "node".intern().into();
-    pub static ref TYPENAME_FIELD_NAME: ServerScalarSelectableName = "__typename".intern().into();
-    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "__link".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+    pub static ref NODE_FIELD_NAME: SelectableName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: SelectableName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: SelectableName = "__link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
-    pub field_name: ClientSelectableName,
+    pub field_name: SelectableName,
     pub path_to_refetch_field_info: PathToRefetchFieldInfo,
 }
 
@@ -110,7 +108,7 @@ fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = Vari
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub name: ServerScalarSelectableName,
+    pub name: SelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -128,7 +126,7 @@ impl MergedScalarFieldSelection {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedLinkedFieldSelection {
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub name: ServerObjectSelectableName,
+    pub name: SelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
     /// Some if the object is concrete; None otherwise.
@@ -453,10 +451,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<
-        (ServerObjectEntityName, ServerObjectSelectableName),
-        ClientSelectableId,
-    >,
+    root_field_id: DefinitionLocation<(ServerObjectEntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -516,7 +511,7 @@ pub fn get_reachable_variables(
 }
 
 pub fn imperative_field_subfields_or_inline_fragments(
-    top_level_schema_field_name: ServerObjectSelectableName,
+    top_level_schema_field_name: SelectableName,
     top_level_schema_field_arguments: &[VariableDefinition<ServerEntityName>],
     top_level_schema_field_concrete_type: Option<ServerObjectEntityName>,
     top_level_schema_field_parent_object_entity_name: ServerObjectEntityName,
@@ -715,7 +710,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: ServerObjectEntityName,
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     field_parent_object_entity_name: ServerObjectEntityName,
-    field_server_object_selectable_name: ServerObjectSelectableName,
+    field_server_object_selectable_name: SelectableName,
 ) {
     if let ObjectSelectionDirectiveSet::Updatable(_) =
         object_selection.object_selection_directive_set
@@ -935,7 +930,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     object_selection: &ValidatedObjectSelection,
     parent_object_entity_name: ServerObjectEntityName,
-    newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
+    newly_encountered_client_object_selectable_name: SelectableName,
 ) {
     let newly_encountered_client_object_selectable = client_object_selectable_named(
         db,
@@ -1005,7 +1000,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     scalar_field_selection: &ValidatedScalarSelection,
     parent_object_entity_name: &ServerObjectEntityName,
-    newly_encountered_scalar_client_selectable_name: &ClientScalarSelectableName,
+    newly_encountered_scalar_client_selectable_name: &SelectableName,
 ) {
     let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
         db,
@@ -1114,7 +1109,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     db: &IsographDatabase<TNetworkProtocol>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_selectable_name: ClientScalarSelectableName,
+    newly_encountered_scalar_client_selectable_name: SelectableName,
     newly_encountered_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
@@ -1197,7 +1192,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
+    newly_encountered_client_object_selectable_name: SelectableName,
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
@@ -1520,7 +1515,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
 pub enum WrappedSelectionMapSelection {
     LinkedField {
         parent_object_entity_name: ServerObjectEntityName,
-        server_object_selectable_name: ServerObjectSelectableName,
+        server_object_selectable_name: SelectableName,
         arguments: Vec<ArgumentKeyAndValue>,
         concrete_type: Option<ServerObjectEntityName>,
     },
@@ -1631,7 +1626,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
             *TYPENAME_FIELD_NAME,
         )
             .server_defined(),
-        name: ScalarSelectableName::from(*TYPENAME_FIELD_NAME).with_generated_location(),
+        name: SelectableName::from(*TYPENAME_FIELD_NAME).with_generated_location(),
         reader_alias: None,
     })
     .with_generated_span();

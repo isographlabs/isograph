@@ -4,7 +4,7 @@ use string_key_newtype::{
     string_key_one_way_conversion,
 };
 
-use crate::{ClientScalarSelectableName, SelectableName, ServerScalarSelectableName};
+use crate::SelectableName;
 
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
@@ -83,8 +83,7 @@ string_key_newtype!(ConstExportName);
 string_key_newtype!(QueryOperationName);
 // Explanation: any client field that is on the Query object is eligible
 // to be a query name.
-string_key_one_way_conversion!(from: ClientScalarSelectableName, to: QueryOperationName);
-string_key_one_way_conversion!(from: QueryOperationName, to: SelectableName);
+string_key_one_way_conversion!(from: SelectableName, to: QueryOperationName);
 
 // For scalars
 string_key_newtype!(JavascriptName);
@@ -96,7 +95,7 @@ string_key_newtype!(IsographDirectiveName);
 
 string_key_newtype!(FieldArgumentName);
 string_key_equality!(FieldArgumentName, VariableName);
-string_key_equality!(ServerScalarSelectableName, VariableName);
+string_key_equality!(SelectableName, VariableName);
 
 string_key_newtype!(ArtifactFilePrefix);
 string_key_newtype!(ArtifactFileName);

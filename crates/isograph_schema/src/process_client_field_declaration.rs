@@ -1,8 +1,7 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    Diagnostic, DiagnosticResult, Location, RelativePathToSourceFile, SelectableName,
-    ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithSpan,
-    WithSpanPostfix,
+    ConstExportName, Diagnostic, DiagnosticResult, Location, RelativePathToSourceFile,
+    SelectableName, ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName,
+    WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -27,7 +26,7 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientScalarSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub client_scalar_selectable_name: ClientScalarSelectableName,
+    pub client_scalar_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
@@ -35,7 +34,7 @@ pub struct UnprocessedClientScalarSelectableSelectionSet {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientObjectSelectableSelectionSet {
     pub parent_object_entity_name: ServerObjectEntityName,
-    pub client_object_selectable_name: ClientObjectSelectableName,
+    pub client_object_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_selection_set: WithSpan<SelectionSet<(), ()>>,
 }
@@ -355,7 +354,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_selection_name: ClientSelectableName,
+    pub client_selection_name: SelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_name: ServerObjectEntityName,

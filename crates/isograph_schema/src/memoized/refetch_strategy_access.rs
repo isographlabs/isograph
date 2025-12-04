@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, DiagnosticResult, DiagnosticVecResult,
-    Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
+    DiagnosticResult, DiagnosticVecResult, Location, ParentObjectEntityNameAndSelectableName,
+    SelectableName, ServerObjectEntityName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -154,7 +154,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>> {
     let map = validated_refetch_strategy_map(db).clone_err()?;
 
@@ -194,7 +194,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientObjectSelectableName,
+    client_object_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
     let map = validated_refetch_strategy_map(db).clone_err()?;
 

@@ -1,6 +1,5 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
-    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableName,
+    DiagnosticResult, DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableName,
     ServerObjectEntityName, WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
@@ -16,7 +15,7 @@ use crate::{
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> ClientSelectableName;
+    fn name(&self) -> SelectableName;
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> ServerObjectEntityName;
 
@@ -32,7 +31,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -63,7 +62,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -94,7 +93,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -125,7 +124,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
+    fn name(&self) -> SelectableName {
         self.name.item.into()
     }
 
@@ -194,7 +193,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
     let selectable = client_scalar_selectable_named(
         db,
@@ -256,7 +255,7 @@ pub fn client_object_selectable_selection_set_for_parent_query<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientObjectSelectableName,
+    client_object_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
     selectable_validated_reader_selection_set(
         db,

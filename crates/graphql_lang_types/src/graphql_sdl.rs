@@ -5,9 +5,8 @@ use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 use super::{GraphQLConstantValue, write_arguments, write_directives};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EnumLiteralValue, GraphQLInterfaceTypeName,
-    GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName,
-    ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName, WithEmbeddedLocation,
-    WithLocation, WithSpan,
+    GraphQLObjectTypeName, GraphQLUnionTypeName, InputTypeName, InputValueName, SelectableName,
+    ServerScalarEntityName, UnvalidatedTypeName, WithEmbeddedLocation, WithLocation, WithSpan,
 };
 use strum::EnumString;
 
@@ -242,7 +241,7 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLFieldDefinition {
     pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<ServerSelectableName>,
+    pub name: WithLocation<SelectableName>,
     pub type_: GraphQLTypeAnnotation<UnvalidatedTypeName>,
     pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,

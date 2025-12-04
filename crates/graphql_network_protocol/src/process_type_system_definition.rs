@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    ClientScalarSelectableName, DescriptionValue, Diagnostic, GraphQLInterfaceTypeName,
-    JavascriptName, Location, ScalarSelectableName, ServerObjectEntityName, UnvalidatedTypeName,
-    VariableName, WithLocation, WithLocationPostfix, WithSpanPostfix,
+    DescriptionValue, Diagnostic, GraphQLInterfaceTypeName, JavascriptName, Location,
+    SelectableName, ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation,
+    WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
@@ -37,7 +37,7 @@ lazy_static! {
     // TODO use schema_data.string_type_id or something
     static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
     static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
-    pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
 
 }
 
@@ -350,7 +350,7 @@ fn refetch_selectable_refetch_strategy(
             selections: vec![
                 ScalarSelection {
                     name: (*ID_FIELD_NAME)
-                        .to::<ScalarSelectableName>()
+                        .to::<SelectableName>()
                         .with_generated_location(),
                     reader_alias: None,
                     associated_data: (),
