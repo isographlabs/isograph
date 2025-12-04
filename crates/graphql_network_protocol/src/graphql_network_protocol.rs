@@ -5,7 +5,7 @@ use common_lang_types::{
     ClientScalarSelectableName, DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo,
     QueryOperationName, QueryText, ScalarSelectableName, SelectableName, ServerObjectEntityName,
     ServerObjectSelectableName, ServerScalarEntityName, ServerSelectableName, UnvalidatedTypeName,
-    WithLocation, WithLocationPostfix, WithSpanPostfix,
+    WithLocation, WithLocationPostfix, WithNonFatalDiagnostics, WithSpanPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -72,12 +72,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> DiagnosticResult<(
-        ParseTypeSystemOutcome<Self>,
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
         // fetchable types
         BTreeMap<ServerObjectEntityName, RootOperationName>,
     )> {
         let mut outcome = ParseTypeSystemOutcome::default();
-        define_default_graphql_types(db, &mut outcome)?;
+        let mut non_fatal_diagnostics = vec![];
+        define_default_graphql_types(db, &mut outcome, &mut non_fatal_diagnostics);
 
         let mut graphql_root_types = None;
         let mut directives = HashMap::new();
@@ -100,6 +101,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             &mut fields_to_process,
             &mut supertype_to_subtype_map,
             &mut interfaces_to_process,
+            &mut non_fatal_diagnostics,
         )?;
 
         for type_system_extension_document in type_system_extension_documents.values() {
@@ -114,6 +116,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 &mut fields_to_process,
                 &mut supertype_to_subtype_map,
                 &mut interfaces_to_process,
+                &mut non_fatal_diagnostics,
             )?;
         }
 
@@ -150,7 +153,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 .interned_value(db)
                 .object_selected()
                 .with_location(with_location.location),
-            )?;
+                &mut non_fatal_diagnostics,
+            );
 
             directives
                 .entry(server_object_entity_name)
@@ -172,7 +176,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 )
                 .scalar_selected()
                 .with_location(with_location.location),
-            )?;
+                &mut non_fatal_diagnostics,
+            );
 
             // I don't think interface-to-interface refinement is handled correctly, let's just
             // ignore it for now.
@@ -240,7 +245,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .object_selected()
                     .with_location(field.location),
-                )?;
+                    &mut non_fatal_diagnostics,
+                );
             } else {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.server_selectables,
@@ -294,7 +300,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .scalar_selected()
                     .with_location(field.location),
-                )?;
+                    &mut non_fatal_diagnostics,
+                );
             }
         }
 
@@ -339,7 +346,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .object_selected()
                     .with_generated_location(),
-                )?;
+                    &mut non_fatal_diagnostics,
+                );
             }
         }
 
@@ -515,7 +523,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             }
         }
 
-        (outcome, graphql_root_types.unwrap_or_default().into()).wrap_ok()
+        (
+            WithNonFatalDiagnostics::new(outcome, non_fatal_diagnostics),
+            graphql_root_types.unwrap_or_default().into(),
+        )
+            .wrap_ok()
     }
 
     fn generate_link_type<'a>(
@@ -612,7 +624,8 @@ impl GraphQLSchemaOriginalDefinitionType {
 fn define_default_graphql_types(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-) -> DiagnosticResult<()> {
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*ID_ENTITY_NAME).into(),
@@ -625,7 +638,8 @@ fn define_default_graphql_types(
         .interned_value(db)
         .scalar_selected()
         .with_generated_location(),
-    )?;
+        non_fatal_diagnostics,
+    );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*STRING_ENTITY_NAME).into(),
@@ -638,7 +652,8 @@ fn define_default_graphql_types(
         .interned_value(db)
         .scalar_selected()
         .with_generated_location(),
-    )?;
+        non_fatal_diagnostics,
+    );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*BOOLEAN_ENTITY_NAME).into(),
@@ -651,7 +666,8 @@ fn define_default_graphql_types(
         .interned_value(db)
         .scalar_selected()
         .with_generated_location(),
-    )?;
+        non_fatal_diagnostics,
+    );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*FLOAT_ENTITY_NAME).into(),
@@ -664,7 +680,8 @@ fn define_default_graphql_types(
         .interned_value(db)
         .scalar_selected()
         .with_generated_location(),
-    )?;
+        non_fatal_diagnostics,
+    );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         (*INT_ENTITY_NAME).into(),
@@ -677,9 +694,8 @@ fn define_default_graphql_types(
         .interned_value(db)
         .scalar_selected()
         .with_generated_location(),
-    )?;
-
-    ().wrap_ok()
+        non_fatal_diagnostics,
+    );
 }
 
 fn is_object_entity(
@@ -769,15 +785,15 @@ pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
     map: &mut BTreeMap<UnvalidatedTypeName, WithLocation<Value>>,
     key: UnvalidatedTypeName,
     item: WithLocation<Value>,
-) -> DiagnosticResult<()> {
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
     match map.entry(key) {
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(item);
-            ().wrap_ok()
         }
-        Entry::Occupied(_) => {
-            multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()).wrap_err()
-        }
+        Entry::Occupied(_) => non_fatal_diagnostics.push(
+            multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()),
+        ),
     }
 }
 
@@ -786,14 +802,14 @@ pub(crate) fn insert_selectable_or_multiple_definition_diagnostic<Value>(
     map: &mut BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<Value>>,
     key: (ServerObjectEntityName, SelectableName),
     item: WithLocation<Value>,
-) -> DiagnosticResult<()> {
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
     match map.entry(key) {
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(item);
-            ().wrap_ok()
         }
-        Entry::Occupied(_) => {
-            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location).wrap_err()
-        }
+        Entry::Occupied(_) => non_fatal_diagnostics.push(
+            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location),
+        ),
     }
 }

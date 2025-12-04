@@ -91,7 +91,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     }
 
     if let Ok(outcome) = TNetworkProtocol::parse_type_system_documents(db) {
-        let expose_fields = &outcome.0.client_scalar_refetch_strategies;
+        let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
         // And we must also do it for expose fields. Ay ay ay
         for with_location in expose_fields.iter().flatten() {

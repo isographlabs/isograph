@@ -53,6 +53,7 @@ pub fn process_graphql_type_system_document(
     fields_to_process: &mut Vec<(ServerObjectEntityName, WithLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) -> DiagnosticResult<()> {
     for with_location in type_system_document.0 {
         let WithLocation {
@@ -85,7 +86,8 @@ pub fn process_graphql_type_system_document(
                     .interned_value(db)
                     .object_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
 
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.server_selectables,
@@ -101,7 +103,8 @@ pub fn process_graphql_type_system_document(
                     )
                     .scalar_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
 
                 directives
                     .entry(server_object_entity_name)
@@ -177,7 +180,8 @@ pub fn process_graphql_type_system_document(
                     .interned_value(db)
                     .scalar_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
                 interfaces_to_process.push(interface_definition.with_location(location));
@@ -211,7 +215,8 @@ pub fn process_graphql_type_system_document(
                     .interned_value(db)
                     .object_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
 
                 directives
                     .entry(server_object_entity_name)
@@ -245,7 +250,8 @@ pub fn process_graphql_type_system_document(
                     .interned_value(db)
                     .scalar_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 let server_object_entity_name =
@@ -275,7 +281,8 @@ pub fn process_graphql_type_system_document(
                     .interned_value(db)
                     .object_selected()
                     .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
 
                 directives
                     .entry(server_object_entity_name)
@@ -299,15 +306,16 @@ pub fn process_graphql_type_system_document(
                     get_typename_selectable(db, server_object_entity_name, location, None)
                         .scalar_selected()
                         .with_location(location),
-                )?;
+                    non_fatal_diagnostics,
+                );
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
-                    return Diagnostic::new(
+                    non_fatal_diagnostics.push(Diagnostic::new(
                         "Duplicate schema definition".to_string(),
                         location.wrap_some(),
-                    )
-                    .wrap_err();
+                    ));
+                    continue;
                 }
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
@@ -434,6 +442,7 @@ pub fn process_graphql_type_system_extension_document(
     fields_to_process: &mut Vec<(ServerObjectEntityName, WithLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) -> DiagnosticResult<()> {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
@@ -459,6 +468,7 @@ pub fn process_graphql_type_system_extension_document(
         fields_to_process,
         supertype_to_subtype_map,
         interfaces_to_process,
+        non_fatal_diagnostics,
     )?;
 
     for extension in extensions {

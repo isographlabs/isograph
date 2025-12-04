@@ -1,9 +1,9 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo,
+    ClientScalarSelectableName, DiagnosticResult, JavascriptName, QueryExtraInfo,
     QueryOperationName, QueryText, SelectableName, ServerObjectEntityName, ServerSelectableName,
-    UnvalidatedTypeName, WithLocation, WithSpan,
+    UnvalidatedTypeName, WithLocation, WithNonFatalDiagnostics, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -38,12 +38,6 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
             )>,
         >,
     >,
-
-    /// e.g. if there are multiple entities with the same name
-    ///
-    /// These will not prevent the LSP from working, but should prevent artifact
-    /// generation from starting.
-    pub non_fatal_validation_errors: Vec<Diagnostic>,
 }
 
 pub trait NetworkProtocol:
@@ -55,7 +49,7 @@ pub trait NetworkProtocol:
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> &DiagnosticResult<(
-        ParseTypeSystemOutcome<Self>,
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
         // TODO just seems awkward that we return fetchable types
         BTreeMap<ServerObjectEntityName, RootOperationName>,
     )>;

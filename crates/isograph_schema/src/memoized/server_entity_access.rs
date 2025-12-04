@@ -24,6 +24,7 @@ pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .item
         .entities
         .iter()
         .map(|(entity_name, entities)| (*entity_name, entities.item))
@@ -39,6 +40,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .item
         .entities
         .iter()
         .filter_map(|(_, x)| x.item.as_object())
@@ -178,6 +180,7 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .item
         .entities
         .get(&entity_name)
         .map(|x| x.location)

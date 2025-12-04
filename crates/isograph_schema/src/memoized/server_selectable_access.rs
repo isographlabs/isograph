@@ -25,6 +25,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .item
         .server_selectables
         .iter()
         .map(|(key, value)| (*key, value.item))

@@ -71,7 +71,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     }
 
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
-    let expose_fields = &outcome.0.client_scalar_refetch_strategies;
+    let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
     for with_location in expose_fields.iter().flatten() {
         let (parent_object_entity_name, selectable_name, refetch_strategy) = &with_location.item;

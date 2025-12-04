@@ -349,7 +349,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     >,
 > {
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
-    let expose_as_field_queue = &outcome.0.client_scalar_selectables;
+    let expose_as_field_queue = &outcome.0.item.client_scalar_selectables;
 
     let mut map = HashMap::new();
     for with_location in expose_as_field_queue.iter().flatten() {
