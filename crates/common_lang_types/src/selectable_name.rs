@@ -1,5 +1,7 @@
 //! # The Isograph object model.
 //!
+//! This is probably quite outdated.
+//!
 //! In Isograph, there are two main "axes" on which things can vary:
 //! - whether they are defined locally or come from a schema, and
 //! - whether they are a scalar or an object
