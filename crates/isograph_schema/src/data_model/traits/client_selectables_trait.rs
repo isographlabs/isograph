@@ -207,7 +207,8 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     .expect(
         "Expected selectable to exist. \
         This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     Ok(match selectable.variant {
         ClientFieldVariant::ImperativelyLoadedField(_) => {

@@ -110,6 +110,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             })
                             .map(lsp_location_to_scalar_response),
                         DefinitionLocation::Client(client_selectable) => client_selectable
+                            .lookup(db)
                             .name
                             .location
                             .as_embedded_location()
@@ -150,6 +151,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                             })
                             .map(lsp_location_to_scalar_response),
                         DefinitionLocation::Client(client_selectable) => client_selectable
+                            .lookup(db)
                             .name
                             .location
                             .as_embedded_location()
@@ -201,6 +203,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .and_then(|referenced_selectable| {
                         referenced_selectable
+                            .lookup(db)
                             .name
                             .location
                             .as_embedded_location()
@@ -239,6 +242,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 .ok_or(LSPRuntimeError::ExpectedError)?;
 
                 let lsp_location_opt = referenced_selectable
+                    .lookup(db)
                     .name
                     .location
                     .as_embedded_location()

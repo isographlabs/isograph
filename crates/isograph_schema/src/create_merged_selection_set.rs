@@ -613,7 +613,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         s.lookup(db).target_object_entity.inner().dereference()
                     }
                     DefinitionLocation::Client(c) => {
-                        c.target_object_entity_name.inner().dereference()
+                        c.lookup(db).target_object_entity_name.inner().dereference()
                     }
                 };
 
@@ -670,7 +670,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_type_map,
                             merge_traversal_state,
                             newly_encountered_client_object_selectable_name,
-                            newly_encountered_client_object_selectable,
+                            newly_encountered_client_object_selectable.lookup(db),
                             object_selection,
                             variable_context,
                         );
@@ -868,7 +868,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         s.lookup(db).target_object_entity.inner().dereference()
                     }
                     DefinitionLocation::Client(o) => {
-                        o.target_object_entity_name.inner().dereference()
+                        o.lookup(db).target_object_entity_name.inner().dereference()
                     }
                 };
 
@@ -951,7 +951,8 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     .expect(
         "Expected selectable to exist. \
         This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     merge_non_loadable_client_type(
         db,
@@ -1017,7 +1018,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         This is indicative of a bug in Isograph.",
     )
     .as_ref()
-    .expect("Expected client scalar selectable to exist.");
+    .expect("Expected client scalar selectable to exist.")
+    .lookup(db);
 
     // If the field is selected loadably or is imperative, we must note the refetch path,
     // because this results in an artifact being generated.
@@ -1370,7 +1372,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     let validated_selections = selectable_validated_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
-        newly_encountered_client_type.name(),
+        newly_encountered_client_type.name().into(),
     )
     .expect("Expected selections to be valid.");
 

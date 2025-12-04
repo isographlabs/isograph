@@ -159,6 +159,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         scalar_selection.name.location,
                     )
                 })?;
+            let client_scalar_selectable = client_scalar_selectable.lookup(db);
             (
                 client_scalar_selectable.parent_object_entity_name,
                 client_scalar_selectable.name.item,
@@ -255,9 +256,11 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         object_selection.name.item.into(),
                         "a scalar",
                         "an object",
-                        e.name.location,
+                        e.lookup(db).name.location,
                     )]
                 })?;
+
+            let client_object_selectable = client_object_selectable.lookup(db);
 
             (
                 (

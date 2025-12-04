@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use common_lang_types::{
-    ClientSelectableName, DiagnosticResult, DiagnosticVecResult,
-    ParentObjectEntityNameAndSelectableName, ServerObjectEntityName, WithSpan, WithSpanPostfix,
+    DiagnosticResult, DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableName,
+    ServerObjectEntityName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -11,7 +11,7 @@ use prelude::Postfix;
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
     client_selectable_declaration_map_from_iso_literals, get_link_fields,
-    get_validated_selection_set, multiple_selectable_definitions_found_diagnostic,
+    get_validated_selection_set,
 };
 
 type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>;
@@ -21,52 +21,34 @@ type ValidatedSelectionSet = WithSpan<SelectionSet<ScalarSelectableId, ObjectSel
 pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
-    (ServerObjectEntityName, ClientSelectableName),
+    (ServerObjectEntityName, SelectableName),
     DiagnosticResult<SelectionType<WithSpan<SelectionSet<(), ()>>, WithSpan<SelectionSet<(), ()>>>>,
 > {
     // TODO use client_selectable_map
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
 
     let mut map: HashMap<_, _> = declaration_map
+        .item
         .iter()
-        .map(|(key, declarations)| {
-            let (first, rest) = declarations.split_first().expect(
-                "Expected at least one item to be present in map. \
-                This is indicative of a bug in Isograph.",
-            );
-            if rest.is_empty() {
-                match first {
-                    SelectionType::Scalar(s) => (
-                        *key,
-                        s.selection_set
-                            .clone()
-                            .note_todo("Do not clone. Use a MemoRef.")
-                            .scalar_selected()
-                            .wrap_ok(),
-                    ),
-                    SelectionType::Object(o) => (
-                        *key,
-                        o.selection_set
-                            .clone()
-                            .note_todo("Do not clone. Use a MemoRef.")
-                            .object_selected()
-                            .wrap_ok(),
-                    ),
-                }
-            } else {
-                (
-                    *key,
-                    multiple_selectable_definitions_found_diagnostic(
-                        key.0,
-                        key.1.into(),
-                        match first {
-                            SelectionType::Scalar(s) => s.client_field_name.location.into(),
-                            SelectionType::Object(o) => o.client_pointer_name.location.into(),
-                        },
-                    )
-                    .wrap_err(),
-                )
-            }
+        .map(|(key, declaration)| match declaration.item {
+            SelectionType::Scalar(s) => (
+                *key,
+                s.lookup(db)
+                    .selection_set
+                    .clone()
+                    .note_todo("Do not clone. Use a MemoRef.")
+                    .scalar_selected()
+                    .wrap_ok(),
+            ),
+            SelectionType::Object(o) => (
+                *key,
+                o.lookup(db)
+                    .selection_set
+                    .clone()
+                    .note_todo("Do not clone. Use a MemoRef.")
+                    .object_selected()
+                    .wrap_ok(),
+            ),
         })
         .collect();
 
@@ -75,8 +57,12 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     match get_link_fields(db) {
         Ok(fields) => {
             for field in fields {
+                let scalar_selectable = field.lookup(db);
                 map.insert(
-                    (field.parent_object_entity_name, field.name.item.into()),
+                    (
+                        scalar_selectable.parent_object_entity_name,
+                        scalar_selectable.name.item.into(),
+                    ),
                     SelectionSet { selections: vec![] }
                         .with_generated_span()
                         .scalar_selected()
@@ -121,7 +107,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
 pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
-    (ServerObjectEntityName, ClientSelectableName),
+    (ServerObjectEntityName, SelectableName),
     DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>>,
 > {
     let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned();
@@ -136,11 +122,11 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
                     .and_then(|unvalidated_selection_set| {
                         let top_level_field_or_pointer = match unvalidated_selection_set {
                             SelectionType::Scalar(_) => {
-                                ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                                ParentObjectEntityNameAndSelectableName::new(key.0, key.1)
                                     .scalar_selected()
                             }
                             SelectionType::Object(_) => {
-                                ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                                ParentObjectEntityNameAndSelectableName::new(key.0, key.1)
                                     .object_selected()
                             }
                         };
@@ -160,13 +146,13 @@ pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProt
 pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
+    selectable_name: SelectableName,
 ) -> DiagnosticVecResult<ValidatedSelectionSet> {
     let map = memoized_validated_reader_selection_set_map(db);
 
-    map.get(&(parent_server_object_entity_name, client_selectable_name))
+    map.get(&(parent_server_object_entity_name, selectable_name))
         .unwrap_or_else(|| panic!("Expected selectable to have been defined. \
-            This is indicative of a bug in Isograph. {parent_server_object_entity_name}.{client_selectable_name}"))
+            This is indicative of a bug in Isograph. {parent_server_object_entity_name}.{selectable_name}"))
         .clone()
         .note_todo("Do not clone. Use a MemoRef.")
 }

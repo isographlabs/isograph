@@ -3,10 +3,12 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
-use isograph_lang_types::{ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType};
+use isograph_lang_types::{
+    ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
+};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, NetworkProtocol, ObjectSelectableId, OwnedClientSelectable,
+    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ObjectSelectableId,
     ScalarSelectableId, ServerObjectSelectable,
     client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
@@ -285,9 +287,14 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
 pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_selectable: &OwnedClientSelectable<TNetworkProtocol>,
+    client_selectable: MemoRefClientSelectable<TNetworkProtocol>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
+    let client_selectable = match client_selectable {
+        SelectionType::Scalar(s) => s.lookup(db).scalar_selected(),
+        SelectionType::Object(o) => o.lookup(db).object_selected(),
+    };
+
     let ts_file_extension = file_extensions.ts();
     let parent_object_entity = &server_object_entity_named(
         db,
@@ -364,7 +371,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     };
 
     let (parameters_import, parameters_type) = if !client_selectable
-        .as_ref()
         .variable_definitions()
         .is_empty()
     {
@@ -407,7 +413,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.as_ref().name().into(),
+                selectable_name: client_selectable.name().into(),
             }
             .wrap_some(),
         },

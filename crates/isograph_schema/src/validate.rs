@@ -6,10 +6,11 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, client_selectable_map,
-    parse_iso_literals, process_iso_literals, server_entities_map_without_locations,
-    server_id_selectable, server_object_entities, server_selectables_map,
-    validate_use_of_arguments, validated_entrypoints,
+    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
+    client_selectable_declaration_map_from_iso_literals, client_selectable_map, parse_iso_literals,
+    process_iso_literals, server_entities_map_without_locations, server_id_selectable,
+    server_object_entities, server_selectables_map, validate_use_of_arguments,
+    validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -48,6 +49,12 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     if let Ok((outcome, _)) = TNetworkProtocol::parse_type_system_documents(db) {
         errors.extend(outcome.non_fatal_diagnostics.clone());
     }
+
+    errors.extend(
+        client_selectable_declaration_map_from_iso_literals(db)
+            .non_fatal_diagnostics
+            .clone(),
+    );
 
     let contains_iso_stats = match validate_all_iso_literals(db) {
         Ok(stats) => stats,
@@ -184,7 +191,7 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
 
             match selection {
                 SelectionType::Scalar(s) => {
-                    if let ClientFieldVariant::UserWritten(u) = &s.variant
+                    if let ClientFieldVariant::UserWritten(u) = &s.lookup(db).variant
                         && let Err(e) = &u.client_scalar_selectable_directive_set
                     {
                         return Some(e.clone());

@@ -19,6 +19,7 @@ use isograph_schema::{
     transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
+use pico::MemoRef;
 
 use crate::{
     generate_artifacts::{ReaderAst, get_serialized_field_arguments},
@@ -66,7 +67,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     scalar_client_defined_field_ast_node(
                         db,
                         scalar_field_selection,
-                        client_scalar_selectable,
+                        *client_scalar_selectable,
                         indentation_level,
                         path,
                         root_refetched_paths,
@@ -238,7 +239,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected selectable to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
             let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
@@ -327,13 +329,14 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
     parent_variable_context: &VariableContext,
 ) -> String {
+    let client_scalar_selectable = client_scalar_selectable.lookup(db);
     let client_scalar_selectable_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
         &client_scalar_selectable.variable_definitions,
@@ -833,7 +836,8 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         match categorize_field_loadability(
                             client_scalar_selectable,
@@ -894,7 +898,8 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         let new_paths = refetched_paths_with_path(
                             db,

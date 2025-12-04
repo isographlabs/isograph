@@ -28,6 +28,11 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
+pub type MemoRefObjectSelectable<TNetworkProtocol> = DefinitionLocation<
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
+    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
+>;
+
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<Description>;

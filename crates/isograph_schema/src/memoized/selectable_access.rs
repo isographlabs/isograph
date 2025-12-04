@@ -1,32 +1,20 @@
 use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
-use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
+use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoRefServerSelectable,
-    NetworkProtocol, client_selectable_map, client_selectable_named,
-    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
-    server_selectables_map_for_entity,
+    IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_map,
+    client_selectable_named, multiple_selectable_definitions_found_diagnostic,
+    server_selectable_named, server_selectables_map_for_entity,
 };
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<
-    Option<
-        DefinitionLocation<
-            MemoRefServerSelectable<TNetworkProtocol>,
-            SelectionType<
-                ClientScalarSelectable<TNetworkProtocol>,
-                ClientObjectSelectable<TNetworkProtocol>,
-            >,
-        >,
-    >,
-> {
+) -> DiagnosticResult<Option<MemoRefSelectable<TNetworkProtocol>>> {
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
@@ -54,14 +42,13 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
             Some(server_selectable) => server_selectable.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
-        (Err(_), Ok(client)) => match client.note_todo("Do not clone. Use a MemoRef.").clone() {
+        (Err(_), Ok(client)) => match *client.note_todo("Do not clone. Use a MemoRef.") {
             Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
-            (None, Some(client_selectable)) => client_selectable
-                .clone()
+            (None, Some(client_selectable)) => (*client_selectable)
                 .note_todo("Do not clone. Use a MemoRef.")
                 .client_defined()
                 .wrap_some()
@@ -84,24 +71,11 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: ServerObjectEntityName,
-) -> DiagnosticResult<
-    Vec<
-        DiagnosticResult<
-            DefinitionLocation<
-                MemoRefServerSelectable<TNetworkProtocol>,
-                SelectionType<
-                    ClientScalarSelectable<TNetworkProtocol>,
-                    ClientObjectSelectable<TNetworkProtocol>,
-                >,
-            >,
-        >,
-    >,
-> {
+) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TNetworkProtocol>>>> {
     let mut selectables = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .to_owned()?.into_values().map(|value| {
             value

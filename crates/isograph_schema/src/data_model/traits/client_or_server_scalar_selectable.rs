@@ -5,5 +5,5 @@ use crate::{ClientScalarSelectable, ServerScalarSelectable};
 
 pub type ScalarSelectable<TNetworkProtocol> = DefinitionLocation<
     MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
-    ClientScalarSelectable<TNetworkProtocol>,
+    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
 >;

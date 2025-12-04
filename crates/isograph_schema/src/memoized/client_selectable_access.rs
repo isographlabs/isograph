@@ -1,33 +1,38 @@
 use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    OwnedClientSelectable, add_client_scalar_selectable_to_entity, get_link_fields_map,
+    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoRefClientSelectable,
+    NetworkProtocol, add_client_scalar_selectable_to_entity, get_link_fields_map,
     process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
     DiagnosticResult, Location, SelectableName, ServerObjectEntityName, WithLocation,
+    WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, SelectionType, SelectionTypePostfix,
 };
+use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::parse_iso_literal_in_source;
+
+type MemoRefDeclaration =
+    SelectionType<MemoRef<ClientFieldDeclaration>, MemoRef<ClientPointerDeclaration>>;
 
 /// client selectables defined by iso literals.
 /// Note: this is just the declarations, not the fields!
 #[memo]
 pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> HashMap<
-    (ServerObjectEntityName, ClientSelectableName),
-    Vec<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>,
+) -> WithNonFatalDiagnostics<
+    BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<MemoRefDeclaration>>,
 > {
-    let mut out: HashMap<(_, ClientSelectableName), Vec<_>> = HashMap::new();
+    let mut out: BTreeMap<(_, SelectableName), _> = BTreeMap::new();
+    let mut non_fatal_diagnostics = vec![];
 
     for (_relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
         for extraction in parse_iso_literal_in_source(db, *iso_literals_source_id).to_owned() {
@@ -36,32 +41,48 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                     IsoLiteralExtractionResult::ClientPointerDeclaration(
                         client_pointer_declaration,
                     ) => {
-                        out.entry((
-                            client_pointer_declaration.item.parent_type.item.0,
+                        insert_selectable_or_multiple_definition_diagnostic(
+                            &mut out,
+                            (
+                                client_pointer_declaration.item.parent_type.item.0,
+                                client_pointer_declaration
+                                    .item
+                                    .client_pointer_name
+                                    .item
+                                    .0
+                                    .into(),
+                            ),
                             client_pointer_declaration
                                 .item
-                                .client_pointer_name
-                                .item
-                                .0
-                                .into(),
-                        ))
-                        .or_default()
-                        .push(client_pointer_declaration.item.object_selected());
+                                .interned_value(db)
+                                .object_selected()
+                                .with_generated_location()
+                                .note_todo("Real location"),
+                            &mut non_fatal_diagnostics,
+                        );
                     }
                     IsoLiteralExtractionResult::ClientFieldDeclaration(
                         client_field_declaration,
                     ) => {
-                        out.entry((
-                            client_field_declaration.item.parent_type.item.0,
+                        insert_selectable_or_multiple_definition_diagnostic(
+                            &mut out,
+                            (
+                                client_field_declaration.item.parent_type.item.0,
+                                client_field_declaration
+                                    .item
+                                    .client_field_name
+                                    .item
+                                    .0
+                                    .into(),
+                            ),
                             client_field_declaration
                                 .item
-                                .client_field_name
-                                .item
-                                .0
-                                .into(),
-                        ))
-                        .or_default()
-                        .push(client_field_declaration.item.scalar_selected());
+                                .interned_value(db)
+                                .scalar_selected()
+                                .with_generated_location()
+                                .note_todo("Real location"),
+                            &mut non_fatal_diagnostics,
+                        );
                     }
                     IsoLiteralExtractionResult::EntrypointDeclaration(_) => {
                         // Intentionally ignored. TODO reconsider
@@ -77,20 +98,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
         }
     }
 
-    out
-}
-
-#[memo]
-pub fn client_selectable_declarations<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
-    client_selectable_name: ClientSelectableName,
-) -> Vec<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>> {
-    client_selectable_declaration_map_from_iso_literals(db)
-        .get(&(parent_object_entity_name, client_selectable_name))
-        .cloned()
-        .note_todo("Do not clone. Use a MemoRef.")
-        .unwrap_or_default()
+    WithNonFatalDiagnostics::new(out, non_fatal_diagnostics)
 }
 
 #[memo]
@@ -98,35 +106,11 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
-) -> DiagnosticResult<Option<SelectionType<ClientFieldDeclaration, ClientPointerDeclaration>>> {
-    match client_selectable_declarations(db, parent_object_entity_name, client_selectable_name)
-        .split_first()
-    {
-        Some((first, rest)) => {
-            if rest.is_empty() {
-                first
-                    .clone()
-                    .note_todo("Do not clone. Use a MemoRef.")
-                    .wrap_some()
-                    .wrap_ok()
-            } else {
-                let location = match first {
-                    SelectionType::Scalar(s) => s.client_field_name.location.to::<Location>(),
-                    SelectionType::Object(o) => o.client_pointer_name.location.into(),
-                };
-                multiple_selectable_definitions_found_diagnostic(
-                    parent_object_entity_name,
-                    client_selectable_name.into(),
-                    location,
-                )
-                .wrap_err()
-            }
-        }
-        None => {
-            // Empty, this shouldn't happen. We can consider having a NonEmptyVec or something
-            Ok(None)
-        }
-    }
+) -> Option<MemoRefDeclaration> {
+    client_selectable_declaration_map_from_iso_literals(db)
+        .item
+        .get(&(parent_object_entity_name, client_selectable_name.into()))
+        .map(|x| x.item)
 }
 
 #[memo]
@@ -134,31 +118,27 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> DiagnosticResult<Option<ClientFieldDeclaration>> {
+) -> DiagnosticResult<Option<MemoRef<ClientFieldDeclaration>>> {
     let selectable = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_scalar_selectable_name.into(),
     );
 
-    let selectable = selectable.clone_err()?;
-
     let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
     match item {
-        SelectionType::Scalar(client_field_declaration) => client_field_declaration
-            .clone()
-            .note_todo("Do not clone. Use a MemoRef.")
-            .wrap_some()
-            .wrap_ok(),
+        SelectionType::Scalar(client_field_declaration) => {
+            (*client_field_declaration).wrap_some().wrap_ok()
+        }
         SelectionType::Object(o) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
             client_scalar_selectable_name.into(),
             "a scalar",
             "an object",
-            o.client_pointer_name.location.into(),
+            o.lookup(db).client_pointer_name.location.into(),
         )
         .wrap_err(),
     }
@@ -169,22 +149,19 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> DiagnosticResult<Option<ClientPointerDeclaration>> {
+) -> DiagnosticResult<Option<MemoRef<ClientPointerDeclaration>>> {
     let selectable = client_selectable_declaration(
         db,
         parent_object_entity_name,
         client_object_selectable_name.into(),
     );
 
-    let selectable = selectable.clone_err()?;
-
     let item = match selectable {
         Some(item) => item,
         None => return Ok(None),
     };
     match item {
-        SelectionType::Object(client_pointer_declaration) => client_pointer_declaration
-            .clone()
+        SelectionType::Object(client_pointer_declaration) => (*client_pointer_declaration)
             .note_todo("Do not clone. Use a MemoRef.")
             .wrap_some()
             .wrap_ok(),
@@ -193,7 +170,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             client_object_selectable_name.into(),
             "a scalar",
             "an object",
-            s.client_field_name.location.into(),
+            s.lookup(db).client_field_name.location.into(),
         )
         .wrap_err(),
     }
@@ -204,15 +181,13 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_scalar_selectable_name: ClientScalarSelectableName,
-) -> DiagnosticResult<Option<ClientScalarSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRef<ClientScalarSelectable<TNetworkProtocol>>>> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
             .clone_err()?;
 
     let declaration = match declaration {
-        Some(declaration) => declaration
-            .clone()
-            .note_todo("Do not clone. Use a MemoRef."),
+        Some(declaration) => (*declaration).note_todo("Do not clone. Use a MemoRef."),
         None => {
             // This is an awkward situation! We didn't find any client scalar selectable defined
             // by an iso literal. But, we still need to check for linked fields.
@@ -228,7 +203,10 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             let link_fields = get_link_fields_map(db).clone_err()?;
 
             if let Some(link_field) = link_fields
-                .get(&(parent_object_entity_name, client_scalar_selectable_name))
+                .get(&(
+                    parent_object_entity_name,
+                    client_scalar_selectable_name.into(),
+                ))
                 .cloned()
             {
                 return link_field.wrap_some().wrap_ok();
@@ -246,11 +224,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     let (_, scalar_selectable) =
         add_client_scalar_selectable_to_entity(db, declaration).clone_err()?;
 
-    scalar_selectable
-        .clone()
-        .note_todo("Do not clone. Use a MemoRef.")
-        .wrap_some()
-        .wrap_ok()
+    scalar_selectable.dereference().wrap_some().wrap_ok()
 }
 
 #[memo]
@@ -258,26 +232,20 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_object_selectable_name: ClientObjectSelectableName,
-) -> DiagnosticResult<Option<ClientObjectSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRef<ClientObjectSelectable<TNetworkProtocol>>>> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
             .clone_err()?;
 
     let declaration = match declaration {
-        Some(declaration) => declaration
-            .clone()
-            .note_todo("Do not clone. Use a MemoRef."),
+        Some(declaration) => (*declaration).note_todo("Do not clone. Use a MemoRef."),
         None => return Ok(None),
     };
 
     let (_, object_selectable) =
         process_client_pointer_declaration_inner(db, declaration).clone_err()?;
 
-    object_selectable
-        .clone()
-        .note_todo("Do not clone. Use a MemoRef.")
-        .wrap_some()
-        .wrap_ok()
+    object_selectable.dereference().wrap_some().wrap_ok()
 }
 
 #[memo]
@@ -285,14 +253,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: ServerObjectEntityName,
     client_selectable_name: ClientSelectableName,
-) -> DiagnosticResult<
-    Option<
-        SelectionType<
-            ClientScalarSelectable<TNetworkProtocol>,
-            ClientObjectSelectable<TNetworkProtocol>,
-        >,
-    >,
-> {
+) -> DiagnosticResult<Option<MemoRefClientSelectable<TNetworkProtocol>>> {
     // we can do this better by reordering functions in this file
     // just in general, we can do better! This is awkward!
     // TODO don't call to_owned, since that clones an error unnecessarily
@@ -339,13 +300,14 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
+#[expect(clippy::type_complexity)]
 #[memo]
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
     HashMap<
         (ServerObjectEntityName, ClientScalarSelectableName),
-        ClientScalarSelectable<TNetworkProtocol>,
+        MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     >,
 > {
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
@@ -358,7 +320,7 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
                 with_location.item.parent_object_entity_name,
                 with_location.item.name.item,
             ),
-            with_location.item.clone(),
+            with_location.item.interned_ref(db),
         );
     }
 
@@ -373,64 +335,37 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
     HashMap<
-        (ServerObjectEntityName, ClientSelectableName),
-        DiagnosticResult<OwnedClientSelectable<TNetworkProtocol>>,
+        (ServerObjectEntityName, SelectableName),
+        DiagnosticResult<MemoRefClientSelectable<TNetworkProtocol>>,
     >,
 > {
     let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);
 
     iso_literal_map
+        .item
         .iter()
         .map(
             |((parent_object_entity_name, client_selectable_name), value)| {
-                let value = (|| match value.split_first() {
-                    Some((first, rest)) => {
-                        if rest.is_empty() {
-                            Ok(
-                                match first.note_todo("Do not clone. Use a MemoRef.").clone() {
-                                    SelectionType::Scalar(scalar_declaration) => {
-                                        add_client_scalar_selectable_to_entity(
-                                            db,
-                                            scalar_declaration,
-                                        )
-                                        .clone()
-                                        .note_todo("Do not clone. Use a MemoRef.")
-                                        .map(|(_, selectable)| selectable)?
-                                        .scalar_selected()
-                                    }
-                                    SelectionType::Object(object_declaration) => {
-                                        process_client_pointer_declaration_inner(
-                                            db,
-                                            object_declaration,
-                                        )
-                                        .clone()
-                                        .note_todo("Do not clone. Use a MemoRef.")
-                                        .map(|(_, selectable)| selectable)?
-                                        .object_selected()
-                                    }
-                                },
-                            )
-                        } else {
-                            let location = match first {
-                                SelectionType::Scalar(s) => {
-                                    s.client_field_name.location.to::<Location>()
-                                }
-                                SelectionType::Object(o) => o.client_pointer_name.location.into(),
-                            };
-                            multiple_selectable_definitions_found_diagnostic(
-                                *parent_object_entity_name,
-                                (*client_selectable_name).into(),
-                                location,
-                            )
-                            .wrap_err()
+                (
+                    (*parent_object_entity_name, *client_selectable_name),
+                    (|| {
+                        match value.item {
+                            SelectionType::Scalar(scalar_declaration) => {
+                                add_client_scalar_selectable_to_entity(db, scalar_declaration)
+                                    .clone()
+                                    .map(|(_, selectable)| selectable)?
+                                    .scalar_selected()
+                            }
+                            SelectionType::Object(object_declaration) => {
+                                process_client_pointer_declaration_inner(db, object_declaration)
+                                    .clone()
+                                    .map(|(_, selectable)| selectable)?
+                                    .object_selected()
+                            }
                         }
-                    }
-                    None => {
-                        panic!("Unexpected empty vec. This is indicative of a bug in Isograph.")
-                    }
-                })();
-
-                ((*parent_object_entity_name, *client_selectable_name), value)
+                        .wrap_ok()
+                    })(),
+                )
             },
         )
         .chain(
@@ -438,14 +373,19 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
-                .map(|(key, value)| ((key.0, key.1.into()), Ok(value.scalar_selected()))),
+                .map(|(key, value)| ((key.0, key.1), value.scalar_selected().wrap_ok())),
         )
         .chain(
             expose_field_map(db)
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
-                .map(|(key, selectable)| ((key.0, key.1.into()), Ok(selectable.scalar_selected()))),
+                .map(|(key, selectable)| {
+                    (
+                        (key.0, key.1.into()),
+                        selectable.scalar_selected().wrap_ok(),
+                    )
+                }),
         )
         .collect::<HashMap<_, _>>()
         .wrap_ok()

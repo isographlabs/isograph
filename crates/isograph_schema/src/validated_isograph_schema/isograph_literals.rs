@@ -125,7 +125,8 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                 IsoLiteralExtractionResult::ClientFieldDeclaration(client_field_declaration) => {
                     match process_client_field_declaration(
                         db,
-                        client_field_declaration,
+                        // TODO it makes no sense to intern here
+                        client_field_declaration.item.interned_value(db),
                         text_source,
                     ) {
                         Ok(unprocessed_client_field_items) => unprocess_client_field_items
@@ -140,7 +141,8 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                 ) => {
                     match process_client_pointer_declaration(
                         db,
-                        client_pointer_declaration,
+                        // TODO it makes no sense to intern here
+                        client_pointer_declaration.item.interned_value(db),
                         text_source,
                     ) {
                         Ok(unprocessed_client_pointer_item) => unprocess_client_field_items

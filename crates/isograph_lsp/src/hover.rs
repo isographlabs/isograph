@@ -41,7 +41,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
     .to_owned()
 }
 
-// #[memo]
+#[memo]
 fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
@@ -96,7 +96,12 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                             )
                         }
                         DefinitionLocation::Client(c) => {
-                            (c.name.item.into(), c.description, c.arguments())
+                            let client = c.lookup(db);
+                            (
+                                client.name.item.into(),
+                                client.description,
+                                client.arguments(),
+                            )
                         }
                     };
 
@@ -128,7 +133,12 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                             )
                         }
                         DefinitionLocation::Client(c) => {
-                            (c.name.item.into(), c.description, c.arguments())
+                            let client = c.lookup(db);
+                            (
+                                client.name.item.into(),
+                                client.description,
+                                client.arguments(),
+                            )
                         }
                     };
 

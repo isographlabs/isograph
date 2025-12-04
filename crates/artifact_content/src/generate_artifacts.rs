@@ -233,7 +233,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
@@ -268,7 +269,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => (),
@@ -476,7 +478,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .expect("Expected client selectable to be valid");
 
             match &value {
-                SelectionType::Scalar(s) => match &s.variant {
+                SelectionType::Scalar(s) => match &s.lookup(db).variant {
                     isograph_schema::ClientFieldVariant::UserWritten(_) => {}
                     isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
                     isograph_schema::ClientFieldVariant::Link => return None,
@@ -495,7 +497,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
         // For each user-written client types, generate a param type artifact
         path_and_contents.push(generate_eager_reader_param_type_artifact(
             db,
-            user_written_client_type,
+            user_written_client_type.dereference(),
             config.options.include_file_extensions_in_import_statements,
         ));
 
@@ -512,7 +514,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 // If this field is not reachable from an entrypoint, we need to
                 // encounter all the client fields
                 for nested_client_selectable_id in
-                    accessible_client_selectables(db, user_written_client_type)
+                    accessible_client_selectables(db, user_written_client_type.dereference())
                 {
                     encountered_output_types.insert(nested_client_selectable_id.item);
                 }
@@ -538,10 +540,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                     This is indicative of a bug in Isograph.",
                 );
 
-        let artifact_path_and_content =
-            match client_selectable {
-                SelectionType::Object(client_object_selectable) => {
-                    generate_eager_reader_output_type_artifact(
+        let artifact_path_and_content = match client_selectable {
+            SelectionType::Object(client_object_selectable) => {
+                let client_object_selectable = client_object_selectable.lookup(db);
+                generate_eager_reader_output_type_artifact(
                         db,
                         &client_object_selectable.object_selected(),
                         config,
@@ -555,10 +557,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         config.options.include_file_extensions_in_import_statements,
                     )
                     .wrap_some()
-                }
-                SelectionType::Scalar(client_scalar_selectable) => match &client_scalar_selectable
-                    .variant
-                {
+            }
+            SelectionType::Scalar(client_scalar_selectable) => {
+                let client_scalar_selectable = client_scalar_selectable.lookup(db);
+                match &client_scalar_selectable.variant {
                     ClientFieldVariant::Link => {
                         generate_link_output_type_artifact(db, client_scalar_selectable).wrap_some()
                     }
@@ -576,8 +578,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         generate_refetch_output_type_artifact(db, client_scalar_selectable)
                             .wrap_some()
                     }
-                },
-            };
+                }
+            }
+        };
 
         if let Some(path_and_content) = artifact_path_and_content {
             path_and_contents.push(path_and_content);
@@ -936,7 +939,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     );
 
             write_optional_description(
-                description(db, &object_selectable),
+                description(db, object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
@@ -944,7 +947,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                output_type_annotation(db, &object_selectable)
+                output_type_annotation(db, object_selectable)
                     .clone()
                     .map(&mut |_| {
                         generate_client_scalar_selectable_parameter_type(
@@ -961,6 +964,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 name_or_alias,
                 match object_selectable {
                     DefinitionLocation::Client(client_object_selectable) => {
+                        let client_object_selectable = client_object_selectable.lookup(db);
                         loadable_fields.insert(client_object_selectable.type_and_field());
 
                         print_javascript_type_declaration(&type_annotation.map(&mut |target| {
@@ -1005,7 +1009,8 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     .expect(
         "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     write_optional_description(
         client_scalar_selectable.description,
@@ -1211,7 +1216,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     );
 
             write_optional_description(
-                description(db, &object_selectable),
+                description(db, object_selectable),
                 query_type_declaration,
                 indentation_level,
             );
@@ -1219,7 +1224,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = linked_field.name_or_alias().item;
 
             let type_annotation =
-                output_type_annotation(db, &object_selectable)
+                output_type_annotation(db, object_selectable)
                     .clone()
                     .map(&mut |_| {
                         generate_client_scalar_selectable_updatable_data_type(
@@ -1239,7 +1244,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
-                        output_type_annotation(db, &object_selectable),
+                        output_type_annotation(db, object_selectable),
                         &type_annotation,
                     );
                 }

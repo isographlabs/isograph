@@ -57,7 +57,8 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     .expect(
         "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     let parent_object_entity =
         &server_object_entity_named(db, entrypoint.parent_object_entity_name())

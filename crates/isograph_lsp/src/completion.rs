@@ -8,7 +8,6 @@ use isograph_compiler::CompilerState;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
 use isograph_lang_types::SelectionType;
-use isograph_schema::SelectableTrait;
 use isograph_schema::get_parent_for_selection_set_path;
 use isograph_schema::selectables_for_entity;
 use isograph_schema::{NetworkProtocol, process_iso_literal_extraction};
@@ -78,10 +77,22 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                                             )
                                         }
                                     },
-                                    DefinitionLocation::Client(c) => (
-                                        c.name().item.to_string(),
-                                        c.description().map(|x| x.to_string()),
-                                    ),
+                                    DefinitionLocation::Client(c) => match c {
+                                        SelectionType::Scalar(s) => {
+                                            let scalar = s.lookup(db);
+                                            (
+                                                scalar.name.item.to_string(),
+                                                scalar.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                        SelectionType::Object(o) => {
+                                            let object = o.lookup(db);
+                                            (
+                                                object.name.item.to_string(),
+                                                object.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                    },
                                 };
                                 CompletionItem {
                                     label_details: CompletionItemLabelDetails {

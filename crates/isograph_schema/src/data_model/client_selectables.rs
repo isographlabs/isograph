@@ -5,6 +5,7 @@ use common_lang_types::{
     WithSpan,
 };
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
+use pico::MemoRef;
 
 use crate::{ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenClientPointerInfo};
 
@@ -19,9 +20,9 @@ pub type ClientSelectable<'a, TNetworkProtocol> = SelectionType<
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
-pub type OwnedClientSelectable<TNetworkProtocol> = SelectionType<
-    ClientScalarSelectable<TNetworkProtocol>,
-    ClientObjectSelectable<TNetworkProtocol>,
+pub type MemoRefClientSelectable<TNetworkProtocol> = SelectionType<
+    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
 >;
 
 /// The struct formally known as a client field, and declared with the field keyword
@@ -42,7 +43,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
 /// The struct formally known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
-#[derive(Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: WithLocation<ClientObjectSelectableName>,

@@ -46,7 +46,14 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
-        validate_use_of_arguments_for_client_type(db, client_selectable.as_ref(), &mut errors);
+        match client_selectable {
+            SelectionType::Scalar(s) => {
+                validate_use_of_arguments_for_client_type(db, s.lookup(db), &mut errors);
+            }
+            SelectionType::Object(o) => {
+                validate_use_of_arguments_for_client_type(db, o.lookup(db), &mut errors);
+            }
+        }
     }
 
     if errors.is_empty() {
@@ -66,7 +73,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     let validated_selections = match selectable_validated_reader_selection_set(
         db,
         client_type.parent_object_entity_name(),
-        client_type.name(),
+        client_type.name().into(),
     ) {
         Ok(validated_selections) => validated_selections,
         Err(new_errors) => {
@@ -124,6 +131,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .variable_definitions
                     .iter()
                     .map(|x| x.item.clone())
@@ -190,7 +198,8 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         client_object_selectable
                             .variable_definitions

@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
-    DiagnosticVecResult, Location, ParentObjectEntityNameAndSelectableName, ServerObjectEntityName,
+    ClientObjectSelectableName, ClientScalarSelectableName, DiagnosticResult, DiagnosticVecResult,
+    Location, ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -21,7 +21,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<
     HashMap<
-        (ServerObjectEntityName, ClientSelectableName),
+        (ServerObjectEntityName, SelectableName),
         DiagnosticResult<SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>>,
     >,
 > {
@@ -30,43 +30,41 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 
     let mut out = HashMap::new();
 
-    for (key, value) in declaration_map {
-        for item in value {
-            match out.entry(*key) {
-                Entry::Occupied(mut occupied_entry) => {
-                    // TODO check for length instead
-                    *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
-                        key.0,
-                        key.1.into(),
-                        Location::Generated,
-                    )
-                    .wrap_err()
+    for (key, with_location) in &declaration_map.item {
+        let item = with_location.item;
+        match out.entry(*key) {
+            Entry::Occupied(mut occupied_entry) => {
+                // TODO check for length instead
+                *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
+                    key.0,
+                    key.1,
+                    Location::Generated,
+                )
+                .wrap_err()
+            }
+            Entry::Vacant(vacant_entry) => match item {
+                SelectionType::Scalar(_) => {
+                    let refetch_strategy =
+                        get_unvalidated_refetch_stategy(db, key.0).map(SelectionType::Scalar);
+                    vacant_entry.insert(refetch_strategy);
                 }
-                Entry::Vacant(vacant_entry) => match item {
-                    SelectionType::Scalar(_) => {
-                        let refetch_strategy =
-                            get_unvalidated_refetch_stategy(db, key.0).map(SelectionType::Scalar);
-                        vacant_entry.insert(refetch_strategy);
-                    }
-                    SelectionType::Object(o) => {
-                        // HACK ALERT
-                        // For client pointers, the refetch strategy is based on the "to" object type.
-                        // This is extremely weird, and we should fix this!
-                        let refetch_strategy =
-                            get_unvalidated_refetch_stategy(db, o.target_type.inner().0).map(
-                                |item| {
-                                    item.expect(
-                                        "Expected client object selectable \
+                SelectionType::Object(o) => {
+                    // HACK ALERT
+                    // For client pointers, the refetch strategy is based on the "to" object type.
+                    // This is extremely weird, and we should fix this!
+                    let refetch_strategy =
+                        get_unvalidated_refetch_stategy(db, o.lookup(db).target_type.inner().0)
+                            .map(|item| {
+                                item.expect(
+                                    "Expected client object selectable \
                                         to have a refetch strategy. \
                                         This is indicative of a bug in Isograph.",
-                                    )
-                                    .object_selected()
-                                },
-                            );
-                        vacant_entry.insert(refetch_strategy);
-                    }
-                },
-            }
+                                )
+                                .object_selected()
+                            });
+                    vacant_entry.insert(refetch_strategy);
+                }
+            },
         }
     }
 
@@ -105,7 +103,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<
     HashMap<
-        (ServerObjectEntityName, ClientSelectableName),
+        (ServerObjectEntityName, SelectableName),
         DiagnosticVecResult<
             SelectionType<
                 Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
@@ -127,7 +125,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                             db,
                             refetch_strategy,
                             key.0,
-                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
+                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1)
                                 .scalar_selected(),
                         )
                     })
@@ -138,8 +136,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                     db,
                     refetch_strategy,
                     key.0,
-                    ParentObjectEntityNameAndSelectableName::new(key.0, key.1.into())
-                        .object_selected(),
+                    ParentObjectEntityNameAndSelectableName::new(key.0, key.1).object_selected(),
                 )?
                 .object_selected()
                 .wrap_ok(),

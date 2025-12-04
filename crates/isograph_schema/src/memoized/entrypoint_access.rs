@@ -9,9 +9,9 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, SelectableTrait,
-    client_scalar_selectable_named, parse_iso_literal_in_source,
-    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
+    parse_iso_literal_in_source, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 #[memo]
@@ -83,7 +83,10 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                                 SelectionType::Scalar(s) => s.lookup(db).name.location,
                                 SelectionType::Object(o) => o.lookup(db).name.location,
                             },
-                            DefinitionLocation::Client(c) => c.name().location,
+                            DefinitionLocation::Client(c) => match c {
+                                SelectionType::Scalar(s) => s.lookup(db).name.location,
+                                SelectionType::Object(o) => o.lookup(db).name.location,
+                            },
                         },
                     );
                 }

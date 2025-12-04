@@ -12,8 +12,8 @@ use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
-    IsographDatabase, MemoRefSelectable, NetworkProtocol, OwnedObjectSelectable, ScalarSelectable,
-    SelectableTrait, ServerObjectEntity, ServerScalarEntity, entity_not_defined_diagnostic,
+    IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable, NetworkProtocol,
+    ScalarSelectable, ServerObjectEntity, ServerScalarEntity, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_object_entity_named,
 };
@@ -84,7 +84,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
         },
         DefinitionLocation::Client(client) => match client {
             SelectionType::Scalar(scalar) => scalar.client_defined().wrap_ok(),
-            SelectionType::Object(object) => object.name.location.wrap_err(),
+            SelectionType::Object(object) => object.lookup(db).name.location.wrap_err(),
         },
     }
     .map_err(|location| {
@@ -106,7 +106,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     object_path: &ObjectSelectionPath<'a>,
 ) -> DiagnosticResult<(
     MemoRef<ServerObjectEntity<TNetworkProtocol>>,
-    OwnedObjectSelectable<TNetworkProtocol>,
+    MemoRefObjectSelectable<TNetworkProtocol>,
 )> {
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
@@ -119,15 +119,17 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         object_selectable_name.into(),
     )?;
 
-    let location = match &selectable {
-        DefinitionLocation::Server(server) => match server {
-            SelectionType::Scalar(s) => s.lookup(db).name.location,
-            SelectionType::Object(o) => o.lookup(db).name.location,
-        },
-        DefinitionLocation::Client(client) => client.name().location,
-    };
-
     let selectable = selectable.as_object().ok_or_else(|| {
+        let location = match &selectable {
+            DefinitionLocation::Server(server) => match server {
+                SelectionType::Scalar(s) => s.lookup(db).name.location,
+                SelectionType::Object(o) => o.lookup(db).name.location,
+            },
+            DefinitionLocation::Client(client) => match client {
+                SelectionType::Scalar(s) => s.lookup(db).name.location,
+                SelectionType::Object(o) => o.lookup(db).name.location,
+            },
+        };
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
             object_selectable_name.into(),
@@ -157,7 +159,9 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Server(s) => {
                     s.lookup(db).target_object_entity.inner().dereference()
                 }
-                DefinitionLocation::Client(c) => c.target_object_entity_name.inner().dereference(),
+                DefinitionLocation::Client(c) => {
+                    c.lookup(db).target_object_entity_name.inner().dereference()
+                }
             }
         }
         SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
@@ -196,7 +200,9 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
                 DefinitionLocation::Server(s) => {
                     s.lookup(db).target_object_entity.inner().dereference()
                 }
-                DefinitionLocation::Client(c) => c.target_object_entity_name.inner().dereference(),
+                DefinitionLocation::Client(c) => {
+                    c.lookup(db).target_object_entity_name.inner().dereference()
+                }
             };
 
             parent_object_entity_and_selectable(
