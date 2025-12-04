@@ -7,7 +7,6 @@ struct TestDatabase {
 }
 
 #[test]
-#[should_panic]
 fn intern_then_intern_ref() {
     let db = TestDatabase::default();
 
@@ -15,7 +14,6 @@ fn intern_then_intern_ref() {
     let val_ref = memo_ref_1.lookup(&db);
     let memo_ref_2 = db.intern_ref(val_ref);
 
-    // This will panic, presumably because the hash of "foo".to_string() and the
-    // hash of &"foo".to_string() are identical.
+    // This test ensures that this call does not panic.
     memo_ref_2.lookup(&db);
 }

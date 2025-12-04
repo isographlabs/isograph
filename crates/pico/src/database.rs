@@ -383,7 +383,10 @@ pub fn intern_value<Db: Database, T: Clone + Hash + DynEq + 'static>(
     db: &Db,
     value: T,
 ) -> MemoRef<T> {
-    let param_id = hash(&value).into();
+    let wrapped_value = InternValueWrapper(value);
+    let param_id = hash(&wrapped_value).into();
+    let value = wrapped_value.0;
+
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
     let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
@@ -587,3 +590,11 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
 
     MemoRef::new_with_kind(derived_node_id, MemoRefKind::RawPtr)
 }
+
+// This is wrapper exists solely so that if we call db.intern(val) and db.intern_ref(&val)
+// for the same value, then we do not calculate the same hash, and thus return a MemoRef
+// for the first when looking up the second.
+//
+// We make a somewhat arbitrary choice and choose to wrap interned values.
+#[derive(Hash)]
+struct InternValueWrapper<T>(T);
