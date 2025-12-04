@@ -55,7 +55,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 let selectable = selectable_named(
                     db,
                     entrypoint_declaration_info.parent_type.item.0,
-                    entrypoint_declaration_info.client_field_name.item.0.into(),
+                    entrypoint_declaration_info.client_field_name.item.0,
                 );
 
                 if let Ok(Some(selectable)) = selectable {
@@ -70,7 +70,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 
                     return selectable_is_wrong_type_diagnostic(
                         entrypoint_declaration_info.parent_type.item.0,
-                        entrypoint_declaration_info.client_field_name.item.0.into(),
+                        entrypoint_declaration_info.client_field_name.item.0,
                         "client field",
                         actual_type,
                         match selectable {
@@ -89,7 +89,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 // if not
                 selectable_is_not_defined_diagnostic(
                     entrypoint_declaration_info.parent_type.item.0,
-                    entrypoint_declaration_info.client_field_name.item.0.into(),
+                    entrypoint_declaration_info.client_field_name.item.0,
                     entrypoint_declaration_info.client_field_name.location,
                 )
             })?;

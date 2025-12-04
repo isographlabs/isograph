@@ -61,7 +61,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
                 map.insert(
                     (
                         scalar_selectable.parent_object_entity_name,
-                        scalar_selectable.name.item.into(),
+                        scalar_selectable.name.item,
                     ),
                     SelectionSet { selections: vec![] }
                         .with_generated_span()
@@ -86,7 +86,7 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
 
             if let RefetchStrategy::UseRefetchField(refetch_strategy) = refetch_strategy {
                 map.insert(
-                    (*parent_object_entity_name, (*selectable_name).into()),
+                    (*parent_object_entity_name, (*selectable_name)),
                     refetch_strategy
                         .refetch_selection_set
                         .clone()

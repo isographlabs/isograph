@@ -32,13 +32,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item.into()
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
@@ -63,13 +63,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item.into()
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
@@ -94,13 +94,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item.into()
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
@@ -125,13 +125,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item.into()
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
@@ -156,7 +156,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -176,7 +176,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -241,7 +241,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
             selectable_validated_reader_selection_set(
                 db,
                 parent_object_entity_name,
-                client_scalar_selectable_name.into(),
+                client_scalar_selectable_name,
             )
             .as_ref()
             .expect("Expected selection set to be valid.")
@@ -260,7 +260,7 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,
-        client_object_selectable_name.into(),
+        client_object_selectable_name,
     )
     .clone()
 }

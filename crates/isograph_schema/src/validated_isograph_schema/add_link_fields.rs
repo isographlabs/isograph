@@ -55,7 +55,7 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
             (
                 (
                     link_selectable.lookup(db).parent_object_entity_name,
-                    (*LINK_FIELD_NAME).into(),
+                    (*LINK_FIELD_NAME),
                 ),
                 link_selectable,
             )

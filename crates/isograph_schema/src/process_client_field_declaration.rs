@@ -48,17 +48,16 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
-    let parent_type_id =
-        defined_entity(db, client_field_declaration_item.parent_type.item.0.into())
-            .to_owned()?
-            .ok_or_else(|| {
-                let parent_object_entity_name = client_field_declaration_item.parent_type.item;
-                Diagnostic::new(
-                    format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                    Location::new(text_source, client_field_declaration_item.parent_type.span)
-                        .wrap_some(),
-                )
-            })?;
+    let parent_type_id = defined_entity(db, client_field_declaration_item.parent_type.item.0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let parent_object_entity_name = client_field_declaration_item.parent_type.item;
+            Diagnostic::new(
+                format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                Location::new(text_source, client_field_declaration_item.parent_type.span)
+                    .wrap_some(),
+            )
+        })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => {
@@ -90,39 +89,33 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     text_source: TextSource,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
-    let parent_type_id = defined_entity(
-        db,
-        client_pointer_declaration_item.parent_type.item.0.into(),
-    )
-    .to_owned()?
-    .ok_or_else(|| {
-        let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
-        Diagnostic::new(
-            format!("`{parent_object_entity_name}` is not a type that has been defined."),
-            Location::new(
-                text_source,
-                client_pointer_declaration_item.parent_type.span,
+    let parent_type_id = defined_entity(db, client_pointer_declaration_item.parent_type.item.0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
+            Diagnostic::new(
+                format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                Location::new(
+                    text_source,
+                    client_pointer_declaration_item.parent_type.span,
+                )
+                .wrap_some(),
             )
-            .wrap_some(),
-        )
-    })?;
+        })?;
 
-    let target_type_id = defined_entity(
-        db,
-        client_pointer_declaration_item.target_type.inner().0.into(),
-    )
-    .to_owned()?
-    .ok_or_else(|| {
-        let target_type = client_pointer_declaration_item.target_type.inner();
-        Diagnostic::new(
-            format!("`{target_type}` is not a type that has been defined."),
-            Location::new(
-                text_source,
-                client_pointer_declaration_item.target_type.span(),
+    let target_type_id = defined_entity(db, client_pointer_declaration_item.target_type.inner().0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let target_type = client_pointer_declaration_item.target_type.inner();
+            Diagnostic::new(
+                format!("`{target_type}` is not a type that has been defined."),
+                Location::new(
+                    text_source,
+                    client_pointer_declaration_item.target_type.span(),
+                )
+                .wrap_some(),
             )
-            .wrap_some(),
-        )
-    })?;
+        })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
@@ -190,7 +183,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
                     db,
                     variable_definition,
                     client_field_declaration.parent_type.item.0,
-                    client_scalar_selectable_name.0.into(),
+                    client_scalar_selectable_name.0,
                     client_field_declaration
                         .client_field_name
                         .location
@@ -232,8 +225,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
         let id_field =
-            server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
-                .clone_err()?;
+            server_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME).clone_err()?;
 
         let query_id = fetchable_types_map
             .iter()
@@ -316,7 +308,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
                     db,
                     variable_definition,
                     parent_object_entity_name,
-                    client_pointer_name.into(),
+                    client_pointer_name,
                     client_pointer_declaration
                         .client_pointer_name
                         .location

@@ -25,7 +25,7 @@ impl From<GraphQLObjectTypeDefinition> for IsographObjectTypeDefinition {
             description: object_type_definition
                 .description
                 .map(|with_span| with_span.map(|dv| dv.into())),
-            name: object_type_definition.name.map(|x| x.into()),
+            name: object_type_definition.name.map(|x| x),
             interfaces: object_type_definition.interfaces,
             directives: object_type_definition.directives,
             fields: object_type_definition.fields,
@@ -39,7 +39,7 @@ impl From<GraphQLInterfaceTypeDefinition> for IsographObjectTypeDefinition {
             description: value
                 .description
                 .map(|with_span| with_span.map(|dv| dv.into())),
-            name: value.name.map(|x| x.into()),
+            name: value.name.map(|x| x),
             interfaces: value.interfaces,
             directives: value.directives,
             fields: value.fields,
@@ -55,7 +55,7 @@ impl From<GraphQLInputObjectTypeDefinition> for IsographObjectTypeDefinition {
             description: value
                 .description
                 .map(|with_span| with_span.map(|dv| dv.into())),
-            name: value.name.map(|x| x.into()),
+            name: value.name.map(|x| x),
             interfaces: vec![],
             directives: value.directives,
             fields: value

@@ -62,7 +62,7 @@ pub fn process_graphql_type_system_document(
                 let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
-                    server_object_entity_name.into(),
+                    server_object_entity_name,
                     ServerObjectEntity {
                         description: object_type_definition.description.map(|description_value| {
                             description_value
@@ -85,7 +85,7 @@ pub fn process_graphql_type_system_document(
 
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
                     get_typename_selectable(
                         db,
                         server_object_entity_name,
@@ -134,7 +134,7 @@ pub fn process_graphql_type_system_document(
                 if has_id_field {
                     insert_selectable_or_multiple_definition_diagnostic(
                         &mut outcome.selectables,
-                        (server_object_entity_name, (*REFETCH_FIELD_NAME).into()),
+                        (server_object_entity_name, (*REFETCH_FIELD_NAME)),
                         get_refetch_selectable(
                             server_object_entity_name,
                             subfields_or_inline_fragments.clone(),
@@ -159,15 +159,15 @@ pub fn process_graphql_type_system_document(
 
                 for interface_name in object_type_definition.interfaces {
                     supertype_to_subtype_map
-                        .entry(interface_name.item.into())
+                        .entry(interface_name.item)
                         .or_default()
-                        .push(server_object_entity_name.into());
+                        .push(server_object_entity_name);
                 }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
-                    scalar_type_definition.name.item.into(),
+                    scalar_type_definition.name.item,
                     ServerScalarEntity {
                         description: scalar_type_definition
                             .description
@@ -192,7 +192,7 @@ pub fn process_graphql_type_system_document(
 
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
-                    server_object_entity_name.into(),
+                    server_object_entity_name,
                     ServerObjectEntity {
                         description: input_object_definition
                             .description
@@ -235,7 +235,7 @@ pub fn process_graphql_type_system_document(
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
-                    enum_definition.name.item.into(),
+                    enum_definition.name.item,
                     ServerScalarEntity {
                         description: enum_definition
                             .description
@@ -256,7 +256,7 @@ pub fn process_graphql_type_system_document(
 
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
-                    server_object_entity_name.into(),
+                    server_object_entity_name,
                     ServerObjectEntity {
                         description: union_definition.description.map(|description_value| {
                             description_value
@@ -287,7 +287,7 @@ pub fn process_graphql_type_system_document(
                     .extend(union_definition.directives);
 
                 supertype_to_subtype_map
-                    .entry(server_object_entity_name.into())
+                    .entry(server_object_entity_name)
                     .or_default()
                     .extend(
                         union_definition
@@ -299,7 +299,7 @@ pub fn process_graphql_type_system_document(
                 // unions do not implement interfaces
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
                     get_typename_selectable(db, server_object_entity_name, location, None)
                         .scalar_selected()
                         .server_defined()
@@ -318,15 +318,15 @@ pub fn process_graphql_type_system_document(
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
                         .query
-                        .map(|entity_name| entity_name.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Query".intern().into()),
                     mutation: schema_definition
                         .mutation
-                        .map(|entity_name| entity_name.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Mutation".intern().into()),
                     subscription: schema_definition
                         .subscription
-                        .map(|entity_name| entity_name.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Subscription".intern().into()),
                 }
                 .wrap_some()
@@ -378,7 +378,7 @@ fn get_refetch_selectable(
         .wrap_some(),
         name: (*REFETCH_FIELD_NAME).with_generated_location(),
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-            client_selection_name: (*REFETCH_FIELD_NAME).into(),
+            client_selection_name: (*REFETCH_FIELD_NAME),
             // TODO use the actual schema query type
             root_object_entity_name: "Query".intern().into(),
             subfields_or_inline_fragments,

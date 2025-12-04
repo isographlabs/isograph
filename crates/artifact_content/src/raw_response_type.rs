@@ -48,7 +48,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 let server_scalar_selectable = server_scalar_selectable_named(
                     db,
                     scalar_field.parent_object_entity_name,
-                    scalar_field.name.into(),
+                    scalar_field.name,
                 )
                 .as_ref()
                 .expect(
@@ -99,7 +99,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 let server_object_selectable = server_object_selectable_named(
                     db,
                     linked_field.parent_object_entity_name,
-                    linked_field.name.into(),
+                    linked_field.name,
                 )
                 .as_ref()
                 .expect(

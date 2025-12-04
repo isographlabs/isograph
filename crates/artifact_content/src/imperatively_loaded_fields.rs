@@ -166,7 +166,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
                 file_name: query_text_file_name_with_extension,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     parent_object_entity_name: root_parent_object,
-                    selectable_name: root_fetchable_field.into(),
+                    selectable_name: root_fetchable_field,
                 }
                 .wrap_some(),
             },
@@ -177,7 +177,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
                 file_name: file_name_prefix,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     parent_object_entity_name: root_parent_object,
-                    selectable_name: root_fetchable_field.into(),
+                    selectable_name: root_fetchable_field,
                 }
                 .wrap_some(),
             },

@@ -53,16 +53,16 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
         .clone_err()?
         .lookup(db);
 
-    match map.get(&server_object_entity_name.into()) {
+    match map.get(&server_object_entity_name) {
         Some(entity) => match entity {
             SelectionType::Scalar(_) => {
-                let location = entity_definition_location(db, server_object_entity_name.into())
+                let location = entity_definition_location(db, server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
                     .flatten();
                 entity_wrong_type_diagnostic(
-                    server_object_entity_name.into(),
+                    server_object_entity_name,
                     "a scalar",
                     "an object",
                     location,
@@ -84,16 +84,16 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
         .clone_err()?
         .lookup(db);
 
-    match map.get(&server_scalar_entity_name.into()) {
+    match map.get(&server_scalar_entity_name) {
         Some(entity) => match entity {
             SelectionType::Object(_) => {
-                let location = entity_definition_location(db, server_scalar_entity_name.into())
+                let location = entity_definition_location(db, server_scalar_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
                     .flatten();
                 entity_wrong_type_diagnostic(
-                    server_scalar_entity_name.into(),
+                    server_scalar_entity_name,
                     "an object",
                     "a scalar",
                     location,

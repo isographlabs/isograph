@@ -21,7 +21,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {
@@ -47,7 +47,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {

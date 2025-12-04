@@ -31,7 +31,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -67,7 +67,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -78,20 +78,6 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
         self.arguments.iter().map(|x| &x.item).collect()
     }
 }
-
-// TODO rename
-pub type ServerSelectableId =
-    SelectionType<(EntityName, SelectableName), (EntityName, SelectableName)>;
-
-pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
-    &'a ServerScalarSelectable<TNetworkProtocol>,
-    &'a ServerObjectSelectable<TNetworkProtocol>,
->;
-
-pub type OwnedServerSelectable<TNetworkProtocol> = SelectionType<
-    ServerScalarSelectable<TNetworkProtocol>,
-    ServerObjectSelectable<TNetworkProtocol>,
->;
 
 pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<
     MemoRef<ServerScalarSelectable<TNetworkProtocol>>,

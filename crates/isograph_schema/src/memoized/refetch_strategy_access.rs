@@ -73,11 +73,11 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 
     for with_location in expose_fields.iter().flatten() {
         let (parent_object_entity_name, selectable_name, refetch_strategy) = &with_location.item;
-        match out.entry((*parent_object_entity_name, (*selectable_name).into())) {
+        match out.entry((*parent_object_entity_name, (*selectable_name))) {
             Entry::Occupied(mut occupied_entry) => {
                 *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
                     *parent_object_entity_name,
-                    (*selectable_name).into(),
+                    *selectable_name,
                     with_location.location,
                 )
                 .wrap_err();
@@ -160,13 +160,13 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
 
     match map.get(&(
         parent_server_object_entity_name,
-        client_scalar_selectable_name.into(),
+        client_scalar_selectable_name,
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
                 SelectionType::Object(_) => vec![selectable_is_wrong_type_diagnostic(
                     parent_server_object_entity_name,
-                    client_scalar_selectable_name.into(),
+                    client_scalar_selectable_name,
                     "a scalar",
                     "an object",
                     Location::Generated,
@@ -181,7 +181,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
         },
         None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
-            client_scalar_selectable_name.into(),
+            client_scalar_selectable_name,
             Location::Generated,
         )]
         .wrap_err(),
@@ -200,13 +200,13 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
 
     match map.get(&(
         parent_server_object_entity_name,
-        client_object_selectable_name.into(),
+        client_object_selectable_name,
     )) {
         Some(result) => match result {
             Ok(selection_type) => match selection_type {
                 SelectionType::Scalar(_) => vec![selectable_is_wrong_type_diagnostic(
                     parent_server_object_entity_name,
-                    client_object_selectable_name.into(),
+                    client_object_selectable_name,
                     "an object",
                     "a scalar",
                     Location::Generated,
@@ -221,7 +221,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
         },
         None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
-            client_object_selectable_name.into(),
+            client_object_selectable_name,
             Location::Generated,
         )]
         .wrap_err(),

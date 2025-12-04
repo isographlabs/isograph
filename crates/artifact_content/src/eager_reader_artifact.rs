@@ -161,7 +161,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name().into(),
+                selectable_name: client_selectable.name(),
             }
             .wrap_some(),
         },
@@ -186,7 +186,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     parent_object_entity_name: parent_object_entity.name,
-                    selectable_name: client_selectable.name().into(),
+                    selectable_name: client_selectable.name(),
                 }
                 .wrap_some(),
             },
@@ -278,7 +278,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: server_object_selectable_name.into(),
+                selectable_name: server_object_selectable_name,
             }
             .wrap_some(),
         },
@@ -413,7 +413,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name().into(),
+                selectable_name: client_selectable.name(),
             }
             .wrap_some(),
         },
@@ -482,7 +482,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name().into(),
+                selectable_name: client_selectable.name(),
             }
             .wrap_some(),
         },
@@ -523,7 +523,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: parent_object_entity.name,
-                selectable_name: client_scalar_selectable.name().into(),
+                selectable_name: client_scalar_selectable.name(),
             }
             .wrap_some(),
         },

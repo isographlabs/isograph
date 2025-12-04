@@ -71,7 +71,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
         match &parent {
             SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
         },
-        scalar_selectable_name.into(),
+        scalar_selectable_name,
     )?;
 
     let selectable = match selectable {
@@ -87,7 +87,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     .map_err(|location| {
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
-            scalar_selectable_name.into(),
+            scalar_selectable_name,
             "a scalar",
             "an object",
             location,
@@ -113,7 +113,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         match &parent {
             SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
         },
-        object_selectable_name.into(),
+        object_selectable_name,
     )?;
 
     let selectable = selectable.as_object().ok_or_else(|| {
@@ -129,7 +129,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         };
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
-            object_selectable_name.into(),
+            object_selectable_name,
             "an object",
             "a scalar",
             location,

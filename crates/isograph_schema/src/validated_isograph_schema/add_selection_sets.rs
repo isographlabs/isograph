@@ -85,11 +85,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(o) => o,
     };
 
-    let selectable = selectable_named(
-        db,
-        parent_object_entity_name,
-        scalar_selection.name.item.into(),
-    );
+    let selectable = selectable_named(db, parent_object_entity_name, scalar_selection.name.item);
 
     let location = selectable.clone_err()?.as_ref().ok_or_else(|| {
         selection_does_not_exist_diagnostic(
@@ -97,7 +93,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             type_and_field.parent_object_entity_name,
             type_and_field.selectable_name,
             parent_object_entity_name,
-            scalar_selection.name.item.into(),
+            scalar_selection.name.item,
             scalar_selection.name.location,
         )
     })?;
@@ -130,7 +126,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        scalar_selection.name.item.into(),
+                        scalar_selection.name.item,
                         "an object",
                         "a scalar",
                         scalar_selection.name.location,
@@ -152,7 +148,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        scalar_selection.name.item.into(),
+                        scalar_selection.name.item,
                         "an object",
                         "a scalar",
                         scalar_selection.name.location,
@@ -193,11 +189,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     // TODO this can be vastly simplified... it looks like we're looking up the same object
     // multiple times :) and the result we're returning might be in the parameters anyway.
 
-    let selectable = selectable_named(
-        db,
-        parent_object_entity_name,
-        object_selection.name.item.into(),
-    );
+    let selectable = selectable_named(db, parent_object_entity_name, object_selection.name.item);
 
     let selectable = selectable.clone_err()?.as_ref().ok_or_else(|| {
         vec![selection_does_not_exist_diagnostic(
@@ -205,7 +197,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             type_and_field.parent_object_entity_name,
             type_and_field.selectable_name,
             parent_object_entity_name,
-            object_selection.name.item.into(),
+            object_selection.name.item,
             object_selection.name.location,
         )]
     })?;
@@ -224,7 +216,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        object_selection.name.item.into(),
+                        object_selection.name.item,
                         "a scalar",
                         "an object",
                         server_scalar_selectable.name.location,
@@ -252,7 +244,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        object_selection.name.item.into(),
+                        object_selection.name.item,
                         "a scalar",
                         "an object",
                         e.lookup(db).name.location,

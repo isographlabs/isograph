@@ -72,7 +72,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::EntityNameWrapper(entity) => {
-                let location = entity_definition_location(db, entity.inner.0.into())
+                let location = entity_definition_location(db, entity.inner.0)
                     .to_owned()
                     .ok()
                     .ok_or(LSPRuntimeError::ExpectedError)?

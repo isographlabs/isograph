@@ -73,7 +73,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     let validated_selections = match selectable_validated_reader_selection_set(
         db,
         client_type.parent_object_entity_name(),
-        client_type.name().into(),
+        client_type.name(),
     ) {
         Ok(validated_selections) => validated_selections,
         Err(new_errors) => {
@@ -93,7 +93,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         let server_scalar_selectable = server_scalar_selectable_named(
                             db,
                             parent_object_entity_name,
-                            server_scalar_selectable_name.into(),
+                            server_scalar_selectable_name,
                         )
                         .as_ref()
                         .expect(
@@ -163,7 +163,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     )) => server_object_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_object_selectable_name.into(),
+                        server_object_selectable_name,
                     )
                     .as_ref()
                     .expect(

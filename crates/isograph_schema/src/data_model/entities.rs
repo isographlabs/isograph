@@ -1,10 +1,10 @@
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::marker::PhantomData;
 
-use common_lang_types::{EntityName, JavascriptName, SelectableName};
-use isograph_lang_types::{DefinitionLocation, Description, SelectionType};
+use common_lang_types::{EntityName, JavascriptName};
+use isograph_lang_types::{Description, SelectionType};
 use pico::MemoRef;
 
-use crate::{ClientSelectableId, NetworkProtocol, ServerSelectableId};
+use crate::NetworkProtocol;
 
 // TODO Scalar and Object entities should be a single struct, with all the extra info
 // held in a network_protocol_associated_data field. (Some of that data, like the javascript_name,
@@ -18,10 +18,6 @@ pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
     pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
-pub type SelectableId = DefinitionLocation<ServerSelectableId, ClientSelectableId>;
-
-pub type ServerObjectEntityAvailableSelectables = BTreeMap<SelectableName, SelectableId>;
-
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
@@ -30,14 +26,6 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
 
     pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
 }
-
-pub type ServerEntity<'a, TNetworkProtocol> = SelectionType<
-    &'a ServerScalarEntity<TNetworkProtocol>,
-    &'a ServerObjectEntity<TNetworkProtocol>,
->;
-
-pub type OwnedServerEntity<TNetworkProtocol> =
-    SelectionType<ServerScalarEntity<TNetworkProtocol>, ServerObjectEntity<TNetworkProtocol>>;
 
 pub type MemoRefServerEntity<TNetworkProtocol> = SelectionType<
     MemoRef<ServerScalarEntity<TNetworkProtocol>>,

@@ -43,12 +43,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                             &mut out,
                             (
                                 client_pointer_declaration.item.parent_type.item.0,
-                                client_pointer_declaration
-                                    .item
-                                    .client_pointer_name
-                                    .item
-                                    .0
-                                    .into(),
+                                client_pointer_declaration.item.client_pointer_name.item.0,
                             ),
                             client_pointer_declaration
                                 .item
@@ -66,12 +61,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                             &mut out,
                             (
                                 client_field_declaration.item.parent_type.item.0,
-                                client_field_declaration
-                                    .item
-                                    .client_field_name
-                                    .item
-                                    .0
-                                    .into(),
+                                client_field_declaration.item.client_field_name.item.0,
                             ),
                             client_field_declaration
                                 .item
@@ -107,7 +97,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 ) -> Option<MemoRefDeclaration> {
     client_selectable_declaration_map_from_iso_literals(db)
         .item
-        .get(&(parent_object_entity_name, client_selectable_name.into()))
+        .get(&(parent_object_entity_name, client_selectable_name))
         .map(|x| x.item)
 }
 
@@ -117,11 +107,8 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientFieldDeclaration>>> {
-    let selectable = client_selectable_declaration(
-        db,
-        parent_object_entity_name,
-        client_scalar_selectable_name.into(),
-    );
+    let selectable =
+        client_selectable_declaration(db, parent_object_entity_name, client_scalar_selectable_name);
 
     let item = match selectable {
         Some(item) => item,
@@ -133,7 +120,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionType::Object(o) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
-            client_scalar_selectable_name.into(),
+            client_scalar_selectable_name,
             "a scalar",
             "an object",
             o.lookup(db).client_pointer_name.location.into(),
@@ -148,11 +135,8 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientPointerDeclaration>>> {
-    let selectable = client_selectable_declaration(
-        db,
-        parent_object_entity_name,
-        client_object_selectable_name.into(),
-    );
+    let selectable =
+        client_selectable_declaration(db, parent_object_entity_name, client_object_selectable_name);
 
     let item = match selectable {
         Some(item) => item,
@@ -165,7 +149,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             .wrap_ok(),
         SelectionType::Scalar(s) => selectable_is_wrong_type_diagnostic(
             parent_object_entity_name,
-            client_object_selectable_name.into(),
+            client_object_selectable_name,
             "a scalar",
             "an object",
             s.lookup(db).client_field_name.location.into(),
@@ -201,10 +185,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             let link_fields = get_link_fields_map(db).clone_err()?;
 
             if let Some(link_field) = link_fields
-                .get(&(
-                    parent_object_entity_name,
-                    client_scalar_selectable_name.into(),
-                ))
+                .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .cloned()
             {
                 return link_field.wrap_some().wrap_ok();
@@ -213,10 +194,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
             // Awkward! We also need to check for expose fields. Ay ay ay
             return client_selectables_defined_by_network_protocol(db)
                 .clone_err()?
-                .get(&(
-                    parent_object_entity_name,
-                    client_scalar_selectable_name.into(),
-                ))
+                .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .and_then(|x| x.as_scalar())
                 .wrap_ok();
         }

@@ -105,7 +105,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             let server_scalar_selectable = server_scalar_selectable_named(
                 db,
                 parent_object_entity_name,
-                server_scalar_selectable_name.into(),
+                server_scalar_selectable_name,
             )
             .as_ref()
             .expect(
@@ -134,7 +134,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             let server_object_selectable = server_object_selectable_named(
                 db,
                 parent_object_entity_name,
-                server_object_selectable_name.into(),
+                server_object_selectable_name,
             )
             .as_ref()
             .expect(

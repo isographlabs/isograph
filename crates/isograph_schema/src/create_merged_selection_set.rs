@@ -118,7 +118,7 @@ impl MergedScalarFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
+            get_aliased_mutation_field_name(self.name, &self.arguments).wrap_some()
         }
     }
 }
@@ -139,7 +139,7 @@ impl MergedLinkedFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
+            get_aliased_mutation_field_name(self.name, &self.arguments).wrap_some()
         }
     }
 }
@@ -582,17 +582,11 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            server_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, server_object_selectable_name),
                         DefinitionLocation::Client((
                             parent_object_entity_name,
                             client_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            client_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, client_object_selectable_name),
                     };
 
                 let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
@@ -723,7 +717,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     let server_object_selectable = server_object_selectable_named(
         db,
         field_parent_object_entity_name,
-        field_server_object_selectable_name.into(),
+        field_server_object_selectable_name,
     )
     .as_ref()
     .expect(
@@ -815,7 +809,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
         }
         ServerObjectSelectableVariant::LinkedField => {
             let normalization_key = create_transformed_name_and_arguments(
-                object_selection.name.item.into(),
+                object_selection.name.item,
                 &object_selection.arguments,
                 variable_context,
             )
@@ -837,17 +831,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            server_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, server_object_selectable_name),
                         DefinitionLocation::Client((
                             parent_object_entity_name,
                             client_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            client_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, client_object_selectable_name),
                     };
 
                 let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
@@ -1152,7 +1140,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_scalar_selectable.name.item.into(),
+            field_name: newly_encountered_client_scalar_selectable.name.item,
             path_to_refetch_field_info: info,
         },
     );
@@ -1240,7 +1228,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         .0;
 
     let name_and_arguments = create_transformed_name_and_arguments(
-        object_selection.name.item.into(),
+        object_selection.name.item,
         &object_selection.arguments,
         variable_context,
     );
@@ -1277,7 +1265,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         },
 
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
-            client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
+            client_selection_name: newly_encountered_client_object_selectable.name.item,
             top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
@@ -1311,7 +1299,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_object_selectable.name.item.into(),
+            field_name: newly_encountered_client_object_selectable.name.item,
             path_to_refetch_field_info: info,
         },
     );
@@ -1380,7 +1368,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     let validated_selections = selectable_validated_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
-        newly_encountered_client_type.name().into(),
+        newly_encountered_client_type.name(),
     )
     .expect("Expected selections to be valid.");
 
@@ -1436,7 +1424,7 @@ fn merge_server_scalar_field(
         NormalizationKey::Id
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
-            scalar_field_name.into(),
+            scalar_field_name,
             &scalar_field_selection.arguments,
             variable_context,
         ))
@@ -1555,7 +1543,7 @@ pub fn selection_map_wrapped(
             } => {
                 map.insert(
                     NormalizationKey::ServerField(NameAndArguments {
-                        name: server_object_selectable_name.into(),
+                        name: server_object_selectable_name,
                         arguments: arguments.clone(),
                     }),
                     MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
@@ -1639,7 +1627,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
             *TYPENAME_FIELD_NAME,
         )
             .server_defined(),
-        name: SelectableName::from(*TYPENAME_FIELD_NAME).with_generated_location(),
+        name: (*TYPENAME_FIELD_NAME).with_generated_location(),
         reader_alias: None,
     })
     .with_generated_span();
@@ -1652,7 +1640,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
         )
             .client_defined(),
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: WithLocation::new_generated((*LINK_FIELD_NAME).into()),
+        name: WithLocation::new_generated(*LINK_FIELD_NAME),
         reader_alias: None,
     })
     .with_generated_span();

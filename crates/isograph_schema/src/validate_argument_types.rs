@@ -377,7 +377,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 .wrap_some(),
                 None => match field_type_annotation {
                     GraphQLTypeAnnotation::NonNull(_) => {
-                        ObjectLiteralFieldType::Missing((*field_name).into()).wrap_some()
+                        ObjectLiteralFieldType::Missing(*field_name).wrap_some()
                     }
                     GraphQLTypeAnnotation::List(_) | GraphQLTypeAnnotation::Named(_) => None,
                 },
@@ -432,8 +432,8 @@ fn id_annotation_to_typename_annotation(
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
 ) -> GraphQLTypeAnnotation<EntityName> {
     type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_entity_name) => scalar_entity_name.into(),
-        SelectionType::Object(object_entity_name) => object_entity_name.into(),
+        SelectionType::Scalar(scalar_entity_name) => scalar_entity_name,
+        SelectionType::Object(object_entity_name) => object_entity_name,
     })
 }
 
@@ -445,7 +445,7 @@ fn enum_satisfies_type(
     match enum_type.item {
         SelectionType::Object(object_entity_name) => {
             let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                enum_type.clone().map(|_| object_entity_name.into()),
+                enum_type.clone().map(|_| object_entity_name),
             ));
 
             expected_type_found_something_else_named_diagnostic(

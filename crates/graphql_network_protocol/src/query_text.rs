@@ -61,8 +61,8 @@ fn write_variables_to_string<'a>(
                         This is indicative of a bug in Isograph.",
                 );
             match schema_input_type {
-                SelectionType::Scalar(s) => s.lookup(db).name.into(),
-                SelectionType::Object(o) => o.lookup(db).name.into(),
+                SelectionType::Scalar(s) => s.lookup(db).name,
+                SelectionType::Object(o) => o.lookup(db).name,
             }
         });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.

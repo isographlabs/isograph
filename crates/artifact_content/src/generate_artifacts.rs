@@ -187,7 +187,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 let server_object_selectable = server_object_selectable_named(
                     db,
                     *parent_object_entity_name,
-                    (*server_object_selectable_name).into(),
+                    *server_object_selectable_name,
                 )
                 .as_ref()
                 .expect(
@@ -419,7 +419,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     key.0.linked_fields.insert(
                                         0,
                                         NormalizationKey::ServerField(NameAndArguments {
-                                            name: (*NODE_FIELD_NAME).into(),
+                                            name: (*NODE_FIELD_NAME),
                                             arguments: vec![id_arg.clone()],
                                         }),
                                     );
@@ -524,8 +524,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
     for output_type_id in encountered_output_types {
         let (parent_object_entity_name, client_selectable_name) = match output_type_id {
-            SelectionType::Scalar(s) => (s.0, s.1.into()),
-            SelectionType::Object(o) => (o.0, o.1.into()),
+            SelectionType::Scalar(s) => (s.0, s.1),
+            SelectionType::Object(o) => (o.0, o.1),
         };
         let client_selectable =
             client_selectable_named(db, parent_object_entity_name, client_selectable_name)
@@ -838,7 +838,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let server_scalar_selectable = server_scalar_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_scalar_selectable_name.into(),
+                        server_scalar_selectable_name,
                     )
                     .as_ref()
                     .expect(
@@ -906,17 +906,11 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,
-                    )) => (
-                        parent_object_entity_name,
-                        server_object_selectable_name.into(),
-                    ),
+                    )) => (parent_object_entity_name, server_object_selectable_name),
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         client_object_selectable_name,
-                    )) => (
-                        parent_object_entity_name,
-                        client_object_selectable_name.into(),
-                    ),
+                    )) => (parent_object_entity_name, client_object_selectable_name),
                 };
 
             let object_selectable =
@@ -1099,7 +1093,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let server_scalar_selectable = server_scalar_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_scalar_selectable_name.into(),
+                        server_scalar_selectable_name,
                     )
                     .as_ref()
                     .expect(
@@ -1183,17 +1177,11 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,
-                    )) => (
-                        parent_object_entity_name,
-                        server_object_selectable_name.into(),
-                    ),
+                    )) => (parent_object_entity_name, server_object_selectable_name),
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         client_object_selectable_name,
-                    )) => (
-                        parent_object_entity_name,
-                        client_object_selectable_name.into(),
-                    ),
+                    )) => (parent_object_entity_name, client_object_selectable_name),
                 };
 
             let object_selectable =

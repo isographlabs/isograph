@@ -82,7 +82,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Client(_) => {
                     path.push(NormalizationKey::ClientPointer(NameAndArguments {
                         // TODO use alias
-                        name: linked_field_selection.name.item.into(),
+                        name: linked_field_selection.name.item,
                         // TODO this clearly does something, but why are we able to pass
                         // the initial variable context here??
                         arguments: transform_arguments_with_child_context(
@@ -125,7 +125,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     let server_object_selectable = server_object_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_object_selectable_name.into(),
+                        server_object_selectable_name,
                     )
                     .as_ref()
                     .expect(
@@ -143,7 +143,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     {
                         ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
-                            name: linked_field_selection.name.item.into(),
+                            name: linked_field_selection.name.item,
                             // TODO this clearly does something, but why are we able to pass
                             // the initial variable context here??
                             arguments: transform_arguments_with_child_context(
@@ -260,7 +260,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             let server_object_selectable = server_object_selectable_named(
                 db,
                 parent_object_entity_name,
-                server_object_selectable_name.into(),
+                server_object_selectable_name,
             )
             .as_ref()
             .expect(
@@ -276,7 +276,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
-                        selectable_name: linked_field.name.item.into(),
+                        selectable_name: linked_field.name.item,
                         parent_object_entity_name: server_object_selectable
                             .parent_object_entity_name,
                     };
@@ -921,7 +921,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         let name_and_arguments = NameAndArguments {
                             // TODO use alias
-                            name: linked_field_selection.name.item.into(),
+                            name: linked_field_selection.name.item,
                             arguments: transform_arguments_with_child_context(
                                 linked_field_selection
                                     .arguments
@@ -960,7 +960,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let server_object_selectable = server_object_selectable_named(
                             db,
                             parent_object_entity_name,
-                            server_object_selectable_name.into(),
+                            server_object_selectable_name,
                         )
                         .as_ref()
                         .expect(
@@ -978,7 +978,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             match server_object_selectable.object_selectable_variant {
                                 ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                                     // TODO use alias
-                                    name: linked_field_selection.name.item.into(),
+                                    name: linked_field_selection.name.item,
                                     arguments: transform_arguments_with_child_context(
                                         linked_field_selection
                                             .arguments

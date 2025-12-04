@@ -104,7 +104,7 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
             SelectionType::Scalar(s) => {
                 let scalar = s.lookup(db);
                 (
-                    scalar.target_scalar_entity.inner().dereference().into(),
+                    scalar.target_scalar_entity.inner().dereference(),
                     scalar.name.location,
                     &scalar.arguments,
                 )
@@ -112,7 +112,7 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
             SelectionType::Object(o) => {
                 let object = o.lookup(db);
                 (
-                    object.target_object_entity.inner().dereference().into(),
+                    object.target_object_entity.inner().dereference(),
                     object.name.location,
                     &object.arguments,
                 )
@@ -131,8 +131,8 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
 
         for argument in arguments {
             let arg_target = match argument.item.type_.inner().dereference() {
-                SelectionType::Scalar(s) => s.into(),
-                SelectionType::Object(o) => o.into(),
+                SelectionType::Scalar(s) => s,
+                SelectionType::Object(o) => o,
             };
 
             if !entities.contains_key(&arg_target) {

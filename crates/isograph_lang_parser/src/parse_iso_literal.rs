@@ -206,7 +206,7 @@ fn parse_client_field_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             expected_literal_to_be_exported_diagnostic(
                 "field",
-                client_field_name.item.into(),
+                client_field_name.item,
                 // TODO use a better location
                 client_field_name.location.into(),
             )
@@ -305,7 +305,7 @@ fn parse_client_pointer_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             expected_literal_to_be_exported_diagnostic(
                 "pointer",
-                client_pointer_name.item.into(),
+                client_pointer_name.item,
                 client_pointer_name.location.into(),
             )
         })?;

@@ -127,7 +127,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
             insert_entity_or_multiple_definition_diagnostic(
                 &mut outcome.entities,
-                server_object_entity_name.into(),
+                server_object_entity_name,
                 ServerObjectEntity {
                     description: interface_definition.description.map(|description_value| {
                         description_value
@@ -140,7 +140,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
                         subtypes: supertype_to_subtype_map
-                            .get(&server_object_entity_name.into())
+                            .get(&server_object_entity_name)
                             .cloned()
                             .unwrap_or_default(),
                     },
@@ -162,7 +162,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
-                (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
+                (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
                 get_typename_selectable(
                     db,
                     server_object_entity_name,
@@ -190,7 +190,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             if is_object_entity(&outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (parent_object_entity_name, field.item.name.item.into()),
+                    (parent_object_entity_name, field.item.name.item),
                     ServerObjectSelectable {
                         description: field
                             .item
@@ -247,7 +247,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             } else {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (parent_object_entity_name, field.item.name.item.into()),
+                    (parent_object_entity_name, field.item.name.item),
                     ServerScalarSelectable {
                         description: field
                             .item
@@ -397,14 +397,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
                 let client_field_scalar_selection_name = expose_field_directive
                     .expose_as
-                    .unwrap_or(mutation_field.name.item.into());
+                    .unwrap_or(mutation_field.name.item);
                 let top_level_schema_field_parent_object_entity_name =
                     mutation_field.parent_object_entity_name;
                 let mutation_field_arguments = mutation_field.arguments.clone();
 
                 let top_level_schema_field_is_concrete = outcome
                     .entities
-                    .get(&payload_object_entity_name.into())
+                    .get(&payload_object_entity_name)
                     .and_then(|entity| entity.item.as_object())
                     .expect("Expected entity to exist and to be an object.")
                     .lookup(db)
@@ -657,7 +657,7 @@ fn define_default_graphql_types(
 ) {
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
-        (*ID_ENTITY_NAME).into(),
+        *ID_ENTITY_NAME,
         ServerScalarEntity {
             description: None,
             name: *ID_ENTITY_NAME,
@@ -671,7 +671,7 @@ fn define_default_graphql_types(
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
-        (*STRING_ENTITY_NAME).into(),
+        *STRING_ENTITY_NAME,
         ServerScalarEntity {
             description: None,
             name: *STRING_ENTITY_NAME,
@@ -685,7 +685,7 @@ fn define_default_graphql_types(
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
-        (*BOOLEAN_ENTITY_NAME).into(),
+        *BOOLEAN_ENTITY_NAME,
         ServerScalarEntity {
             description: None,
             name: *BOOLEAN_ENTITY_NAME,
@@ -699,7 +699,7 @@ fn define_default_graphql_types(
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
-        (*FLOAT_ENTITY_NAME).into(),
+        *FLOAT_ENTITY_NAME,
         ServerScalarEntity {
             description: None,
             name: *FLOAT_ENTITY_NAME,
@@ -713,7 +713,7 @@ fn define_default_graphql_types(
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
-        (*INT_ENTITY_NAME).into(),
+        *INT_ENTITY_NAME,
         ServerScalarEntity {
             description: None,
             name: *INT_ENTITY_NAME,
@@ -732,7 +732,7 @@ fn is_object_entity(
     target: EntityName,
 ) -> bool {
     entities
-        .get(&target.into())
+        .get(&target)
         .and_then(|entity| entity.item.as_object())
         .is_some()
 }
@@ -749,7 +749,7 @@ fn traverse_selections_and_return_path<'a>(
     // TODO do not do a linear scan
     let mut current_entity = outcome
         .entities
-        .get(&payload_object_entity_name.into())
+        .get(&payload_object_entity_name)
         .and_then(|entity| entity.item.as_object())
         .ok_or_else(|| {
             Diagnostic::new(
@@ -768,7 +768,7 @@ fn traverse_selections_and_return_path<'a>(
     for selection_name in primary_field_selection_name_parts {
         let selectable = outcome
             .selectables
-            .get(&(current_entity.name, selection_name.dereference().into()))
+            .get(&(current_entity.name, selection_name.dereference()))
             .and_then(|x| x.item.as_object())
             .and_then(|x| x.as_server())
             .ok_or_else(|| {
@@ -783,7 +783,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_object_entity.inner().dereference().into();
+        let next_entity_name = selectable.target_object_entity.inner().dereference();
 
         current_entity = outcome
             .entities

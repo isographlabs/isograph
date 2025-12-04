@@ -68,12 +68,8 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
-    let selectable = server_selectable_named(
-        db,
-        parent_server_object_entity_name,
-        (*ID_FIELD_NAME).into(),
-    )
-    .clone_err()?;
+    let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
+        .clone_err()?;
 
     let selectable = match selectable {
         Some(s) => s,
@@ -90,7 +86,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     "Expected `{parent_server_object_entity_name}.{selectable_name}` \
                     to be a scalar, but it was an object."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -118,7 +114,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     \"on_invalid_id_type\" config parameter."
                 ),
                 // TODO use the location of the selectable
-                entity_definition_location(db, (*target_scalar_entity_name).into())
+                entity_definition_location(db, *target_scalar_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -144,7 +140,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -176,7 +172,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
                         to be an object, but it was a scalar."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -206,7 +202,7 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
                     "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \
                         to be a scalar, but it was an object."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
