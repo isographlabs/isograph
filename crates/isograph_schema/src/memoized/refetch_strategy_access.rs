@@ -1,8 +1,8 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    DiagnosticResult, DiagnosticVecResult, Location, ParentObjectEntityNameAndSelectableName,
-    SelectableName, ServerObjectEntityName,
+    DiagnosticResult, DiagnosticVecResult, EntityName, Location,
+    ParentObjectEntityNameAndSelectableName, SelectableName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
@@ -21,7 +21,7 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<
     HashMap<
-        (ServerObjectEntityName, SelectableName),
+        (EntityName, SelectableName),
         DiagnosticResult<SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>>,
     >,
 > {
@@ -103,7 +103,7 @@ pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<
     HashMap<
-        (ServerObjectEntityName, SelectableName),
+        (EntityName, SelectableName),
         DiagnosticVecResult<
             SelectionType<
                 Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
@@ -153,7 +153,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>> {
     let map = validated_refetch_strategy_map(db).clone_err()?;
@@ -193,7 +193,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
     let map = validated_refetch_strategy_map(db).clone_err()?;

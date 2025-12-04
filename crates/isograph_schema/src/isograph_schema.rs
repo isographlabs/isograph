@@ -1,8 +1,7 @@
 use std::fmt::Debug;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, JavascriptName, SelectableName, ServerObjectEntityName,
-    ServerScalarEntityName, VariableName,
+    Diagnostic, DiagnosticResult, EntityName, JavascriptName, SelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -18,11 +17,11 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref ID_ENTITY_NAME: ServerScalarEntityName = "ID".intern().into();
-    pub static ref STRING_ENTITY_NAME: ServerScalarEntityName = "String".intern().into();
-    pub static ref INT_ENTITY_NAME: ServerScalarEntityName = "Int".intern().into();
-    pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
-    pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
+    pub static ref ID_ENTITY_NAME: EntityName = "ID".intern().into();
+    pub static ref STRING_ENTITY_NAME: EntityName = "String".intern().into();
+    pub static ref INT_ENTITY_NAME: EntityName = "Int".intern().into();
+    pub static ref FLOAT_ENTITY_NAME: EntityName = "Float".intern().into();
+    pub static ref BOOLEAN_ENTITY_NAME: EntityName = "Boolean".intern().into();
     pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
     pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
@@ -35,7 +34,7 @@ pub struct RootOperationName(pub &'static str);
 
 pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    root_object_name: ServerObjectEntityName,
+    root_object_name: EntityName,
     selections: impl Iterator<Item = SelectableName>,
 ) -> DiagnosticResult<Vec<ServerObjectSelectable<TNetworkProtocol>>> {
     let mut path = vec![];
@@ -120,7 +119,5 @@ pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 
-pub type ScalarSelectableId = DefinitionLocation<
-    (ServerObjectEntityName, SelectableName),
-    (ServerObjectEntityName, SelectableName),
->;
+pub type ScalarSelectableId =
+    DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;

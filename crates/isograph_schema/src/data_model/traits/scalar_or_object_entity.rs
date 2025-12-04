@@ -1,12 +1,9 @@
-use common_lang_types::{
-    DiagnosticResult, Location, SelectableName, ServerObjectEntityName, ServerScalarEntityName,
-    WithLocation,
-};
+use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName, WithLocation};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
-    DefinitionLocation, DefinitionLocationPostfix, Description, ObjectSelectionPath,
-    ScalarSelectionPath, SelectionParentType, SelectionSetParentType, SelectionSetPath,
-    SelectionType, SelectionTypePostfix, ServerObjectEntityNameWrapper,
+    DefinitionLocation, DefinitionLocationPostfix, Description, EntityNameWrapper,
+    ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionSetParentType,
+    SelectionSetPath, SelectionType, SelectionTypePostfix,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -20,12 +17,12 @@ use crate::{
 
 #[impl_for_selection_type]
 pub trait ServerScalarOrObjectEntity {
-    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName>;
+    fn name(&self) -> SelectionType<EntityName, EntityName>;
     fn description(&self) -> Option<Description>;
 }
 
 impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<T> {
-    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+    fn name(&self) -> SelectionType<EntityName, EntityName> {
         self.item.name()
     }
 
@@ -37,7 +34,7 @@ impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerScalarEntity<TNetworkProtocol>
 {
-    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+    fn name(&self) -> SelectionType<EntityName, EntityName> {
         self.name.scalar_selected()
     }
 
@@ -49,7 +46,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
     for ServerObjectEntity<TNetworkProtocol>
 {
-    fn name(&self) -> SelectionType<ServerScalarEntityName, ServerObjectEntityName> {
+    fn name(&self) -> SelectionType<EntityName, EntityName> {
         self.name.object_selected()
     }
 
@@ -226,7 +223,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
 
 pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityNameWrapper,
+    parent_server_object_entity_name: EntityNameWrapper,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
     MemoRef<ServerObjectEntity<TNetworkProtocol>>,

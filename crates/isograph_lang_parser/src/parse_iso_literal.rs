@@ -1,7 +1,7 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, IsoLiteralText, Location, RelativePathToSourceFile,
-    SelectableName, Span, TextSource, UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation,
-    WithLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, EntityName, IsoLiteralText, Location, RelativePathToSourceFile,
+    SelectableName, Span, TextSource, ValueKeyName, WithEmbeddedLocation, WithLocation,
+    WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -10,11 +10,11 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
-    ConstantValue, EntrypointDeclaration, IsographFieldDirective, IsographResolvedNode,
-    IsographSemanticToken, NonConstantValue, ObjectSelection, ScalarSelection,
-    SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
-    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
-    from_isograph_field_directives, semantic_token_legend,
+    ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
+    IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
+    ScalarSelection, SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
+    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
+    semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -113,7 +113,7 @@ fn parse_iso_entrypoint_declaration(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )?
-            .map(ServerObjectEntityNameWrapper);
+            .map(EntityNameWrapper);
         let dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
         let client_field_name = tokens
@@ -175,7 +175,7 @@ fn parse_client_field_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
+            .map(|with_span| with_span.map(EntityNameWrapper))?;
 
         let _ = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
@@ -245,7 +245,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation<EntityNameWrapper>> {
     let keyword = tokens.parse_source_of_kind(
         IsographLangTokenKind::Identifier,
         semantic_token_legend::ST_TO,
@@ -258,9 +258,8 @@ fn parse_client_pointer_target_type(
         )
         .wrap_err()
     } else {
-        parse_type_annotation(tokens).map(|with_span| {
-            with_span.map(|x| ServerObjectEntityNameWrapper(x.unchecked_conversion()))
-        })
+        parse_type_annotation(tokens)
+            .map(|with_span| with_span.map(|x| EntityNameWrapper(x.unchecked_conversion())))
     }
 }
 
@@ -275,7 +274,7 @@ fn parse_client_pointer_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
+            .map(|with_span| with_span.map(EntityNameWrapper))?;
 
         let _dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
@@ -695,7 +694,7 @@ fn parse_object_entry(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
+) -> DiagnosticResult<Vec<WithSpan<VariableDefinition<EntityName>>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -720,7 +719,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
+) -> DiagnosticResult<WithSpan<VariableDefinition<EntityName>>> {
     tokens
         .with_span_result(|tokens| {
             let _dollar = tokens.parse_token_of_kind(
@@ -780,7 +779,7 @@ fn parse_optional_default_value(
 
 fn parse_type_annotation(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation<EntityName>> {
     from_control_flow(|| {
         to_control_flow::<_, Diagnostic>(|| {
             let type_ = tokens.parse_string_key_type(

@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{Diagnostic, DiagnosticResult, SelectableName, ServerObjectEntityName};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
@@ -17,7 +17,7 @@ use crate::{
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
-    BTreeMap<(ServerObjectEntityName, SelectableName), MemoRefServerSelectable<TNetworkProtocol>>,
+    BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TNetworkProtocol>>,
 > {
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
@@ -34,7 +34,7 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TNetworkProtocol>>> {
     let map = server_selectables_map(db).clone_err()?;
 
@@ -53,7 +53,7 @@ pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRefServerSelectable<TNetworkProtocol>>> {
     server_selectables_map_for_entity(db, parent_server_object_entity_name)
@@ -66,7 +66,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
     let selectable = server_selectable_named(
         db,
@@ -161,7 +161,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ServerObjectSelectable<TNetworkProtocol>>>> {
     let item =
@@ -191,7 +191,7 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
     let item =

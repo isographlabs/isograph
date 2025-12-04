@@ -1,5 +1,5 @@
 use common_lang_types::{
-    SelectableName, ServerObjectEntityName, Span, relative_path_from_absolute_and_working_directory,
+    EntityName, SelectableName, Span, relative_path_from_absolute_and_working_directory,
 };
 use isograph_compiler::CompilerState;
 use isograph_lang_types::{
@@ -71,7 +71,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
-            IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
+            IsographResolvedNode::EntityNameWrapper(entity) => {
                 let server_object_entity = server_object_entity_named(db, entity.inner.0)
                     .as_ref()
                     .map_err(|_| LSPRuntimeError::ExpectedError)?
@@ -318,7 +318,7 @@ fn hover_text_for_selectable(
     selectable_name: SelectableName,
     selectable_description: Option<Description>,
     selectable_arguments: Vec<&VariableDefinition<ServerEntityName>>,
-    parent_type_name: ServerObjectEntityName,
+    parent_type_name: EntityName,
     parent_description: Option<Description>,
 ) -> String {
     let parent_description = parent_description

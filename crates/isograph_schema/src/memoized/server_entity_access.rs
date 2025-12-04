@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{
-    Diagnostic, DiagnosticResult, JavascriptName, Location, ServerObjectEntityName,
-    ServerScalarEntityName, UnvalidatedTypeName,
-};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, JavascriptName, Location};
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
@@ -18,8 +15,7 @@ use crate::{
 #[memo]
 pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<MemoRef<BTreeMap<UnvalidatedTypeName, MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic>
-{
+) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
     let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
@@ -51,7 +47,7 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_object_entity_name: ServerObjectEntityName,
+    server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
     let map = server_entities_map_without_locations(db)
         .clone_err()?
@@ -82,7 +78,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: ServerScalarEntityName,
+    server_scalar_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarEntity<TNetworkProtocol>>>> {
     let map = server_entities_map_without_locations(db)
         .clone_err()?
@@ -114,7 +110,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: ServerScalarEntityName,
+    server_scalar_entity_name: EntityName,
 ) -> DiagnosticResult<Option<JavascriptName>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name).clone()?;
 
@@ -157,7 +153,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
 ) -> DiagnosticResult<Option<ServerEntityName>> {
     match server_entities_map_without_locations(db)
         .clone_err()?
@@ -175,7 +171,7 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
 ) -> DiagnosticResult<Option<Location>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
@@ -188,7 +184,7 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn entity_wrong_type_diagnostic(
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
     actual_type: &'static str,
     intended_type: &'static str,
     location: Option<Location>,
@@ -199,10 +195,7 @@ pub fn entity_wrong_type_diagnostic(
     )
 }
 
-pub fn entity_not_defined_diagnostic(
-    entity_name: ServerObjectEntityName,
-    location: Location,
-) -> Diagnostic {
+pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {
     Diagnostic::new(
         format!("`{entity_name}` is not defined."),
         location.wrap_some(),

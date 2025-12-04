@@ -37,44 +37,7 @@ string_key_newtype!(InputTypeName);
 //
 // It can also be used in error messages a sort of top type name type, i.e. any type name
 // can be converted into this type name.
-string_key_newtype!(UnvalidatedTypeName);
-
-string_key_one_way_conversion!(from: ServerObjectEntityName, to: UnvalidatedTypeName);
-
-string_key_newtype!(GraphQLObjectTypeName);
-// TODO there should also be a GraphQL scalar name that can be converted to this
-string_key_newtype!(ServerScalarEntityName);
-string_key_newtype!(GraphQLInterfaceTypeName);
-string_key_newtype!(GraphQLEnumTypeName);
-string_key_newtype!(GraphQLUnionTypeName);
-string_key_newtype!(GraphQLInputObjectTypeName);
-
-// TODO this doesn't belong in common
-// This type represents any type with fields *in the Isograph world*.
-// TypeWithFields is a GraphQL concept, this is an Isograph concept.
-string_key_newtype!(ServerObjectEntityName);
-string_key_one_way_conversion!(from: GraphQLObjectTypeName, to: ServerObjectEntityName);
-string_key_one_way_conversion!(from: GraphQLInterfaceTypeName, to: ServerObjectEntityName);
-string_key_one_way_conversion!(from: GraphQLUnionTypeName, to: ServerObjectEntityName);
-
-string_key_one_way_conversion!(from: GraphQLObjectTypeName, to: OutputTypeName);
-string_key_one_way_conversion!(from: ServerScalarEntityName, to: OutputTypeName);
-string_key_one_way_conversion!(from: GraphQLInterfaceTypeName, to: OutputTypeName);
-string_key_one_way_conversion!(from: GraphQLEnumTypeName, to: OutputTypeName);
-string_key_one_way_conversion!(from: GraphQLUnionTypeName, to: OutputTypeName);
-
-string_key_one_way_conversion!(from: ServerScalarEntityName, to: InputTypeName);
-string_key_one_way_conversion!(from: GraphQLEnumTypeName, to: InputTypeName);
-string_key_one_way_conversion!(from: GraphQLInputObjectTypeName, to: InputTypeName);
-
-string_key_one_way_conversion!(from: GraphQLObjectTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: ServerScalarEntityName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: GraphQLInterfaceTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: GraphQLEnumTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: GraphQLUnionTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: GraphQLInputObjectTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: OutputTypeName, to: UnvalidatedTypeName);
-string_key_one_way_conversion!(from: InputTypeName, to: UnvalidatedTypeName);
+string_key_newtype!(EntityName);
 
 string_key_newtype!(ConstExportName);
 

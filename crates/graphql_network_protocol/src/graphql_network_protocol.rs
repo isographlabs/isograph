@@ -2,9 +2,9 @@ use std::collections::btree_map::Entry;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, DiagnosticResult, QueryExtraInfo, QueryOperationName, QueryText,
-    SelectableName, ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName,
-    WithLocation, WithLocationPostfix, WithNonFatalDiagnostics, WithSpanPostfix,
+    DescriptionValue, Diagnostic, DiagnosticResult, EntityName, QueryExtraInfo, QueryOperationName,
+    QueryText, SelectableName, WithLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    WithSpanPostfix,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -37,9 +37,9 @@ use crate::process_type_system_definition::{
 use crate::{parse_graphql_schema, query_text::generate_query_text};
 
 pub(crate) struct GraphQLRootTypes {
-    pub query: ServerObjectEntityName,
-    pub mutation: ServerObjectEntityName,
-    pub subscription: ServerObjectEntityName,
+    pub query: EntityName,
+    pub mutation: EntityName,
+    pub subscription: EntityName,
 }
 
 impl Default for GraphQLRootTypes {
@@ -52,7 +52,7 @@ impl Default for GraphQLRootTypes {
     }
 }
 
-impl From<GraphQLRootTypes> for BTreeMap<ServerObjectEntityName, RootOperationName> {
+impl From<GraphQLRootTypes> for BTreeMap<EntityName, RootOperationName> {
     fn from(val: GraphQLRootTypes) -> Self {
         let mut map = BTreeMap::new();
         map.insert(val.query, RootOperationName("query"));
@@ -75,7 +75,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     ) -> DiagnosticResult<(
         WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
         // fetchable types
-        BTreeMap<ServerObjectEntityName, RootOperationName>,
+        BTreeMap<EntityName, RootOperationName>,
     )> {
         let mut outcome = ParseTypeSystemOutcome::default();
         let mut non_fatal_diagnostics = vec![];
@@ -123,10 +123,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         // and we should make that refactor.
         for with_location in interfaces_to_process {
             let interface_definition = with_location.item;
-            let server_object_entity_name = interface_definition
-                .name
-                .item
-                .to::<ServerObjectEntityName>();
+            let server_object_entity_name = interface_definition.name.item.to::<EntityName>();
 
             insert_entity_or_multiple_definition_diagnostic(
                 &mut outcome.entities,
@@ -188,7 +185,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         // the same struct, and you will have to do a follow up request for the target entity to
         // know whether it is an object or scalar selectable.
         for (parent_object_entity_name, field) in fields_to_process {
-            let target: ServerObjectEntityName = (*field.item.type_.inner()).unchecked_conversion();
+            let target: EntityName = (*field.item.type_.inner()).unchecked_conversion();
 
             if is_object_entity(&outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
@@ -225,11 +222,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             input_type_name.unchecked_conversion(),
                                         ) {
                                             input_type_name
-                                                .unchecked_conversion::<ServerObjectEntityName>()
+                                                .unchecked_conversion::<EntityName>()
                                                 .object_selected()
                                         } else {
                                             input_type_name
-                                                .unchecked_conversion::<ServerScalarEntityName>()
+                                                .unchecked_conversion::<EntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -273,11 +270,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             input_type_name.unchecked_conversion(),
                                         ) {
                                             input_type_name
-                                                .unchecked_conversion::<ServerObjectEntityName>()
+                                                .unchecked_conversion::<EntityName>()
                                                 .object_selected()
                                         } else {
                                             input_type_name
-                                                .unchecked_conversion::<ServerScalarEntityName>()
+                                                .unchecked_conversion::<EntityName>()
                                                 .scalar_selected()
                                         }
                                     }),
@@ -557,7 +554,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn generate_link_type<'a>(
         db: &IsographDatabase<Self>,
-        server_object_entity_name: &ServerObjectEntityName,
+        server_object_entity_name: &EntityName,
     ) -> String {
         let server_object_entity = &server_object_entity_named(db, *server_object_entity_name)
             .as_ref()
@@ -606,7 +603,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     fn generate_query_extra_info(
         query_name: QueryOperationName,
-        operation_name: ServerObjectEntityName,
+        operation_name: EntityName,
         indentation_level: u8,
     ) -> QueryExtraInfo {
         let indent = "  ".repeat((indentation_level + 1) as usize);
@@ -624,7 +621,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 pub struct GraphQLSchemaObjectAssociatedData {
     pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
     // TODO expose this as a separate memoized method
-    pub subtypes: Vec<UnvalidatedTypeName>,
+    pub subtypes: Vec<EntityName>,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -724,11 +721,8 @@ fn define_default_graphql_types(
 }
 
 fn is_object_entity(
-    entities: &BTreeMap<
-        UnvalidatedTypeName,
-        WithLocation<MemoRefServerEntity<GraphQLNetworkProtocol>>,
-    >,
-    target: ServerObjectEntityName,
+    entities: &BTreeMap<EntityName, WithLocation<MemoRefServerEntity<GraphQLNetworkProtocol>>>,
+    target: EntityName,
 ) -> bool {
     entities
         .get(&target.into())
@@ -739,7 +733,7 @@ fn is_object_entity(
 fn traverse_selections_and_return_path<'a>(
     db: &'a IsographDatabase<GraphQLNetworkProtocol>,
     outcome: &'a ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-    payload_object_entity_name: ServerObjectEntityName,
+    payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
     Vec<&'a ServerObjectSelectable<GraphQLNetworkProtocol>>,
@@ -808,8 +802,8 @@ fn traverse_selections_and_return_path<'a>(
 
 // TODO make this generic over value, too
 pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
-    map: &mut BTreeMap<UnvalidatedTypeName, WithLocation<Value>>,
-    key: UnvalidatedTypeName,
+    map: &mut BTreeMap<EntityName, WithLocation<Value>>,
+    key: EntityName,
     item: WithLocation<Value>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {

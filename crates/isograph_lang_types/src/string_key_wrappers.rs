@@ -59,14 +59,14 @@ pub enum DescriptionParent<'a> {
 }
 
 define_wrapper!(
-    ServerObjectEntityNameWrapper,
-    common_lang_types::ServerObjectEntityName,
-    ServerObjectEntityNameWrapperParent<'a>,
-    ServerObjectEntityNameWrapperPath
+    EntityNameWrapper,
+    common_lang_types::EntityName,
+    EntityNameWrapperParent<'a>,
+    EntityNameWrapperPath
 );
 
 #[derive(Debug)]
-pub enum ServerObjectEntityNameWrapperParent<'a> {
+pub enum EntityNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),

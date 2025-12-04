@@ -71,7 +71,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
-            IsographResolvedNode::ServerObjectEntityNameWrapper(entity) => {
+            IsographResolvedNode::EntityNameWrapper(entity) => {
                 let location = entity_definition_location(db, entity.inner.0.into())
                     .to_owned()
                     .ok()

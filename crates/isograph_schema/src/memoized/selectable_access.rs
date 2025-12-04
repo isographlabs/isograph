@@ -1,4 +1,4 @@
-use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
 use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
@@ -12,7 +12,7 @@ use crate::{
 #[memo]
 pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRefSelectable<TNetworkProtocol>>> {
     // we don't obviously have a better way to do this besides checking whether this
@@ -74,7 +74,7 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TNetworkProtocol>>>> {
     let mut selectables = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .to_owned()?.into_values().map(|value| {

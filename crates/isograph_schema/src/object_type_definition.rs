@@ -1,6 +1,4 @@
-use common_lang_types::{
-    GraphQLInterfaceTypeName, ServerObjectEntityName, WithEmbeddedLocation, WithLocation, WithSpan,
-};
+use common_lang_types::{EntityName, WithEmbeddedLocation, WithLocation, WithSpan};
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition,
     GraphQLInputObjectTypeDefinition, GraphQLInterfaceTypeDefinition, GraphQLObjectTypeDefinition,
@@ -10,9 +8,9 @@ use isograph_lang_types::Description;
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct IsographObjectTypeDefinition {
     pub description: Option<WithSpan<Description>>,
-    pub name: WithEmbeddedLocation<ServerObjectEntityName>,
+    pub name: WithEmbeddedLocation<EntityName>,
     // maybe this should be Vec<WithSpan<IsographObjectTypeName>>>
-    pub interfaces: Vec<WithLocation<GraphQLInterfaceTypeName>>,
+    pub interfaces: Vec<WithLocation<EntityName>>,
     /// Directives that we don't know about. Maybe this should be validated to be
     /// empty, or not exist.
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,

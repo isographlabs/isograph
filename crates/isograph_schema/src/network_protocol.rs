@@ -1,9 +1,8 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    DiagnosticResult, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
-    SelectableName, ServerObjectEntityName, UnvalidatedTypeName, WithLocation,
-    WithNonFatalDiagnostics, WithSpan,
+    DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    SelectableName, WithLocation, WithNonFatalDiagnostics, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
@@ -18,22 +17,13 @@ type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub entities:
-        BTreeMap<UnvalidatedTypeName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
+    pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
 
-    pub selectables: BTreeMap<
-        (ServerObjectEntityName, SelectableName),
-        WithLocation<MemoRefSelectable<TNetworkProtocol>>,
-    >,
+    pub selectables:
+        BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefSelectable<TNetworkProtocol>>>,
 
     pub client_scalar_refetch_strategies: Vec<
-        DiagnosticResult<
-            WithLocation<(
-                ServerObjectEntityName,
-                SelectableName,
-                UnvalidatedRefetchStrategy,
-            )>,
-        >,
+        DiagnosticResult<WithLocation<(EntityName, SelectableName, UnvalidatedRefetchStrategy)>>,
     >,
 }
 
@@ -49,7 +39,7 @@ pub trait NetworkProtocol:
     ) -> &DiagnosticResult<(
         WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
         // TODO just seems awkward that we return fetchable types
-        BTreeMap<ServerObjectEntityName, RootOperationName>,
+        BTreeMap<EntityName, RootOperationName>,
     )>;
 
     fn generate_query_text<'a>(
@@ -63,13 +53,13 @@ pub trait NetworkProtocol:
 
     fn generate_link_type(
         db: &IsographDatabase<Self>,
-        server_object_entity_name: &ServerObjectEntityName,
+        server_object_entity_name: &EntityName,
     ) -> String;
 
     // TODO: include `QueryText` to incrementally adopt persisted documents
     fn generate_query_extra_info(
         query_name: QueryOperationName,
-        operation_name: ServerObjectEntityName,
+        operation_name: EntityName,
         indentation_level: u8,
     ) -> QueryExtraInfo;
 }
@@ -86,7 +76,7 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
 pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
     pub name: WithLocation<SelectableName>,
-    pub graphql_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    pub graphql_type: GraphQLTypeAnnotation<EntityName>,
     /// An override type for the typename field. Normally, the JavaScript type is
     /// acquired by going through graphql_type.inner(), but there is no separate
     /// 'UserTypename' type in GraphQL. So we do this instead. This is horrible
@@ -111,7 +101,7 @@ pub struct FieldToInsert {
 pub struct ExposeFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
-    pub parent_object_name: ServerObjectEntityName,
+    pub parent_object_name: EntityName,
     pub description: Option<Description>,
 }
 

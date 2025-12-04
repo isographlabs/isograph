@@ -2,7 +2,7 @@
 
 use std::fmt::Display;
 
-use common_lang_types::{Location, SelectableName, UnvalidatedTypeName, WithLocation};
+use common_lang_types::{EntityName, Location, SelectableName, WithLocation};
 use intern::Lookup;
 use resolve_position::ResolvePosition;
 
@@ -206,9 +206,7 @@ impl<T0: Into<SelectableName>, T1: Into<SelectableName>> From<SelectionType<T0, 
     }
 }
 
-impl<T0: Into<UnvalidatedTypeName>, T1: Into<UnvalidatedTypeName>> From<SelectionType<T0, T1>>
-    for UnvalidatedTypeName
-{
+impl<T0: Into<EntityName>, T1: Into<EntityName>> From<SelectionType<T0, T1>> for EntityName {
     fn from(value: SelectionType<T0, T1>) -> Self {
         match value {
             SelectionType::Scalar(s) => s.into(),

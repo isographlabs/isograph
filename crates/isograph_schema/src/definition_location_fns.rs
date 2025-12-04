@@ -1,4 +1,4 @@
-use common_lang_types::ServerObjectEntityName;
+use common_lang_types::EntityName;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
 
 use crate::{IsographDatabase, MemoRefObjectSelectable, NetworkProtocol};
@@ -16,7 +16,7 @@ pub fn description<TNetworkProtocol: NetworkProtocol>(
 pub fn output_type_annotation<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
-) -> &TypeAnnotation<ServerObjectEntityName> {
+) -> &TypeAnnotation<EntityName> {
     match definition_location {
         DefinitionLocation::Client(client_pointer) => {
             &client_pointer.lookup(db).target_object_entity_name

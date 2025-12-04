@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, GraphQLInterfaceTypeName, JavascriptName, Location,
-    SelectableName, ServerObjectEntityName, UnvalidatedTypeName, VariableName, WithLocation,
-    WithLocationPostfix, WithSpanPostfix,
+    DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
+    VariableName, WithLocation, WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
@@ -35,8 +34,8 @@ use crate::{
 
 lazy_static! {
     // TODO use schema_data.string_type_id or something
-    static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
-    static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
+    static ref STRING_TYPE_NAME: EntityName = "String".intern().into();
+    static ref NODE_INTERFACE_NAME: EntityName= "Node".intern().into();
     pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
 
 }
@@ -47,8 +46,8 @@ pub fn process_graphql_type_system_document(
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-    directives: &mut HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(ServerObjectEntityName, WithLocation<GraphQLFieldDefinition>)>,
+    directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
@@ -60,10 +59,7 @@ pub fn process_graphql_type_system_document(
         } = with_location;
         match type_system_definition {
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                let server_object_entity_name = object_type_definition
-                    .name
-                    .item
-                    .to::<ServerObjectEntityName>();
+                let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name.into(),
@@ -191,10 +187,8 @@ pub fn process_graphql_type_system_document(
                 interfaces_to_process.push(interface_definition.with_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
-                let server_object_entity_name = input_object_definition
-                    .name
-                    .item
-                    .to::<ServerObjectEntityName>();
+                let server_object_entity_name =
+                    input_object_definition.name.item.to::<EntityName>();
 
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
@@ -258,8 +252,7 @@ pub fn process_graphql_type_system_document(
                 );
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
-                let server_object_entity_name =
-                    union_definition.name.item.to::<ServerObjectEntityName>();
+                let server_object_entity_name = union_definition.name.item.to::<EntityName>();
 
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
@@ -300,7 +293,7 @@ pub fn process_graphql_type_system_document(
                         union_definition
                             .union_member_types
                             .iter()
-                            .map(|entity_name| entity_name.item.to::<UnvalidatedTypeName>()),
+                            .map(|entity_name| entity_name.item.to::<EntityName>()),
                     );
 
                 // unions do not implement interfaces
@@ -371,7 +364,7 @@ fn refetch_selectable_refetch_strategy(
 }
 
 fn get_refetch_selectable(
-    server_object_entity_name: ServerObjectEntityName,
+    server_object_entity_name: EntityName,
     subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
 ) -> ClientScalarSelectable<GraphQLNetworkProtocol> {
     ClientScalarSelectable {
@@ -414,7 +407,7 @@ fn get_refetch_selectable(
 
 pub(crate) fn get_typename_selectable(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
-    server_object_entity_name: ServerObjectEntityName,
+    server_object_entity_name: EntityName,
     location: Location,
     javascript_type_override: Option<JavascriptName>,
 ) -> MemoRef<ServerScalarSelectable<GraphQLNetworkProtocol>> {
@@ -441,8 +434,8 @@ pub fn process_graphql_type_system_extension_document(
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-    directives: &mut HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(ServerObjectEntityName, WithLocation<GraphQLFieldDefinition>)>,
+    directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
@@ -486,10 +479,10 @@ pub fn process_graphql_type_system_extension_document(
     }
 }
 
-type UnvalidatedTypeRefinementMap = BTreeMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
+type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
 
 pub fn multiple_entity_definitions_found_diagnostic(
-    server_object_entity_name: UnvalidatedTypeName,
+    server_object_entity_name: EntityName,
     location: Option<Location>,
 ) -> Diagnostic {
     Diagnostic::new(

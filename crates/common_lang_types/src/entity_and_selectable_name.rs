@@ -1,10 +1,10 @@
-use crate::{ArtifactFilePrefix, SelectableName, ServerObjectEntityName};
+use crate::{ArtifactFilePrefix, EntityName, SelectableName};
 
 // TODO consider making this generic over the type of field_name. We sometimes know
 // that the field is e.g. a scalar field
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
 pub struct ParentObjectEntityNameAndSelectableName {
-    pub parent_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: EntityName,
     pub selectable_name: SelectableName,
 }
 
@@ -18,7 +18,7 @@ impl ParentObjectEntityNameAndSelectableName {
 
     pub fn relative_path(
         &self,
-        current_file_type_name: ServerObjectEntityName,
+        current_file_type_name: EntityName,
         file_type: ArtifactFilePrefix,
     ) -> String {
         let ParentObjectEntityNameAndSelectableName {
@@ -32,10 +32,7 @@ impl ParentObjectEntityNameAndSelectableName {
         }
     }
 
-    pub fn new(
-        parent_object_entity_name: ServerObjectEntityName,
-        selectable_name: SelectableName,
-    ) -> Self {
+    pub fn new(parent_object_entity_name: EntityName, selectable_name: SelectableName) -> Self {
         Self {
             parent_object_entity_name,
             selectable_name,

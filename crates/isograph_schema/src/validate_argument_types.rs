@@ -1,7 +1,6 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EnumLiteralValue, Location, SelectableName,
-    ServerObjectEntityName, ServerScalarEntityName, UnvalidatedTypeName, ValueKeyName,
-    VariableName, WithLocation, WithSpan,
+    Diagnostic, DiagnosticResult, EntityName, EnumLiteralValue, Location, SelectableName,
+    ValueKeyName, VariableName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -41,7 +40,7 @@ fn graphql_type_to_nullable_type<TValue>(
 }
 
 fn scalar_literal_satisfies_type(
-    scalar_literal_name: ServerScalarEntityName,
+    scalar_literal_name: EntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
     location: Location,
 ) -> DiagnosticResult<()> {
@@ -278,7 +277,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     selection_supplied_argument_value: &WithLocation<NonConstantValue>,
     variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    object_entity_name: ServerObjectEntityName,
+    object_entity_name: EntityName,
 ) -> DiagnosticResult<()> {
     validate_no_extraneous_fields(
         db,
@@ -338,7 +337,7 @@ enum ObjectLiteralFieldType {
 fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    server_object_entity_name: ServerObjectEntityName,
+    server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Vec<ObjectLiteralFieldType>> {
     let server_selectables =
         server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
@@ -390,7 +389,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
 
 fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: Location,
 ) -> DiagnosticResult<()> {
@@ -431,7 +430,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
 
 fn id_annotation_to_typename_annotation(
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
-) -> GraphQLTypeAnnotation<UnvalidatedTypeName> {
+) -> GraphQLTypeAnnotation<EntityName> {
     type_.clone().map(|type_id| match type_id {
         SelectionType::Scalar(scalar_entity_name) => scalar_entity_name.into(),
         SelectionType::Object(object_entity_name) => object_entity_name.into(),
@@ -493,7 +492,7 @@ fn get_variable_type<'a>(
 }
 
 fn expected_type_found_something_else_named_diagnostic(
-    expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    expected: GraphQLTypeAnnotation<EntityName>,
     actual: StringKey,
     type_description: &str,
     location: Location,
@@ -505,7 +504,7 @@ fn expected_type_found_something_else_named_diagnostic(
 }
 
 fn expected_type_found_something_else_anonymous_diagnostic(
-    expected: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    expected: GraphQLTypeAnnotation<EntityName>,
     type_description: &str,
     location: Location,
 ) -> Diagnostic {

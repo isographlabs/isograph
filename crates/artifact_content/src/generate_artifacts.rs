@@ -1,7 +1,7 @@
 use common_lang_types::{
-    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DiagnosticVecResult,
-    ParentObjectEntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
-    ServerObjectEntityName, WithLocation, WithSpan, WithSpanPostfix, derive_display,
+    ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DiagnosticVecResult, EntityName,
+    ParentObjectEntityNameAndSelectableName, SelectableName, SelectableNameOrAlias, WithLocation,
+    WithSpan, WithSpanPostfix, derive_display,
 };
 use core::panic;
 use graphql_lang_types::{
@@ -992,7 +992,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
     scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) {
     let client_scalar_selectable = client_scalar_selectable_named(
@@ -1264,7 +1264,7 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<ServerObjectEntityName>,
+    output_type_annotation: &TypeAnnotation<EntityName>,
     type_annotation: &TypeAnnotation<ClientScalarSelectableUpdatableDataType>,
 ) {
     query_type_declaration.push_str(&format!(

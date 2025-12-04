@@ -6,7 +6,7 @@ use crate::{
     process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, Location, SelectableName, ServerObjectEntityName, WithLocation,
+    Diagnostic, DiagnosticResult, EntityName, Location, SelectableName, WithLocation,
     WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
@@ -27,9 +27,8 @@ type MemoRefDeclaration =
 #[memo]
 pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> WithNonFatalDiagnostics<
-    BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<MemoRefDeclaration>>,
-> {
+) -> WithNonFatalDiagnostics<BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefDeclaration>>>
+{
     let mut out: BTreeMap<(_, SelectableName), _> = BTreeMap::new();
     let mut non_fatal_diagnostics = vec![];
 
@@ -103,7 +102,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
 #[memo]
 pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
 ) -> Option<MemoRefDeclaration> {
     client_selectable_declaration_map_from_iso_literals(db)
@@ -115,7 +114,7 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientFieldDeclaration>>> {
     let selectable = client_selectable_declaration(
@@ -146,7 +145,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientPointerDeclaration>>> {
     let selectable = client_selectable_declaration(
@@ -178,7 +177,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientScalarSelectable<TNetworkProtocol>>>> {
     let declaration =
@@ -232,7 +231,7 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientObjectSelectable<TNetworkProtocol>>>> {
     let declaration =
@@ -253,7 +252,7 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRefClientSelectable<TNetworkProtocol>>> {
     // we can do this better by reordering functions in this file
@@ -307,7 +306,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn client_selectables_defined_by_network_protocol<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
-    HashMap<(ServerObjectEntityName, SelectableName), MemoRefClientSelectable<TNetworkProtocol>>,
+    HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TNetworkProtocol>>,
 > {
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
@@ -327,7 +326,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
     HashMap<
-        (ServerObjectEntityName, SelectableName),
+        (EntityName, SelectableName),
         DiagnosticResult<MemoRefClientSelectable<TNetworkProtocol>>,
     >,
 > {
@@ -378,7 +377,7 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn multiple_selectable_definitions_found_diagnostic(
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
@@ -391,7 +390,7 @@ pub fn multiple_selectable_definitions_found_diagnostic(
 }
 
 pub fn selectable_is_wrong_type_diagnostic(
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
     intended_type: &'static str,
     actual_type: &'static str,
@@ -407,7 +406,7 @@ pub fn selectable_is_wrong_type_diagnostic(
 }
 
 pub fn selectable_is_not_defined_diagnostic(
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
@@ -419,8 +418,8 @@ pub fn selectable_is_not_defined_diagnostic(
 
 // TODO make this generic over value, too
 pub fn insert_selectable_or_multiple_definition_diagnostic<Value>(
-    map: &mut BTreeMap<(ServerObjectEntityName, SelectableName), WithLocation<Value>>,
-    key: (ServerObjectEntityName, SelectableName),
+    map: &mut BTreeMap<(EntityName, SelectableName), WithLocation<Value>>,
+    key: (EntityName, SelectableName),
     item: WithLocation<Value>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {

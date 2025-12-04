@@ -11,8 +11,8 @@ use crate::{
     raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName,
-    QueryOperationName, SelectableName, ServerObjectEntityName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, EntityName, ParentObjectEntityNameAndSelectableName,
+    QueryOperationName, SelectableName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -35,7 +35,7 @@ use std::collections::BTreeSet;
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     entrypoint_scalar_selectable_name: SelectableName,
     info: &EntrypointDeclarationInfo,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -133,7 +133,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: Vec<&ValidatedVariableDefinition>,
     // TODO this implements copy, don't take reference
-    default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
+    default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
@@ -466,7 +466,7 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
     field_name: SelectableName,
-    concrete_type: ServerObjectEntityName,
+    concrete_type: EntityName,
     directive_set: &EntrypointDirectiveSet,
     field_directive_set: ClientScalarSelectableDirectiveSet,
 ) -> String {

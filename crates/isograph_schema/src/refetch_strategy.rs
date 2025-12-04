@@ -1,8 +1,6 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use common_lang_types::{
-    ServerObjectEntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix,
-};
+use common_lang_types::{EntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix};
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
     SelectionTypeContainingSelections,
@@ -64,7 +62,7 @@ pub fn generate_refetch_field_strategy<
             TSelectionTypeSelectionLinkedFieldAssociatedData,
         >,
     >,
-    root_fetchable_type_name: ServerObjectEntityName,
+    root_fetchable_type_name: EntityName,
     subfields: Vec<WrappedSelectionMapSelection>,
 ) -> UseRefetchFieldRefetchStrategy<
     TSelectionTypeSelectionScalarFieldAssociatedData,
@@ -91,7 +89,7 @@ pub struct UseRefetchFieldRefetchStrategy<
         >,
     >,
     /// Query, Mutation, etc.
-    pub root_fetchable_type_name: ServerObjectEntityName,
+    pub root_fetchable_type_name: EntityName,
 
     /// Given the content one needs to refetch (which can be empty?), generate
     /// the merged selection map and variables representing the entire query.

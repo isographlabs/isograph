@@ -4,9 +4,7 @@ use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     server_object_entities,
 };
-use common_lang_types::{
-    DiagnosticResult, SelectableName, ServerObjectEntityName, WithLocationPostfix,
-};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use pico::MemoRef;
@@ -47,10 +45,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
 pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
-    HashMap<
-        (ServerObjectEntityName, SelectableName),
-        MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
-    >,
+    HashMap<(EntityName, SelectableName), MemoRef<ClientScalarSelectable<TNetworkProtocol>>>,
 > {
     get_link_fields(db)
         .to_owned()

@@ -1,6 +1,6 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{Diagnostic, DiagnosticResult, SelectableName, ServerObjectEntityName};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
 use pico_macros::memo;
@@ -32,8 +32,7 @@ pub fn entrypoints<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> HashMap<(ServerObjectEntityName, SelectableName), DiagnosticResult<EntrypointDeclarationInfo>>
-{
+) -> HashMap<(EntityName, SelectableName), DiagnosticResult<EntrypointDeclarationInfo>> {
     let entrypoints = entrypoints(db);
 
     let mut out: HashMap<_, Result<EntrypointDeclarationInfo, _>> = HashMap::new();

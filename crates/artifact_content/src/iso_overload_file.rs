@@ -7,9 +7,7 @@ use pico::MemoRef;
 use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
-use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, SelectableName, ServerObjectEntityName,
-};
+use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
     IsographDatabase, LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol,
@@ -55,7 +53,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         ClientScalarSelectableDirectiveSet,
     ),
     file_extensions: GenerateFileExtensionsOption,
-    link_types: &mut BTreeSet<ServerObjectEntityName>,
+    link_types: &mut BTreeSet<EntityName>,
 ) -> (String, String) {
     let (client_type, variant) = client_type_and_variant;
     let type_and_field = match client_type_and_variant.0 {

@@ -1,7 +1,6 @@
 use common_lang_types::{
-    ConstExportName, Diagnostic, DiagnosticResult, Location, RelativePathToSourceFile,
-    SelectableName, ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName,
-    WithSpan, WithSpanPostfix,
+    ConstExportName, Diagnostic, DiagnosticResult, EntityName, Location, RelativePathToSourceFile,
+    SelectableName, TextSource, VariableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -25,7 +24,7 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientScalarSelectableSelectionSet {
-    pub parent_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: EntityName,
     pub client_scalar_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
@@ -33,7 +32,7 @@ pub struct UnprocessedClientScalarSelectableSelectionSet {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientObjectSelectableSelectionSet {
-    pub parent_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: EntityName,
     pub client_object_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_selection_set: WithSpan<SelectionSet<(), ()>>,
@@ -223,7 +222,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
 
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
     let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
 
@@ -357,7 +356,7 @@ pub struct ImperativelyLoadedFieldVariant {
     pub client_selection_name: SelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
-    pub root_object_entity_name: ServerObjectEntityName,
+    pub root_object_entity_name: EntityName,
     pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
     pub field_map: Vec<FieldMapItem>,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
@@ -409,8 +408,8 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
 
 pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    variable_definition: &WithSpan<VariableDefinition<UnvalidatedTypeName>>,
-    parent_object_entity_name: ServerObjectEntityName,
+    variable_definition: &WithSpan<VariableDefinition<EntityName>>,
+    parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     // TODO this is hacky
     text_source: TextSource,

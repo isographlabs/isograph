@@ -4,9 +4,8 @@ use crate::{
     ValidatedSelection, selectable_named,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
-    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName, WithSpan,
-    WithSpanPostfix,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, Location,
+    ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection,
@@ -24,7 +23,7 @@ use prelude::{ErrClone, Postfix};
 pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: WithSpan<SelectionSet<(), ()>>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -46,7 +45,7 @@ pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -74,7 +73,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -179,7 +178,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -291,7 +290,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 pub fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     unvalidated_refetch_strategy: RefetchStrategy<(), ()>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -336,9 +335,9 @@ pub fn get_all_errors_or_all_ok<T, E>(
 
 fn selection_does_not_exist_diagnostic(
     client_type: &str,
-    declaration_parent_object_entity_name: ServerObjectEntityName,
+    declaration_parent_object_entity_name: EntityName,
     declaration_selectable_name: SelectableName,
-    selectable_parent_object_entity_name: ServerObjectEntityName,
+    selectable_parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
@@ -355,9 +354,9 @@ fn selection_does_not_exist_diagnostic(
 #[expect(clippy::too_many_arguments)]
 fn selection_wrong_selection_type_diagnostic(
     client_type: &str,
-    declaration_entity_name: ServerObjectEntityName,
+    declaration_entity_name: EntityName,
     declaration_selectable_name: SelectableName,
-    selectable_entity_name: ServerObjectEntityName,
+    selectable_entity_name: EntityName,
     selectable_name: SelectableName,
     selected_as: &str,
     proper_way_to_select: &str,
