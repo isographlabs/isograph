@@ -2,7 +2,9 @@ use common_lang_types::{
     SelectableName, ServerObjectEntityName, Span, relative_path_from_absolute_and_working_directory,
 };
 use isograph_compiler::CompilerState;
-use isograph_lang_types::{Description, IsographResolvedNode, VariableDefinition};
+use isograph_lang_types::{
+    DefinitionLocation, Description, IsographResolvedNode, VariableDefinition,
+};
 use isograph_schema::{
     IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
     read_iso_literals_source_from_relative_path,
@@ -39,7 +41,7 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
     .to_owned()
 }
 
-#[memo]
+// #[memo]
 fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     url: Uri,
@@ -84,12 +86,26 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
+                    let (name, description, arguments) = match &selectable {
+                        DefinitionLocation::Server(s) => {
+                            let scalar = s.lookup(db);
+                            (
+                                scalar.name.item.into(),
+                                scalar.description,
+                                scalar.arguments(),
+                            )
+                        }
+                        DefinitionLocation::Client(c) => {
+                            (c.name.item.into(), c.description, c.arguments())
+                        }
+                    };
+
                     let parent_object = parent_object.lookup(db);
                     hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name().item,
-                        selectable.description(),
-                        selectable.arguments(),
+                        name,
+                        description,
+                        arguments,
                         parent_object.name,
                         parent_object.description,
                     )
@@ -102,12 +118,26 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
                 {
+                    let (name, description, arguments) = match &selectable {
+                        DefinitionLocation::Server(s) => {
+                            let scalar = s.lookup(db);
+                            (
+                                scalar.name.item.into(),
+                                scalar.description,
+                                scalar.arguments(),
+                            )
+                        }
+                        DefinitionLocation::Client(c) => {
+                            (c.name.item.into(), c.description, c.arguments())
+                        }
+                    };
+
                     let parent_object = parent_object.lookup(db);
                     hover_text_for_selectable(
                         selectable.variant_name(),
-                        selectable.name().item,
-                        selectable.description(),
-                        selectable.arguments(),
+                        name,
+                        description,
+                        arguments,
                         parent_object.name,
                         parent_object.description,
                     )

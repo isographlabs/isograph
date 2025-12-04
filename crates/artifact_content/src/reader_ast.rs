@@ -135,7 +135,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     .expect(
                         "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                    );
+                    )
+                    .lookup(db);
 
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
@@ -268,7 +269,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
@@ -964,7 +966,8 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         let normalization_key =
                             match server_object_selectable.object_selectable_variant {

@@ -2,16 +2,16 @@ use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, QueryExtraInfo,
-    QueryOperationName, QueryText, ServerObjectEntityName, ServerSelectableName,
+    QueryOperationName, QueryText, SelectableName, ServerObjectEntityName, ServerSelectableName,
     UnvalidatedTypeName, WithLocation, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
 
 use crate::{
-    ClientScalarSelectable, ExposeFieldDirective, MemoRefServerEntity, MergedSelectionMap,
-    RefetchStrategy, RootOperationName, ServerObjectEntity, ServerObjectSelectable,
-    ServerScalarSelectable, ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ClientScalarSelectable, ExposeFieldDirective, MemoRefServerEntity, MemoRefServerSelectable,
+    MergedSelectionMap, RefetchStrategy, RootOperationName, ServerObjectEntity,
+    ValidatedVariableDefinition, isograph_database::IsographDatabase,
 };
 
 type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
@@ -21,11 +21,10 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
     pub entities:
         BTreeMap<UnvalidatedTypeName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
 
-    // TODO these should all be MemoRef
-    pub server_object_selectables:
-        Vec<DiagnosticResult<WithLocation<ServerObjectSelectable<TNetworkProtocol>>>>,
-    pub server_scalar_selectables:
-        Vec<DiagnosticResult<WithLocation<ServerScalarSelectable<TNetworkProtocol>>>>,
+    pub server_selectables: BTreeMap<
+        (ServerObjectEntityName, SelectableName),
+        WithLocation<MemoRefServerSelectable<TNetworkProtocol>>,
+    >,
 
     // expose_as fields...
     pub client_scalar_selectables:

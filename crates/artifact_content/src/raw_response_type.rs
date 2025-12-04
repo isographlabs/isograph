@@ -59,7 +59,8 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 let raw_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
                     &mut |scalar_entity_name| match server_scalar_selectable
@@ -109,7 +110,8 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 let raw_type =
                     server_object_selectable

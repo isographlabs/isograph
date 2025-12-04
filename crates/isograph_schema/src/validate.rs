@@ -7,8 +7,9 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, client_selectable_map,
-    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    parse_iso_literals, process_iso_literals, server_entities_map_without_locations,
+    server_id_selectable, server_object_entities, server_selectables_map,
+    validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -83,22 +84,59 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
 fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<()> {
-    // Note: server_selectables_map is a HashMap<_, Vec<(_, Result)>
-    // That result encodes whether the field exists. So, basically, we are collecting
-    // each error from that result.
-    //
-    // This can and should be rethought! Namely, just because the referenced entity doesn't exist
-    // doesn't mean that the selectable can't be materialized. Instead, the result should be
-    // materialized when we actually need to look at the referenced entity.
     let server_selectables = server_selectables_map(db).clone_err()?;
+    let entities = server_entities_map_without_locations(db)
+        .to_owned()?
+        .lookup(db);
 
     let mut errors = vec![];
 
     // TODO use iterator methods
-    for selectables in server_selectables.values() {
-        for (_, selectable_result) in selectables {
-            if let Err(e) = selectable_result {
-                errors.push(e.clone());
+    for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
+        let (target, name_location, arguments) = match selectable {
+            SelectionType::Scalar(s) => {
+                let scalar = s.lookup(db);
+                (
+                    scalar.target_scalar_entity.inner().dereference().into(),
+                    scalar.name.location,
+                    &scalar.arguments,
+                )
+            }
+            SelectionType::Object(o) => {
+                let object = o.lookup(db);
+                (
+                    object.target_object_entity.inner().dereference().into(),
+                    object.name.location,
+                    &object.arguments,
+                )
+            }
+        };
+
+        if !entities.contains_key(&target) {
+            errors.push(Diagnostic::new(
+                format!(
+                    "`{parent_object_entity_name}.{selectable_name}` has inner \
+                    type `{target}, but that type has not been defined"
+                ),
+                name_location.wrap_some(),
+            ))
+        }
+
+        for argument in arguments {
+            let arg_target = match argument.item.type_.inner().dereference() {
+                SelectionType::Scalar(s) => s.into(),
+                SelectionType::Object(o) => o.into(),
+            };
+
+            if !entities.contains_key(&arg_target) {
+                let arg_name = argument.item.name.item;
+                errors.push(Diagnostic::new(
+                    format!(
+                        "In `{parent_object_entity_name}.{selectable_name}`, the argument `{arg_name}` has inner \
+                        type `{arg_target}, but that type has not been defined"
+                    ),
+                    argument.location.wrap_some(),
+                ))
             }
         }
     }

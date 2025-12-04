@@ -48,7 +48,6 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.clone_err()?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
@@ -60,9 +59,8 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                         .wrap_err();
                     }
                     SelectionType::Object(object) => {
-                        // TODO don't clone. When memoized functions return references with 'db lifetime,
-                        // this will be doable.
-                        path.push(object.clone());
+                        let object = object.lookup(db);
+                        path.push(object.clone().note_todo("We should not clone here!!!"));
                         current_entity_name = *object.target_object_entity.inner();
                     }
                 }

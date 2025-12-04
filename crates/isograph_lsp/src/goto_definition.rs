@@ -97,6 +97,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable
+                            .lookup(db)
                             .name
                             .location
                             .as_embedded_location()
@@ -136,6 +137,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 {
                     match selectable {
                         DefinitionLocation::Server(server_selectable) => server_selectable
+                            .lookup(db)
                             .name
                             .location
                             .as_embedded_location()
