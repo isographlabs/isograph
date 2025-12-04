@@ -11,8 +11,9 @@ use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection, SelectionSet,
-    SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant, VariableDefinition,
+    DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
+    SelectionSet, SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant,
+    VariableDefinition,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
@@ -164,7 +165,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             }
 
             insert_selectable_or_multiple_definition_diagnostic(
-                &mut outcome.server_selectables,
+                &mut outcome.selectables,
                 (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
                 get_typename_selectable(
                     db,
@@ -173,6 +174,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     None,
                 )
                 .scalar_selected()
+                .server_defined()
                 .with_location(with_location.location),
                 &mut non_fatal_diagnostics,
             );
@@ -191,7 +193,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
             if is_object_entity(&outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.server_selectables,
+                    &mut outcome.selectables,
                     (parent_object_entity_name, field.item.name.item.into()),
                     ServerObjectSelectable {
                         description: field
@@ -242,12 +244,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                     .interned_value(db)
                     .object_selected()
+                    .server_defined()
                     .with_location(field.location),
                     &mut non_fatal_diagnostics,
                 );
             } else {
                 insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.server_selectables,
+                    &mut outcome.selectables,
                     (parent_object_entity_name, field.item.name.item.into()),
                     ServerScalarSelectable {
                         description: field
@@ -297,6 +300,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                     .interned_value(db)
                     .scalar_selected()
+                    .server_defined()
                     .with_location(field.location),
                     &mut non_fatal_diagnostics,
                 );
@@ -307,7 +311,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
             for concrete_child_entity_name in concrete_child_entity_names.iter() {
                 insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.server_selectables,
+                    &mut outcome.selectables,
                     (
                         abstract_parent_entity_name.unchecked_conversion(),
                         format!("as{concrete_child_entity_name}").intern().into(),
@@ -343,6 +347,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                     .interned_value(db)
                     .object_selected()
+                    .server_defined()
                     .with_generated_location(),
                     &mut non_fatal_diagnostics,
                 );
@@ -370,9 +375,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_subfield_name: ServerObjectSelectableName = field.intern().into();
 
                 let mutation_field = match outcome
-                    .server_selectables
+                    .selectables
                     .values()
                     .filter_map(|x| x.item.as_object())
+                    .filter_map(|x| x.as_server())
                     .find_map(|server_object_selectable| {
                         let object = server_object_selectable.lookup(db);
                         if object.name.item == mutation_subfield_name {
@@ -464,7 +470,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                         .name
                                         .item,
                                     arguments: vec![],
-                                    concrete_type: Some(target_parent_object_entity.name)
+                                    concrete_type: Some(target_parent_object_entity_name)
                                         .note_todo(
                                             "This is 100% a bug when there are \
                                             multiple items in parts_reversed, or this \
@@ -506,14 +512,22 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         },
                     ),
                     variable_definitions: vec![],
-                    parent_object_entity_name: target_parent_object_entity.name,
+                    parent_object_entity_name: target_parent_object_entity_name,
                     network_protocol: std::marker::PhantomData::<GraphQLNetworkProtocol>,
                 };
 
-                outcome.client_scalar_selectables.push(
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.selectables,
+                    (
+                        target_parent_object_entity_name,
+                        client_field_scalar_selection_name.unchecked_conversion(),
+                    ),
                     mutation_client_scalar_selectable
-                        .with_generated_location()
-                        .wrap_ok(),
+                        .interned_value(db)
+                        .scalar_selected()
+                        .client_defined()
+                        .with_generated_location(),
+                    &mut non_fatal_diagnostics,
                 );
 
                 outcome.client_scalar_refetch_strategies.push(
@@ -754,9 +768,10 @@ fn traverse_selections_and_return_path<'a>(
 
     for selection_name in primary_field_selection_name_parts {
         let selectable = outcome
-            .server_selectables
+            .selectables
             .get(&(current_entity.name, selection_name.dereference().into()))
             .and_then(|x| x.item.as_object())
+            .and_then(|x| x.as_server())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(

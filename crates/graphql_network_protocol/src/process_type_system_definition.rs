@@ -13,9 +13,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, Description, EmptyDirectiveSet, NonConstantValue, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionSet, SelectionTypePostfix, TypeAnnotation,
-    VariableDefinition,
+    ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
+    NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
+    SelectionTypePostfix, TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
@@ -88,7 +88,7 @@ pub fn process_graphql_type_system_document(
                 );
 
                 insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.server_selectables,
+                    &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
                     get_typename_selectable(
                         db,
@@ -100,6 +100,7 @@ pub fn process_graphql_type_system_document(
                             .wrap_some(),
                     )
                     .scalar_selected()
+                    .server_defined()
                     .with_location(location),
                     non_fatal_diagnostics,
                 );
@@ -135,13 +136,18 @@ pub fn process_graphql_type_system_document(
 
                 // TODO do this if the type implements Node instead
                 if has_id_field {
-                    outcome.client_scalar_selectables.push(
+                    insert_selectable_or_multiple_definition_diagnostic(
+                        &mut outcome.selectables,
+                        (server_object_entity_name, (*REFETCH_FIELD_NAME).into()),
                         get_refetch_selectable(
                             server_object_entity_name,
                             subfields_or_inline_fragments.clone(),
                         )
-                        .with_generated_location()
-                        .wrap_ok(),
+                        .interned_value(db)
+                        .scalar_selected()
+                        .client_defined()
+                        .with_generated_location(),
+                        non_fatal_diagnostics,
                     );
 
                     outcome.client_scalar_refetch_strategies.push(
@@ -299,10 +305,11 @@ pub fn process_graphql_type_system_document(
 
                 // unions do not implement interfaces
                 insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.server_selectables,
+                    &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME).into()),
                     get_typename_selectable(db, server_object_entity_name, location, None)
                         .scalar_selected()
+                        .server_defined()
                         .with_location(location),
                     non_fatal_diagnostics,
                 );

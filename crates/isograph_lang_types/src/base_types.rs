@@ -14,7 +14,7 @@ use crate::{ScalarSelection, UnvalidatedSelection};
 ///
 /// - server fields vs client fields.
 /// - schema server fields (objects) vs client pointers
-#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Ord, PartialOrd, PartialEq, Eq, Hash)]
 pub enum DefinitionLocation<TServer, TClient> {
     Server(TServer),
     Client(TClient),

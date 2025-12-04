@@ -9,9 +9,9 @@ use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
 use isograph_lang_types::Description;
 
 use crate::{
-    ClientScalarSelectable, ExposeFieldDirective, MemoRefServerEntity, MemoRefServerSelectable,
-    MergedSelectionMap, RefetchStrategy, RootOperationName, ServerObjectEntity,
-    ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ExposeFieldDirective, MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap,
+    RefetchStrategy, RootOperationName, ServerObjectEntity, ValidatedVariableDefinition,
+    isograph_database::IsographDatabase,
 };
 
 type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
@@ -21,14 +21,11 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
     pub entities:
         BTreeMap<UnvalidatedTypeName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
 
-    pub server_selectables: BTreeMap<
+    pub selectables: BTreeMap<
         (ServerObjectEntityName, SelectableName),
-        WithLocation<MemoRefServerSelectable<TNetworkProtocol>>,
+        WithLocation<MemoRefSelectable<TNetworkProtocol>>,
     >,
 
-    // expose_as fields...
-    pub client_scalar_selectables:
-        Vec<DiagnosticResult<WithLocation<ClientScalarSelectable<TNetworkProtocol>>>>,
     pub client_scalar_refetch_strategies: Vec<
         DiagnosticResult<
             WithLocation<(

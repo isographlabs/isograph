@@ -302,6 +302,7 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
 #[expect(clippy::type_complexity)]
 #[memo]
+// TODO this function seems quite useless!
 pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
@@ -311,17 +312,16 @@ pub fn expose_field_map<TNetworkProtocol: NetworkProtocol>(
     >,
 > {
     let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
-    let expose_as_field_queue = &outcome.0.item.client_scalar_selectables;
+    let expose_as_field_queue = &outcome.0.item.selectables;
 
     let mut map = HashMap::new();
-    for with_location in expose_as_field_queue.iter().flatten() {
-        map.insert(
-            (
-                with_location.item.parent_object_entity_name,
-                with_location.item.name.item,
-            ),
-            with_location.item.interned_ref(db),
-        );
+    for memo_ref in expose_as_field_queue
+        .iter()
+        .filter_map(|(_key, value)| value.item.as_client())
+        .filter_map(|x| x.as_scalar())
+    {
+        let item = memo_ref.lookup(db);
+        map.insert((item.parent_object_entity_name, item.name.item), memo_ref);
     }
 
     Ok(map)
@@ -377,13 +377,12 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
         )
         .chain(
             expose_field_map(db)
-                .clone()
-                .note_todo("Do not clone. Use a MemoRef.")?
-                .into_iter()
+                .clone_err()?
+                .iter()
                 .map(|(key, selectable)| {
                     (
                         (key.0, key.1.into()),
-                        selectable.scalar_selected().wrap_ok(),
+                        selectable.dereference().scalar_selected().wrap_ok(),
                     )
                 }),
         )

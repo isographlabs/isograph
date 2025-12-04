@@ -15,7 +15,7 @@ use crate::{
 };
 
 #[memo]
-/// This just drops the location (but not internal locations...)
+/// This just drops the location (but not internal locations...) and filters out client fields
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
@@ -26,9 +26,9 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 
     outcome
         .item
-        .server_selectables
+        .selectables
         .iter()
-        .map(|(key, value)| (*key, value.item))
+        .filter_map(|(key, value)| value.item.as_server().map(|server| (*key, server)))
         .collect::<BTreeMap<_, _>>()
         .wrap_ok()
 }
