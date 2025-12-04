@@ -393,7 +393,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                                     parent_object_entity_name: *query_id,
                                                     server_object_selectable_name: *NODE_FIELD_NAME,
                                                     arguments: vec![id_arg.clone()],
-                                                    concrete_type: None,
+                                                    concrete_target_entity_name: None,
                                                 },
                                             ],
                                         );

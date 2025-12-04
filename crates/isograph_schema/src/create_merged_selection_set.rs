@@ -129,8 +129,8 @@ pub struct MergedLinkedFieldSelection {
     pub name: SelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
-    /// Some if the object is concrete; None otherwise.
-    pub concrete_type: Option<EntityName>,
+    /// None if the target is abstract
+    pub concrete_target_entity_name: Option<EntityName>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -323,7 +323,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
-                            concrete_type: linked_field_selection.concrete_type,
+                            concrete_target_entity_name: linked_field_selection
+                                .concrete_target_entity_name,
                             name: linked_field_selection.name,
                             selection_map: transform_child_map_with_parent_context(
                                 &linked_field_selection.selection_map,
@@ -337,7 +338,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                     }
                     MergedServerSelection::ClientObjectSelectable(linked_field_selection) => {
                         MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
-                            concrete_type: linked_field_selection.concrete_type,
+                            concrete_target_entity_name: linked_field_selection
+                                .concrete_target_entity_name,
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
                             name: linked_field_selection.name,
@@ -513,7 +515,7 @@ pub fn get_reachable_variables(
 pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_name: SelectableName,
     top_level_schema_field_arguments: &[VariableDefinition<ServerEntityName>],
-    top_level_schema_field_concrete_type: Option<EntityName>,
+    top_level_schema_field_concrete_target_entity_name: Option<EntityName>,
     top_level_schema_field_parent_object_entity_name: EntityName,
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
@@ -530,7 +532,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
         parent_object_entity_name: top_level_schema_field_parent_object_entity_name,
         server_object_selectable_name: top_level_schema_field_name,
         arguments: top_level_schema_field_arguments,
-        concrete_type: top_level_schema_field_concrete_type,
+        concrete_target_entity_name: top_level_schema_field_concrete_target_entity_name,
     }
 }
 
@@ -879,10 +881,10 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     )
                     .lookup(db)
-                    .concrete_type;
+                    .note_todo("We are looking up the same object for no reason")
+                    .is_concrete;
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    concrete_type,
                     parent_object_entity_name,
                     name: object_selection.name.item,
                     selection_map: BTreeMap::new(),
@@ -893,6 +895,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .map(|arg| arg.item.into_key_and_value()),
                         variable_context,
                     ),
+                    concrete_target_entity_name: if concrete_type {
+                        concrete_object_entity_name.wrap_some()
+                    } else {
+                        None
+                    },
                 })
             });
             match linked_field {
@@ -1244,7 +1251,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     };
 
     let mut subfields_or_inline_fragments = vec![];
-    if target_server_object_entity.concrete_type.is_some() {
+    if target_server_object_entity.is_concrete {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
             target_server_object_entity.name,
         ));
@@ -1256,17 +1263,19 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             key: ID_FIELD_NAME.unchecked_conversion(),
             value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
         }],
-        concrete_type: None,
+        concrete_target_entity_name: None,
     });
 
     let info = PathToRefetchFieldInfo {
-        wrap_refetch_field_with_inline_fragment: target_server_object_entity.concrete_type.map_or(
+        wrap_refetch_field_with_inline_fragment: if target_server_object_entity.is_concrete {
+            None
+        } else {
             (*newly_encountered_client_object_selectable
                 .target_object_entity_name
                 .inner())
-            .wrap_some(),
-            |_| None,
-        ),
+            .wrap_some()
+        },
+
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
             client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
             top_level_schema_field_arguments: id_arguments(),
@@ -1316,7 +1325,11 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     let client_object_selectable = parent_map.entry(normalization_key).or_insert_with(|| {
         MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
             parent_object_entity_name,
-            concrete_type: target_server_object_entity.concrete_type,
+            concrete_target_entity_name: if target_server_object_entity.is_concrete {
+                target_server_object_entity.name.wrap_some()
+            } else {
+                None
+            },
             name: object_selection.name.item,
             selection_map: BTreeMap::new(),
             arguments: transform_arguments_with_child_context(
@@ -1470,7 +1483,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     merged_selection_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
 ) {
-    if parent_object_entity.concrete_type.is_none() {
+    if !parent_object_entity.is_concrete {
         maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
     };
 
@@ -1517,7 +1530,7 @@ pub enum WrappedSelectionMapSelection {
         parent_object_entity_name: EntityName,
         server_object_selectable_name: SelectableName,
         arguments: Vec<ArgumentKeyAndValue>,
-        concrete_type: Option<EntityName>,
+        concrete_target_entity_name: Option<EntityName>,
     },
     InlineFragment(EntityName),
 }
@@ -1538,7 +1551,7 @@ pub fn selection_map_wrapped(
                 parent_object_entity_name,
                 server_object_selectable_name,
                 arguments,
-                concrete_type,
+                concrete_target_entity_name,
             } => {
                 map.insert(
                     NormalizationKey::ServerField(NameAndArguments {
@@ -1550,7 +1563,7 @@ pub fn selection_map_wrapped(
                         name: server_object_selectable_name,
                         selection_map: inner_selection_map,
                         arguments,
-                        concrete_type,
+                        concrete_target_entity_name,
                     }),
                 );
             }

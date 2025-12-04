@@ -71,7 +71,7 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        concrete_type: Some(object_type_definition.name.item.into()),
+                        is_concrete: true,
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                             subtypes: vec![],
@@ -126,7 +126,7 @@ pub fn process_graphql_type_system_document(
                         }],
                         // None -> node is not concrete.
                         // Note that this doesn't matter!
-                        concrete_type: None,
+                        concrete_target_entity_name: None,
                     },
                 ];
 
@@ -203,7 +203,7 @@ pub fn process_graphql_type_system_document(
                                     .wrap(Description)
                             }),
                         name: server_object_entity_name,
-                        concrete_type: Some(input_object_definition.name.item.into()),
+                        is_concrete: true,
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
@@ -265,7 +265,7 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        concrete_type: None,
+                        is_concrete: false,
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: union_definition

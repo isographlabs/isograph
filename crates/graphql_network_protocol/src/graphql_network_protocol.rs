@@ -136,7 +136,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .wrap(Description)
                     }),
                     name: server_object_entity_name,
-                    concrete_type: None,
+                    is_concrete: false,
                     network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
                         subtypes: supertype_to_subtype_map
@@ -402,13 +402,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     mutation_field.parent_object_entity_name;
                 let mutation_field_arguments = mutation_field.arguments.clone();
 
-                let top_level_schema_field_concrete_type = outcome
+                let top_level_schema_field_is_concrete = outcome
                     .entities
                     .get(&payload_object_entity_name.into())
                     .and_then(|entity| entity.item.as_object())
                     .expect("Expected entity to exist and to be an object.")
                     .lookup(db)
-                    .concrete_type;
+                    .is_concrete;
 
                 let (mut parts_reversed, target_parent_object_entity) =
                     match traverse_selections_and_return_path(
@@ -466,12 +466,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                         .name
                                         .item,
                                     arguments: vec![],
-                                    concrete_type: Some(target_parent_object_entity_name)
-                                        .note_todo(
-                                            "This is 100% a bug when there are \
+                                    concrete_target_entity_name: Some(
+                                        target_parent_object_entity_name,
+                                    )
+                                    .note_todo(
+                                        "This is 100% a bug when there are \
                                             multiple items in parts_reversed, or this \
                                             field is ignored.",
-                                        ),
+                                    ),
                                 }
                             }
                             ServerObjectSelectableVariant::InlineFragment => {
@@ -486,7 +488,11 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
                     mutation_subfield_name,
                     &top_level_schema_field_arguments,
-                    top_level_schema_field_concrete_type,
+                    if top_level_schema_field_is_concrete {
+                        payload_object_entity_name.wrap_some()
+                    } else {
+                        None
+                    },
                     top_level_schema_field_parent_object_entity_name,
                 ));
 
@@ -569,8 +575,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             )
             .lookup(db);
 
-        if let Some(concrete_type) = server_object_entity.concrete_type {
-            return format!("Link<\"{concrete_type}\">");
+        if server_object_entity.is_concrete {
+            let name = server_object_entity.name;
+            return format!("Link<\"{name}\">");
         }
 
         let subtypes = server_object_entity

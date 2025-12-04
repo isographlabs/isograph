@@ -255,7 +255,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name: *query_id,
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
-                        concrete_type: None,
+                        concrete_target_entity_name: None,
                     },
                 ],
             ))
