@@ -5,13 +5,12 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{SelectionType, VariableDefinition};
+use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ID_FIELD_NAME,
     ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
-    OwnedClientSelectable, PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath,
-    ServerEntityName, WrappedSelectionMapSelection, client_selectable_named, fetchable_types,
-    selection_map_wrapped,
+    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
+    WrappedSelectionMapSelection, fetchable_types, selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -40,25 +39,8 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let PathToRefetchFieldInfo {
         wrap_refetch_field_with_inline_fragment: refetch_field_parent_object_entity_name,
         imperatively_loaded_field_variant,
-        client_selectable_id,
+        ..
     } = path_to_refetch_field_info;
-
-    let (parent_object_entity_name, client_selectable_name) = match client_selectable_id {
-        SelectionType::Scalar(s) => (s.0, s.1.into()),
-        SelectionType::Object(o) => (o.0, o.1.into()),
-    };
-    let client_selectable =
-        client_selectable_named(db, parent_object_entity_name, client_selectable_name)
-            .as_ref()
-            .expect(
-                "Expected selectable to be valid. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
-            );
 
     let ImperativelyLoadedFieldVariant {
         client_selection_name,
@@ -83,7 +65,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
     // TODO we need to extend this with variables used in subfields_or_inline_fragments
     let mut definitions_of_used_variables =
-        get_used_variable_definitions(reachable_variables, client_selectable);
+        get_used_variable_definitions(reachable_variables, entrypoint);
 
     for variable_definition in top_level_schema_field_arguments.iter() {
         definitions_of_used_variables.push(VariableDefinition {
@@ -205,7 +187,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
-    entrypoint: &OwnedClientSelectable<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> Vec<VariableDefinition<ServerEntityName>> {
     reachable_variables
         .iter()
@@ -215,7 +197,6 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                 None
             } else {
                 entrypoint
-                    .as_ref()
                     .variable_definitions()
                     .iter()
                     .find(|definition| definition.item.name.item == *variable_name)
@@ -225,7 +206,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                                 This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
                                 Client field {} is missing variable definition {}",
-                            entrypoint.as_ref().name(),
+                            entrypoint.name(),
                             variable_name
                         )
                     })
