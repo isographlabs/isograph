@@ -45,19 +45,22 @@ export function useReadAndSubscribe<
   );
 
   if (readOutDataAndRecords.errors != null) {
-    const errors = readOutDataAndRecords.errors.map(
-      (error) => new GraphqlError(error),
+    throw new GraphqlAggregateError(
+      readOutDataAndRecords.errors.map((error) => new GraphqlError(error)),
     );
-    if (errors.length > 1) {
-      throw new AggregateError(errors);
-    }
-    throw errors[0];
   }
 
   return readOutDataAndRecords.item;
 }
 
-class GraphqlError extends Error implements PayloadError {
+export class GraphqlAggregateError extends AggregateError {
+  errors!: [GraphqlError, ...GraphqlError[]];
+  constructor(errors: Iterable<GraphqlError>, message?: string) {
+    super(errors, message);
+  }
+}
+
+export class GraphqlError extends Error implements PayloadError {
   locations?: { line: number; column: number }[];
   path?: (string | number)[];
   extensions?: PayloadErrorExtensions;
