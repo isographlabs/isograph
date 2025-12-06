@@ -297,5 +297,7 @@
     "**/.cargo/**": true,
     "**/.rustup/**": true
   },
-  "editor.rename.enablePreview": false
+  "editor.rename.enablePreview": false,
+  "isograph.rootDirectory": "./demos/pet-demo",
+  "isograph.pathToIsograph": "../../target/debug/isograph_cli"
 }
