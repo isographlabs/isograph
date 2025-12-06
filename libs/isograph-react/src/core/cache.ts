@@ -12,10 +12,7 @@ import {
   type NormalizationAstLoader,
   type NormalizationAstNodes,
 } from '../core/entrypoint';
-import {
-  mergeArrays,
-  mergeObjectsUsingReaderAst,
-} from './areEqualWithDeepComparison';
+import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import type { Brand } from './brand';
 import { FetchOptions } from './check';
 import {
@@ -425,18 +422,10 @@ function callSubscriptionIfDataChanged<
     deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
   }));
 
-  const mergedErrors =
-    subscription.encounteredDataAndRecords.errors &&
-    newEncounteredDataAndRecords.errors
-      ? mergeArrays(
-          subscription.encounteredDataAndRecords.errors,
-          newEncounteredDataAndRecords.errors,
-        )
-      : newEncounteredDataAndRecords.errors;
-
   if (
     mergedItem !== subscription.encounteredDataAndRecords.item ||
-    mergedErrors !== subscription.encounteredDataAndRecords.errors
+    newEncounteredDataAndRecords.errors !==
+      subscription.encounteredDataAndRecords.errors
   ) {
     logAnyError(
       environment,
