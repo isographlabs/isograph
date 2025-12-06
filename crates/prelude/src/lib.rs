@@ -1,3 +1,7 @@
+use std::hash::Hash;
+
+use pico::{Database, DynEq, MemoRef};
+
 pub trait Postfix
 where
     Self: Sized,
@@ -51,6 +55,31 @@ where
     #[inline(always)]
     fn note_do_not_commit(self, #[allow(unused)] message: &'static str) -> Self {
         self
+    }
+
+    #[inline(always)]
+    fn interned_value(self, db: &impl Database) -> MemoRef<Self>
+    where
+        Self: Clone + Hash + DynEq,
+    {
+        db.intern_value(self)
+    }
+
+    #[inline(always)]
+    fn interned_ref(&self, db: &impl Database) -> MemoRef<Self>
+    where
+        Self: Clone + Hash + DynEq,
+    {
+        db.intern_ref(self)
+    }
+
+    #[inline(always)]
+    fn dereference(self) -> <Self as std::ops::Deref>::Target
+    where
+        Self: std::ops::Deref,
+        <Self as std::ops::Deref>::Target: Copy,
+    {
+        *self
     }
 }
 

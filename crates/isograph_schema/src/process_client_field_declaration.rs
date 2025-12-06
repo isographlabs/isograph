@@ -1,14 +1,13 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, ConstExportName,
-    Diagnostic, DiagnosticResult, Location, RelativePathToSourceFile, SelectableName,
-    ServerObjectEntityName, TextSource, UnvalidatedTypeName, VariableName, WithSpan,
-    WithSpanPostfix,
+    ConstExportName, Diagnostic, DiagnosticResult, EntityName, Location, RelativePathToSourceFile,
+    SelectableName, TextSource, VariableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
     ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
     TypeAnnotation, UnvalidatedSelection, VariableDefinition,
 };
+use pico::MemoRef;
 use prelude::{ErrClone, Postfix};
 
 use pico_macros::memo;
@@ -25,16 +24,16 @@ pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientScalarSelectableSelectionSet {
-    pub parent_object_entity_name: ServerObjectEntityName,
-    pub client_scalar_selectable_name: ClientScalarSelectableName,
+    pub parent_object_entity_name: EntityName,
+    pub client_scalar_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientObjectSelectableSelectionSet {
-    pub parent_object_entity_name: ServerObjectEntityName,
-    pub client_object_selectable_name: ClientObjectSelectableName,
+    pub parent_object_entity_name: EntityName,
+    pub client_object_selectable_name: SelectableName,
     pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
     pub refetch_selection_set: WithSpan<SelectionSet<(), ()>>,
 }
@@ -45,24 +44,24 @@ pub type UnprocessedSelectionSet = SelectionType<
 
 pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field_declaration: WithSpan<ClientFieldDeclaration>,
+    client_field_declaration: MemoRef<ClientFieldDeclaration>,
     text_source: TextSource,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
-    let parent_type_id =
-        defined_entity(db, client_field_declaration.item.parent_type.item.0.into())
-            .to_owned()?
-            .ok_or_else(|| {
-                let parent_object_entity_name = client_field_declaration.item.parent_type.item;
-                Diagnostic::new(
-                    format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                    Location::new(text_source, client_field_declaration.item.parent_type.span)
-                        .wrap_some(),
-                )
-            })?;
+    let client_field_declaration_item = client_field_declaration.lookup(db);
+    let parent_type_id = defined_entity(db, client_field_declaration_item.parent_type.item.0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let parent_object_entity_name = client_field_declaration_item.parent_type.item;
+            Diagnostic::new(
+                format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                Location::new(text_source, client_field_declaration_item.parent_type.span)
+                    .wrap_some(),
+            )
+        })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => {
-            add_client_scalar_selectable_to_entity(db, client_field_declaration.item)
+            add_client_scalar_selectable_to_entity(db, client_field_declaration)
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")
                 .map(|x| x.0)?
@@ -75,7 +74,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                     In order to do so, the parent object must \
                     be an object, interface or union."
                 ),
-                Location::new(text_source, client_field_declaration.item.parent_type.span)
+                Location::new(text_source, client_field_declaration_item.parent_type.span)
                     .wrap_some(),
             )
             .wrap_err();
@@ -86,42 +85,37 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 
 pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
+    client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
     text_source: TextSource,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
-    let parent_type_id = defined_entity(
-        db,
-        client_pointer_declaration.item.parent_type.item.0.into(),
-    )
-    .to_owned()?
-    .ok_or_else(|| {
-        let parent_object_entity_name = client_pointer_declaration.item.parent_type.item;
-        Diagnostic::new(
-            format!("`{parent_object_entity_name}` is not a type that has been defined."),
-            Location::new(
-                text_source,
-                client_pointer_declaration.item.parent_type.span,
+    let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
+    let parent_type_id = defined_entity(db, client_pointer_declaration_item.parent_type.item.0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
+            Diagnostic::new(
+                format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                Location::new(
+                    text_source,
+                    client_pointer_declaration_item.parent_type.span,
+                )
+                .wrap_some(),
             )
-            .wrap_some(),
-        )
-    })?;
+        })?;
 
-    let target_type_id = defined_entity(
-        db,
-        client_pointer_declaration.item.target_type.inner().0.into(),
-    )
-    .to_owned()?
-    .ok_or_else(|| {
-        let target_type = client_pointer_declaration.item.target_type.inner();
-        Diagnostic::new(
-            format!("`{target_type}` is not a type that has been defined."),
-            Location::new(
-                text_source,
-                client_pointer_declaration.item.target_type.span(),
+    let target_type_id = defined_entity(db, client_pointer_declaration_item.target_type.inner().0)
+        .to_owned()?
+        .ok_or_else(|| {
+            let target_type = client_pointer_declaration_item.target_type.inner();
+            Diagnostic::new(
+                format!("`{target_type}` is not a type that has been defined."),
+                Location::new(
+                    text_source,
+                    client_pointer_declaration_item.target_type.span(),
+                )
+                .wrap_some(),
             )
-            .wrap_some(),
-        )
-    })?;
+        })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
@@ -139,7 +133,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                     ),
                     Location::new(
                         text_source,
-                        client_pointer_declaration.item.target_type.span(),
+                        client_pointer_declaration_item.target_type.span(),
                     )
                     .wrap_some(),
                 )
@@ -151,7 +145,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{scalar_entity_name}` is not a type that has been defined."),
                 Location::new(
                     text_source,
-                    client_pointer_declaration.item.target_type.span(),
+                    client_pointer_declaration_item.target_type.span(),
                 )
                 .wrap_some(),
             )
@@ -164,14 +158,15 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_field_declaration: ClientFieldDeclaration,
+    client_field_declaration: MemoRef<ClientFieldDeclaration>,
 ) -> DiagnosticResult<(
     UnprocessedClientScalarSelectableSelectionSet,
-    ClientScalarSelectable<TNetworkProtocol>,
+    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
 )> {
+    let client_field_declaration = client_field_declaration.lookup(db);
     let client_scalar_selectable_name = client_field_declaration.client_field_name.item;
 
-    let variant = get_client_variant(&client_field_declaration);
+    let variant = get_client_variant(client_field_declaration);
 
     let selectable = ClientScalarSelectable {
         description: client_field_declaration.description.map(|x| x.item),
@@ -182,13 +177,13 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         variant,
         variable_definitions: client_field_declaration
             .variable_definitions
-            .into_iter()
+            .iter()
             .map(|variable_definition| {
                 validate_variable_definition(
                     db,
                     variable_definition,
                     client_field_declaration.parent_type.item.0,
-                    client_scalar_selectable_name.0.into(),
+                    client_scalar_selectable_name.0,
                     client_field_declaration
                         .client_field_name
                         .location
@@ -201,7 +196,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         network_protocol: std::marker::PhantomData,
     };
 
-    let selections = client_field_declaration.selection_set;
+    let selections = client_field_declaration.selection_set.clone();
 
     let parent_object_entity_name = client_field_declaration.parent_type.item.0;
     let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
@@ -213,14 +208,14 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
             reader_selection_set: selections,
             refetch_strategy,
         },
-        selectable,
+        selectable.interned_value(db),
     )
         .wrap_ok()
 }
 
 pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
     let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
 
@@ -230,10 +225,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
         let id_field =
-            server_selectable_named(db, parent_object_entity_name, (*ID_FIELD_NAME).into())
-                // TODO don't call to_owned
-                .to_owned()?
-                .transpose()?;
+            server_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME).clone_err()?;
 
         let query_id = fetchable_types_map
             .iter()
@@ -255,7 +247,7 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                         parent_object_entity_name: *query_id,
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
-                        concrete_type: None,
+                        concrete_target_entity_name: None,
                     },
                 ],
             ))
@@ -266,26 +258,27 @@ pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
 
 fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_pointer_declaration: WithSpan<ClientPointerDeclaration>,
+    client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let (unprocessed_fields, _) =
-        process_client_pointer_declaration_inner(db, client_pointer_declaration.item).to_owned()?;
+        process_client_pointer_declaration_inner(db, client_pointer_declaration).to_owned()?;
 
-    Ok(unprocessed_fields)
+    unprocessed_fields.wrap_ok()
 }
 
 #[memo]
 pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_pointer_declaration: ClientPointerDeclaration,
+    client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<(
     UnprocessedClientObjectSelectableSelectionSet,
-    ClientObjectSelectable<TNetworkProtocol>,
+    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
 )> {
+    let client_pointer_declaration = client_pointer_declaration.lookup(db);
     let parent_object_entity_name = client_pointer_declaration.parent_type.item.0;
     let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
-    if let Some(directive) = client_pointer_declaration.directives.into_iter().next() {
+    if let Some(directive) = client_pointer_declaration.directives.first() {
         let directive_name = directive.item.name;
         return Diagnostic::new(
             format!("Directive `@{directive_name}` is not supported on client pointers."),
@@ -298,7 +291,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
         .wrap_err();
     }
 
-    let unprocessed_fields = client_pointer_declaration.selection_set;
+    let unprocessed_fields = client_pointer_declaration.selection_set.clone();
 
     let client_object_selectable = ClientObjectSelectable {
         description: client_pointer_declaration.description.map(|x| x.item),
@@ -309,13 +302,13 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
 
         variable_definitions: client_pointer_declaration
             .variable_definitions
-            .into_iter()
+            .iter()
             .map(|variable_definition| {
                 validate_variable_definition(
                     db,
                     variable_definition,
                     parent_object_entity_name,
-                    client_pointer_name.into(),
+                    client_pointer_name,
                     client_pointer_declaration
                         .client_pointer_name
                         .location
@@ -346,16 +339,16 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             }
             .with_generated_span(),
         },
-        client_object_selectable,
+        client_object_selectable.interned_value(db),
     ))
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_selection_name: ClientSelectableName,
+    pub client_selection_name: SelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
-    pub root_object_entity_name: ServerObjectEntityName,
+    pub root_object_entity_name: EntityName,
     pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
     pub field_map: Vec<FieldMapItem>,
     /// The arguments we must pass to the top level schema field, e.g. id: ID!
@@ -407,8 +400,8 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
 
 pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    variable_definition: WithSpan<VariableDefinition<UnvalidatedTypeName>>,
-    parent_object_entity_name: ServerObjectEntityName,
+    variable_definition: &WithSpan<VariableDefinition<EntityName>>,
+    parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     // TODO this is hacky
     text_source: TextSource,
@@ -436,7 +429,7 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
     VariableDefinition {
         name: variable_definition.item.name.map(VariableName::from),
         type_,
-        default_value: variable_definition.item.default_value,
+        default_value: variable_definition.item.default_value.clone(),
     }
     .with_span(variable_definition.span)
     .wrap_ok()

@@ -1,7 +1,6 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, DiagnosticResult,
-    DiagnosticVecResult, ParentObjectEntityNameAndSelectableName, SelectableName,
-    ServerObjectEntityName, WithLocation, WithSpan,
+    DiagnosticResult, DiagnosticVecResult, EntityName, ParentObjectEntityNameAndSelectableName,
+    SelectableName, WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
@@ -16,9 +15,9 @@ use crate::{
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> ClientSelectableName;
+    fn name(&self) -> SelectableName;
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName;
+    fn parent_object_entity_name(&self) -> EntityName;
 
     fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>];
 
@@ -32,18 +31,18 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -63,18 +62,18 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -94,18 +93,18 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -125,18 +124,18 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ClientSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item.into(),
+            selectable_name: self.name.item,
         }
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -157,10 +156,10 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -177,10 +176,10 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -193,8 +192,8 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
-    client_scalar_selectable_name: ClientScalarSelectableName,
+    parent_object_entity_name: EntityName,
+    client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
     let selectable = client_scalar_selectable_named(
         db,
@@ -207,7 +206,8 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     .expect(
         "Expected selectable to exist. \
         This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     Ok(match selectable.variant {
         ClientFieldVariant::ImperativelyLoadedField(_) => {
@@ -241,7 +241,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
             selectable_validated_reader_selection_set(
                 db,
                 parent_object_entity_name,
-                client_scalar_selectable_name.into(),
+                client_scalar_selectable_name,
             )
             .as_ref()
             .expect("Expected selection set to be valid.")
@@ -254,13 +254,13 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
-    client_object_selectable_name: ClientObjectSelectableName,
+    parent_object_entity_name: EntityName,
+    client_object_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
     selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,
-        client_object_selectable_name.into(),
+        client_object_selectable_name,
     )
     .clone()
 }

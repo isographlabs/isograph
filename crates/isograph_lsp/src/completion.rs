@@ -2,13 +2,12 @@ use crate::{
     hover::get_iso_literal_extraction_from_text_position_params,
     lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
 };
-use common_lang_types::SelectableName;
 use common_lang_types::Span;
 use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_compiler::CompilerState;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
-use isograph_schema::SelectableTrait;
+use isograph_lang_types::SelectionType;
 use isograph_schema::get_parent_for_selection_set_path;
 use isograph_schema::selectables_for_entity;
 use isograph_schema::{NetworkProtocol, process_iso_literal_extraction};
@@ -60,24 +59,59 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                     {
                         map.iter()
                             .flat_map(|result| result.as_ref().ok())
-                            .map(|selectable| CompletionItem {
-                                label: selectable.name().item.to_string(),
-                                label_details: Some(CompletionItemLabelDetails {
-                                    detail: None,
-                                    description: selectable.description().map(|x| x.to_string()),
-                                }),
-                                insert_text: match selectable.as_ref() {
-                                    DefinitionLocation::Server(s) => s
-                                        .as_ref()
-                                        .as_object()
-                                        .map(|selectable| selectable.name.item.into()),
-                                    DefinitionLocation::Client(c) => c
-                                        .as_ref()
-                                        .as_object()
-                                        .map(|selectable| selectable.name.item.into()),
+                            .map(|selectable| {
+                                let (selectable_name, description) = match selectable {
+                                    DefinitionLocation::Server(s) => match s {
+                                        SelectionType::Scalar(s) => {
+                                            let scalar = s.lookup(db);
+                                            (
+                                                scalar.name.item.to_string(),
+                                                scalar.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                        SelectionType::Object(o) => {
+                                            let object = o.lookup(db);
+                                            (
+                                                object.name.item.to_string(),
+                                                object.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                    },
+                                    DefinitionLocation::Client(c) => match c {
+                                        SelectionType::Scalar(s) => {
+                                            let scalar = s.lookup(db);
+                                            (
+                                                scalar.name.item.to_string(),
+                                                scalar.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                        SelectionType::Object(o) => {
+                                            let object = o.lookup(db);
+                                            (
+                                                object.name.item.to_string(),
+                                                object.description.map(|x| x.to_string()),
+                                            )
+                                        }
+                                    },
+                                };
+                                CompletionItem {
+                                    label_details: CompletionItemLabelDetails {
+                                        detail: None,
+                                        description,
+                                    }
+                                    .wrap_some(),
+                                    insert_text: match selectable.as_ref() {
+                                        DefinitionLocation::Server(s) => {
+                                            s.as_ref().as_object().map(|_| &selectable_name)
+                                        }
+                                        DefinitionLocation::Client(c) => {
+                                            c.as_ref().as_object().map(|_| &selectable_name)
+                                        }
+                                    }
+                                    .map(|name| format!("{} {{\n}}", name)),
+                                    label: selectable_name,
+                                    ..Default::default()
                                 }
-                                .map(|name: SelectableName| format!("{} {{\n}}", name)),
-                                ..Default::default()
                             })
                             .collect::<Vec<_>>()
                             .wrap_some()

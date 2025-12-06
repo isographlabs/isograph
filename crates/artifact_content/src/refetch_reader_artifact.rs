@@ -94,7 +94,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
             file_name: *REFETCH_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
-                selectable_name: client_scalar_selectable.name.item.into(),
+                selectable_name: client_scalar_selectable.name.item,
             }
             .wrap_some(),
         },
@@ -127,7 +127,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
-                selectable_name: client_scalar_selectable.name.item.into(),
+                selectable_name: client_scalar_selectable.name.item,
             }
             .wrap_some(),
         },

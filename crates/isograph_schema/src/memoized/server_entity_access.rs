@@ -1,9 +1,6 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-use common_lang_types::{
-    Diagnostic, DiagnosticResult, JavascriptName, Location, ServerObjectEntityName,
-    ServerScalarEntityName, UnvalidatedTypeName,
-};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, JavascriptName, Location};
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
@@ -14,63 +11,35 @@ use crate::{
     ServerScalarEntity,
 };
 
-/// N.B. we should normally not materialize a map here. However, parse_type_system_documents
-/// already fully parses the schema, so until that's refactored, there isn't much upside in
-/// not materializing a map here.
+/// This function just drops the locations
 #[memo]
-fn server_entity_map<TNetworkProtocol: NetworkProtocol>(
+pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<HashMap<UnvalidatedTypeName, Vec<MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
+    let (outcome, _fetchable_types) =
+        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
-    let mut server_entities: HashMap<_, Vec<_>> = HashMap::new();
-
-    for item in outcome.iter() {
-        match item {
-            SelectionType::Scalar(s) => server_entities
-                .entry(s.item.name.into())
-                .or_default()
-                .push(db.intern_ref(&s.item).scalar_selected()),
-            SelectionType::Object(outcome) => server_entities
-                .entry(outcome.server_object_entity.item.name.into())
-                .or_default()
-                .push(
-                    db.intern_ref(&outcome.server_object_entity.item)
-                        .object_selected(),
-                ),
-        }
-    }
-
-    Ok(server_entities)
-}
-
-// TODO consider adding a memoized function that creates a map of entities (maybe
-// with untracked access?) and going through that.
-#[memo]
-pub fn server_entities_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: UnvalidatedTypeName,
-) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
-    let map = server_entity_map(db).clone_err()?;
-
-    map.get(&entity_name).cloned().unwrap_or_default().wrap_ok()
+    outcome
+        .item
+        .entities
+        .iter()
+        .map(|(entity_name, entities)| (*entity_name, entities.item))
+        .collect::<BTreeMap<_, _>>()
+        .interned_value(db)
+        .wrap_ok()
 }
 
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<ServerObjectEntity<TNetworkProtocol>>> {
+) -> DiagnosticResult<Vec<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
+        .item
+        .entities
         .iter()
-        .filter_map(|x| x.as_ref().as_object())
-        .map(|x| {
-            x.server_object_entity
-                .item
-                .clone()
-                .note_todo("Do not clone. Use a MemoRef.")
-        })
+        .filter_map(|(_, x)| x.item.as_object())
         .collect::<Vec<_>>()
         .wrap_ok()
 }
@@ -78,94 +47,62 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_object_entity_name: ServerObjectEntityName,
+    server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
-    let entities = server_entities_named(db, server_object_entity_name.into()).clone_err()?;
+    let map = server_entities_map_without_locations(db)
+        .clone_err()?
+        .lookup(db);
 
-    match entities.split_first() {
-        Some((first, rest)) => {
-            if rest.is_empty() {
-                match first {
-                    SelectionType::Object(o) => (*o).wrap_some().wrap_ok(),
-                    SelectionType::Scalar(_) => {
-                        let location =
-                            entity_definition_location(db, server_object_entity_name.into())
-                                .as_ref()
-                                .ok()
-                                .cloned()
-                                .flatten();
-                        entity_wrong_type_diagnostic(
-                            server_object_entity_name.into(),
-                            "a scalar",
-                            "an object",
-                            location,
-                        )
-                        .wrap_err()
-                    }
-                }
-            } else {
-                let location = entity_definition_location(db, server_object_entity_name.into())
+    match map.get(&server_object_entity_name) {
+        Some(entity) => match entity {
+            SelectionType::Scalar(_) => {
+                let location = entity_definition_location(db, server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
                     .flatten();
-
-                multiple_entity_definitions_found_diagnostic(
-                    server_object_entity_name.into(),
+                entity_wrong_type_diagnostic(
+                    server_object_entity_name,
+                    "a scalar",
+                    "an object",
                     location,
                 )
                 .wrap_err()
             }
-        }
-        None => Ok(None),
+            SelectionType::Object(o) => (*o).wrap_some().wrap_ok(),
+        },
+        None => None.wrap_ok(),
     }
 }
 
 #[memo]
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: ServerScalarEntityName,
+    server_scalar_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarEntity<TNetworkProtocol>>>> {
-    let entities = server_entities_named(db, server_scalar_entity_name.into()).clone_err()?;
+    let map = server_entities_map_without_locations(db)
+        .clone_err()?
+        .lookup(db);
 
-    match entities.split_first() {
-        Some((first, rest)) => {
-            if rest.is_empty() {
-                match first {
-                    SelectionType::Scalar(s) => (*s)
-                        .note_todo("Do not clone. Use a MemoRef.")
-                        .wrap_some()
-                        .wrap_ok(),
-                    SelectionType::Object(_) => {
-                        let location =
-                            entity_definition_location(db, server_scalar_entity_name.into())
-                                .as_ref()
-                                .ok()
-                                .cloned()
-                                .flatten();
-                        entity_wrong_type_diagnostic(
-                            server_scalar_entity_name.into(),
-                            "an object",
-                            "a scalar",
-                            location,
-                        )
-                        .wrap_err()
-                    }
-                }
-            } else {
-                let location = entity_definition_location(db, server_scalar_entity_name.into())
+    match map.get(&server_scalar_entity_name) {
+        Some(entity) => match entity {
+            SelectionType::Object(_) => {
+                let location = entity_definition_location(db, server_scalar_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
                     .flatten();
-                multiple_entity_definitions_found_diagnostic(
-                    server_scalar_entity_name.into(),
+                entity_wrong_type_diagnostic(
+                    server_scalar_entity_name,
+                    "an object",
+                    "a scalar",
                     location,
                 )
                 .wrap_err()
             }
-        }
-        None => Ok(None),
+            SelectionType::Scalar(s) => (*s).wrap_some().wrap_ok(),
+        },
+        None => None.wrap_ok(),
     }
 }
 
@@ -173,7 +110,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: ServerScalarEntityName,
+    server_scalar_entity_name: EntityName,
 ) -> DiagnosticResult<Option<JavascriptName>> {
     let value = server_scalar_entity_named(db, server_scalar_entity_name).clone()?;
 
@@ -212,104 +149,42 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-// TODO define this in terms of server_entities_vec??
-#[memo]
-pub fn defined_entities<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<HashMap<UnvalidatedTypeName, Vec<ServerEntityName>>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
-
-    let mut defined_entities: HashMap<UnvalidatedTypeName, Vec<_>> = HashMap::new();
-
-    for defined_entity in outcome.iter() {
-        match defined_entity {
-            SelectionType::Object(outcome) => defined_entities
-                .entry(outcome.server_object_entity.item.name.into())
-                .or_default()
-                .push(outcome.server_object_entity.item.name.object_selected()),
-            SelectionType::Scalar(server_scalar_entity) => defined_entities
-                .entry(server_scalar_entity.item.name.into())
-                .or_default()
-                .push(server_scalar_entity.item.name.scalar_selected()),
-        }
-    }
-
-    Ok(defined_entities)
-}
-
+// TODO what is this for?? We should get rid of this.
 #[memo]
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
 ) -> DiagnosticResult<Option<ServerEntityName>> {
-    match defined_entities(db).clone_err()?.get(&entity_name) {
-        Some(items) => {
-            match items.split_first() {
-                Some((first, rest)) => {
-                    if rest.is_empty() {
-                        Ok(Some(*first))
-                    } else {
-                        let location = entity_definition_location(db, entity_name)
-                            .as_ref()
-                            .ok()
-                            .cloned()
-                            .flatten();
-                        multiple_entity_definitions_found_diagnostic(entity_name, location)
-                            .wrap_err()
-                    }
-                }
-                None => {
-                    // Empty, this shouldn't happen. We can consider having a NonEmptyVec or something
-                    Ok(None)
-                }
-            }
-        }
-        None => Ok(None),
+    match server_entities_map_without_locations(db)
+        .clone_err()?
+        .lookup(db)
+        .get(&entity_name)
+    {
+        Some(entity) => match entity {
+            SelectionType::Scalar(s) => s.lookup(db).name.scalar_selected().wrap_some().wrap_ok(),
+            SelectionType::Object(o) => o.lookup(db).name.object_selected().wrap_some().wrap_ok(),
+        },
+        None => None.wrap_ok(),
     }
 }
 
-/// Finds the entity of the first entity with the target name.
 #[memo]
 pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
 ) -> DiagnosticResult<Option<Location>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
-        .iter()
-        .find_map(|item| {
-            match item {
-                SelectionType::Scalar(s) => {
-                    let name: UnvalidatedTypeName = s.item.name.into();
-                    if name == entity_name {
-                        return Some(s.location);
-                    }
-                }
-                SelectionType::Object(o) => {
-                    let name: UnvalidatedTypeName = o.server_object_entity.item.name.into();
-                    if name == entity_name {
-                        return Some(o.server_object_entity.location);
-                    }
-                }
-            }
-            None
-        })
+        .item
+        .entities
+        .get(&entity_name)
+        .map(|x| x.location)
         .wrap_ok()
 }
 
-pub fn multiple_entity_definitions_found_diagnostic(
-    server_object_entity_name: UnvalidatedTypeName,
-    location: Option<Location>,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!("Multiple definitions of {server_object_entity_name} were found."),
-        location,
-    )
-}
-
 pub fn entity_wrong_type_diagnostic(
-    entity_name: UnvalidatedTypeName,
+    entity_name: EntityName,
     actual_type: &'static str,
     intended_type: &'static str,
     location: Option<Location>,
@@ -320,10 +195,7 @@ pub fn entity_wrong_type_diagnostic(
     )
 }
 
-pub fn entity_not_defined_diagnostic(
-    entity_name: ServerObjectEntityName,
-    location: Location,
-) -> Diagnostic {
+pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {
     Diagnostic::new(
         format!("`{entity_name}` is not defined."),
         location.wrap_some(),

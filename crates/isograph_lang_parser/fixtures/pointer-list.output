@@ -8,8 +8,8 @@ Ok(
                         "pointer",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "User",
                             ),
                         ),
@@ -23,8 +23,8 @@ Ok(
                             Named(
                                 GraphQLNamedTypeAnnotation(
                                     WithSpan {
-                                        item: ServerObjectEntityNameWrapper(
-                                            ServerObjectEntityName(
+                                        item: EntityNameWrapper(
+                                            EntityName(
                                                 "User",
                                             ),
                                         ),

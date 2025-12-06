@@ -1,12 +1,11 @@
 use crate::{
     IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
     UseRefetchFieldRefetchStrategy, ValidatedObjectSelection, ValidatedScalarSelection,
-    ValidatedSelection, selectable_named, server_scalar_selectable_named,
+    ValidatedSelection, selectable_named,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
-    ParentObjectEntityNameAndSelectableName, SelectableName, ServerObjectEntityName, WithSpan,
-    WithSpanPostfix,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, Location,
+    ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection,
@@ -24,7 +23,7 @@ use prelude::{ErrClone, Postfix};
 pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: WithSpan<SelectionSet<(), ()>>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -46,7 +45,7 @@ pub fn get_validated_selection_set<TNetworkProtocol: NetworkProtocol>(
 fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     with_span: WithSpan<UnvalidatedSelection>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -74,7 +73,7 @@ fn get_validated_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -86,11 +85,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(o) => o,
     };
 
-    let selectable = selectable_named(
-        db,
-        parent_object_entity_name,
-        scalar_selection.name.item.into(),
-    );
+    let selectable = selectable_named(db, parent_object_entity_name, scalar_selection.name.item);
 
     let location = selectable.clone_err()?.as_ref().ok_or_else(|| {
         selection_does_not_exist_diagnostic(
@@ -98,7 +93,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             type_and_field.parent_object_entity_name,
             type_and_field.selectable_name,
             parent_object_entity_name,
-            scalar_selection.name.item.into(),
+            scalar_selection.name.item,
             scalar_selection.name.location,
         )
     })?;
@@ -120,7 +115,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                 .wrap_err();
             }
 
-            let server_scalar_selectable = *server_selectable_id
+            let server_scalar_selectable = server_selectable_id
                 .as_ref()
                 .as_scalar_result()
                 .as_ref()
@@ -131,12 +126,13 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        scalar_selection.name.item.into(),
+                        scalar_selection.name.item,
                         "an object",
                         "a scalar",
                         scalar_selection.name.location,
                     )
-                })?;
+                })?
+                .lookup(db);
 
             (
                 server_scalar_selectable.parent_object_entity_name,
@@ -152,12 +148,13 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        scalar_selection.name.item.into(),
+                        scalar_selection.name.item,
                         "an object",
                         "a scalar",
                         scalar_selection.name.location,
                     )
                 })?;
+            let client_scalar_selectable = client_scalar_selectable.lookup(db);
             (
                 client_scalar_selectable.parent_object_entity_name,
                 client_scalar_selectable.name.item,
@@ -177,7 +174,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
 
 fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -192,11 +189,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     // TODO this can be vastly simplified... it looks like we're looking up the same object
     // multiple times :) and the result we're returning might be in the parameters anyway.
 
-    let selectable = selectable_named(
-        db,
-        parent_object_entity_name,
-        object_selection.name.item.into(),
-    );
+    let selectable = selectable_named(db, parent_object_entity_name, object_selection.name.item);
 
     let selectable = selectable.clone_err()?.as_ref().ok_or_else(|| {
         vec![selection_does_not_exist_diagnostic(
@@ -204,45 +197,32 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
             type_and_field.parent_object_entity_name,
             type_and_field.selectable_name,
             parent_object_entity_name,
-            object_selection.name.item.into(),
+            object_selection.name.item,
             object_selection.name.location,
         )]
     })?;
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
         DefinitionLocation::Server(server_selectable) => {
-            let server_object_selectable = *server_selectable
+            let server_object_selectable = server_selectable
                 .as_ref()
                 .as_object_result()
                 .as_ref()
                 .map_err(|server_scalar_selectable| {
-                    let server_scalar_selectable = server_scalar_selectable_named(
-                        db,
-                        server_scalar_selectable.parent_object_entity_name,
-                        (server_scalar_selectable.name.item).into(),
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                    );
+                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
 
                     vec![selection_wrong_selection_type_diagnostic(
                         top_level_field_or_pointer.client_type(),
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        object_selection.name.item.into(),
+                        object_selection.name.item,
                         "a scalar",
                         "an object",
                         server_scalar_selectable.name.location,
                     )]
-                })?;
+                })?
+                .lookup(db);
 
             (
                 (
@@ -264,12 +244,14 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
                         parent_object_entity_name,
-                        object_selection.name.item.into(),
+                        object_selection.name.item,
                         "a scalar",
                         "an object",
-                        e.name.location,
+                        e.lookup(db).name.location,
                     )]
                 })?;
+
+            let client_object_selectable = client_object_selectable.lookup(db);
 
             (
                 (
@@ -300,7 +282,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
 pub fn get_validated_refetch_strategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     unvalidated_refetch_strategy: RefetchStrategy<(), ()>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     top_level_field_or_pointer: SelectionType<
         ParentObjectEntityNameAndSelectableName,
         ParentObjectEntityNameAndSelectableName,
@@ -345,9 +327,9 @@ pub fn get_all_errors_or_all_ok<T, E>(
 
 fn selection_does_not_exist_diagnostic(
     client_type: &str,
-    declaration_parent_object_entity_name: ServerObjectEntityName,
+    declaration_parent_object_entity_name: EntityName,
     declaration_selectable_name: SelectableName,
-    selectable_parent_object_entity_name: ServerObjectEntityName,
+    selectable_parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
@@ -364,9 +346,9 @@ fn selection_does_not_exist_diagnostic(
 #[expect(clippy::too_many_arguments)]
 fn selection_wrong_selection_type_diagnostic(
     client_type: &str,
-    declaration_entity_name: ServerObjectEntityName,
+    declaration_entity_name: EntityName,
     declaration_selectable_name: SelectableName,
-    selectable_entity_name: ServerObjectEntityName,
+    selectable_entity_name: EntityName,
     selectable_name: SelectableName,
     selected_as: &str,
     proper_way_to_select: &str,

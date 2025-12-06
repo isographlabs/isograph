@@ -1,6 +1,5 @@
 use common_lang_types::{
-    ScalarSelectableName, SelectableAlias, SelectableNameOrAlias, ServerObjectSelectableName,
-    VariableName, WithLocation, WithSpan,
+    SelectableAlias, SelectableName, SelectableNameOrAlias, VariableName, WithLocation, WithSpan,
 };
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -47,7 +46,7 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
 // TODO remove type parameter
 pub struct ScalarSelection<TScalarField> {
     // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<ScalarSelectableName>,
+    pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TScalarField,
@@ -72,7 +71,7 @@ impl<TScalarField> ScalarSelection<TScalarField> {
 // TODO remove the type parameters
 pub struct ObjectSelection<TScalar, TLinked> {
     // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<ServerObjectSelectableName>,
+    pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
     pub associated_data: TLinked,

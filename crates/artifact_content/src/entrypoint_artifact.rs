@@ -11,9 +11,8 @@ use crate::{
     raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ClientScalarSelectableName,
-    ParentObjectEntityNameAndSelectableName, QueryOperationName, ServerObjectEntityName,
-    VariableName,
+    ArtifactPath, ArtifactPathAndContent, EntityName, ParentObjectEntityNameAndSelectableName,
+    QueryOperationName, SelectableName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -36,8 +35,8 @@ use std::collections::BTreeSet;
 
 pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
-    entrypoint_scalar_selectable_name: ClientScalarSelectableName,
+    parent_object_entity_name: EntityName,
+    entrypoint_scalar_selectable_name: SelectableName,
     info: &EntrypointDeclarationInfo,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -57,7 +56,8 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     .expect(
         "Expected selectable to exist. \
             This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     let parent_object_entity =
         &server_object_entity_named(db, entrypoint.parent_object_entity_name())
@@ -133,7 +133,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: Vec<&ValidatedVariableDefinition>,
     // TODO this implements copy, don't take reference
-    default_root_operation: &Option<(&ServerObjectEntityName, &RootOperationName)>,
+    default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
@@ -282,7 +282,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .map(|info| info.directive_set)
         .unwrap_or(EntrypointDirectiveSet::None(EmptyDirectiveSet {}));
 
-    let field_name = query_name.into();
+    let field_name = query_name.unchecked_conversion();
     let type_name = parent_object_entity.name;
 
     let entrypoint_file_content = entrypoint_file_content(
@@ -465,8 +465,8 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
     operation_text: &OperationText,
     parent_type: &ServerObjectEntity<TNetworkProtocol>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
-    field_name: ClientScalarSelectableName,
-    concrete_type: ServerObjectEntityName,
+    field_name: SelectableName,
+    concrete_type: EntityName,
     directive_set: &EntrypointDirectiveSet,
     field_directive_set: ClientScalarSelectableDirectiveSet,
 ) -> String {

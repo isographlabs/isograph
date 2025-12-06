@@ -1,170 +1,83 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
-use common_lang_types::{
-    Diagnostic, DiagnosticResult, ServerObjectEntityName, ServerSelectableName,
-};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
 
 use crate::{
-    ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NetworkProtocol, OwnedServerSelectable,
+    ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable, NetworkProtocol,
     ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
-    field_to_insert_to_server_selectable, server_scalar_entity_named,
+    server_scalar_entity_named,
 };
 
-type OwnedSelectableResult<TNetworkProtocol> =
-    DiagnosticResult<OwnedServerSelectable<TNetworkProtocol>>;
-
-#[expect(clippy::type_complexity)]
 #[memo]
+/// This just drops the location (but not internal locations...) and filters out client fields
 pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<
-    HashMap<
-        ServerObjectEntityName,
-        Vec<(
-            ServerSelectableName,
-            OwnedSelectableResult<TNetworkProtocol>,
-        )>,
-    >,
+    BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TNetworkProtocol>>,
 > {
-    let (items, _fetchable_types) =
+    let (outcome, _fetchable_types) =
         TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
-    Ok(items
+    outcome
+        .item
+        .selectables
         .iter()
-        .flat_map(|selection_type| selection_type.as_ref().as_object())
-        .map(|object_outcome| {
-            let fields = object_outcome
-                .fields_to_insert
-                .iter()
-                .map(|field_to_insert| {
-                    (
-                        field_to_insert.item.name.item,
-                        field_to_insert_to_server_selectable(
-                            db,
-                            object_outcome.server_object_entity.item.name,
-                            field_to_insert,
-                        )
-                        .map(|x| x.map_scalar(|(scalar, _)| scalar)),
-                    )
-                })
-                .collect();
-
-            (object_outcome.server_object_entity.item.name, fields)
-        })
-        .collect())
-}
-
-/// A vector of all server selectables that are defined in the type system schema
-/// for a given entity
-#[memo]
-pub fn server_selectables_vec_for_entity<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-) -> DiagnosticResult<
-    // TODO return the SelectableId with each Result, i.e. we should know
-    // the parent type and selectable name infallibly
-    Vec<(
-        ServerSelectableName,
-        OwnedSelectableResult<TNetworkProtocol>,
-    )>,
-> {
-    let map = server_selectables_map(db).clone_err()?;
-
-    map.get(&parent_server_object_entity_name)
-        .cloned()
-        .unwrap_or_default()
+        .filter_map(|(key, value)| value.item.as_server().map(|server| (*key, server)))
+        .collect::<BTreeMap<_, _>>()
         .wrap_ok()
 }
 
 #[memo]
 pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-) -> DiagnosticResult<HashMap<ServerSelectableName, Vec<OwnedSelectableResult<TNetworkProtocol>>>> {
-    let server_selectables =
-        server_selectables_vec_for_entity(db, parent_server_object_entity_name).to_owned()?;
-    let mut map: HashMap<_, Vec<_>> = HashMap::new();
+    parent_server_object_entity_name: EntityName,
+) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TNetworkProtocol>>> {
+    let map = server_selectables_map(db).clone_err()?;
 
-    for (name, item) in server_selectables {
-        map.entry(name).or_default().push(item);
-    }
-
-    Ok(map)
-}
-
-#[memo]
-pub fn server_selectables_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-    server_selectable_name: ServerSelectableName,
-) -> DiagnosticResult<Vec<OwnedSelectableResult<TNetworkProtocol>>> {
-    let map =
-        server_selectables_map_for_entity(db, parent_server_object_entity_name).clone_err()?;
-
-    Ok(map
-        .get(&server_selectable_name)
-        .cloned()
-        .unwrap_or_default())
+    map.iter()
+        .filter_map(|(key, value)| {
+            if key.0 == parent_server_object_entity_name {
+                Some((key.1.unchecked_conversion(), *value))
+            } else {
+                None
+            }
+        })
+        .collect::<BTreeMap<_, _>>()
+        .wrap_ok()
 }
 
 #[memo]
 pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-    server_selectable_name: ServerSelectableName,
-) -> DiagnosticResult<Option<OwnedSelectableResult<TNetworkProtocol>>> {
-    let vec =
-        server_selectables_named(db, parent_server_object_entity_name, server_selectable_name)
-            .clone_err()?;
-
-    match vec.split_first() {
-        Some((first, rest)) => {
-            if rest.is_empty() {
-                Ok(Some(
-                    first.clone().note_todo("Do not clone. Use a MemoRef."),
-                ))
-            } else {
-                Diagnostic::new(
-                    format!(
-                        "Multiple definitions of \
-                        `{parent_server_object_entity_name}.{server_selectable_name}` were found"
-                    ),
-                    entity_definition_location(db, parent_server_object_entity_name.into())
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
-                )
-                .wrap_err()
-            }
-        }
-        None => Ok(None),
-    }
+    parent_server_object_entity_name: EntityName,
+    server_selectable_name: SelectableName,
+) -> DiagnosticResult<Option<MemoRefServerSelectable<TNetworkProtocol>>> {
+    server_selectables_map_for_entity(db, parent_server_object_entity_name)
+        .clone_err()?
+        .get(&server_selectable_name)
+        .cloned()
+        .wrap_ok()
 }
 
 #[memo]
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
-    let selectable = server_selectable_named(
-        db,
-        parent_server_object_entity_name,
-        (*ID_FIELD_NAME).into(),
-    )
-    .clone_err()?;
+    let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
+        .clone_err()?;
 
     let selectable = match selectable {
-        Some(s) => s.clone_err()?,
+        Some(s) => s,
         None => return Ok(None),
     };
 
     // TODO check if it is a client field...
-    let selectable = match selectable {
+    let memo_ref = match selectable {
         SelectionType::Scalar(s) => s,
         SelectionType::Object(_) => {
             let selectable_name = *ID_FIELD_NAME;
@@ -173,7 +86,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     "Expected `{parent_server_object_entity_name}.{selectable_name}` \
                     to be a scalar, but it was an object."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -182,6 +95,8 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
             .wrap_err();
         }
     };
+
+    let selectable = memo_ref.lookup(db);
 
     let target_scalar_entity_name = selectable.target_scalar_entity.inner();
     let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
@@ -199,7 +114,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     \"on_invalid_id_type\" config parameter."
                 ),
                 // TODO use the location of the selectable
-                entity_definition_location(db, (*target_scalar_entity_name).into())
+                entity_definition_location(db, *target_scalar_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -225,7 +140,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
                 ),
-                entity_definition_location(db, parent_server_object_entity_name.into())
+                entity_definition_location(db, parent_server_object_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()
@@ -236,38 +151,35 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 
     // TODO disallow [ID] etc, ID, etc.
 
-    Ok(Some(db.intern_ref(selectable)))
+    memo_ref.dereference().wrap_some().wrap_ok()
 }
 
 #[memo]
 pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-    server_selectable_name: ServerSelectableName,
-) -> DiagnosticResult<Option<ServerObjectSelectable<TNetworkProtocol>>> {
+    parent_server_object_entity_name: EntityName,
+    server_selectable_name: SelectableName,
+) -> DiagnosticResult<Option<MemoRef<ServerObjectSelectable<TNetworkProtocol>>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .clone_err()?;
 
     match item {
-        Some(item) => {
-            let item = item.clone_err()?;
-            match item.as_ref().as_object() {
-                Some(obj) => Ok(Some(obj.clone().note_todo("Do not clone. Use a MemoRef."))),
-                None => Diagnostic::new(
-                    format!(
-                        "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
+        Some(item) => match item.as_ref().as_object() {
+            Some(obj) => (*obj).wrap_some().wrap_ok(),
+            None => Diagnostic::new(
+                format!(
+                    "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
                         to be an object, but it was a scalar."
-                    ),
-                    entity_definition_location(db, parent_server_object_entity_name.into())
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
-                )
-                .wrap_err(),
-            }
-        }
+                ),
+                entity_definition_location(db, parent_server_object_entity_name)
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten(),
+            )
+            .wrap_err(),
+        },
         None => Ok(None),
     }
 }
@@ -275,32 +187,29 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-    server_selectable_name: ServerSelectableName,
-) -> DiagnosticResult<Option<ServerScalarSelectable<TNetworkProtocol>>> {
+    parent_server_object_entity_name: EntityName,
+    server_selectable_name: SelectableName,
+) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .clone_err()?;
 
     match item {
-        Some(item) => {
-            let item = item.clone_err()?;
-            match item.as_ref().as_scalar() {
-                Some(scalar) => Ok(Some(scalar.clone().note_todo("Do not clone"))),
-                None => Diagnostic::new(
-                    format!(
-                        "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \
+        Some(item) => match item.as_ref().as_scalar() {
+            Some(scalar) => (*scalar).wrap_some().wrap_ok(),
+            None => Diagnostic::new(
+                format!(
+                    "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \
                         to be a scalar, but it was an object."
-                    ),
-                    entity_definition_location(db, parent_server_object_entity_name.into())
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
-                )
-                .wrap_err(),
-            }
-        }
+                ),
+                entity_definition_location(db, parent_server_object_entity_name)
+                    .as_ref()
+                    .ok()
+                    .cloned()
+                    .flatten(),
+            )
+            .wrap_err(),
+        },
         None => Ok(None),
     }
 }

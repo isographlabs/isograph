@@ -46,7 +46,14 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
-        validate_use_of_arguments_for_client_type(db, client_selectable.as_ref(), &mut errors);
+        match client_selectable {
+            SelectionType::Scalar(s) => {
+                validate_use_of_arguments_for_client_type(db, s.lookup(db), &mut errors);
+            }
+            SelectionType::Object(o) => {
+                validate_use_of_arguments_for_client_type(db, o.lookup(db), &mut errors);
+            }
+        }
     }
 
     if errors.is_empty() {
@@ -86,7 +93,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         let server_scalar_selectable = server_scalar_selectable_named(
                             db,
                             parent_object_entity_name,
-                            server_scalar_selectable_name.into(),
+                            server_scalar_selectable_name,
                         )
                         .as_ref()
                         .expect(
@@ -97,7 +104,8 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         server_scalar_selectable
                             .arguments
@@ -123,6 +131,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .variable_definitions
                     .iter()
                     .map(|x| x.item.clone())
@@ -154,7 +163,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     )) => server_object_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_object_selectable_name.into(),
+                        server_object_selectable_name,
                     )
                     .as_ref()
                     .expect(
@@ -166,6 +175,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
                     )
+                    .lookup(db)
                     .arguments
                     .iter()
                     .map(|x| x.item.clone())
@@ -188,7 +198,8 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         client_object_selectable
                             .variable_definitions

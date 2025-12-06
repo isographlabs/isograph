@@ -65,3 +65,18 @@ impl From<Diagnostic> for Vec<Diagnostic> {
         vec![value]
     }
 }
+
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
+pub struct WithNonFatalDiagnostics<T> {
+    pub non_fatal_diagnostics: Vec<Diagnostic>,
+    pub item: T,
+}
+
+impl<T> WithNonFatalDiagnostics<T> {
+    pub fn new(item: T, non_fatal_diagnostics: Vec<Diagnostic>) -> Self {
+        WithNonFatalDiagnostics {
+            non_fatal_diagnostics,
+            item,
+        }
+    }
+}

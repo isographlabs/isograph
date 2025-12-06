@@ -6,10 +6,11 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, client_selectable_map,
-    create_new_exposed_field, create_type_system_schema_with_server_selectables,
-    parse_iso_literals, process_iso_literals, server_id_selectable, server_object_entities,
-    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
+    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
+    client_selectable_declaration_map_from_iso_literals, client_selectable_map, parse_iso_literals,
+    process_iso_literals, server_entities_map_without_locations, server_id_selectable,
+    server_object_entities, server_selectables_map, validate_use_of_arguments,
+    validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -43,9 +44,17 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
             .flat_map(|result| result.as_ref().err()?.clone().wrap_some()),
     );
 
-    maybe_extend(&mut errors, validate_all_expose_as_fields(db));
-
     errors.extend(validate_scalar_selectable_directive_sets(db));
+
+    if let Ok((outcome, _)) = TNetworkProtocol::parse_type_system_documents(db) {
+        errors.extend(outcome.non_fatal_diagnostics.clone());
+    }
+
+    errors.extend(
+        client_selectable_declaration_map_from_iso_literals(db)
+            .non_fatal_diagnostics
+            .clone(),
+    );
 
     let contains_iso_stats = match validate_all_iso_literals(db) {
         Ok(stats) => stats,
@@ -62,27 +71,6 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_all_expose_as_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticVecResult<()> {
-    let expose_as_field_queue =
-        create_type_system_schema_with_server_selectables(db).clone_err()?;
-
-    // TODO restructure as a .map or whatnot
-    let mut errors = vec![];
-    for (parent_object_entity_name, expose_as_fields_to_insert) in expose_as_field_queue {
-        for expose_as_field in expose_as_fields_to_insert {
-            if let Err(e) =
-                create_new_exposed_field(db, expose_as_field, *parent_object_entity_name)
-            {
-                errors.push(e);
-            }
-        }
-    }
-
-    is_empty_or_ok(errors)
-}
-
 fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
@@ -94,14 +82,6 @@ fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
     Ok(contains_iso_stats)
 }
 
-fn is_empty_or_ok<E>(errors: Vec<E>) -> Result<(), Vec<E>> {
-    if errors.is_empty() {
-        Err(errors)
-    } else {
-        Ok(())
-    }
-}
-
 fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>) {
     if let Err(e) = result {
         errors_acc.extend(e);
@@ -111,22 +91,59 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
 fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<()> {
-    // Note: server_selectables_map is a HashMap<_, Vec<(_, Result)>
-    // That result encodes whether the field exists. So, basically, we are collecting
-    // each error from that result.
-    //
-    // This can and should be rethought! Namely, just because the referenced entity doesn't exist
-    // doesn't mean that the selectable can't be materialized. Instead, the result should be
-    // materialized when we actually need to look at the referenced entity.
     let server_selectables = server_selectables_map(db).clone_err()?;
+    let entities = server_entities_map_without_locations(db)
+        .to_owned()?
+        .lookup(db);
 
     let mut errors = vec![];
 
     // TODO use iterator methods
-    for selectables in server_selectables.values() {
-        for (_, selectable_result) in selectables {
-            if let Err(e) = selectable_result {
-                errors.push(e.clone());
+    for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
+        let (target, name_location, arguments) = match selectable {
+            SelectionType::Scalar(s) => {
+                let scalar = s.lookup(db);
+                (
+                    scalar.target_scalar_entity.inner().dereference(),
+                    scalar.name.location,
+                    &scalar.arguments,
+                )
+            }
+            SelectionType::Object(o) => {
+                let object = o.lookup(db);
+                (
+                    object.target_object_entity.inner().dereference(),
+                    object.name.location,
+                    &object.arguments,
+                )
+            }
+        };
+
+        if !entities.contains_key(&target) {
+            errors.push(Diagnostic::new(
+                format!(
+                    "`{parent_object_entity_name}.{selectable_name}` has inner \
+                    type `{target}, but that type has not been defined"
+                ),
+                name_location.wrap_some(),
+            ))
+        }
+
+        for argument in arguments {
+            let arg_target = match argument.item.type_.inner().dereference() {
+                SelectionType::Scalar(s) => s,
+                SelectionType::Object(o) => o,
+            };
+
+            if !entities.contains_key(&arg_target) {
+                let arg_name = argument.item.name.item;
+                errors.push(Diagnostic::new(
+                    format!(
+                        "In `{parent_object_entity_name}.{selectable_name}`, the argument `{arg_name}` has inner \
+                        type `{arg_target}, but that type has not been defined"
+                    ),
+                    argument.location.wrap_some(),
+                ))
             }
         }
     }
@@ -148,7 +165,11 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
 
     entities
         .iter()
-        .flat_map(|entity| Result::err(server_id_selectable(db, entity.name).clone_err()))
+        .flat_map(|entity| {
+            server_id_selectable(db, entity.lookup(db).name)
+                .clone_err()
+                .err()
+        })
         .collect()
 }
 
@@ -170,7 +191,7 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
 
             match selection {
                 SelectionType::Scalar(s) => {
-                    if let ClientFieldVariant::UserWritten(u) = &s.variant
+                    if let ClientFieldVariant::UserWritten(u) = &s.lookup(db).variant
                         && let Err(e) = &u.client_scalar_selectable_directive_set
                     {
                         return Some(e.clone());

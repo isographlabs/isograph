@@ -1,6 +1,4 @@
-use common_lang_types::{
-    QueryExtraInfo, QueryOperationName, ServerObjectEntityName, derive_display,
-};
+use common_lang_types::{EntityName, QueryExtraInfo, QueryOperationName, derive_display};
 use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsHashAlgorithm;
 use isograph_schema::{
@@ -23,7 +21,7 @@ pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol>(
     merged_selection_map: &MergedSelectionMap,
     query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
-    operation_name: ServerObjectEntityName,
+    operation_name: EntityName,
     persisted_documents: &mut Option<PersistedDocuments>,
     indentation_level: u8,
 ) -> OperationText {

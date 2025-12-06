@@ -1,41 +1,37 @@
 use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, SelectionType};
+use isograph_lang_types::{
+    ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, SelectionType, SelectionTypePostfix,
+};
+use pico::MemoRef;
 use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
-use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, SelectableName, ServerObjectEntityName,
-};
+use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, OwnedClientSelectable,
+    IsographDatabase, LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol,
     client_scalar_selectable_named, client_selectable_map, validated_entrypoints,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
 fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+    db: &IsographDatabase<TNetworkProtocol>,
+    client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
+    let type_and_field = client_scalar_selectable.lookup(db).type_and_field();
     let formatted_field = format!(
         "entrypoint {}.{}",
-        client_scalar_selectable
-            .type_and_field()
-            .parent_object_entity_name,
-        client_scalar_selectable.type_and_field().selectable_name
+        type_and_field.parent_object_entity_name, type_and_field.selectable_name
     );
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
-        client_scalar_selectable
-            .type_and_field()
-            .underscore_separated(),
-        client_scalar_selectable
-            .type_and_field()
-            .parent_object_entity_name,
-        client_scalar_selectable.type_and_field().selectable_name,
+        type_and_field.underscore_separated(),
+        type_and_field.parent_object_entity_name,
+        type_and_field.selectable_name,
         file_extensions.ts()
     );
 
@@ -45,23 +41,31 @@ export function iso<T>(
   param: T & MatchesWhitespaceAndString<'{}', T>
 ): typeof entrypoint_{};\n",
         formatted_field,
-        client_scalar_selectable
-            .type_and_field()
-            .underscore_separated(),
+        type_and_field.underscore_separated(),
     ));
     (import, s)
 }
 
 fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
     client_type_and_variant: (
-        OwnedClientSelectable<TNetworkProtocol>,
+        MemoRefClientSelectable<TNetworkProtocol>,
         ClientScalarSelectableDirectiveSet,
     ),
     file_extensions: GenerateFileExtensionsOption,
-    link_types: &mut BTreeSet<ServerObjectEntityName>,
+    link_types: &mut BTreeSet<EntityName>,
 ) -> (String, String) {
     let (client_type, variant) = client_type_and_variant;
-    let type_and_field = client_type.as_ref().type_and_field();
+    let type_and_field = match client_type_and_variant.0 {
+        SelectionType::Scalar(s) => {
+            let scalar = s.lookup(db);
+            scalar.type_and_field()
+        }
+        SelectionType::Object(o) => {
+            let object = o.lookup(db);
+            object.type_and_field()
+        }
+    };
 
     let mut s: String = "".to_string();
     let import = format!(
@@ -81,6 +85,10 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
         type_and_field.parent_object_entity_name,
         type_and_field.selectable_name
     );
+    let client_type = match client_type {
+        SelectionType::Scalar(s) => s.lookup(db).scalar_selected(),
+        SelectionType::Object(o) => o.lookup(db).object_selected(),
+    };
     if matches!(variant, ClientScalarSelectableDirectiveSet::Component(_)) {
         s.push_str(&format!(
             "
@@ -189,6 +197,7 @@ type MatchesWhitespaceAndString<
             .into_iter()
             .map(|client_type| {
                 build_iso_overload_for_client_defined_type(
+                    db,
                     client_type,
                     file_extensions,
                     &mut target_object_entity_names,
@@ -212,7 +221,7 @@ type MatchesWhitespaceAndString<
 
     let entrypoint_overloads = sorted_entrypoints(db)
         .into_iter()
-        .map(|(field, _)| build_iso_overload_for_entrypoint(&field, file_extensions));
+        .map(|(field, _)| build_iso_overload_for_entrypoint(db, field, file_extensions));
     for (import, entrypoint_overload) in entrypoint_overloads {
         imports.push_str(&import);
         content.push_str(&entrypoint_overload);
@@ -238,6 +247,7 @@ export function iso(_isographLiteralText: string):
                 sorted_entrypoints(db)
                     .into_iter()
                     .map(|(field, entrypoint_declaration_info)| {
+                        let field = field.lookup(db);
                         format!(
                             "    case '{}':
       return entrypoint_{};\n",
@@ -279,7 +289,7 @@ export function iso(isographLiteralText: string):
 fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<(
-    OwnedClientSelectable<TNetworkProtocol>,
+    MemoRefClientSelectable<TNetworkProtocol>,
     ClientScalarSelectableDirectiveSet,
 )> {
     let mut client_types = client_selectable_map(db)
@@ -292,7 +302,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 .expect("Expected client selectable to be valid");
 
             match value {
-                SelectionType::Scalar(s) => match &s.variant {
+                SelectionType::Scalar(s) => match &s.lookup(db).variant {
                     isograph_schema::ClientFieldVariant::UserWritten(_) => {}
                     isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
                     isograph_schema::ClientFieldVariant::Link => return None,
@@ -300,12 +310,12 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 SelectionType::Object(_) => {}
             };
 
-            value.clone().wrap_some()
+            (*value).wrap_some()
         })
         .map(|selection_type| {
             let client_scalar_selection_directive_set = {
                 match &selection_type {
-                    SelectionType::Scalar(scalar) => match &scalar.variant {
+                    SelectionType::Scalar(scalar) => match &scalar.lookup(db).variant {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
                         ) => user_written_client_type_info
@@ -332,24 +342,31 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
         .collect::<Vec<_>>();
 
     client_types.sort_by(|client_type_1, client_type_2| {
-        match client_type_1
-            .0
-            .as_ref()
-            .type_and_field()
-            .parent_object_entity_name
-            .cmp(
-                &client_type_2
-                    .0
-                    .as_ref()
-                    .type_and_field()
-                    .parent_object_entity_name,
-            ) {
+        let (parent_1, selectable_name_1) = match client_type_1.0 {
+            SelectionType::Scalar(s) => {
+                let s = s.lookup(db);
+                (s.parent_object_entity_name, s.name.item)
+            }
+            SelectionType::Object(o) => {
+                let o = o.lookup(db);
+                (o.parent_object_entity_name, o.name.item)
+            }
+        };
+        let (parent_2, selectable_name_2) = match client_type_2.0 {
+            SelectionType::Scalar(s) => {
+                let s = s.lookup(db);
+                (s.parent_object_entity_name, s.name.item)
+            }
+            SelectionType::Object(o) => {
+                let o = o.lookup(db);
+                (o.parent_object_entity_name, o.name.item)
+            }
+        };
+
+        match parent_1.cmp(&parent_2) {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
-            Ordering::Equal => sort_field_name(
-                client_type_1.0.as_ref().type_and_field().selectable_name,
-                client_type_2.0.as_ref().type_and_field().selectable_name,
-            ),
+            Ordering::Equal => sort_field_name(selectable_name_1, selectable_name_2),
         }
     });
     client_types
@@ -358,7 +375,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
 fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<(
-    ClientScalarSelectable<TNetworkProtocol>,
+    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     &EntrypointDeclarationInfo,
 )> {
     let mut entrypoints = validated_entrypoints(db)
@@ -394,19 +411,18 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
         .collect::<Vec<_>>();
     entrypoints.sort_by(
         |(client_scalar_selectable_1, _), (client_scalar_selectable_2, _)| {
+            let client_scalar_selectable_1 = client_scalar_selectable_1.lookup(db);
+            let client_scalar_selectable_2 = client_scalar_selectable_2.lookup(db);
+
             match client_scalar_selectable_1
-                .type_and_field()
                 .parent_object_entity_name
-                .cmp(
-                    &client_scalar_selectable_2
-                        .type_and_field()
-                        .parent_object_entity_name,
-                ) {
+                .cmp(&client_scalar_selectable_2.parent_object_entity_name)
+            {
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => sort_field_name(
-                    client_scalar_selectable_1.type_and_field().selectable_name,
-                    client_scalar_selectable_2.type_and_field().selectable_name,
+                    client_scalar_selectable_1.name.item,
+                    client_scalar_selectable_2.name.item,
                 ),
             }
         },

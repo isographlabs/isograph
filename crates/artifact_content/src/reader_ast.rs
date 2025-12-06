@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{
-    ClientScalarSelectableName, ParentObjectEntityNameAndSelectableName, WithSpan, WithSpanPostfix,
+    ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
@@ -19,6 +19,7 @@ use isograph_schema::{
     transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
+use pico::MemoRef;
 
 use crate::{
     generate_artifacts::{ReaderAst, get_serialized_field_arguments},
@@ -66,7 +67,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     scalar_client_defined_field_ast_node(
                         db,
                         scalar_field_selection,
-                        client_scalar_selectable,
+                        *client_scalar_selectable,
                         indentation_level,
                         path,
                         root_refetched_paths,
@@ -81,7 +82,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Client(_) => {
                     path.push(NormalizationKey::ClientPointer(NameAndArguments {
                         // TODO use alias
-                        name: linked_field_selection.name.item.into(),
+                        name: linked_field_selection.name.item,
                         // TODO this clearly does something, but why are we able to pass
                         // the initial variable context here??
                         arguments: transform_arguments_with_child_context(
@@ -124,7 +125,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     let server_object_selectable = server_object_selectable_named(
                         db,
                         parent_object_entity_name,
-                        server_object_selectable_name.into(),
+                        server_object_selectable_name,
                     )
                     .as_ref()
                     .expect(
@@ -135,13 +136,14 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     .expect(
                         "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                    );
+                    )
+                    .lookup(db);
 
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
                         ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
-                            name: linked_field_selection.name.item.into(),
+                            name: linked_field_selection.name.item,
                             // TODO this clearly does something, but why are we able to pass
                             // the initial variable context here??
                             arguments: transform_arguments_with_child_context(
@@ -237,7 +239,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected selectable to exist. \
                 This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
 
             let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
@@ -257,7 +260,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             let server_object_selectable = server_object_selectable_named(
                 db,
                 parent_object_entity_name,
-                server_object_selectable_name.into(),
+                server_object_selectable_name,
             )
             .as_ref()
             .expect(
@@ -268,11 +271,12 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected selectable to exist. \
                         This is indicative of a bug in Isograph.",
-            );
+            )
+            .lookup(db);
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
-                        selectable_name: linked_field.name.item.into(),
+                        selectable_name: linked_field.name.item,
                         parent_object_entity_name: server_object_selectable
                             .parent_object_entity_name,
                     };
@@ -325,13 +329,14 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_field_selection: &ValidatedScalarSelection,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+    client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
     root_refetched_paths: &RefetchedPathsMap,
     reader_imports: &mut ReaderImports,
     parent_variable_context: &VariableContext,
 ) -> String {
+    let client_scalar_selectable = client_scalar_selectable.lookup(db);
     let client_scalar_selectable_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
         &client_scalar_selectable.variable_definitions,
@@ -727,7 +732,7 @@ fn get_nested_refetch_query_text(
 fn find_imperatively_fetchable_query_index(
     paths: &RefetchedPathsMap,
     outer_path: &[NormalizationKey],
-    imperatively_fetchable_field_name: ClientScalarSelectableName,
+    imperatively_fetchable_field_name: SelectableName,
 ) -> usize {
     paths
         .iter()
@@ -831,7 +836,8 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         match categorize_field_loadability(
                             client_scalar_selectable,
@@ -892,7 +898,8 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         let new_paths = refetched_paths_with_path(
                             db,
@@ -914,7 +921,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         let name_and_arguments = NameAndArguments {
                             // TODO use alias
-                            name: linked_field_selection.name.item.into(),
+                            name: linked_field_selection.name.item,
                             arguments: transform_arguments_with_child_context(
                                 linked_field_selection
                                     .arguments
@@ -953,7 +960,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let server_object_selectable = server_object_selectable_named(
                             db,
                             parent_object_entity_name,
-                            server_object_selectable_name.into(),
+                            server_object_selectable_name,
                         )
                         .as_ref()
                         .expect(
@@ -964,13 +971,14 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         .expect(
                             "Expected selectable to exist. \
                                 This is indicative of a bug in Isograph.",
-                        );
+                        )
+                        .lookup(db);
 
                         let normalization_key =
                             match server_object_selectable.object_selectable_variant {
                                 ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                                     // TODO use alias
-                                    name: linked_field_selection.name.item.into(),
+                                    name: linked_field_selection.name.item,
                                     arguments: transform_arguments_with_child_context(
                                         linked_field_selection
                                             .arguments

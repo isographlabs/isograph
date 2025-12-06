@@ -1,4 +1,4 @@
-use common_lang_types::{QueryOperationName, QueryText, UnvalidatedTypeName};
+use common_lang_types::{EntityName, QueryOperationName, QueryText};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, SelectionType};
 use isograph_schema::{
@@ -48,24 +48,23 @@ fn write_variables_to_string<'a>(
             first = false;
         }
         // TODO can we consume the variables here?
-        let x: GraphQLTypeAnnotation<UnvalidatedTypeName> =
-            variable.type_.clone().map(|input_type_id| {
-                let schema_input_type = server_entity_named(db, input_type_id)
-                    .as_ref()
-                    .expect(
-                        "Expected this not to have failed. \
+        let x: GraphQLTypeAnnotation<EntityName> = variable.type_.clone().map(|input_type_id| {
+            let schema_input_type = server_entity_named(db, input_type_id)
+                .as_ref()
+                .expect(
+                    "Expected this not to have failed. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected entity to exist. \
+                )
+                .as_ref()
+                .expect(
+                    "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
-                    );
-                match schema_input_type {
-                    SelectionType::Scalar(s) => s.lookup(db).name.into(),
-                    SelectionType::Object(o) => o.lookup(db).name.into(),
-                }
-            });
+                );
+            match schema_input_type {
+                SelectionType::Scalar(s) => s.lookup(db).name,
+                SelectionType::Object(o) => o.lookup(db).name,
+            }
+        });
         // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
         // We should find a way to make WithLocation not impl display, without making error's hard
         // to work with.

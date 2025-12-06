@@ -30,6 +30,3 @@ impl FieldMapItem {
         }
     }
 }
-
-// TODO this should be a different type.
-pub(crate) struct ProcessedFieldMapItem(pub FieldMapItem);

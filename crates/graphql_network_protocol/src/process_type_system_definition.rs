@@ -1,63 +1,57 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, GraphQLInterfaceTypeName, Location, SelectableName,
-    ServerObjectEntityName, Span, UnvalidatedTypeName, WithLocation, WithLocationPostfix, WithSpan,
-    WithSpanPostfix,
+    DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
+    VariableName, WithLocation, WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLNamedTypeAnnotation,
-    GraphQLNonNullTypeAnnotation, GraphQLScalarTypeDefinition, GraphQLTypeAnnotation,
+    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{Description, SelectionTypePostfix};
+use isograph_lang_types::{
+    ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
+    NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
+    SelectionTypePostfix, TypeAnnotation, VariableDefinition,
+};
 use isograph_schema::{
-    ExposeFieldDirective, ExposeFieldToInsert, FieldMapItem, FieldToInsert, ID_FIELD_NAME,
-    IsographObjectTypeDefinition, ParseTypeSystemOutcome, ProcessObjectTypeDefinitionOutcome,
-    STRING_JAVASCRIPT_TYPE, ServerObjectEntity, ServerScalarEntity, TYPENAME_FIELD_NAME,
+    ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
+    ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
+    ServerScalarEntity, ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
+use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    GraphQLSchemaOriginalDefinitionType,
+    GraphQLSchemaOriginalDefinitionType, insert_entity_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {
     // TODO use schema_data.string_type_id or something
-    static ref STRING_TYPE_NAME: UnvalidatedTypeName = "String".intern().into();
-    static ref NODE_INTERFACE_NAME: GraphQLInterfaceTypeName = "Node".intern().into();
+    static ref STRING_TYPE_NAME: EntityName = "String".intern().into();
+    static ref NODE_INTERFACE_NAME: EntityName= "Node".intern().into();
     pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
 
 }
 
-#[expect(clippy::type_complexity)]
+#[expect(clippy::too_many_arguments)]
 pub fn process_graphql_type_system_document(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-) -> DiagnosticResult<(
-    ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-    // TODO why are we returning these?
-    HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    Vec<ExposeFieldToInsert>,
-)> {
-    // TODO return a vec of errors, not just one
-
-    // In the schema, interfaces, unions and objects are the same type of object (SchemaType),
-    // with e.g. interfaces "simply" being objects that can be refined to other
-    // concrete objects.
-
-    let mut supertype_to_subtype_map = BTreeMap::new();
-
-    let mut type_system_entities = vec![];
-
-    let mut directives = HashMap::<_, Vec<_>>::new();
-
-    let mut refetch_fields = vec![];
-
+    outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+    directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
+    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
+    interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
     for with_location in type_system_document.0 {
         let WithLocation {
             location,
@@ -65,240 +59,387 @@ pub fn process_graphql_type_system_document(
         } = with_location;
         match type_system_definition {
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
-                let concrete_type = Some(object_type_definition.name.item.into());
+                let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    server_object_entity_name,
+                    ServerObjectEntity {
+                        description: object_type_definition.description.map(|description_value| {
+                            description_value
+                                .item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
+                        name: server_object_entity_name,
+                        is_concrete: true,
+                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
+                            subtypes: vec![],
+                        },
+                    }
+                    .interned_value(db)
+                    .object_selected()
+                    .with_location(location),
+                    non_fatal_diagnostics,
+                );
 
-                for interface_name in object_type_definition.interfaces.iter() {
-                    insert_into_type_refinement_map(
-                        interface_name.item.into(),
-                        object_type_definition.name.item.into(),
-                        &mut supertype_to_subtype_map,
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.selectables,
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
+                    get_typename_selectable(
+                        db,
+                        server_object_entity_name,
+                        location,
+                        format!("\"{}\"", server_object_entity_name)
+                            .intern()
+                            .to::<JavascriptName>()
+                            .wrap_some(),
+                    )
+                    .scalar_selected()
+                    .server_defined()
+                    .with_location(location),
+                    non_fatal_diagnostics,
+                );
+
+                directives
+                    .entry(server_object_entity_name)
+                    .or_default()
+                    .extend(object_type_definition.directives);
+
+                let mut has_id_field = false;
+                for field in object_type_definition.fields {
+                    if field.item.name.item == *ID_FIELD_NAME {
+                        has_id_field = true;
+                    }
+                    fields_to_process.push((server_object_entity_name, field));
+                }
+
+                let subfields_or_inline_fragments = vec![
+                    WrappedSelectionMapSelection::InlineFragment(server_object_entity_name),
+                    WrappedSelectionMapSelection::LinkedField {
+                        // TODO this should be query
+                        parent_object_entity_name: server_object_entity_name,
+                        server_object_selectable_name: *NODE_FIELD_NAME,
+                        arguments: vec![ArgumentKeyAndValue {
+                            key: (*ID_FIELD_NAME).unchecked_conversion(),
+                            value: NonConstantValue::Variable(*ID_VARIABLE_NAME),
+                        }],
+                        // None -> node is not concrete.
+                        // Note that this doesn't matter!
+                        concrete_target_entity_name: None,
+                    },
+                ];
+
+                // TODO do this if the type implements Node instead
+                if has_id_field {
+                    insert_selectable_or_multiple_definition_diagnostic(
+                        &mut outcome.selectables,
+                        (server_object_entity_name, (*REFETCH_FIELD_NAME)),
+                        get_refetch_selectable(
+                            server_object_entity_name,
+                            subfields_or_inline_fragments.clone(),
+                        )
+                        .interned_value(db)
+                        .scalar_selected()
+                        .client_defined()
+                        .with_generated_location(),
+                        non_fatal_diagnostics,
+                    );
+
+                    outcome.client_scalar_refetch_strategies.push(
+                        (
+                            server_object_entity_name,
+                            *REFETCH_FIELD_NAME,
+                            refetch_selectable_refetch_strategy(subfields_or_inline_fragments),
+                        )
+                            .with_generated_location()
+                            .wrap_ok(),
                     );
                 }
 
-                let object_name = object_type_definition.name.item.unchecked_conversion();
-                let object_type_definition = object_type_definition.into();
-
-                let (object_definition_outcome, new_directives) = process_object_type_definition(
-                    object_type_definition,
-                    concrete_type,
-                    GraphQLSchemaObjectAssociatedData {
-                        original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
-                        subtypes: vec![],
-                    },
-                    GraphQLObjectDefinitionType::Object,
-                    &mut refetch_fields,
-                )?;
-
-                directives
-                    .entry(object_name)
-                    .or_default()
-                    .extend(new_directives);
-
-                type_system_entities.push(object_definition_outcome.object_selected());
+                for interface_name in object_type_definition.interfaces {
+                    supertype_to_subtype_map
+                        .entry(interface_name.item)
+                        .or_default()
+                        .push(server_object_entity_name);
+                }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                let name_location = scalar_type_definition.name.location;
-                type_system_entities.push(
-                    process_scalar_definition(scalar_type_definition)
-                        .with_location(name_location)
-                        .scalar_selected(),
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    scalar_type_definition.name.item,
+                    ServerScalarEntity {
+                        description: scalar_type_definition
+                            .description
+                            .map(|with_span| with_span.item.into()),
+                        name: scalar_type_definition.name.item,
+                        // TODO allow customization here
+                        javascript_name: *STRING_JAVASCRIPT_TYPE,
+                        network_protocol: std::marker::PhantomData,
+                    }
+                    .interned_value(db)
+                    .scalar_selected()
+                    .with_location(location),
+                    non_fatal_diagnostics,
                 );
-                // N.B. we assume that Mutation will be an object, not a scalar
             }
-            GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_type_definition) => {
-                let interface_name = interface_type_definition.name.item.unchecked_conversion();
-                let (process_object_type_definition_outcome, new_directives) =
-                    process_object_type_definition(
-                        interface_type_definition.into(),
-                        None,
-                        GraphQLSchemaObjectAssociatedData {
-                            original_definition_type:
-                                GraphQLSchemaOriginalDefinitionType::Interface,
-                            subtypes: vec![],
-                        },
-                        GraphQLObjectDefinitionType::Interface,
-                        &mut refetch_fields,
-                    )?;
-
-                type_system_entities.push(process_object_type_definition_outcome.object_selected());
-
-                directives
-                    .entry(interface_name)
-                    .or_default()
-                    .extend(new_directives);
-                // N.B. we assume that Mutation will be an object, not an interface
+            GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
+                interfaces_to_process.push(interface_definition.with_location(location));
             }
-            GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
-                input_object_type_definition,
-            ) => {
-                let concrete_type = Some(input_object_type_definition.name.item.into());
-                let input_object_name = input_object_type_definition
-                    .name
-                    .item
-                    .unchecked_conversion();
-                let (process_object_type_definition_outcome, new_directives) =
-                    process_object_type_definition(
-                        input_object_type_definition.into(),
-                        // Shouldn't really matter what we pass here
-                        concrete_type,
-                        GraphQLSchemaObjectAssociatedData {
+            GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
+                let server_object_entity_name =
+                    input_object_definition.name.item.to::<EntityName>();
+
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    server_object_entity_name,
+                    ServerObjectEntity {
+                        description: input_object_definition
+                            .description
+                            .map(|description_value| {
+                                description_value
+                                    .item
+                                    .unchecked_conversion::<DescriptionValue>()
+                                    .wrap(Description)
+                            }),
+                        name: server_object_entity_name,
+                        is_concrete: true,
+                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                             subtypes: vec![],
                         },
-                        GraphQLObjectDefinitionType::InputObject,
-                        &mut refetch_fields,
-                    )?;
-
-                type_system_entities.push(process_object_type_definition_outcome.object_selected());
+                    }
+                    .interned_value(db)
+                    .object_selected()
+                    .with_location(location),
+                    non_fatal_diagnostics,
+                );
 
                 directives
-                    .entry(input_object_name)
+                    .entry(server_object_entity_name)
                     .or_default()
-                    .extend(new_directives);
+                    .extend(input_object_definition.directives);
+
+                for field in input_object_definition.fields {
+                    fields_to_process.push((server_object_entity_name, field.map(From::from)));
+                }
+
+                // inputs do not implement interfaces
+                // nor have typenames
             }
             GraphQLTypeSystemDefinition::DirectiveDefinition(_) => {
                 // For now, Isograph ignores directive definitions,
                 // but it might choose to allow-list them.
             }
             GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
-                // TODO Do not do this
-                type_system_entities.push(
-                    process_scalar_definition(GraphQLScalarTypeDefinition {
-                        description: enum_definition.description,
-                        name: enum_definition.name.map(|x| x.unchecked_conversion()),
-                        directives: enum_definition.directives,
-                    })
-                    .with_location(enum_definition.name.location)
-                    .scalar_selected(),
-                )
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    enum_definition.name.item,
+                    ServerScalarEntity {
+                        description: enum_definition
+                            .description
+                            .map(|with_span| with_span.item.into()),
+                        name: enum_definition.name.item,
+                        // TODO allow customization here
+                        javascript_name: *STRING_JAVASCRIPT_TYPE,
+                        network_protocol: std::marker::PhantomData,
+                    }
+                    .interned_value(db)
+                    .scalar_selected()
+                    .with_location(location),
+                    non_fatal_diagnostics,
+                );
             }
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
-                // TODO do something reasonable here, once we add support for type refinements.
-                let (process_object_type_definition_outcome, new_directives) =
-                    process_object_type_definition(
-                        IsographObjectTypeDefinition {
-                            description: union_definition
-                                .description
-                                .map(|with_span| with_span.map(|dv| dv.into())),
-                            name: union_definition.name.map(|x| x.into()),
-                            interfaces: vec![],
-                            directives: union_definition.directives,
-                            fields: vec![],
-                        },
-                        None,
-                        GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
-                            subtypes: vec![],
-                        },
-                        GraphQLObjectDefinitionType::Union,
-                        &mut refetch_fields,
-                    )?;
+                let server_object_entity_name = union_definition.name.item.to::<EntityName>();
 
-                type_system_entities.push(process_object_type_definition_outcome.object_selected());
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    server_object_entity_name,
+                    ServerObjectEntity {
+                        description: union_definition.description.map(|description_value| {
+                            description_value
+                                .item
+                                .unchecked_conversion::<DescriptionValue>()
+                                .wrap(Description)
+                        }),
+                        name: server_object_entity_name,
+                        is_concrete: false,
+                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
+                            subtypes: union_definition
+                                .union_member_types
+                                .iter()
+                                .map(|entity_name| entity_name.item.unchecked_conversion())
+                                .collect(),
+                        },
+                    }
+                    .interned_value(db)
+                    .object_selected()
+                    .with_location(location),
+                    non_fatal_diagnostics,
+                );
 
                 directives
-                    .entry(union_definition.name.item.unchecked_conversion())
+                    .entry(server_object_entity_name)
                     .or_default()
-                    .extend(new_directives);
+                    .extend(union_definition.directives);
 
-                for union_member_type in union_definition.union_member_types {
-                    insert_into_type_refinement_map(
-                        union_definition.name.item.into(),
-                        union_member_type.item.into(),
-                        &mut supertype_to_subtype_map,
-                    )
-                }
+                supertype_to_subtype_map
+                    .entry(server_object_entity_name)
+                    .or_default()
+                    .extend(
+                        union_definition
+                            .union_member_types
+                            .iter()
+                            .map(|entity_name| entity_name.item.to::<EntityName>()),
+                    );
+
+                // unions do not implement interfaces
+                insert_selectable_or_multiple_definition_diagnostic(
+                    &mut outcome.selectables,
+                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
+                    get_typename_selectable(db, server_object_entity_name, location, None)
+                        .scalar_selected()
+                        .server_defined()
+                        .with_location(location),
+                    non_fatal_diagnostics,
+                );
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
-                    return Diagnostic::new(
+                    non_fatal_diagnostics.push(Diagnostic::new(
                         "Duplicate schema definition".to_string(),
                         location.wrap_some(),
-                    )
-                    .wrap_err();
+                    ));
+                    continue;
                 }
                 *graphql_root_types = GraphQLRootTypes {
                     query: schema_definition
                         .query
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Query".intern().into()),
                     mutation: schema_definition
                         .mutation
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Mutation".intern().into()),
                     subscription: schema_definition
                         .subscription
-                        .map(|x| x.item.into())
+                        .map(|entity_name| entity_name.item)
                         .unwrap_or_else(|| "Subscription".intern().into()),
                 }
                 .wrap_some()
             }
         }
     }
-
-    // For each supertype (e.g. Node) and a subtype (e.g. Pet), we need to add an asConcreteType field.
-    for (supertype_name, subtypes) in supertype_to_subtype_map.iter() {
-        let object_outcome = type_system_entities
-            .iter_mut()
-            .find_map(|definition| {
-                definition.as_ref_mut().as_object().and_then(|x| {
-                    // Why do we have to do this?
-                    let supertype_name: ServerObjectEntityName =
-                        supertype_name.unchecked_conversion();
-                    if x.server_object_entity.item.name == supertype_name {
-                        Some(x)
-                    } else {
-                        None
-                    }
-                })
-            })
-            .expect("Expected supertype to exist. This is indicative of a bug in Isograph.");
-
-        // add subtypes to associated_data
-        object_outcome
-            .server_object_entity
-            .item
-            .network_protocol_associated_data
-            .subtypes
-            .extend(subtypes);
-
-        for subtype_name in subtypes.iter() {
-            object_outcome.fields_to_insert.push(
-                FieldToInsert {
-                    description: Description(
-                        format!("A client pointer for the {subtype_name} type.")
-                            .intern()
-                            .into(),
-                    )
-                    .with_generated_span()
-                    .wrap_some(),
-                    name: WithLocation::new_generated(format!("as{subtype_name}").intern().into()),
-
-                    graphql_type: GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                        (*subtype_name).with_generated_span(),
-                    )),
-                    javascript_type_override: None,
-                    arguments: vec![],
-                    is_inline_fragment: true,
-                }
-                .with_generated_location(),
-            );
-        }
-    }
-
-    (type_system_entities, directives, refetch_fields).wrap_ok()
 }
 
-#[expect(clippy::type_complexity)]
-pub fn process_graphql_type_extension_document(
+fn refetch_selectable_refetch_strategy(
+    subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
+) -> RefetchStrategy<(), ()> {
+    RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
+        SelectionSet {
+            selections: vec![
+                ScalarSelection {
+                    name: (*ID_FIELD_NAME)
+                        .to::<SelectableName>()
+                        .with_generated_location(),
+                    reader_alias: None,
+                    associated_data: (),
+                    arguments: vec![],
+                    scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
+                        EmptyDirectiveSet {},
+                    ),
+                }
+                .scalar_selected()
+                .with_generated_span(),
+            ],
+        }
+        .with_generated_span(),
+        // TODO use the type from the schema
+        "Query".intern().into(),
+        subfields_or_inline_fragments,
+    ))
+}
+
+fn get_refetch_selectable(
+    server_object_entity_name: EntityName,
+    subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
+) -> ClientScalarSelectable<GraphQLNetworkProtocol> {
+    ClientScalarSelectable {
+        description: format!(
+            "A refetch field for the {} type.",
+            server_object_entity_name
+        )
+        .intern()
+        .to::<DescriptionValue>()
+        .wrap(Description)
+        .wrap_some(),
+        name: (*REFETCH_FIELD_NAME).with_generated_location(),
+        variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
+            client_selection_name: (*REFETCH_FIELD_NAME),
+            // TODO use the actual schema query type
+            root_object_entity_name: "Query".intern().into(),
+            subfields_or_inline_fragments,
+            field_map: vec![FieldMapItem {
+                from: (*ID_FIELD_NAME).unchecked_conversion(),
+                to: (*ID_FIELD_NAME).unchecked_conversion(),
+            }],
+            top_level_schema_field_arguments: vec![VariableDefinition {
+                name: (*ID_FIELD_NAME)
+                    .unchecked_conversion::<VariableName>()
+                    .with_generated_location(),
+                type_: GraphQLTypeAnnotation::NonNull(
+                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                        (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),
+                    ))
+                    .boxed(),
+                ),
+                default_value: None,
+            }],
+        }),
+        variable_definitions: vec![],
+        parent_object_entity_name: server_object_entity_name,
+        network_protocol: std::marker::PhantomData,
+    }
+}
+
+pub(crate) fn get_typename_selectable(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
+    server_object_entity_name: EntityName,
+    location: Location,
+    javascript_type_override: Option<JavascriptName>,
+) -> MemoRef<ServerScalarSelectable<GraphQLNetworkProtocol>> {
+    ServerScalarSelectable {
+        description: format!("A discriminant for the {} type", server_object_entity_name)
+            .intern()
+            .to::<DescriptionValue>()
+            .wrap(Description)
+            .wrap_some(),
+        name: (*TYPENAME_FIELD_NAME).with_location(location),
+        // Should this be the typename entity?
+        target_scalar_entity: TypeAnnotation::Scalar("String".intern().into()),
+        javascript_type_override,
+        parent_object_entity_name: server_object_entity_name,
+        arguments: vec![],
+        phantom_data: std::marker::PhantomData,
+    }
+    .interned_value(db)
+}
+
+#[expect(clippy::too_many_arguments)]
+pub fn process_graphql_type_system_extension_document(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-) -> DiagnosticResult<(
-    ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
-    HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    Vec<ExposeFieldToInsert>,
-)> {
+    outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+    directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
+    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
+    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
+    interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
 
@@ -314,209 +455,38 @@ pub fn process_graphql_type_extension_document(
         }
     }
 
-    let (outcome, mut directives, refetch_fields) = process_graphql_type_system_document(
+    process_graphql_type_system_document(
+        db,
         GraphQLTypeSystemDocument(definitions),
         graphql_root_types,
-    )?;
+        outcome,
+        directives,
+        fields_to_process,
+        supertype_to_subtype_map,
+        interfaces_to_process,
+        non_fatal_diagnostics,
+    );
 
-    for extension in extensions.into_iter() {
-        // TODO collect errors into vec
-        // TODO we can encounter new interface implementations; we should account for that
-
-        for (name, new_directives) in process_graphql_type_system_extension(extension) {
-            directives.entry(name).or_default().extend(new_directives);
+    for extension in extensions {
+        match extension.item {
+            GraphQLTypeSystemExtension::ObjectTypeExtension(object_type_extension) => {
+                directives
+                    .entry(object_type_extension.name.item.unchecked_conversion())
+                    .or_default()
+                    .extend(object_type_extension.directives);
+            }
         }
     }
-
-    (outcome, directives, refetch_fields).wrap_ok()
 }
 
-fn process_object_type_definition(
-    object_type_definition: IsographObjectTypeDefinition,
-    concrete_type: Option<ServerObjectEntityName>,
-    associated_data: GraphQLSchemaObjectAssociatedData,
-    type_definition_type: GraphQLObjectDefinitionType,
-    refetch_fields: &mut Vec<ExposeFieldToInsert>,
-) -> DiagnosticResult<(
-    ProcessObjectTypeDefinitionOutcome<GraphQLNetworkProtocol>,
-    Vec<GraphQLDirective<GraphQLConstantValue>>,
-)> {
-    let should_add_refetch_field = type_definition_type.is_concrete()
-        && type_definition_type.is_output_type()
-        && type_implements_node(&object_type_definition);
-    let server_object_entity = ServerObjectEntity {
-        description: object_type_definition.description.map(|d| d.item),
-        name: object_type_definition.name.item,
-        concrete_type,
-        network_protocol_associated_data: associated_data,
-    }
-    .with_location(object_type_definition.name.location.into());
+type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
 
-    let mut fields_to_insert: Vec<_> = object_type_definition
-        .fields
-        .into_iter()
-        .map(|field_definition| {
-            FieldToInsert {
-                description: field_definition
-                    .item
-                    .description
-                    .map(|with_span| with_span.map(|dv| dv.into())),
-                name: field_definition.item.name,
-                graphql_type: field_definition.item.type_,
-                javascript_type_override: None,
-
-                arguments: field_definition.item.arguments,
-                is_inline_fragment: field_definition.item.is_inline_fragment,
-            }
-            .with_location(field_definition.location)
-        })
-        .collect();
-
-    // We need to define a typename field for objects and interfaces, but not unions or input objects
-    if type_definition_type.has_typename_field() {
-        fields_to_insert.push(
-            FieldToInsert {
-                description: None,
-                name: WithLocation::new((*TYPENAME_FIELD_NAME).into(), Location::Generated),
-                graphql_type: GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(WithSpan::new(
-                        *STRING_TYPE_NAME,
-                        Span::todo_generated(),
-                    )))
-                    .boxed(),
-                ),
-                // This is bad data modeling, and we should do better.
-                javascript_type_override: concrete_type.map(|parent_concrete_type| {
-                    format!("\"{parent_concrete_type}\"").intern().into()
-                }),
-
-                arguments: vec![],
-                is_inline_fragment: false,
-            }
-            .with_generated_location(),
-        );
-    }
-
-    if should_add_refetch_field {
-        refetch_fields.push(ExposeFieldToInsert {
-            expose_field_directive: ExposeFieldDirective {
-                expose_as: (*REFETCH_FIELD_NAME).wrap_some(),
-                field_map: vec![FieldMapItem {
-                    from: ID_FIELD_NAME.unchecked_conversion(),
-                    to: ID_FIELD_NAME.unchecked_conversion(),
-                }],
-                field: format!("node.as{}", object_type_definition.name.item)
-                    .intern()
-                    .into(),
-            },
-            parent_object_name: object_type_definition.name.item,
-            description: Description(
-                format!(
-                    "A refetch field for the {} type.",
-                    object_type_definition.name.item
-                )
-                .intern()
-                .into(),
-            )
-            .wrap_some(),
-        });
-    }
-
-    (
-        ProcessObjectTypeDefinitionOutcome {
-            server_object_entity,
-            fields_to_insert,
-            expose_fields_to_insert: vec![],
-        },
-        object_type_definition.directives,
+pub fn multiple_entity_definitions_found_diagnostic(
+    server_object_entity_name: EntityName,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Multiple definitions of {server_object_entity_name} were found."),
+        location,
     )
-        .wrap_ok()
-}
-
-// TODO this should accept an IsographScalarTypeDefinition
-fn process_scalar_definition(
-    scalar_type_definition: GraphQLScalarTypeDefinition,
-) -> ServerScalarEntity<GraphQLNetworkProtocol> {
-    ServerScalarEntity {
-        description: scalar_type_definition
-            .description
-            .map(|with_span| with_span.item.into()),
-        name: scalar_type_definition.name.item,
-        // TODO we should allow customization here
-        javascript_name: *STRING_JAVASCRIPT_TYPE,
-        network_protocol: std::marker::PhantomData,
-    }
-}
-
-fn process_graphql_type_system_extension(
-    extension: WithLocation<GraphQLTypeSystemExtension>,
-) -> HashMap<ServerObjectEntityName, Vec<GraphQLDirective<GraphQLConstantValue>>> {
-    let mut types_and_directives = HashMap::new();
-    match extension.item {
-        GraphQLTypeSystemExtension::ObjectTypeExtension(object_extension) => {
-            types_and_directives.insert(
-                object_extension.name.item.into(),
-                object_extension.directives,
-            );
-        }
-    }
-
-    types_and_directives
-}
-
-#[derive(Clone, Copy)]
-enum GraphQLObjectDefinitionType {
-    InputObject,
-    Union,
-    Object,
-    Interface,
-}
-
-impl GraphQLObjectDefinitionType {
-    pub fn has_typename_field(&self) -> bool {
-        match self {
-            GraphQLObjectDefinitionType::InputObject => false,
-            GraphQLObjectDefinitionType::Union => true,
-            GraphQLObjectDefinitionType::Object => true,
-            GraphQLObjectDefinitionType::Interface => true,
-        }
-    }
-
-    pub fn is_concrete(&self) -> bool {
-        match self {
-            GraphQLObjectDefinitionType::InputObject => true,
-            GraphQLObjectDefinitionType::Union => false,
-            GraphQLObjectDefinitionType::Object => true,
-            GraphQLObjectDefinitionType::Interface => false,
-        }
-    }
-
-    pub fn is_output_type(&self) -> bool {
-        match self {
-            GraphQLObjectDefinitionType::InputObject => false,
-            GraphQLObjectDefinitionType::Union => true,
-            GraphQLObjectDefinitionType::Object => true,
-            GraphQLObjectDefinitionType::Interface => true,
-        }
-    }
-}
-
-fn insert_into_type_refinement_map(
-    supertype_name: UnvalidatedTypeName,
-    subtype_name: UnvalidatedTypeName, // aka the concrete type or union member
-    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-) {
-    supertype_to_subtype_map
-        .entry(supertype_name)
-        .or_default()
-        .push(subtype_name);
-}
-
-type UnvalidatedTypeRefinementMap = BTreeMap<UnvalidatedTypeName, Vec<UnvalidatedTypeName>>;
-
-fn type_implements_node(object_type_definition: &IsographObjectTypeDefinition) -> bool {
-    object_type_definition
-        .interfaces
-        .iter()
-        .any(|x| x.item == *NODE_INTERFACE_NAME)
 }

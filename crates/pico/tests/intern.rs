@@ -50,7 +50,7 @@ fn first_letter(
         .chars()
         .next()
         .ok_or(FirstLetterError::EmptyString)
-        .map(|v| db.intern(v))
+        .map(|v| db.intern_value(v))
 }
 
 #[memo]

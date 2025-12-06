@@ -1,35 +1,20 @@
-use common_lang_types::{DiagnosticResult, SelectableName, ServerObjectEntityName};
-use isograph_lang_types::{DefinitionLocation, DefinitionLocationPostfix, SelectionType};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
+use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, NetworkProtocol,
-    ServerObjectSelectable, ServerScalarSelectable, client_selectable_map, client_selectable_named,
-    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
-    server_selectables_vec_for_entity,
+    IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_map,
+    client_selectable_named, multiple_selectable_definitions_found_diagnostic,
+    server_selectable_named, server_selectables_map_for_entity,
 };
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
+    parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<
-    Option<
-        DefinitionLocation<
-            SelectionType<
-                ServerScalarSelectable<TNetworkProtocol>,
-                ServerObjectSelectable<TNetworkProtocol>,
-            >,
-            SelectionType<
-                ClientScalarSelectable<TNetworkProtocol>,
-                ClientObjectSelectable<TNetworkProtocol>,
-            >,
-        >,
-    >,
-> {
+) -> DiagnosticResult<Option<MemoRefSelectable<TNetworkProtocol>>> {
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
@@ -53,34 +38,32 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => e.clone().wrap_err(),
-        (Ok(server), Err(_)) => match server.note_todo("Do not clone. Use a MemoRef.").clone() {
-            Some(server_selectable) => server_selectable?.server_defined().wrap_some().wrap_ok(),
+        (Ok(server), Err(_)) => match *server.note_todo("Do not clone. Use a MemoRef.") {
+            Some(server_selectable) => server_selectable.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
-        (Err(_), Ok(client)) => match client.note_todo("Do not clone. Use a MemoRef.").clone() {
+        (Err(_), Ok(client)) => match *client.note_todo("Do not clone. Use a MemoRef.") {
             Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
-            (None, Some(client_selectable)) => client_selectable
-                .clone()
+            (None, Some(client_selectable)) => (*client_selectable)
                 .note_todo("Do not clone. Use a MemoRef.")
                 .client_defined()
                 .wrap_some()
                 .wrap_ok(),
-            (Some(server_selectable), None) => server_selectable
-                .clone()
-                .note_todo("Do not clone. Use a MemoRef.")?
+            (Some(server_selectable), None) => (*server_selectable)
+                .note_todo("Do not clone. Use a MemoRef.")
                 .server_defined()
                 .wrap_some()
                 .wrap_ok(),
             (Some(s), Some(_)) => multiple_selectable_definitions_found_diagnostic(
                 parent_server_object_entity_name,
                 selectable_name,
-                match s.clone_err()? {
-                    SelectionType::Scalar(s) => s.name.location,
-                    SelectionType::Object(o) => o.name.location,
+                match s {
+                    SelectionType::Scalar(s) => s.lookup(db).name.location,
+                    SelectionType::Object(o) => o.lookup(db).name.location,
                 },
             )
             .wrap_err(),
@@ -88,31 +71,18 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: ServerObjectEntityName,
-) -> DiagnosticResult<
-    Vec<
-        DiagnosticResult<
-            DefinitionLocation<
-                SelectionType<
-                    ServerScalarSelectable<TNetworkProtocol>,
-                    ServerObjectSelectable<TNetworkProtocol>,
-                >,
-                SelectionType<
-                    ClientScalarSelectable<TNetworkProtocol>,
-                    ClientObjectSelectable<TNetworkProtocol>,
-                >,
-            >,
-        >,
-    >,
-> {
-    let mut selectables = server_selectables_vec_for_entity(db, parent_server_object_entity_name)
-        .to_owned()?
-        .into_iter()
-        .map(|(_key, value)| value?.server_defined().wrap_ok())
+    parent_server_object_entity_name: EntityName,
+) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TNetworkProtocol>>>> {
+    let mut selectables = server_selectables_map_for_entity(db, parent_server_object_entity_name)
+        .to_owned()?.into_values().map(|value| {
+            value
+                .server_defined()
+                .note_todo("Do not wrap in a Result here when client selectables aren't wrapped in results")
+                .wrap_ok()
+        })
         .collect::<Vec<_>>();
 
     selectables.extend(

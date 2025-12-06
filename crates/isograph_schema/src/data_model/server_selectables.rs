@@ -1,26 +1,24 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{
-    JavascriptName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarEntityName, ServerScalarSelectableName, WithLocation,
-};
+use common_lang_types::{EntityName, JavascriptName, SelectableName, WithLocation};
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
 };
+use pico::MemoRef;
 
 use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ServerScalarSelectableName>,
+    pub name: WithLocation<SelectableName>,
 
-    pub target_scalar_entity: TypeAnnotation<ServerScalarEntityName>,
+    pub target_scalar_entity: TypeAnnotation<EntityName>,
     /// Normally, we look up the JavaScript type to use by going through the
     /// target scalar entity. However, there are
     pub javascript_type_override: Option<JavascriptName>,
 
-    pub parent_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: EntityName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
@@ -33,10 +31,10 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -47,16 +45,16 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
 
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<ServerObjectSelectableName>,
+    pub name: WithLocation<SelectableName>,
 
-    pub target_object_entity: TypeAnnotation<ServerObjectEntityName>,
+    pub target_object_entity: TypeAnnotation<EntityName>,
 
     pub object_selectable_variant: ServerObjectSelectableVariant,
 
-    pub parent_object_entity_name: ServerObjectEntityName,
+    pub parent_object_entity_name: EntityName,
     pub arguments: Vec<WithLocation<VariableDefinition<ServerEntityName>>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
@@ -69,10 +67,10 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x.into())
+        self.name.map(|x| x)
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
@@ -81,18 +79,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 }
 
-// TODO rename
-pub type ServerSelectableId = SelectionType<
-    (ServerObjectEntityName, ServerScalarSelectableName),
-    (ServerObjectEntityName, ServerObjectSelectableName),
->;
-
-pub type ServerSelectable<'a, TNetworkProtocol> = SelectionType<
-    &'a ServerScalarSelectable<TNetworkProtocol>,
-    &'a ServerObjectSelectable<TNetworkProtocol>,
->;
-
-pub type OwnedServerSelectable<TNetworkProtocol> = SelectionType<
-    ServerScalarSelectable<TNetworkProtocol>,
-    ServerObjectSelectable<TNetworkProtocol>,
+pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<
+    MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
 >;
