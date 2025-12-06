@@ -43,7 +43,6 @@ export function createAndStartLanguageClient(
     args,
   };
 
-  // Options to control the language client
   const clientOptions: LanguageClientOptions = {
     markdown: {
       isTrusted: true,
@@ -57,8 +56,6 @@ export function createAndStartLanguageClient(
 
     outputChannel: context.lspOutputChannel,
 
-    // Since we use stderr for debug logs, the "Something went wrong" popup
-    // in VSCode shows up a lot. This tells vscode not to show it in any case.
     revealOutputChannelOn: RevealOutputChannelOn.Never,
 
     initializationFailedHandler: (error) => {
@@ -70,7 +67,6 @@ export function createAndStartLanguageClient(
     },
   };
 
-  // Create the language client and start the client.
   const client = new LanguageClient(
     'IsographLanguageClient',
     'Isograph Language Client',
@@ -84,34 +80,32 @@ export function createAndStartLanguageClient(
     )}`,
   );
 
-  // VSCode does not automatically ask the Isograph language server to format tsx (etc)
-  // documents, opting to use the built-in formatter. This is a hack that allows us
-  // to get the language server to format documents.
-  workspace.onWillSaveTextDocument(async (event) => {
-    event.waitUntil(
-      (async () => {
-        try {
-          const textEdits: TextEdit[] = await client.sendRequest(
-            'textDocument/formatting',
-            {
-              textDocument: TextDocumentIdentifier.create(
-                event.document.uri.toString(),
-              ),
-              options: {
-                tabSize: 2,
-                insertSpaces: true,
-              } as FormattingOptions,
-            },
-          );
-          const edit = new WorkspaceEdit();
-          edit.set(event.document.uri, textEdits);
-          await workspace.applyEdit(edit);
-        } catch {}
-      })(),
-    );
-  });
+  if (config.autoformatIsoLiterals) {
+    workspace.onWillSaveTextDocument(async (event) => {
+      event.waitUntil(
+        (async () => {
+          try {
+            const textEdits: TextEdit[] = await client.sendRequest(
+              'textDocument/formatting',
+              {
+                textDocument: TextDocumentIdentifier.create(
+                  event.document.uri.toString(),
+                ),
+                options: {
+                  tabSize: 2,
+                  insertSpaces: true,
+                } as FormattingOptions,
+              },
+            );
+            const edit = new WorkspaceEdit();
+            edit.set(event.document.uri, textEdits);
+            await workspace.applyEdit(edit);
+          } catch {}
+        })(),
+      );
+    });
+  }
 
-  // Start the client. This will also launch the server
   client.start();
   context.client = client;
 }
