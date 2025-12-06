@@ -70,7 +70,7 @@ export function stableCopy<T>(value: T): T {
   if (!value || typeof value !== 'object') {
     return value;
   }
-  if (Array.isArray(value)) {
+  if (isArray(value)) {
     // @ts-ignore
     return value.map(stableCopy);
   }
@@ -665,7 +665,7 @@ function dataIdsAreTheSame(
   existingValue: DataTypeValue,
   newDataIds: (StoreLink | null)[],
 ): boolean {
-  if (Array.isArray(existingValue)) {
+  if (isArray(existingValue)) {
     if (newDataIds.length !== existingValue.length) {
       return false;
     }
@@ -729,14 +729,13 @@ function normalizeNetworkResponseObject(
 }
 
 function isScalarOrEmptyArray(
-  data: NonNullable<NetworkResponseValue>,
+  data: NetworkResponseValue,
 ): data is
   | NetworkResponseScalarValue
   | readonly (NetworkResponseScalarValue | null)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
-  if (Array.isArray(data)) {
-    // This is maybe fixed in a new version of Typescript??
-    return (data as any).every((x: any) => isScalarOrEmptyArray(x));
+  if (isArray(data)) {
+    return data.every((x) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
     data === null ||
@@ -749,7 +748,7 @@ function isScalarOrEmptyArray(
 function isNullOrEmptyArray(
   data: unknown,
 ): data is readonly never[] | null[] | null {
-  if (Array.isArray(data)) {
+  if (isArray(data)) {
     if (data.length === 0) {
       return true;
     }
