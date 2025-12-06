@@ -160,15 +160,21 @@ function recordReachableIdsFromRecord(
         const linkedFieldOrFields = currentRecord[linkKey];
 
         const links: StoreLink[] = [];
-        if (Array.isArray(linkedFieldOrFields)) {
-          for (const maybeLink of linkedFieldOrFields) {
+        if (
+          linkedFieldOrFields?.kind === 'Data' &&
+          Array.isArray(linkedFieldOrFields.value)
+        ) {
+          for (const maybeLink of linkedFieldOrFields.value) {
             const link = assertLink(maybeLink);
             if (link != null) {
               links.push(link);
             }
           }
         } else {
-          const link = assertLink(linkedFieldOrFields);
+          const link =
+            linkedFieldOrFields?.kind === 'Data'
+              ? assertLink(linkedFieldOrFields.value)
+              : null;
           if (link != null) {
             links.push(link);
           }

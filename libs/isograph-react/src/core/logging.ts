@@ -10,6 +10,7 @@ import { FragmentReference, Variables } from './FragmentReference';
 import {
   IsographEnvironment,
   StoreRecord,
+  type PayloadErrors,
   type StoreLink,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
@@ -20,7 +21,8 @@ export type LogMessage =
   | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
-      networkResponse: NetworkResponseObject;
+      networkResponse: NetworkResponseObject | undefined;
+      errors: PayloadErrors | undefined;
       variables: Variables;
     }
   | {

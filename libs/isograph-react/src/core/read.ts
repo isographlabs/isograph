@@ -24,6 +24,7 @@ import {
   getOrLoadReaderWithRefetchQueries,
   IsographEnvironment,
   type DataTypeValue,
+  type PayloadErrors,
   type StoreLink,
   type StoreRecord,
 } from './IsographEnvironment';
@@ -53,6 +54,7 @@ import { Arguments } from './util';
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
+  readonly errors: PayloadErrors | undefined;
 };
 
 export function readButDoNotEvaluate<
@@ -122,6 +124,7 @@ export function readButDoNotEvaluate<
     return {
       encounteredRecords: mutableEncounteredRecords,
       item: response.data,
+      errors: response.errors,
     };
   }
 }
