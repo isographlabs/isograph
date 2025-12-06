@@ -1,15 +1,12 @@
 import { useEffect, useState } from 'react';
 import { subscribe } from '../core/cache';
+import { GraphqlAggregateError, GraphqlError } from '../core/errors';
 import {
   ExtractData,
   FragmentReference,
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import type {
-  PayloadError,
-  PayloadErrorExtensions,
-} from '../core/IsographEnvironment';
 import {
   NetworkRequestReaderOptions,
   readButDoNotEvaluate,
@@ -47,26 +44,6 @@ export function useReadAndSubscribe<
   }
 
   return readOutDataAndRecords.item;
-}
-
-export class GraphqlAggregateError extends AggregateError {
-  errors!: [GraphqlError, ...GraphqlError[]];
-  constructor(errors: Iterable<GraphqlError>, message?: string) {
-    super(errors, message);
-  }
-}
-
-export class GraphqlError extends Error implements PayloadError {
-  locations?: { line: number; column: number }[];
-  path?: (string | number)[];
-  extensions?: PayloadErrorExtensions;
-  constructor(error: PayloadError) {
-    super(error.message);
-    this.name = 'GraphqlError';
-    if (error.path) this.path = error.path;
-    if (error.locations) this.locations = error.locations;
-    if (error.extensions) this.extensions = error.extensions;
-  }
 }
 
 export function useSubscribeToMultiple<

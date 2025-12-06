@@ -9,7 +9,6 @@ import {
   ROOT_ID,
   type BaseStoreLayerData,
   type DataTypeValue,
-  type PayloadErrors,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
@@ -17,14 +16,10 @@ import { iso } from './__isograph/iso';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
-function ok<T extends DataTypeValue>(
-  value: T,
-  errors?: PayloadErrors,
-): WithErrorsData<T> {
+function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   return {
     kind: 'Data',
     value,
-    errors,
   };
 }
 

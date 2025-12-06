@@ -13,7 +13,6 @@ import {
   type NormalizationAstNodes,
 } from '../core/entrypoint';
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import type { Brand } from './brand';
 import { FetchOptions } from './check';
 import {
   ExtractParameters,
@@ -32,8 +31,6 @@ import {
   StoreLink,
   StoreRecord,
   type IsographEnvironment,
-  type PayloadErrorPath,
-  type PayloadErrors,
   type TypeName,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
@@ -46,6 +43,14 @@ import {
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
+import {
+  findErrors,
+  groupErrorsByPath,
+  type ErrorsByPath,
+  PayloadError,
+  PayloadErrorPath,
+} from './errors';
+import type { NonEmptyArray } from './NonEmptyArray';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -164,24 +169,13 @@ export type NetworkResponseObject = {
   readonly __typename?: TypeName;
 };
 
-declare const PayloadErrorPathJoinedBrand: unique symbol;
-type PayloadErrorPathJoined = Brand<string, typeof PayloadErrorPathJoinedBrand>;
-
-function joinPayloadErrorPath(
-  path: PayloadErrorPath[] | undefined,
-): PayloadErrorPathJoined {
-  return (path?.join('.') ?? '') as PayloadErrorPathJoined;
-}
-
-export type ErrorsByPath = Map<PayloadErrorPathJoined, PayloadErrors>;
-
 export function normalizeData(
   environment: IsographEnvironment,
   storeLayer: StoreLayerWithData,
   normalizationAst: NormalizationAstNodes,
   networkResponse: {
     data: NetworkResponseObject | undefined;
-    errors: PayloadErrors | undefined;
+    errors: NonEmptyArray<PayloadError> | undefined;
   },
   variables: Variables,
   root: StoreLink,
@@ -197,10 +191,7 @@ export function normalizeData(
 
   const newStoreRecord = getMutableStoreRecordProxy(storeLayer, root);
 
-  const errorsByPath: ErrorsByPath = groupBy(
-    networkResponse.errors ?? [],
-    (error) => joinPayloadErrorPath(error.path),
-  );
+  const errorsByPath = groupErrorsByPath(networkResponse.errors ?? []);
 
   const path: PayloadErrorPath[] = [];
 
@@ -218,23 +209,6 @@ export function normalizeData(
   );
 
   return encounteredIds;
-}
-
-function groupBy<V, K extends string | number | symbol>(
-  arr: readonly V[],
-  keyFn: (v: V) => K,
-) {
-  const result: Map<K, [V, ...V[]]> = new Map();
-  for (const el of arr) {
-    const key = keyFn(el);
-    const entry = result.get(key);
-    if (entry != null) {
-      entry.push(el);
-    } else {
-      result.set(key, [el]);
-    }
-  }
-  return result;
 }
 
 export function subscribeToAnyChange(
@@ -563,24 +537,6 @@ export function insertEmptySetIfMissing<K, V>(map: Map<K, Set<V>>, key: K) {
     map.set(key, result);
   }
   return result;
-}
-
-/**
- * If errors bubble up, the error path will be a full-path to the field
- */
-function findErrors(errorsByPath: ErrorsByPath, path: PayloadErrorPath[]) {
-  const joinedPath = joinPayloadErrorPath(path);
-  let errors: PayloadErrors | undefined = undefined;
-  for (const [errorPath, suberrors] of errorsByPath) {
-    if (suberrors && errorPath.startsWith(joinedPath)) {
-      if (errors == null) {
-        errors = suberrors;
-      } else {
-        errors.push(...suberrors);
-      }
-    }
-  }
-  return errors;
 }
 
 type RecordHasBeenUpdated = boolean;
