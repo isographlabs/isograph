@@ -43,6 +43,14 @@ import {
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
+import {
+  findErrors,
+  groupErrorsByPath,
+  type ErrorsByPath,
+  PayloadError,
+  PayloadErrorPath,
+} from './errors';
+import type { NonEmptyArray } from './NonEmptyArray';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -165,7 +173,10 @@ export function normalizeData(
   environment: IsographEnvironment,
   storeLayer: StoreLayerWithData,
   normalizationAst: NormalizationAstNodes,
-  networkResponse: NetworkResponseObject,
+  networkResponse: {
+    data: NetworkResponseObject | undefined;
+    errors: NonEmptyArray<PayloadError> | undefined;
+  },
   variables: Variables,
   root: StoreLink,
   encounteredIds: EncounteredIds,
@@ -173,21 +184,28 @@ export function normalizeData(
   logMessage(environment, () => ({
     kind: 'AboutToNormalize',
     normalizationAst,
-    networkResponse,
+    networkResponse: networkResponse.data,
+    errors: networkResponse.errors,
     variables,
   }));
 
   const newStoreRecord = getMutableStoreRecordProxy(storeLayer, root);
 
+  const errorsByPath = groupErrorsByPath(networkResponse.errors ?? []);
+
+  const path: PayloadErrorPath[] = [];
+
   normalizeDataIntoRecord(
     environment,
     storeLayer,
     normalizationAst,
-    networkResponse,
+    networkResponse.data ?? {},
     newStoreRecord,
     root,
     variables,
     encounteredIds,
+    errorsByPath,
+    path,
   );
 
   return encounteredIds;
@@ -378,7 +396,11 @@ function callSubscriptionIfDataChanged<
     deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
   }));
 
-  if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+  if (
+    mergedItem !== subscription.encounteredDataAndRecords.item ||
+    newEncounteredDataAndRecords.errors !==
+      subscription.encounteredDataAndRecords.errors
+  ) {
     logAnyError(
       environment,
       { situation: 'calling FragmentSubscription callback' },
@@ -430,22 +452,31 @@ function normalizeDataIntoRecord(
   targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
+  errorsByPath: ErrorsByPath,
+  path: PayloadErrorPath[],
 ): RecordHasBeenUpdated {
   let recordHasBeenUpdated = false;
   for (const normalizationNode of normalizationAst) {
     switch (normalizationNode.kind) {
       case 'Scalar': {
+        const networkResponseKey = getNetworkResponseKey(normalizationNode);
+        path.push(networkResponseKey);
         const scalarFieldResultedInChange = normalizeScalarField(
           normalizationNode,
           networkResponseParentRecord,
           targetParentRecord,
           variables,
+          errorsByPath,
+          path,
         );
+        path.pop();
         recordHasBeenUpdated =
           recordHasBeenUpdated || scalarFieldResultedInChange;
         break;
       }
       case 'Linked': {
+        const networkResponseKey = getNetworkResponseKey(normalizationNode);
+        path.push(networkResponseKey);
         const linkedFieldResultedInChange = normalizeLinkedField(
           environment,
           storeLayer,
@@ -455,7 +486,10 @@ function normalizeDataIntoRecord(
           targetParentRecordLink,
           variables,
           mutableEncounteredIds,
+          errorsByPath,
+          path,
         );
+        path.pop();
         recordHasBeenUpdated =
           recordHasBeenUpdated || linkedFieldResultedInChange;
         break;
@@ -470,6 +504,8 @@ function normalizeDataIntoRecord(
           targetParentRecordLink,
           variables,
           mutableEncounteredIds,
+          errorsByPath,
+          path,
         );
         recordHasBeenUpdated =
           recordHasBeenUpdated || inlineFragmentResultedInChange;
@@ -509,6 +545,8 @@ function normalizeScalarField(
   networkResponseParentRecord: NetworkResponseObject,
   targetStoreRecord: StoreRecord,
   variables: Variables,
+  errorsByPath: ErrorsByPath,
+  path: PayloadErrorPath[],
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -516,13 +554,35 @@ function normalizeScalarField(
   const existingValue = targetStoreRecord[parentRecordKey];
 
   if (networkResponseData == null) {
-    targetStoreRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    const errors = findErrors(errorsByPath, path);
+
+    if (errors) {
+      targetStoreRecord[parentRecordKey] = {
+        kind: 'Errors',
+        errors,
+      };
+      return (
+        existingValue?.kind !== 'Errors' ||
+        JSON.stringify(stableCopy(existingValue.errors)) !==
+          JSON.stringify(stableCopy(errors))
+      );
+    }
+    targetStoreRecord[parentRecordKey] = {
+      kind: 'Data',
+      value: null,
+    };
+    return existingValue?.kind === 'Errors' || existingValue?.value !== null;
   }
 
   if (isScalarOrEmptyArray(networkResponseData)) {
-    targetStoreRecord[parentRecordKey] = networkResponseData;
-    return existingValue !== networkResponseData;
+    targetStoreRecord[parentRecordKey] = {
+      kind: 'Data',
+      value: networkResponseData,
+    };
+    return (
+      existingValue?.kind === 'Errors' ||
+      existingValue?.value !== networkResponseData
+    );
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
@@ -544,6 +604,8 @@ function normalizeLinkedField(
   targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
+  errorsByPath: ErrorsByPath,
+  path: PayloadErrorPath[],
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
@@ -551,8 +613,24 @@ function normalizeLinkedField(
   const existingValue = targetParentRecord[parentRecordKey];
 
   if (networkResponseData == null) {
-    targetParentRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    const errors = findErrors(errorsByPath, path);
+
+    if (errors) {
+      targetParentRecord[parentRecordKey] = {
+        kind: 'Errors',
+        errors,
+      };
+      return (
+        existingValue?.kind !== 'Errors' ||
+        JSON.stringify(stableCopy(existingValue.errors)) !==
+          JSON.stringify(stableCopy(errors))
+      );
+    }
+    targetParentRecord[parentRecordKey] = {
+      kind: 'Data',
+      value: null,
+    };
+    return existingValue?.kind === 'Errors' || existingValue?.value !== null;
   }
 
   if (
@@ -573,6 +651,7 @@ function normalizeLinkedField(
         dataIds.push(null);
         continue;
       }
+      path.push(i as PayloadErrorPath);
       const newStoreRecordId = normalizeNetworkResponseObject(
         environment,
         storeLayer,
@@ -582,7 +661,10 @@ function normalizeLinkedField(
         variables,
         i,
         mutableEncounteredIds,
+        errorsByPath,
+        path,
       );
+      path.pop();
 
       const __typename =
         astNode.concreteType ?? networkResponseObject[TYPENAME_FIELD_NAME];
@@ -597,8 +679,14 @@ function normalizeLinkedField(
         __typename,
       });
     }
-    targetParentRecord[parentRecordKey] = dataIds;
-    return !dataIdsAreTheSame(existingValue, dataIds);
+    targetParentRecord[parentRecordKey] = {
+      kind: 'Data',
+      value: dataIds,
+    };
+    return (
+      existingValue?.kind === 'Errors' ||
+      !dataIdsAreTheSame(existingValue?.value, dataIds)
+    );
   } else {
     const newStoreRecordId = normalizeNetworkResponseObject(
       environment,
@@ -609,6 +697,8 @@ function normalizeLinkedField(
       variables,
       null,
       mutableEncounteredIds,
+      errorsByPath,
+      path,
     );
 
     let __typename =
@@ -622,11 +712,15 @@ function normalizeLinkedField(
     }
 
     targetParentRecord[parentRecordKey] = {
-      __link: newStoreRecordId,
-      __typename,
+      kind: 'Data',
+      value: {
+        __link: newStoreRecordId,
+        __typename,
+      },
     };
 
-    const link = getLink(existingValue);
+    const link =
+      existingValue?.kind === 'Data' ? getLink(existingValue.value) : undefined;
     return link?.__link !== newStoreRecordId || link.__typename !== __typename;
   }
 }
@@ -643,6 +737,8 @@ function normalizeInlineFragment(
   targetParentRecordLink: StoreLink,
   variables: Variables,
   mutableEncounteredIds: EncounteredIds,
+  errorsByPath: ErrorsByPath,
+  path: PayloadErrorPath[],
 ): RecordHasBeenUpdated {
   const typeToRefineTo = astNode.type;
   if (networkResponseParentRecord[TYPENAME_FIELD_NAME] === typeToRefineTo) {
@@ -655,6 +751,8 @@ function normalizeInlineFragment(
       targetParentRecordLink,
       variables,
       mutableEncounteredIds,
+      errorsByPath,
+      path,
     );
     return hasBeenModified;
   }
@@ -693,6 +791,8 @@ function normalizeNetworkResponseObject(
   variables: Variables,
   index: number | null,
   mutableEncounteredIds: EncounteredIds,
+  errorsByPath: ErrorsByPath,
+  path: PayloadErrorPath[],
 ): DataId /* The id of the modified or newly created item */ {
   const newStoreRecordId = getDataIdOfNetworkResponse(
     targetParentRecordLink,
@@ -723,6 +823,8 @@ function normalizeNetworkResponseObject(
     link,
     variables,
     mutableEncounteredIds,
+    errorsByPath,
+    path,
   );
 
   return newStoreRecordId;
@@ -827,9 +929,11 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
+export type NetworkResponseKey = string;
+
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
-): string {
+): NetworkResponseKey {
   let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
 
@@ -945,7 +1049,7 @@ export function writeData<
     environment,
     environment.store,
     entrypoint.networkRequestInfo.normalizationAst.selections,
-    data,
+    { data, errors: undefined },
     variables,
     { __link: ROOT_ID, __typename: entrypoint.concreteType },
     encounteredIds,

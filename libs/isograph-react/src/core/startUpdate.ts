@@ -15,6 +15,7 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
+  type DataTypeValue,
   type IsographEnvironment,
   type StoreLink,
 } from './IsographEnvironment';
@@ -28,6 +29,7 @@ import {
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
+  assertNever,
   readImperativelyLoadedField,
   readLinkedFieldData,
   readLoadablySelectedFieldData,
@@ -201,15 +203,25 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               root,
               variables,
             );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
+            switch (data.kind) {
+              case 'MissingData':
+                throw new Error(data.reason);
+              case 'Error':
+                return null;
+              case 'Success':
+                return data.data;
+              default: {
+                assertNever(data);
+              }
             }
-            return data.data;
           },
           field.isUpdatable
-            ? (newValue) => {
+            ? (newValue: DataTypeValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
-                storeRecord[storeRecordName] = newValue;
+                storeRecord[storeRecordName] = {
+                  kind: 'Data',
+                  value: newValue,
+                };
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
                   root.__typename,
@@ -259,11 +271,15 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
-                  storeRecord[storeRecordName] = newValue.map((node) =>
-                    assertLink(node?.__link),
-                  );
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    value: newValue.map((node) => assertLink(node?.__link)),
+                  };
                 } else {
-                  storeRecord[storeRecordName] = assertLink(newValue?.__link);
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    value: assertLink(newValue?.__link),
+                  };
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -287,10 +303,17 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
@@ -306,10 +329,17 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
@@ -324,10 +354,18 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequestOptions,
             new Map(),
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Error':
+              return null;
+            case 'Success':
+              return data.data;
+            default: {
+              assertNever(data);
+            }
           }
-          return data.data;
         });
         break;
       }
@@ -345,5 +383,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   return {
     kind: 'Success',
     data: target as any,
+    errors: undefined,
   };
 }

@@ -212,9 +212,6 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('GraphQL network response had errors', {
-          cause: networkResponse,
-        });
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
@@ -225,7 +222,10 @@ export function makeNetworkRequest<
           environment,
           environment.store,
           normalizationAst.selections,
-          networkResponse.data ?? {},
+          {
+            data: networkResponse.data ?? undefined,
+            errors: networkResponse.errors ?? undefined,
+          },
           variables,
           root,
           encounteredIds,

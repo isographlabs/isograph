@@ -1,6 +1,6 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import { isArray } from './cache';
+import { isArray, type NetworkResponseKey } from './cache';
 import {
   IsographEntrypoint,
   IsographOperation,
@@ -24,6 +24,8 @@ import {
 } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import type { NonEmptyArray } from './NonEmptyArray';
+import type { PayloadError } from './errors';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -95,7 +97,10 @@ export type MissingFieldHandler = (
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<{
+  data?: any;
+  errors?: any;
+}>;
 
 export interface Link<T extends TypeName> extends StoreLink {
   readonly __link: Brand<DataId, T>;
@@ -121,11 +126,23 @@ export type DataTypeValue =
   // Plural scalar and linked fields:
   | readonly DataTypeValue[];
 
+export type WithErrorsData<T extends DataTypeValue> = {
+  readonly kind: 'Data';
+  readonly value: T;
+};
+
+export type WithErrors<T extends DataTypeValue> =
+  | WithErrorsData<T>
+  | {
+      readonly kind: 'Errors';
+      readonly errors: NonEmptyArray<PayloadError>;
+    };
+
 export type StoreRecord = {
-  [index: DataId | string]: DataTypeValue;
+  [index: NetworkResponseKey]: WithErrors<DataTypeValue>;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
-  readonly id?: DataId;
+  readonly id?: WithErrorsData<DataId>;
 };
 
 export type TypeName = string;
