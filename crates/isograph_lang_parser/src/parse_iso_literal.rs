@@ -112,8 +112,13 @@ fn parse_iso_entrypoint_declaration(
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
-            )?
-            .map(EntityNameWrapper);
+            )
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_location(tokens.text_source)
+            })?;
+
         let dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
         let client_field_name = tokens

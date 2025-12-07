@@ -12,7 +12,7 @@ use crate::{
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
-    pub parent_type: WithSpan<EntityNameWrapper>,
+    pub parent_type: WithLocation<EntityNameWrapper>,
     // N.B. there is no reason this can't be a server field name /shrug
     #[resolve_field]
     pub client_field_name: WithLocation<ClientScalarSelectableNameWrapper>,
