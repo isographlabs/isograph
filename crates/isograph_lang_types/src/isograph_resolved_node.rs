@@ -48,14 +48,14 @@ fn get_path_using_selection_parent<'a>(
                 SelectionSetParentType::ClientFieldDeclaration(client_field_declaration) => {
                     string_vec.push(format!(
                         "{}.{}",
-                        client_field_declaration.inner.parent_type,
+                        client_field_declaration.inner.parent_type.item,
                         client_field_declaration.inner.client_field_name.item
                     ));
                 }
                 SelectionSetParentType::ClientPointerDeclaration(client_pointer_declaration) => {
                     string_vec.push(format!(
                         "{}.{}",
-                        client_pointer_declaration.inner.parent_type,
+                        client_pointer_declaration.inner.parent_type.item,
                         client_pointer_declaration.inner.client_pointer_name.item
                     ));
                 }

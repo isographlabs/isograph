@@ -180,7 +180,11 @@ fn parse_client_field_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(EntityNameWrapper))?;
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_location(tokens.text_source)
+            })?;
 
         let _ = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
@@ -279,7 +283,11 @@ fn parse_client_pointer_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(EntityNameWrapper))?;
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_location(tokens.text_source)
+            })?;
 
         let _dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;

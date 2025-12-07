@@ -45,7 +45,6 @@ pub type UnprocessedSelectionSet = SelectionType<
 pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     client_field_declaration: MemoRef<ClientFieldDeclaration>,
-    text_source: TextSource,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
     let parent_type_id = defined_entity(db, client_field_declaration_item.parent_type.item.0)
@@ -54,7 +53,9 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             let parent_object_entity_name = client_field_declaration_item.parent_type.item;
             Diagnostic::new(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                Location::new(text_source, client_field_declaration_item.parent_type.span)
+                client_field_declaration_item
+                    .parent_type
+                    .location
                     .wrap_some(),
             )
         })?;
@@ -74,7 +75,9 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                     In order to do so, the parent object must \
                     be an object, interface or union."
                 ),
-                Location::new(text_source, client_field_declaration_item.parent_type.span)
+                client_field_declaration_item
+                    .parent_type
+                    .location
                     .wrap_some(),
             )
             .wrap_err();
@@ -95,11 +98,10 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
             Diagnostic::new(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                Location::new(
-                    text_source,
-                    client_pointer_declaration_item.parent_type.span,
-                )
-                .wrap_some(),
+                client_pointer_declaration_item
+                    .parent_type
+                    .location
+                    .wrap_some(),
             )
         })?;
 
