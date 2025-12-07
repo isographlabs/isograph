@@ -294,8 +294,10 @@ export const errorsClientFieldComponent = iso(`
     }
   }
 `)(() => {});
-// prettier-ignore
-const errorsClientFieldComponentEntrypoint = iso(`entrypoint Query.errorsClientFieldComponent`);
+
+const errorsClientFieldComponentEntrypoint = iso(
+  `entrypoint Query.errorsClientFieldComponent`,
+);
 
 let errorsClientPointerFieldMock = vitest.fn();
 
@@ -317,8 +319,10 @@ export const errorsClientPointer = iso(`
     }
   }
 `)(() => {});
-// prettier-ignore
-const errorsClientPointerEntrypoint = iso(`entrypoint Query.errorsClientPointer`);
+
+const errorsClientPointerEntrypoint = iso(
+  `entrypoint Query.errorsClientPointer`,
+);
 
 describe('errors', () => {
   describe('normalizeData', () => {
