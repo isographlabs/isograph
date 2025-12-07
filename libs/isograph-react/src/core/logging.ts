@@ -16,6 +16,18 @@ import { ReadDataResult } from './read';
 import { Arguments } from './util';
 import type { StoreLayer } from './optimisticProxy';
 
+/**
+ * Note: these types are unstable. We will add and remove items from this enum
+ * and add and remove fields. Please do not rely on the specifics here (for now).
+ *
+ * Goals include:
+ * - convenient debugging for Isograph developers
+ * - eventual support for the Isograph devtools
+ *
+ * In some cases (e.g. in `AfterNormalization`), we include large objects and thus
+ * prevent them from getting garbage collected (if the log message is printed).
+ * Especially in cases like that, we intend to remove those!
+ */
 export type LogMessage =
   | {
       kind: 'AboutToNormalize';
