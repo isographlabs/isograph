@@ -3,6 +3,7 @@
 use crate::{
     completion::on_completion,
     diagnostic_notification::publish_new_diagnostics_and_clear_old_diagnostics,
+    document_highlight::on_document_highlight,
     format::on_format,
     goto_definition::on_goto_definition,
     hover::on_hover,
@@ -26,7 +27,7 @@ use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     CompletionOptions, HoverProviderCapability,
-    request::{Completion, HoverRequest, SemanticTokensFullRequest},
+    request::{Completion, DocumentHighlightRequest, HoverRequest, SemanticTokensFullRequest},
 };
 use lsp_types::{
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
@@ -62,6 +63,7 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
             trigger_characters: Some(vec!["\n".to_string()]),
             ..Default::default()
         }),
+        document_highlight_provider: Some(OneOf::Left(true)),
         ..Default::default()
     };
     let server_capabilities =
@@ -219,6 +221,7 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             .on_request_sync::<Formatting>(on_format)?
             .on_request_sync::<GotoDefinition>(on_goto_definition)?
             .on_request_sync::<Completion>(on_completion)?
+            .on_request_sync::<DocumentHighlightRequest>(on_document_highlight)?
             .request();
 
         // If we have gotten here, we have not handled the request

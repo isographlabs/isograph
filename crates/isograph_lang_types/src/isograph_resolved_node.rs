@@ -8,6 +8,7 @@ use crate::{
 #[derive(Debug)]
 pub enum IsographResolvedNode<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    // TODO this needs to be WithLocation<...>
     EntityNameWrapper(EntityNameWrapperPath<'a>),
     Description(DescriptionPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),

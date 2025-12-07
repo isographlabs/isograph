@@ -6,6 +6,7 @@ use lsp_server::Connection;
 
 mod completion;
 mod diagnostic_notification;
+mod document_highlight;
 mod format;
 mod goto_definition;
 mod hover;

@@ -53,7 +53,6 @@ define_wrapper!(
 
 #[derive(Debug)]
 pub enum DescriptionParent<'a> {
-    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
