@@ -1,6 +1,7 @@
 #![allow(clippy::print_stderr)]
 
 use crate::{
+    code_action::on_code_action,
     completion::on_completion,
     diagnostic_notification::publish_new_diagnostics_and_clear_old_diagnostics,
     document_highlight::on_document_highlight,
@@ -10,6 +11,7 @@ use crate::{
     lsp_notification_dispatch::LSPNotificationDispatch,
     lsp_request_dispatch::LSPRequestDispatch,
     lsp_runtime_error::LSPRuntimeError,
+    lsp_state::LspState,
     semantic_tokens::on_semantic_token_full_request,
     text_document::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
@@ -26,8 +28,11 @@ use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
-    CompletionOptions, HoverProviderCapability,
-    request::{Completion, DocumentHighlightRequest, HoverRequest, SemanticTokensFullRequest},
+    CodeActionProviderCapability, CompletionOptions, HoverProviderCapability,
+    request::{
+        CodeActionRequest, Completion, DocumentHighlightRequest, HoverRequest,
+        SemanticTokensFullRequest,
+    },
 };
 use lsp_types::{
     InitializeParams, OneOf, SemanticTokensFullOptions, SemanticTokensOptions,
@@ -64,6 +69,7 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
             ..Default::default()
         }),
         document_highlight_provider: Some(OneOf::Left(true)),
+        code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         ..Default::default()
     };
     let server_capabilities =
@@ -87,8 +93,10 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
-    let mut compiler_state: CompilerState<TNetworkProtocol> =
+    let compiler_state: CompilerState<TNetworkProtocol> =
         CompilerState::new(config_location, current_working_directory)?;
+    let mut lsp_state = LspState::new(compiler_state, &connection.sender);
+
     #[allow(clippy::mutable_key_type)]
     let mut uris_with_diagnostics = BTreeSet::new();
 
@@ -97,7 +105,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
 
-    let config = compiler_state.db.get_isograph_config().clone();
+    let config = lsp_state.compiler_state.db.get_isograph_config().clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -115,13 +123,13 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         match lsp_message {
                             lsp_server::Message::Request(request) => {
                                 eprintln!("\nReceived request: {}", request.method);
-                                let response = dispatch_request(request, &compiler_state);
+                                let response = dispatch_request(request, &lsp_state);
                                 eprintln!("Sending response: {response:?}");
                                 connection.sender.send(response.into()).unwrap();
                             }
                             lsp_server::Message::Notification(notification) => {
                                 eprintln!("\nReceived notification: {}", notification.method);
-                                let _ = dispatch_notification(notification, &mut compiler_state);
+                                let _ = dispatch_notification(notification, &mut lsp_state);
 
                                 // NOTE: we attempt to be judicious, i.e. only trigger the debounce timer
                                 // if we receive a notification (which may have changed state).
@@ -143,7 +151,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                 if let Some(Ok(changes)) = message {
                     if has_config_changes(&changes) {
                         eprintln!("Config change detected.");
-                        compiler_state = CompilerState::new(config_location, current_working_directory)?;
+                        let compiler_state = CompilerState::new(config_location, current_working_directory)?;
+                        lsp_state = LspState::new(compiler_state, &connection.sender);
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) =
@@ -162,9 +171,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         }
                     } else {
                         eprintln!("File changes detected. Starting to compile.");
-                        update_sources(&mut compiler_state.db, &changes)?;
+                        update_sources(&mut lsp_state.compiler_state.db, &changes)?;
 
-                        compiler_state.run_garbage_collection();
+                        lsp_state.compiler_state.run_garbage_collection();
                     };
 
                     debounce_timer.as_mut().reset(Instant::now() + SHORT_DEBOUNCE_TIME);
@@ -174,7 +183,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             _ = &mut debounce_timer => {
-                let diagnostics = validate_entire_schema(&compiler_state.db)
+                let diagnostics = validate_entire_schema(&lsp_state.compiler_state.db)
                     .clone_err()
                     .err()
                     .unwrap_or_default();
@@ -182,7 +191,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                 eprintln!("Publishing diagnostics {:?}", diagnostics);
 
                 uris_with_diagnostics = publish_new_diagnostics_and_clear_old_diagnostics(
-                    &compiler_state.db,
+                    &lsp_state.compiler_state.db,
                     &diagnostics,
                     &connection.sender,
                     uris_with_diagnostics
@@ -198,9 +207,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
 
 fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
     notification: lsp_server::Notification,
-    compiler_state: &mut CompilerState<TNetworkProtocol>,
+    lsp_state: &mut LspState<TNetworkProtocol>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
-    LSPNotificationDispatch::new(notification, compiler_state)
+    LSPNotificationDispatch::new(notification, lsp_state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
         .on_notification_sync::<DidCloseTextDocument>(on_did_close_text_document)?
         .on_notification_sync::<DidChangeTextDocument>(on_did_change_text_document)?
@@ -210,18 +219,19 @@ fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
 }
 fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
     request: lsp_server::Request,
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
 ) -> Response {
     // Returns ControlFlow::Break(ServerResponse) if the request
     // was handled, ControlFlow::Continue(Request) otherwise.
     let get_response = || {
-        let request = LSPRequestDispatch::new(request, compiler_state)
+        let request = LSPRequestDispatch::new(request, lsp_state)
             .on_request_sync::<SemanticTokensFullRequest>(on_semantic_token_full_request)?
             .on_request_sync::<HoverRequest>(on_hover)?
             .on_request_sync::<Formatting>(on_format)?
             .on_request_sync::<GotoDefinition>(on_goto_definition)?
             .on_request_sync::<Completion>(on_completion)?
             .on_request_sync::<DocumentHighlightRequest>(on_document_highlight)?
+            .on_request_sync::<CodeActionRequest>(on_code_action)?
             .request();
 
         // If we have gotten here, we have not handled the request

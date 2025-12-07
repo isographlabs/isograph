@@ -1,10 +1,10 @@
+use crate::lsp_state::LspState;
 use crate::{
     hover::get_iso_literal_extraction_from_text_position_params,
     lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::Span;
 use common_lang_types::relative_path_from_absolute_and_working_directory;
-use isograph_compiler::CompilerState;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
 use isograph_lang_types::SelectionType;
@@ -20,13 +20,13 @@ use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
 pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <Completion as Request>::Params,
 ) -> LSPRuntimeResult<Option<CompletionResponse>> {
     let url = params.text_document_position.text_document.uri;
     let position = params.text_document_position.position;
 
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
 
     let current_working_directory = db.get_current_working_directory();
 

@@ -1,7 +1,6 @@
 use common_lang_types::{
     EmbeddedLocation, Span, relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DescriptionParent, EntityNameWrapperParent, IsographResolvedNode,
@@ -17,16 +16,17 @@ use resolve_position::ResolvePosition;
 
 use crate::hover::get_iso_literal_extraction_from_text_position_params;
 use crate::location_utils::isograph_location_to_lsp_location;
+use crate::lsp_state::LspState;
 use crate::{
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
     uri_file_path_ext::UriFilePathExt,
 };
 
 pub fn on_document_highlight<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <DocumentHighlightRequest as Request>::Params,
 ) -> LSPRuntimeResult<<DocumentHighlightRequest as Request>::Result> {
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
     on_document_highlight_impl(
         db,
         params.text_document_position_params.text_document.uri,

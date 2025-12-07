@@ -1,9 +1,9 @@
 use std::fmt::Display;
 
 use prelude::Postfix;
-use serde::de;
+use serde::{Deserialize, Serialize, de};
 
-use crate::Location;
+use crate::{Location, ParentObjectEntityNameAndSelectableName};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diagnostic(pub Box<DiagnosticData>);
@@ -15,11 +15,21 @@ pub struct DiagnosticData {
 
     /// The primary location where the message originated.
     pub location: Option<Location>,
+
+    /// Any associated code actions
+    pub code_actions: Vec<IsographCodeAction>,
 }
 
 impl Diagnostic {
     pub fn new(message: String, location: Option<Location>) -> Diagnostic {
-        Diagnostic(DiagnosticData { message, location }.boxed())
+        Diagnostic(
+            DiagnosticData {
+                message,
+                location,
+                code_actions: vec![],
+            }
+            .boxed(),
+        )
     }
 
     pub fn from_error(e: impl std::error::Error, location: Option<Location>) -> Diagnostic {
@@ -27,6 +37,7 @@ impl Diagnostic {
             DiagnosticData {
                 message: e.to_string(),
                 location,
+                code_actions: vec![],
             }
             .boxed(),
         )
@@ -34,6 +45,21 @@ impl Diagnostic {
 
     pub fn location(&self) -> Option<Location> {
         self.0.location
+    }
+
+    pub fn new_with_code_actions(
+        message: String,
+        location: Option<Location>,
+        code_actions: Vec<IsographCodeAction>,
+    ) -> Diagnostic {
+        Diagnostic(
+            DiagnosticData {
+                message,
+                location,
+                code_actions,
+            }
+            .boxed(),
+        )
     }
 }
 
@@ -83,4 +109,9 @@ impl<T> WithNonFatalDiagnostics<T> {
             item,
         }
     }
+}
+
+#[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy, Serialize, Deserialize)]
+pub enum IsographCodeAction {
+    CreateNewScalarSelectable(ParentObjectEntityNameAndSelectableName),
 }

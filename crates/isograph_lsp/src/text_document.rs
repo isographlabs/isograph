@@ -1,5 +1,4 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
-use isograph_compiler::CompilerState;
 use isograph_schema::NetworkProtocol;
 use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
@@ -8,16 +7,18 @@ use lsp_types::{
     },
 };
 
-use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
+use crate::{
+    lsp_runtime_error::LSPRuntimeResult, lsp_state::LspState, uri_file_path_ext::UriFilePathExt,
+};
 
 pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &mut CompilerState<TNetworkProtocol>,
+    lsp_state: &mut LspState<TNetworkProtocol>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidOpenTextDocumentParams { text_document } = params;
     let TextDocumentItem { text, uri, .. } = text_document;
 
-    let db = &mut compiler_state.db;
+    let db = &mut lsp_state.compiler_state.db;
     let current_working_directory = db.get_current_working_directory();
 
     let relative_path_to_source_file = relative_path_from_absolute_and_working_directory(
@@ -30,11 +31,11 @@ pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &mut CompilerState<TNetworkProtocol>,
+    lsp_state: &mut LspState<TNetworkProtocol>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let uri = params.text_document.uri;
-    let db = &mut compiler_state.db;
+    let db = &mut lsp_state.compiler_state.db;
 
     let current_working_directory = db.get_current_working_directory();
 
@@ -49,7 +50,7 @@ pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
 }
 
 pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &mut CompilerState<TNetworkProtocol>,
+    lsp_state: &mut LspState<TNetworkProtocol>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidChangeTextDocumentParams {
@@ -57,7 +58,7 @@ pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol>(
         text_document,
     } = params;
     let uri = text_document.uri;
-    let db = &mut compiler_state.db;
+    let db = &mut lsp_state.compiler_state.db;
 
     // We do full text document syncing, so the new text will be in the first content change event.
     let content_changed = content_changes

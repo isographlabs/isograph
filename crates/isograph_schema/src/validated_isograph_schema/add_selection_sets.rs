@@ -4,7 +4,7 @@ use crate::{
     ValidatedSelection, selectable_named,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, Location,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, IsographCodeAction, Location,
     ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
@@ -333,13 +333,19 @@ fn selection_does_not_exist_diagnostic(
     selectable_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
-    Diagnostic::new(
+    Diagnostic::new_with_code_actions(
         format!(
             "In the client {client_type} `{declaration_parent_object_entity_name}.{declaration_selectable_name}`, \
             the field `{selectable_parent_object_entity_name}.{selectable_name}` is selected, but that \
             field does not exist on `{selectable_parent_object_entity_name}`"
         ),
         location.wrap_some(),
+        vec![IsographCodeAction::CreateNewScalarSelectable(
+            ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: selectable_parent_object_entity_name,
+                selectable_name,
+            },
+        )],
     )
 }
 

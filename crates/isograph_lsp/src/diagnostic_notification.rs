@@ -8,6 +8,7 @@ use lsp_types::{
     PublishDiagnosticsParams, Uri,
     notification::{Notification, PublishDiagnostics},
 };
+use prelude::Postfix;
 
 use crate::location_utils::isograph_location_to_lsp_location;
 
@@ -70,6 +71,12 @@ fn iso_diagnostics_to_params<TNetworkProtocol: NetworkProtocol>(
             .push(lsp_types::Diagnostic {
                 range: location.range,
                 message: diagnostic.to_string(),
+                data: serde_json::to_value(diagnostic.0.code_actions.clone())
+                    .expect(
+                        "Expected serialization to work. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .wrap_some(),
                 ..Default::default()
             })
     }

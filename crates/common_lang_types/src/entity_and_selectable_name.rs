@@ -1,8 +1,10 @@
+use serde::{Deserialize, Serialize};
+
 use crate::{ArtifactFilePrefix, EntityName, SelectableName};
 
 // TODO consider making this generic over the type of field_name. We sometimes know
 // that the field is e.g. a scalar field
-#[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy)]
+#[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy, Serialize, Deserialize)]
 pub struct ParentObjectEntityNameAndSelectableName {
     pub parent_object_entity_name: EntityName,
     pub selectable_name: SelectableName,

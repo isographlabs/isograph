@@ -4,6 +4,7 @@ use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult
 use isograph_schema::NetworkProtocol;
 use lsp_server::Connection;
 
+mod code_action;
 mod completion;
 mod diagnostic_notification;
 mod document_highlight;
@@ -14,6 +15,7 @@ mod location_utils;
 pub mod lsp_notification_dispatch;
 mod lsp_request_dispatch;
 pub mod lsp_runtime_error;
+mod lsp_state;
 mod semantic_tokens;
 pub mod server;
 pub mod text_document;

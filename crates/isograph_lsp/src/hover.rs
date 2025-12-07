@@ -1,7 +1,6 @@
 use common_lang_types::{
     EntityName, SelectableName, Span, relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     DefinitionLocation, Description, IsographResolvedNode, VariableDefinition,
 };
@@ -22,6 +21,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
+use crate::lsp_state::LspState;
 use crate::{
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
     semantic_tokens::delta_line_delta_start,
@@ -29,10 +29,10 @@ use crate::{
 };
 
 pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
     on_hover_impl(
         db,
         params.text_document_position_params.text_document.uri,
