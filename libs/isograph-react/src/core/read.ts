@@ -12,7 +12,7 @@ import type {
   ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import type { PayloadError } from './errors';
+import { GraphqlAggregateError, GraphqlError, PayloadError } from './errors';
 import type {
   ExtractData,
   FragmentReference,
@@ -55,7 +55,7 @@ import type { Arguments } from './util';
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
-  readonly errors: NonEmptyArray<PayloadError> | undefined;
+  readonly errors: GraphqlAggregateError | undefined;
 };
 
 export function readButDoNotEvaluate<
@@ -125,7 +125,12 @@ export function readButDoNotEvaluate<
     return {
       encounteredRecords: mutableEncounteredRecords,
       item: response.data,
-      errors: response.errors,
+      errors:
+        response.errors != null
+          ? new GraphqlAggregateError(
+              response.errors.map((error) => new GraphqlError(error)),
+            )
+          : undefined,
     };
   }
 }

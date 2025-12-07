@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { GraphqlAggregateError, GraphqlError } from '../core/errors';
 import {
   type ExtractData,
   type FragmentReference,
@@ -42,9 +41,7 @@ export function useReadAndSubscribe<
   );
 
   if (readOutDataAndRecords.errors != null) {
-    throw new GraphqlAggregateError(
-      readOutDataAndRecords.errors.map((error) => new GraphqlError(error)),
-    );
+    throw readOutDataAndRecords.errors;
   }
 
   return readOutDataAndRecords.item;
