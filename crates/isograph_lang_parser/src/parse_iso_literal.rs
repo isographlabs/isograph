@@ -116,7 +116,7 @@ fn parse_iso_entrypoint_declaration(
             .map(|with_span| {
                 with_span
                     .map(EntityNameWrapper)
-                    .to_with_location(tokens.text_source)
+                    .to_with_embedded_location(tokens.text_source)
             })?;
 
         let dot = tokens
@@ -129,7 +129,7 @@ fn parse_iso_entrypoint_declaration(
             .map(|with_span| {
                 with_span
                     .map(ClientScalarSelectableNameWrapper)
-                    .to_with_location(tokens.text_source)
+                    .to_with_embedded_location(tokens.text_source)
             })?;
 
         let directives = parse_directives(tokens)?;
@@ -183,7 +183,7 @@ fn parse_client_field_declaration_inner(
             .map(|with_span| {
                 with_span
                     .map(EntityNameWrapper)
-                    .to_with_location(tokens.text_source)
+                    .to_with_embedded_location(tokens.text_source)
             })?;
 
         let _ = tokens
@@ -286,7 +286,7 @@ fn parse_client_pointer_declaration_inner(
             .map(|with_span| {
                 with_span
                     .map(EntityNameWrapper)
-                    .to_with_location(tokens.text_source)
+                    .to_with_embedded_location(tokens.text_source)
             })?;
 
         let _dot = tokens

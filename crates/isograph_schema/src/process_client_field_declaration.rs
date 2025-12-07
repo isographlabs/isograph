@@ -56,6 +56,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 client_field_declaration_item
                     .parent_type
                     .location
+                    .to::<Location>()
                     .wrap_some(),
             )
         })?;
@@ -78,6 +79,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 client_field_declaration_item
                     .parent_type
                     .location
+                    .to::<Location>()
                     .wrap_some(),
             )
             .wrap_err();
@@ -101,6 +103,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 client_pointer_declaration_item
                     .parent_type
                     .location
+                    .to::<Location>()
                     .wrap_some(),
             )
         })?;

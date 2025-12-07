@@ -1,6 +1,6 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, EntityName, RelativePathToSourceFile, WithEmbeddedLocation,
-    WithLocation, WithSpan,
+    WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
@@ -20,7 +20,7 @@ use crate::{
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithLocation<EntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
@@ -43,7 +43,7 @@ pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithLocation<EntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
     #[resolve_field]
