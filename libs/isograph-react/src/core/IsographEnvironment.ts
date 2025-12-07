@@ -8,6 +8,7 @@ import type {
   ReaderWithRefetchQueries,
   ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
+import type { PayloadError } from './errors';
 import type {
   ExtractStartUpdate,
   FragmentReference,
@@ -17,6 +18,7 @@ import type {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import type { LogFunction, WrappedLogFunction } from './logging';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { type StoreLayer } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -145,7 +147,7 @@ export type WithErrors<T extends DataTypeValue> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';
-      readonly errors: PayloadErrors;
+      readonly errors: NonEmptyArray<PayloadError>;
     };
 
 export type StoreRecord = {
@@ -159,16 +161,6 @@ export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
-
-export interface PayloadErrorExtensions {}
-export type PayloadErrorPath = string | number;
-export type PayloadError = {
-  readonly message: string;
-  readonly locations?: { readonly line: number; readonly column: number }[];
-  readonly path?: PayloadErrorPath[];
-  readonly extensions?: PayloadErrorExtensions;
-};
-export type PayloadErrors = [PayloadError, ...PayloadError[]];
 
 export type StoreLayerData = {
   [index: TypeName]: {

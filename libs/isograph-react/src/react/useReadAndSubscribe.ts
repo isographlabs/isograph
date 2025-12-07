@@ -1,17 +1,11 @@
 import { useEffect, useState } from 'react';
+import { GraphqlAggregateError, GraphqlError } from '../core/errors';
 import {
   type ExtractData,
   type FragmentReference,
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import type {
-  IsographComponentFunction,
-  PayloadError,
-  PayloadErrorExtensions,
-} from '../core/IsographEnvironment';
-import { logMessage } from '../core/logging';
-import { readPromise } from '../core/PromiseWrapper';
 import {
   type NetworkRequestReaderOptions,
   readButDoNotEvaluate,
@@ -22,6 +16,9 @@ import { subscribe } from '../core/subscribe';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useRerenderOnChange } from './useRerenderOnChange';
+import type { IsographComponentFunction } from '../core/IsographEnvironment';
+import { readPromise } from '../core/PromiseWrapper';
+import { logMessage } from '../core/logging';
 
 /**
  * Read the data from a fragment reference and subscribe to updates.
@@ -51,26 +48,6 @@ export function useReadAndSubscribe<
   }
 
   return readOutDataAndRecords.item;
-}
-
-export class GraphqlAggregateError extends AggregateError {
-  errors!: [GraphqlError, ...GraphqlError[]];
-  constructor(errors: Iterable<GraphqlError>, message?: string) {
-    super(errors, message);
-  }
-}
-
-export class GraphqlError extends Error implements PayloadError {
-  locations?: { line: number; column: number }[];
-  path?: (string | number)[];
-  extensions?: PayloadErrorExtensions;
-  constructor(error: PayloadError) {
-    super(error.message);
-    this.name = 'GraphqlError';
-    if (error.path != null) this.path = error.path;
-    if (error.locations != null) this.locations = error.locations;
-    if (error.extensions != null) this.extensions = error.extensions;
-  }
 }
 
 export function useSubscribeToMultiple<

@@ -8,7 +8,6 @@ import {
   ROOT_ID,
   type BaseStoreLayerData,
   type DataTypeValue,
-  type PayloadErrors,
   type WithErrors,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
@@ -23,6 +22,8 @@ import type { Query__errorsClientField__param } from './__isograph/Query/errorsC
 import type { Query__errorsClientFieldComponent__param } from './__isograph/Query/errorsClientFieldComponent/param_type';
 import type { Query__errorsClientPointer__param } from './__isograph/Query/errorsClientPointer/param_type';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
+import type { NonEmptyArray } from '../core/NonEmptyArray';
+import type { PayloadError } from '../core/errors';
 
 function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   return {
@@ -31,7 +32,7 @@ function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   };
 }
 
-function err(errors: PayloadErrors): WithErrors<DataTypeValue> {
+function err(errors: NonEmptyArray<PayloadError>): WithErrors<DataTypeValue> {
   return {
     kind: 'Errors',
     errors,

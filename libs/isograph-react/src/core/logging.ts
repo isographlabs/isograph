@@ -6,13 +6,14 @@ import type {
   NormalizationAstNodes,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
+import type { PayloadError } from './errors';
 import type { FragmentReference, Variables } from './FragmentReference';
 import type {
   IsographEnvironment,
-  PayloadErrors,
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
+import type { NonEmptyArray } from './NonEmptyArray';
 import type { StoreLayer } from './optimisticProxy';
 import type { ReadDataResult } from './read';
 import type { Arguments } from './util';
@@ -34,7 +35,7 @@ export type LogMessage =
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject | undefined;
-      errors: PayloadErrors | undefined;
+      errors: NonEmptyArray<PayloadError> | undefined;
       variables: Variables;
     }
   | {

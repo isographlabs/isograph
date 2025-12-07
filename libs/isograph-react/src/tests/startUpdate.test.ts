@@ -7,7 +7,6 @@ import {
   ROOT_ID,
   type BaseStoreLayerData,
   type DataTypeValue,
-  type PayloadErrors,
   type StoreLayerData,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
