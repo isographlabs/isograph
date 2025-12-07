@@ -202,7 +202,8 @@ fn parse_client_field_declaration_inner(
 
         let client_field_directive_set = from_isograph_field_directives(&directives);
 
-        let description = parse_optional_description(tokens);
+        let description = parse_optional_description(tokens)
+            .map(|x| x.to_with_embedded_location(tokens.text_source));
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
             expected_selection_set_diagnostic(Location::new(
@@ -305,7 +306,8 @@ fn parse_client_pointer_declaration_inner(
 
         let directives = parse_directives(tokens)?;
 
-        let description = parse_optional_description(tokens);
+        let description = parse_optional_description(tokens)
+            .map(|x| x.to_with_embedded_location(tokens.text_source));
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
             expected_selection_set_diagnostic(Location::new(

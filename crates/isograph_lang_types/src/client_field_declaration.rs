@@ -24,7 +24,7 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub client_scalar_selectable_directive_set:
@@ -49,7 +49,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
