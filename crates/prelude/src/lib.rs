@@ -81,6 +81,16 @@ where
     {
         *self
     }
+
+    #[inline(always)]
+    fn reference(&self) -> &Self {
+        self
+    }
+
+    #[inline(always)]
+    fn wrap_vec(self) -> Vec<Self> {
+        vec![self]
+    }
 }
 
 impl<T> Postfix for T {}
