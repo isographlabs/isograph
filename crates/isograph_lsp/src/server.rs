@@ -13,7 +13,6 @@ use crate::{
         on_did_change_text_document, on_did_close_text_document, on_did_open_text_document,
     },
 };
-use colored::Colorize;
 use common_lang_types::{
     CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult,
 };
@@ -23,7 +22,6 @@ use isograph_compiler::{
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::NetworkProtocol;
-use log::{info, warn};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     CompletionOptions, HoverProviderCapability,
@@ -125,10 +123,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
             message = file_system_receiver.recv() => {
                 if let Some(Ok(changes)) = message {
                     if has_config_changes(&changes) {
-                        info!(
-                            "{}",
-                            "Config change detected.".cyan()
-                        );
+                        eprintln!("Config change detected.");
                         compiler_state = CompilerState::new(config_location, current_working_directory)?;
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
@@ -139,7 +134,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         // new DB. Namely, there's an open files hash map that needs to be transferred over.
                         //
                         // That will probably be a bit more easily solved when we have a db macro.
-                        warn!("Shutting down language server. This is not currently supported");
+                        eprintln!("Shutting down language server. This is not currently supported");
                         // Wrapping this in if true, because otherwise, cargo complains that the above code
                         // is useless! And that's true. But this is a temporary expedient, because we
                         // don't actually want to break here.
@@ -147,7 +142,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                             break 'all_messages;
                         }
                     } else {
-                        info!("{}", "File changes detected. Starting to compile.".cyan());
+                        eprintln!("File changes detected. Starting to compile.");
                         update_sources(&mut compiler_state.db, &changes)?;
                         compiler_state.run_garbage_collection();
                     };
