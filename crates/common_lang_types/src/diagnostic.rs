@@ -31,6 +31,10 @@ impl Diagnostic {
             .boxed(),
         )
     }
+
+    pub fn location(&self) -> Option<Location> {
+        self.0.location
+    }
 }
 
 impl Display for Diagnostic {

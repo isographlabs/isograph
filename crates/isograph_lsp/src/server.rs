@@ -2,6 +2,7 @@
 
 use crate::{
     completion::on_completion,
+    diagnostic_notification::publish_new_diagnostics_and_clear_old_diagnostics,
     format::on_format,
     goto_definition::on_goto_definition,
     hover::on_hover,
@@ -21,7 +22,7 @@ use isograph_compiler::{
     watch::{create_debounced_file_watcher, has_config_changes},
 };
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     CompletionOptions, HoverProviderCapability,
@@ -34,8 +35,9 @@ use lsp_types::{
     notification::{DidChangeTextDocument, DidCloseTextDocument, DidOpenTextDocument},
     request::{Formatting, GotoDefinition},
 };
-use prelude::Postfix;
-use std::{ops::ControlFlow, path::PathBuf};
+use prelude::{ErrClone, Postfix};
+use std::{collections::BTreeSet, ops::ControlFlow, path::PathBuf, time::Duration};
+use tokio::time::{Instant, sleep};
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
@@ -73,6 +75,9 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
         .wrap_ok()
 }
 
+const SHORT_DEBOUNCE_TIME: Duration = Duration::from_millis(100);
+const LONG_DEBOUNCE_TIME: Duration = Duration::from_hours(24 * 365);
+
 /// Run the main server loop
 pub async fn run<TNetworkProtocol: NetworkProtocol>(
     connection: Connection,
@@ -82,6 +87,8 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
 ) -> DiagnosticVecResult<()> {
     let mut compiler_state: CompilerState<TNetworkProtocol> =
         CompilerState::new(config_location, current_working_directory)?;
+    #[allow(clippy::mutable_key_type)]
+    let mut uris_with_diagnostics = BTreeSet::new();
 
     eprintln!("Running server loop");
 
@@ -92,6 +99,11 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
+
+    // After 100ms of inactivity, we compile the codebase and emit diagnostics.
+    // Note that in response to events, we delay the debounce timer.
+    let debounce_timer = sleep(SHORT_DEBOUNCE_TIME);
+    tokio::pin!(debounce_timer);
 
     'all_messages: loop {
         tokio::select! {
@@ -108,6 +120,10 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                             lsp_server::Message::Notification(notification) => {
                                 eprintln!("\nReceived notification: {}", notification.method);
                                 let _ = dispatch_notification(notification, &mut compiler_state);
+
+                                // NOTE: we attempt to be judicious, i.e. only trigger the debounce timer
+                                // if we receive a notification (which may have changed state).
+                                debounce_timer.as_mut().reset(Instant::now() + SHORT_DEBOUNCE_TIME);
                             }
                             lsp_server::Message::Response(response) => {
                                 eprintln!("\nReceived response: {response:?}");
@@ -115,6 +131,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         }
                     });
                     eprintln!("Processing took {}ms.", duration.elapsed_time.as_millis());
+
                 } else {
                     // If any connection breaks, we can just end
                     break 'all_messages;
@@ -144,17 +161,37 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                     } else {
                         eprintln!("File changes detected. Starting to compile.");
                         update_sources(&mut compiler_state.db, &changes)?;
+
                         compiler_state.run_garbage_collection();
                     };
+
+                    debounce_timer.as_mut().reset(Instant::now() + SHORT_DEBOUNCE_TIME);
                 } else {
                     // If any connection breaks or we have some file system errors, we can just end here.
                     break 'all_messages;
                 }
             }
+            _ = &mut debounce_timer => {
+                let diagnostics = validate_entire_schema(&compiler_state.db)
+                    .clone_err()
+                    .err()
+                    .unwrap_or_default();
+
+                eprintln!("Publishing diagnostics {:?}", diagnostics);
+
+                uris_with_diagnostics = publish_new_diagnostics_and_clear_old_diagnostics(
+                    &compiler_state.db,
+                    &diagnostics,
+                    &connection.sender,
+                    uris_with_diagnostics
+                );
+
+                debounce_timer.as_mut().reset(Instant::now() + LONG_DEBOUNCE_TIME);
+            }
         };
     }
 
-    Ok(())
+    ().wrap_ok()
 }
 
 fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(

@@ -5,6 +5,7 @@ use isograph_schema::NetworkProtocol;
 use lsp_server::Connection;
 
 mod completion;
+mod diagnostic_notification;
 mod format;
 mod goto_definition;
 mod hover;
