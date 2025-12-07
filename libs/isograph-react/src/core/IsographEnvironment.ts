@@ -24,6 +24,8 @@ import {
 } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import type { NonEmptyArray } from './NonEmptyArray';
+import type { PayloadError } from './errors';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -133,7 +135,7 @@ export type WithErrors<T extends DataTypeValue> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';
-      readonly errors: PayloadErrors;
+      readonly errors: NonEmptyArray<PayloadError>;
     };
 
 export type StoreRecord = {
@@ -147,16 +149,6 @@ export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
-
-export interface PayloadErrorExtensions {}
-export type PayloadErrorPath = string | number;
-export type PayloadError = {
-  readonly message: string;
-  readonly locations?: { readonly line: number; readonly column: number }[];
-  readonly path?: PayloadErrorPath[];
-  readonly extensions?: PayloadErrorExtensions;
-};
-export type PayloadErrors = [PayloadError, ...PayloadError[]];
 
 export type StoreLayerData = {
   [index: TypeName]: {

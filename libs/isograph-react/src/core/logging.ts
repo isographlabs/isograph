@@ -10,12 +10,13 @@ import { FragmentReference, Variables } from './FragmentReference';
 import {
   IsographEnvironment,
   StoreRecord,
-  type PayloadErrors,
   type StoreLink,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
 import type { StoreLayer } from './optimisticProxy';
+import type { NonEmptyArray } from './NonEmptyArray';
+import type { PayloadError } from './errors';
 
 /**
  * Note: these types are unstable. We will add and remove items from this enum
@@ -34,7 +35,7 @@ export type LogMessage =
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject | undefined;
-      errors: PayloadErrors | undefined;
+      errors: NonEmptyArray<PayloadError> | undefined;
       variables: Variables;
     }
   | {

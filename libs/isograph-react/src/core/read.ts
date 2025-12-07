@@ -12,6 +12,7 @@ import {
   RefetchQueryNormalizationArtifactWrapper,
   type ReaderWithRefetchQueries,
 } from './entrypoint';
+import type { PayloadError } from './errors';
 import {
   ExtractData,
   FragmentReference,
@@ -24,12 +25,12 @@ import {
   getOrLoadReaderWithRefetchQueries,
   IsographEnvironment,
   type DataTypeValue,
-  type PayloadErrors,
   type StoreLink,
   type StoreRecord,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { getStoreRecordProxy } from './optimisticProxy';
 import {
   getPromiseState,
@@ -54,7 +55,7 @@ import { Arguments } from './util';
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
   readonly item: ExtractData<T>;
-  readonly errors: PayloadErrors | undefined;
+  readonly errors: NonEmptyArray<PayloadError> | undefined;
 };
 
 export function readButDoNotEvaluate<
@@ -132,7 +133,7 @@ export function readButDoNotEvaluate<
 export type ReadDataResultSuccess<Data> = {
   readonly kind: 'Success';
   readonly data: Data;
-  readonly errors: PayloadErrors | undefined;
+  readonly errors: NonEmptyArray<PayloadError> | undefined;
 };
 
 type ReadDataResultMissingData = {
@@ -153,7 +154,7 @@ export type ReadFieldResultSuccess<Data> = {
 
 export type ReadFieldResultError = {
   readonly kind: 'Error';
-  readonly errors: PayloadErrors;
+  readonly errors: NonEmptyArray<PayloadError>;
 };
 
 export type ReadFieldResult<Data> =
@@ -194,7 +195,7 @@ function readData<TReadFromStore>(
   }
 
   let target: { [index: string]: any } = {};
-  let errors: PayloadErrors | undefined = undefined;
+  let errors: NonEmptyArray<PayloadError> | undefined = undefined;
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
@@ -826,7 +827,7 @@ export function readLinkedFieldData(
   }
 
   if (value?.kind === 'Data' && Array.isArray(value.value)) {
-    let errors: PayloadErrors | undefined = undefined;
+    let errors: NonEmptyArray<PayloadError> | undefined = undefined;
     const results = [];
     for (const item of value.value) {
       const link = assertLink(item);
