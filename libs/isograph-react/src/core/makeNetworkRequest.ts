@@ -417,7 +417,10 @@ function readDataForOnComplete<
       environment,
       fragment,
       fakeNetworkRequestOptions,
-    ).item;
+    );
+    if (fragmentResult.kind === 'Errors') {
+      return null;
+    }
     const readerArtifact = resolvedReaderWithRefetchQueries.readerArtifact;
     switch (readerArtifact.kind) {
       case 'ComponentReaderArtifact': {
@@ -445,7 +448,7 @@ function readDataForOnComplete<
       }
       case 'EagerReaderArtifact': {
         return readerArtifact.resolver({
-          data: fragmentResult,
+          data: fragmentResult.item,
           parameters: variables,
           ...(readerArtifact.hasUpdatable
             ? {

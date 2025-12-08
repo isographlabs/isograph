@@ -1,5 +1,7 @@
 import type { Brand } from './brand';
-import type { NonEmptyArray } from './NonEmptyArray';
+import type { WithErrors } from './IsographEnvironment';
+import { isNonEmptyArray, type NonEmptyArray } from './NonEmptyArray';
+import { assertNever } from './read';
 
 export interface PayloadErrorExtensions {}
 export type PayloadErrorPath = string | number;
@@ -15,8 +17,11 @@ type PayloadErrorPathJoined = Brand<string, typeof PayloadErrorPathJoinedBrand>;
 
 export class GraphqlAggregateError extends AggregateError {
   readonly errors!: GraphqlError[];
-  constructor(errors: Iterable<GraphqlError>, message?: string) {
-    super(errors, message);
+  constructor(errors: NonEmptyArray<PayloadError>, message?: string) {
+    super(
+      errors.map((error) => new GraphqlError(error)),
+      message,
+    );
     this.name = 'GraphqlAggregateError';
   }
 }
@@ -45,7 +50,9 @@ export type ErrorsByPath = Map<
   NonEmptyArray<PayloadError>
 >;
 
-export function groupErrorsByPath(errors: PayloadError[]): ErrorsByPath {
+export function groupErrorsByPath(
+  errors: readonly PayloadError[],
+): ErrorsByPath {
   return groupBy(errors, (error) => joinPayloadErrorPath(error.path));
 }
 
@@ -57,17 +64,30 @@ export function findErrors(
   path: PayloadErrorPath[],
 ) {
   const joinedPath = joinPayloadErrorPath(path);
-  let errors: NonEmptyArray<PayloadError> | undefined = undefined;
+  let errors: PayloadError[] = [];
   for (const [errorPath, suberrors] of errorsByPath) {
     if (suberrors && errorPath.startsWith(joinedPath)) {
-      if (errors == null) {
-        errors = suberrors;
-      } else {
-        errors.push(...suberrors);
-      }
+      errors.push(...suberrors);
     }
   }
-  return errors;
+  return isNonEmptyArray(errors) ? errors : undefined;
+}
+
+export function readDataWithErrors<T>(
+  result: WithErrors<T>,
+  errors: PayloadError[],
+): T | null {
+  switch (result.kind) {
+    case 'Errors':
+      errors.push(...result.errors);
+      return null;
+    case 'Data': {
+      return result.value;
+    }
+    default: {
+      assertNever(result);
+    }
+  }
 }
 
 function groupBy<V, K extends string | number | symbol>(

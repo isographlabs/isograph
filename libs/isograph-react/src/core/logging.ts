@@ -12,6 +12,7 @@ import type {
   IsographEnvironment,
   StoreLink,
   StoreRecord,
+  type WithErrors,
 } from './IsographEnvironment';
 import type { NonEmptyArray } from './NonEmptyArray';
 import type { StoreLayer } from './optimisticProxy';
@@ -84,7 +85,7 @@ export type LogMessage =
     }
   | {
       kind: 'DoneReading';
-      response: ReadDataResult<any>;
+      response: ReadDataResult<WithErrors<unknown>>;
       fieldName: string;
       root: StoreLink;
     }

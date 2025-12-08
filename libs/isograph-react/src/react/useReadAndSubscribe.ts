@@ -5,6 +5,9 @@ import {
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import type { IsographComponentFunction } from '../core/IsographEnvironment';
+import { readPromise } from '../core/PromiseWrapper';
+import { logMessage } from '../core/logging';
 import {
   type NetworkRequestReaderOptions,
   readButDoNotEvaluate,
@@ -15,9 +18,6 @@ import { subscribe } from '../core/subscribe';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useRerenderOnChange } from './useRerenderOnChange';
-import type { IsographComponentFunction } from '../core/IsographEnvironment';
-import { readPromise } from '../core/PromiseWrapper';
-import { logMessage } from '../core/logging';
 
 /**
  * Read the data from a fragment reference and subscribe to updates.
@@ -40,7 +40,7 @@ export function useReadAndSubscribe<
     readerAst,
   );
 
-  if (readOutDataAndRecords.errors != null) {
+  if (readOutDataAndRecords.kind === 'Errors') {
     throw readOutDataAndRecords.errors;
   }
 

@@ -138,12 +138,12 @@ export type DataTypeValue =
   // Plural scalar and linked fields:
   | readonly DataTypeValue[];
 
-export type WithErrorsData<T extends DataTypeValue> = {
+export type WithErrorsData<T> = {
   readonly kind: 'Data';
   readonly value: T;
 };
 
-export type WithErrors<T extends DataTypeValue> =
+export type WithErrors<T> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';

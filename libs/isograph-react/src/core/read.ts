@@ -12,7 +12,8 @@ import type {
   ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import { GraphqlAggregateError, GraphqlError, PayloadError } from './errors';
+import type { PayloadError } from './errors';
+import { GraphqlAggregateError, readDataWithErrors } from './errors';
 import type {
   ExtractData,
   FragmentReference,
@@ -27,10 +28,11 @@ import {
   type DataTypeValue,
   type StoreLink,
   type StoreRecord,
+  type WithErrors,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import type { NonEmptyArray } from './NonEmptyArray';
+import { isNonEmptyArray } from './NonEmptyArray';
 import { getStoreRecordProxy } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import {
@@ -52,11 +54,17 @@ import type {
 import { getOrCreateCachedStartUpdate } from './startUpdate';
 import type { Arguments } from './util';
 
-export type WithEncounteredRecords<T> = {
-  readonly encounteredRecords: EncounteredIds;
-  readonly item: ExtractData<T>;
-  readonly errors: GraphqlAggregateError | undefined;
-};
+export type WithEncounteredRecords<T> =
+  | {
+      readonly kind: 'Success';
+      readonly encounteredRecords: EncounteredIds;
+      readonly item: ExtractData<T>;
+    }
+  | {
+      readonly kind: 'Errors';
+      readonly encounteredRecords: EncounteredIds;
+      readonly errors: GraphqlAggregateError;
+    };
 
 export function readButDoNotEvaluate<
   TReadFromStore extends UnknownTReadFromStore,
@@ -121,24 +129,24 @@ export function readButDoNotEvaluate<
       });
     }
     throw onNextChangeToRecord(environment, response.recordLink);
+  } else if (response.item.kind === 'Errors') {
+    return {
+      kind: 'Errors',
+      encounteredRecords: mutableEncounteredRecords,
+      errors: new GraphqlAggregateError(response.item.errors),
+    };
   } else {
     return {
+      kind: 'Success',
       encounteredRecords: mutableEncounteredRecords,
-      item: response.data,
-      errors:
-        response.errors != null
-          ? new GraphqlAggregateError(
-              response.errors.map((error) => new GraphqlError(error)),
-            )
-          : undefined,
+      item: response.item.value,
     };
   }
 }
 
-export type ReadDataResultSuccess<Data> = {
+export type ReadDataResultSuccess<Item> = {
   readonly kind: 'Success';
-  readonly data: Data;
-  readonly errors: NonEmptyArray<PayloadError> | undefined;
+  readonly item: Item;
 };
 
 type ReadDataResultMissingData = {
@@ -148,23 +156,8 @@ type ReadDataResultMissingData = {
   readonly recordLink: StoreLink;
 };
 
-export type ReadDataResult<Data> =
-  | ReadDataResultSuccess<Data>
-  | ReadDataResultMissingData;
-
-export type ReadFieldResultSuccess<Data> = {
-  readonly kind: 'Success';
-  readonly data: Data;
-};
-
-export type ReadFieldResultError = {
-  readonly kind: 'Error';
-  readonly errors: NonEmptyArray<PayloadError>;
-};
-
-export type ReadFieldResult<Data> =
-  | ReadFieldResultSuccess<Data>
-  | ReadFieldResultError
+export type ReadDataResult<Item> =
+  | ReadDataResultSuccess<Item>
   | ReadDataResultMissingData;
 
 function readData<TReadFromStore>(
@@ -176,7 +169,7 @@ function readData<TReadFromStore>(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<ExtractData<TReadFromStore>> {
+): ReadDataResult<WithErrors<ExtractData<TReadFromStore>>> {
   const encounteredIds = insertEmptySetIfMissing(
     mutableEncounteredRecords,
     root.__typename,
@@ -194,13 +187,15 @@ function readData<TReadFromStore>(
   if (storeRecord == null) {
     return {
       kind: 'Success',
-      data: null as any,
-      errors: undefined,
+      item: {
+        kind: 'Data',
+        value: null as any,
+      },
     };
   }
 
   let target: { [index: string]: any } = {};
-  let errors: NonEmptyArray<PayloadError> | undefined = undefined;
+  let errors: PayloadError[] = [];
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
@@ -209,16 +204,11 @@ function readData<TReadFromStore>(
         switch (data.kind) {
           case 'MissingData':
             return data;
-          case 'Error':
-            if (errors == null) {
-              errors = data.errors;
-            } else {
-              errors.push(...data.errors);
-            }
-            target[field.alias ?? field.fieldName] = null;
-            break;
           case 'Success':
-            target[field.alias ?? field.fieldName] = data.data;
+            target[field.alias ?? field.fieldName] = readDataWithErrors(
+              data.item,
+              errors,
+            );
             break;
         }
         break;
@@ -249,15 +239,17 @@ function readData<TReadFromStore>(
               mutableEncounteredRecords,
             ),
         );
-        if (data.kind === 'MissingData') {
-          return data;
+
+        switch (data.kind) {
+          case 'MissingData':
+            return data;
+          case 'Success':
+            target[field.alias ?? field.fieldName] = readDataWithErrors(
+              data.item,
+              errors,
+            );
+            break;
         }
-        if (errors == null) {
-          errors = data.errors;
-        } else if (data.errors != null) {
-          errors.push(...data.errors);
-        }
-        target[field.alias ?? field.fieldName] = data.data;
         break;
       }
       case 'ImperativelyLoadedField': {
@@ -274,16 +266,8 @@ function readData<TReadFromStore>(
         switch (data.kind) {
           case 'MissingData':
             return data;
-          case 'Error':
-            if (errors == null) {
-              errors = data.errors;
-            } else {
-              errors.push(...data.errors);
-            }
-            target[field.alias] = null;
-            break;
           case 'Success':
-            target[field.alias] = data.data;
+            target[field.alias] = readDataWithErrors(data.item, errors);
             break;
         }
         break;
@@ -302,16 +286,8 @@ function readData<TReadFromStore>(
         switch (data.kind) {
           case 'MissingData':
             return data;
-          case 'Error':
-            if (errors == null) {
-              errors = data.errors;
-            } else {
-              errors.push(...data.errors);
-            }
-            target[field.alias] = null;
-            break;
           case 'Success':
-            target[field.alias] = data.data;
+            target[field.alias] = readDataWithErrors(data.item, errors);
             break;
         }
         break;
@@ -329,26 +305,23 @@ function readData<TReadFromStore>(
         switch (data.kind) {
           case 'MissingData':
             return data;
-          case 'Error':
-            if (errors == null) {
-              errors = data.errors;
-            } else {
-              errors.push(...data.errors);
-            }
-            target[field.alias] = null;
-            break;
           case 'Success':
-            target[field.alias] = data.data;
+            target[field.alias] = readDataWithErrors(data.item, errors);
             break;
         }
         break;
       }
     }
   }
+
   return {
     kind: 'Success',
-    data: target as any,
-    errors,
+    item: isNonEmptyArray(errors)
+      ? { kind: 'Errors', errors }
+      : {
+          kind: 'Data',
+          value: target as any,
+        },
   };
 }
 
@@ -360,7 +333,7 @@ export function readLoadablySelectedFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadFieldResult<unknown> {
+): ReadDataResult<WithErrors<unknown>> {
   const refetchReaderParams = readData(
     environment,
     field.refetchReaderAst,
@@ -382,153 +355,158 @@ export function readLoadablySelectedFieldData(
     };
   }
 
-  if (refetchReaderParams.errors != null) {
-    return {
-      kind: 'Error',
-      errors: refetchReaderParams.errors,
-    };
+  if (refetchReaderParams.item.kind === 'Errors') {
+    return refetchReaderParams;
   }
+  const { item } = refetchReaderParams;
 
   return {
     kind: 'Success',
-    data: (
-      args: any,
-      // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any, never>,
-    ) => {
-      // TODO we should use the reader AST for this
-      const includeReadOutData = (variables: any, readOutData: any) => {
-        variables.id = readOutData.id;
-        return variables;
-      };
-      const localVariables = includeReadOutData(
-        args ?? {},
-        refetchReaderParams.data,
-      );
-      writeQueryArgsToVariables(
-        localVariables,
-        field.queryArguments,
-        variables,
-      );
+    item: {
+      kind: 'Data',
+      value: (
+        args: any,
+        // TODO get the associated type for FetchOptions from the loadably selected field
+        fetchOptions?: FetchOptions<any, never>,
+      ) => {
+        // TODO we should use the reader AST for this
+        const includeReadOutData = (variables: any, readOutData: any) => {
+          variables.id = readOutData.id;
+          return variables;
+        };
+        const localVariables = includeReadOutData(args ?? {}, item.value);
+        writeQueryArgsToVariables(
+          localVariables,
+          field.queryArguments,
+          variables,
+        );
 
-      return [
-        // Stable id
-        root.__typename +
-          ':' +
-          root.__link +
-          '/' +
-          field.name +
-          '/' +
-          stableStringifyArgs(localVariables),
-        // Fetcher
-        () => {
-          const fragmentReferenceAndDisposeFromEntrypoint = (
-            entrypoint: IsographEntrypoint<any, any, any, {}>,
-          ): [FragmentReference<any, any>, CleanupFn] => {
-            const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
-              getOrLoadReaderWithRefetchQueries(
+        return [
+          // Stable id
+          root.__typename +
+            ':' +
+            root.__link +
+            '/' +
+            field.name +
+            '/' +
+            stableStringifyArgs(localVariables),
+          // Fetcher
+          () => {
+            const fragmentReferenceAndDisposeFromEntrypoint = (
+              entrypoint: IsographEntrypoint<any, any, any, {}>,
+            ): [FragmentReference<any, any>, CleanupFn] => {
+              const {
+                fieldName,
+                readerArtifactKind,
+                readerWithRefetchQueries,
+              } = getOrLoadReaderWithRefetchQueries(
                 environment,
                 entrypoint.readerWithRefetchQueries,
               );
-            const [networkRequest, disposeNetworkRequest] =
-              maybeMakeNetworkRequest(
-                environment,
-                entrypoint,
-                localVariables,
-                readerWithRefetchQueries,
-                fetchOptions ?? null,
-              );
-
-            const fragmentReference: FragmentReference<any, any> = {
-              kind: 'FragmentReference',
-              readerWithRefetchQueries,
-              fieldName,
-              readerArtifactKind,
-              // TODO localVariables is not guaranteed to have an id field
-              root,
-              variables: localVariables,
-              networkRequest,
-            };
-            return [fragmentReference, disposeNetworkRequest];
-          };
-
-          if (field.entrypoint.kind === 'Entrypoint') {
-            return fragmentReferenceAndDisposeFromEntrypoint(field.entrypoint);
-          } else {
-            const isographArtifactPromiseWrapper = getOrLoadIsographArtifact(
-              environment,
-              field.entrypoint.typeAndField,
-              field.entrypoint.loader,
-            );
-            const state = getPromiseState(isographArtifactPromiseWrapper);
-            if (state.kind === 'Ok') {
-              return fragmentReferenceAndDisposeFromEntrypoint(state.value);
-            } else {
-              // Promise is pending or thrown
-
-              let entrypointLoaderState:
-                | {
-                    kind: 'EntrypointNotLoaded';
-                  }
-                | {
-                    kind: 'NetworkRequestStarted';
-                    disposeNetworkRequest: CleanupFn;
-                  }
-                | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
-
-              const readerWithRefetchQueries = wrapPromise(
-                isographArtifactPromiseWrapper.promise.then(
-                  (entrypoint) =>
-                    getOrLoadReaderWithRefetchQueries(
-                      environment,
-                      entrypoint.readerWithRefetchQueries,
-                    ).readerWithRefetchQueries.promise,
-                ),
-              );
-              const networkRequest = wrapPromise(
-                isographArtifactPromiseWrapper.promise.then((entrypoint) => {
-                  if (entrypointLoaderState.kind === 'EntrypointNotLoaded') {
-                    const [networkRequest, disposeNetworkRequest] =
-                      maybeMakeNetworkRequest(
-                        environment,
-                        entrypoint,
-                        localVariables,
-                        readerWithRefetchQueries,
-                        fetchOptions ?? null,
-                      );
-                    entrypointLoaderState = {
-                      kind: 'NetworkRequestStarted',
-                      disposeNetworkRequest,
-                    };
-                    return networkRequest.promise;
-                  }
-                }),
-              );
+              const [networkRequest, disposeNetworkRequest] =
+                maybeMakeNetworkRequest(
+                  environment,
+                  entrypoint,
+                  localVariables,
+                  readerWithRefetchQueries,
+                  fetchOptions ?? null,
+                );
 
               const fragmentReference: FragmentReference<any, any> = {
                 kind: 'FragmentReference',
                 readerWithRefetchQueries,
-                fieldName: field.name,
-                readerArtifactKind: field.entrypoint.readerArtifactKind,
+                fieldName,
+                readerArtifactKind,
                 // TODO localVariables is not guaranteed to have an id field
                 root,
                 variables: localVariables,
                 networkRequest,
               };
+              return [fragmentReference, disposeNetworkRequest];
+            };
 
-              return [
-                fragmentReference,
-                () => {
-                  if (entrypointLoaderState.kind === 'NetworkRequestStarted') {
-                    entrypointLoaderState.disposeNetworkRequest();
-                  }
-                  entrypointLoaderState = { kind: 'Disposed' };
-                },
-              ];
+            if (field.entrypoint.kind === 'Entrypoint') {
+              return fragmentReferenceAndDisposeFromEntrypoint(
+                field.entrypoint,
+              );
+            } else {
+              const isographArtifactPromiseWrapper = getOrLoadIsographArtifact(
+                environment,
+                field.entrypoint.typeAndField,
+                field.entrypoint.loader,
+              );
+              const state = getPromiseState(isographArtifactPromiseWrapper);
+              if (state.kind === 'Ok') {
+                return fragmentReferenceAndDisposeFromEntrypoint(state.value);
+              } else {
+                // Promise is pending or thrown
+
+                let entrypointLoaderState:
+                  | {
+                      kind: 'EntrypointNotLoaded';
+                    }
+                  | {
+                      kind: 'NetworkRequestStarted';
+                      disposeNetworkRequest: CleanupFn;
+                    }
+                  | { kind: 'Disposed' } = { kind: 'EntrypointNotLoaded' };
+
+                const readerWithRefetchQueries = wrapPromise(
+                  isographArtifactPromiseWrapper.promise.then(
+                    (entrypoint) =>
+                      getOrLoadReaderWithRefetchQueries(
+                        environment,
+                        entrypoint.readerWithRefetchQueries,
+                      ).readerWithRefetchQueries.promise,
+                  ),
+                );
+                const networkRequest = wrapPromise(
+                  isographArtifactPromiseWrapper.promise.then((entrypoint) => {
+                    if (entrypointLoaderState.kind === 'EntrypointNotLoaded') {
+                      const [networkRequest, disposeNetworkRequest] =
+                        maybeMakeNetworkRequest(
+                          environment,
+                          entrypoint,
+                          localVariables,
+                          readerWithRefetchQueries,
+                          fetchOptions ?? null,
+                        );
+                      entrypointLoaderState = {
+                        kind: 'NetworkRequestStarted',
+                        disposeNetworkRequest,
+                      };
+                      return networkRequest.promise;
+                    }
+                  }),
+                );
+
+                const fragmentReference: FragmentReference<any, any> = {
+                  kind: 'FragmentReference',
+                  readerWithRefetchQueries,
+                  fieldName: field.name,
+                  readerArtifactKind: field.entrypoint.readerArtifactKind,
+                  // TODO localVariables is not guaranteed to have an id field
+                  root,
+                  variables: localVariables,
+                  networkRequest,
+                };
+
+                return [
+                  fragmentReference,
+                  () => {
+                    if (
+                      entrypointLoaderState.kind === 'NetworkRequestStarted'
+                    ) {
+                      entrypointLoaderState.disposeNetworkRequest();
+                    }
+                    entrypointLoaderState = { kind: 'Disposed' };
+                  },
+                ];
+              }
             }
-          }
-        },
-      ];
+          },
+        ];
+      },
     },
   };
 }
@@ -619,7 +597,7 @@ export function readResolverFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadFieldResult<unknown> {
+): ReadDataResult<WithErrors<unknown>> {
   const usedRefetchQueries = field.usedRefetchQueries;
   const resolverRefetchQueries = usedRefetchQueries.map((index) => {
     const resolverRefetchQuery = nestedRefetchQueries[index];
@@ -668,15 +646,12 @@ export function readResolverFieldData(
         };
       }
 
-      if (data.errors != null) {
-        return {
-          kind: 'Error',
-          errors: data.errors,
-        };
+      if (data.item.kind === 'Errors') {
+        return data;
       }
 
       const firstParameter = {
-        data: data.data,
+        data: data.item.value,
         parameters: variables,
         startUpdate: field.readerArtifact.hasUpdatable
           ? getOrCreateCachedStartUpdate(
@@ -688,17 +663,23 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        data: field.readerArtifact.resolver(firstParameter),
+        item: {
+          kind: 'Data',
+          value: field.readerArtifact.resolver(firstParameter),
+        },
       };
     }
     case 'ComponentReaderArtifact': {
       return {
         kind: 'Success',
-        data: getOrCreateCachedComponent(
-          environment,
-          fragment,
-          networkRequestOptions,
-        ),
+        item: {
+          kind: 'Data',
+          value: getOrCreateCachedComponent(
+            environment,
+            fragment,
+            networkRequestOptions,
+          ),
+        },
       };
     }
   }
@@ -709,7 +690,7 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadFieldResult<DataTypeValue> {
+): ReadDataResult<WithErrors<DataTypeValue>> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
@@ -721,10 +702,8 @@ export function readScalarFieldData(
       recordLink: root,
     };
   }
-  if (value.kind === 'Errors') {
-    return { kind: 'Error', errors: value.errors };
-  }
-  return { kind: 'Success', data: value.value };
+
+  return { kind: 'Success', item: value };
 }
 
 export function readLinkedFieldData(
@@ -739,10 +718,19 @@ export function readLinkedFieldData(
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
-  ) => ReadDataResult<object>,
-): ReadDataResult<unknown> {
+  ) => ReadDataResult<WithErrors<object>>,
+): ReadDataResult<WithErrors<unknown>> {
   const storeRecordName = getParentRecordKey(field, variables);
-  let value = storeRecord[storeRecordName];
+  let item = storeRecord[storeRecordName];
+
+  if (item?.kind === 'Errors') {
+    return {
+      kind: 'Success',
+      item: item,
+    };
+  }
+
+  let value = item?.value;
 
   if (field.condition != null) {
     const data = readData(field.condition.readerAst, root);
@@ -756,12 +744,8 @@ export function readLinkedFieldData(
       };
     }
 
-    if (data.errors != null) {
-      return {
-        kind: 'Success',
-        data: null,
-        errors: data.errors,
-      };
+    if (data.item.kind === 'Errors') {
+      return data;
     }
 
     const readerWithRefetchQueries = {
@@ -790,7 +774,7 @@ export function readLinkedFieldData(
     } satisfies FragmentReference<any, any>;
 
     const condition = field.condition.resolver({
-      data: data.data,
+      data: data.item.value,
       parameters: {},
       ...(field.condition.hasUpdatable
         ? {
@@ -802,16 +786,13 @@ export function readLinkedFieldData(
           }
         : undefined),
     });
-    value = {
-      kind: 'Data',
-      value: condition,
-    };
+    value = condition;
   }
 
-  if (value?.kind === 'Data' && Array.isArray(value.value)) {
-    let errors: NonEmptyArray<PayloadError> | undefined = undefined;
+  if (Array.isArray(value)) {
+    let errors: PayloadError[] = [];
     const results = [];
-    for (const item of value.value) {
+    for (const item of value) {
       const link = assertLink(item);
       if (link === undefined) {
         return {
@@ -854,17 +835,10 @@ export function readLinkedFieldData(
               nestedReason: result,
               recordLink: result.recordLink,
             };
-          case 'Error':
-            if (errors == null) {
-              errors = result.errors;
-            } else if (result.errors != null) {
-              errors.push(...result.errors);
-            }
-            results.push(null);
+          case 'Success': {
+            results.push(readDataWithErrors(result.item, errors));
             break;
-          case 'Success':
-            results.push(result.data);
-            break;
+          }
         }
 
         continue;
@@ -885,21 +859,18 @@ export function readLinkedFieldData(
           recordLink: result.recordLink,
         };
       }
-      if (errors == null) {
-        errors = result.errors;
-      } else if (result.errors != null) {
-        errors.push(...result.errors);
-      }
-      results.push(result.data);
+
+      results.push(readDataWithErrors(result.item, errors));
     }
     return {
       kind: 'Success',
-      data: results,
-      errors,
+      item: isNonEmptyArray(errors)
+        ? { kind: 'Errors', errors }
+        : { kind: 'Data', value: results },
     };
   }
-  let link = value?.kind === 'Data' ? assertLink(value.value) : null;
 
+  let link = assertLink(value);
   if (link === undefined) {
     // TODO make this configurable, and also generated and derived from the schema
     const missingFieldHandler = environment.missingFieldHandler;
@@ -938,8 +909,10 @@ export function readLinkedFieldData(
   } else if (link == null) {
     return {
       kind: 'Success',
-      data: null,
-      errors: value?.kind === 'Errors' ? value?.errors : undefined,
+      item: {
+        kind: 'Data',
+        value: null,
+      },
     };
   }
 
@@ -962,18 +935,8 @@ export function readLinkedFieldData(
           nestedReason: data,
           recordLink: data.recordLink,
         };
-      case 'Error':
-        return {
-          kind: 'Success',
-          data: null,
-          errors: data.errors,
-        };
       case 'Success':
-        return {
-          kind: 'Success',
-          data: data.data,
-          errors: undefined,
-        };
+        return data;
     }
   }
   const data = readData(field.selections, link);
@@ -1003,8 +966,8 @@ export function readClientPointerData(
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
-  ) => ReadDataResult<object>,
-): ReadFieldResult<unknown> {
+  ) => ReadDataResult<WithErrors<object>>,
+): ReadDataResult<WithErrors<unknown>> {
   const refetchReaderParams = readData(
     [
       {
@@ -1027,11 +990,8 @@ export function readClientPointerData(
     };
   }
 
-  if (refetchReaderParams.errors != null) {
-    return {
-      kind: 'Error',
-      errors: refetchReaderParams.errors,
-    };
+  if (refetchReaderParams.item.kind === 'Errors') {
+    return refetchReaderParams;
   }
 
   const refetchQuery = nestedRefetchQueries[field.refetchQueryIndex];
@@ -1042,73 +1002,74 @@ export function readClientPointerData(
   }
   const refetchQueryArtifact = refetchQuery.artifact;
   const allowedVariables = refetchQuery.allowedVariables;
+  const { item } = refetchReaderParams;
 
   return {
     kind: 'Success',
-    data: (
-      args: any,
-      // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any, never>,
-    ) => {
-      const includeReadOutData = (variables: any, readOutData: any) => {
-        variables.id = readOutData.id;
-        return variables;
-      };
-      const localVariables = includeReadOutData(
-        args ?? {},
-        refetchReaderParams.data,
-      );
-      writeQueryArgsToVariables(localVariables, field.arguments, variables);
+    item: {
+      kind: 'Data',
+      value: (
+        args: any,
+        // TODO get the associated type for FetchOptions from the loadably selected field
+        fetchOptions?: FetchOptions<any, never>,
+      ) => {
+        const includeReadOutData = (variables: any, readOutData: any) => {
+          variables.id = readOutData.id;
+          return variables;
+        };
+        const localVariables = includeReadOutData(args ?? {}, item.value);
+        writeQueryArgsToVariables(localVariables, field.arguments, variables);
 
-      return [
-        // Stable id
-        root.__typename +
-          ':' +
-          root.__link +
-          '/' +
-          field.fieldName +
-          '/' +
-          stableStringifyArgs(localVariables),
-        // Fetcher
-        (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
-          const variables = includeReadOutData(
-            filterVariables({ ...args, ...localVariables }, allowedVariables),
-            refetchReaderParams.data,
-          );
-
-          const readerWithRefetchQueries = wrapResolvedValue({
-            kind: 'ReaderWithRefetchQueries',
-            readerArtifact: {
-              kind: 'EagerReaderArtifact',
-              fieldName: field.fieldName,
-              readerAst: field.selections,
-              resolver: ({ data }: { data: any }) => data,
-              hasUpdatable: false,
-            },
-            nestedRefetchQueries,
-          } as const);
-
-          const [networkRequest, disposeNetworkRequest] =
-            maybeMakeNetworkRequest(
-              environment,
-              refetchQueryArtifact,
-              variables,
-              readerWithRefetchQueries,
-              fetchOptions ?? null,
+        return [
+          // Stable id
+          root.__typename +
+            ':' +
+            root.__link +
+            '/' +
+            field.fieldName +
+            '/' +
+            stableStringifyArgs(localVariables),
+          // Fetcher
+          (): ItemCleanupPair<FragmentReference<any, any>> | undefined => {
+            const variables = includeReadOutData(
+              filterVariables({ ...args, ...localVariables }, allowedVariables),
+              item.value,
             );
 
-          const fragmentReference: FragmentReference<any, any> = {
-            kind: 'FragmentReference',
-            fieldName: field.fieldName,
-            readerArtifactKind: 'EagerReaderArtifact',
-            readerWithRefetchQueries: readerWithRefetchQueries,
-            root,
-            variables,
-            networkRequest,
-          };
-          return [fragmentReference, disposeNetworkRequest];
-        },
-      ];
+            const readerWithRefetchQueries = wrapResolvedValue({
+              kind: 'ReaderWithRefetchQueries',
+              readerArtifact: {
+                kind: 'EagerReaderArtifact',
+                fieldName: field.fieldName,
+                readerAst: field.selections,
+                resolver: ({ data }: { data: any }) => data,
+                hasUpdatable: false,
+              },
+              nestedRefetchQueries,
+            } as const);
+
+            const [networkRequest, disposeNetworkRequest] =
+              maybeMakeNetworkRequest(
+                environment,
+                refetchQueryArtifact,
+                variables,
+                readerWithRefetchQueries,
+                fetchOptions ?? null,
+              );
+
+            const fragmentReference: FragmentReference<any, any> = {
+              kind: 'FragmentReference',
+              fieldName: field.fieldName,
+              readerArtifactKind: 'EagerReaderArtifact',
+              readerWithRefetchQueries: readerWithRefetchQueries,
+              root,
+              variables,
+              networkRequest,
+            };
+            return [fragmentReference, disposeNetworkRequest];
+          },
+        ];
+      },
     },
   };
 }
@@ -1151,7 +1112,7 @@ export function readImperativelyLoadedField(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadFieldResult<unknown> {
+): ReadDataResult<WithErrors<unknown>> {
   // First, we read the data using the refetch reader AST (i.e. read out the
   // id field).
   const data = readData(
@@ -1174,11 +1135,8 @@ export function readImperativelyLoadedField(
       nestedReason: data,
       recordLink: data.recordLink,
     };
-  } else if (data.errors != null) {
-    return {
-      kind: 'Error',
-      errors: data.errors,
-    };
+  } else if (data.item.kind === 'Errors') {
+    return data;
   } else {
     const { refetchQueryIndex } = field;
     const refetchQuery = nestedRefetchQueries[refetchQueryIndex];
@@ -1190,25 +1148,29 @@ export function readImperativelyLoadedField(
     const refetchQueryArtifact = refetchQuery.artifact;
     const allowedVariables = refetchQuery.allowedVariables;
 
+    const { item } = data;
     // Second, we allow the user to call the resolver, which will ultimately
     // use the resolver reader AST to get the resolver parameters.
     return {
       kind: 'Success',
-      data: (args: any) => [
-        // Stable id
-        root.__typename + ':' + root.__link + '__' + field.name,
-        // Fetcher
-        field.refetchReaderArtifact.resolver(
-          environment,
-          refetchQueryArtifact,
-          data.data,
-          filterVariables({ ...args, ...variables }, allowedVariables),
-          root,
-          // TODO these params should be removed
-          null,
-          [],
-        ),
-      ],
+      item: {
+        kind: 'Data',
+        value: (args: any) => [
+          // Stable id
+          root.__typename + ':' + root.__link + '__' + field.name,
+          // Fetcher
+          field.refetchReaderArtifact.resolver(
+            environment,
+            refetchQueryArtifact,
+            item.value,
+            filterVariables({ ...args, ...variables }, allowedVariables),
+            root,
+            // TODO these params should be removed
+            null,
+            [],
+          ),
+        ],
+      },
     };
   }
 }

@@ -30,7 +30,7 @@ import {
   type StoreLayerWithData,
 } from './optimisticProxy';
 import type { ReaderLinkedField, ReaderScalarField } from './reader';
-import { type Argument, type ArgumentValue, isArray, stableCopy } from './util';
+import type { Argument, ArgumentValue } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
