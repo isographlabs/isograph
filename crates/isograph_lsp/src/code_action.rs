@@ -102,13 +102,12 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                                 new_text: format!(
                                     "import {{ iso }} from '@iso';\n\
                                     \n\
-                                    export const {} = iso(`\n\
-                                    {indent}field {}.{} {{\n\
+                                    export const {parent_entity_name}__{selectable_name} = iso(`\n\
+                                    {indent}field {parent_entity_name}.{selectable_name} {{\n\
                                     {indent}}}\n\
                                     `)(({{ data }}) => {{\n\
                                     {indent}return null;\n\
                                     }})\n",
-                                    selectable_name, parent_entity_name, selectable_name
                                 ),
                             })],
                         }),
