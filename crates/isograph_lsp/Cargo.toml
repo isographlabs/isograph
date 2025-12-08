@@ -31,5 +31,6 @@ tokio = { workspace = true, features = ["full", "test-util", "tracing"] }
 tracing = { workspace = true }
 url = { workspace = true }
 
-[lints]
-workspace = true
+[lints.clippy]
+# TODO figure out how to inherit workspace lints, except print_stderr = "deny"
+print_stdout = "deny"
