@@ -11,6 +11,7 @@ import {
   IsographEnvironment,
   StoreRecord,
   type StoreLink,
+  type WithErrors,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
@@ -84,7 +85,7 @@ export type LogMessage =
     }
   | {
       kind: 'DoneReading';
-      response: ReadDataResult<any>;
+      response: ReadDataResult<WithErrors<unknown>>;
       fieldName: string;
       root: StoreLink;
     }

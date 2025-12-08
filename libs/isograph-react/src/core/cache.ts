@@ -15,6 +15,13 @@ import {
 import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
 import { FetchOptions } from './check';
 import {
+  findErrors,
+  groupErrorsByPath,
+  PayloadError,
+  PayloadErrorPath,
+  type ErrorsByPath,
+} from './errors';
+import {
   ExtractParameters,
   FragmentReference,
   Variables,
@@ -35,6 +42,7 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
+import type { NonEmptyArray } from './NonEmptyArray';
 import {
   addNetworkResponseStoreLayer,
   getMutableStoreRecordProxy,
@@ -43,14 +51,6 @@ import {
 import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
 import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
 import { Argument, ArgumentValue } from './util';
-import {
-  findErrors,
-  groupErrorsByPath,
-  type ErrorsByPath,
-  PayloadError,
-  PayloadErrorPath,
-} from './errors';
-import type { NonEmptyArray } from './NonEmptyArray';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -382,25 +382,38 @@ function callSubscriptionIfDataChanged<
     },
   );
 
+  if (
+    newEncounteredDataAndRecords.kind === 'Errors' ||
+    subscription.encounteredDataAndRecords.kind === 'Errors'
+  ) {
+    logAnyError(
+      environment,
+      { situation: 'calling FragmentSubscription callback' },
+      () => {
+        subscription.callback(newEncounteredDataAndRecords);
+      },
+    );
+    subscription.encounteredDataAndRecords = newEncounteredDataAndRecords;
+    return;
+  }
+
+  const oldItem = subscription.encounteredDataAndRecords.item;
+
   const mergedItem = mergeObjectsUsingReaderAst(
     subscription.readerAst,
-    subscription.encounteredDataAndRecords.item,
+    oldItem,
     newEncounteredDataAndRecords.item,
   );
 
   logMessage(environment, () => ({
     kind: 'DeepEqualityCheck',
     fragmentReference: subscription.fragmentReference,
-    old: subscription.encounteredDataAndRecords.item,
+    old: oldItem,
     new: newEncounteredDataAndRecords.item,
-    deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
+    deeplyEqual: mergedItem === oldItem,
   }));
 
-  if (
-    mergedItem !== subscription.encounteredDataAndRecords.item ||
-    newEncounteredDataAndRecords.errors !==
-      subscription.encounteredDataAndRecords.errors
-  ) {
+  if (mergedItem !== oldItem) {
     logAnyError(
       environment,
       { situation: 'calling FragmentSubscription callback' },

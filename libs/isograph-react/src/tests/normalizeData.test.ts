@@ -1,6 +1,11 @@
 import { beforeEach, describe, expect, test, vi, vitest } from 'vitest';
 import { getOrCreateCacheForArtifact, normalizeData } from '../core/cache';
 import {
+  GraphqlAggregateError,
+  GraphqlError,
+  type PayloadError,
+} from '../core/errors';
+import {
   createIsographEnvironment,
   createIsographStore,
   ROOT_ID,
@@ -9,6 +14,7 @@ import {
   type WithErrors,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
+import type { NonEmptyArray } from '../core/NonEmptyArray';
 import type { BaseStoreLayer } from '../core/optimisticProxy';
 import {
   readButDoNotEvaluate,
@@ -20,8 +26,6 @@ import type { Query__errorsClientField__param } from './__isograph/Query/errorsC
 import type { Query__errorsClientFieldComponent__param } from './__isograph/Query/errorsClientFieldComponent/param_type';
 import type { Query__errorsClientPointer__param } from './__isograph/Query/errorsClientPointer/param_type';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
-import type { NonEmptyArray } from '../core/NonEmptyArray';
-import type { PayloadError } from '../core/errors';
 
 function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   return {
@@ -205,6 +209,7 @@ describe('nested Query', () => {
     });
 
     expect(data).toStrictEqual({
+      kind: 'Success',
       encounteredRecords: new Map([
         ['Economist', new Set(['1'])],
         ['Query', new Set([ROOT_ID])],
@@ -216,7 +221,6 @@ describe('nested Query', () => {
           },
         },
       },
-      errors: undefined,
     } satisfies WithEncounteredRecords<Query__subquery__param>);
   });
 });
@@ -244,15 +248,6 @@ export const nicknameErrors = iso(`
   }
 `)(() => {});
 const nicknameErrorsEntrypoint = iso(`entrypoint Query.nicknameErrors`);
-
-export const errorsSecond = iso(`
-  field Query.errorsSecond($id: ID!) {
-    node(id: $id) {
-      id
-    }
-  }
-`)(() => {});
-const errorsSecondEntrypoint = iso(`entrypoint Query.errorsSecond`);
 
 let errorsClientFieldFieldMock = vitest.fn();
 
@@ -621,60 +616,6 @@ describe('errors', () => {
         },
       });
     });
-
-    test('keeps unrelated errors', () => {
-      const store: BaseStoreLayerData = {
-        Query: {
-          [ROOT_ID]: {
-            node____id___1: err([
-              {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'name'],
-              },
-            ]),
-          },
-        },
-      };
-      const environment = createIsographEnvironment(
-        store,
-        vi.fn().mockRejectedValue(new Error('Fetch failed')),
-      );
-
-      normalizeData(
-        environment,
-        environment.store as BaseStoreLayer,
-        errorsSecondEntrypoint.networkRequestInfo.normalizationAst.selections,
-        {
-          data: {
-            node____id___v_id: {
-              __typename: 'Economist',
-              id: '1',
-            },
-          },
-          errors: undefined,
-        },
-        { id: '1' },
-        { __link: ROOT_ID, __typename: errorsSecondEntrypoint.concreteType },
-        new Map(),
-      );
-
-      expect(store).toStrictEqual<BaseStoreLayerData>({
-        Economist: {
-          '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
-          },
-        },
-        Query: {
-          [ROOT_ID]: {
-            node____id___1: ok({
-              __typename: 'Economist',
-              __link: '1',
-            }),
-          },
-        },
-      });
-    });
   });
 
   describe('readData', () => {
@@ -706,16 +647,14 @@ describe('errors', () => {
       });
 
       expect(data).toStrictEqual<WithEncounteredRecords<Query__errors__param>>({
+        kind: 'Errors',
         encounteredRecords: new Map([['Query', new Set([ROOT_ID])]]),
-        item: {
-          node: null,
-        },
-        errors: [
-          {
+        errors: new GraphqlAggregateError([
+          new GraphqlError({
             message: 'Missing name',
             path: ['node____id___v_id', 'name'],
-          },
-        ],
+          }),
+        ]),
       });
     });
 
@@ -760,21 +699,17 @@ describe('errors', () => {
       expect(data).toStrictEqual<
         WithEncounteredRecords<Query__errorsClientField__param>
       >({
+        kind: 'Errors',
         encounteredRecords: new Map([
           ['Query', new Set([ROOT_ID])],
           ['Economist', new Set(['1'])],
         ]),
-        item: {
-          node: {
-            asEconomist: { errorsClientFieldField: null },
-          },
-        },
-        errors: [
-          {
+        errors: new GraphqlAggregateError([
+          new GraphqlError({
             message: 'Missing name',
             path: ['node____id___v_id', 'nickname'],
-          },
-        ],
+          }),
+        ]),
       });
     });
 
@@ -823,6 +758,7 @@ describe('errors', () => {
       expect(data).toStrictEqual<
         WithEncounteredRecords<Query__errorsClientFieldComponent__param>
       >({
+        kind: 'Success',
         encounteredRecords: new Map([
           ['Query', new Set([ROOT_ID])],
           ['Economist', new Set(['1'])],
@@ -834,7 +770,6 @@ describe('errors', () => {
             },
           },
         },
-        errors: undefined,
       });
     });
 
@@ -883,21 +818,17 @@ describe('errors', () => {
       expect(data).toStrictEqual<
         WithEncounteredRecords<Query__errorsClientPointer__param>
       >({
+        kind: 'Errors',
         encounteredRecords: new Map([
           ['Query', new Set([ROOT_ID])],
           ['Economist', new Set(['1'])],
         ]),
-        item: {
-          node: {
-            asEconomist: { errorsClientPointerField: null },
-          },
-        },
-        errors: [
-          {
+        errors: new GraphqlAggregateError([
+          new GraphqlError({
             message: 'Missing name',
             path: ['node____id___v_id', 'nickname'],
-          },
-        ],
+          }),
+        ]),
       });
     });
 
@@ -934,6 +865,7 @@ describe('errors', () => {
       });
 
       expect(data).toStrictEqual<WithEncounteredRecords<Query__errors__param>>({
+        kind: 'Success',
         encounteredRecords: new Map([
           ['Economist', new Set(['1'])],
           ['Query', new Set([ROOT_ID])],
@@ -943,7 +875,6 @@ describe('errors', () => {
             asEconomist: { id: '1', name: 'Bob' },
           },
         },
-        errors: undefined,
       });
     });
   });

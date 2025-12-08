@@ -8,6 +8,7 @@ import {
   type ReaderWithRefetchQueries,
   type ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
+import type { PayloadError } from './errors';
 import {
   FragmentReference,
   Variables,
@@ -16,6 +17,7 @@ import {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import { LogFunction, WrappedLogFunction } from './logging';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { type StoreLayer } from './optimisticProxy';
 import {
   PromiseWrapper,
@@ -24,8 +26,6 @@ import {
 } from './PromiseWrapper';
 import { WithEncounteredRecords } from './read';
 import type { ReaderAst, StartUpdate } from './reader';
-import type { NonEmptyArray } from './NonEmptyArray';
-import type { PayloadError } from './errors';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -126,12 +126,12 @@ export type DataTypeValue =
   // Plural scalar and linked fields:
   | readonly DataTypeValue[];
 
-export type WithErrorsData<T extends DataTypeValue> = {
+export type WithErrorsData<T> = {
   readonly kind: 'Data';
   readonly value: T;
 };
 
-export type WithErrors<T extends DataTypeValue> =
+export type WithErrors<T> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';

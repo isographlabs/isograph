@@ -36,7 +36,7 @@ export function useReadAndSubscribe<
     readerAst,
   );
 
-  if (readOutDataAndRecords.errors) {
+  if (readOutDataAndRecords.kind === 'Errors') {
     throw readOutDataAndRecords.errors;
   }
 

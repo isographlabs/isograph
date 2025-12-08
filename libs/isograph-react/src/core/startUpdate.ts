@@ -5,6 +5,8 @@ import {
   type EncounteredIds,
 } from './cache';
 import type { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
+import { GraphqlAggregateError } from './errors';
+
 import {
   stableIdForFragmentReference,
   type ExtractParameters,
@@ -18,6 +20,8 @@ import {
   type DataTypeValue,
   type IsographEnvironment,
   type StoreLink,
+  type WithErrors,
+  type WithErrorsData,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import {
@@ -125,7 +129,7 @@ export function createUpdatableProxy<
       lastInvalidated: 0,
     },
     mutableUpdatedIds,
-  ).data;
+  ).item.value;
 }
 
 type MutableInvalidationState = {
@@ -183,7 +187,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
-): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
+): ReadDataResultSuccess<WithErrorsData<ExtractUpdatableData<TReadFromStore>>> {
   const storeRecord = getMutableStoreRecordProxy(storeLayer, root);
   let target: { [index: string]: any } = {};
 
@@ -206,10 +210,8 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             switch (data.kind) {
               case 'MissingData':
                 throw new Error(data.reason);
-              case 'Error':
-                return null;
               case 'Success':
-                return data.data;
+                return readDataOrThrowOnError(data.item);
               default: {
                 assertNever(data);
               }
@@ -265,7 +267,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             if (data.kind === 'MissingData') {
               throw new Error(data.reason);
             }
-            return data.data;
+            return readDataOrThrowOnError(data.item);
           },
           'isUpdatable' in field && field.isUpdatable
             ? (newValue) => {
@@ -306,10 +308,8 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           switch (data.kind) {
             case 'MissingData':
               throw new Error(data.reason);
-            case 'Error':
-              return null;
             case 'Success':
-              return data.data;
+              return readDataOrThrowOnError(data.item);
             default: {
               assertNever(data);
             }
@@ -332,10 +332,9 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           switch (data.kind) {
             case 'MissingData':
               throw new Error(data.reason);
-            case 'Error':
-              return null;
+
             case 'Success':
-              return data.data;
+              return readDataOrThrowOnError(data.item);
             default: {
               assertNever(data);
             }
@@ -358,10 +357,8 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           switch (data.kind) {
             case 'MissingData':
               throw new Error(data.reason);
-            case 'Error':
-              return null;
             case 'Success':
-              return data.data;
+              return readDataOrThrowOnError(data.item);
             default: {
               assertNever(data);
             }
@@ -382,7 +379,22 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
 
   return {
     kind: 'Success',
-    data: target as any,
-    errors: undefined,
+    item: {
+      kind: 'Data',
+      value: target as any,
+    },
   };
+}
+
+function readDataOrThrowOnError<T>(result: WithErrors<T>) {
+  switch (result.kind) {
+    case 'Errors':
+      throw new GraphqlAggregateError(result.errors);
+    case 'Data': {
+      return result.value;
+    }
+    default: {
+      assertNever(result);
+    }
+  }
 }
