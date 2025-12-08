@@ -105,7 +105,10 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     let mut lsp_state = LspState::new(compiler_state, &connection.sender);
 
     #[allow(clippy::mutable_key_type)]
-    let mut uris_with_diagnostics = BTreeSet::new();
+    let mut uris_with_diagnostics = BTreeSet::new().note_todo(
+        "When we panic, we should clear all diagnostics. \
+        Add a panic_unwind handler for that.",
+    );
 
     eprintln!("Running server loop");
 
