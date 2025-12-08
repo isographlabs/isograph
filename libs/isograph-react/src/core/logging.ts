@@ -1,20 +1,21 @@
 import type { CleanupFn } from '@isograph/disposable-types';
-import type { NetworkResponseObject, EncounteredIds } from './cache';
+import type { EncounteredIds, NetworkResponseObject } from './cache';
 import type { CheckResult } from './check';
 import type {
   IsographEntrypoint,
-  RefetchQueryNormalizationArtifact,
   NormalizationAstNodes,
+  RefetchQueryNormalizationArtifact,
 } from './entrypoint';
 import type { FragmentReference, Variables } from './FragmentReference';
 import type {
   IsographEnvironment,
-  StoreRecord,
+  PayloadErrors,
   StoreLink,
+  StoreRecord,
 } from './IsographEnvironment';
+import type { StoreLayer } from './optimisticProxy';
 import type { ReadDataResult } from './read';
 import type { Arguments } from './util';
-import type { StoreLayer } from './optimisticProxy';
 
 /**
  * Note: these types are unstable. We will add and remove items from this enum
@@ -32,7 +33,8 @@ export type LogMessage =
   | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
-      networkResponse: NetworkResponseObject;
+      networkResponse: NetworkResponseObject | undefined;
+      errors: PayloadErrors | undefined;
       variables: Variables;
     }
   | {
