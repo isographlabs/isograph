@@ -2,6 +2,7 @@
 
 use crate::{
     code_action::on_code_action,
+    commands::{all_commands, on_command},
     completion::on_completion,
     diagnostic_notification::publish_new_diagnostics_and_clear_old_diagnostics,
     document_highlight::on_document_highlight,
@@ -28,9 +29,10 @@ use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
-    CodeActionProviderCapability, CompletionOptions, HoverProviderCapability,
+    CodeActionProviderCapability, CompletionOptions, ExecuteCommandOptions,
+    HoverProviderCapability,
     request::{
-        CodeActionRequest, Completion, DocumentHighlightRequest, HoverRequest,
+        CodeActionRequest, Completion, DocumentHighlightRequest, ExecuteCommand, HoverRequest,
         SemanticTokensFullRequest,
     },
 };
@@ -70,6 +72,11 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
         }),
         document_highlight_provider: Some(OneOf::Left(true)),
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+        execute_command_provider: ExecuteCommandOptions {
+            commands: all_commands(),
+            ..Default::default()
+        }
+        .wrap_some(),
         ..Default::default()
     };
     let server_capabilities =
@@ -232,6 +239,7 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
             .on_request_sync::<Completion>(on_completion)?
             .on_request_sync::<DocumentHighlightRequest>(on_document_highlight)?
             .on_request_sync::<CodeActionRequest>(on_code_action)?
+            .on_request_sync::<ExecuteCommand>(on_command)?
             .request();
 
         // If we have gotten here, we have not handled the request
@@ -243,11 +251,12 @@ fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
         ControlFlow::Continue(request) => Response {
             id: request.id,
             result: None,
-            error: Some(ResponseError {
+            error: ResponseError {
                 code: ErrorCode::MethodNotFound as i32,
                 data: None,
                 message: format!("No handler registered for method '{}'", request.method),
-            }),
+            }
+            .wrap_some(),
         },
     }
 }

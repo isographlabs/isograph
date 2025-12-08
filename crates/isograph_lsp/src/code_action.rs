@@ -10,8 +10,8 @@ use lsp_types::{
 };
 use prelude::Postfix;
 
-use crate::lsp_runtime_error::LSPRuntimeResult;
-use crate::lsp_state::LspState;
+use crate::{commands::IsographLspCommand, lsp_runtime_error::LSPRuntimeResult};
+use crate::{commands::OpenFileIsographLspCommand, lsp_state::LspState};
 
 pub fn on_code_action<TNetworkProtocol: NetworkProtocol>(
     lsp_state: &LspState<TNetworkProtocol>,
@@ -56,7 +56,7 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
             let parent_entity_name =
                 parent_object_entity_name_and_selectable_name.parent_object_entity_name;
             let selectable_name = parent_object_entity_name_and_selectable_name.selectable_name;
-            let new_file_path = Uri::from_str(&format!(
+            let new_file_path_string = format!(
                 "{}/{}/{}.ts",
                 config.project_root.to_str().expect(
                     "Expected project root to be able to be turned into a string. \
@@ -64,8 +64,8 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                 ),
                 parent_entity_name,
                 selectable_name
-            ))
-            .expect(
+            );
+            let new_file_path = Uri::from_str(&new_file_path_string).expect(
                 "Expected uri to be valid. \
                 This is indicative of a bug in Isograph.",
             );
@@ -117,6 +117,7 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                     ..Default::default()
                 }
                 .wrap_some(),
+                command: OpenFileIsographLspCommand::command(new_file_path_string).wrap_some(),
                 ..Default::default()
             })]
         }
