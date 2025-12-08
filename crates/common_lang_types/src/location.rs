@@ -1,6 +1,6 @@
 use intern::string_key::{Intern, Lookup};
 use prelude::Postfix;
-use std::{error::Error, fmt, path::PathBuf};
+use std::{cell::RefCell, collections::HashMap, error::Error, fmt, path::PathBuf};
 
 use crate::{
     CurrentWorkingDirectory, RelativePathToSourceFile, Span, WithSpan,
@@ -23,47 +23,30 @@ pub struct TextSource {
 
 const ISO_PRINT_ABSOLUTE_FILEPATH: &str = "ISO_PRINT_ABSOLUTE_FILEPATH";
 
+thread_local! {
+    static SOURCE_READER: RefCell<Option<Box<dyn SourceReader>>> = RefCell::new(None);
+}
+
+pub fn set_source_reader(reader: Box<dyn SourceReader>) {
+    SOURCE_READER.with(|r| {
+        *r.borrow_mut() = Some(reader);
+    });
+}
+
 impl TextSource {
     pub fn read_to_string(&self) -> (String, String) {
-        // TODO maybe intern these or somehow avoid reading a bajillion times.
-        // This is especially important for when we display many errors.
-        let mut file_path = PathBuf::from(self.current_working_directory.lookup());
-        let relative_path = self.relative_path_to_source_file.lookup();
-        file_path.push(relative_path);
+        // Try thread-local reader first (for WASM)
+        let result =
+            SOURCE_READER.with(|r| r.borrow().as_ref().map(|reader| reader.read_source(self)));
 
-        // HACK
-        //
-        // When we run pnpm build-pet-demo (etc), then the terminal's working directory is
-        // the isograph folder. But the process thinks that the working directory is
-        // /demos/pet-demo. As a result, if we print relative paths, we can't command-click
-        // on them, leading to a worse developer experience when working on Isograph.
-        //
-        // On the other hand, printing relative paths (from the current working directory):
-        // - is a nice default
-        // - means that if we capture that output, e.g. for fixtures, we can have consistent
-        //   fixture output, no matter what machine the fixtures were generated on.
-        //
-        // So, we need both options. This can probably be improved somewhat.
-        let absolute_or_relative_file_path = if std::env::var(ISO_PRINT_ABSOLUTE_FILEPATH).is_ok() {
-            file_path
-                .to_str()
-                .expect("Expected path to be able to be stringified.")
-                .to_string()
-        } else {
-            relative_path.to_string()
-        };
-
-        let file_contents =
-            std::fs::read_to_string(&absolute_or_relative_file_path).expect("file should exist");
-        if let Some(span) = self.span {
-            // TODO we're cloning here unnecessarily, I think!
-            (
-                absolute_or_relative_file_path,
-                file_contents[span.as_usize_range()].to_string(),
-            )
-        } else {
-            (absolute_or_relative_file_path, file_contents)
+        if let Some(Ok(value)) = result {
+            return value;
         }
+
+        // Fall back to filesystem reader 
+        FileSystemSourceReader
+            .read_source(self)
+            .expect("file should exist")
     }
 }
 
@@ -286,4 +269,92 @@ pub fn relative_path_from_absolute_and_working_directory(
     .expect("Expected path to be able to be stringified")
     .intern()
     .into()
+}
+
+pub trait SourceReader {
+    fn read_source(&self, text_source: &TextSource) -> Result<(String, String), String>;
+}
+
+pub struct FileSystemSourceReader;
+
+impl SourceReader for FileSystemSourceReader {
+    fn read_source(&self, text_source: &TextSource) -> Result<(String, String), String> {
+        // TODO maybe intern these or somehow avoid reading a bajillion times.
+        // This is especially important for when we display many errors.
+        let mut file_path = PathBuf::from(text_source.current_working_directory.lookup());
+        let relative_path = text_source.relative_path_to_source_file.lookup();
+        file_path.push(relative_path);
+
+        // HACK
+        //
+        // When we run pnpm build-pet-demo (etc), then the terminal's working directory is
+        // the isograph folder. But the process thinks that the working directory is
+        // /demos/pet-demo. As a result, if we print relative paths, we can't command-click
+        // on them, leading to a worse developer experience when working on Isograph.
+        //
+        // On the other hand, printing relative paths (from the current working directory):
+        // - is a nice default
+        // - means that if we capture that output, e.g. for fixtures, we can have consistent
+        //   fixture output, no matter what machine the fixtures were generated on.
+        //
+        // So, we need both options. This can probably be improved somewhat.
+        let absolute_or_relative_file_path = if std::env::var(ISO_PRINT_ABSOLUTE_FILEPATH).is_ok() {
+            file_path
+                .to_str()
+                .expect("Expected path to be able to be stringified.")
+                .to_string()
+        } else {
+            relative_path.to_string()
+        };
+
+        let file_contents =
+            std::fs::read_to_string(&absolute_or_relative_file_path).map_err(|e| {
+                format!(
+                    "Failed to read file {}: {}",
+                    absolute_or_relative_file_path, e
+                )
+            })?;
+
+        if let Some(span) = text_source.span {
+            // TODO we're cloning here unnecessarily, I think!
+            Ok((
+                absolute_or_relative_file_path,
+                file_contents[span.as_usize_range()].to_string(),
+            ))
+        } else {
+            Ok((absolute_or_relative_file_path, file_contents))
+        }
+    }
+}
+
+pub struct InMemorySourceReader {
+    sources: RefCell<HashMap<String, String>>,
+}
+
+impl InMemorySourceReader {
+    pub fn new() -> Self {
+        Self {
+            sources: RefCell::new(HashMap::new()),
+        }
+    }
+
+    pub fn add_source(&self, path: String, content: String) {
+        self.sources.borrow_mut().insert(path, content);
+    }
+}
+
+impl SourceReader for InMemorySourceReader {
+    fn read_source(&self, text_source: &TextSource) -> Result<(String, String), String> {
+        let path = text_source.relative_path_to_source_file.lookup();
+        let sources = self.sources.borrow();
+        let content = sources
+            .get(path)
+            .ok_or_else(|| format!("Source not found: {}", path))?;
+
+        if let Some(span) = text_source.span {
+            Ok((path.to_string(), content[span.as_usize_range()].to_string()))
+        } else {
+            Ok((path.to_string(), content.clone()))
+        }
+    }
 }

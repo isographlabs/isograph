@@ -128,3 +128,11 @@ command = [
 ]
 watch = ["crates"]
 need_stdout = false
+
+[jobs.build-parser-wasm]
+command = [
+	"cargo", "build", "-p", "isograph_lang_parser_wasm", "--release", "--target", "wasm32-unknown-unknown",
+	"--color", "always",
+]
+watch = ["crates/isograph_lang_parser_wasm", "crates/isograph_lang_parser", "crates/common_lang_types"]
+need_stdout = false
