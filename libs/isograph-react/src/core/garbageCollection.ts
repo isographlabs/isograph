@@ -1,4 +1,4 @@
-import { getParentRecordKey } from './cache';
+import { getParentRecordKey, isArray } from './cache';
 import { NormalizationAstNodes, type NormalizationAst } from './entrypoint';
 import { Variables } from './FragmentReference';
 import {
@@ -159,16 +159,20 @@ function recordReachableIdsFromRecord(
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
 
+        if (linkedFieldOrFields?.kind !== 'Data') {
+          continue;
+        }
+
         const links: StoreLink[] = [];
-        if (Array.isArray(linkedFieldOrFields)) {
-          for (const maybeLink of linkedFieldOrFields) {
+        if (isArray(linkedFieldOrFields.value)) {
+          for (const maybeLink of linkedFieldOrFields.value) {
             const link = assertLink(maybeLink);
             if (link != null) {
               links.push(link);
             }
           }
         } else {
-          const link = assertLink(linkedFieldOrFields);
+          const link = assertLink(linkedFieldOrFields.value);
           if (link != null) {
             links.push(link);
           }

@@ -1,6 +1,6 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import { isArray } from './cache';
+import { isArray, type NetworkResponseKey } from './cache';
 import {
   IsographEntrypoint,
   IsographOperation,
@@ -95,7 +95,10 @@ export type MissingFieldHandler = (
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<{
+  data?: any;
+  errors?: any;
+}>;
 
 export interface Link<T extends TypeName> extends StoreLink {
   readonly __link: Brand<DataId, T>;
@@ -121,17 +124,45 @@ export type DataTypeValue =
   // Plural scalar and linked fields:
   | readonly DataTypeValue[];
 
+export type WithErrorsData<T extends DataTypeValue> = {
+  readonly kind: 'Data';
+  readonly value: T;
+  /**
+   * A field can be null with errors and have a value depending on it's nested fields
+   * 1. if a nested field is non null and has a error it bubbles up to this parent field
+   * 2. in another query which is not selecting this nested field the parent field can resolve correctly
+   */
+  readonly errors: PayloadErrors | undefined;
+};
+
+export type WithErrors<T extends DataTypeValue> =
+  | WithErrorsData<T>
+  | {
+      readonly kind: 'Errors';
+      readonly errors: PayloadErrors;
+    };
+
 export type StoreRecord = {
-  [index: DataId | string]: DataTypeValue;
+  [index: NetworkResponseKey]: WithErrors<DataTypeValue>;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
-  readonly id?: DataId;
+  readonly id?: WithErrorsData<DataId>;
 };
 
 export type TypeName = string;
 export type DataId = string;
 
 export const ROOT_ID: DataId & '__ROOT' = '__ROOT';
+
+export interface PayloadErrorExtensions {}
+export type PayloadErrorPath = string | number;
+export type PayloadError = {
+  readonly message: string;
+  readonly locations?: { readonly line: number; readonly column: number }[];
+  readonly path?: PayloadErrorPath[];
+  readonly extensions?: PayloadErrorExtensions;
+};
+export type PayloadErrors = [PayloadError, ...PayloadError[]];
 
 export type StoreLayerData = {
   [index: TypeName]: {
