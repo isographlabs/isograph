@@ -11,8 +11,11 @@ use lsp_types::{
 };
 use prelude::Postfix;
 
-use crate::{commands::IsographLspCommand, lsp_runtime_error::LSPRuntimeResult};
 use crate::{commands::OpenFileIsographLspCommand, lsp_state::LspState};
+use crate::{
+    commands::{IsographLspCommand, OpenFileIsographLspCommandParams},
+    lsp_runtime_error::LSPRuntimeResult,
+};
 
 pub fn on_code_action<TNetworkProtocol: NetworkProtocol>(
     lsp_state: &LspState<TNetworkProtocol>,
@@ -142,9 +145,24 @@ fn create_new_selectable_code_action(
         ""
     };
 
-    let (keyword, to_section) = match selectable_type {
-        SelectionType::Scalar(_) => ("field", ""),
-        SelectionType::Object(_) => ("pointer", " to TYPE"),
+    let (keyword, to_section, target_range) = match selectable_type {
+        SelectionType::Scalar(_) => ("field", "", None),
+        SelectionType::Object(_) => (
+            "pointer",
+            " to TYPE",
+            // Corresponds to TYPE in the generated output...
+            Range::new(
+                Position {
+                    line: 3,
+                    character: 21,
+                },
+                Position {
+                    line: 3,
+                    character: 25,
+                },
+            )
+            .wrap_some(),
+        ),
     };
 
     CodeAction {
@@ -192,7 +210,10 @@ fn create_new_selectable_code_action(
             ..Default::default()
         }
         .wrap_some(),
-        command: OpenFileIsographLspCommand::command(new_file_path_string).wrap_some(),
+        command: OpenFileIsographLspCommand::command(OpenFileIsographLspCommandParams {
+            uri_string: new_file_path_string,
+            target_range,
+        }).wrap_some(),
         ..Default::default()
     }
 }

@@ -3,11 +3,11 @@ use std::{ops::ControlFlow, str::FromStr};
 use isograph_schema::NetworkProtocol;
 use lsp_server::{Message, RequestId};
 use lsp_types::{
-    Command, ShowDocumentParams, Uri,
+    Command, Range, ShowDocumentParams, Uri,
     request::{ExecuteCommand, Request, ShowDocument},
 };
 use prelude::Postfix;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 
 use crate::{
@@ -42,26 +42,32 @@ pub(crate) trait IsographLspCommand {
 
 pub(crate) struct OpenFileIsographLspCommand {}
 
+#[derive(Debug, Serialize, Deserialize)]
+pub struct OpenFileIsographLspCommandParams {
+    pub uri_string: String,
+    pub target_range: Option<Range>,
+}
+
 impl IsographLspCommand for OpenFileIsographLspCommand {
     const METHOD: &'static str = "iso_open_file";
     const TITLE: &'static str = "Isograph: Open file";
-    // the uri of the file
-    type Params = String;
+    type Params = OpenFileIsographLspCommandParams;
 
     fn handler<TNetworkProtocol: NetworkProtocol>(
         state: &LspState<TNetworkProtocol>,
-        params: <OpenFileIsographLspCommand as IsographLspCommand>::Params,
+        lsp_command_params: <OpenFileIsographLspCommand as IsographLspCommand>::Params,
     ) -> LSPRuntimeResult<Option<Value>> {
+        let uri = lsp_command_params.uri_string;
         let params = ShowDocumentParams {
-            uri: Uri::from_str(&params).map_err(|_| {
+            uri: Uri::from_str(&uri).map_err(|_| {
                 LSPRuntimeError::UnexpectedError(format!(
-                    "Unable to convert to uri: `{params}`. \
-                        This is indicative of a bug in Isograph."
+                    "Unable to convert to uri: `{uri}`. \
+                    This is indicative of a bug in Isograph."
                 ))
             })?,
             external: None,
             take_focus: true.wrap_some(),
-            selection: None,
+            selection: lsp_command_params.target_range,
         };
 
         let request = lsp_server::Request {
