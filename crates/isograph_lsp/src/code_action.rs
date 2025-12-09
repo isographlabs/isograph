@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
-use common_lang_types::IsographCodeAction;
+use common_lang_types::{EntityName, IsographCodeAction, SelectableName};
+use isograph_lang_types::SelectionType;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     CodeAction, CodeActionOrCommand, CreateFile, DocumentChangeOperation, DocumentChanges, OneOf,
@@ -69,56 +70,129 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                 "Expected uri to be valid. \
                 This is indicative of a bug in Isograph.",
             );
-            let indent = "  ";
 
-            vec![CodeActionOrCommand::CodeAction(CodeAction {
-                title: format!(
-                    "Create new field named `{}.{}`",
-                    parent_entity_name, selectable_name
+            vec![
+                CodeActionOrCommand::CodeAction(create_new_selectable_code_action(
+                    parent_entity_name,
+                    selectable_name,
+                    new_file_path_string.clone(),
+                    new_file_path.clone(),
+                    false,
+                    SelectionType::Scalar(()),
+                )),
+                CodeActionOrCommand::CodeAction(create_new_selectable_code_action(
+                    parent_entity_name,
+                    selectable_name,
+                    new_file_path_string,
+                    new_file_path,
+                    true,
+                    SelectionType::Scalar(()),
+                )),
+            ]
+        }
+        IsographCodeAction::CreateNewObjectSelectable(
+            parent_object_entity_name_and_selectable_name,
+        ) => {
+            let parent_entity_name =
+                parent_object_entity_name_and_selectable_name.parent_object_entity_name;
+            let selectable_name = parent_object_entity_name_and_selectable_name.selectable_name;
+            let new_file_path_string = format!(
+                "{}/{}/{}.ts",
+                config.project_root.to_str().expect(
+                    "Expected project root to be able to be turned into a string. \
+                    This is indicative of a bug in Isograph."
                 ),
-                edit: WorkspaceEdit {
-                    document_changes: DocumentChanges::Operations(vec![
-                        DocumentChangeOperation::Op(ResourceOp::Create(CreateFile {
-                            uri: new_file_path.clone(),
-                            options: None,
-                            annotation_id: None,
-                        })),
-                        DocumentChangeOperation::Edit(TextDocumentEdit {
-                            text_document: OptionalVersionedTextDocumentIdentifier {
-                                uri: new_file_path,
-                                version: None,
+                parent_entity_name,
+                selectable_name
+            );
+            let new_file_path = Uri::from_str(&new_file_path_string).expect(
+                "Expected uri to be valid. \
+                This is indicative of a bug in Isograph.",
+            );
+
+            vec![CodeActionOrCommand::CodeAction(
+                create_new_selectable_code_action(
+                    parent_entity_name,
+                    selectable_name,
+                    new_file_path_string.clone(),
+                    new_file_path.clone(),
+                    false,
+                    SelectionType::Object(()),
+                ),
+            )]
+        }
+    }
+}
+
+fn create_new_selectable_code_action(
+    parent_entity_name: EntityName,
+    selectable_name: SelectableName,
+    new_file_path_string: String,
+    new_file_path: Uri,
+    // TODO it would be more elegant to make should_add_component_annotation
+    // in the SelectionType::Scalar variant of selectable_type
+    should_add_component_annotation: bool,
+    selectable_type: SelectionType<(), ()>,
+) -> CodeAction {
+    let indent = "  ";
+
+    let component_annotation = if should_add_component_annotation {
+        "@component "
+    } else {
+        ""
+    };
+
+    let (keyword, to_section) = match selectable_type {
+        SelectionType::Scalar(_) => ("field", ""),
+        SelectionType::Object(_) => ("pointer", " to TYPE"),
+    };
+
+    CodeAction {
+        title: format!(
+            "Create new {component_annotation}{keyword} named `{}.{}`",
+            parent_entity_name, selectable_name
+        ),
+        edit: WorkspaceEdit {
+            document_changes: DocumentChanges::Operations(vec![
+                DocumentChangeOperation::Op(ResourceOp::Create(CreateFile {
+                    uri: new_file_path.clone(),
+                    options: None,
+                    annotation_id: None,
+                })),
+                DocumentChangeOperation::Edit(TextDocumentEdit {
+                    text_document: OptionalVersionedTextDocumentIdentifier {
+                        uri: new_file_path,
+                        version: None,
+                    },
+                    edits: vec![OneOf::Left(TextEdit {
+                        range: Range {
+                            start: Position {
+                                line: 0,
+                                character: 0,
                             },
-                            edits: vec![OneOf::Left(TextEdit {
-                                range: Range {
-                                    start: Position {
-                                        line: 0,
-                                        character: 0,
-                                    },
-                                    end: Position {
-                                        line: 0,
-                                        character: 0,
-                                    },
-                                },
-                                new_text: format!(
-                                    "import {{ iso }} from '@iso';\n\
+                            end: Position {
+                                line: 0,
+                                character: 0,
+                            },
+                        },
+                        new_text: format!(
+                            "import {{ iso }} from '@iso';\n\
                                     \n\
                                     export const {parent_entity_name}__{selectable_name} = iso(`\n\
-                                    {indent}field {parent_entity_name}.{selectable_name} {{\n\
+                                    {indent}{keyword} {parent_entity_name}.{selectable_name}{to_section} {component_annotation}{{\n\
                                     {indent}}}\n\
                                     `)(({{ data }}) => {{\n\
                                     {indent}return null;\n\
                                     }})\n",
-                                ),
-                            })],
-                        }),
-                    ])
-                    .wrap_some(),
-                    ..Default::default()
-                }
-                .wrap_some(),
-                command: OpenFileIsographLspCommand::command(new_file_path_string).wrap_some(),
-                ..Default::default()
-            })]
+                        ),
+                    })],
+                }),
+            ])
+            .wrap_some(),
+            ..Default::default()
         }
+        .wrap_some(),
+        command: OpenFileIsographLspCommand::command(new_file_path_string).wrap_some(),
+        ..Default::default()
     }
 }

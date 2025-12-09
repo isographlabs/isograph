@@ -114,4 +114,5 @@ impl<T> WithNonFatalDiagnostics<T> {
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy, Serialize, Deserialize)]
 pub enum IsographCodeAction {
     CreateNewScalarSelectable(ParentObjectEntityNameAndSelectableName),
+    CreateNewObjectSelectable(ParentObjectEntityNameAndSelectableName),
 }
