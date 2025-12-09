@@ -510,6 +510,6 @@ jobs:
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
     uses: ./.github/workflows/release-isograph-extension.yml
     needs: [all-checks-passed]
-    with:
+    secrets:
       vs-marketplace-token: ${{ secrets.VS_MARKETPLACE_TOKEN }}
       open-vsx-token: ${{ secrets.OPEN_VSX_TOKEN }}
