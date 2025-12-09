@@ -6,8 +6,8 @@ use std::{
 
 use crate::operation_text::hash;
 use common_lang_types::{
-    ArtifactFileName, ArtifactHash, ArtifactPathAndContent, FileContent, FileSystemOperation,
-    SelectableName, ServerObjectEntityName,
+    ArtifactFileName, ArtifactHash, ArtifactPathAndContent, EntityName, FileContent,
+    FileSystemOperation, SelectableName,
 };
 use isograph_config::PersistedDocumentsHashAlgorithm;
 
@@ -16,7 +16,7 @@ use isograph_config::PersistedDocumentsHashAlgorithm;
 pub struct FileSystemState {
     root_files: HashMap<ArtifactFileName, (Index<FileContent>, ArtifactHash)>,
     nested_files: HashMap<
-        ServerObjectEntityName,
+        EntityName,
         HashMap<SelectableName, HashMap<ArtifactFileName, (Index<FileContent>, ArtifactHash)>>,
     >,
 }
@@ -167,7 +167,7 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
     fn from(artifacts: &[ArtifactPathAndContent]) -> Self {
         let mut root_files = HashMap::new();
         let mut nested_files: HashMap<
-            ServerObjectEntityName,
+            EntityName,
             HashMap<SelectableName, HashMap<ArtifactFileName, (Index<FileContent>, ArtifactHash)>>,
         > = HashMap::new();
 
@@ -207,6 +207,7 @@ mod tests {
     use super::*;
     use common_lang_types::{ArtifactPath, ParentObjectEntityNameAndSelectableName};
     use intern::string_key::Intern;
+    use prelude::Postfix;
     use std::path::PathBuf;
 
     fn create_artifact(
@@ -216,10 +217,11 @@ mod tests {
         content: &str,
     ) -> ArtifactPathAndContent {
         let type_and_field = match (server, selectable) {
-            (Some(s), Some(sel)) => Some(ParentObjectEntityNameAndSelectableName {
+            (Some(s), Some(sel)) => ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: s.intern().into(),
                 selectable_name: sel.intern().into(),
-            }),
+            }
+            .wrap_some(),
             _ => None,
         };
 

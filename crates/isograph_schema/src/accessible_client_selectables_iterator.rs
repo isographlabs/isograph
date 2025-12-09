@@ -5,8 +5,8 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    ClientSelectableId, IsographDatabase, NetworkProtocol, ObjectSelectableId,
-    OwnedClientSelectable, ScalarSelectableId,
+    ClientSelectableId, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
+    ObjectSelectableId, ScalarSelectableId,
     client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query,
 };
@@ -16,22 +16,28 @@ use isograph_lang_types::SelectionType;
 // This should really be replaced with a proper visitor, or something
 pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_type: &OwnedClientSelectable<TNetworkProtocol>,
+    selection_type: MemoRefClientSelectable<TNetworkProtocol>,
 ) -> impl Iterator<Item = WithLocation<ClientSelectableId>> {
     let selection_set = match selection_type {
-        SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
-            db,
-            scalar.parent_object_entity_name,
-            scalar.name.item,
-        )
-        .expect("Expected selection set to be valid"),
+        SelectionType::Scalar(scalar) => {
+            let scalar = scalar.lookup(db);
+            client_scalar_selectable_selection_set_for_parent_query(
+                db,
+                scalar.parent_object_entity_name,
+                scalar.name.item,
+            )
+            .expect("Expected selection set to be valid")
+        }
 
-        SelectionType::Object(object) => client_object_selectable_selection_set_for_parent_query(
-            db,
-            object.parent_object_entity_name,
-            object.name.item,
-        )
-        .expect("Expected selection set to be valid"),
+        SelectionType::Object(object) => {
+            let object = object.lookup(db);
+            client_object_selectable_selection_set_for_parent_query(
+                db,
+                object.parent_object_entity_name,
+                object.name.item,
+            )
+            .expect("Expected selection set to be valid")
+        }
     };
 
     AccessibleClientSelectableIterator {

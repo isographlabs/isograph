@@ -55,6 +55,13 @@
             "null"
           ],
           "description": "A path relative to the root of your VSCode project for the extension to work from. The default value is the root of your project. This will change where we start looking for the isograph-compiler node module. This will also affect where the LSP server is started, therefore affecting how the isograph config is found. This is helpful if your project is in a nested directory."
+        },
+        "isograph.autoformatIsoLiterals": {
+          "scope": "workspace",
+          "default": true,
+          "type": [
+            "boolean"
+          ]
         }
       }
     },
@@ -92,7 +99,7 @@
     "eslint-config-airbnb-base": "^15.0.0",
     "eslint-config-airbnb-typescript": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
-    "prettier": "^2.6.2",
+    "prettier": "^3.7.4",
     "typescript": "5.6.3"
   }
 }

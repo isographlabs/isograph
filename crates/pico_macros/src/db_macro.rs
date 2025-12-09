@@ -119,8 +119,8 @@ pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
             }
 
             #[inline]
-            fn intern<T: Clone + std::hash::Hash + ::pico::DynEq + 'static>(&self, value: T) -> ::pico::MemoRef<T> {
-                ::pico::intern(self, value)
+            fn intern_value<T: Clone + std::hash::Hash + ::pico::DynEq + 'static>(&self, value: T) -> ::pico::MemoRef<T> {
+                ::pico::intern_value(self, value)
             }
 
             #[inline]

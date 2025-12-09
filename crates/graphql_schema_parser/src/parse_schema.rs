@@ -1,9 +1,8 @@
 use std::{ops::ControlFlow, str::FromStr};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, DiagnosticResult, EnumLiteralValue, GraphQLInterfaceTypeName,
-    GraphQLObjectTypeName, Location, StringLiteralValue, TextSource, WithLocation, WithSpan,
-    WithSpanPostfix,
+    DescriptionValue, Diagnostic, DiagnosticResult, EntityName, EnumLiteralValue, Location,
+    StringLiteralValue, TextSource, WithLocation, WithSpan, WithSpanPostfix,
 };
 use graphql_syntax::TokenKind;
 use intern::{
@@ -420,7 +419,7 @@ fn parse_union_definition(
 
 fn parse_union_member_types(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithLocation<GraphQLObjectTypeName>>> {
+) -> DiagnosticResult<Vec<WithLocation<EntityName>>> {
     // This is a no-op if the token kind doesn't match, so effectively
     // this is an optional pipe
     let _pipe = tokens.parse_token_of_kind(TokenKind::Pipe);
@@ -489,11 +488,8 @@ fn parse_schema_definition(
 }
 
 fn reassign_or_error(
-    root_type: &mut Option<WithLocation<GraphQLObjectTypeName>>,
-    operation_type: &(
-        WithSpan<RootOperationKind>,
-        WithLocation<GraphQLObjectTypeName>,
-    ),
+    root_type: &mut Option<WithLocation<EntityName>>,
+    operation_type: &(WithSpan<RootOperationKind>, WithLocation<EntityName>),
     text_source: TextSource,
 ) -> DiagnosticResult<()> {
     if root_type.is_some() {
@@ -511,10 +507,7 @@ fn reassign_or_error(
 
 fn parse_root_operation_type(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<(
-    WithSpan<RootOperationKind>,
-    WithLocation<GraphQLObjectTypeName>,
-)> {
+) -> DiagnosticResult<(WithSpan<RootOperationKind>, WithLocation<EntityName>)> {
     let name = tokens.parse_source_of_kind(TokenKind::Identifier)?;
 
     let root_operation_type = match name.item {
@@ -563,7 +556,7 @@ fn parse_scalar_type_definition(
 /// The state of the PeekableLexer is that we have not parsed the "implements" keyword.
 fn parse_implements_interfaces_if_present(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
+) -> DiagnosticResult<Vec<WithLocation<EntityName>>> {
     if tokens.parse_matching_identifier("implements").is_ok() {
         parse_interfaces(tokens)?.wrap_ok()
     } else {
@@ -580,9 +573,7 @@ fn parse_implements_interfaces_if_present(
 ///
 /// In the spec, this would error later, e.g. after an ObjectTypeDefinition
 /// with only "Foo", no directives and no fields was successfully parsed.
-fn parse_interfaces(
-    tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithLocation<GraphQLInterfaceTypeName>>> {
+fn parse_interfaces(tokens: &mut PeekableLexer) -> DiagnosticResult<Vec<WithLocation<EntityName>>> {
     let _optional_ampersand = tokens.parse_token_of_kind(TokenKind::Ampersand);
 
     let first_interface = tokens.parse_string_key_type(TokenKind::Identifier)?;

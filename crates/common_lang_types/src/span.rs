@@ -114,12 +114,6 @@ impl<T> WithSpan<T> {
     }
 }
 
-impl<T: fmt::Display> fmt::Display for WithSpan<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.item.fmt(f)
-    }
-}
-
 pub trait WithSpanPostfix
 where
     Self: Sized,

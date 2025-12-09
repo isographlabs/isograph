@@ -7,8 +7,8 @@ Ok(
                         "BasicField",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Type",
                             ),
                         ),
@@ -319,8 +319,8 @@ Ok(
                         "BasicField2",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Type",
                             ),
                         ),
@@ -732,8 +732,8 @@ Ok(
                         "BasicField3",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Type",
                             ),
                         ),
@@ -1145,8 +1145,8 @@ Ok(
                         "updatable",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Type",
                             ),
                         ),

@@ -8,12 +8,12 @@ use pico::{MemoRef, SourceId};
 use pico_macros::memo;
 use prelude::Postfix;
 
-#[expect(clippy::type_complexity)]
 #[memo]
+// TODO add error recovery and the non_fatal_diagnostics vec
 pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticResult<(
-    MemoRef<GraphQLTypeSystemDocument>,
+    GraphQLTypeSystemDocument,
     BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
 )> {
     let SchemaSource {
@@ -37,7 +37,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
         schema_extensions.insert(*relative_path, extensions_document);
     }
 
-    (db.intern(schema), schema_extensions).wrap_ok()
+    (schema, schema_extensions).wrap_ok()
 }
 
 #[memo]
@@ -52,5 +52,5 @@ pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
     } = db.get(schema_extension_source_id);
     let schema_extensions = parse_schema_extensions(content, *text_source)?;
 
-    db.intern(schema_extensions).wrap_ok()
+    schema_extensions.interned_value(db).wrap_ok()
 }

@@ -1,9 +1,7 @@
 use std::fmt::Debug;
 
 use common_lang_types::{
-    ClientScalarSelectableName, Diagnostic, DiagnosticResult, JavascriptName, SelectableName,
-    ServerObjectEntityName, ServerScalarEntityName, ServerScalarSelectableName,
-    ServerSelectableName,
+    Diagnostic, DiagnosticResult, EntityName, JavascriptName, SelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -19,13 +17,16 @@ use crate::{
 };
 
 lazy_static! {
-    pub static ref ID_ENTITY_NAME: ServerScalarEntityName = "ID".intern().into();
-    pub static ref STRING_ENTITY_NAME: ServerScalarEntityName = "String".intern().into();
-    pub static ref INT_ENTITY_NAME: ServerScalarEntityName = "Int".intern().into();
-    pub static ref FLOAT_ENTITY_NAME: ServerScalarEntityName = "Float".intern().into();
-    pub static ref BOOLEAN_ENTITY_NAME: ServerScalarEntityName = "Boolean".intern().into();
-    pub static ref ID_FIELD_NAME: ServerScalarSelectableName = "id".intern().into();
+    pub static ref ID_ENTITY_NAME: EntityName = "ID".intern().into();
+    pub static ref STRING_ENTITY_NAME: EntityName = "String".intern().into();
+    pub static ref INT_ENTITY_NAME: EntityName = "Int".intern().into();
+    pub static ref FLOAT_ENTITY_NAME: EntityName = "Float".intern().into();
+    pub static ref BOOLEAN_ENTITY_NAME: EntityName = "Boolean".intern().into();
+    pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
+    pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+    pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
+    pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
@@ -33,8 +34,8 @@ pub struct RootOperationName(pub &'static str);
 
 pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    root_object_name: ServerObjectEntityName,
-    selections: impl Iterator<Item = ServerSelectableName>,
+    root_object_name: EntityName,
+    selections: impl Iterator<Item = SelectableName>,
 ) -> DiagnosticResult<Vec<ServerObjectSelectable<TNetworkProtocol>>> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
@@ -45,7 +46,6 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
         match current_selectable {
             Some(entity) => {
-                let entity = entity.clone_err()?;
                 match entity {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
@@ -57,9 +57,8 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                         .wrap_err();
                     }
                     SelectionType::Object(object) => {
-                        // TODO don't clone. When memoized functions return references with 'db lifetime,
-                        // this will be doable.
-                        path.push(object.clone());
+                        let object = object.lookup(db);
+                        path.push(object.clone().note_todo("We should not clone here!!!"));
                         current_entity_name = *object.target_object_entity.inner();
                     }
                 }
@@ -85,7 +84,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct PathToRefetchField {
     pub linked_fields: Vec<NormalizationKey>,
-    pub field_name: SelectionType<ClientScalarSelectableName, NameAndArguments>,
+    pub field_name: SelectionType<SelectableName, NameAndArguments>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
@@ -104,7 +103,7 @@ impl NameAndArguments {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 // This struct is indicative of poor data modeling.
 pub enum ServerObjectSelectableVariant {
     LinkedField,
@@ -120,7 +119,5 @@ pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 
-pub type ScalarSelectableId = DefinitionLocation<
-    (ServerObjectEntityName, ServerScalarSelectableName),
-    (ServerObjectEntityName, ClientScalarSelectableName),
->;
+pub type ScalarSelectableId =
+    DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;

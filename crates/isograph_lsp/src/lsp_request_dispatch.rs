@@ -58,7 +58,7 @@ impl<'state, TState> LSPRequestDispatch<'state, TState> {
     }
 }
 
-fn convert_to_lsp_response(
+pub(crate) fn convert_to_lsp_response(
     id: ServerRequestId,
     result: LSPRuntimeResult<serde_json::Value>,
 ) -> Response {

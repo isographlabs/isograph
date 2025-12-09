@@ -1,17 +1,15 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{
-    ClientScalarSelectableName, Diagnostic, DiagnosticResult, ServerObjectEntityName,
-};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, SelectableTrait,
-    client_scalar_selectable_named, parse_iso_literal_in_source,
-    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
+    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
+    parse_iso_literal_in_source, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 #[memo]
@@ -34,10 +32,7 @@ pub fn entrypoints<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> HashMap<
-    (ServerObjectEntityName, ClientScalarSelectableName),
-    DiagnosticResult<EntrypointDeclarationInfo>,
-> {
+) -> HashMap<(EntityName, SelectableName), DiagnosticResult<EntrypointDeclarationInfo>> {
     let entrypoints = entrypoints(db);
 
     let mut out: HashMap<_, Result<EntrypointDeclarationInfo, _>> = HashMap::new();
@@ -60,7 +55,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 let selectable = selectable_named(
                     db,
                     entrypoint_declaration_info.parent_type.item.0,
-                    entrypoint_declaration_info.client_field_name.item.0.into(),
+                    entrypoint_declaration_info.client_field_name.item.0,
                 );
 
                 if let Ok(Some(selectable)) = selectable {
@@ -75,12 +70,18 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 
                     return selectable_is_wrong_type_diagnostic(
                         entrypoint_declaration_info.parent_type.item.0,
-                        entrypoint_declaration_info.client_field_name.item.0.into(),
+                        entrypoint_declaration_info.client_field_name.item.0,
                         "client field",
                         actual_type,
                         match selectable {
-                            DefinitionLocation::Server(s) => s.name().location,
-                            DefinitionLocation::Client(c) => c.name().location,
+                            DefinitionLocation::Server(server) => match server {
+                                SelectionType::Scalar(s) => s.lookup(db).name.location,
+                                SelectionType::Object(o) => o.lookup(db).name.location,
+                            },
+                            DefinitionLocation::Client(c) => match c {
+                                SelectionType::Scalar(s) => s.lookup(db).name.location,
+                                SelectionType::Object(o) => o.lookup(db).name.location,
+                            },
                         },
                     );
                 }
@@ -88,8 +89,11 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 // if not
                 selectable_is_not_defined_diagnostic(
                     entrypoint_declaration_info.parent_type.item.0,
-                    entrypoint_declaration_info.client_field_name.item.0.into(),
-                    entrypoint_declaration_info.client_field_name.location,
+                    entrypoint_declaration_info.client_field_name.item.0,
+                    entrypoint_declaration_info
+                        .client_field_name
+                        .location
+                        .into(),
                 )
             })?;
 
@@ -124,6 +128,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         entrypoint_declaration_info
                             .client_field_name
                             .location
+                            .to::<Location>()
                             .wrap_some(),
                     )
                     .wrap_err()

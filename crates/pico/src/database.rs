@@ -24,7 +24,7 @@ pub trait Database: DatabaseDyn + Sized {
     fn get<T: 'static>(&self, id: SourceId<T>) -> &T;
     /// Because `T` is a `Singleton`, unlike `get` this does not require `id: SourceId<T>`
     fn get_singleton<T: 'static + Singleton>(&self) -> Option<&T>;
-    fn intern<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
+    fn intern_value<T: Clone + Hash + DynEq + 'static>(&self, value: T) -> MemoRef<T>;
     fn intern_ref<T: Clone + Hash + DynEq + 'static>(&self, value: &T) -> MemoRef<T>;
     fn set<T: Source + DynEq>(&mut self, source: T) -> SourceId<T>;
     fn remove<T>(&mut self, id: SourceId<T>);
@@ -175,8 +175,7 @@ impl<Db: Database> Storage<Db> {
     pub fn run_garbage_collection(&mut self) {
         self.assert_empty_dependency_stack();
 
-        let top_level_function_calls =
-            std::mem::replace(&mut self.top_level_calls, BoxcarVec::new());
+        let top_level_function_calls = std::mem::take(&mut self.top_level_calls);
 
         for derived_node_id in top_level_function_calls {
             self.top_level_call_lru_cache.put(derived_node_id, ());
@@ -380,8 +379,14 @@ impl<Db: Database> Default for Storage<Db> {
     }
 }
 
-pub fn intern<Db: Database, T: Clone + Hash + DynEq + 'static>(db: &Db, value: T) -> MemoRef<T> {
-    let param_id = hash(&value).into();
+pub fn intern_value<Db: Database, T: Clone + Hash + DynEq + 'static>(
+    db: &Db,
+    value: T,
+) -> MemoRef<T> {
+    let wrapped_value = InternValueWrapper(value);
+    let param_id = hash(&wrapped_value).into();
+    let value = wrapped_value.0;
+
     let mut param_ids = init_param_vec();
     param_ids.push(param_id);
     let derived_node_id = DerivedNodeId::new(param_id.inner().into(), param_ids);
@@ -585,3 +590,11 @@ pub fn intern_ref<Db: Database, T: Clone + Hash + DynEq + 'static>(
 
     MemoRef::new_with_kind(derived_node_id, MemoRefKind::RawPtr)
 }
+
+// This is wrapper exists solely so that if we call db.intern(val) and db.intern_ref(&val)
+// for the same value, then we do not calculate the same hash, and thus return a MemoRef
+// for the first when looking up the second.
+//
+// We make a somewhat arbitrary choice and choose to wrap interned values.
+#[derive(Hash)]
+struct InternValueWrapper<T>(T);

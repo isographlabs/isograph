@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ConstExportName, Diagnostic, RelativePathToSourceFile, UnvalidatedTypeName,
-    WithEmbeddedLocation, WithSpan,
+    ConstExportName, Diagnostic, EntityName, RelativePathToSourceFile, WithEmbeddedLocation,
+    WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
@@ -9,8 +9,8 @@ use std::fmt::Debug;
 
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
-    ClientScalarSelectableNameWrapper, IsographFieldDirective, IsographSemanticToken,
-    ObjectSelectionPath, SelectionTypeContainingSelections, ServerObjectEntityNameWrapper,
+    ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
+    IsographSemanticToken, ObjectSelectionPath, SelectionTypeContainingSelections,
     VariableDefinition, isograph_resolved_node::IsographResolvedNode,
     string_key_wrappers::Description,
 };
@@ -20,16 +20,16 @@ use crate::{
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
@@ -43,16 +43,16 @@ pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
-    pub target_type: GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>,
+    pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>,
+    pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,

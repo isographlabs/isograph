@@ -4,8 +4,8 @@ Ok(
             WithSpan {
                 item: EntrypointDeclaration {
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Query",
                             ),
                         ),

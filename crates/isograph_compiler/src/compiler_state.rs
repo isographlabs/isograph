@@ -18,6 +18,7 @@ const GC_DURATION_SECONDS: u64 = 60;
 pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
     pub db: IsographDatabase<TNetworkProtocol>,
     pub last_gc_run: Instant,
+    // TODO this doesn't belong here... it's watch-mode-specific
     pub file_system_state: Option<FileSystemState>,
 }
 

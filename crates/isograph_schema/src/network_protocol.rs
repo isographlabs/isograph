@@ -1,23 +1,31 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    Diagnostic, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
-    ServerObjectEntityName, ServerSelectableName, UnvalidatedTypeName, WithLocation, WithSpan,
+    DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    SelectableName, WithLocation, WithNonFatalDiagnostics, WithSpan,
 };
 use graphql_lang_types::{GraphQLInputValueDefinition, GraphQLTypeAnnotation};
-use isograph_lang_types::{Description, SelectionType};
+use isograph_lang_types::Description;
 
 use crate::{
-    ExposeFieldDirective, MergedSelectionMap, RootOperationName, ServerObjectEntity,
-    ServerScalarEntity, ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ExposeFieldDirective, MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap,
+    RefetchStrategy, RootOperationName, ServerObjectEntity, ValidatedVariableDefinition,
+    isograph_database::IsographDatabase,
 };
 
-pub type ParseTypeSystemOutcome<TNetworkProtocol> = Vec<
-    SelectionType<
-        WithLocation<ServerScalarEntity<TNetworkProtocol>>,
-        ProcessObjectTypeDefinitionOutcome<TNetworkProtocol>,
+type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
+
+#[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
+pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
+    pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
+
+    pub selectables:
+        BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefSelectable<TNetworkProtocol>>>,
+
+    pub client_scalar_refetch_strategies: Vec<
+        DiagnosticResult<WithLocation<(EntityName, SelectableName, UnvalidatedRefetchStrategy)>>,
     >,
->;
+}
 
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
@@ -25,16 +33,14 @@ pub trait NetworkProtocol:
     type SchemaObjectAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
+    #[expect(clippy::type_complexity)]
     fn parse_type_system_documents(
         db: &IsographDatabase<Self>,
-    ) -> &Result<
-        (
-            ParseTypeSystemOutcome<Self>,
-            // TODO just seems awkward that we return fetchable types
-            BTreeMap<ServerObjectEntityName, RootOperationName>,
-        ),
-        Diagnostic,
-    >;
+    ) -> &DiagnosticResult<(
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
+        // TODO just seems awkward that we return fetchable types
+        BTreeMap<EntityName, RootOperationName>,
+    )>;
 
     fn generate_query_text<'a>(
         db: &IsographDatabase<Self>,
@@ -47,13 +53,13 @@ pub trait NetworkProtocol:
 
     fn generate_link_type(
         db: &IsographDatabase<Self>,
-        server_object_entity_name: &ServerObjectEntityName,
+        server_object_entity_name: &EntityName,
     ) -> String;
 
     // TODO: include `QueryText` to incrementally adopt persisted documents
     fn generate_query_extra_info(
         query_name: QueryOperationName,
-        operation_name: ServerObjectEntityName,
+        operation_name: EntityName,
         indentation_level: u8,
     ) -> QueryExtraInfo;
 }
@@ -69,8 +75,8 @@ pub struct ProcessObjectTypeDefinitionOutcome<TNetworkProtocol: NetworkProtocol>
 #[derive(Debug, Eq, PartialEq, Hash, Clone)]
 pub struct FieldToInsert {
     pub description: Option<WithSpan<Description>>,
-    pub name: WithLocation<ServerSelectableName>,
-    pub graphql_type: GraphQLTypeAnnotation<UnvalidatedTypeName>,
+    pub name: WithLocation<SelectableName>,
+    pub graphql_type: GraphQLTypeAnnotation<EntityName>,
     /// An override type for the typename field. Normally, the JavaScript type is
     /// acquired by going through graphql_type.inner(), but there is no separate
     /// 'UserTypename' type in GraphQL. So we do this instead. This is horrible
@@ -95,7 +101,7 @@ pub struct FieldToInsert {
 pub struct ExposeFieldToInsert {
     pub expose_field_directive: ExposeFieldDirective,
     // e.g. Query or Mutation
-    pub parent_object_name: ServerObjectEntityName,
+    pub parent_object_name: EntityName,
     pub description: Option<Description>,
 }
 

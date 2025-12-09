@@ -1,10 +1,10 @@
-use common_lang_types::{IsoLiteralText, WithLocation, WithSpan};
+use common_lang_types::{IsoLiteralText, WithEmbeddedLocation, WithSpan};
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
 use crate::{
-    ClientScalarSelectableNameWrapper, IsographResolvedNode, IsographSemanticToken,
-    ServerObjectEntityNameWrapper, entrypoint_directive_set::EntrypointDirectiveSet,
+    ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographResolvedNode,
+    IsographSemanticToken, entrypoint_directive_set::EntrypointDirectiveSet,
 };
 
 // TODO should this be ObjectTypeAndFieldNames?
@@ -12,11 +12,11 @@ use crate::{
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
-    pub parent_type: WithSpan<ServerObjectEntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
+
     // N.B. there is no reason this can't be a server field name /shrug
     #[resolve_field]
-    pub client_field_name: WithLocation<ClientScalarSelectableNameWrapper>,
-
+    pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     // TODO consider moving this behind a cfg flag, since this is only used
     // by the language server.
     pub entrypoint_keyword: WithSpan<()>,

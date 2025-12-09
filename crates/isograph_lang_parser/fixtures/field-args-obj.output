@@ -7,8 +7,8 @@ Ok(
                         "ValidArgs",
                     ),
                     parent_type: WithSpan {
-                        item: ServerObjectEntityNameWrapper(
-                            ServerObjectEntityName(
+                        item: EntityNameWrapper(
+                            EntityName(
                                 "Type",
                             ),
                         ),

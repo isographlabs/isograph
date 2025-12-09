@@ -1,21 +1,18 @@
-use common_lang_types::{
-    ClientObjectSelectableName, ObjectSelectableName, ServerObjectEntityName,
-    ServerObjectSelectableName,
-};
+use common_lang_types::{EntityName, SelectableName};
 use impl_base_types_macro::impl_for_definition_location;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
+use pico::MemoRef;
 
 use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 
-pub type ObjectSelectableId = DefinitionLocation<
-    (ServerObjectEntityName, ServerObjectSelectableName),
-    (ServerObjectEntityName, ClientObjectSelectableName),
->;
+pub type ObjectSelectableId =
+    DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;
 
+// This is poorly named... its not owned!
 pub type OwnedObjectSelectable<TNetworkProtocol> = DefinitionLocation<
     // HACK: Note the owned server selectable
     // This is fixable when memoized functions can return references with 'db lifetime
-    ServerObjectSelectable<TNetworkProtocol>,
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
     ClientObjectSelectable<TNetworkProtocol>,
 >;
 
@@ -26,12 +23,17 @@ pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
+pub type MemoRefObjectSelectable<TNetworkProtocol> = DefinitionLocation<
+    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
+    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
+>;
+
 #[impl_for_definition_location]
 pub trait ClientOrServerObjectSelectable {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> ObjectSelectableName;
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName;
-    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName>;
+    fn name(&self) -> SelectableName;
+    fn parent_object_entity_name(&self) -> EntityName;
+    fn target_object_entity_name(&self) -> TypeAnnotation<EntityName>;
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
@@ -41,15 +43,15 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
         self.target_object_entity_name.clone()
     }
 }
@@ -61,15 +63,15 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
         self.target_object_entity_name.clone()
     }
 }
@@ -81,15 +83,15 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
         self.target_object_entity.clone()
     }
 }
@@ -101,15 +103,15 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
         self.description
     }
 
-    fn name(&self) -> ObjectSelectableName {
-        self.name.item.into()
+    fn name(&self) -> SelectableName {
+        self.name.item
     }
 
-    fn parent_object_entity_name(&self) -> ServerObjectEntityName {
+    fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
 
-    fn target_object_entity_name(&self) -> TypeAnnotation<ServerObjectEntityName> {
+    fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
         self.target_object_entity.clone()
     }
 }

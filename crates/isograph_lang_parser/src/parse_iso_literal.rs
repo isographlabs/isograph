@@ -1,8 +1,7 @@
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName, Diagnostic,
-    DiagnosticResult, IsoLiteralText, Location, RelativePathToSourceFile, Span, TextSource,
-    UnvalidatedTypeName, ValueKeyName, WithEmbeddedLocation, WithLocation, WithLocationPostfix,
-    WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, EntityName, IsoLiteralText, Location, RelativePathToSourceFile,
+    SelectableName, Span, TextSource, ValueKeyName, WithEmbeddedLocation, WithLocation,
+    WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -11,11 +10,11 @@ use graphql_lang_types::{
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
-    ConstantValue, EntrypointDeclaration, IsographFieldDirective, IsographResolvedNode,
-    IsographSemanticToken, NonConstantValue, ObjectSelection, ScalarSelection,
-    SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
-    ServerObjectEntityNameWrapper, UnvalidatedSelection, VariableDefinition,
-    from_isograph_field_directives, semantic_token_legend,
+    ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
+    IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
+    ScalarSelection, SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
+    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
+    semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -113,8 +112,13 @@ fn parse_iso_entrypoint_declaration(
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
-            )?
-            .map(ServerObjectEntityNameWrapper);
+            )
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_embedded_location(tokens.text_source)
+            })?;
+
         let dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
         let client_field_name = tokens
@@ -125,7 +129,7 @@ fn parse_iso_entrypoint_declaration(
             .map(|with_span| {
                 with_span
                     .map(ClientScalarSelectableNameWrapper)
-                    .to_with_location(tokens.text_source)
+                    .to_with_embedded_location(tokens.text_source)
             })?;
 
         let directives = parse_directives(tokens)?;
@@ -176,12 +180,16 @@ fn parse_client_field_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_embedded_location(tokens.text_source)
+            })?;
 
         let _ = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
-        let client_field_name: WithEmbeddedLocation<ClientScalarSelectableName> = tokens
+        let client_field_name: WithEmbeddedLocation<SelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
@@ -194,7 +202,8 @@ fn parse_client_field_declaration_inner(
 
         let client_field_directive_set = from_isograph_field_directives(&directives);
 
-        let description = parse_optional_description(tokens);
+        let description = parse_optional_description(tokens)
+            .map(|x| x.to_with_embedded_location(tokens.text_source));
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
             expected_selection_set_diagnostic(Location::new(
@@ -207,7 +216,7 @@ fn parse_client_field_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             expected_literal_to_be_exported_diagnostic(
                 "field",
-                client_field_name.item.into(),
+                client_field_name.item,
                 // TODO use a better location
                 client_field_name.location.into(),
             )
@@ -246,7 +255,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<GraphQLTypeAnnotation<ServerObjectEntityNameWrapper>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation<EntityNameWrapper>> {
     let keyword = tokens.parse_source_of_kind(
         IsographLangTokenKind::Identifier,
         semantic_token_legend::ST_TO,
@@ -259,9 +268,8 @@ fn parse_client_pointer_target_type(
         )
         .wrap_err()
     } else {
-        parse_type_annotation(tokens).map(|with_span| {
-            with_span.map(|x| ServerObjectEntityNameWrapper(x.unchecked_conversion()))
-        })
+        parse_type_annotation(tokens)
+            .map(|with_span| with_span.map(|x| EntityNameWrapper(x.unchecked_conversion())))
     }
 }
 
@@ -276,12 +284,16 @@ fn parse_client_pointer_declaration_inner(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_SERVER_OBJECT_TYPE,
             )
-            .map(|with_span| with_span.map(ServerObjectEntityNameWrapper))?;
+            .map(|with_span| {
+                with_span
+                    .map(EntityNameWrapper)
+                    .to_with_embedded_location(tokens.text_source)
+            })?;
 
         let _dot = tokens
             .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 
-        let client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableName> = tokens
+        let client_pointer_name: WithEmbeddedLocation<SelectableName> = tokens
             .parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_CLIENT_SELECTABLE_NAME,
@@ -294,7 +306,8 @@ fn parse_client_pointer_declaration_inner(
 
         let directives = parse_directives(tokens)?;
 
-        let description = parse_optional_description(tokens);
+        let description = parse_optional_description(tokens)
+            .map(|x| x.to_with_embedded_location(tokens.text_source));
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
             expected_selection_set_diagnostic(Location::new(
@@ -307,7 +320,7 @@ fn parse_client_pointer_declaration_inner(
         let const_export_name = const_export_name.ok_or_else(|| {
             expected_literal_to_be_exported_diagnostic(
                 "pointer",
-                client_pointer_name.item.into(),
+                client_pointer_name.item,
                 client_pointer_name.location.into(),
             )
         })?;
@@ -696,7 +709,7 @@ fn parse_object_entry(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithSpan<VariableDefinition<UnvalidatedTypeName>>>> {
+) -> DiagnosticResult<Vec<WithSpan<VariableDefinition<EntityName>>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -721,7 +734,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<WithSpan<VariableDefinition<UnvalidatedTypeName>>> {
+) -> DiagnosticResult<WithSpan<VariableDefinition<EntityName>>> {
     tokens
         .with_span_result(|tokens| {
             let _dollar = tokens.parse_token_of_kind(
@@ -781,7 +794,7 @@ fn parse_optional_default_value(
 
 fn parse_type_annotation(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<GraphQLTypeAnnotation<UnvalidatedTypeName>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation<EntityName>> {
     from_control_flow(|| {
         to_control_flow::<_, Diagnostic>(|| {
             let type_ = tokens.parse_string_key_type(
@@ -886,7 +899,7 @@ fn expected_selection_set_diagnostic(location: Location) -> Diagnostic {
 
 fn expected_literal_to_be_exported_diagnostic(
     literal_type: &str,
-    suggested_const_export_name: ClientSelectableName,
+    suggested_const_export_name: SelectableName,
     location: Location,
 ) -> Diagnostic {
     Diagnostic::new(

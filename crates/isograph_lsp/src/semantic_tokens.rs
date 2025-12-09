@@ -1,12 +1,12 @@
 use crate::{
     location_utils::uri_is_project_file,
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    lsp_state::LspState,
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{
     Span, TextSource, WithSpan, relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::CompilerState;
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
@@ -22,11 +22,11 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
 
     get_semantic_tokens(db, uri).to_owned()
 }

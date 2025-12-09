@@ -8,6 +8,7 @@ use common_lang_types::{
 };
 
 use artifact_content::FileSystemState;
+use prelude::Postfix;
 
 #[tracing::instrument(skip_all)]
 pub(crate) fn get_file_system_operations(
@@ -24,7 +25,7 @@ pub(crate) fn get_file_system_operations(
             artifact_directory,
         ),
     };
-    *file_system_state = Some(new_file_system_state);
+    *file_system_state = new_file_system_state.wrap_some();
     operations
 }
 

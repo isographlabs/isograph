@@ -1,9 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    ClientObjectSelectableName, ClientScalarSelectableName, ClientSelectableName,
-    ScalarSelectableName, SelectableName, ServerObjectEntityName, ServerObjectSelectableName,
-    ServerScalarSelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
+    EntityName, SelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
     WithSpanPostfix,
 };
 use graphql_lang_types::{
@@ -41,7 +39,7 @@ pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<(ServerObjectEntityName, ServerObjectSelectableName), ClientSelectableId>,
+    DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     FieldTraversalResult,
 >;
 
@@ -55,15 +53,15 @@ pub struct FieldTraversalResult {
 }
 
 lazy_static! {
-    pub static ref REFETCH_FIELD_NAME: ClientScalarSelectableName = "__refetch".intern().into();
-    pub static ref NODE_FIELD_NAME: ServerObjectSelectableName = "node".intern().into();
-    pub static ref TYPENAME_FIELD_NAME: ServerScalarSelectableName = "__typename".intern().into();
-    pub static ref LINK_FIELD_NAME: ClientScalarSelectableName = "__link".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+    pub static ref NODE_FIELD_NAME: SelectableName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: SelectableName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: SelectableName = "__link".intern().into();
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
-    pub field_name: ClientSelectableName,
+    pub field_name: SelectableName,
     pub path_to_refetch_field_info: PathToRefetchFieldInfo,
 }
 
@@ -109,8 +107,8 @@ fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = Vari
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
 pub struct MergedScalarFieldSelection {
-    pub parent_object_entity_name: ServerObjectEntityName,
-    pub name: ServerScalarSelectableName,
+    pub parent_object_entity_name: EntityName,
+    pub name: SelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
 }
 
@@ -120,19 +118,19 @@ impl MergedScalarFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
+            get_aliased_mutation_field_name(self.name, &self.arguments).wrap_some()
         }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedLinkedFieldSelection {
-    pub parent_object_entity_name: ServerObjectEntityName,
-    pub name: ServerObjectSelectableName,
+    pub parent_object_entity_name: EntityName,
+    pub name: SelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
-    /// Some if the object is concrete; None otherwise.
-    pub concrete_type: Option<ServerObjectEntityName>,
+    /// None if the target is abstract
+    pub concrete_target_entity_name: Option<EntityName>,
 }
 
 impl MergedLinkedFieldSelection {
@@ -141,14 +139,14 @@ impl MergedLinkedFieldSelection {
         if self.arguments.is_empty() {
             None
         } else {
-            get_aliased_mutation_field_name(self.name.into(), &self.arguments).wrap_some()
+            get_aliased_mutation_field_name(self.name, &self.arguments).wrap_some()
         }
     }
 }
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedInlineFragmentSelection {
-    pub type_to_refine_to: ServerObjectEntityName,
+    pub type_to_refine_to: EntityName,
     // TODO make this type more precise, this selection map should not contain inline fragments
     pub selection_map: MergedSelectionMap,
 }
@@ -160,7 +158,7 @@ pub enum NormalizationKey {
     // TODO this should not have NameAndArguments, but LinkedFieldNameAndArguments
     ServerField(NameAndArguments),
     ClientPointer(NameAndArguments),
-    InlineFragment(ServerObjectEntityName),
+    InlineFragment(EntityName),
 }
 
 impl NormalizationKey {
@@ -194,7 +192,7 @@ pub struct PathToRefetchFieldInfo {
     // If the field (e.g. icheckin) returns an abstract type (ICheckin) that is different than
     // the concrete type we want (Checkin), then we refine to that concrete type.
     // TODO investigate whether this can be done when the ImperativelyLoadedFieldVariant is created
-    pub wrap_refetch_field_with_inline_fragment: Option<ServerObjectEntityName>,
+    pub wrap_refetch_field_with_inline_fragment: Option<EntityName>,
     pub imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant,
     pub client_selectable_id: ClientSelectableId,
 }
@@ -325,7 +323,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
-                            concrete_type: linked_field_selection.concrete_type,
+                            concrete_target_entity_name: linked_field_selection
+                                .concrete_target_entity_name,
                             name: linked_field_selection.name,
                             selection_map: transform_child_map_with_parent_context(
                                 &linked_field_selection.selection_map,
@@ -339,7 +338,8 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                     }
                     MergedServerSelection::ClientObjectSelectable(linked_field_selection) => {
                         MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
-                            concrete_type: linked_field_selection.concrete_type,
+                            concrete_target_entity_name: linked_field_selection
+                                .concrete_target_entity_name,
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
                             name: linked_field_selection.name,
@@ -453,10 +453,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<
-        (ServerObjectEntityName, ServerObjectSelectableName),
-        ClientSelectableId,
-    >,
+    root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -516,10 +513,10 @@ pub fn get_reachable_variables(
 }
 
 pub fn imperative_field_subfields_or_inline_fragments(
-    top_level_schema_field_name: ServerObjectSelectableName,
+    top_level_schema_field_name: SelectableName,
     top_level_schema_field_arguments: &[VariableDefinition<ServerEntityName>],
-    top_level_schema_field_concrete_type: Option<ServerObjectEntityName>,
-    top_level_schema_field_parent_object_entity_name: ServerObjectEntityName,
+    top_level_schema_field_concrete_target_entity_name: Option<EntityName>,
+    top_level_schema_field_parent_object_entity_name: EntityName,
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
         .iter()
@@ -535,7 +532,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
         parent_object_entity_name: top_level_schema_field_parent_object_entity_name,
         server_object_selectable_name: top_level_schema_field_name,
         arguments: top_level_schema_field_arguments,
-        concrete_type: top_level_schema_field_concrete_type,
+        concrete_target_entity_name: top_level_schema_field_concrete_target_entity_name,
     }
 }
 
@@ -585,31 +582,31 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            server_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, server_object_selectable_name),
                         DefinitionLocation::Client((
                             parent_object_entity_name,
                             client_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            client_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, client_object_selectable_name),
                     };
 
-                let target_object_entity_name =
-                    *selectable_named(db, parent_object_entity_name, selectable_name)
-                        .clone() // TODO don't clone
-                        .expect("Expected selectable to be valid.")
-                        .expect(
-                            "Expected selectable to exist. \
+                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
+                    .clone() // TODO don't clone
+                    .expect("Expected selectable to be valid.")
+                    .expect(
+                        "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect("Expected selectable to be object.")
-                        .target_object_entity_name()
-                        .inner();
+                    )
+                    .as_object()
+                    .expect("Expected selectable to be object.");
+
+                let target_object_entity_name = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        s.lookup(db).target_object_entity.inner().dereference()
+                    }
+                    DefinitionLocation::Client(c) => {
+                        c.lookup(db).target_object_entity_name.inner().dereference()
+                    }
+                };
 
                 let object_selection_parent_object_entity =
                     &server_object_entity_named(db, target_object_entity_name)
@@ -664,7 +661,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_type_map,
                             merge_traversal_state,
                             newly_encountered_client_object_selectable_name,
-                            newly_encountered_client_object_selectable,
+                            newly_encountered_client_object_selectable.lookup(db),
                             object_selection,
                             variable_context,
                         );
@@ -706,10 +703,10 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
     object_selection: &ValidatedObjectSelection,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
-    field_parent_object_entity_name: ServerObjectEntityName,
-    field_server_object_selectable_name: ServerObjectSelectableName,
+    field_parent_object_entity_name: EntityName,
+    field_server_object_selectable_name: SelectableName,
 ) {
     if let ObjectSelectionDirectiveSet::Updatable(_) =
         object_selection.object_selection_directive_set
@@ -720,18 +717,19 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     let server_object_selectable = server_object_selectable_named(
         db,
         field_parent_object_entity_name,
-        field_server_object_selectable_name.into(),
+        field_server_object_selectable_name,
     )
     .as_ref()
     .expect(
         "Expected validation to have succeeded. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
         "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-    );
+        This is indicative of a bug in Isograph.",
+    )
+    .lookup(db);
 
     match &server_object_selectable.object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
@@ -811,7 +809,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
         }
         ServerObjectSelectableVariant::LinkedField => {
             let normalization_key = create_transformed_name_and_arguments(
-                object_selection.name.item.into(),
+                object_selection.name.item,
                 &object_selection.arguments,
                 variable_context,
             )
@@ -833,31 +831,31 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            server_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, server_object_selectable_name),
                         DefinitionLocation::Client((
                             parent_object_entity_name,
                             client_object_selectable_name,
-                        )) => (
-                            parent_object_entity_name,
-                            client_object_selectable_name.into(),
-                        ),
+                        )) => (parent_object_entity_name, client_object_selectable_name),
                     };
 
-                let concrete_object_entity_name =
-                    *selectable_named(db, parent_object_entity_name, selectable_name)
-                        .clone() // TODO don't clone
-                        .expect("Expected selectable to be valid.")
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect("Expected selectable to be object.")
-                        .target_object_entity_name()
-                        .inner();
+                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
+                    .clone() // TODO don't clone
+                    .expect("Expected selectable to be valid.")
+                    .expect(
+                        "Expected selectable to exist. \
+                        This is indicative of a bug in Isograph.",
+                    )
+                    .as_object()
+                    .expect("Expected selectable to be object.");
+
+                let concrete_object_entity_name = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        s.lookup(db).target_object_entity.inner().dereference()
+                    }
+                    DefinitionLocation::Client(o) => {
+                        o.lookup(db).target_object_entity_name.inner().dereference()
+                    }
+                };
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -871,10 +869,10 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     )
                     .lookup(db)
-                    .concrete_type;
+                    .note_todo("We are looking up the same object for no reason")
+                    .is_concrete;
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    concrete_type,
                     parent_object_entity_name,
                     name: object_selection.name.item,
                     selection_map: BTreeMap::new(),
@@ -885,6 +883,11 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .map(|arg| arg.item.into_key_and_value()),
                         variable_context,
                     ),
+                    concrete_target_entity_name: if concrete_type {
+                        concrete_object_entity_name.wrap_some()
+                    } else {
+                        None
+                    },
                 })
             });
             match linked_field {
@@ -921,8 +924,8 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
     object_selection: &ValidatedObjectSelection,
-    parent_object_entity_name: ServerObjectEntityName,
-    newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
+    parent_object_entity_name: EntityName,
+    newly_encountered_client_object_selectable_name: SelectableName,
 ) {
     let newly_encountered_client_object_selectable = client_object_selectable_named(
         db,
@@ -938,7 +941,8 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     .expect(
         "Expected selectable to exist. \
         This is indicative of a bug in Isograph.",
-    );
+    )
+    .lookup(db);
 
     merge_non_loadable_client_type(
         db,
@@ -990,8 +994,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
     scalar_field_selection: &ValidatedScalarSelection,
-    parent_object_entity_name: &ServerObjectEntityName,
-    newly_encountered_scalar_client_selectable_name: &ClientScalarSelectableName,
+    parent_object_entity_name: &EntityName,
+    newly_encountered_scalar_client_selectable_name: &SelectableName,
 ) {
     let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
         db,
@@ -1004,7 +1008,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         This is indicative of a bug in Isograph.",
     )
     .as_ref()
-    .expect("Expected client scalar selectable to exist.");
+    .expect("Expected client scalar selectable to exist.")
+    .lookup(db);
 
     // If the field is selected loadably or is imperative, we must note the refetch path,
     // because this results in an artifact being generated.
@@ -1099,9 +1104,9 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     db: &IsographDatabase<TNetworkProtocol>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_scalar_client_selectable_name: ClientScalarSelectableName,
+    newly_encountered_scalar_client_selectable_name: SelectableName,
     newly_encountered_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
@@ -1135,7 +1140,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_scalar_selectable.name.item.into(),
+            field_name: newly_encountered_client_scalar_selectable.name.item,
             path_to_refetch_field_info: info,
         },
     );
@@ -1182,7 +1187,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     parent_map: &mut MergedSelectionMap,
     encountered_client_field_map: &mut FieldToCompletedMergeTraversalStateMap,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    newly_encountered_client_object_selectable_name: ClientObjectSelectableName,
+    newly_encountered_client_object_selectable_name: SelectableName,
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
     object_selection: &ValidatedObjectSelection,
     variable_context: &VariableContext,
@@ -1223,7 +1228,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         .0;
 
     let name_and_arguments = create_transformed_name_and_arguments(
-        object_selection.name.item.into(),
+        object_selection.name.item,
         &object_selection.arguments,
         variable_context,
     );
@@ -1234,7 +1239,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     };
 
     let mut subfields_or_inline_fragments = vec![];
-    if target_server_object_entity.concrete_type.is_some() {
+    if target_server_object_entity.is_concrete {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
             target_server_object_entity.name,
         ));
@@ -1246,19 +1251,21 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             key: ID_FIELD_NAME.unchecked_conversion(),
             value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
         }],
-        concrete_type: None,
+        concrete_target_entity_name: None,
     });
 
     let info = PathToRefetchFieldInfo {
-        wrap_refetch_field_with_inline_fragment: target_server_object_entity.concrete_type.map_or(
+        wrap_refetch_field_with_inline_fragment: if target_server_object_entity.is_concrete {
+            None
+        } else {
             (*newly_encountered_client_object_selectable
                 .target_object_entity_name
                 .inner())
-            .wrap_some(),
-            |_| None,
-        ),
+            .wrap_some()
+        },
+
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
-            client_selection_name: newly_encountered_client_object_selectable.name.item.into(),
+            client_selection_name: newly_encountered_client_object_selectable.name.item,
             top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
@@ -1292,7 +1299,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_object_selectable.name.item.into(),
+            field_name: newly_encountered_client_object_selectable.name.item,
             path_to_refetch_field_info: info,
         },
     );
@@ -1306,7 +1313,11 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     let client_object_selectable = parent_map.entry(normalization_key).or_insert_with(|| {
         MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
             parent_object_entity_name,
-            concrete_type: target_server_object_entity.concrete_type,
+            concrete_target_entity_name: if target_server_object_entity.is_concrete {
+                target_server_object_entity.name.wrap_some()
+            } else {
+                None
+            },
             name: object_selection.name.item,
             selection_map: BTreeMap::new(),
             arguments: transform_arguments_with_child_context(
@@ -1397,7 +1408,7 @@ fn merge_server_scalar_field(
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
 ) {
     if let ScalarSelectionDirectiveSet::Updatable(_) =
         scalar_field_selection.scalar_selection_directive_set
@@ -1413,7 +1424,7 @@ fn merge_server_scalar_field(
         NormalizationKey::Id
     } else {
         NormalizationKey::ServerField(create_transformed_name_and_arguments(
-            scalar_field_name.into(),
+            scalar_field_name,
             &scalar_field_selection.arguments,
             variable_context,
         ))
@@ -1460,7 +1471,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
     merged_selection_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
 ) {
-    if parent_object_entity.concrete_type.is_none() {
+    if !parent_object_entity.is_concrete {
         maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
     };
 
@@ -1504,12 +1515,12 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum WrappedSelectionMapSelection {
     LinkedField {
-        parent_object_entity_name: ServerObjectEntityName,
-        server_object_selectable_name: ServerObjectSelectableName,
+        parent_object_entity_name: EntityName,
+        server_object_selectable_name: SelectableName,
         arguments: Vec<ArgumentKeyAndValue>,
-        concrete_type: Option<ServerObjectEntityName>,
+        concrete_target_entity_name: Option<EntityName>,
     },
-    InlineFragment(ServerObjectEntityName),
+    InlineFragment(EntityName),
 }
 
 pub fn selection_map_wrapped(
@@ -1528,11 +1539,11 @@ pub fn selection_map_wrapped(
                 parent_object_entity_name,
                 server_object_selectable_name,
                 arguments,
-                concrete_type,
+                concrete_target_entity_name,
             } => {
                 map.insert(
                     NormalizationKey::ServerField(NameAndArguments {
-                        name: server_object_selectable_name.into(),
+                        name: server_object_selectable_name,
                         arguments: arguments.clone(),
                     }),
                     MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
@@ -1540,7 +1551,7 @@ pub fn selection_map_wrapped(
                         name: server_object_selectable_name,
                         selection_map: inner_selection_map,
                         arguments,
-                        concrete_type,
+                        concrete_target_entity_name,
                     }),
                 );
             }
@@ -1563,7 +1574,7 @@ pub fn selection_map_wrapped(
 
 fn maybe_add_typename_selection(
     selections: &mut MergedSelectionMap,
-    parent_object_entity_name: ServerObjectEntityName,
+    parent_object_entity_name: EntityName,
 ) {
     // If a discriminator exists, this is a no-op
     selections.insert(
@@ -1616,7 +1627,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
             *TYPENAME_FIELD_NAME,
         )
             .server_defined(),
-        name: ScalarSelectableName::from(*TYPENAME_FIELD_NAME).with_generated_location(),
+        name: (*TYPENAME_FIELD_NAME).with_generated_location(),
         reader_alias: None,
     })
     .with_generated_span();
@@ -1629,7 +1640,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
         )
             .client_defined(),
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: WithLocation::new_generated((*LINK_FIELD_NAME).into()),
+        name: WithLocation::new_generated(*LINK_FIELD_NAME),
         reader_alias: None,
     })
     .with_generated_span();

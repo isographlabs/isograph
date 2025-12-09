@@ -48,7 +48,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 let server_scalar_selectable = server_scalar_selectable_named(
                     db,
                     scalar_field.parent_object_entity_name,
-                    scalar_field.name.into(),
+                    scalar_field.name,
                 )
                 .as_ref()
                 .expect(
@@ -59,7 +59,8 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 let raw_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
                     &mut |scalar_entity_name| match server_scalar_selectable
@@ -98,7 +99,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 let server_object_selectable = server_object_selectable_named(
                     db,
                     linked_field.parent_object_entity_name,
-                    linked_field.name.into(),
+                    linked_field.name,
                 )
                 .as_ref()
                 .expect(
@@ -109,7 +110,8 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
-                );
+                )
+                .lookup(db);
 
                 let raw_type =
                     server_object_selectable

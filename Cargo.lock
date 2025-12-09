@@ -2414,6 +2414,9 @@ dependencies = [
 [[package]]
 name = "prelude"
 version = "0.4.3"
+dependencies = [
+ "pico",
+]
 
 [[package]]
 name = "pretty-duration"
