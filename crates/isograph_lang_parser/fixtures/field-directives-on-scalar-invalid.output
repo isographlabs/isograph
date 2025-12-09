@@ -3,6 +3,7 @@ Err(
         DiagnosticData {
             message: "data did not match any variant of untagged enum ScalarSelectionDirectiveSet",
             location: None,
+            code_actions: [],
         },
     ),
 )
@@ -14,6 +15,7 @@ Err(
         DiagnosticData {
             message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             location: None,
+            code_actions: [],
         },
     ),
 )
@@ -25,6 +27,7 @@ Err(
         DiagnosticData {
             message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             location: None,
+            code_actions: [],
         },
     ),
 )
@@ -36,6 +39,7 @@ Err(
         DiagnosticData {
             message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
             location: None,
+            code_actions: [],
         },
     ),
 )

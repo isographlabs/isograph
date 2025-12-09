@@ -7,16 +7,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "pointer",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 28,
+                                        end: 116,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 11,
+                                end: 15,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "User",
                             ),
                         ),
-                        span: Span {
-                            start: 11,
-                            end: 15,
-                        },
                     },
                     target_type: List(
                         GraphQLListTypeAnnotation(
@@ -57,7 +71,7 @@ Ok(
                             },
                         },
                         item: ClientObjectSelectableNameWrapper(
-                            ClientObjectSelectableName(
+                            SelectableName(
                                 "bestFriend",
                             ),
                         ),
@@ -90,7 +104,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ServerObjectSelectableName(
+                                                item: SelectableName(
                                                     "friends",
                                                 ),
                                             },
@@ -123,7 +137,7 @@ Ok(
                                                                                 },
                                                                             },
                                                                         ),
-                                                                        item: ScalarSelectableName(
+                                                                        item: SelectableName(
                                                                             "id",
                                                                         ),
                                                                     },
@@ -164,7 +178,7 @@ Ok(
                                                                                 },
                                                                             },
                                                                         ),
-                                                                        item: ScalarSelectableName(
+                                                                        item: SelectableName(
                                                                             "closeness",
                                                                         ),
                                                                     },

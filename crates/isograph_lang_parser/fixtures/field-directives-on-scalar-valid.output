@@ -6,16 +6,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "BasicField",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 77,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "Type",
                             ),
                         ),
-                        span: Span {
-                            start: 9,
-                            end: 13,
-                        },
                     },
                     client_field_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -37,7 +51,7 @@ Ok(
                             },
                         },
                         item: ClientScalarSelectableNameWrapper(
-                            ClientScalarSelectableName(
+                            SelectableName(
                                 "Name",
                             ),
                         ),
@@ -70,7 +84,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarSelectableName(
+                                                item: SelectableName(
                                                     "scalar",
                                                 ),
                                             },
@@ -318,16 +332,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "BasicField2",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 116,
+                                        end: 187,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "Type",
                             ),
                         ),
-                        span: Span {
-                            start: 9,
-                            end: 13,
-                        },
                     },
                     client_field_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -349,7 +377,7 @@ Ok(
                             },
                         },
                         item: ClientScalarSelectableNameWrapper(
-                            ClientScalarSelectableName(
+                            SelectableName(
                                 "Name",
                             ),
                         ),
@@ -382,7 +410,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarSelectableName(
+                                                item: SelectableName(
                                                     "scalar",
                                                 ),
                                             },
@@ -731,16 +759,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "BasicField3",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 226,
+                                        end: 296,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "Type",
                             ),
                         ),
-                        span: Span {
-                            start: 9,
-                            end: 13,
-                        },
                     },
                     client_field_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -762,7 +804,7 @@ Ok(
                             },
                         },
                         item: ClientScalarSelectableNameWrapper(
-                            ClientScalarSelectableName(
+                            SelectableName(
                                 "Name",
                             ),
                         ),
@@ -795,7 +837,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarSelectableName(
+                                                item: SelectableName(
                                                     "scalar",
                                                 ),
                                             },
@@ -1144,16 +1186,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "updatable",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 333,
+                                        end: 380,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "Type",
                             ),
                         ),
-                        span: Span {
-                            start: 9,
-                            end: 13,
-                        },
                     },
                     client_field_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -1175,7 +1231,7 @@ Ok(
                             },
                         },
                         item: ClientScalarSelectableNameWrapper(
-                            ClientScalarSelectableName(
+                            SelectableName(
                                 "Name",
                             ),
                         ),
@@ -1208,7 +1264,7 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ScalarSelectableName(
+                                                item: SelectableName(
                                                     "scalar",
                                                 ),
                                             },
