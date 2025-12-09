@@ -219,3 +219,5 @@ Thanks to all the contributors to Isograph!
 <a href="https://github.com/isographlabs/isograph/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=isographlabs/isograph" />
 </a>
+
+TEST
