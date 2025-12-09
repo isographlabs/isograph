@@ -11,10 +11,13 @@ import {
   IsographEnvironment,
   StoreRecord,
   type StoreLink,
+  type WithErrors,
 } from './IsographEnvironment';
 import { ReadDataResult } from './read';
 import { Arguments } from './util';
 import type { StoreLayer } from './optimisticProxy';
+import type { NonEmptyArray } from './NonEmptyArray';
+import type { PayloadError } from './errors';
 
 /**
  * Note: these types are unstable. We will add and remove items from this enum
@@ -32,7 +35,8 @@ export type LogMessage =
   | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
-      networkResponse: NetworkResponseObject;
+      networkResponse: NetworkResponseObject | undefined;
+      errors: NonEmptyArray<PayloadError> | undefined;
       variables: Variables;
     }
   | {
@@ -81,7 +85,7 @@ export type LogMessage =
     }
   | {
       kind: 'DoneReading';
-      response: ReadDataResult<any>;
+      response: ReadDataResult<WithErrors<unknown>>;
       fieldName: string;
       root: StoreLink;
     }
