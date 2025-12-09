@@ -128,7 +128,7 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
         None
     };
 
-    Ok(Some(CompletionResponse::Array(
-        completion_response.unwrap_or_default(),
-    )))
+    CompletionResponse::Array(completion_response.unwrap_or_default())
+        .wrap_some()
+        .wrap_ok()
 }

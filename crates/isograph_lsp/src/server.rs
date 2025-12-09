@@ -66,10 +66,11 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
         hover_provider: HoverProviderCapability::Simple(true).wrap_some(),
         document_formatting_provider: OneOf::Left(true).wrap_some(),
         definition_provider: OneOf::Left(true).wrap_some(),
-        completion_provider: Some(CompletionOptions {
-            trigger_characters: Some(vec!["\n".to_string()]),
+        completion_provider: CompletionOptions {
+            trigger_characters: vec!["\n".to_string()].wrap_some(),
             ..Default::default()
-        }),
+        }
+        .wrap_some(),
         document_highlight_provider: Some(OneOf::Left(true)),
         code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
         execute_command_provider: ExecuteCommandOptions {
