@@ -212,7 +212,7 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('GraphQL network response had errors', {
+        throw new Error('Network response had errors', {
           cause: networkResponse,
         });
       }
