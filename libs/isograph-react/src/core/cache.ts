@@ -34,7 +34,10 @@ import {
   type TypeName,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
-import { maybeMakeNetworkRequest } from './makeNetworkRequest';
+import {
+  maybeMakeNetworkRequest,
+  retainQueryWithoutMakingNetworkRequest,
+} from './makeNetworkRequest';
 import {
   addNetworkResponseStoreLayer,
   getMutableStoreRecordProxy,
@@ -927,17 +930,18 @@ function getDataIdOfNetworkResponse(
 export function writeData<
   TReadFromStore extends UnknownTReadFromStore,
   TRawResponseType extends NetworkResponseObject,
+  TClientFieldValue,
 >(
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<
     TReadFromStore,
-    unknown,
+    TClientFieldValue,
     NormalizationAst,
     TRawResponseType
   >,
   data: TRawResponseType,
   variables: ExtractParameters<TReadFromStore>,
-) {
+): ItemCleanupPair<FragmentReference<TReadFromStore, TClientFieldValue>> {
   const encounteredIds: EncounteredIds = new Map();
   environment.store = addNetworkResponseStoreLayer(environment.store);
   normalizeData(
@@ -956,4 +960,27 @@ export function writeData<
   }));
 
   callSubscriptions(environment, encounteredIds);
+
+  const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
+    getOrLoadReaderWithRefetchQueries(
+      environment,
+      entrypoint.readerWithRefetchQueries,
+    );
+  const [networkRequest, disposeNetworkRequest] =
+    retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
+
+  return [
+    {
+      kind: 'FragmentReference',
+      readerWithRefetchQueries,
+      fieldName,
+      readerArtifactKind,
+      root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
+      variables,
+      networkRequest,
+    },
+    () => {
+      disposeNetworkRequest();
+    },
+  ];
 }

@@ -115,7 +115,7 @@ export function maybeMakeNetworkRequest<
   }
 }
 
-function retainQueryWithoutMakingNetworkRequest<
+export function retainQueryWithoutMakingNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TRawResponseType extends NetworkResponseObject,
