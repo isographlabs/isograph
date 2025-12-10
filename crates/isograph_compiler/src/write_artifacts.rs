@@ -50,7 +50,6 @@ pub(crate) fn apply_file_system_operations(
                 }
             }
             FileSystemOperation::CreateDirectory(path) => {
-                count += 1;
                 fs::create_dir_all(path.clone()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(
                         path,
@@ -60,6 +59,7 @@ pub(crate) fn apply_file_system_operations(
                 })?;
             }
             FileSystemOperation::WriteFile(path, content) => {
+                count += 1;
                 let content = &artifacts
                     .get(content.idx)
                     .expect("index should be valid for artifacts vec")
@@ -73,6 +73,7 @@ pub(crate) fn apply_file_system_operations(
                 })?;
             }
             FileSystemOperation::DeleteFile(path) => {
+                count += 1;
                 fs::remove_file(path.clone()).map_err(|e| {
                     unable_to_do_something_at_path_diagnostic(path, &e.to_string(), "delete file")
                 })?;

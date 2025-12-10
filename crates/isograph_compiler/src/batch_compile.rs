@@ -65,8 +65,8 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
     };
 
     info!(
-        "Successfully compiled {} client field{}, {} client pointer{}, {} \
-        entrypoint{}, and wrote {} artifact{}, in {}.",
+        "Success! Compiled {} client field{}, {} client pointer{} and {} \
+        entrypoint{}, and wrote or modified {} file{}, in {}.",
         stats.client_field_count,
         s_if_plural(stats.client_field_count),
         stats.client_pointer_count,
