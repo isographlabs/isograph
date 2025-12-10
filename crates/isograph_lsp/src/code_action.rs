@@ -1,6 +1,7 @@
 use std::str::FromStr;
 
 use common_lang_types::{EntityName, IsographCodeAction, SelectableName};
+use intern::Lookup;
 use isograph_lang_types::SelectionType;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
@@ -147,22 +148,26 @@ fn create_new_selectable_code_action(
 
     let (keyword, to_section, target_range) = match selectable_type {
         SelectionType::Scalar(_) => ("field", "", None),
-        SelectionType::Object(_) => (
-            "pointer",
-            " to TYPE",
-            // Corresponds to TYPE in the generated output...
-            Range::new(
-                Position {
-                    line: 3,
-                    character: 21,
-                },
-                Position {
-                    line: 3,
-                    character: 25,
-                },
+        SelectionType::Object(_) => {
+            let left_char =
+                (15 + parent_entity_name.lookup().len() + selectable_name.lookup().len()) as u32;
+            (
+                "pointer",
+                " to TYPE",
+                // Corresponds to TYPE in the generated output...
+                Range::new(
+                    Position {
+                        line: 3,
+                        character: left_char,
+                    },
+                    Position {
+                        line: 3,
+                        character: left_char + 4,
+                    },
+                )
+                .wrap_some(),
             )
-            .wrap_some(),
-        ),
+        }
     };
 
     CodeAction {
@@ -195,13 +200,13 @@ fn create_new_selectable_code_action(
                         },
                         new_text: format!(
                             "import {{ iso }} from '@iso';\n\
-                                    \n\
-                                    export const {parent_entity_name}__{selectable_name} = iso(`\n\
-                                    {indent}{keyword} {parent_entity_name}.{selectable_name}{to_section} {component_annotation}{{\n\
-                                    {indent}}}\n\
-                                    `)(({{ data }}) => {{\n\
-                                    {indent}return null;\n\
-                                    }})\n",
+                            \n\
+                            export const {parent_entity_name}__{selectable_name} = iso(`\n\
+                            {indent}{keyword} {parent_entity_name}.{selectable_name}{to_section} {component_annotation}{{\n\
+                            {indent}}}\n\
+                            `)(({{ data }}) => {{\n\
+                            {indent}return null;\n\
+                            }})\n",
                         ),
                     })],
                 }),
