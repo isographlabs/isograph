@@ -935,7 +935,7 @@ export function writeData<
   environment: IsographEnvironment,
   entrypoint: IsographEntrypoint<
     TReadFromStore,
-    unknown,
+    TClientFieldValue,
     NormalizationAst,
     TRawResponseType
   >,
