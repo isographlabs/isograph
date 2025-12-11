@@ -4,8 +4,8 @@
 
 The project depends on `Cargo` and `Rust` for the compiler, as well as `pnpm` to build
 
-* `Rust`: [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
-* `pnpm`: [https://pnpm.io/installation](https://pnpm.io/installation)
+- `Rust`: [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
+- `pnpm`: [https://pnpm.io/installation](https://pnpm.io/installation)
 
 ## Running locally
 
