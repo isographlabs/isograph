@@ -51,7 +51,10 @@ async fn start_compiler(
                 info!("{}", "Successfully watched. Exiting.\n")
             }
             Err(err) => {
-                error!("{}\n{:?}", "Error in watch process of some sort.\n", err);
+                error!("Error in watch process of some sort");
+                for diagnostic in err {
+                    error!("\n{}", diagnostic);
+                }
                 std::process::exit(1);
             }
         };
