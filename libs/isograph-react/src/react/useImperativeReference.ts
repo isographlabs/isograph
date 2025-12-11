@@ -25,6 +25,7 @@ export type UseImperativeReferenceResult<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType,
 > = {
   fragmentReference: FragmentReference<
     TReadFromStore,
@@ -33,8 +34,13 @@ export type UseImperativeReferenceResult<
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
     ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
-      ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-      : [fetchOptions?: FetchOptions<TClientFieldValue>]
+      ? [
+          fetchOptions: RequiredFetchOptions<
+            TClientFieldValue,
+            TRawResponseType
+          >,
+        ]
+      : [fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>]
   ) => void;
 };
 
@@ -53,7 +59,8 @@ export function useImperativeReference<
 ): UseImperativeReferenceResult<
   TReadFromStore,
   TClientFieldValue,
-  TNormalizationAst
+  TNormalizationAst,
+  TRawResponseType
 > {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -64,7 +71,7 @@ export function useImperativeReference<
     fragmentReference: state !== UNASSIGNED_STATE ? state : null,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
-      fetchOptions?: FetchOptions<TClientFieldValue>,
+      fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>,
     ) => {
       const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
         getOrLoadReaderWithRefetchQueries(

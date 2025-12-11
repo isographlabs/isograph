@@ -38,7 +38,7 @@ export type UsePaginationReturnValue<
       kind: 'HasMoreRecords';
       fetchMore: (
         count: number,
-        fetchOptions?: FetchOptions<Connection<TItem>>,
+        fetchOptions?: FetchOptions<Connection<TItem>, never>,
       ) => void;
       results: ReadonlyArray<TItem>;
     }
@@ -210,7 +210,10 @@ export function useConnectionSpecPagination<
 
   const getFetchMore =
     (after: string | null) =>
-    (count: number, fetchOptions?: FetchOptions<Connection<TItem>>): void => {
+    (
+      count: number,
+      fetchOptions?: FetchOptions<Connection<TItem>, never>,
+    ): void => {
       const loadedField = loadableField(
         {
           after: after,

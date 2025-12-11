@@ -8,7 +8,7 @@ import {
 } from '../core/IsographEnvironment';
 import {
   addNetworkResponseStoreLayer as addNetworkResponseStoreLayerInner,
-  addOptimisticStoreLayer as addOptimisticStoreLayerInner,
+  addOptimisticUpdaterStoreLayer as addOptimisticStoreLayerInner,
   addStartUpdateStoreLayer as addStartUpdateStoreLayerInner,
   getStoreRecordProxy,
   revertOptimisticStoreLayerAndMaybeReplace,
@@ -51,7 +51,7 @@ describe('optimisticLayer', () => {
       expect(environment.store).toMatchObject({
         kind: 'NetworkResponseStoreLayer',
         parentStoreLayer: {
-          kind: 'OptimisticStoreLayer',
+          kind: 'OptimisticUpdaterStoreLayer',
           parentStoreLayer: {
             kind: 'BaseStoreLayer',
           },
@@ -76,7 +76,7 @@ describe('optimisticLayer', () => {
       expect(environment.store).toMatchObject({
         kind: 'StartUpdateStoreLayer',
         parentStoreLayer: {
-          kind: 'OptimisticStoreLayer',
+          kind: 'OptimisticUpdaterStoreLayer',
           parentStoreLayer: {
             kind: 'BaseStoreLayer',
           },
@@ -270,7 +270,7 @@ describe('optimisticLayer', () => {
         revert(4);
 
         expect(environment.store).toMatchObject({
-          kind: 'OptimisticStoreLayer',
+          kind: 'OptimisticUpdaterStoreLayer',
           parentStoreLayer: {
             kind: 'BaseStoreLayer',
           },
@@ -295,7 +295,7 @@ describe('optimisticLayer', () => {
         revert(4);
 
         expect(environment.store).toMatchObject({
-          kind: 'OptimisticStoreLayer',
+          kind: 'OptimisticUpdaterStoreLayer',
           parentStoreLayer: {
             kind: 'BaseStoreLayer',
           },
@@ -318,7 +318,7 @@ describe('optimisticLayer', () => {
         revert(5);
 
         expect(environment.store).toMatchObject({
-          kind: 'OptimisticStoreLayer',
+          kind: 'OptimisticUpdaterStoreLayer',
           parentStoreLayer: {
             kind: 'BaseStoreLayer',
           },
@@ -347,7 +347,7 @@ describe('optimisticLayer', () => {
         expect(environment.store).toMatchObject({
           kind: 'NetworkResponseStoreLayer',
           parentStoreLayer: {
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -374,7 +374,7 @@ describe('optimisticLayer', () => {
         expect(environment.store).toMatchObject({
           kind: 'NetworkResponseStoreLayer',
           parentStoreLayer: {
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -402,7 +402,7 @@ describe('optimisticLayer', () => {
         expect(environment.store).toMatchObject({
           kind: 'NetworkResponseStoreLayer',
           parentStoreLayer: {
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -431,7 +431,7 @@ describe('optimisticLayer', () => {
         expect(environment.store).toMatchObject({
           kind: 'NetworkResponseStoreLayer',
           parentStoreLayer: {
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -460,7 +460,7 @@ describe('optimisticLayer', () => {
           parentStoreLayer: {
             kind: 'NetworkResponseStoreLayer',
             parentStoreLayer: {
-              kind: 'OptimisticStoreLayer',
+              kind: 'OptimisticUpdaterStoreLayer',
               parentStoreLayer: {
                 kind: 'BaseStoreLayer',
               },
@@ -576,7 +576,7 @@ describe('optimisticLayer', () => {
           revert(null);
 
           expect(environment.store).toMatchObject({
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -601,7 +601,7 @@ describe('optimisticLayer', () => {
           revert(null);
 
           expect(environment.store).toMatchObject({
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -624,7 +624,7 @@ describe('optimisticLayer', () => {
           revert(null);
 
           expect(environment.store).toMatchObject({
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -653,7 +653,7 @@ describe('optimisticLayer', () => {
           expect(environment.store).toMatchObject({
             kind: 'NetworkResponseStoreLayer',
             parentStoreLayer: {
-              kind: 'OptimisticStoreLayer',
+              kind: 'OptimisticUpdaterStoreLayer',
               parentStoreLayer: {
                 kind: 'BaseStoreLayer',
               },
@@ -680,7 +680,7 @@ describe('optimisticLayer', () => {
           expect(environment.store).toMatchObject({
             kind: 'NetworkResponseStoreLayer',
             parentStoreLayer: {
-              kind: 'OptimisticStoreLayer',
+              kind: 'OptimisticUpdaterStoreLayer',
               parentStoreLayer: {
                 kind: 'BaseStoreLayer',
               },
@@ -708,7 +708,7 @@ describe('optimisticLayer', () => {
           expect(environment.store).toMatchObject({
             kind: 'NetworkResponseStoreLayer',
             parentStoreLayer: {
-              kind: 'OptimisticStoreLayer',
+              kind: 'OptimisticUpdaterStoreLayer',
               parentStoreLayer: {
                 kind: 'BaseStoreLayer',
               },
@@ -735,7 +735,7 @@ describe('optimisticLayer', () => {
           revert(null);
 
           expect(environment.store).toMatchObject({
-            kind: 'OptimisticStoreLayer',
+            kind: 'OptimisticUpdaterStoreLayer',
             parentStoreLayer: {
               kind: 'BaseStoreLayer',
             },
@@ -762,7 +762,7 @@ describe('optimisticLayer', () => {
           expect(environment.store).toMatchObject({
             kind: 'StartUpdateStoreLayer',
             parentStoreLayer: {
-              kind: 'OptimisticStoreLayer',
+              kind: 'OptimisticUpdaterStoreLayer',
               parentStoreLayer: {
                 kind: 'BaseStoreLayer',
               },

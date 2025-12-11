@@ -122,8 +122,12 @@ export type StartUpdateStoreLayer = {
   startUpdate: DataUpdate<StartUpdateStoreLayer | BaseStoreLayer>;
 };
 
-export type OptimisticStoreLayer = {
-  readonly kind: 'OptimisticStoreLayer';
+export type OptimisticStoreLayer =
+  | OptimisticUpdaterStoreLayer
+  | OptimisticNetworkResponseStoreLayer;
+
+export type OptimisticUpdaterStoreLayer = {
+  readonly kind: 'OptimisticUpdaterStoreLayer';
   childStoreLayer:
     | OptimisticStoreLayer
     | StartUpdateStoreLayer
@@ -135,7 +139,22 @@ export type OptimisticStoreLayer = {
     | NetworkResponseStoreLayer
     | BaseStoreLayer;
   data: StoreLayerData;
-  readonly startUpdate: DataUpdate<OptimisticStoreLayer>;
+  readonly startUpdate: DataUpdate<OptimisticUpdaterStoreLayer>;
+};
+
+export type OptimisticNetworkResponseStoreLayer = {
+  readonly kind: 'OptimisticNetworkResponseStoreLayer';
+  childStoreLayer:
+    | OptimisticStoreLayer
+    | StartUpdateStoreLayer
+    | NetworkResponseStoreLayer
+    | null;
+  parentStoreLayer:
+    | OptimisticStoreLayer
+    | StartUpdateStoreLayer
+    | NetworkResponseStoreLayer
+    | BaseStoreLayer;
+  data: StoreLayerData;
 };
 
 export function addNetworkResponseStoreLayer(
@@ -147,7 +166,8 @@ export function addNetworkResponseStoreLayer(
       return parent;
     }
     case 'StartUpdateStoreLayer':
-    case 'OptimisticStoreLayer': {
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
       const node: NetworkResponseStoreLayer = {
         kind: 'NetworkResponseStoreLayer',
         parentStoreLayer: parent,
@@ -205,7 +225,8 @@ export function addStartUpdateStoreLayer(
       return node;
     }
     case 'NetworkResponseStoreLayer':
-    case 'OptimisticStoreLayer': {
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
       const node: StartUpdateStoreLayer = {
         kind: 'StartUpdateStoreLayer',
         parentStoreLayer: parent,
@@ -225,17 +246,18 @@ export function addStartUpdateStoreLayer(
   }
 }
 
-export function addOptimisticStoreLayer(
+export function addOptimisticUpdaterStoreLayer(
   parent: StoreLayer,
-  startUpdate: OptimisticStoreLayer['startUpdate'],
-): OptimisticStoreLayer {
+  startUpdate: OptimisticUpdaterStoreLayer['startUpdate'],
+): OptimisticUpdaterStoreLayer {
   switch (parent.kind) {
     case 'BaseStoreLayer':
     case 'StartUpdateStoreLayer':
     case 'NetworkResponseStoreLayer':
-    case 'OptimisticStoreLayer': {
-      const node: OptimisticStoreLayer = {
-        kind: 'OptimisticStoreLayer',
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
+      const node: OptimisticUpdaterStoreLayer = {
+        kind: 'OptimisticUpdaterStoreLayer',
         parentStoreLayer: parent,
         childStoreLayer: null,
         data: {},
@@ -243,6 +265,33 @@ export function addOptimisticStoreLayer(
       };
 
       startUpdate(node);
+      parent.childStoreLayer = node;
+
+      return node;
+    }
+    default: {
+      parent satisfies never;
+      throw new Error('Unreachable. This is a bug in Isograph.');
+    }
+  }
+}
+
+export function addOptimisticNetworkResponseStoreLayer(
+  parent: StoreLayer,
+): OptimisticNetworkResponseStoreLayer {
+  switch (parent.kind) {
+    case 'BaseStoreLayer':
+    case 'StartUpdateStoreLayer':
+    case 'NetworkResponseStoreLayer':
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
+      const node: OptimisticNetworkResponseStoreLayer = {
+        kind: 'OptimisticNetworkResponseStoreLayer',
+        parentStoreLayer: parent,
+        childStoreLayer: null,
+        data: {},
+      };
+
       parent.childStoreLayer = node;
 
       return node;
@@ -273,7 +322,7 @@ function mergeLayersWithDataIntoBaseLayer(
 ) {
   while (
     storeLayerToMerge &&
-    storeLayerToMerge.kind !== 'OptimisticStoreLayer'
+    storeLayerToMerge.kind !== 'OptimisticUpdaterStoreLayer'
   ) {
     mergeDataLayer(baseStoreLayer.data, storeLayerToMerge.data);
     storeLayerToMerge = storeLayerToMerge.childStoreLayer;
@@ -309,6 +358,7 @@ function reexecuteUpdatesAndMergeData(
   while (storeLayer !== null) {
     mergeDataLayer(oldMergedData, storeLayer.data);
     switch (storeLayer.kind) {
+      case 'OptimisticNetworkResponseStoreLayer':
       case 'NetworkResponseStoreLayer':
         break;
       case 'StartUpdateStoreLayer': {
@@ -316,7 +366,7 @@ function reexecuteUpdatesAndMergeData(
         storeLayer.startUpdate(storeLayer);
         break;
       }
-      case 'OptimisticStoreLayer': {
+      case 'OptimisticUpdaterStoreLayer': {
         storeLayer.data = {};
         storeLayer.startUpdate(storeLayer);
         break;
@@ -467,7 +517,10 @@ export type StoreLayer =
   | StartUpdateStoreLayer
   | BaseStoreLayer;
 
-export type StoreLayerWithData = BaseStoreLayer | NetworkResponseStoreLayer;
+export type StoreLayerWithData =
+  | BaseStoreLayer
+  | NetworkResponseStoreLayer
+  | OptimisticNetworkResponseStoreLayer;
 
 function compareData(
   oldData: StoreLayerData,

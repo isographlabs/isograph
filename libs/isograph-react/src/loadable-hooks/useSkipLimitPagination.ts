@@ -33,7 +33,7 @@ export type UseSkipLimitReturnValue<
       readonly kind: 'Complete';
       readonly fetchMore: (
         count: number,
-        fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+        fetchOptions?: FetchOptions<ReadonlyArray<TItem>, never>,
       ) => void;
       readonly results: ReadonlyArray<TItem>;
     }
@@ -196,7 +196,7 @@ export function useSkipLimitPagination<
     (loadedSoFar: number) =>
     (
       count: number,
-      fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+      fetchOptions?: FetchOptions<ReadonlyArray<TItem>, never>,
     ): void => {
       const loadedField = loadableField(
         {

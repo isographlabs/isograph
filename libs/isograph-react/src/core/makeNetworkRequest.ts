@@ -27,7 +27,12 @@ import {
 } from './garbageCollection';
 import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
 import { logMessage } from './logging';
-import { addNetworkResponseStoreLayer } from './optimisticProxy';
+import {
+  addNetworkResponseStoreLayer,
+  addOptimisticNetworkResponseStoreLayer,
+  revertOptimisticStoreLayerAndMaybeReplace,
+  type OptimisticStoreLayer,
+} from './optimisticProxy';
 import {
   AnyError,
   PromiseWrapper,
@@ -58,7 +63,7 @@ export function maybeMakeNetworkRequest<
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   > | null,
-  fetchOptions: FetchOptions<TClientFieldValue> | null,
+  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
@@ -75,6 +80,7 @@ export function maybeMakeNetworkRequest<
         environment,
         artifact,
         variables,
+        fetchOptions,
       );
     }
     case 'IfNecessary': {
@@ -83,7 +89,7 @@ export function maybeMakeNetworkRequest<
         'NormalizationAstLoader'
       ) {
         throw new Error(
-          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to slower initial load time.',
+          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to network waterfall.',
         );
       }
       const result = check(
@@ -101,6 +107,7 @@ export function maybeMakeNetworkRequest<
           environment,
           artifact,
           variables,
+          fetchOptions,
         );
       } else {
         return makeNetworkRequest(
@@ -130,19 +137,39 @@ export function retainQueryWithoutMakingNetworkRequest<
         TRawResponseType
       >,
   variables: ExtractParameters<TReadFromStore>,
+  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   let status: NetworkRequestStatus = {
-    kind: 'Undisposed',
+    kind: 'UndisposedIncomplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
       variables,
     ),
+    optimistic:
+      fetchOptions?.optimisticNetworkResponse != null
+        ? makeOptimisticUpdate(
+            environment,
+            artifact,
+            variables,
+            fetchOptions.optimisticNetworkResponse,
+          )
+        : null,
   };
   return [
     wrapResolvedValue(undefined),
     () => {
-      if (status.kind === 'Undisposed') {
+      if (status.kind !== 'Disposed') {
+        if (
+          status.kind === 'UndisposedIncomplete' &&
+          status.optimistic != null
+        ) {
+          revertOptimisticStoreLayerAndMaybeReplace(
+            environment,
+            status.optimistic,
+            null,
+          );
+        }
         unretainAndGarbageCollect(environment, status);
       }
       status = {
@@ -171,18 +198,27 @@ export function makeNetworkRequest<
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   > | null,
-  fetchOptions: FetchOptions<TClientFieldValue> | null,
+  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
   networkRequestId++;
   let status: NetworkRequestStatus = {
-    kind: 'Undisposed',
+    kind: 'UndisposedIncomplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
       variables,
     ),
+    optimistic:
+      fetchOptions?.optimisticNetworkResponse != null
+        ? makeOptimisticUpdate(
+            environment,
+            artifact,
+            variables,
+            fetchOptions?.optimisticNetworkResponse,
+          )
+        : null,
   };
 
   logMessage(environment, () => ({
@@ -218,26 +254,40 @@ export function makeNetworkRequest<
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-      if (status.kind === 'Undisposed') {
-        const encounteredIds: EncounteredIds = new Map();
-        environment.store = addNetworkResponseStoreLayer(environment.store);
-        normalizeData(
-          environment,
-          environment.store,
-          normalizationAst.selections,
-          networkResponse.data ?? {},
-          variables,
-          root,
-          encounteredIds,
-        );
 
-        logMessage(environment, () => ({
-          kind: 'AfterNormalization',
-          store: environment.store,
-          encounteredIds: encounteredIds,
-        }));
+      if (status.kind === 'UndisposedIncomplete') {
+        if (status.optimistic != null) {
+          revertOptimisticStoreLayerAndMaybeReplace(
+            environment,
+            status.optimistic,
+            null,
+          );
+        } else {
+          const encounteredIds: EncounteredIds = new Map();
+          environment.store = addNetworkResponseStoreLayer(environment.store);
+          normalizeData(
+            environment,
+            environment.store,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+            encounteredIds,
+          );
 
-        callSubscriptions(environment, encounteredIds);
+          logMessage(environment, () => ({
+            kind: 'AfterNormalization',
+            store: environment.store,
+            encounteredIds: encounteredIds,
+          }));
+
+          callSubscriptions(environment, encounteredIds);
+        }
+
+        status = {
+          kind: 'UndisposedComplete',
+          retainedQuery: status.retainedQuery,
+        };
       }
 
       const onComplete = fetchOptions?.onComplete;
@@ -276,7 +326,17 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      if (status.kind === 'Undisposed') {
+      if (status.kind !== 'Disposed') {
+        if (
+          status.kind === 'UndisposedIncomplete' &&
+          status.optimistic != null
+        ) {
+          revertOptimisticStoreLayerAndMaybeReplace(
+            environment,
+            status.optimistic,
+            null,
+          );
+        }
         unretainAndGarbageCollect(environment, status);
       }
       status = {
@@ -287,13 +347,20 @@ export function makeNetworkRequest<
   return response;
 }
 
-type NetworkRequestStatusUndisposed = {
-  readonly kind: 'Undisposed';
+type NetworkRequestStatusUndisposedIncomplete = {
+  readonly kind: 'UndisposedIncomplete';
+  readonly retainedQuery: RetainedQuery;
+  readonly optimistic: OptimisticStoreLayer | null;
+};
+
+type NetworkRequestStatusUndisposedComplete = {
+  readonly kind: 'UndisposedComplete';
   readonly retainedQuery: RetainedQuery;
 };
 
 type NetworkRequestStatus =
-  | NetworkRequestStatusUndisposed
+  | NetworkRequestStatusUndisposedIncomplete
+  | NetworkRequestStatusUndisposedComplete
   | {
       readonly kind: 'Disposed';
     };
@@ -438,9 +505,62 @@ function fetchNormalizationAstAndRetainArtifact<
   return retainedQuery;
 }
 
+function makeOptimisticUpdate<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+  optimisticNetworkResponse: TRawResponseType,
+): OptimisticStoreLayer {
+  const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+
+  if (
+    artifact.networkRequestInfo.normalizationAst.kind ===
+    'NormalizationAstLoader'
+  ) {
+    throw new Error(
+      'Using lazy loaded normalizationAst with optimisticNetworkResponse is not supported.',
+    );
+  }
+  const encounteredIds: EncounteredIds = new Map();
+  const optimistic = (environment.store =
+    addOptimisticNetworkResponseStoreLayer(environment.store));
+  normalizeData(
+    environment,
+    environment.store,
+    artifact.networkRequestInfo.normalizationAst.selections,
+    optimisticNetworkResponse,
+    variables,
+    root,
+    encounteredIds,
+  );
+
+  logMessage(environment, () => ({
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds: encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
+  return optimistic;
+}
+
 function unretainAndGarbageCollect(
   environment: IsographEnvironment,
-  status: NetworkRequestStatusUndisposed,
+  status:
+    | NetworkRequestStatusUndisposedIncomplete
+    | NetworkRequestStatusUndisposedComplete,
 ) {
   const didUnretainSomeQuery = unretainQuery(environment, status.retainedQuery);
   if (didUnretainSomeQuery) {

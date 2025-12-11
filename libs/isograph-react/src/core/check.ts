@@ -15,15 +15,17 @@ export type RequiredShouldFetch = 'Yes' | 'No';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions<TReadOutData> = {
+export type FetchOptions<TReadOutData, TRawResponseType> = {
   shouldFetch?: ShouldFetch;
   onComplete?: (data: TReadOutData) => void;
   onError?: () => void;
+  optimisticNetworkResponse?: TRawResponseType;
 };
 
-export type RequiredFetchOptions<TReadOutData> = {
+export interface RequiredFetchOptions<TReadOutData, TRawResponseType>
+  extends FetchOptions<TReadOutData, TRawResponseType> {
   shouldFetch: RequiredShouldFetch;
-} & FetchOptions<TReadOutData>;
+}
 
 export type CheckResult =
   | {

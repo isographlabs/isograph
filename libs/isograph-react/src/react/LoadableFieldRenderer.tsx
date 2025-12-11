@@ -38,7 +38,7 @@ export function LoadableFieldRenderer<
       React.FC<TProps>,
       Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
     >;
-    fetchOptions?: FetchOptions<React.FC<TProps>>;
+    fetchOptions?: FetchOptions<React.FC<TProps>, never>;
     networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
     additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
   } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,

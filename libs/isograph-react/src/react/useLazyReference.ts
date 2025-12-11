@@ -31,8 +31,8 @@ export function useLazyReference<
   >,
   variables: ExtractParameters<TReadFromStore>,
   ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader
-    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-    : [fetchOptions?: FetchOptions<TClientFieldValue>]
+    ? [fetchOptions: RequiredFetchOptions<TClientFieldValue, TRawResponseType>]
+    : [fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>]
 ): NormalizationAst | NormalizationAstLoader extends TNormalizationAst
   ? unknown
   : {
