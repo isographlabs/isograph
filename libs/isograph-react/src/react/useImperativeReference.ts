@@ -34,12 +34,7 @@ export type UseImperativeReferenceResult<
   loadFragmentReference: (
     variables: ExtractParameters<TReadFromStore>,
     ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
-      ? [
-          fetchOptions: RequiredFetchOptions<
-            TClientFieldValue,
-            TRawResponseType
-          >,
-        ]
+      ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
       : [fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>]
   ) => void;
 };
