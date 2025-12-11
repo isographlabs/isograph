@@ -316,7 +316,7 @@ export function readLoadablySelectedFieldData(
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any>,
+      fetchOptions?: FetchOptions<any, never>,
     ) => {
       // TODO we should use the reader AST for this
       const includeReadOutData = (variables: any, readOutData: any) => {
@@ -919,7 +919,7 @@ export function readClientPointerData(
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any>,
+      fetchOptions?: FetchOptions<any, never>,
     ) => {
       const includeReadOutData = (variables: any, readOutData: any) => {
         variables.id = readOutData.id;

@@ -30,11 +30,11 @@ export function useClientSideDefer<
   >
     ? [
         args?: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
-        fetchOptions?: FetchOptions<TResult>,
+        fetchOptions?: FetchOptions<TResult, never>,
       ]
     : [
         args: ArgsWithoutProvidedArgs<TReadFromStore, TProvidedArgs>,
-        fetchOptions?: FetchOptions<TResult>,
+        fetchOptions?: FetchOptions<TResult, never>,
       ]
 ): { fragmentReference: FragmentReference<TReadFromStore, TResult> } {
   const [args, fetchOptions] = maybeRequiredArgs;

@@ -19,7 +19,7 @@ export type UseImperativeLoadableFieldReturn<
     // TODO this should be void iff all args are provided by the query, like in
     // useClientSideDefer.
     args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-    fetchOptions?: FetchOptions<TResult>,
+    fetchOptions?: FetchOptions<TResult, never>,
   ) => void;
 };
 
@@ -40,7 +40,7 @@ export function useImperativeLoadableField<
   return {
     loadFragmentReference: (
       args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-      fetchOptions?: FetchOptions<TResult>,
+      fetchOptions?: FetchOptions<TResult, never>,
     ) => {
       const [_id, loader] = loadableField(args, fetchOptions ?? {});
       setState(loader());

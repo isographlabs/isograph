@@ -100,7 +100,7 @@ export function getOrCreateCacheForArtifact<
     TRawResponseType
   >,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
+  fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>,
 ): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
   let cacheKey = '';
   switch (entrypoint.networkRequestInfo.operation.kind) {

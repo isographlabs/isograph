@@ -38,7 +38,7 @@ export function LoadableFieldReader<
       TResult,
       Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
     >;
-    fetchOptions?: FetchOptions<TResult>;
+    fetchOptions?: FetchOptions<TResult, never>;
     networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
     children: (arg: TResult) => TChildrenResult;
   } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,
