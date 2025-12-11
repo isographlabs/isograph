@@ -14,7 +14,6 @@ const sidebars: SidebarsConfig = {
   documentationSidebar: [
     'introduction',
     'quickstart',
-    'troubleshooting',
     'workflow',
     'isograph-config',
     'loadable-fields',
@@ -50,7 +49,12 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Miscellaneous',
-      items: ['isograph-rules', 'development-workflow', 'backlog'],
+      items: [
+        'isograph-rules',
+        'development-workflow',
+        'backlog',
+        'troubleshooting',
+      ],
     },
     {
       type: 'category',
