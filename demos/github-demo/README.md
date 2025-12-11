@@ -1,5 +1,12 @@
 # GitHub Demo
 
+## Prerequisites:
+
+The project depends on `Cargo` and `Rust` for the compiler, as well as `pnpm` to build
+
+* `Rust`: [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
+* `pnpm`: [https://pnpm.io/installation](https://pnpm.io/installation)
+
 ## Running locally
 
 In order to run this demo locally:
@@ -16,7 +23,7 @@ Then, run the following from the root of the repository:
 
 ```sh
 pnpm i
-pnpm -r compile
+pnpm -r compile-libs
 ```
 
 Then, run the project as follows from the `demos/github-demo` folder:
@@ -40,16 +47,23 @@ Changes to the `libs/*` folders must be followed by a `pnpm -r compile`.
 
 Changes to the components in the demo will automatically be picked up by Next, but you will probably have to manually refresh the page.
 
-
 ## Troubleshooting
 
-#### `tree-sitter install failed`
+### Installation Issues
 
+```tree-sitter install failed```
 
 This library depends on node-gyp to run. You may need to install it on your system. \
 Fix: `pnpm add node-gyp`
 
-#### `tree-sitter-cli install script failed`
+```tree-sitter-cli install script failed```
 
 The node-gyp build pipeline requires C++20 or later. You may need to set the flag before building and compiling. \
 Fix: `CXXFLAGS="-std=c++20" pnpm i`
+
+### Runtime Issues
+
+```build-compiler failed: feature `edition2024` is required```
+
+The compiler needs at least Cargo 1.85 to run. You'll need to update your local version to at least that version or higher. \
+Fix: `rustup update`
