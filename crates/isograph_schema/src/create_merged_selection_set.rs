@@ -520,8 +520,6 @@ pub fn imperative_field_subfields_or_inline_fragments(
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
         .iter()
-        // TODO don't clone
-        .cloned()
         .map(|variable_definition| ArgumentKeyAndValue {
             key: variable_definition.name.item.unchecked_conversion(),
             value: NonConstantValue::Variable(variable_definition.name.item),
