@@ -81,7 +81,6 @@ export function maybeMakeNetworkRequest<
         environment,
         artifact,
         variables,
-        fetchOptions,
       );
     }
     case 'IfNecessary': {
@@ -109,7 +108,6 @@ export function maybeMakeNetworkRequest<
           environment,
           artifact,
           variables,
-          fetchOptions,
         );
       } else {
         return makeNetworkRequest(
@@ -139,39 +137,22 @@ export function retainQueryWithoutMakingNetworkRequest<
         TRawResponseType
       >,
   variables: ExtractParameters<TReadFromStore>,
-  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   let status:
-    | NetworkRequestStatusUndisposedIncomplete
+    | NetworkRequestStatusUndisposedComplete
     | NetworkRequestStatusDisposed = {
-    kind: 'UndisposedIncomplete',
+    kind: 'UndisposedComplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
       variables,
     ),
-    optimistic:
-      fetchOptions?.optimisticNetworkResponse != null
-        ? makeOptimisticUpdate(
-            environment,
-            artifact,
-            variables,
-            fetchOptions.optimisticNetworkResponse,
-          )
-        : null,
   };
   return [
     wrapResolvedValue(undefined),
     () => {
       if (status.kind !== 'Disposed') {
-        status = unretainAndGarbageCollect(
-          environment,
-          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
-            environment,
-            status,
-            null,
-          ),
-        );
+        status = unretainAndGarbageCollect(environment, status);
       }
     },
   ];
