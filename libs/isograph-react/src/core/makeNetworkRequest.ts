@@ -32,6 +32,7 @@ import {
   addOptimisticNetworkResponseStoreLayer,
   revertOptimisticStoreLayerAndMaybeReplace,
   type OptimisticStoreLayer,
+  type StoreLayerWithData,
 } from './optimisticProxy';
 import {
   AnyError,
@@ -140,7 +141,9 @@ export function retainQueryWithoutMakingNetworkRequest<
   variables: ExtractParameters<TReadFromStore>,
   fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  let status: NetworkRequestStatus = {
+  let status:
+    | NetworkRequestStatusUndisposedIncomplete
+    | NetworkRequestStatusDisposed = {
     kind: 'UndisposedIncomplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
@@ -161,21 +164,15 @@ export function retainQueryWithoutMakingNetworkRequest<
     wrapResolvedValue(undefined),
     () => {
       if (status.kind !== 'Disposed') {
-        if (
-          status.kind === 'UndisposedIncomplete' &&
-          status.optimistic != null
-        ) {
-          revertOptimisticStoreLayerAndMaybeReplace(
+        status = unretainAndGarbageCollect(
+          environment,
+          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
             environment,
-            status.optimistic,
+            status,
             null,
-          );
-        }
-        unretainAndGarbageCollect(environment, status);
+          ),
+        );
       }
-      status = {
-        kind: 'Disposed',
-      };
     },
   ];
 }
@@ -258,11 +255,21 @@ export function makeNetworkRequest<
 
       if (status.kind === 'UndisposedIncomplete') {
         if (status.optimistic != null) {
-          revertOptimisticStoreLayerAndMaybeReplace(
-            environment,
-            status.optimistic,
-            null,
-          );
+          status =
+            revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+              environment,
+              status,
+              (storeLayer) =>
+                normalizeData(
+                  environment,
+                  storeLayer,
+                  normalizationAst.selections,
+                  networkResponse.data ?? {},
+                  variables,
+                  root,
+                  new Map(),
+                ),
+            );
         } else {
           const encounteredIds: EncounteredIds = new Map();
           environment.store = addNetworkResponseStoreLayer(environment.store);
@@ -283,12 +290,12 @@ export function makeNetworkRequest<
           }));
 
           callSubscriptions(environment, encounteredIds);
-        }
 
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery: status.retainedQuery,
-        };
+          status = {
+            kind: 'UndisposedComplete',
+            retainedQuery: status.retainedQuery,
+          };
+        }
       }
 
       const onComplete = fetchOptions?.onComplete;
@@ -320,16 +327,13 @@ export function makeNetworkRequest<
         fetchOptions?.onError?.();
       } catch {}
 
-      if (status.kind === 'UndisposedIncomplete' && status.optimistic != null) {
-        revertOptimisticStoreLayerAndMaybeReplace(
-          environment,
-          status.optimistic,
-          null,
-        );
-        status = {
-          kind: 'UndisposedComplete',
-          retainedQuery: status.retainedQuery,
-        };
+      if (status.kind === 'UndisposedIncomplete') {
+        status =
+          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+            environment,
+            status,
+            null,
+          );
       }
 
       throw e;
@@ -340,22 +344,17 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      if (status.kind !== 'Disposed') {
-        if (
-          status.kind === 'UndisposedIncomplete' &&
-          status.optimistic != null
-        ) {
-          revertOptimisticStoreLayerAndMaybeReplace(
+      if (status.kind === 'UndisposedIncomplete') {
+        status =
+          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
             environment,
-            status.optimistic,
+            status,
             null,
           );
-        }
-        unretainAndGarbageCollect(environment, status);
       }
-      status = {
-        kind: 'Disposed',
-      };
+      if (status.kind !== 'Disposed') {
+        status = unretainAndGarbageCollect(environment, status);
+      }
     },
   ];
   return response;
@@ -372,12 +371,14 @@ type NetworkRequestStatusUndisposedComplete = {
   readonly retainedQuery: RetainedQuery;
 };
 
+type NetworkRequestStatusDisposed = {
+  readonly kind: 'Disposed';
+};
+
 type NetworkRequestStatus =
   | NetworkRequestStatusUndisposedIncomplete
   | NetworkRequestStatusUndisposedComplete
-  | {
-      readonly kind: 'Disposed';
-    };
+  | NetworkRequestStatusDisposed;
 
 function readDataForOnComplete<
   TReadFromStore extends UnknownTReadFromStore,
@@ -570,14 +571,35 @@ function makeOptimisticUpdate<
   return optimistic;
 }
 
+function revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+  environment: IsographEnvironment,
+  status: NetworkRequestStatusUndisposedIncomplete,
+  normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
+): NetworkRequestStatusUndisposedComplete {
+  if (status.optimistic) {
+    revertOptimisticStoreLayerAndMaybeReplace(
+      environment,
+      status.optimistic,
+      normalizeData,
+    );
+  }
+
+  return {
+    kind: 'UndisposedComplete',
+    retainedQuery: status.retainedQuery,
+  };
+}
+
 function unretainAndGarbageCollect(
   environment: IsographEnvironment,
-  status:
-    | NetworkRequestStatusUndisposedIncomplete
-    | NetworkRequestStatusUndisposedComplete,
-) {
+  status: NetworkRequestStatusUndisposedComplete,
+): NetworkRequestStatusDisposed {
   const didUnretainSomeQuery = unretainQuery(environment, status.retainedQuery);
   if (didUnretainSomeQuery) {
     garbageCollectEnvironment(environment);
   }
+
+  return {
+    kind: 'Disposed',
+  };
 }
