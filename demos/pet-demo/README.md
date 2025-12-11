@@ -30,3 +30,7 @@ pnpm watch-rs
 cd demos/pet-demo && pnpm backend
 cd demos/pet-demo && pnpm dev
 ```
+
+## Issues
+
+For issues setting up the demo, checkout out [troubleshooting](/docs-website/docs/troubleshooting.md)

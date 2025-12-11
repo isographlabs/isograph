@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
   documentationSidebar: [
     'introduction',
     'quickstart',
+    'troubleshooting',
     'workflow',
     'isograph-config',
     'loadable-fields',
