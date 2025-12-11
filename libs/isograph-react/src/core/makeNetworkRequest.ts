@@ -319,6 +319,19 @@ export function makeNetworkRequest<
       try {
         fetchOptions?.onError?.();
       } catch {}
+
+      if (status.kind === 'UndisposedIncomplete' && status.optimistic != null) {
+        revertOptimisticStoreLayerAndMaybeReplace(
+          environment,
+          status.optimistic,
+          null,
+        );
+        status = {
+          kind: 'UndisposedComplete',
+          retainedQuery: status.retainedQuery,
+        };
+      }
+
       throw e;
     });
 
