@@ -35,13 +35,16 @@ export type UsePaginationReturnValue<
       results: ReadonlyArray<TItem>;
     }
   | {
-      kind: 'Complete';
+      kind: 'HasMoreRecords';
       fetchMore: (
         count: number,
         fetchOptions?: FetchOptions<Connection<TItem>>,
       ) => void;
       results: ReadonlyArray<TItem>;
-      hasNextPage: boolean;
+    }
+  | {
+      kind: 'NoMoreRecords';
+      results: ReadonlyArray<TItem>;
     };
 
 type LoadedFragmentReferences<
@@ -301,12 +304,18 @@ export function useConnectionSpecPagination<
   );
 
   if (!networkRequestStatus) {
-    return {
-      kind: 'Complete',
-      fetchMore: getFetchMore(initialState?.endCursor ?? null),
-      results: [],
-      hasNextPage: initialState?.hasNextPage ?? true,
-    };
+    if (initialState?.hasNextPage ?? true) {
+      return {
+        kind: 'HasMoreRecords',
+        fetchMore: getFetchMore(initialState?.endCursor ?? null),
+        results: [],
+      };
+    } else {
+      return {
+        kind: 'NoMoreRecords',
+        results: [],
+      };
+    }
   }
 
   switch (networkRequestStatus.kind) {
@@ -333,12 +342,18 @@ export function useConnectionSpecPagination<
         completedFragmentReferences,
       );
 
-      return {
-        results: results.edges,
-        hasNextPage: results.pageInfo.hasNextPage,
-        kind: 'Complete',
-        fetchMore: getFetchMore(results.pageInfo.endCursor),
-      };
+      if (results.pageInfo.hasNextPage) {
+        return {
+          kind: 'HasMoreRecords',
+          fetchMore: getFetchMore(results.pageInfo.endCursor),
+          results: results.edges,
+        };
+      } else {
+        return {
+          kind: 'NoMoreRecords',
+          results: results.edges,
+        };
+      }
     }
   }
 }
