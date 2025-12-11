@@ -89,7 +89,8 @@ export function maybeMakeNetworkRequest<
         'NormalizationAstLoader'
       ) {
         throw new Error(
-          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to network waterfall.',
+          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is ' +
+            'not supported as it will lead to a network waterfall.',
         );
       }
       const result = check(
