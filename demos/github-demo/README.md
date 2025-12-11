@@ -39,3 +39,17 @@ pnpm run watch-github-demo
 Changes to the `libs/*` folders must be followed by a `pnpm -r compile`.
 
 Changes to the components in the demo will automatically be picked up by Next, but you will probably have to manually refresh the page.
+
+
+## Troubleshooting
+
+#### `tree-sitter install failed`
+
+
+This library depends on node-gyp to run. You may need to install it on your system. \
+Fix: `pnpm add node-gyp`
+
+#### `tree-sitter-cli install script failed`
+
+The node-gyp build pipeline requires C++20 or later. You may need to set the flag before building and compiling. \
+Fix: `CXXFLAGS="-std=c++20" pnpm i`
