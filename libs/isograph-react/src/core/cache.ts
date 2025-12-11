@@ -967,7 +967,12 @@ export function writeData<
       entrypoint.readerWithRefetchQueries,
     );
   const [networkRequest, disposeNetworkRequest] =
-    retainQueryWithoutMakingNetworkRequest(environment, entrypoint, variables);
+    retainQueryWithoutMakingNetworkRequest(
+      environment,
+      entrypoint,
+      variables,
+      null,
+    );
 
   return [
     {
