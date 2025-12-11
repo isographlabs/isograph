@@ -55,3 +55,7 @@ See the comments in [this file](./src/components/PreloadedPostsPage.tsx) for mor
 ## Caching behavior
 
 In the lazy loaded demo, more than ten posts get loaded, but then only ten requests for authors' details are made. This is because all simultaneous calls to `getOrCreateCacheForUrl` that are passed the same cache key (e.g. `https://jsonplaceholder.typicode.com/users/{userId}`) re-use the same cache, and therefore share the same network call.
+
+## Issues
+
+For issues setting up the demo, checkout out [troubleshooting](/docs-website/docs/troubleshooting.md)

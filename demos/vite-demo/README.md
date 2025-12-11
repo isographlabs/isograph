@@ -32,3 +32,7 @@ Review the following files to see the proper configuration you'll need to match 
 2. `.babelrc.json`
 3. `tsconfig.app.json`
 4. `tsconfig.node.json`
+
+## Issues
+
+For issues setting up the demo, checkout out [troubleshooting](/docs-website/docs/troubleshooting.md)
