@@ -148,8 +148,6 @@ You are not expected to use the `@loadable` field directly. Instead, always pass
 The `@exposeField` feature will change before the next release.
 :::
 
-> Currently, `@exposeField` is only processed if it is on the Mutation type. But, it will be made more generally available at some point.
-
 Types with the `@exposeField(field: String!, path: String!, fieldMap: [FieldMap!]!)` directive have their fields re-exposed on other objects. For example, consider this schema:
 
 ```graphql
