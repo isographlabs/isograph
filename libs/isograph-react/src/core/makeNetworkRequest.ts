@@ -37,6 +37,8 @@ import {
 import {
   AnyError,
   PromiseWrapper,
+  PromiseWrapperAll,
+  PromiseWrapperThen,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
@@ -208,15 +210,18 @@ export function makeNetworkRequest<
   }));
 
   // This should be an observable, not a promise
-  const promise = Promise.all([
-    environment.networkFunction(
-      artifact.networkRequestInfo.operation,
-      variables,
-    ),
-    status.retainedQuery.normalizationAst.promise,
-    readerWithRefetchQueries?.promise,
-  ])
-    .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
+  const wrapper = PromiseWrapperThen(
+    PromiseWrapperAll([
+      wrapPromise(
+        environment.networkFunction(
+          artifact.networkRequestInfo.operation,
+          variables,
+        ),
+      ),
+      status.retainedQuery.normalizationAst,
+      readerWithRefetchQueries,
+    ]),
+    ([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
       logMessage(environment, () => ({
         kind: 'ReceivedNetworkResponse',
         networkResponse,
@@ -297,8 +302,8 @@ export function makeNetworkRequest<
           onComplete(data);
         } catch {}
       }
-    })
-    .catch((e) => {
+    },
+    (e) => {
       logMessage(environment, () => ({
         kind: 'ReceivedNetworkError',
         networkRequestId: myNetworkRequestId,
@@ -318,9 +323,8 @@ export function makeNetworkRequest<
       }
 
       throw e;
-    });
-
-  const wrapper = wrapPromise(promise);
+    },
+  );
 
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
@@ -378,9 +382,10 @@ function readDataForOnComplete<
   environment: IsographEnvironment,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries:
-    | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-    | undefined,
+  readerWithRefetchQueries: ReaderWithRefetchQueries<
+    TReadFromStore,
+    TClientFieldValue
+  > | null,
 ): TClientFieldValue | null {
   // An entrypoint, but not a RefetchQueryNormalizationArtifact, has a reader ASTs.
   // So, we can only pass data to onComplete if makeNetworkRequest was passed an entrypoint.
