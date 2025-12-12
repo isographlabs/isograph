@@ -70,7 +70,20 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                 parent_entity_name,
                 selectable_name
             );
+            let new_file_path_string_tsx = format!(
+                "{}/{}/{}.tsx",
+                config.project_root.to_str().expect(
+                    "Expected project root to be able to be turned into a string. \
+                    This is indicative of a bug in Isograph."
+                ),
+                parent_entity_name,
+                selectable_name
+            );
             let new_file_path = Uri::from_str(&new_file_path_string).expect(
+                "Expected uri to be valid. \
+                This is indicative of a bug in Isograph.",
+            );
+            let new_file_path_tsx = Uri::from_str(&new_file_path_string_tsx).expect(
                 "Expected uri to be valid. \
                 This is indicative of a bug in Isograph.",
             );
@@ -79,16 +92,16 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
                 CodeActionOrCommand::CodeAction(create_new_selectable_code_action(
                     parent_entity_name,
                     selectable_name,
-                    new_file_path_string.clone(),
-                    new_file_path.clone(),
+                    new_file_path_string,
+                    new_file_path,
                     false,
                     SelectionType::Scalar(()),
                 )),
                 CodeActionOrCommand::CodeAction(create_new_selectable_code_action(
                     parent_entity_name,
                     selectable_name,
-                    new_file_path_string,
-                    new_file_path,
+                    new_file_path_string_tsx,
+                    new_file_path_tsx,
                     true,
                     SelectionType::Scalar(()),
                 )),
@@ -135,6 +148,7 @@ fn create_new_selectable_code_action(
     new_file_path: Uri,
     // TODO it would be more elegant to make should_add_component_annotation
     // in the SelectionType::Scalar variant of selectable_type
+    // And to make the tsx ending part of that...
     should_add_component_annotation: bool,
     selectable_type: SelectionType<(), ()>,
 ) -> CodeAction {
