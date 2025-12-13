@@ -667,7 +667,7 @@ export function readLinkedFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   let value = storeRecord[storeRecordName];
 
-  if (field.condition) {
+  if (field.condition != null) {
     const data = readData(field.condition.readerAst, root);
     if (data.kind === 'MissingData') {
       return {

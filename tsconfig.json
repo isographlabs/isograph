@@ -1,8 +1,5 @@
 {
   "extends": "./tsconfig.build.json",
-  "compilerOptions": {
-    "baseUrl": "./"
-  },
   "include": [
     "./libs/**/*.ts",
     "libs/isograph-react/src/index.tsx",

@@ -70,7 +70,7 @@ export function getOrCreateItemInSuspenseCache<
  * results.
  */
 export function stableCopy<T>(value: T): T {
-  if (!value || typeof value !== 'object') {
+  if (value == null || typeof value !== 'object') {
     return value;
   }
   if (isArray(value)) {
@@ -319,7 +319,7 @@ export function callSubscriptions(
           if (
             recordsEncounteredWhenNormalizing
               .get(subscription.recordLink.__typename)
-              ?.has(subscription.recordLink.__link)
+              ?.has(subscription.recordLink.__link) != null
           ) {
             logAnyError(
               environment,
