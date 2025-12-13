@@ -1,6 +1,9 @@
 import type { Contravariant, PhantomData } from './brand';
 import type { NetworkResponseObject } from './cache';
-import type { UnknownTReadFromStore } from './FragmentReference';
+import type {
+  FragmentReference,
+  UnknownTReadFromStore,
+} from './FragmentReference';
 import type { ComponentOrFieldName, TypeName } from './IsographEnvironment';
 import { TopLevelReaderArtifact } from './reader';
 import { Arguments } from './util';
@@ -74,6 +77,13 @@ export type IsographEntrypoint<
    */
   readonly '~TRawResponseType'?: PhantomData<Contravariant<TRawResponseType>>;
 };
+
+export type FragmentReferenceOfEntrypoint<
+  TEntrypoint extends IsographEntrypoint<any, any, any, any>,
+> = FragmentReference<
+  ExtractReadFromStore<TEntrypoint>,
+  ExtractClientFieldValue<TEntrypoint>
+>;
 
 export type IsographEntrypointLoader<
   TReadFromStore extends UnknownTReadFromStore,
@@ -173,6 +183,8 @@ export function assertIsEntrypoint<
 
 export type ExtractReadFromStore<Type> =
   Type extends IsographEntrypoint<infer X, any, any, any> ? X : never;
+export type ExtractClientFieldValue<Type> =
+  Type extends IsographEntrypoint<any, infer X, any, any> ? X : never;
 export type ExtractRawResponseType<Type> =
   Type extends IsographEntrypoint<any, any, any, infer X> ? X : never;
 export type ExtractResolverResult<Type> =
