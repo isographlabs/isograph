@@ -14,7 +14,7 @@ export async function activate(extensionContext: ExtensionContext) {
   isographExtensionContext =
     await buildIsographExtensionContext(extensionContext);
 
-  if (isographExtensionContext) {
+  if (isographExtensionContext != null) {
     isographExtensionContext.primaryOutputChannel.appendLine(
       'Starting the Isograph extension...',
     );
@@ -34,14 +34,14 @@ async function buildIsographExtensionContext(
   extensionContext.subscriptions.push(lspOutputChannel);
   extensionContext.subscriptions.push(primaryOutputChannel);
 
-  let rootPath = workspace.rootPath || process.cwd();
-  if (config.rootDirectory) {
+  let rootPath = workspace.rootPath ?? process.cwd();
+  if (config.rootDirectory != null) {
     rootPath = path.join(rootPath, config.rootDirectory);
   }
 
   const binary = await findIsographBinaryWithWarnings(primaryOutputChannel);
 
-  if (binary) {
+  if (binary != null) {
     return {
       client: null,
       extensionContext,

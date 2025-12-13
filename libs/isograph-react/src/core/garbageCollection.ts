@@ -135,7 +135,7 @@ function recordReachableIds(
   ] ??= new Set());
   retainedRecordsIds.add(retainedQuery.root.__link);
 
-  if (record) {
+  if (record != null) {
     recordReachableIdsFromRecord(
       dataLayer,
       record,

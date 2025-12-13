@@ -4,7 +4,7 @@ import * as semver from 'semver';
 import { OutputChannel, window, workspace } from 'vscode';
 import { getConfig } from '../config';
 
-async function exists(file: string): Promise {
+async function exists(file: string): Promise<boolean> {
   return fs
     .stat(file)
     .then(() => true)
@@ -90,13 +90,13 @@ async function findIsographCompilerBinary(rootPath: string): Promise {
   const isographCompilerDirectory =
     await findIsographCompilerDirectory(rootPath);
 
-  if (!isographCompilerDirectory) {
+  if (isographCompilerDirectory == null) {
     return { kind: 'packageNotFound' };
   }
 
   const isographBinaryRelativeToPackage = getBinaryPathRelativeToPackage();
 
-  if (!isographBinaryRelativeToPackage) {
+  if (isographBinaryRelativeToPackage == null) {
     return { kind: 'architectureNotSupported' };
   }
 
@@ -155,11 +155,14 @@ type IsographCompilerBinary = {
 
 export async function findIsographBinaryWithWarnings(
   outputChannel: OutputChannel,
-): Promise {
+): Promise<null | {
+  path: string;
+  version: string;
+}> {
   const config = getConfig();
 
-  let rootPath = workspace.rootPath || process.cwd();
-  if (config.rootDirectory) {
+  let rootPath = workspace.rootPath ?? process.cwd();
+  if (config.rootDirectory != null) {
     rootPath = path.join(rootPath, config.rootDirectory);
   }
 
@@ -169,7 +172,7 @@ export async function findIsographBinaryWithWarnings(
   );
   const isographBinaryResult = await findIsographCompilerBinary(rootPath);
 
-  if (config.pathToIsograph) {
+  if (config.pathToIsograph != null) {
     outputChannel.appendLine(
       "You've manually specified 'isograph.pathToBinary'. We cannot confirm this version of the Isograph Compiler is supported by this version of the extension. I hope you know what you're doing.",
     );
