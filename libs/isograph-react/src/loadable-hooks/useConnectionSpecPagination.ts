@@ -264,7 +264,7 @@ export function useConnectionSpecPagination<
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 
-  if (mostRecentItem && mostRecentFragmentReference === null) {
+  if (mostRecentItem != null && mostRecentFragmentReference === null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
       This is indicative of a bug in Isograph.',
@@ -272,8 +272,9 @@ export function useConnectionSpecPagination<
   }
 
   const networkRequestStatus =
-    mostRecentFragmentReference &&
-    getPromiseState(mostRecentFragmentReference.networkRequest);
+    mostRecentFragmentReference != null
+      ? getPromiseState(mostRecentFragmentReference.networkRequest)
+      : null;
 
   const slicedFragmentReferences =
     networkRequestStatus?.kind === 'Ok'
@@ -306,7 +307,7 @@ export function useConnectionSpecPagination<
     subscribeCompletedFragmentReferences(completedFragmentReferences),
   );
 
-  if (!networkRequestStatus) {
+  if (networkRequestStatus == null) {
     if (initialState?.hasNextPage ?? true) {
       return {
         kind: 'HasMoreRecords',

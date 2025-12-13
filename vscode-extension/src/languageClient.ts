@@ -27,7 +27,7 @@ export function createAndStartLanguageClient(
 
   const args = ['lsp'];
 
-  if (config.pathToConfig) {
+  if (config.pathToConfig != null) {
     args.push('--config');
     args.push(config.pathToConfig);
   }
@@ -115,7 +115,7 @@ type DidNotError = boolean;
 export async function killLanguageClient(
   context: IsographExtensionContext,
 ): Promise<DidNotError> {
-  if (!context.client) {
+  if (context.client == null) {
     return true;
   }
 

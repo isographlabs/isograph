@@ -19,7 +19,7 @@ export const PetBestFriendCard = iso(`
 `)(function PetBestFriendCardComponent({ data }) {
   const navigateTo = useNavigateTo();
   const bestFriendRelationship = data.best_friend_relationship;
-  if (!bestFriendRelationship) {
+  if (bestFriendRelationship == null) {
     return (
       <Card
         variant="outlined"

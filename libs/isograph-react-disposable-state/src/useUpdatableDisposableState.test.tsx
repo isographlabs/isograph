@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { type MutableRefObject } from 'react';
 import { create } from 'react-test-renderer';
 import { describe, expect, test, vi } from 'vitest';
 import {
@@ -6,7 +6,13 @@ import {
   useUpdatableDisposableState,
 } from './useUpdatableDisposableState';
 
-function Suspender({ promise, isResolvedRef }) {
+function Suspender({
+  promise,
+  isResolvedRef,
+}: {
+  isResolvedRef: MutableRefObject<boolean>;
+  promise: Promise<unknown>;
+}) {
   if (!isResolvedRef.current) {
     throw promise;
   }
@@ -43,7 +49,7 @@ function promiseAndResolver() {
 
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
-async function awaitableCreate(Component, isConcurrent) {
+async function awaitableCreate(Component, isConcurrent: boolean) {
   const element = create(
     Component,
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
@@ -377,7 +383,11 @@ if (false) {
       }
 
       let setState;
-      function ParentComponent({ shouldMountRef }) {
+      function ParentComponent({
+        shouldMountRef,
+      }: {
+        shouldMountRef: MutableRefObject<boolean>;
+      }) {
         const [, _setState] = React.useState();
         setState = _setState;
         return shouldMountRef.current ? (
@@ -450,7 +460,11 @@ if (false) {
       }
 
       let setState;
-      function ParentComponent({ shouldMountRef }) {
+      function ParentComponent({
+        shouldMountRef,
+      }: {
+        shouldMountRef: MutableRefObject<boolean>;
+      }) {
         const [, _setState] = React.useState();
         setState = _setState;
         return shouldMountRef.current ? <TestComponent /> : null;
