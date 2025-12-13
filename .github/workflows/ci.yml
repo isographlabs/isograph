@@ -196,6 +196,22 @@ jobs:
       - name: 'Check working directory status'
         run: './scripts/check-git-status.sh'
 
+  lint:
+    name: Run lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: pnpm/action-setup@v2
+      - name: Use Node.js 22
+        uses: actions/setup-node@v3
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+      - name: Run lint
+        run: pnpm run lint --deny-warnings
+
   cargo-fmt:
     name: cargo fmt
     runs-on: ubuntu-latest
