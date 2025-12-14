@@ -1,0 +1,12 @@
+diff --git a/tsconfig.json b/tsconfig.json
+index 7597f6de821a534ac954ca69499c816df8e196fd..169e9dc2a2fca468183625a00153b1f38400a83a 100644
+--- a/tsconfig.json
++++ b/tsconfig.json
+@@ -15,7 +15,6 @@
+       "@docusaurus/module-type-aliases",
+       "@docusaurus/theme-classic"
+     ],
+-    "baseUrl": ".",
+     "paths": {
+       "@site/*": ["./*"]
+     },
