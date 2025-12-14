@@ -72,7 +72,7 @@ export default function App({ Component, pageProps }: AppProps) {
         // @ts-expect-error network function and environment should be generated
         makeNetworkRequest,
         missingFieldHandler,
-        typeof window != 'undefined' ? console.log : null,
+        typeof window !== 'undefined' ? console.log : null,
       ),
     [],
   );

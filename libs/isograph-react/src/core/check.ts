@@ -108,12 +108,12 @@ function checkFromRecord(
             kind: 'MissingData',
             record: recordLink,
           };
-        } else if (linkedValue === null) {
+        } else if (linkedValue == null) {
           continue;
         } else if (Array.isArray(linkedValue)) {
           arrayItemsLoop: for (const item of linkedValue) {
             const link = getLink(item);
-            if (link === null) {
+            if (link == null) {
               throw new Error(
                 'Unexpected non-link in the Isograph store. ' +
                   'This is indicative of a bug in Isograph.',
@@ -127,7 +127,7 @@ function checkFromRecord(
                 kind: 'MissingData',
                 record: link,
               };
-            } else if (linkedRecord === null) {
+            } else if (linkedRecord == null) {
               continue arrayItemsLoop;
             } else {
               // TODO in __DEV__ assert linkedRecord is an object
@@ -146,7 +146,7 @@ function checkFromRecord(
           }
         } else {
           const link = getLink(linkedValue);
-          if (link === null) {
+          if (link == null) {
             throw new Error(
               'Unexpected non-link in the Isograph store. ' +
                 'This is indicative of a bug in Isograph.',
@@ -160,7 +160,7 @@ function checkFromRecord(
               kind: 'MissingData',
               record: link,
             };
-          } else if (linkedRecord === null) {
+          } else if (linkedRecord == null) {
             continue normalizationAstLoop;
           } else {
             // TODO in __DEV__ assert linkedRecord is an object

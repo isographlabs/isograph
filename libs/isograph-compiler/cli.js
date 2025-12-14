@@ -6,7 +6,7 @@ var spawn = require('child_process').spawn;
 
 var input = process.argv.slice(2);
 
-if (bin !== null) {
+if (bin != null) {
   spawn(bin, input, { stdio: 'inherit' }).on('exit', process.exit);
 } else {
   throw new Error(

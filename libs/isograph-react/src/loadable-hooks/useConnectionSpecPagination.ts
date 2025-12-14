@@ -264,7 +264,7 @@ export function useConnectionSpecPagination<
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 
-  if (mostRecentItem != null && mostRecentFragmentReference === null) {
+  if (mostRecentItem != null && mostRecentFragmentReference == null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
       This is indicative of a bug in Isograph.',

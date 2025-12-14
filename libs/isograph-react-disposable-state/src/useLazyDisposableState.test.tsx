@@ -47,7 +47,7 @@ describe('useLazyDisposableState', async () => {
       }, []);
 
       useEffect(() => {
-        if (state == 1) return;
+        if (state === 1) return;
         committed.resolve();
       }, [state]);
 

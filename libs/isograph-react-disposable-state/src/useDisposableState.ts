@@ -32,7 +32,7 @@ export function useDisposableState<T = never>(
   useEffect(
     function cleanupItemCleanupPairRefAfterSetState() {
       if (stateFromDisposableStateHook !== UNASSIGNED_STATE) {
-        if (itemCleanupPairRef.current !== null) {
+        if (itemCleanupPairRef.current != null) {
           itemCleanupPairRef.current[1]();
           itemCleanupPairRef.current = null;
         } else {
@@ -48,12 +48,25 @@ export function useDisposableState<T = never>(
 
   useEffect(function cleanupItemCleanupPairRefIfSetStateNotCalled() {
     return () => {
-      if (itemCleanupPairRef.current !== null) {
+      if (itemCleanupPairRef.current != null) {
         itemCleanupPairRef.current[1]();
         itemCleanupPairRef.current = null;
       }
     };
   }, []);
+  const state: T | undefined =
+    (stateFromDisposableStateHook !== UNASSIGNED_STATE
+      ? stateFromDisposableStateHook
+      : null) ??
+    preCommitItem?.state ??
+    itemCleanupPairRef.current?.[0];
+
+  if (state != null) {
+    return {
+      state: state,
+      setState,
+    };
+  }
 
   // Safety: we can be in one of three states. Pre-commit, in which case
   // preCommitItem is assigned, post-commit but before setState has been
@@ -68,17 +81,9 @@ export function useDisposableState<T = never>(
   // Note that in the post-commit post-setState state, itemCleanupPairRef
   // can still be assigned, during the render before the
   // cleanupItemCleanupPairRefAfterSetState effect is called.
-  const state: T | undefined =
-    (stateFromDisposableStateHook != UNASSIGNED_STATE
-      ? stateFromDisposableStateHook
-      : null) ??
-    preCommitItem?.state ??
-    itemCleanupPairRef.current?.[0];
-
-  return {
-    state: state!,
-    setState,
-  };
+  throw new Error(
+    'state was unexpectedly null. This indicates a bug in react-disposable-state.',
+  );
 }
 
 // @ts-ignore

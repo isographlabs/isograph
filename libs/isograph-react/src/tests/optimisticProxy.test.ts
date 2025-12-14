@@ -813,7 +813,7 @@ describe('optimisticLayer', () => {
     return revertOptimisticStoreLayerAndMaybeReplace(
       environment,
       node,
-      counter === null
+      counter == null
         ? counter
         : (storeLayer) => update(storeLayer, () => counter),
     );
@@ -851,7 +851,7 @@ describe('optimisticLayer', () => {
       },
     };
 
-    return counter != nextCounter ? CHANGES : NO_CHANGES;
+    return counter !== nextCounter ? CHANGES : NO_CHANGES;
   };
 
   function ignoreReadonly(value: StoreLayer): { data: StoreLayerData } {

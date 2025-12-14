@@ -80,7 +80,7 @@ export const getNewsfeedItems = (skip, limit) => {
 
 function fillNewsfeedItems(limit) {
   for (let i = newsfeedItems.length; i < limit; i++) {
-    if (i % 10 == 9) {
+    if (i % 10 === 9) {
       const adItem = {
         __typename: 'AdItem',
         id: `ad_${adItems.length}`,

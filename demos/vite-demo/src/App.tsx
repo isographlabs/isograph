@@ -51,7 +51,7 @@ export default function App() {
         // @ts-expect-error network function and environment should be generated
         makeNetworkRequest,
         null,
-        typeof window != 'undefined' ? console.log : null,
+        typeof window !== 'undefined' ? console.log : null,
       ),
     [],
   );

@@ -29,15 +29,18 @@ export function getStoreRecordProxy(
   link: StoreLink,
 ): Readonly<StoreRecord> | null | undefined {
   let startNode: StoreLayer | null = storeLayer;
-  while (startNode !== null) {
+  while (startNode != null) {
     const storeRecord = startNode.data[link.__typename]?.[link.__link];
-    if (storeRecord === null) {
+    if (storeRecord === undefined) {
+      startNode = startNode.parentStoreLayer;
+      continue;
+    }
+
+    if (storeRecord == null) {
       return null;
     }
-    if (storeRecord != null) {
-      return getMutableStoreRecordProxy(startNode, link);
-    }
-    startNode = startNode.parentStoreLayer;
+
+    return getMutableStoreRecordProxy(startNode, link);
   }
 
   return undefined;
@@ -52,13 +55,13 @@ export function getMutableStoreRecordProxy(
     {
       get(_, propertyName) {
         let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-        while (currentStoreLayer !== null) {
+        while (currentStoreLayer != null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
-          if (storeRecord === null) {
-            return undefined;
-          }
-          if (storeRecord != null) {
+          if (storeRecord !== undefined) {
+            if (storeRecord == null) {
+              return undefined;
+            }
             const value = Reflect.get(storeRecord, propertyName);
             if (value !== undefined) {
               return value;
@@ -69,15 +72,16 @@ export function getMutableStoreRecordProxy(
       },
       has(_, propertyName) {
         let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-        while (currentStoreLayer !== null) {
+        while (currentStoreLayer != null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
-          if (storeRecord === null) {
-            return false;
-          }
-          if (storeRecord != null) {
+          if (storeRecord !== undefined) {
+            if (storeRecord == null) {
+              return false;
+            }
+
             const value = Reflect.has(storeRecord, propertyName);
-            if (value !== undefined) {
+            if (value) {
               return true;
             }
           }
@@ -193,7 +197,7 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
     }
     const targetRecordById = (target[typeName] ??= {});
     for (const [id, sourceRecord] of Object.entries(sourceById)) {
-      if (sourceRecord === null) {
+      if (sourceRecord == null) {
         targetRecordById[id] = null;
         continue;
       }
@@ -355,7 +359,7 @@ function reexecuteUpdatesAndMergeData(
   // reflects whatever replaced the optimistic layer
   newMergedData: StoreLayerData,
 ): void {
-  while (storeLayer !== null) {
+  while (storeLayer != null) {
     mergeDataLayer(oldMergedData, storeLayer.data);
     switch (storeLayer.kind) {
       case 'OptimisticNetworkResponseStoreLayer':
@@ -394,7 +398,7 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
   newChildStoreLayer: TStoreLayer['childStoreLayer'],
 ) {
   storeLayerToModify.childStoreLayer = newChildStoreLayer;
-  if (newChildStoreLayer !== null) {
+  if (newChildStoreLayer != null) {
     newChildStoreLayer.parentStoreLayer = storeLayerToModify;
   } else {
     environment.store = storeLayerToModify;
@@ -427,7 +431,7 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
 
   let newMergedData = {};
   let childNode = optimisticNode.childStoreLayer;
-  if (normalizeData !== null) {
+  if (normalizeData != null) {
     const networkResponseStoreLayer: NetworkResponseStoreLayer = {
       kind: 'NetworkResponseStoreLayer',
       data: {},
