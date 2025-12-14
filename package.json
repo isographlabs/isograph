@@ -24,7 +24,7 @@
     "compile-libs": "turbo compile-libs --log-order=grouped",
     "watch-libs": "turbo watch compile-libs",
     "cross": "cross build",
-    "lint": "oxlint --type-aware ./libs/  ",
+    "lint": "oxlint --type-aware ./libs/",
     "build-json-schema": "./target/debug/build_json_schema",
     "watch-pet-demo": "turbo watch iso --filter=// --filter=pet-demo --ui=tui",
     "watch-github-demo": "turbo watch iso --filter=// --filter=github-demo --ui=tui",
