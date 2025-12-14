@@ -1,12 +1,10 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import {
-  createReferenceCountedPointer,
-  ReferenceCountedPointer,
-} from '@isograph/reference-counted-pointer';
+import type { ReferenceCountedPointer } from '@isograph/reference-counted-pointer';
+import { createReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
 import type { FetchOptions } from '../core/check';

@@ -1,9 +1,7 @@
 import React from 'react';
 import { type FetchOptions } from '../core/check';
-import {
-  ExtractParameters,
-  type UnknownTReadFromStore,
-} from '../core/FragmentReference';
+import type { ExtractParameters } from '../core/FragmentReference';
+import { type UnknownTReadFromStore } from '../core/FragmentReference';
 import { type NetworkRequestReaderOptions } from '../core/read';
 import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';

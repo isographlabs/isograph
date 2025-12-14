@@ -1,6 +1,7 @@
-import { ExtensionContext, window, workspace } from 'vscode';
+import type { ExtensionContext } from 'vscode';
+import { window, workspace } from 'vscode';
 import { getConfig } from './config';
-import { IsographExtensionContext } from './context';
+import type { IsographExtensionContext } from './context';
 import { createAndStartLanguageClient } from './languageClient';
 import { findIsographBinaryWithWarnings } from './utils/findIsographBinary';
 

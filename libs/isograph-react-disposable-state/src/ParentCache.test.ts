@@ -1,6 +1,6 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { assert, describe, expect, test, vi } from 'vitest';
-import { CacheItem } from './CacheItem';
+import type { CacheItem } from './CacheItem';
 import { ParentCache } from './ParentCache';
 
 function getValue<T>(cache: ParentCache<T>): CacheItem<T> | null {

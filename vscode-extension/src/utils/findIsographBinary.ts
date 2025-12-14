@@ -1,7 +1,8 @@
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import * as semver from 'semver';
-import { OutputChannel, window, workspace } from 'vscode';
+import type { OutputChannel } from 'vscode';
+import { window, workspace } from 'vscode';
 import { getConfig } from '../config';
 
 async function exists(file: string): Promise<boolean> {

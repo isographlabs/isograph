@@ -5,7 +5,7 @@ import {
   onNextChangeToRecord,
   type EncounteredIds,
 } from './cache';
-import { FetchOptions } from './check';
+import type { FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
 import type {
   IsographEntrypoint,
@@ -18,11 +18,11 @@ import type {
   UnknownTReadFromStore,
   Variables,
 } from './FragmentReference';
+import type { IsographEnvironment } from './IsographEnvironment';
 import {
   assertLink,
   getOrLoadIsographArtifact,
   getOrLoadReaderWithRefetchQueries,
-  IsographEnvironment,
   type DataTypeValue,
   type StoreLink,
   type StoreRecord,
@@ -30,10 +30,10 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { getStoreRecordProxy } from './optimisticProxy';
+import type { PromiseWrapper } from './PromiseWrapper';
 import {
   getPromiseState,
   NOT_SET,
-  PromiseWrapper,
   readPromise,
   wrapPromise,
   wrapResolvedValue,

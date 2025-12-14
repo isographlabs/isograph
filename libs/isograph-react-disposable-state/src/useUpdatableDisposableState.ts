@@ -1,4 +1,4 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useHasCommittedRef } from './useHasCommittedRef';
 

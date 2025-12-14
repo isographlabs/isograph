@@ -2,7 +2,7 @@
 
 import type { ItemCleanupPair } from '@isograph/isograph-disposable-types';
 import { useEffect, useRef } from 'react';
-import { ParentCache } from './ParentCache';
+import type { ParentCache } from './ParentCache';
 import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
 import { type UnassignedState } from './useUpdatableDisposableState';
 

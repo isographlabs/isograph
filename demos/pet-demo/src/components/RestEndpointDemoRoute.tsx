@@ -5,8 +5,8 @@ import {
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import { Suspense, useEffect } from 'react';
+import type { FragmentReferenceOfEntrypoint } from '@isograph/react';
 import {
-  FragmentReferenceOfEntrypoint,
   FragmentRenderer,
   useIsographEnvironment,
   writeData,
