@@ -298,7 +298,7 @@ describe('CacheItem', () => {
       assert(state.kind === 'NotInParentCacheAndDisposed');
 
       assert(
-        cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) === null,
+        cacheItem.permanentRetainIfNotDisposed(disposeTemporaryRetain) == null,
       );
 
       expect(() => {

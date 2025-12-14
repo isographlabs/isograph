@@ -164,7 +164,7 @@ function readData<TReadFromStore>(
     };
   }
 
-  if (storeRecord === null) {
+  if (storeRecord == null) {
     return {
       kind: 'Success',
       data: null as any,
@@ -736,7 +736,7 @@ export function readLinkedFieldData(
             JSON.stringify(item),
           recordLink: root,
         };
-      } else if (link === null) {
+      } else if (link == null) {
         results.push(null);
         continue;
       }
@@ -827,7 +827,7 @@ export function readLinkedFieldData(
     } else {
       link = altLink;
     }
-  } else if (link === null) {
+  } else if (link == null) {
     return {
       kind: 'Success',
       data: null,
@@ -869,7 +869,7 @@ export function readLinkedFieldData(
 function isClientPointer(
   field: ReaderLinkedField,
 ): field is ReaderClientPointer {
-  return field.refetchQueryIndex !== null;
+  return field.refetchQueryIndex != null;
 }
 
 export function readClientPointerData(

@@ -520,7 +520,7 @@ function normalizeScalarField(
 
   if (networkResponseData == null) {
     targetStoreRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    return existingValue === undefined || existingValue != null;
   }
 
   if (isScalarOrEmptyArray(networkResponseData)) {
@@ -555,7 +555,7 @@ function normalizeLinkedField(
 
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    return existingValue === undefined || existingValue != null;
   }
 
   if (
@@ -741,7 +741,7 @@ function isScalarOrEmptyArray(
     return data.every((x) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
-    data === null ||
+    data == null ||
     typeof data === 'string' ||
     typeof data === 'number' ||
     typeof data === 'boolean';
@@ -758,7 +758,7 @@ function isNullOrEmptyArray(
     return data.every((x) => isNullOrEmptyArray(x));
   }
 
-  return data === null;
+  return data == null;
 }
 
 export function getParentRecordKey(

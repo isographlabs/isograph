@@ -4,6 +4,7 @@
   "plugins": ["typescript"],
   "env": { "node": true, "browser": true },
   "rules": {
+    "eslint/eqeqeq": ["error", "always", { "null": "never" }],
     "eslint/no-control-regex": "off",
     "eslint/no-constant-condition": "off",
     "eslint/no-unassigned-vars": "off",

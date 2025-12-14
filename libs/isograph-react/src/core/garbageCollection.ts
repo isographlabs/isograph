@@ -101,7 +101,7 @@ export function garbageCollectBaseStoreLayer(
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
-    if (retainedTypeIds == undefined || retainedTypeIds.size == 0) {
+    if (retainedTypeIds === undefined || retainedTypeIds.size === 0) {
       delete baseStoreLayer.data[typeName];
       continue;
     }
@@ -175,11 +175,11 @@ function recordReachableIdsFromRecord(
         }
 
         let typeStore =
-          selection.concreteType !== null
+          selection.concreteType != null
             ? dataLayer[selection.concreteType]
             : null;
 
-        if (typeStore == null && selection.concreteType !== null) {
+        if (typeStore == null && selection.concreteType != null) {
           continue;
         }
 

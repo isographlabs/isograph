@@ -51,7 +51,7 @@ export class ParentCache<T> {
   }
 
   getOrPopulateAndTemporaryRetain(): [CacheItem<T>, T, CleanupFn] {
-    return this.__cacheItem === null
+    return this.__cacheItem == null
       ? this.__populateAndTemporaryRetain()
       : temporaryRetain(this.__cacheItem);
   }
@@ -93,7 +93,7 @@ export class ParentCache<T> {
   }
 
   isEmpty(): boolean {
-    return this.__cacheItem === null;
+    return this.__cacheItem == null;
   }
 }
 

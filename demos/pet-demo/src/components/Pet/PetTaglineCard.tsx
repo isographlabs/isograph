@@ -54,7 +54,7 @@ export const PetTaglineCard = iso(`
       <CardContent>
         <h2>Tagline</h2>
         <p>&quot;{pet.tagline}&quot;</p>
-        {mutationRef === null ? (
+        {mutationRef == null ? (
           button
         ) : (
           <Suspense fallback="Updating tagline...">

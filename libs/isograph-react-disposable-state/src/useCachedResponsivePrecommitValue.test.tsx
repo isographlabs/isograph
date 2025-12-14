@@ -158,7 +158,7 @@ describe('useCachedResponsivePrecommitValue', () => {
       setState = _setState;
       const value = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
-      if (initialRender && value !== null) {
+      if (initialRender && value != null) {
         initialRender = false;
         expect(value).toEqual({ state: 1 });
       } else {

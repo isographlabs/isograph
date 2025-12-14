@@ -6,12 +6,8 @@ function mergeUsingReaderAst(
   oldItem: unknown,
   newItem: unknown,
 ): unknown {
-  if (newItem === null) {
-    return oldItem === null ? oldItem : newItem;
-  }
-
-  if (newItem === undefined) {
-    return oldItem === undefined ? oldItem : newItem;
+  if (newItem == null || oldItem == null) {
+    return newItem;
   }
 
   if (Array.isArray(newItem)) {
