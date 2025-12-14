@@ -9,21 +9,21 @@ import {
 } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   FragmentReference,
-  type UnknownTReadFromStore,
+  UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst } from '../core/reader';
+import type { LoadableField, ReaderAst } from '../core/reader';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { maybeUnwrapNetworkRequest } from '../react/maybeUnwrapNetworkRequest';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 export type UseSkipLimitReturnValue<
   TReadFromStore extends UnknownTReadFromStore,

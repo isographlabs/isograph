@@ -1,7 +1,7 @@
 import { RetainedQuery } from '../core/garbageCollection';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { iso } from './__isograph/iso';
+import { iso } from '@iso';
 
 // TODO investigate why this can't be in garbageCollection.test.ts without
 // typescript incorrectly thinking it is referenced in its own initializer

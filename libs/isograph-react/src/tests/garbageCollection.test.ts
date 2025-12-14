@@ -1,18 +1,15 @@
+import { iso } from '@iso';
 import { describe, expect, test } from 'vitest';
 import {
   garbageCollectEnvironment,
   retainQuery,
   type RetainedQuery,
 } from '../core/garbageCollection';
-import {
-  createIsographEnvironment,
-  ROOT_ID,
-  type BaseStoreLayerData,
-} from '../core/IsographEnvironment';
+import { ROOT_ID, type BaseStoreLayerData } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { iso } from './__isograph/iso';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 
 const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {

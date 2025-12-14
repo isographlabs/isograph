@@ -31,3 +31,29 @@ export type ArgumentValue =
       readonly kind: 'Object';
       readonly value: Arguments;
     };
+
+export function isArray(value: unknown): value is readonly unknown[] {
+  return Array.isArray(value);
+}
+
+/**
+ * Creates a copy of the provided value, ensuring any nested objects have their
+ * keys sorted such that equivalent values would have identical JSON.stringify
+ * results.
+ */
+export function stableCopy<T>(value: T): T {
+  if (value == null || typeof value !== 'object') {
+    return value;
+  }
+  if (isArray(value)) {
+    // @ts-ignore
+    return value.map(stableCopy);
+  }
+  const keys = Object.keys(value).sort();
+  const stable: { [index: string]: any } = {};
+  for (let i = 0; i < keys.length; i++) {
+    // @ts-ignore
+    stable[keys[i]] = stableCopy(value[keys[i]]);
+  }
+  return stable as any;
+}

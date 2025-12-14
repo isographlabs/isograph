@@ -5,8 +5,8 @@ import type {
   UnknownTReadFromStore,
 } from './FragmentReference';
 import type { ComponentOrFieldName, TypeName } from './IsographEnvironment';
-import { TopLevelReaderArtifact } from './reader';
-import { Arguments } from './util';
+import type { TopLevelReaderArtifact } from './reader';
+import type { Arguments } from './util';
 
 export type ReaderWithRefetchQueries<
   TReadFromStore extends UnknownTReadFromStore,

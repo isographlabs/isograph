@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { callSubscriptions, type EncounteredIds } from '../core/cache';
+
+import { type EncounteredIds } from '../core/cache';
 import {
-  createIsographEnvironment,
   createIsographStore,
   type IsographEnvironment,
   type StoreLayerData,
@@ -15,8 +15,10 @@ import {
   type OptimisticStoreLayer,
   type StoreLayer,
 } from '../core/optimisticProxy';
+import { callSubscriptions } from '../core/subscribe';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 
-vi.mock(import('../core/cache'), { spy: true });
+vi.mock(import('../core/subscribe'), { spy: true });
 
 const CHANGES = new Map([['Query', new Set(['__ROOT'])]]);
 const NO_CHANGES = new Map();

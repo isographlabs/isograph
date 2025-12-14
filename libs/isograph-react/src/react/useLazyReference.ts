@@ -1,8 +1,5 @@
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
-import {
-  getOrCreateCacheForArtifact,
-  type NetworkResponseObject,
-} from '../core/cache';
+import { type NetworkResponseObject } from '../core/cache';
 import { FetchOptions, type RequiredFetchOptions } from '../core/check';
 import {
   IsographEntrypoint,
@@ -16,6 +13,7 @@ import {
 } from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
 
 export function useLazyReference<
   TReadFromStore extends UnknownTReadFromStore,
