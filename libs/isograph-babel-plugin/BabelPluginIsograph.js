@@ -30,7 +30,7 @@ let IsographConfig;
  * @returns {babel.PluginObj} */
 module.exports = function BabelPluginIsograph(context, options) {
   const result = configExplorer.searchSync(options.searchFrom);
-  if (result) {
+  if (result != null) {
     IsographConfig = result;
   } else {
     throw new Error(
@@ -39,7 +39,7 @@ module.exports = function BabelPluginIsograph(context, options) {
   }
 
   const { types } = context;
-  if (!types) {
+  if (types == null) {
     throw new Error(
       'BabelPluginIsograph: Expected plugin context to include "types", but got:' +
         String(context),

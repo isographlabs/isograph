@@ -12,7 +12,11 @@ const os = require('os');
  */
 function compileTag(t, path, config) {
   const callee = path.node.callee;
-  if (t.isIdentifier(callee) && callee.name === 'iso' && path.node.arguments) {
+  if (
+    t.isIdentifier(callee) &&
+    callee.name === 'iso' &&
+    path.node.arguments != null
+  ) {
     const { keyword, parentObjectEntityName, selectableName } =
       getParentObjectEntityNameAndSelectableName(path);
     if (keyword === 'entrypoint') {

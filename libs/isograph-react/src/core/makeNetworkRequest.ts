@@ -557,7 +557,7 @@ function revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
   status: NetworkRequestStatusUndisposedIncomplete,
   normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
 ): NetworkRequestStatusUndisposedComplete {
-  if (status.optimistic) {
+  if (status.optimistic != null) {
     revertOptimisticStoreLayerAndMaybeReplace(
       environment,
       status.optimistic,

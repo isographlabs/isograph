@@ -2,9 +2,10 @@ const path = require('path');
 const fs = require('fs');
 
 const RELEASE_COMMIT_SHA = process.env.RELEASE_COMMIT_SHA;
-const VERSION = RELEASE_COMMIT_SHA
-  ? `0.0.0-main-${RELEASE_COMMIT_SHA.substr(0, 8)}`
-  : process.env.npm_package_version;
+const VERSION =
+  RELEASE_COMMIT_SHA !== '' && RELEASE_COMMIT_SHA != null
+    ? `0.0.0-main-${RELEASE_COMMIT_SHA.substr(0, 8)}`
+    : process.env.npm_package_version;
 
 const builds = [
   {
@@ -38,7 +39,7 @@ const builds = [
 ];
 
 const setMainVersion = async () => {
-  if (!RELEASE_COMMIT_SHA) {
+  if (RELEASE_COMMIT_SHA === '' || RELEASE_COMMIT_SHA == null) {
     throw new Error('Expected the RELEASE_COMMIT_SHA env variable to be set.');
   }
 

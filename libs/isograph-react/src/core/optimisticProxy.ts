@@ -321,7 +321,7 @@ function mergeLayersWithDataIntoBaseLayer(
   baseStoreLayer: BaseStoreLayer,
 ) {
   while (
-    storeLayerToMerge &&
+    storeLayerToMerge != null &&
     storeLayerToMerge.kind !== 'OptimisticUpdaterStoreLayer'
   ) {
     mergeDataLayer(baseStoreLayer.data, storeLayerToMerge.data);

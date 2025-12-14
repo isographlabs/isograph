@@ -161,7 +161,7 @@ function defineCachedProperty<T>(
       }
       return value.value;
     },
-    ...(set && {
+    ...(set != null && {
       set: (newValue) => {
         set(newValue);
         mutableState.lastInvalidated++;
