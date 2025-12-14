@@ -1,4 +1,4 @@
-import { CleanupFn, type ItemCleanupPair } from '@isograph/disposable-types';
+import type { CleanupFn, ItemCleanupPair } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertEmptySetIfMissing,
@@ -7,16 +7,16 @@ import {
 } from './cache';
 import { FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
-import {
+import type {
   IsographEntrypoint,
+  ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifactWrapper,
-  type ReaderWithRefetchQueries,
 } from './entrypoint';
-import {
+import type {
   ExtractData,
   FragmentReference,
+  UnknownTReadFromStore,
   Variables,
-  type UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   assertLink,
@@ -38,17 +38,17 @@ import {
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import {
+import type {
+  LoadablySelectedField,
   ReaderAst,
-  type LoadablySelectedField,
-  type ReaderClientPointer,
-  type ReaderImperativelyLoadedField,
-  type ReaderLinkedField,
-  type ReaderNonLoadableResolverField,
-  type ReaderScalarField,
+  ReaderClientPointer,
+  ReaderImperativelyLoadedField,
+  ReaderLinkedField,
+  ReaderNonLoadableResolverField,
+  ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import { Arguments } from './util';
+import type { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;

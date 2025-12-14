@@ -1,5 +1,4 @@
 import {
-  callSubscriptions,
   getParentRecordKey,
   insertEmptySetIfMissing,
   type EncounteredIds,
@@ -37,6 +36,7 @@ import {
   type ReadDataResultSuccess,
 } from './read';
 import type { ReaderAst } from './reader';
+import { callSubscriptions } from './subscribe';
 
 export function getOrCreateCachedStartUpdate<
   TReadFromStore extends UnknownTReadFromStore,

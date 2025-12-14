@@ -1,13 +1,11 @@
+import { iso } from '@iso';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getOrCreateCacheForArtifact } from '../core/cache';
+
 import type { ExtractUpdatableData } from '../core/FragmentReference';
-import {
-  createIsographEnvironment,
-  ROOT_ID,
-  type BaseStoreLayerData,
-} from '../core/IsographEnvironment';
+import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
+import { ROOT_ID, type BaseStoreLayerData } from '../core/IsographEnvironment';
 import { createUpdatableProxy } from '../core/startUpdate';
-import { iso } from './__isograph/iso';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 

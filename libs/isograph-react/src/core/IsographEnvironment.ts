@@ -1,29 +1,33 @@
 import { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import { isArray } from './cache';
-import {
+import type {
   IsographEntrypoint,
   IsographOperation,
   IsographPersistedOperation,
-  type ReaderWithRefetchQueries,
-  type ReaderWithRefetchQueriesLoader,
+  ReaderWithRefetchQueries,
+  ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
-import {
+import type {
+  ExtractStartUpdate,
   FragmentReference,
+  StableIdForFragmentReference,
+  UnknownTReadFromStore,
   Variables,
-  type StableIdForFragmentReference,
-  type UnknownTReadFromStore,
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
-import { LogFunction, WrappedLogFunction } from './logging';
+import type { LogFunction, WrappedLogFunction } from './logging';
 import { type StoreLayer } from './optimisticProxy';
 import {
   PromiseWrapper,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import { WithEncounteredRecords } from './read';
+import type {
+  NetworkRequestReaderOptions,
+  WithEncounteredRecords,
+} from './read';
 import type { ReaderAst, StartUpdate } from './reader';
+import { isArray } from './util';
 
 export type ComponentOrFieldName = string;
 export type StringifiedArgs = string;
@@ -66,6 +70,7 @@ export type CacheMap<T> = { [index: string]: ParentCache<T> };
 export type IsographEnvironment = {
   store: StoreLayer;
   readonly networkFunction: IsographNetworkFunction;
+  readonly componentFunction: IsographComponentFunction;
   readonly missingFieldHandler: MissingFieldHandler | null;
   readonly componentCache: FieldCache<React.FC<any>>;
   readonly eagerReaderCache: FieldCache<StartUpdate<any> | undefined>;
@@ -96,6 +101,15 @@ export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
 ) => Promise<any>;
+
+export type IsographComponentFunction = <
+  TReadFromStore extends UnknownTReadFromStore = any,
+>(
+  environment: IsographEnvironment,
+  fragmentReference: FragmentReference<TReadFromStore, any>,
+  networkRequestOptions: NetworkRequestReaderOptions,
+  startUpdate: ExtractStartUpdate<TReadFromStore>,
+) => React.FC<any>;
 
 export interface Link<T extends TypeName> extends StoreLink {
   readonly __link: Brand<DataId, T>;
@@ -146,9 +160,10 @@ export interface BaseStoreLayerData extends StoreLayerData {
 }
 
 const DEFAULT_GC_BUFFER_SIZE = 10;
-export function createIsographEnvironment(
+export function createIsographEnvironmentCore(
   baseStoreLayerData: BaseStoreLayerData,
   networkFunction: IsographNetworkFunction,
+  componentFunction: IsographComponentFunction,
   missingFieldHandler?: MissingFieldHandler | null,
   logFunction?: LogFunction | null,
 ): IsographEnvironment {
@@ -164,6 +179,7 @@ export function createIsographEnvironment(
   return {
     store,
     networkFunction,
+    componentFunction,
     missingFieldHandler: missingFieldHandler ?? null,
     componentCache: {},
     eagerReaderCache: {},

@@ -1,19 +1,16 @@
 import { getOrCreateCachedComponent } from '../core/componentCache';
-import {
+import type {
   FragmentReference,
-  type UnknownTReadFromStore,
+  UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import { readPromise } from '../core/PromiseWrapper';
 import {
-  getPromiseState,
-  PromiseWrapper,
-  readPromise,
-} from '../core/PromiseWrapper';
-import {
+  type NetworkRequestReaderOptions,
   getNetworkRequestOptionsWithDefaults,
-  NetworkRequestReaderOptions,
 } from '../core/read';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
-import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useReadAndSubscribe } from './useReadAndSubscribe';
 
 export function useResult<
@@ -66,20 +63,5 @@ export function useResult<
       // @ts-expect-error
       return readerWithRefetchQueries.readerArtifact.resolver(param);
     }
-  }
-}
-
-export function maybeUnwrapNetworkRequest(
-  networkRequest: PromiseWrapper<void, any>,
-  networkRequestOptions: NetworkRequestReaderOptions,
-) {
-  const state = getPromiseState(networkRequest);
-  if (state.kind === 'Err' && networkRequestOptions.throwOnNetworkError) {
-    throw state.error;
-  } else if (
-    state.kind === 'Pending' &&
-    networkRequestOptions.suspendIfInFlight
-  ) {
-    throw state.promise;
   }
 }

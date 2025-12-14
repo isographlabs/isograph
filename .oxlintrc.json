@@ -1,7 +1,7 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
   "ignorePatterns": ["__isograph", "vite-demo"],
-  "plugins": ["typescript"],
+  "plugins": ["typescript", "import"],
   "env": { "node": true, "browser": true },
   "rules": {
     "eslint/eqeqeq": ["error", "always", { "null": "never" }],
@@ -10,6 +10,7 @@
     "eslint/no-unassigned-vars": "off",
     "eslint/no-unused-expressions": "off",
     "eslint/no-unused-vars": "off",
+    "import/no-cycle": "error",
     "typescript/no-duplicate-type-constituents": "off",
     "typescript/no-redundant-type-constituents": "off",
     "typescript/no-base-to-string": "off",

@@ -1,8 +1,5 @@
-import {
-  callSubscriptions,
-  insertEmptySetIfMissing,
-  type EncounteredIds,
-} from './cache';
+import { insertEmptySetIfMissing, type EncounteredIds } from './cache';
+import { callSubscriptions } from './subscribe';
 import type {
   BaseStoreLayerData,
   IsographEnvironment,

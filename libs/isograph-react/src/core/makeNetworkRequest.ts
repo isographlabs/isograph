@@ -1,23 +1,22 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
-  callSubscriptions,
   normalizeData,
   type EncounteredIds,
   type NetworkResponseObject,
 } from './cache';
 import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
-import {
+import type {
   IsographEntrypoint,
+  NormalizationAst,
+  NormalizationAstLoader,
   ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifact,
-  type NormalizationAst,
-  type NormalizationAstLoader,
 } from './entrypoint';
-import {
+import type {
   ExtractParameters,
-  type FragmentReference,
-  type UnknownTReadFromStore,
+  FragmentReference,
+  UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   garbageCollectEnvironment,
@@ -42,6 +41,7 @@ import {
 } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
+import { callSubscriptions } from './subscribe';
 
 let networkRequestId = 0;
 

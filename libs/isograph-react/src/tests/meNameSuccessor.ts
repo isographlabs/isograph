@@ -1,7 +1,7 @@
 import type { RetainedQuery } from '../core/garbageCollection';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
-import { iso } from './__isograph/iso';
+import { iso } from '@iso';
 
 export const meNameField = iso(`
   field Query.meNameSuccessor {

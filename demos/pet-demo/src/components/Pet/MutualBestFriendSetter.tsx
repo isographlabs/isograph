@@ -3,7 +3,7 @@ import {
   useClientSideDefer,
   useImperativeReference,
 } from '@isograph/react';
-import { iso } from '../__isograph/iso';
+import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
 
 /**

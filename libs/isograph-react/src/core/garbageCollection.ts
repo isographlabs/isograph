@@ -1,11 +1,11 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes, type NormalizationAst } from './entrypoint';
-import { Variables } from './FragmentReference';
+import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
+import type { Variables } from './FragmentReference';
 import {
   assertLink,
-  DataId,
-  IsographEnvironment,
-  StoreRecord,
+  type DataId,
+  type IsographEnvironment,
+  type StoreRecord,
   type StoreLayerData,
   type StoreLink,
   type TypeName,
