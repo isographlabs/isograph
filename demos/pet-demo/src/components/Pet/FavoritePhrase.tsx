@@ -18,7 +18,7 @@ export const PetFavoritePhrase = iso(`
   const pet = data.pet;
   if (pet == null) return;
 
-  return pet.favorite_phrase == null ? (
+  return pet.favorite_phrase != null ? (
     <p>
       {pet.fullName} likes to say: &quot;{pet.favorite_phrase}&quot;
     </p>
@@ -48,7 +48,7 @@ export const PetFavoritePhrase2 = iso(`
   const pet = data.pet;
   if (pet == null) return;
 
-  return pet.favorite_phrase == null ? (
+  return pet.favorite_phrase != null ? (
     <p>
       {pet.fullName} likes to say: &quot;{pet.favorite_phrase}&quot;
     </p>
