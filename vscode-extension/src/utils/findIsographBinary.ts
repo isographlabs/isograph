@@ -155,10 +155,7 @@ type IsographCompilerBinary = {
 
 export async function findIsographBinaryWithWarnings(
   outputChannel: OutputChannel,
-): Promise<null | {
-  path: string;
-  version: string;
-}> {
+): Promise<null | IsographCompilerBinary> {
   const config = getConfig();
 
   let rootPath = workspace.rootPath ?? process.cwd();
