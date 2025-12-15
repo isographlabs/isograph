@@ -196,7 +196,7 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            deprecated_associated_data: (),
                                             selection_set: WithSpan {
                                                 item: SelectionSet {
                                                     selections: [
@@ -229,7 +229,7 @@ Ok(
                                                                         ),
                                                                     },
                                                                     reader_alias: None,
-                                                                    associated_data: (),
+                                                                    deprecated_associated_data: (),
                                                                     arguments: [],
                                                                     scalar_selection_directive_set: None(
                                                                         EmptyDirectiveSet,
@@ -270,7 +270,7 @@ Ok(
                                                                         ),
                                                                     },
                                                                     reader_alias: None,
-                                                                    associated_data: (),
+                                                                    deprecated_associated_data: (),
                                                                     arguments: [],
                                                                     scalar_selection_directive_set: None(
                                                                         EmptyDirectiveSet,

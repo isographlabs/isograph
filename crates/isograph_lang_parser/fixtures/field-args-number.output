@@ -89,7 +89,7 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
+                                            deprecated_associated_data: (),
                                             arguments: [
                                                 WithLocation {
                                                     location: Embedded(
