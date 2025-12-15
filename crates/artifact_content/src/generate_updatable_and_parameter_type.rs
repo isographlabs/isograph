@@ -8,8 +8,8 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet,
-    SelectionTypeContainingSelections, TypeAnnotation,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
+    TypeAnnotation,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarOrObjectSelectable, IsographDatabase, LINK_FIELD_NAME,
@@ -30,6 +30,7 @@ use crate::{
 
 pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -41,6 +42,7 @@ pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: Networ
     for selection in selection_map.item.selections.iter() {
         write_param_type_from_selection(
             db,
+            parent_object_entity_name,
             &mut client_scalar_selectable_parameter_type,
             selection,
             nested_client_scalar_selectable_imports,
@@ -56,6 +58,7 @@ pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: Networ
 
 fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -63,29 +66,24 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
 ) {
     match &selection.item {
-        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.deprecated_associated_data {
-                DefinitionLocation::Server((
-                    parent_object_entity_name,
-                    server_scalar_selectable_name,
-                )) => {
-                    let server_scalar_selectable = server_scalar_selectable_named(
-                        db,
-                        parent_object_entity_name,
-                        server_scalar_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db);
+        SelectionType::Scalar(scalar_field_selection) => {
+            let selectable = selectable_named(
+                db,
+                parent_object_entity_name,
+                scalar_field_selection.name.item,
+            )
+            .as_ref()
+            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.")
+            .as_scalar()
+            .expect(
+                "Expected selectable to be a scalar. \
+                This is indicative of a bug in Isograph.",
+            );
 
+            match selectable {
+                DefinitionLocation::Server(server_scalar_selectable) => {
+                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
                         server_scalar_selectable.description,
                         query_type_declaration,
@@ -119,10 +117,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         print_javascript_type_declaration(&output_type)
                     ));
                 }
-                DefinitionLocation::Client((
-                    parent_object_entity_name,
-                    client_scalar_selectable_name,
-                )) => write_param_type_from_client_scalar_selectable(
+                DefinitionLocation::Client(_) => write_param_type_from_client_scalar_selectable(
                     db,
                     query_type_declaration,
                     nested_client_scalar_selectable_imports,
@@ -130,41 +125,24 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     indentation_level,
                     scalar_field_selection,
                     parent_object_entity_name,
-                    client_scalar_selectable_name,
+                    scalar_field_selection.name.item,
                 ),
             }
         }
-        SelectionTypeContainingSelections::Object(linked_field) => {
-            let (parent_object_entity_name, object_selectable_name) =
-                match linked_field.deprecated_associated_data {
-                    DefinitionLocation::Server((
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )) => (parent_object_entity_name, server_object_selectable_name),
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        client_object_selectable_name,
-                    )) => (parent_object_entity_name, client_object_selectable_name),
-                };
-
-            let object_selectable =
-                selectable_named(db, parent_object_entity_name, object_selectable_name)
-                    // TODO why do we have to clone?
-                    .clone()
-                    .expect(
-                        "Expected selectable to be valid. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_object()
-                    // TODO have an object_selectable_named method
-                    .expect(
-                        "Expected selectable to be object. \
-                        This is indicative of a bug in Isograph.",
-                    );
+        SelectionType::Object(object_selection) => {
+            let object_selectable = selectable_named(
+                db,
+                parent_object_entity_name,
+                object_selection.name.item,
+            )
+            .as_ref()
+            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.")
+            .as_object()
+            .expect(
+                "Expected selectable to be an object. \
+                This is indicative of a bug in Isograph.",
+            );
 
             write_optional_description(
                 description(db, object_selectable),
@@ -172,7 +150,13 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
-            let name_or_alias = linked_field.name_or_alias().item;
+            let name_or_alias = object_selection.name_or_alias().item;
+
+            let new_parent_object_entity_name = match object_selectable {
+                DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_object_entity_name.inner(),
+            }
+            .dereference();
 
             let type_annotation =
                 output_type_annotation(db, object_selectable)
@@ -180,7 +164,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .map(&mut |_| {
                         generate_client_selectable_parameter_type(
                             db,
-                            &linked_field.selection_set,
+                            new_parent_object_entity_name,
+                            &object_selection.selection_set,
                             nested_client_scalar_selectable_imports,
                             loadable_fields,
                             indentation_level,
@@ -252,7 +237,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     updatable_fields: &mut UpdatableImports,
 ) {
     match &selection.item {
-        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
+        SelectionType::Scalar(scalar_field_selection) => {
             match scalar_field_selection.deprecated_associated_data {
                 DefinitionLocation::Server((
                     parent_object_entity_name,
@@ -339,7 +324,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 }
             }
         }
-        SelectionTypeContainingSelections::Object(linked_field) => {
+        SelectionType::Object(linked_field) => {
             let (parent_object_entity_name, object_selectable_name) =
                 match linked_field.deprecated_associated_data {
                     DefinitionLocation::Server((
