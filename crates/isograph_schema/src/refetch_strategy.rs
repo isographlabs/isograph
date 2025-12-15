@@ -126,7 +126,7 @@ pub fn id_selection() -> UnprocessedSelection {
         name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        associated_data: (),
+        deprecated_associated_data: (),
         arguments: vec![],
     })
     .with_generated_span()

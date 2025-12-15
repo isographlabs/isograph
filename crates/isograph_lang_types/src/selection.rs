@@ -49,7 +49,9 @@ pub struct ScalarSelection<TScalarField> {
     pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TScalarField,
+    /// TODO do not use this field! Instead, we need to look things up
+    /// from the database instead of accessing this field.
+    pub deprecated_associated_data: TScalarField,
     // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,

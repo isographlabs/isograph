@@ -167,7 +167,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
     Ok(ScalarSelection {
         name: scalar_selection.name,
         reader_alias: scalar_selection.reader_alias,
-        associated_data,
+        deprecated_associated_data: associated_data,
         scalar_selection_directive_set: scalar_selection.scalar_selection_directive_set,
         arguments: scalar_selection.arguments,
     })

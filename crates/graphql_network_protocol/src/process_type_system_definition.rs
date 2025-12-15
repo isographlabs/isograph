@@ -346,7 +346,7 @@ fn refetch_selectable_refetch_strategy(
                         .to::<SelectableName>()
                         .with_generated_location(),
                     reader_alias: None,
-                    associated_data: (),
+                    deprecated_associated_data: (),
                     arguments: vec![],
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
                         EmptyDirectiveSet {},

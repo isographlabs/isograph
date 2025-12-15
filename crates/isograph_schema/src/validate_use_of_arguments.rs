@@ -85,7 +85,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         &validated_selections.item.selections,
         &mut |selection| match selection {
             SelectionType::Scalar(scalar_selection) => {
-                let field_argument_definitions = match scalar_selection.associated_data {
+                let field_argument_definitions = match scalar_selection.deprecated_associated_data {
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_scalar_selectable_name,

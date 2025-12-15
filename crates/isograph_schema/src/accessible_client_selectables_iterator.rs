@@ -73,7 +73,7 @@ impl Iterator for AccessibleClientSelectableIterator {
             if let Some(selection) = item {
                 match &selection.item {
                     SelectionTypeContainingSelections::Scalar(scalar_selection) => {
-                        match scalar_selection.associated_data {
+                        match scalar_selection.deprecated_associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;

@@ -830,7 +830,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data {
+            match scalar_field_selection.deprecated_associated_data {
                 DefinitionLocation::Server((
                     parent_object_entity_name,
                     server_scalar_selectable_name,
@@ -1085,7 +1085,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 ) {
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.associated_data {
+            match scalar_field_selection.deprecated_associated_data {
                 DefinitionLocation::Server((
                     parent_object_entity_name,
                     server_scalar_selectable_name,

@@ -546,7 +546,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     for validated_selection in validated_selections.item.selections.iter() {
         match &validated_selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
-                match &scalar_field_selection.associated_data {
+                match &scalar_field_selection.deprecated_associated_data {
                     DefinitionLocation::Server(_) => {
                         merge_server_scalar_field(
                             scalar_field_selection,
@@ -1620,7 +1620,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         // What is this for???
-        associated_data: (
+        deprecated_associated_data: (
             server_object_selectable.parent_object_entity_name,
             *TYPENAME_FIELD_NAME,
         )
@@ -1632,7 +1632,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
 
     let link_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
         arguments: vec![],
-        associated_data: (
+        deprecated_associated_data: (
             server_object_selectable.parent_object_entity_name,
             *LINK_FIELD_NAME,
         )

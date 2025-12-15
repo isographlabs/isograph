@@ -489,7 +489,7 @@ fn parse_selection(
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
+                    deprecated_associated_data: (),
                     arguments,
                     scalar_selection_directive_set,
                 })
