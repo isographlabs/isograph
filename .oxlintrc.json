@@ -18,6 +18,7 @@
     "typescript/no-floating-promises": "off",
     "typescript/no-implied-eval": "off",
     "typescript/unbound-method": "off",
+    "typescript/consistent-type-imports": "error",
     "typescript/strict-boolean-expressions": [
       "error",
       {

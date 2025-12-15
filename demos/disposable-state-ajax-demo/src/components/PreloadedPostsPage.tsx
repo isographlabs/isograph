@@ -6,8 +6,9 @@ import React, { useEffect } from 'react';
 import NoSSR from 'react-no-ssr';
 import { makeNetworkRequest } from './api';
 import { Card } from './Card';
-import { Comment, Post, User } from './networkTypes';
-import { PromiseWrapper, useReadPromise } from './PromiseWrapper';
+import type { Comment, Post, User } from './networkTypes';
+import type { PromiseWrapper } from './PromiseWrapper';
+import { useReadPromise } from './PromiseWrapper';
 
 /**
  * Preloading demo

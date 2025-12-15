@@ -1,9 +1,10 @@
-import {
+import type {
   CleanupFn,
   Factory,
   ItemCleanupPair,
 } from '@isograph/disposable-types';
-import { CacheItem, createTemporarilyRetainedCacheItem } from './CacheItem';
+import type { CacheItem } from './CacheItem';
+import { createTemporarilyRetainedCacheItem } from './CacheItem';
 
 // TODO convert cache impl to a getter and setter and free functions
 // TODO accept options that get passed to CacheItem

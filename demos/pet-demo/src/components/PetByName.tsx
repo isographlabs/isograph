@@ -1,7 +1,7 @@
 import { iso } from '@iso';
 import { useLazyReference, useResult } from '@isograph/react';
 import React from 'react';
-import { PetByNameRoute } from './routes';
+import type { PetByNameRoute } from './routes';
 
 export const PetByNameRouteComponent = iso(`
   field Query.PetByName(

@@ -1,5 +1,5 @@
-import { ExtensionContext, OutputChannel, Terminal } from 'vscode';
-import { LanguageClient } from 'vscode-languageclient/node';
+import type { ExtensionContext, OutputChannel, Terminal } from 'vscode';
+import type { LanguageClient } from 'vscode-languageclient/node';
 
 export type IsographExtensionContext = {
   client: LanguageClient | null;

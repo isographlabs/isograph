@@ -1,7 +1,5 @@
-import {
-  FragmentReference,
-  stableIdForFragmentReference,
-} from './FragmentReference';
+import type { FragmentReference } from './FragmentReference';
+import { stableIdForFragmentReference } from './FragmentReference';
 import type { IsographEnvironment } from './IsographEnvironment';
 import type { NetworkRequestReaderOptions } from './read';
 import { createStartUpdate } from './startUpdate';

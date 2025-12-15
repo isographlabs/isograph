@@ -1,12 +1,12 @@
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
 import { getOrCreateItemInSuspenseCache } from '../core/cache';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   ExtractParameters,
   FragmentReference,
-  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
-import { LoadableField } from '../core/reader';
+import { type UnknownTReadFromStore } from '../core/FragmentReference';
+import type { LoadableField } from '../core/reader';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
 
 type ArgsWithoutProvidedArgs<

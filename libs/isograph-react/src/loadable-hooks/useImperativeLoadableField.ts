@@ -2,12 +2,12 @@ import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   ExtractParameters,
   FragmentReference,
 } from '../core/FragmentReference';
-import { LoadableField } from '../core/reader';
+import type { LoadableField } from '../core/reader';
 
 export type UseImperativeLoadableFieldReturn<
   TReadFromStore extends { data: object; parameters: object },

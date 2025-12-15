@@ -1,4 +1,4 @@
-import { ParentCache } from '@isograph/react-disposable-state';
+import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
 import type {
   IsographEntrypoint,
@@ -17,11 +17,8 @@ import type {
 import type { RetainedQuery } from './garbageCollection';
 import type { LogFunction, WrappedLogFunction } from './logging';
 import { type StoreLayer } from './optimisticProxy';
-import {
-  PromiseWrapper,
-  wrapPromise,
-  wrapResolvedValue,
-} from './PromiseWrapper';
+import type { PromiseWrapper } from './PromiseWrapper';
+import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import type {
   NetworkRequestReaderOptions,
   WithEncounteredRecords,

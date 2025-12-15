@@ -7,7 +7,8 @@ import {
 import { Button, Container, Input, Stack } from '@mui/material';
 import React, { useState } from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
-import { FullPageLoading, PetCheckinListRoute, useNavigateTo } from './routes';
+import type { PetCheckinListRoute } from './routes';
+import { FullPageLoading, useNavigateTo } from './routes';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetCheckinListRoute(

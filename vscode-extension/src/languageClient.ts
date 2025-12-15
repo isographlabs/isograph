@@ -1,20 +1,15 @@
 import * as path from 'path';
+import type { FormattingOptions, TextEdit } from 'vscode';
+import { Range, window, workspace, WorkspaceEdit } from 'vscode';
+import type { LanguageClientOptions } from 'vscode-languageclient';
 import {
-  FormattingOptions,
-  Range,
-  TextEdit,
-  window,
-  workspace,
-  WorkspaceEdit,
-} from 'vscode';
-import {
-  LanguageClientOptions,
   RevealOutputChannelOn,
   TextDocumentIdentifier,
 } from 'vscode-languageclient';
-import { LanguageClient, ServerOptions } from 'vscode-languageclient/node';
+import type { ServerOptions } from 'vscode-languageclient/node';
+import { LanguageClient } from 'vscode-languageclient/node';
 import { getConfig } from './config';
-import { IsographExtensionContext } from './context';
+import type { IsographExtensionContext } from './context';
 
 export function createAndStartLanguageClient(
   context: IsographExtensionContext,

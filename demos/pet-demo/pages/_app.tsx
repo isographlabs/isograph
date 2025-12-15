@@ -1,8 +1,8 @@
+import type { IsographOperation } from '@isograph/react';
 import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
-  IsographOperation,
   type StoreLink,
   type StoreRecord,
 } from '@isograph/react';

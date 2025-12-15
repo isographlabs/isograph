@@ -1,4 +1,5 @@
-import React, { ReactNode } from 'react';
+import type { ReactNode } from 'react';
+import React from 'react';
 
 /**
  * The root component for posts. It lazily loads all posts, and renders them.

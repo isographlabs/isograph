@@ -1,4 +1,4 @@
-import { RetainedQuery } from '../core/garbageCollection';
+import type { RetainedQuery } from '../core/garbageCollection';
 import { ROOT_ID } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
 import { iso } from '@iso';

@@ -1,12 +1,12 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes } from './entrypoint';
-import { Variables } from './FragmentReference';
-import {
-  getLink,
+import type { NormalizationAstNodes } from './entrypoint';
+import type { Variables } from './FragmentReference';
+import type {
   IsographEnvironment,
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
+import { getLink } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { getStoreRecordProxy } from './optimisticProxy';
 
