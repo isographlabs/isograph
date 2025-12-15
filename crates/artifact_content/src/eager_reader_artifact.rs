@@ -1,15 +1,17 @@
 use common_lang_types::{
     ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
 };
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
+    VariableDefinition,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
     LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ObjectSelectableId,
-    ScalarSelectableId, ServerObjectSelectable,
+    ScalarSelectableId, ServerEntityName, ServerObjectSelectable,
     client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     server_object_entity_named,
@@ -18,14 +20,17 @@ use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
+use crate::format_parameter_type::format_parameter_type;
+use crate::generate_updatable_and_parameter_type::{
+    generate_client_scalar_selectable_parameter_type,
+    generate_client_scalar_selectable_updatable_data_type,
+};
 use crate::{
     generate_artifacts::{
         ClientScalarSelectableFunctionImportStatement, ClientScalarSelectableOutputType,
         RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE,
         RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-        RESOLVER_READER_FILE_NAME, generate_client_scalar_selectable_parameter_type,
-        generate_client_scalar_selectable_updatable_data_type, generate_output_type,
-        generate_parameters,
+        RESOLVER_READER_FILE_NAME, generate_output_type,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -580,4 +585,23 @@ fn generate_function_import_statement(
     ClientScalarSelectableFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{file_name}';"
     ))
+}
+
+fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
+) -> String {
+    let mut s = "{\n".to_string();
+    let indent = "  ";
+    for arg in argument_definitions {
+        let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
+        s.push_str(&format!(
+            "{indent}readonly {}{}: {},\n",
+            arg.name.item,
+            if is_optional { "?" } else { "" },
+            format_parameter_type(db, arg.type_.clone(), 1)
+        ));
+    }
+    s.push_str("};");
+    s
 }
