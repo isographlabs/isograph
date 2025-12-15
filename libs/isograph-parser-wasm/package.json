@@ -1,0 +1,21 @@
+{
+  "name": "isograph_lang_parser_wasm",
+  "type": "module",
+  "version": "0.4.3",
+  "license": "MIT",
+  "files": [
+    "isograph_lang_parser_wasm_bg.wasm",
+    "isograph_lang_parser_wasm.js",
+    "isograph_lang_parser_wasm_bg.js",
+    "isograph_lang_parser_wasm.d.ts"
+  ],
+  "scripts": {
+    "test": "node --experimental-wasm-modules experimental_test.js"
+  },
+  "main": "isograph_lang_parser_wasm.js",
+  "types": "isograph_lang_parser_wasm.d.ts",
+  "sideEffects": [
+    "./isograph_lang_parser_wasm.js",
+    "./snippets/*"
+  ]
+}

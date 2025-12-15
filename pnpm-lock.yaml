@@ -350,6 +350,8 @@ importers:
         specifier: 5.6.3
         version: 5.6.3
 
+  libs/isograph-parser-wasm: {}
+
   libs/isograph-react:
     dependencies:
       '@isograph/disposable-types':
