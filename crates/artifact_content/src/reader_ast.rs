@@ -57,12 +57,12 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded by this point. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     );
                     scalar_client_defined_field_ast_node(
                         db,
@@ -130,12 +130,12 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .lookup(db);
 
