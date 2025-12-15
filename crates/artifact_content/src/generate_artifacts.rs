@@ -843,12 +843,12 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .lookup(db);
 
@@ -869,11 +869,11 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                                 .as_ref()
                                 .expect(
                                     "Expected parsing to not have failed. \
-                                        This is indicative of a bug in Isograph.",
+                                    This is indicative of a bug in Isograph.",
                                 )
                                 .expect(
                                     "Expected entity to exist. \
-                                        This is indicative of a bug in Isograph.",
+                                    This is indicative of a bug in Isograph.",
                                 ),
                         },
                     );
@@ -997,12 +997,12 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     .as_ref()
     .expect(
         "Expected parsing to have succeeded by this point. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
         "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .lookup(db);
 
@@ -1098,12 +1098,12 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .as_ref()
                     .expect(
                         "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .as_ref()
                     .expect(
                         "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                     .lookup(db);
 
@@ -1121,11 +1121,11 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                                 .as_ref()
                                 .expect(
                                     "Expected parsing to not have failed. \
-                                        This is indicative of a bug in Isograph.",
+                                    This is indicative of a bug in Isograph.",
                                 )
                                 .expect(
                                     "Expected entity to exist. \
-                                        This is indicative of a bug in Isograph.",
+                                    This is indicative of a bug in Isograph.",
                                 )
                         },
                     );
