@@ -76,7 +76,7 @@ pub struct ObjectSelection<TScalar, TLinked> {
     pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TLinked,
+    pub deprecated_associated_data: TLinked,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<TScalar, TLinked>>,
     // TODO make this WithSpan instead of WithLocation

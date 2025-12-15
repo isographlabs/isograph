@@ -156,7 +156,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                 );
             }
             SelectionType::Object(object_selection) => {
-                let field_argument_definitions = match object_selection.associated_data {
+                let field_argument_definitions = match object_selection.deprecated_associated_data {
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,

@@ -479,7 +479,7 @@ fn parse_selection(
                     object_selection_directive_set,
                     selection_set,
                     arguments,
-                    associated_data: (),
+                    deprecated_associated_data: (),
                 })
             }
             None => {

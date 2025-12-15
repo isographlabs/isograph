@@ -273,7 +273,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
         name: object_selection.name,
         reader_alias: object_selection.reader_alias,
         object_selection_directive_set: object_selection.object_selection_directive_set,
-        associated_data,
+        deprecated_associated_data: associated_data,
         arguments: object_selection.arguments,
         selection_set: get_validated_selection_set(
             db,

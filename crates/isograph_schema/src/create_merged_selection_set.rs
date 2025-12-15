@@ -576,7 +576,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
             }
             SelectionType::Object(object_selection) => {
                 let (parent_object_entity_name, selectable_name) =
-                    match object_selection.associated_data {
+                    match object_selection.deprecated_associated_data {
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,
@@ -620,7 +620,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         )
                         .lookup(db);
 
-                match object_selection.associated_data {
+                match object_selection.deprecated_associated_data {
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         newly_encountered_client_object_selectable_name,
@@ -825,7 +825,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
                 let (parent_object_entity_name, selectable_name) =
-                    match object_selection.associated_data {
+                    match object_selection.deprecated_associated_data {
                         DefinitionLocation::Server((
                             parent_object_entity_name,
                             server_object_selectable_name,

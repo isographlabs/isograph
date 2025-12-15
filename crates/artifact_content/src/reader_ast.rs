@@ -78,7 +78,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionTypeContainingSelections::Object(linked_field_selection) => {
-            match linked_field_selection.associated_data {
+            match linked_field_selection.deprecated_associated_data {
                 DefinitionLocation::Client(_) => {
                     path.push(NormalizationKey::ClientPointer(NameAndArguments {
                         // TODO use alias
@@ -223,7 +223,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let condition = match linked_field.associated_data {
+    let condition = match linked_field.deprecated_associated_data {
         DefinitionLocation::Client((parent_object_entity_name, client_object_selectable_name)) => {
             let client_object_selectable = client_object_selectable_named(
                 db,
@@ -298,7 +298,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 
-    let refetch_query = match linked_field.associated_data {
+    let refetch_query = match linked_field.deprecated_associated_data {
         DefinitionLocation::Client(_) => {
             let refetch_query_index = find_imperatively_fetchable_query_index(
                 root_refetched_paths,
@@ -879,7 +879,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             SelectionTypeContainingSelections::Object(linked_field_selection) => {
-                match linked_field_selection.associated_data {
+                match linked_field_selection.deprecated_associated_data {
                     DefinitionLocation::Client((
                         parent_object_entity_name,
                         client_object_selectable_name,

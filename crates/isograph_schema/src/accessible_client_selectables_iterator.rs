@@ -97,7 +97,7 @@ impl Iterator for AccessibleClientSelectableIterator {
                             sub_iterator: None,
                         };
 
-                        match object_selection.associated_data {
+                        match object_selection.deprecated_associated_data {
                             DefinitionLocation::Client(client_object_selectable_id) => {
                                 // TODO: include pointer target link type
                                 // https://github.com/isographlabs/isograph/issues/719

@@ -138,7 +138,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let (parent_object_entity_name, object_selectable_name) =
-                match linked_field.associated_data {
+                match linked_field.deprecated_associated_data {
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,
@@ -345,7 +345,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionTypeContainingSelections::Object(linked_field) => {
             let (parent_object_entity_name, object_selectable_name) =
-                match linked_field.associated_data {
+                match linked_field.deprecated_associated_data {
                     DefinitionLocation::Server((
                         parent_object_entity_name,
                         server_object_selectable_name,
