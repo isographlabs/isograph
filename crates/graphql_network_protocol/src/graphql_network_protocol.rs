@@ -66,7 +66,7 @@ impl From<GraphQLRootTypes> for BTreeMap<EntityName, RootOperationName> {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type SchemaObjectAssociatedData = GraphQLSchemaObjectAssociatedData;
+    type EntityAssociatedData = GraphQLSchemaObjectAssociatedData;
 
     #[expect(clippy::type_complexity)]
     #[memo]
