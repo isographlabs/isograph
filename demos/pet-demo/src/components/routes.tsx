@@ -78,10 +78,6 @@ function toRouteUrl(route: Route): string {
       return `/only-one-root-loadble/${route.id}`;
     case 'RestEndpointDemo':
       return '/rest-endpoint-demo';
-    default: {
-      let _: never = route;
-      throw new Error('Unhandled route');
-    }
   }
 }
 

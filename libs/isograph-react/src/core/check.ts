@@ -206,13 +206,6 @@ function checkFromRecord(
 
         continue normalizationAstLoop;
       }
-      default: {
-        let _: never = normalizationAstNode;
-        _;
-        throw new Error(
-          'Unexpected case. This is indicative of a bug in Isograph.',
-        );
-      }
     }
   }
 

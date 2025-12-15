@@ -27,12 +27,6 @@ function mergeUsingReaderAst(
       }
 
       return mergeObjectsUsingReaderAst(field.selections, oldItem, newItem);
-    default: {
-      // Ensure we have covered all variants
-      let _: never = field;
-      _;
-      throw new Error('Unexpected case.');
-    }
   }
 }
 
@@ -120,12 +114,6 @@ export function mergeObjectsUsingReaderAst(
       case 'ImperativelyLoadedField':
       case 'LoadablySelectedField':
         break;
-      default: {
-        // Ensure we have covered all variants
-        let _: never = field;
-        _;
-        throw new Error('Unexpected case.');
-      }
     }
   }
 

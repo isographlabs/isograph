@@ -458,11 +458,6 @@ function readDataForOnComplete<
             : undefined),
         });
       }
-      default: {
-        const _: never = readerArtifact;
-        _;
-        throw new Error('Expected case');
-      }
     }
   }
   return null;
