@@ -1,21 +1,17 @@
 import { getParentRecordKey } from './cache';
-import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
+import type { NormalizationAst, NormalizationAstNodes } from './entrypoint';
 import type { Variables } from './FragmentReference';
 import {
   assertLink,
   type DataId,
   type IsographEnvironment,
-  type StoreRecord,
   type StoreLayerData,
   type StoreLink,
+  type StoreRecord,
   type TypeName,
 } from './IsographEnvironment';
 import type { BaseStoreLayer } from './optimisticProxy';
-import {
-  NOT_SET,
-  type PromiseWrapper,
-  type PromiseWrapperOk,
-} from './PromiseWrapper';
+import { type PromiseWrapper, type PromiseWrapperOk } from './PromiseWrapper';
 
 export type RetainedQuery = {
   readonly normalizationAst: PromiseWrapper<NormalizationAst>;
@@ -30,10 +26,7 @@ export interface RetainedQueryWithNormalizationAst extends RetainedQuery {
 function isRetainedQueryWithNormalizationAst(
   query: RetainedQuery,
 ): query is RetainedQueryWithNormalizationAst {
-  return (
-    query.normalizationAst.result !== NOT_SET &&
-    query.normalizationAst.result.kind === 'Ok'
-  );
+  return query.normalizationAst.result.kind === 'Ok';
 }
 
 export type DidUnretainSomeQuery = boolean;
