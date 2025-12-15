@@ -16,7 +16,6 @@ use isograph_schema::{
     NetworkProtocol, ObjectSelectableId, ScalarSelectableId, ServerEntityName, ValidatedSelection,
     ValidatedVariableDefinition, client_scalar_selectable_named, description,
     output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named,
 };
 use prelude::Postfix;
 
@@ -199,6 +198,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
 pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
@@ -212,6 +212,7 @@ pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: N
     for selection in selection_map.item.selections.iter() {
         write_updatable_data_type_from_selection(
             db,
+            parent_object_entity_name,
             &mut client_scalar_selectable_updatable_data_type,
             selection,
             nested_client_scalar_selectable_imports,
@@ -227,8 +228,10 @@ pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: N
     ClientScalarSelectableUpdatableDataType(client_scalar_selectable_updatable_data_type)
 }
 
+#[expect(clippy::too_many_arguments)]
 fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
     selection: &WithSpan<ValidatedSelection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -236,37 +239,32 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     indentation_level: u8,
     updatable_fields: &mut UpdatableImports,
 ) {
-    match &selection.item {
-        SelectionType::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.deprecated_associated_data {
-                DefinitionLocation::Server((
-                    parent_object_entity_name,
-                    server_scalar_selectable_name,
-                )) => {
-                    let server_scalar_selectable = server_scalar_selectable_named(
-                        db,
-                        parent_object_entity_name,
-                        server_scalar_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db);
+    let selectable = selectable_named(db, parent_object_entity_name, selection.item.name())
+        .as_ref()
+        .expect(
+            "Expected validation to have succeeded. \
+            This is indicative of a bug in Isograph.",
+        )
+        .expect(
+            "Expected selectable to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
+    match &selection.item {
+        SelectionType::Scalar(scalar_selection) => {
+            match selectable.as_scalar().expect(
+                "Expected selectable to be a scalar. \
+                This is indicative of a bug in Isograph.",
+            ) {
+                DefinitionLocation::Server(server_scalar_selectable) => {
+                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
                         server_scalar_selectable.description,
                         query_type_declaration,
                         indentation_level,
                     );
 
-                    let name_or_alias = scalar_field_selection.name_or_alias().item;
+                    let name_or_alias = selection.item.name_or_alias().item;
 
                     let output_type = server_scalar_selectable.target_scalar_entity.clone().map(
                         &mut |scalar_entity_name| {
@@ -283,78 +281,43 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         },
                     );
 
-                    match scalar_field_selection.scalar_selection_directive_set {
-                        ScalarSelectionDirectiveSet::Updatable(_) => {
-                            *updatable_fields = true;
-                            query_type_declaration
-                                .push_str(&"  ".repeat(indentation_level as usize).to_string());
-                            query_type_declaration.push_str(&format!(
-                                "{}: {},\n",
-                                name_or_alias,
-                                print_javascript_type_declaration(&output_type)
-                            ));
-                        }
-                        ScalarSelectionDirectiveSet::Loadable(_) => {
-                            panic!("@loadable server fields are not supported")
-                        }
-                        ScalarSelectionDirectiveSet::None(_) => {
-                            query_type_declaration.push_str(&format!(
-                                "{}readonly {}: {},\n",
-                                "  ".repeat(indentation_level as usize),
-                                name_or_alias,
-                                print_javascript_type_declaration(&output_type)
-                            ));
-                        }
+                    if selection.item.is_updatable() {
+                        *updatable_fields = true;
+                        query_type_declaration
+                            .push_str(&"  ".repeat(indentation_level as usize).to_string());
+                        query_type_declaration.push_str(&format!(
+                            "{}: {},\n",
+                            name_or_alias,
+                            print_javascript_type_declaration(&output_type)
+                        ));
+                    } else {
+                        query_type_declaration.push_str(&format!(
+                            "{}readonly {}: {},\n",
+                            "  ".repeat(indentation_level as usize),
+                            name_or_alias,
+                            print_javascript_type_declaration(&output_type)
+                        ));
                     }
                 }
-                DefinitionLocation::Client((
-                    parent_object_entity_name,
-                    client_scalar_selectable_name,
-                )) => {
+                DefinitionLocation::Client(_) => {
                     write_param_type_from_client_scalar_selectable(
                         db,
                         query_type_declaration,
                         nested_client_scalar_selectable_imports,
                         loadable_fields,
                         indentation_level,
-                        scalar_field_selection,
+                        scalar_selection,
                         parent_object_entity_name,
-                        client_scalar_selectable_name,
+                        selection.item.name(),
                     );
                 }
             }
         }
-        SelectionType::Object(linked_field) => {
-            let (parent_object_entity_name, object_selectable_name) =
-                match linked_field.deprecated_associated_data {
-                    DefinitionLocation::Server((
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )) => (parent_object_entity_name, server_object_selectable_name),
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        client_object_selectable_name,
-                    )) => (parent_object_entity_name, client_object_selectable_name),
-                };
-
-            let object_selectable =
-                selectable_named(db, parent_object_entity_name, object_selectable_name)
-                    // TODO Why do we have to clone here, instead of calling as_ref?
-                    .clone()
-                    .expect(
-                        "Expected selectable to be valid. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_object()
-                    // TODO have an object_selectable_named method
-                    .expect(
-                        "Expected selectable to be object. \
-                        This is indicative of a bug in Isograph.",
-                    );
+        SelectionType::Object(object_selection) => {
+            let object_selectable = selectable.as_object().expect(
+                "Expected selectable to be object. \
+                This is indicative of a bug in Isograph.",
+            );
 
             write_optional_description(
                 description(db, object_selectable),
@@ -362,7 +325,13 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
-            let name_or_alias = linked_field.name_or_alias().item;
+            let name_or_alias = object_selection.name_or_alias().item;
+
+            let new_parent_object_entity_name = match object_selectable {
+                DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_object_entity_name.inner(),
+            }
+            .dereference();
 
             let type_annotation =
                 output_type_annotation(db, object_selectable)
@@ -370,7 +339,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     .map(&mut |_| {
                         generate_client_selectable_updatable_data_type(
                             db,
-                            &linked_field.selection_set,
+                            new_parent_object_entity_name,
+                            &object_selection.selection_set,
                             nested_client_scalar_selectable_imports,
                             loadable_fields,
                             indentation_level,
@@ -378,7 +348,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         )
                     });
 
-            match linked_field.object_selection_directive_set {
+            match object_selection.object_selection_directive_set {
                 ObjectSelectionDirectiveSet::Updatable(_) => {
                     *updatable_fields = true;
                     write_getter_and_setter(
@@ -435,7 +405,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     nested_client_scalar_selectable_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
-    scalar_field_selection: &ScalarSelection<ScalarSelectableId>,
+    scalar_selection: &ScalarSelection<ScalarSelectableId>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) {
@@ -474,7 +444,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
                     .type_and_field()
                     .underscore_separated()
             );
-            let output_type = match scalar_field_selection.scalar_selection_directive_set {
+            let output_type = match scalar_selection.scalar_selection_directive_set {
                 ScalarSelectionDirectiveSet::Updatable(_)
                 | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
                 ScalarSelectionDirectiveSet::Loadable(_) => {
@@ -484,7 +454,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
                             .variable_definitions
                             .iter()
                             .map(|x| &x.item),
-                        &scalar_field_selection.arguments,
+                        &scalar_selection.arguments,
                     );
 
                     let indent = "  ".repeat((indentation_level + 1) as usize);
@@ -516,7 +486,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
             query_type_declaration.push_str(
                 &(format!(
                     "readonly {}: {},\n",
-                    scalar_field_selection.name_or_alias().item,
+                    scalar_selection.name_or_alias().item,
                     output_type
                 )),
             );

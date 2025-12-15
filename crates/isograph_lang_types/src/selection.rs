@@ -25,6 +25,13 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
         }
     }
 
+    pub fn name(&self) -> SelectableName {
+        match self {
+            SelectionType::Scalar(s) => s.name.item,
+            SelectionType::Object(o) => o.name.item,
+        }
+    }
+
     pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableName> + 'a {
         let get_variable = |x: &'a WithLocation<SelectionFieldArgument>| match x.item.value.item {
             NonConstantValue::Variable(v) => Some(v),
@@ -37,6 +44,19 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
             SelectionTypeContainingSelections::Object(linked_field) => {
                 linked_field.arguments.iter().flat_map(get_variable)
             }
+        }
+    }
+
+    pub fn is_updatable(&self) -> bool {
+        match self {
+            SelectionType::Scalar(s) => matches!(
+                s.scalar_selection_directive_set,
+                ScalarSelectionDirectiveSet::Updatable(_)
+            ),
+            SelectionType::Object(o) => matches!(
+                o.object_selection_directive_set,
+                ObjectSelectionDirectiveSet::Updatable(_)
+            ),
         }
     }
 }

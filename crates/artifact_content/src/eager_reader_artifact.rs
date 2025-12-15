@@ -343,6 +343,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     );
     let updatable_data_type = generate_client_selectable_updatable_data_type(
         db,
+        client_selectable.parent_object_entity_name(),
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
