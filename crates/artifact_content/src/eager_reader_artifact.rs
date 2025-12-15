@@ -308,12 +308,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     .as_ref()
     .expect(
         "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
         "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .lookup(db);
 
