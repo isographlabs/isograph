@@ -1,4 +1,4 @@
-import { getParentRecordKey } from './cache';
+import { getParentRecordKey, TYPENAME_FIELD_NAME } from './cache';
 import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
 import type { Variables } from './FragmentReference';
 import {
@@ -155,6 +155,17 @@ function recordReachableIdsFromRecord(
 ) {
   for (const selection of selections) {
     switch (selection.kind) {
+      case 'InlineFragment':
+        if (currentRecord[TYPENAME_FIELD_NAME] === selection.type) {
+          recordReachableIdsFromRecord(
+            dataLayer,
+            currentRecord,
+            mutableRetainedIds,
+            selection.selections,
+            variables,
+          );
+        }
+        continue;
       case 'Linked':
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
