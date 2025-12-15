@@ -35,8 +35,13 @@ import {
   type OptimisticStoreLayer,
   type StoreLayerWithData,
 } from './optimisticProxy';
-import type { AnyError, PromiseWrapper } from './PromiseWrapper';
-import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
+import * as PromiseWrapperUtils from './PromiseWrapper';
+import {
+  wrapPromise,
+  wrapResolvedValue,
+  type AnyError,
+  type PromiseWrapper,
+} from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
 import { callSubscriptions } from './subscribe';
@@ -206,97 +211,102 @@ export function makeNetworkRequest<
   }));
 
   // This should be an observable, not a promise
-  const promise = Promise.all([
-    environment.networkFunction(
-      artifact.networkRequestInfo.operation,
-      variables,
-    ),
-    status.retainedQuery.normalizationAst.promise,
-    readerWithRefetchQueries?.promise,
-  ])
-    .then(([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
-      logMessage(environment, () => ({
-        kind: 'ReceivedNetworkResponse',
-        networkResponse,
-        networkRequestId: myNetworkRequestId,
-      }));
-
-      if (networkResponse.errors != null) {
-        try {
-          fetchOptions?.onError?.();
-        } catch {}
-        throw new Error('Network response had errors', {
-          cause: networkResponse,
-        });
-      }
-
-      const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-
-      if (status.kind === 'UndisposedIncomplete') {
-        if (status.optimistic != null) {
-          status =
-            revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
-              environment,
-              status,
-              (storeLayer) =>
-                normalizeData(
-                  environment,
-                  storeLayer,
-                  normalizationAst.selections,
-                  networkResponse.data ?? {},
-                  variables,
-                  root,
-                  new Map(),
-                ),
-            );
-        } else {
-          const encounteredIds: EncounteredIds = new Map();
-          environment.store = addNetworkResponseStoreLayer(environment.store);
-          normalizeData(
-            environment,
-            environment.store,
-            normalizationAst.selections,
-            networkResponse.data ?? {},
+  const wrapper = PromiseWrapperUtils.mapErr(
+    PromiseWrapperUtils.mapOk(
+      PromiseWrapperUtils.all([
+        wrapPromise(
+          environment.networkFunction(
+            artifact.networkRequestInfo.operation,
             variables,
+          ),
+        ),
+        status.retainedQuery.normalizationAst,
+        readerWithRefetchQueries,
+      ]),
+      ([networkResponse, normalizationAst, readerWithRefetchQueries]) => {
+        logMessage(environment, () => ({
+          kind: 'ReceivedNetworkResponse',
+          networkResponse,
+          networkRequestId: myNetworkRequestId,
+        }));
+
+        if (networkResponse.errors != null) {
+          try {
+            fetchOptions?.onError?.();
+          } catch {}
+          throw new Error('Network response had errors', {
+            cause: networkResponse,
+          });
+        }
+
+        const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+
+        if (status.kind === 'UndisposedIncomplete') {
+          if (status.optimistic != null) {
+            status =
+              revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+                environment,
+                status,
+                (storeLayer) =>
+                  normalizeData(
+                    environment,
+                    storeLayer,
+                    normalizationAst.selections,
+                    networkResponse.data ?? {},
+                    variables,
+                    root,
+                    new Map(),
+                  ),
+              );
+          } else {
+            const encounteredIds: EncounteredIds = new Map();
+            environment.store = addNetworkResponseStoreLayer(environment.store);
+            normalizeData(
+              environment,
+              environment.store,
+              normalizationAst.selections,
+              networkResponse.data ?? {},
+              variables,
+              root,
+              encounteredIds,
+            );
+
+            logMessage(environment, () => ({
+              kind: 'AfterNormalization',
+              store: environment.store,
+              encounteredIds: encounteredIds,
+            }));
+
+            callSubscriptions(environment, encounteredIds);
+
+            status = {
+              kind: 'UndisposedComplete',
+              retainedQuery: status.retainedQuery,
+            };
+          }
+        }
+
+        const onComplete = fetchOptions?.onComplete;
+        if (onComplete != null) {
+          let data = readDataForOnComplete(
+            artifact,
+            environment,
             root,
-            encounteredIds,
+            variables,
+            readerWithRefetchQueries,
           );
 
-          logMessage(environment, () => ({
-            kind: 'AfterNormalization',
-            store: environment.store,
-            encounteredIds: encounteredIds,
-          }));
-
-          callSubscriptions(environment, encounteredIds);
-
-          status = {
-            kind: 'UndisposedComplete',
-            retainedQuery: status.retainedQuery,
-          };
+          try {
+            // @ts-expect-error this problem will be fixed when we remove RefetchQueryNormalizationArtifact
+            // (or we can fix this by having a single param of type { kind: 'Entrypoint', entrypoint,
+            // fetchOptions: FetchOptions<TReadFromStore> } | { kind: 'RefetchQuery', refetchQuery,
+            // fetchOptions: FetchOptions<void> }).
+            onComplete(data);
+          } catch {}
         }
-      }
-
-      const onComplete = fetchOptions?.onComplete;
-      if (onComplete != null) {
-        let data = readDataForOnComplete(
-          artifact,
-          environment,
-          root,
-          variables,
-          readerWithRefetchQueries,
-        );
-
-        try {
-          // @ts-expect-error this problem will be fixed when we remove RefetchQueryNormalizationArtifact
-          // (or we can fix this by having a single param of type { kind: 'Entrypoint', entrypoint,
-          // fetchOptions: FetchOptions<TReadFromStore> } | { kind: 'RefetchQuery', refetchQuery,
-          // fetchOptions: FetchOptions<void> }).
-          onComplete(data);
-        } catch {}
-      }
-    })
-    .catch((e) => {
+      },
+    ),
+    (e) => {
       logMessage(environment, () => ({
         kind: 'ReceivedNetworkError',
         networkRequestId: myNetworkRequestId,
@@ -316,9 +326,8 @@ export function makeNetworkRequest<
       }
 
       throw e;
-    });
-
-  const wrapper = wrapPromise(promise);
+    },
+  );
 
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
@@ -376,9 +385,10 @@ function readDataForOnComplete<
   environment: IsographEnvironment,
   root: StoreLink,
   variables: ExtractParameters<TReadFromStore>,
-  readerWithRefetchQueries:
-    | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
-    | undefined,
+  readerWithRefetchQueries: ReaderWithRefetchQueries<
+    TReadFromStore,
+    TClientFieldValue
+  > | null,
 ): TClientFieldValue | null {
   // An entrypoint, but not a RefetchQueryNormalizationArtifact, has a reader ASTs.
   // So, we can only pass data to onComplete if makeNetworkRequest was passed an entrypoint.

@@ -33,7 +33,6 @@ import { getStoreRecordProxy } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import {
   getPromiseState,
-  NOT_SET,
   readPromise,
   wrapPromise,
   wrapResolvedValue,
@@ -108,7 +107,7 @@ export function readButDoNotEvaluate<
       // process OOM's or something.) Hence, we throw an error.
 
       const result = fragmentReference.networkRequest.result;
-      if (result !== NOT_SET && result.kind === 'Err') {
+      if (result.kind === 'Err') {
         throw new Error('NetworkError', { cause: result.error });
       }
 

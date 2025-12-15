@@ -14,8 +14,6 @@ export {
   type PromiseState,
   type Result,
   type AnyError,
-  type NotSet,
-  NOT_SET,
 } from './core/PromiseWrapper';
 export {
   normalizeData,
