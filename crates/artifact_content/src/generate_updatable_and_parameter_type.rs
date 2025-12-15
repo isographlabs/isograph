@@ -28,9 +28,7 @@ use crate::{
     import_statements::{ParamTypeImports, UpdatableImports},
 };
 
-pub(crate) fn generate_client_scalar_selectable_parameter_type<
-    TNetworkProtocol: NetworkProtocol,
->(
+pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -180,7 +178,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 output_type_annotation(db, object_selectable)
                     .clone()
                     .map(&mut |_| {
-                        generate_client_scalar_selectable_parameter_type(
+                        generate_client_selectable_parameter_type(
                             db,
                             &linked_field.selection_set,
                             nested_client_scalar_selectable_imports,
@@ -214,9 +212,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub(crate) fn generate_client_scalar_selectable_updatable_data_type<
-    TNetworkProtocol: NetworkProtocol,
->(
+pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -387,7 +383,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 output_type_annotation(db, object_selectable)
                     .clone()
                     .map(&mut |_| {
-                        generate_client_scalar_selectable_updatable_data_type(
+                        generate_client_selectable_updatable_data_type(
                             db,
                             &linked_field.selection_set,
                             nested_client_scalar_selectable_imports,

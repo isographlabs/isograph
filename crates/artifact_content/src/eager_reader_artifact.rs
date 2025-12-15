@@ -22,8 +22,7 @@ use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
 use crate::format_parameter_type::format_parameter_type;
 use crate::generate_updatable_and_parameter_type::{
-    generate_client_scalar_selectable_parameter_type,
-    generate_client_scalar_selectable_updatable_data_type,
+    generate_client_selectable_parameter_type, generate_client_selectable_updatable_data_type,
 };
 use crate::{
     generate_artifacts::{
@@ -334,14 +333,14 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         )
         .expect("Expected selection set to be valid."),
     };
-    let client_scalar_selectable_parameter_type = generate_client_scalar_selectable_parameter_type(
+    let client_scalar_selectable_parameter_type = generate_client_selectable_parameter_type(
         db,
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
     );
-    let updatable_data_type = generate_client_scalar_selectable_updatable_data_type(
+    let updatable_data_type = generate_client_selectable_updatable_data_type(
         db,
         &selection_set_for_parent_query,
         &mut param_type_imports,
