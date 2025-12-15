@@ -25,6 +25,7 @@ use isograph_compiler::{
     CompilerState, WithDuration, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
 };
+use isograph_config::CompilerConfig;
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
@@ -44,7 +45,7 @@ use lsp_types::{
     request::{Formatting, GotoDefinition},
 };
 use prelude::{ErrClone, Postfix};
-use std::{collections::BTreeSet, ops::ControlFlow, path::PathBuf, time::Duration};
+use std::{collections::BTreeSet, ops::ControlFlow, time::Duration};
 use tokio::time::{Instant, sleep};
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
@@ -97,12 +98,12 @@ const LONG_DEBOUNCE_TIME: Duration = Duration::from_hours(24 * 365);
 /// Run the main server loop
 pub async fn run<TNetworkProtocol: NetworkProtocol>(
     connection: Connection,
-    config_location: &PathBuf,
+    config: CompilerConfig,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
     let compiler_state: CompilerState<TNetworkProtocol> =
-        CompilerState::new(config_location, current_working_directory)?;
+        CompilerState::new(config.clone(), current_working_directory)?;
     let mut lsp_state = LspState::new(compiler_state, &connection.sender);
 
     #[allow(clippy::mutable_key_type)]
@@ -115,8 +116,6 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
 
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
-
-    let config = lsp_state.compiler_state.db.get_isograph_config().clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
@@ -162,7 +161,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                 if let Some(Ok(changes)) = message {
                     if has_config_changes(&changes) {
                         eprintln!("Config change detected.");
-                        let compiler_state = CompilerState::new(config_location, current_working_directory)?;
+                        let compiler_state = CompilerState::new(config.clone(), current_working_directory)?;
                         lsp_state = LspState::new(compiler_state, &connection.sender);
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.

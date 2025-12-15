@@ -1,4 +1,4 @@
-use std::{path::PathBuf, time::Duration};
+use std::time::Duration;
 
 use crate::{
     compiler_state::CompilerState,
@@ -8,6 +8,7 @@ use crate::{
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, DiagnosticVecResult};
+use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
@@ -21,11 +22,11 @@ pub struct CompilationStats {
 }
 
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
-    config_location: &PathBuf,
+    config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
     info!("{}", "Starting to compile.".cyan());
-    let mut state = CompilerState::new(config_location, current_working_directory)?;
+    let mut state = CompilerState::new(config, current_working_directory)?;
     print_result(WithDuration::new(|| {
         compile::<TNetworkProtocol>(&mut state)
     }))
