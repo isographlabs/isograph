@@ -128,13 +128,19 @@ type Unwrap<T> = T extends null | undefined
     ? V
     : T;
 
+type UnwrapErr<T> = T extends null | undefined
+  ? never
+  : T extends PromiseWrapper<infer _, infer E>
+    ? E
+    : never;
+
 export function all<T extends readonly unknown[] | []>(
   values: T,
 ): PromiseWrapper<
   {
     -readonly [P in keyof T]: Unwrap<T[P]>;
   },
-  Unwrap<T[number]>
+  UnwrapErr<T[keyof T]>
 > {
   const promise: Promise<any> = Promise.all(
     values.map((value) => {
