@@ -4,7 +4,7 @@ The framework for teams that move fast — without breaking things.
 
 Isograph makes it easy to build robust, performant, data-driven apps.
 
-- Read the [docs](https://isograph.dev/docs/introduction/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
+- Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf 2024](https://www.youtube.com/watch?v=sf8ac2NtwPY) (and from [2023](https://www.youtube.com/watch?v=gO65JJRqjuc)).
 - Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
