@@ -91,7 +91,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         &validated_selections.item.selections,
         parent_entity,
         &mut |selection, parent_object_entity| {
-            let selectable = selectable_named(
+            let selectable = match selectable_named(
                 db,
                 parent_object_entity.name,
                 match selection {
@@ -103,11 +103,16 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             .expect(
                 "Expected parsing to have succeeded. \
                 This is indicative of a bug in Isograph.",
-            )
-            .expect(
-                "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
-            );
+            ) {
+                Some(s) => s,
+                None => {
+                    // We could emit an error, but this is validated already as part of
+                    // validate_selection_sets.
+                    //
+                    // We could combine these validations, though, as arguments live in selection sets!
+                    return;
+                }
+            };
 
             match selection {
                 SelectionType::Scalar(scalar_selection) => {

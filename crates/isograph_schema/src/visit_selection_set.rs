@@ -10,6 +10,10 @@ use crate::{
     server_object_entity_named,
 };
 
+/// This is visiting an unvalidated selection set, and should not panic.
+/// Instead, we simply avoid visiting selections where parents aren't found.
+///
+/// This function should probably be renamed, as it's not what you expect, otherwise!
 pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &[WithSpan<Selection>],
@@ -27,22 +31,21 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(object_selection) => {
                 visit_selection(object_selection.object_selected(), parent_entity);
 
-                let target_entity =
-                    selectable_named(db, parent_entity.name, object_selection.name.item)
+                let selectable =
+                    match selectable_named(db, parent_entity.name, object_selection.name.item)
                         .as_ref()
                         .expect(
                             "Expected parsing to have succeeded. \
                             This is indicative of a bug in Isograph.",
-                        )
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect(
-                            "Expected selectable to be an object. \
-                            This is indicative of a bug in Isograph.",
-                        );
+                        ) {
+                        Some(s) => s,
+                        None => continue,
+                    };
+
+                let target_entity = match selectable.as_object() {
+                    Some(s) => s,
+                    None => continue,
+                };
 
                 let target_entity_name = match target_entity {
                     DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
