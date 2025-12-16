@@ -73,7 +73,7 @@ async fn start_language_server(
 
     configure_logger(lsp_command.log_level, &config);
     if let Err(e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
-        config.clone(),
+        config,
         current_working_directory,
     )
     .await

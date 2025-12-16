@@ -25,7 +25,7 @@ use isograph_compiler::{
     CompilerState, WithDuration, update_sources,
     watch::{create_debounced_file_watcher, has_config_changes},
 };
-use isograph_config::CompilerConfig;
+use isograph_config::{CompilerConfig, create_config};
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
 use isograph_schema::{NetworkProtocol, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
@@ -102,8 +102,13 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticVecResult<()> {
+    let config_location = config.config_location.clone();
+
+    let (mut file_system_receiver, mut file_system_watcher) =
+        create_debounced_file_watcher(&config);
+
     let compiler_state: CompilerState<TNetworkProtocol> =
-        CompilerState::new(config.clone(), current_working_directory)?;
+        CompilerState::new(config, current_working_directory)?;
     let mut lsp_state = LspState::new(compiler_state, &connection.sender);
 
     #[allow(clippy::mutable_key_type)]
@@ -116,9 +121,6 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
 
     let (tokio_sender, mut lsp_message_receiver) = tokio::sync::mpsc::channel(100);
     bridge_crossbeam_to_tokio(connection.receiver, tokio_sender);
-
-    let (mut file_system_receiver, mut file_system_watcher) =
-        create_debounced_file_watcher(&config);
 
     // After 100ms of inactivity, we compile the codebase and emit diagnostics.
     // Note that in response to events, we delay the debounce timer.
@@ -161,12 +163,13 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                 if let Some(Ok(changes)) = message {
                     if has_config_changes(&changes) {
                         eprintln!("Config change detected.");
-                        let compiler_state = CompilerState::new(config.clone(), current_working_directory)?;
-                        lsp_state = LspState::new(compiler_state, &connection.sender);
+                        let config = create_config(&config_location, current_working_directory);
                         file_system_watcher.stop();
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) =
                             create_debounced_file_watcher(&config);
+                        let compiler_state = CompilerState::new(config, current_working_directory)?;
+                        lsp_state = LspState::new(compiler_state, &connection.sender);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
                         // new DB. Namely, there's an open files hash map that needs to be transferred over.
