@@ -4,19 +4,20 @@ use common_lang_types::{
     EntityName, ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
-    ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    LoadableDirectiveParameters, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet,
-    SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
+    ClientScalarSelectableDirectiveSet, DefinitionLocation, DefinitionLocationPostfix,
+    EmptyDirectiveSet, LoadableDirectiveParameters, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionSet, SelectionTypeContainingSelections,
+    SelectionTypePostfix,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    Loadability, NameAndArguments, NetworkProtocol, NormalizationKey, ObjectSelectableId,
-    PathToRefetchField, RefetchedPathsMap, ScalarSelectableId, ServerObjectSelectableVariant,
-    ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
-    categorize_field_loadability, client_object_selectable_named,
-    client_object_selectable_selection_set_for_parent_query, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, selectable_named,
-    server_object_selectable_named, transform_arguments_with_child_context,
+    BorrowedObjectSelectable, ClientFieldVariant, ClientScalarOrObjectSelectable,
+    ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments, NetworkProtocol,
+    NormalizationKey, ObjectSelectableId, PathToRefetchField, RefetchedPathsMap,
+    ScalarSelectableId, ServerObjectSelectableVariant, ValidatedObjectSelection,
+    ValidatedScalarSelection, ValidatedSelection, VariableContext, categorize_field_loadability,
+    client_object_selectable_named, client_object_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    selectable_named, server_object_selectable_named, transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use pico::MemoRef;
@@ -78,6 +79,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             );
             match object_selectable {
                 DefinitionLocation::Client(client_object_selectable) => {
+                    let client_object_selectable = client_object_selectable.lookup(db);
                     path.push(NormalizationKey::ClientPointer(NameAndArguments {
                         // TODO use alias
                         name: object_selection.name.item,
@@ -96,7 +98,6 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
                         client_object_selectable
-                            .lookup(db)
                             .target_object_entity_name
                             .inner()
                             .dereference(),
@@ -111,8 +112,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     path.pop();
 
                     linked_field_ast_node(
-                        db,
                         object_selection,
+                        client_object_selectable.client_defined(),
                         indentation_level,
                         inner_reader_ast,
                         initial_variable_context,
@@ -166,8 +167,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                     path.pop();
 
                     linked_field_ast_node(
-                        db,
                         object_selection,
+                        server_object_selectable.server_defined(),
                         indentation_level,
                         inner_reader_ast,
                         initial_variable_context,
@@ -183,8 +184,8 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
 #[expect(clippy::too_many_arguments)]
 fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    linked_field: &ValidatedObjectSelection,
+    object_selection: &ValidatedObjectSelection,
+    object_selectable: BorrowedObjectSelectable<TNetworkProtocol>,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
     initial_variable_context: &VariableContext,
@@ -192,15 +193,15 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
 ) -> String {
-    let name = linked_field.name.item;
-    let alias = linked_field
+    let name = object_selection.name.item;
+    let alias = object_selection
         .reader_alias
         .map(|x| format!("\"{}\"", x.item))
         .unwrap_or("null".to_string());
 
     let arguments = get_serialized_field_arguments(
         &transform_arguments_with_child_context(
-            linked_field
+            object_selection
                 .arguments
                 .iter()
                 .map(|x| x.item.into_key_and_value()),
@@ -211,60 +212,12 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let condition = match linked_field.deprecated_associated_data {
-        DefinitionLocation::Client((parent_object_entity_name, client_object_selectable_name)) => {
-            let client_object_selectable = client_object_selectable_named(
-                db,
-                parent_object_entity_name,
-                client_object_selectable_name,
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to be valid. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
-
-            let reader_artifact_import_name = format!(
-                "{}__resolver_reader",
-                client_object_selectable
-                    .type_and_field()
-                    .underscore_separated()
-            );
-
-            reader_imports.insert((
-                client_object_selectable.type_and_field(),
-                ImportedFileCategory::ResolverReader,
-            ));
-
-            reader_artifact_import_name
-        }
-        DefinitionLocation::Server((parent_object_entity_name, server_object_selectable_name)) => {
-            let server_object_selectable = server_object_selectable_named(
-                db,
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )
-            .as_ref()
-            .expect(
-                "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
+    let condition = match object_selectable {
+        DefinitionLocation::Server(server_object_selectable) => {
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
-                        selectable_name: linked_field.name.item,
+                        selectable_name: object_selection.name.item,
                         parent_object_entity_name: server_object_selectable
                             .parent_object_entity_name,
                     };
@@ -279,19 +232,34 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 ServerObjectSelectableVariant::LinkedField => "null".to_string(),
             }
         }
+        DefinitionLocation::Client(client_object_selectable) => {
+            let reader_artifact_import_name = format!(
+                "{}__resolver_reader",
+                client_object_selectable
+                    .type_and_field()
+                    .underscore_separated()
+            );
+
+            reader_imports.insert((
+                client_object_selectable.type_and_field(),
+                ImportedFileCategory::ResolverReader,
+            ));
+
+            reader_artifact_import_name
+        }
     };
 
     let is_updatable = matches!(
-        linked_field.object_selection_directive_set,
+        object_selection.object_selection_directive_set,
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 
-    let refetch_query = match linked_field.deprecated_associated_data {
+    let refetch_query = match object_selection.deprecated_associated_data {
         DefinitionLocation::Client(_) => {
             let refetch_query_index = find_imperatively_fetchable_query_index(
                 root_refetched_paths,
                 path,
-                linked_field.name.item.unchecked_conversion(),
+                object_selection.name.item.unchecked_conversion(),
             );
 
             format!("{refetch_query_index}")
