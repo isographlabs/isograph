@@ -787,36 +787,12 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             //
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
-                let (parent_object_entity_name, selectable_name) =
-                    match object_selection.deprecated_associated_data {
-                        DefinitionLocation::Server((
-                            parent_object_entity_name,
-                            server_object_selectable_name,
-                        )) => (parent_object_entity_name, server_object_selectable_name),
-                        DefinitionLocation::Client((
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )) => (parent_object_entity_name, client_object_selectable_name),
-                    };
+                let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
 
-                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
-                    .clone() // TODO don't clone
-                    .expect("Expected selectable to be valid.")
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_object()
-                    .expect("Expected selectable to be object.");
-
-                let concrete_object_entity_name = match selectable {
-                    DefinitionLocation::Server(s) => {
-                        s.lookup(db).target_object_entity.inner().dereference()
-                    }
-                    DefinitionLocation::Client(o) => {
-                        o.lookup(db).target_object_entity_name.inner().dereference()
-                    }
-                };
+                let concrete_object_entity_name = server_object_selectable
+                    .target_object_entity
+                    .inner()
+                    .dereference();
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -830,7 +806,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     )
                     .lookup(db)
-                    .note_todo("We are looking up the same object for no reason")
                     .is_concrete;
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
