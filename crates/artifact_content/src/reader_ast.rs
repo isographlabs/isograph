@@ -29,6 +29,7 @@ use crate::{
 };
 
 // Can we do this when visiting the client field in when generating entrypoints?
+#[expect(clippy::too_many_arguments)]
 fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
@@ -627,6 +628,7 @@ fn server_defined_scalar_field_ast_node(
     )
 }
 
+#[expect(clippy::too_many_arguments)]
 fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
