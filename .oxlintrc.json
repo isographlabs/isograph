@@ -17,6 +17,7 @@
     "typescript/await-thenable": "off",
     "typescript/no-floating-promises": "off",
     "typescript/no-implied-eval": "off",
+    "typescript/switch-exhaustiveness-check": "error",
     "typescript/unbound-method": "off",
     "typescript/consistent-type-imports": "error",
     "typescript/strict-boolean-expressions": [

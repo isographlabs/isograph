@@ -103,12 +103,6 @@ export function callSubscriptions(
           }
           return;
         }
-        default: {
-          // Ensure we have covered all variants
-          const _: never = subscription;
-          _;
-          throw new Error('Unexpected case');
-        }
       }
     }),
   );

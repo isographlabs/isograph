@@ -266,13 +266,6 @@ function readData<TReadFromStore>(
         target[field.alias] = data.data;
         break;
       }
-
-      default: {
-        // Ensure we have covered all variants
-        let _: never = field;
-        _;
-        throw new Error('Unexpected case.');
-      }
     }
   }
   return {
@@ -528,11 +521,6 @@ function writeQueryArgsToVariables(
         targetVariables[name] = argType.value;
         break;
       }
-      default: {
-        const _: never = argType;
-        _;
-        throw new Error('Unexpected case');
-      }
     }
   }
 }
@@ -619,11 +607,6 @@ export function readResolverFieldData(
           networkRequestOptions,
         ),
       };
-    }
-    default: {
-      let _: never = field.readerArtifact;
-      _;
-      throw new Error('Unexpected kind');
     }
   }
 }

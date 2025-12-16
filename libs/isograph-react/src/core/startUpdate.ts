@@ -335,10 +335,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
         target[field.alias] = root;
         break;
       }
-      default: {
-        field satisfies never;
-        throw new Error('Unexpected case.');
-      }
     }
   }
 

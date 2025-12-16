@@ -179,10 +179,6 @@ export function addNetworkResponseStoreLayer(
 
       return node;
     }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
-    }
   }
 }
 
@@ -240,10 +236,6 @@ export function addStartUpdateStoreLayer(
       startUpdate(node);
       return node;
     }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
-    }
   }
 }
 
@@ -270,10 +262,6 @@ export function addOptimisticUpdaterStoreLayer(
 
       return node;
     }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
-    }
   }
 }
 
@@ -296,10 +284,6 @@ export function addOptimisticNetworkResponseStoreLayer(
       parent.childStoreLayer = node;
 
       return node;
-    }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
 }
@@ -371,10 +355,6 @@ function reexecuteUpdatesAndMergeData(
         storeLayer.data = {};
         storeLayer.startUpdate(storeLayer);
         break;
-      }
-      default: {
-        storeLayer satisfies never;
-        throw new Error('Unreachable. This is a bug in Isograph.');
       }
     }
     mergeDataLayer(newMergedData, storeLayer.data);

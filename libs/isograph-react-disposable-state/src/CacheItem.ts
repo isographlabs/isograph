@@ -102,7 +102,7 @@ export class CacheItem<T> {
       case 'NotInParentCacheAndNotDisposed': {
         return this.__state.value;
       }
-      default: {
+      case 'NotInParentCacheAndDisposed': {
         throw new Error(
           'Attempted to access disposed value from CacheItem. ' +
             'This indicates a bug in react-disposable-state.',
@@ -142,7 +142,7 @@ export class CacheItem<T> {
                 );
                 return;
               }
-              default: {
+              case 'NotInParentCacheAndDisposed': {
                 throw new Error(
                   'CacheItem was in a disposed state, but there existed a permanent retain. ' +
                     'This indicates a bug in react-disposable-state.',
@@ -174,7 +174,8 @@ export class CacheItem<T> {
                 );
                 return;
               }
-              default: {
+              case 'InParentCacheAndNotDisposed':
+              case 'NotInParentCacheAndDisposed': {
                 throw new Error(
                   'CacheItem was in an unexpected state. ' +
                     'This indicates a bug in react-disposable-state.',
@@ -184,7 +185,7 @@ export class CacheItem<T> {
           },
         ];
       }
-      default: {
+      case 'NotInParentCacheAndDisposed': {
         // The CacheItem is disposed, so disposeOfTemporaryRetain is a no-op
         return null;
       }
@@ -215,7 +216,8 @@ export class CacheItem<T> {
                 clearTimeout(timeoutId);
                 return;
               }
-              default: {
+              case 'NotInParentCacheAndDisposed':
+              case 'NotInParentCacheAndNotDisposed': {
                 throw new Error(
                   'A temporary retain was cleared, for which the CacheItem is in an invalid state. ' +
                     'This indicates a bug in react-disposable-state.',
@@ -233,7 +235,8 @@ export class CacheItem<T> {
               this.__maybeExitInParentCacheAndNotDisposedState(this.__state);
               return;
             }
-            default: {
+            case 'NotInParentCacheAndDisposed':
+            case 'NotInParentCacheAndNotDisposed': {
               throw new Error(
                 'A temporary retain was cleared, for which the CacheItem is in an invalid state. ' +
                   'This indicates a bug in react-disposable-state.',
@@ -248,7 +251,8 @@ export class CacheItem<T> {
         );
         return clearTemporaryRetainByCallack;
       }
-      default: {
+      case 'NotInParentCacheAndDisposed':
+      case 'NotInParentCacheAndNotDisposed': {
         throw new Error(
           'temporaryRetain was called, for which the CacheItem is in an invalid state. ' +
             'This indicates a bug in react-disposable-state.',
@@ -281,7 +285,7 @@ export class CacheItem<T> {
               this.__maybeExitNotInParentCacheAndNotDisposedState(this.__state);
               return;
             }
-            default: {
+            case 'NotInParentCacheAndDisposed': {
               throw new Error(
                 'CacheItem was in a disposed state, but there existed a permanent retain. ' +
                   'This indicates a bug in react-disposable-state.',
@@ -307,7 +311,8 @@ export class CacheItem<T> {
               this.__maybeExitNotInParentCacheAndNotDisposedState(this.__state);
               return;
             }
-            default: {
+            case 'InParentCacheAndNotDisposed':
+            case 'NotInParentCacheAndDisposed': {
               throw new Error(
                 'CacheItem was in an unexpected state. ' +
                   'This indicates a bug in react-disposable-state.',
@@ -316,7 +321,7 @@ export class CacheItem<T> {
           }
         };
       }
-      default: {
+      case 'NotInParentCacheAndDisposed': {
         throw new Error(
           'permanentRetain was called, but the CacheItem is in an invalid state. ' +
             'This indicates a bug in react-disposable-state.',

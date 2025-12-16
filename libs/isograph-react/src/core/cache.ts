@@ -194,12 +194,6 @@ function normalizeDataIntoRecord(
           recordHasBeenUpdated || inlineFragmentResultedInChange;
         break;
       }
-      default: {
-        // Ensure we have covered all variants
-        let _: never = normalizationNode;
-        _;
-        throw new Error('Unexpected normalization node kind');
-      }
     }
   }
   if (recordHasBeenUpdated) {
@@ -520,13 +514,6 @@ function getStoreKeyChunkForArgumentValue(
     case 'Enum': {
       return argumentValue.value;
     }
-    default: {
-      // TODO configure eslint to allow unused vars starting with _
-      // Ensure we have covered all variants
-      const _: never = argumentValue;
-      _;
-      throw new Error('Unexpected case');
-    }
   }
 }
 
@@ -586,12 +573,6 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
     }
     case 'Enum': {
       return 'e_' + argumentValue.value;
-    }
-    default: {
-      // Ensure we have covered all variants
-      let _: never = argumentValue;
-      _;
-      throw new Error('Unexpected case');
     }
   }
 }
