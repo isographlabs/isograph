@@ -1,16 +1,18 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{Diagnostic, DiagnosticVecResult};
-use isograph_lang_types::SelectionType;
+use common_lang_types::{Diagnostic, DiagnosticVecResult, Location};
+use isograph_lang_types::{DefinitionLocation, SelectionSet, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
-    client_selectable_declaration_map_from_iso_literals, client_selectable_map, parse_iso_literals,
-    process_iso_literals, server_entities_map_without_locations, server_id_selectable,
-    server_object_entities, server_selectables_map, validate_use_of_arguments,
-    validated_entrypoints,
+    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol, ServerObjectEntity,
+    client_selectable_declaration_map_from_iso_literals, client_selectable_map,
+    entity_not_defined_diagnostic, memoized_unvalidated_reader_selection_set_map,
+    parse_iso_literals, process_iso_literals, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic, selectable_named, server_entities_map_without_locations,
+    server_id_selectable, server_object_entities, server_object_entity_named,
+    server_selectables_map, validate_use_of_arguments, validated_entrypoints,
 };
 
 /// In the world of pico, we minimally validate. For example, if the
@@ -30,6 +32,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     let mut errors = BTreeSet::new();
 
     maybe_extend(&mut errors, validate_use_of_arguments(db));
+
+    errors.extend(validate_selection_sets(db));
 
     maybe_extend(
         &mut errors,
@@ -205,4 +209,162 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
             None
         })
         .collect()
+}
+
+fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Vec<Diagnostic> {
+    let selection_sets = memoized_unvalidated_reader_selection_set_map(db);
+
+    let mut errors = vec![];
+    for (key, selection_set) in selection_sets {
+        let selection_set = match selection_set.clone_err() {
+            Ok(s) => s,
+            Err(e) => {
+                errors.push(e);
+                continue;
+            }
+        };
+        let selection_set = match selection_set {
+            SelectionType::Scalar(s) => &s.item,
+            SelectionType::Object(o) => &o.item,
+        };
+
+        let parent_entity = match server_object_entity_named(db, key.0).clone_err() {
+            Ok(entity) => {
+                match entity {
+                    Some(s) => s,
+                    None => {
+                        // TODO better location... and this is probably already validated elsewhere.
+                        // Maybe we can just continue
+                        errors.push(entity_not_defined_diagnostic(key.0, Location::Generated));
+                        continue;
+                    }
+                }
+            }
+            Err(e) => {
+                errors.push(e);
+                continue;
+            }
+        }
+        .lookup(db);
+
+        validate_selection_set(db, &mut errors, selection_set, parent_entity)
+    }
+
+    errors
+}
+
+/// for each selection, validate that it corresponds to a selectable of the correct SelectionType
+fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    errors: &mut Vec<Diagnostic>,
+    selection_set: &SelectionSet,
+    parent_entity: &ServerObjectEntity<TNetworkProtocol>,
+) {
+    for selection in selection_set.selections.iter() {
+        match selection.item.reference() {
+            SelectionType::Scalar(scalar_selection) => {
+                let selectable_name = scalar_selection.name.item;
+                let selectable =
+                    match selectable_named(db, parent_entity.name, selectable_name).clone_err() {
+                        Ok(s) => match s {
+                            Some(s) => s,
+                            None => {
+                                errors.push(selectable_is_not_defined_diagnostic(
+                                    parent_entity.name,
+                                    selectable_name,
+                                    scalar_selection.name.location,
+                                ));
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            errors.push(e);
+                            continue;
+                        }
+                    };
+
+                match selectable.as_scalar() {
+                    Some(_) => {}
+                    None => errors.push(selectable_is_wrong_type_diagnostic(
+                        parent_entity.name,
+                        selectable_name,
+                        "a scalar",
+                        "an object",
+                        scalar_selection.name.location,
+                    )),
+                };
+            }
+            SelectionType::Object(object_selection) => {
+                let selectable_name = object_selection.name.item;
+                let selectable =
+                    match selectable_named(db, parent_entity.name, selectable_name).clone_err() {
+                        Ok(s) => match s {
+                            Some(s) => s,
+                            None => {
+                                errors.push(selectable_is_not_defined_diagnostic(
+                                    parent_entity.name,
+                                    selectable_name,
+                                    object_selection.name.location,
+                                ));
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            errors.push(e);
+                            continue;
+                        }
+                    };
+
+                let target_entity_name = match selectable.as_object() {
+                    Some(o) => match o {
+                        DefinitionLocation::Server(s) => {
+                            s.lookup(db).target_object_entity.inner().dereference()
+                        }
+                        DefinitionLocation::Client(c) => {
+                            c.lookup(db).target_object_entity_name.inner().dereference()
+                        }
+                    },
+                    None => {
+                        errors.push(selectable_is_wrong_type_diagnostic(
+                            parent_entity.name,
+                            selectable_name,
+                            "an object",
+                            "a scalar",
+                            object_selection.name.location,
+                        ));
+                        continue;
+                    }
+                };
+
+                let new_parent_entity =
+                    match server_object_entity_named(db, target_entity_name).clone_err() {
+                        Ok(entity) => match entity {
+                            Some(s) => s,
+                            None => {
+                                // This was probably validated elsewhere??
+                                errors.push(entity_not_defined_diagnostic(
+                                    target_entity_name,
+                                    object_selection.name.location,
+                                ));
+                                continue;
+                            }
+                        },
+                        Err(e) => {
+                            errors.push(e);
+                            continue;
+                        }
+                    }
+                    .lookup(db);
+
+                validate_selection_set(
+                    db,
+                    errors,
+                    &object_selection.selection_set.item,
+                    new_parent_entity,
+                );
+            }
+        }
+    }
 }
