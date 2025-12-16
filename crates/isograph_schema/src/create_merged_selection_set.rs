@@ -11,8 +11,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypeContainingSelections,
-    SelectionTypePostfix, VariableDefinition,
+    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypePostfix, VariableDefinition,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -1616,7 +1615,7 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
 pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
 ) -> WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>> {
-    let typename_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+    let typename_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         // What is this for???
@@ -1630,7 +1629,7 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     })
     .with_generated_span();
 
-    let link_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+    let link_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         deprecated_associated_data: (
             server_object_selectable.parent_object_entity_name,

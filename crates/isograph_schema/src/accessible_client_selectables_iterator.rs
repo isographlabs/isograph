@@ -1,7 +1,5 @@
 use common_lang_types::{WithLocation, WithLocationPostfix, WithSpan};
-use isograph_lang_types::{
-    DefinitionLocation, SelectionSet, SelectionTypeContainingSelections, SelectionTypePostfix,
-};
+use isograph_lang_types::{DefinitionLocation, SelectionSet, SelectionTypePostfix};
 use prelude::Postfix;
 
 use crate::{
@@ -72,7 +70,7 @@ impl Iterator for AccessibleClientSelectableIterator {
 
             if let Some(selection) = item {
                 match &selection.item {
-                    SelectionTypeContainingSelections::Scalar(scalar_selection) => {
+                    SelectionType::Scalar(scalar_selection) => {
                         match scalar_selection.deprecated_associated_data {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
@@ -90,7 +88,7 @@ impl Iterator for AccessibleClientSelectableIterator {
                             }
                         }
                     }
-                    SelectionTypeContainingSelections::Object(object_selection) => {
+                    SelectionType::Object(object_selection) => {
                         let mut iterator = AccessibleClientSelectableIterator {
                             selection_set: object_selection.selection_set.clone(),
                             index: 0,

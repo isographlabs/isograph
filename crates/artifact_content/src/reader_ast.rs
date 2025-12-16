@@ -6,8 +6,7 @@ use common_lang_types::{
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, DefinitionLocationPostfix,
     EmptyDirectiveSet, LoadableDirectiveParameters, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionSet, SelectionType, SelectionTypeContainingSelections,
-    SelectionTypePostfix,
+    ScalarSelectionDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
 };
 use isograph_schema::{
     BorrowedObjectSelectable, ClientFieldVariant, ClientScalarOrObjectSelectable,
@@ -47,7 +46,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
         .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
     match &selection.item {
-        SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
+        SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = selectable.as_scalar().expect(
                 "Expected selectable to be a scalar. \
                 This is indicative of a bug in Isograph.",
@@ -73,7 +72,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 }
             }
         }
-        SelectionTypeContainingSelections::Object(object_selection) => {
+        SelectionType::Object(object_selection) => {
             let object_selectable = selectable.as_object().expect(
                 "Expected selectable to be an object. \
                 This is indicative of a bug in Isograph.",

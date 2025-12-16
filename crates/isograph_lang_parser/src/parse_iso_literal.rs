@@ -12,9 +12,8 @@ use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
-    ScalarSelection, SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
-    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
-    semantic_token_legend,
+    ScalarSelection, SelectionFieldArgument, SelectionSet, SelectionType, UnvalidatedSelection,
+    VariableDefinition, from_isograph_field_directives, semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -472,7 +471,7 @@ fn parse_selection(
         match selection_set {
             Some(selection_set) => {
                 let object_selection_directive_set = from_isograph_field_directives(&directives)?;
-                SelectionTypeContainingSelections::Object(ObjectSelection {
+                SelectionType::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
@@ -485,7 +484,7 @@ fn parse_selection(
             None => {
                 let scalar_selection_directive_set = from_isograph_field_directives(&directives)?;
 
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                SelectionType::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),

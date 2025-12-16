@@ -20,8 +20,8 @@ pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
 impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
-            SelectionTypeContainingSelections::Object(linked_field) => linked_field.name_or_alias(),
+            SelectionType::Scalar(scalar_field) => scalar_field.name_or_alias(),
+            SelectionType::Object(linked_field) => linked_field.name_or_alias(),
         }
     }
 
@@ -38,10 +38,10 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
             _ => None,
         };
         match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => {
+            SelectionType::Scalar(scalar_field) => {
                 scalar_field.arguments.iter().flat_map(get_variable)
             }
-            SelectionTypeContainingSelections::Object(linked_field) => {
+            SelectionType::Object(linked_field) => {
                 linked_field.arguments.iter().flat_map(get_variable)
             }
         }

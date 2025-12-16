@@ -2,8 +2,7 @@ use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use common_lang_types::{EntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix};
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypeContainingSelections,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet, SelectionType,
 };
 
 use crate::{
@@ -122,7 +121,7 @@ impl GenerateRefetchQueryImpl {
 }
 
 pub fn id_selection() -> UnprocessedSelection {
-    SelectionTypeContainingSelections::Scalar(ScalarSelection {
+    SelectionType::Scalar(ScalarSelection {
         name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
