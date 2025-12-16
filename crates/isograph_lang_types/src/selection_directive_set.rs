@@ -40,7 +40,5 @@ pub struct EmptyDirectiveSet {}
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct LoadableDirectiveParameters {
     #[serde(default)]
-    complete_selection_set: bool,
-    #[serde(default)]
     pub lazy_load_artifact: bool,
 }
