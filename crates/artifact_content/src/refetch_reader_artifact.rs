@@ -57,6 +57,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        client_scalar_selectable.parent_object_entity_name,
         // TODO model this better
         if was_selected_loadably {
             validated_refetch_strategy

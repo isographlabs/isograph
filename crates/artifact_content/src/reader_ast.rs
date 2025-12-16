@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{
-    ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
+    EntityName, ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
@@ -15,11 +15,12 @@ use isograph_schema::{
     ValidatedObjectSelection, ValidatedScalarSelection, ValidatedSelection, VariableContext,
     categorize_field_loadability, client_object_selectable_named,
     client_object_selectable_selection_set_for_parent_query, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, server_object_selectable_named,
-    transform_arguments_with_child_context,
+    client_scalar_selectable_selection_set_for_parent_query, selectable_named,
+    server_object_selectable_named, transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use pico::MemoRef;
+use prelude::Postfix;
 
 use crate::{
     generate_artifacts::{ReaderAst, get_serialized_field_arguments},
@@ -29,6 +30,7 @@ use crate::{
 // Can we do this when visiting the client field in when generating entrypoints?
 fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     selection: &WithSpan<ValidatedSelection>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
@@ -37,37 +39,29 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> String {
+    let selectable = selectable_named(db, parent_object_entity_name, selection.item.name())
+        .as_ref()
+        .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+        .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
+
     match &selection.item {
         SelectionTypeContainingSelections::Scalar(scalar_field_selection) => {
-            match scalar_field_selection.deprecated_associated_data {
+            let scalar_selectable = selectable.as_scalar().expect(
+                "Expected selectable to be a scalar. \
+                This is indicative of a bug in Isograph.",
+            );
+
+            match scalar_selectable {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
                     indentation_level,
                     initial_variable_context,
                 ),
-                DefinitionLocation::Client((
-                    parent_object_entity_name,
-                    client_scalar_selectable_name,
-                )) => {
-                    let client_scalar_selectable = client_scalar_selectable_named(
-                        db,
-                        parent_object_entity_name,
-                        client_scalar_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected parsing to have succeeded by this point. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    );
+                DefinitionLocation::Client(client_scalar_selectable) => {
                     scalar_client_defined_field_ast_node(
                         db,
                         scalar_field_selection,
-                        *client_scalar_selectable,
+                        client_scalar_selectable,
                         indentation_level,
                         path,
                         root_refetched_paths,
@@ -77,16 +71,20 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 }
             }
         }
-        SelectionTypeContainingSelections::Object(linked_field_selection) => {
-            match linked_field_selection.deprecated_associated_data {
-                DefinitionLocation::Client(_) => {
+        SelectionTypeContainingSelections::Object(object_selection) => {
+            let object_selectable = selectable.as_object().expect(
+                "Expected selectable to be an object. \
+                This is indicative of a bug in Isograph.",
+            );
+            match object_selectable {
+                DefinitionLocation::Client(client_object_selectable) => {
                     path.push(NormalizationKey::ClientPointer(NameAndArguments {
                         // TODO use alias
-                        name: linked_field_selection.name.item,
+                        name: object_selection.name.item,
                         // TODO this clearly does something, but why are we able to pass
                         // the initial variable context here??
                         arguments: transform_arguments_with_child_context(
-                            linked_field_selection
+                            object_selection
                                 .arguments
                                 .iter()
                                 .map(|x| x.item.into_key_and_value()),
@@ -97,7 +95,12 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        &linked_field_selection.selection_set,
+                        client_object_selectable
+                            .lookup(db)
+                            .target_object_entity_name
+                            .inner()
+                            .dereference(),
+                        &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
                         root_refetched_paths,
@@ -109,7 +112,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     linked_field_ast_node(
                         db,
-                        linked_field_selection,
+                        object_selection,
                         indentation_level,
                         inner_reader_ast,
                         initial_variable_context,
@@ -118,36 +121,17 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         path,
                     )
                 }
-                DefinitionLocation::Server((
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )) => {
-                    let server_object_selectable = server_object_selectable_named(
-                        db,
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db);
-
+                DefinitionLocation::Server(server_object_selectable) => {
+                    let server_object_selectable = server_object_selectable.lookup(db);
                     let normalization_key = match server_object_selectable.object_selectable_variant
                     {
                         ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
-                            name: linked_field_selection.name.item,
+                            name: object_selection.name.item,
                             // TODO this clearly does something, but why are we able to pass
                             // the initial variable context here??
                             arguments: transform_arguments_with_child_context(
-                                linked_field_selection
+                                object_selection
                                     .arguments
                                     .iter()
                                     .map(|x| x.item.into_key_and_value()),
@@ -167,7 +151,11 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        &linked_field_selection.selection_set,
+                        server_object_selectable
+                            .target_object_entity
+                            .inner()
+                            .dereference(),
+                        &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
                         root_refetched_paths,
@@ -179,7 +167,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     linked_field_ast_node(
                         db,
-                        linked_field_selection,
+                        object_selection,
                         indentation_level,
                         inner_reader_ast,
                         initial_variable_context,
@@ -605,6 +593,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
+        client_scalar_selectable.parent_object_entity_name,
         validated_refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
@@ -672,6 +661,7 @@ fn server_defined_scalar_field_ast_node(
 
 fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     indentation_level: u8,
     nested_client_scalar_selectable_imports: &mut ReaderImports,
@@ -684,6 +674,7 @@ fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     for item in &selection_set.item.selections {
         let s = generate_reader_ast_node(
             db,
+            parent_object_entity_name,
             item,
             indentation_level + 1,
             nested_client_scalar_selectable_imports,
@@ -754,6 +745,7 @@ fn find_imperatively_fetchable_query_index(
 
 pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    parent_object_entity_name: EntityName,
     selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
@@ -764,6 +756,7 @@ pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     let mut client_scalar_selectable_imports = BTreeSet::new();
     let reader_ast = generate_reader_ast_with_path(
         db,
+        parent_object_entity_name,
         selection_set,
         indentation_level,
         &mut client_scalar_selectable_imports,

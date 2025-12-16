@@ -66,6 +66,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        client_selectable.parent_object_entity_name(),
         &match client_selectable {
             SelectionType::Scalar(scalar) => {
                 client_scalar_selectable_selection_set_for_parent_query(
@@ -242,6 +243,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        server_object_selectable.parent_object_entity_name,
         inline_fragment_reader_selections,
         0,
         refetch_paths,
