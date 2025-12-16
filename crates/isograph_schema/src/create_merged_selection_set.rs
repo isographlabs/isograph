@@ -670,7 +670,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                         merge_server_object_field(
                             db,
                             parent_map,
-                            parent_object_entity,
                             merge_traversal_state,
                             encountered_client_type_map,
                             variable_context,
@@ -695,7 +694,6 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -791,7 +789,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
                     create_merged_selection_map_for_field_and_insert_into_global_map(
                         db,
-                        parent_object_entity,
+                        &object_selection_parent_object_entity,
                         &object_selection.selection_set,
                         encountered_client_type_map,
                         (
