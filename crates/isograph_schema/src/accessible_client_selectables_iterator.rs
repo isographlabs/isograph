@@ -112,19 +112,32 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                         };
                     }
                     SelectionType::Object(object_selection) => {
+                        let object_selectable = selectable.as_object().expect(
+                            "Expected selectable to be an object. \
+                            This is indicative of a bug in Isograph.",
+                        );
+
+                        // TODO don't match on object_selectable twice
+                        let target_entity_name = match object_selectable {
+                            DefinitionLocation::Server(s) => {
+                                s.lookup(self.db).target_object_entity.inner().dereference()
+                            }
+                            DefinitionLocation::Client(c) => c
+                                .lookup(self.db)
+                                .target_object_entity_name
+                                .inner()
+                                .dereference(),
+                        };
+
                         let mut iterator = AccessibleClientSelectableIterator {
                             selection_set: object_selection.selection_set.clone(),
                             index: 0,
                             sub_iterator: None,
                             db: self.db,
-                            // TODO not correct
-                            parent_entity_name: self.parent_entity_name,
+                            parent_entity_name: target_entity_name,
                         };
 
-                        match selectable.as_object().expect(
-                            "Expected selectable to be an object. \
-                            This is indicative of a bug in Isograph.",
-                        ) {
+                        match object_selectable {
                             DefinitionLocation::Server(_) => {}
                             DefinitionLocation::Client(_) => {
                                 self.sub_iterator = Some(iterator.boxed());
