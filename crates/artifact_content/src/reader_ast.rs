@@ -254,7 +254,8 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         ObjectSelectionDirectiveSet::Updatable(_)
     );
 
-    let refetch_query = match object_selection.deprecated_associated_data {
+    let refetch_query = match object_selectable {
+        DefinitionLocation::Server(_) => "null".to_string(),
         DefinitionLocation::Client(_) => {
             let refetch_query_index = find_imperatively_fetchable_query_index(
                 root_refetched_paths,
@@ -264,7 +265,6 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
             format!("{refetch_query_index}")
         }
-        DefinitionLocation::Server(_) => "null".to_string(),
     };
 
     format!(
