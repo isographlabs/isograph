@@ -64,23 +64,18 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
 ) {
+    let selectable = selectable_named(db, parent_object_entity_name, selection.item.name())
+        .as_ref()
+        .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+        .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
     match &selection.item {
         SelectionType::Scalar(scalar_field_selection) => {
-            let selectable = selectable_named(
-                db,
-                parent_object_entity_name,
-                scalar_field_selection.name.item,
-            )
-            .as_ref()
-            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.")
-            .as_scalar()
-            .expect(
+            let scalar_selectable = selectable.as_scalar().expect(
                 "Expected selectable to be a scalar. \
                 This is indicative of a bug in Isograph.",
             );
 
-            match selectable {
+            match scalar_selectable {
                 DefinitionLocation::Server(server_scalar_selectable) => {
                     let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
@@ -129,16 +124,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionType::Object(object_selection) => {
-            let object_selectable = selectable_named(
-                db,
-                parent_object_entity_name,
-                object_selection.name.item,
-            )
-            .as_ref()
-            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.")
-            .as_object()
-            .expect(
+            let object_selectable = selectable.as_object().expect(
                 "Expected selectable to be an object. \
                 This is indicative of a bug in Isograph.",
             );
