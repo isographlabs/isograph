@@ -1,28 +1,27 @@
 use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{
-    DiagnosticResult, DiagnosticVecResult, EntityName, Location,
-    ParentObjectEntityNameAndSelectableName, SelectableName,
+    DiagnosticResult, DiagnosticVecResult, EntityName, Location, SelectableName,
 };
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ObjectSelectableId, RefetchStrategy, ScalarSelectableId,
+    IsographDatabase, NetworkProtocol, RefetchStrategy,
     client_selectable_declaration_map_from_iso_literals, get_unvalidated_refetch_stategy,
-    get_validated_refetch_strategy, multiple_selectable_definitions_found_diagnostic,
-    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic,
+    multiple_selectable_definitions_found_diagnostic, selectable_is_not_defined_diagnostic,
+    selectable_is_wrong_type_diagnostic,
 };
 
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
+pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> DiagnosticVecResult<
     HashMap<
         (EntityName, SelectableName),
-        DiagnosticResult<SelectionType<Option<RefetchStrategy<(), ()>>, RefetchStrategy<(), ()>>>,
+        DiagnosticResult<SelectionType<Option<RefetchStrategy>, RefetchStrategy>>,
     >,
 > {
     // TODO use a "list of iso declarations" fn
@@ -97,57 +96,6 @@ pub fn unvalidated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
     Ok(out)
 }
 
-#[expect(clippy::type_complexity)]
-#[memo]
-pub fn validated_refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticVecResult<
-    HashMap<
-        (EntityName, SelectableName),
-        DiagnosticVecResult<
-            SelectionType<
-                Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>,
-                RefetchStrategy<ScalarSelectableId, ObjectSelectableId>,
-            >,
-        >,
-    >,
-> {
-    let map = unvalidated_refetch_strategy_map(db)
-        .note_todo("Do not clone. Use a MemoRef.")
-        .clone()?;
-
-    map.into_iter()
-        .map(|(key, value)| {
-            let value = value.map_err(|e| vec![e]).and_then(|opt| match opt {
-                SelectionType::Scalar(refetch_strategy) => refetch_strategy
-                    .map(|refetch_strategy| {
-                        get_validated_refetch_strategy(
-                            db,
-                            refetch_strategy,
-                            key.0,
-                            ParentObjectEntityNameAndSelectableName::new(key.0, key.1)
-                                .scalar_selected(),
-                        )
-                    })
-                    .transpose()?
-                    .scalar_selected()
-                    .wrap_ok(),
-                SelectionType::Object(refetch_strategy) => get_validated_refetch_strategy(
-                    db,
-                    refetch_strategy,
-                    key.0,
-                    ParentObjectEntityNameAndSelectableName::new(key.0, key.1).object_selected(),
-                )?
-                .object_selected()
-                .wrap_ok(),
-            });
-
-            (key, value)
-        })
-        .collect::<HashMap<_, _>>()
-        .wrap_ok()
-}
-
 #[memo]
 pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     TNetworkProtocol: NetworkProtocol,
@@ -155,8 +103,8 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
-) -> DiagnosticVecResult<Option<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>>> {
-    let map = validated_refetch_strategy_map(db).clone_err()?;
+) -> DiagnosticVecResult<Option<RefetchStrategy>> {
+    let map = refetch_strategy_map(db).clone_err()?;
 
     match map.get(&(
         parent_server_object_entity_name,
@@ -177,7 +125,7 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
                     .note_todo("Do not clone. Use a MemoRef.")
                     .wrap_ok(),
             },
-            Err(e) => e.clone().wrap_err(),
+            Err(e) => e.clone().wrap_vec().wrap_err(),
         },
         None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
@@ -195,8 +143,8 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
-) -> DiagnosticVecResult<RefetchStrategy<ScalarSelectableId, ObjectSelectableId>> {
-    let map = validated_refetch_strategy_map(db).clone_err()?;
+) -> DiagnosticVecResult<RefetchStrategy> {
+    let map = refetch_strategy_map(db).clone_err()?;
 
     match map.get(&(
         parent_server_object_entity_name,
@@ -217,7 +165,7 @@ pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
                     .note_todo("Do not clone. Use a MemoRef.")
                     .wrap_ok(),
             },
-            Err(e) => e.clone().wrap_err(),
+            Err(e) => e.clone().wrap_vec().wrap_err(),
         },
         None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,

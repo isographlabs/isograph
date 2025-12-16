@@ -5,15 +5,14 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocation, ObjectSelection, ScalarSelection, SelectionType,
-    SelectionTypeContainingSelections, VariableDefinition,
+    ArgumentKeyAndValue, DefinitionLocation, SelectionType, VariableDefinition,
 };
 use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, NormalizationKey, ObjectSelectableId, ServerEntityName,
-    ServerObjectSelectable, server_selectable_named,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ServerEntityName, ServerObjectSelectable,
+    server_selectable_named,
 };
 
 lazy_static! {
@@ -109,13 +108,6 @@ pub enum ServerObjectSelectableVariant {
     LinkedField,
     InlineFragment,
 }
-
-pub type ValidatedSelection =
-    SelectionTypeContainingSelections<ScalarSelectableId, ObjectSelectableId>;
-
-pub type ValidatedObjectSelection = ObjectSelection<ScalarSelectableId, ObjectSelectableId>;
-
-pub type ValidatedScalarSelection = ScalarSelection<ScalarSelectableId>;
 
 pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
 

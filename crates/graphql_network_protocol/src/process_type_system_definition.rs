@@ -337,7 +337,7 @@ pub fn process_graphql_type_system_document(
 
 fn refetch_selectable_refetch_strategy(
     subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
-) -> RefetchStrategy<(), ()> {
+) -> RefetchStrategy {
     RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
         SelectionSet {
             selections: vec![
@@ -346,7 +346,6 @@ fn refetch_selectable_refetch_strategy(
                         .to::<SelectableName>()
                         .with_generated_location(),
                     reader_alias: None,
-                    deprecated_associated_data: (),
                     arguments: vec![],
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
                         EmptyDirectiveSet {},

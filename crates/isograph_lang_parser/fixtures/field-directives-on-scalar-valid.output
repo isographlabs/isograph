@@ -89,7 +89,6 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            deprecated_associated_data: (),
                                             arguments: [],
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
@@ -415,7 +414,6 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            deprecated_associated_data: (),
                                             arguments: [],
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
@@ -842,7 +840,6 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            deprecated_associated_data: (),
                                             arguments: [],
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
@@ -1269,7 +1266,6 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            deprecated_associated_data: (),
                                             arguments: [],
                                             scalar_selection_directive_set: Updatable(
                                                 UpdatableDirectiveSet {

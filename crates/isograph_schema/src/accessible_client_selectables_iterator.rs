@@ -4,7 +4,6 @@ use prelude::Postfix;
 
 use crate::{
     ClientSelectableId, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
-    ObjectSelectableId, ScalarSelectableId,
     client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, selectable_named,
 };
@@ -56,7 +55,7 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
 struct AccessibleClientSelectableIterator<'db, TNetworkProtocol: NetworkProtocol> {
     // TODO have a reference
     db: &'db IsographDatabase<TNetworkProtocol>,
-    selection_set: WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: WithSpan<SelectionSet>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientSelectableIterator<'db, TNetworkProtocol>>>,
     parent_entity_name: EntityName,

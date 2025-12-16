@@ -89,7 +89,6 @@ Ok(
                                                 ),
                                             },
                                             reader_alias: None,
-                                            deprecated_associated_data: (),
                                             selection_set: WithSpan {
                                                 item: SelectionSet {
                                                     selections: [],

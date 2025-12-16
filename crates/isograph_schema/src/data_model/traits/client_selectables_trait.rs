@@ -7,8 +7,8 @@ use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    NetworkProtocol, ObjectSelectableId, ScalarSelectableId, SelectableTrait, ServerEntityName,
-    client_scalar_selectable_named, selectable_validated_reader_selection_set,
+    NetworkProtocol, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
+    selectable_validated_reader_selection_set,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
@@ -194,7 +194,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
-) -> DiagnosticResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
+) -> DiagnosticResult<WithSpan<SelectionSet>> {
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
@@ -256,7 +256,7 @@ pub fn client_object_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
-) -> DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
+) -> DiagnosticVecResult<WithSpan<SelectionSet>> {
     selectable_validated_reader_selection_set(
         db,
         parent_object_entity_name,

@@ -10,9 +10,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ObjectSelectableId,
-    ScalarSelectableId, ServerEntityName, ServerObjectSelectable,
-    client_object_selectable_selection_set_for_parent_query,
+    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ServerEntityName,
+    ServerObjectSelectable, client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     server_object_entity_named,
 };
@@ -204,9 +203,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-    inline_fragment_reader_selections: &WithSpan<
-        SelectionSet<ScalarSelectableId, ObjectSelectableId>,
-    >,
+    inline_fragment_reader_selections: &WithSpan<SelectionSet>,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {

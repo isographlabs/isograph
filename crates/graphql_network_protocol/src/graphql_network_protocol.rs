@@ -437,14 +437,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .unchecked_conversion::<SelectableName>()
                                 .with_generated_location(),
                             reader_alias: None,
-                            deprecated_associated_data: (),
                             arguments: vec![],
                             scalar_selection_directive_set:
                                 isograph_lang_types::ScalarSelectionDirectiveSet::None(
                                     EmptyDirectiveSet {},
                                 ),
                         }
-                        .scalar_selected::<ObjectSelection<(), ()>>()
+                        .scalar_selected::<ObjectSelection>()
                         .with_generated_span()
                     })
                     .collect::<Vec<_>>();

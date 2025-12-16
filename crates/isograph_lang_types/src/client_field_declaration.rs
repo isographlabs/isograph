@@ -10,9 +10,8 @@ use std::fmt::Debug;
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
     ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionPath, SelectionTypeContainingSelections,
-    VariableDefinition, isograph_resolved_node::IsographResolvedNode,
-    string_key_wrappers::Description,
+    IsographSemanticToken, ObjectSelectionPath, Selection, VariableDefinition,
+    isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
@@ -26,7 +25,7 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet<(), ()>>,
+    pub selection_set: WithSpan<SelectionSet>,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
@@ -51,7 +50,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet<(), ()>>,
+    pub selection_set: WithSpan<SelectionSet>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -62,10 +61,10 @@ pub type ClientPointerDeclarationPath<'a> =
     PositionResolutionPath<&'a ClientPointerDeclaration, ()>;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=SelectionSetParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
-pub struct SelectionSet<TScalar, TLinked> {
+#[resolve_position(parent_type=SelectionSetParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
+pub struct SelectionSet {
     #[resolve_field]
-    pub selections: Vec<WithSpan<SelectionTypeContainingSelections<TScalar, TLinked>>>,
+    pub selections: Vec<WithSpan<Selection>>,
 }
 
 #[derive(Debug)]
@@ -76,4 +75,4 @@ pub enum SelectionSetParentType<'a> {
 }
 
 pub type SelectionSetPath<'a> =
-    PositionResolutionPath<&'a SelectionSet<(), ()>, SelectionSetParentType<'a>>;
+    PositionResolutionPath<&'a SelectionSet, SelectionSetParentType<'a>>;

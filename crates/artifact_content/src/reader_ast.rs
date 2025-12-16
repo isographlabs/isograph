@@ -5,15 +5,15 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, DefinitionLocationPostfix,
-    EmptyDirectiveSet, LoadableDirectiveParameters, ObjectSelectionDirectiveSet,
-    ScalarSelectionDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
+    EmptyDirectiveSet, LoadableDirectiveParameters, ObjectSelection, ObjectSelectionDirectiveSet,
+    ScalarSelection, ScalarSelectionDirectiveSet, Selection, SelectionSet, SelectionType,
+    SelectionTypePostfix,
 };
 use isograph_schema::{
     BorrowedObjectSelectable, ClientFieldVariant, ClientScalarOrObjectSelectable,
     ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments, NetworkProtocol,
-    NormalizationKey, ObjectSelectableId, PathToRefetchField, RefetchedPathsMap,
-    ScalarSelectableId, ServerObjectSelectableVariant, ValidatedObjectSelection,
-    ValidatedScalarSelection, ValidatedSelection, VariableContext, categorize_field_loadability,
+    NormalizationKey, PathToRefetchField, RefetchedPathsMap, ServerObjectSelectableVariant,
+    VariableContext, categorize_field_loadability,
     client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, selectable_named,
     transform_arguments_with_child_context,
@@ -32,7 +32,7 @@ use crate::{
 fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection: &WithSpan<ValidatedSelection>,
+    selection: &WithSpan<Selection>,
     indentation_level: u8,
     reader_imports: &mut ReaderImports,
     // TODO use this to generate usedRefetchQueries
@@ -184,7 +184,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
 #[expect(clippy::too_many_arguments)]
 fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     object_selectable: BorrowedObjectSelectable<TNetworkProtocol>,
     indentation_level: u8,
     inner_reader_ast: ReaderAst,
@@ -284,7 +284,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 #[expect(clippy::too_many_arguments)]
 fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     indentation_level: u8,
     path: &mut Vec<NormalizationKey>,
@@ -344,7 +344,7 @@ fn scalar_client_defined_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn link_variant_ast_node(
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     indentation_level: u8,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
@@ -362,7 +362,7 @@ fn link_variant_ast_node(
 #[expect(clippy::too_many_arguments)]
 fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     indentation_level: u8,
     nested_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     path: &mut Vec<NormalizationKey>,
@@ -433,7 +433,7 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     root_refetched_paths: &RefetchedPathsMap,
     path: &[NormalizationKey],
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
 ) -> String {
     let alias = scalar_field_selection.name_or_alias().item;
     let indent_1 = "  ".repeat(indentation_level as usize);
@@ -478,7 +478,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     reader_imports: &mut ReaderImports,
     indentation_level: u8,
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     client_scalar_selectable_variable_context: &VariableContext,
     loadable_directive_parameters: &LoadableDirectiveParameters,
 ) -> String {
@@ -590,7 +590,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn server_defined_scalar_field_ast_node(
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     indentation_level: u8,
     initial_variable_context: &VariableContext,
 ) -> String {
@@ -631,7 +631,7 @@ fn server_defined_scalar_field_ast_node(
 fn generate_reader_ast_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     indentation_level: u8,
     nested_client_scalar_selectable_imports: &mut ReaderImports,
     // N.B. this is not root_refetched_paths when we're generating a non-fetchable client field :(
@@ -715,7 +715,7 @@ fn find_imperatively_fetchable_query_index(
 pub(crate) fn generate_reader_ast<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     indentation_level: u8,
     // N.B. this is not root_refetched_paths when we're generating an entrypoint :(
     // ????
@@ -769,7 +769,7 @@ fn refetched_paths_for_client_scalar_selectable<TNetworkProtocol: NetworkProtoco
 fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_set: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     path: &mut Vec<NormalizationKey>,
     initial_variable_context: &VariableContext,
 ) -> HashSet<PathToRefetchField> {

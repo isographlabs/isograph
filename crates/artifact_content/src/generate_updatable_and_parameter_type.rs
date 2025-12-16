@@ -8,14 +8,13 @@ use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
+    ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
     TypeAnnotation,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarOrObjectSelectable, IsographDatabase, LINK_FIELD_NAME,
-    NetworkProtocol, ObjectSelectableId, ScalarSelectableId, ServerEntityName, ValidatedSelection,
-    ValidatedVariableDefinition, client_scalar_selectable_named, description,
-    output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
+    NetworkProtocol, ServerEntityName, ValidatedVariableDefinition, client_scalar_selectable_named,
+    description, output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
 };
 use prelude::Postfix;
 
@@ -30,7 +29,7 @@ use crate::{
 pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_map: &WithSpan<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -59,7 +58,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
-    selection: &WithSpan<ValidatedSelection>,
+    selection: &WithSpan<Selection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -84,7 +83,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         indentation_level,
                     );
 
-                    let name_or_alias = scalar_field_selection.name_or_alias().item;
+                    let name_or_alias: SelectableNameOrAlias =
+                        (*scalar_field_selection).name_or_alias().item;
 
                     let output_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
                         &mut |scalar_entity_name| match server_scalar_selectable
@@ -135,7 +135,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
-            let name_or_alias = object_selection.name_or_alias().item;
+            let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
@@ -185,7 +185,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_map: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_map: &WithSpan<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -219,7 +219,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
-    selection: &WithSpan<ValidatedSelection>,
+    selection: &WithSpan<Selection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -311,7 +311,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 indentation_level,
             );
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
-            let name_or_alias = object_selection.name_or_alias().item;
+            let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
@@ -391,7 +391,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     nested_client_scalar_selectable_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
     indentation_level: u8,
-    scalar_selection: &ScalarSelection<ScalarSelectableId>,
+    scalar_selection: &ScalarSelection,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) {

@@ -10,8 +10,9 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypePostfix, VariableDefinition,
+    NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
+    SelectionTypePostfix, VariableDefinition,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -20,12 +21,10 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
     ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, ObjectSelectableId, PathToRefetchField, ScalarSelectableId,
-    ServerEntityName, ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ValidatedObjectSelection, ValidatedScalarSelection, VariableContext,
-    client_object_selectable_named, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName, ServerObjectEntity,
+    ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
     server_id_selectable, server_object_entity_named, server_object_selectable_named,
@@ -450,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    validated_selections: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
@@ -481,7 +480,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    validated_selections: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> FieldTraversalResult {
@@ -537,7 +536,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    validated_selections: &WithSpan<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -663,7 +662,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     field_parent_object_entity_name: EntityName,
@@ -732,8 +731,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             )
                             .lookup(db);
 
-                    let reader_selection_set =
-                        inline_fragment_reader_selection_set(server_object_selectable);
+                    let reader_selection_set = inline_fragment_reader_selection_set();
                     merge_validated_selections_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
@@ -859,7 +857,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
     newly_encountered_client_object_selectable_name: SelectableName,
 ) {
@@ -929,7 +927,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     parent_object_entity_name: EntityName,
     newly_encountered_scalar_client_selectable_name: SelectableName,
 ) {
@@ -1125,7 +1123,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_object_selectable_name: SelectableName,
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     variable_context: &VariableContext,
 ) {
     let target_server_object_entity_name = *newly_encountered_client_object_selectable
@@ -1340,7 +1338,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn merge_server_scalar_field(
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1551,18 +1549,10 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     }]
 }
 
-pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
-    server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-) -> WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>> {
+pub fn inline_fragment_reader_selection_set() -> WithSpan<SelectionSet> {
     let typename_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        // What is this for???
-        deprecated_associated_data: (
-            server_object_selectable.parent_object_entity_name,
-            *TYPENAME_FIELD_NAME,
-        )
-            .server_defined(),
         name: (*TYPENAME_FIELD_NAME).with_generated_location(),
         reader_alias: None,
     })
@@ -1570,11 +1560,6 @@ pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
 
     let link_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
-        deprecated_associated_data: (
-            server_object_selectable.parent_object_entity_name,
-            *LINK_FIELD_NAME,
-        )
-            .client_defined(),
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         name: WithLocation::new_generated(*LINK_FIELD_NAME),
         reader_alias: None,

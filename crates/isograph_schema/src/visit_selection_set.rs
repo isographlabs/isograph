@@ -1,7 +1,7 @@
 use common_lang_types::WithSpan;
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ScalarSelection, SelectionType,
-    SelectionTypeContainingSelections, SelectionTypePostfix,
+    DefinitionLocation, ObjectSelection, ScalarSelection, Selection, SelectionType,
+    SelectionTypePostfix,
 };
 use prelude::Postfix;
 
@@ -10,27 +10,12 @@ use crate::{
     server_object_entity_named,
 };
 
-pub(crate) fn visit_selection_set<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-    TNetworkProtocol: NetworkProtocol,
->(
+pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: &[WithSpan<
-        SelectionTypeContainingSelections<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >],
+    selection_set: &[WithSpan<Selection>],
     parent_entity: &ServerObjectEntity<TNetworkProtocol>,
     visit_selection: &mut impl FnMut(
-        SelectionType<
-            &ScalarSelection<TSelectionTypeSelectionScalarFieldAssociatedData>,
-            &ObjectSelection<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
+        SelectionType<&ScalarSelection, &ObjectSelection>,
         &ServerObjectEntity<TNetworkProtocol>,
     ),
 ) {

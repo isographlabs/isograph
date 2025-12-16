@@ -11,38 +11,13 @@ use crate::{
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum RefetchStrategy<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-> {
-    UseRefetchField(
-        UseRefetchFieldRefetchStrategy<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    ),
+pub enum RefetchStrategy {
+    UseRefetchField(UseRefetchFieldRefetchStrategy),
     RefetchFromRoot,
 }
 
-impl<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
->
-    RefetchStrategy<
-        TSelectionTypeSelectionScalarFieldAssociatedData,
-        TSelectionTypeSelectionLinkedFieldAssociatedData,
-    >
-{
-    pub fn refetch_selection_set(
-        &self,
-    ) -> Option<
-        &WithSpan<
-            SelectionSet<
-                TSelectionTypeSelectionScalarFieldAssociatedData,
-                TSelectionTypeSelectionLinkedFieldAssociatedData,
-            >,
-        >,
-    > {
+impl RefetchStrategy {
+    pub fn refetch_selection_set(&self) -> Option<&WithSpan<SelectionSet>> {
         match self {
             RefetchStrategy::UseRefetchField(used_refetch_field) => {
                 Some(&used_refetch_field.refetch_selection_set)
@@ -51,22 +26,11 @@ impl<
         }
     }
 }
-pub fn generate_refetch_field_strategy<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
->(
-    refetch_selection_set: WithSpan<
-        SelectionSet<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >,
+pub fn generate_refetch_field_strategy(
+    refetch_selection_set: WithSpan<SelectionSet>,
     root_fetchable_type_name: EntityName,
     subfields: Vec<WrappedSelectionMapSelection>,
-) -> UseRefetchFieldRefetchStrategy<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-> {
+) -> UseRefetchFieldRefetchStrategy {
     UseRefetchFieldRefetchStrategy {
         refetch_selection_set,
         root_fetchable_type_name,
@@ -75,18 +39,10 @@ pub fn generate_refetch_field_strategy<
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct UseRefetchFieldRefetchStrategy<
-    TSelectionTypeSelectionScalarFieldAssociatedData,
-    TSelectionTypeSelectionLinkedFieldAssociatedData,
-> {
+pub struct UseRefetchFieldRefetchStrategy {
     /// If this field is fetched imperatively, what fields do we need to
     /// select in the parent query?
-    pub refetch_selection_set: WithSpan<
-        SelectionSet<
-            TSelectionTypeSelectionScalarFieldAssociatedData,
-            TSelectionTypeSelectionLinkedFieldAssociatedData,
-        >,
-    >,
+    pub refetch_selection_set: WithSpan<SelectionSet>,
     /// Query, Mutation, etc.
     pub root_fetchable_type_name: EntityName,
 
@@ -125,7 +81,6 @@ pub fn id_selection() -> UnprocessedSelection {
         name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        deprecated_associated_data: (),
         arguments: vec![],
     })
     .with_generated_span()

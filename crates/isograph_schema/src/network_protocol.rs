@@ -13,8 +13,6 @@ use crate::{
     isograph_database::IsographDatabase,
 };
 
-type UnvalidatedRefetchStrategy = RefetchStrategy<(), ()>;
-
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
     pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
@@ -22,9 +20,8 @@ pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
     pub selectables:
         BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefSelectable<TNetworkProtocol>>>,
 
-    pub client_scalar_refetch_strategies: Vec<
-        DiagnosticResult<WithLocation<(EntityName, SelectableName, UnvalidatedRefetchStrategy)>>,
-    >,
+    pub client_scalar_refetch_strategies:
+        Vec<DiagnosticResult<WithLocation<(EntityName, SelectableName, RefetchStrategy)>>>,
 }
 
 pub trait NetworkProtocol:

@@ -200,7 +200,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                         path_and_contents.push(generate_eager_reader_condition_artifact(
                             db,
                             server_object_selectable,
-                            &inline_fragment_reader_selection_set(server_object_selectable),
+                            &inline_fragment_reader_selection_set(),
                             &traversal_state.refetch_paths,
                             config.options.include_file_extensions_in_import_statements,
                         ));
