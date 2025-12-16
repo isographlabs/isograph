@@ -14,9 +14,8 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientScalarOrObjectSelectable, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
-    ValidatedVariableDefinition, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, selectable_validated_reader_selection_set,
-    server_object_selectable_named, server_scalar_selectable_named,
+    ValidatedVariableDefinition, client_selectable_map, selectable_named,
+    selectable_validated_reader_selection_set, server_object_entity_named,
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
 };
 
@@ -81,144 +80,113 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         }
     };
 
+    let parent_entity = server_object_entity_named(db, client_type.parent_object_entity_name())
+        .as_ref()
+        .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+        .expect("Expected entity to exist. This is indicative of a bug in Isograph.")
+        .lookup(db);
+
     visit_selection_set(
+        db,
         &validated_selections.item.selections,
-        &mut |selection| match selection {
-            SelectionType::Scalar(scalar_selection) => {
-                let field_argument_definitions = match scalar_selection.deprecated_associated_data {
-                    DefinitionLocation::Server((
-                        parent_object_entity_name,
-                        server_scalar_selectable_name,
-                    )) => {
-                        let server_scalar_selectable = server_scalar_selectable_named(
-                            db,
-                            parent_object_entity_name,
-                            server_scalar_selectable_name,
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have succeeded. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db);
+        parent_entity,
+        &mut |selection, parent_object_entity| {
+            let selectable = selectable_named(
+                db,
+                parent_object_entity.name,
+                match selection {
+                    SelectionType::Scalar(s) => s.name.item,
+                    SelectionType::Object(o) => o.name.item,
+                },
+            )
+            .as_ref()
+            .expect(
+                "Expected parsing to have succeeded. \
+                This is indicative of a bug in Isograph.",
+            )
+            .expect(
+                "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+            );
 
-                        server_scalar_selectable
-                            .arguments
-                            .iter()
-                            .map(|x| x.item.clone())
-                            .collect::<Vec<_>>()
-                    }
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        client_selectable_name,
-                    )) => client_scalar_selectable_named(
+            match selection {
+                SelectionType::Scalar(scalar_selection) => {
+                    let scalar_selectable = selectable.as_scalar().expect(
+                        "Expected selectable to be a scalar. \
+                        This is indicative of a bug in Isograph.",
+                    );
+                    let field_argument_definitions = match scalar_selectable {
+                        DefinitionLocation::Server(server_scalar_selectable) => {
+                            let server_scalar_selectable = server_scalar_selectable.lookup(db);
+
+                            server_scalar_selectable
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect::<Vec<_>>()
+                        }
+                        DefinitionLocation::Client(client_scalar_selectable) => {
+                            client_scalar_selectable
+                                .lookup(db)
+                                .variable_definitions
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect()
+                        }
+                    };
+
+                    // Only loadably selected fields are allowed to have missing arguments
+                    let can_have_missing_args = matches!(
+                        scalar_selection.scalar_selection_directive_set,
+                        ScalarSelectionDirectiveSet::Loadable(_)
+                    );
+
+                    validate_use_of_arguments_impl(
                         db,
-                        parent_object_entity_name,
-                        client_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to be valid. \
+                        errors,
+                        &mut reachable_variables,
+                        field_argument_definitions,
+                        client_type.variable_definitions(),
+                        can_have_missing_args,
+                        &scalar_selection.arguments,
+                        scalar_selection.name.location,
+                    );
+                }
+                SelectionType::Object(object_selection) => {
+                    let object_selectable = selectable.as_object().expect(
+                        "Expected selectable to be an object. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db)
-                    .variable_definitions
-                    .iter()
-                    .map(|x| x.item.clone())
-                    .collect(),
-                };
+                    );
+                    let field_argument_definitions = match object_selectable {
+                        DefinitionLocation::Server(server_object_selectable) => {
+                            server_object_selectable
+                                .lookup(db)
+                                .arguments
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect::<Vec<_>>()
+                        }
+                        DefinitionLocation::Client(client_object_selectable) => {
+                            client_object_selectable
+                                .lookup(db)
+                                .variable_definitions
+                                .iter()
+                                .map(|x| x.item.clone())
+                                .collect()
+                        }
+                    };
 
-                // Only loadably selected fields are allowed to have missing arguments
-                let can_have_missing_args = matches!(
-                    scalar_selection.scalar_selection_directive_set,
-                    ScalarSelectionDirectiveSet::Loadable(_)
-                );
-
-                validate_use_of_arguments_impl(
-                    db,
-                    errors,
-                    &mut reachable_variables,
-                    field_argument_definitions,
-                    client_type.variable_definitions(),
-                    can_have_missing_args,
-                    &scalar_selection.arguments,
-                    scalar_selection.name.location,
-                );
-            }
-            SelectionType::Object(object_selection) => {
-                let field_argument_definitions = match object_selection.deprecated_associated_data {
-                    DefinitionLocation::Server((
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )) => server_object_selectable_named(
+                    validate_use_of_arguments_impl(
                         db,
-                        parent_object_entity_name,
-                        server_object_selectable_name,
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db)
-                    .arguments
-                    .iter()
-                    .map(|x| x.item.clone())
-                    .collect::<Vec<_>>(),
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        client_object_selectable_name,
-                    )) => {
-                        let client_object_selectable = client_object_selectable_named(
-                            db,
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to be valid. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db);
-
-                        client_object_selectable
-                            .variable_definitions
-                            .iter()
-                            .map(|x| x.item.clone())
-                            .collect()
-                    }
-                };
-
-                validate_use_of_arguments_impl(
-                    db,
-                    errors,
-                    &mut reachable_variables,
-                    field_argument_definitions,
-                    client_type.variable_definitions(),
-                    true,
-                    &object_selection.arguments,
-                    object_selection.name.location,
-                );
+                        errors,
+                        &mut reachable_variables,
+                        field_argument_definitions,
+                        client_type.variable_definitions(),
+                        true,
+                        &object_selection.arguments,
+                        object_selection.name.location,
+                    );
+                }
             }
         },
     );

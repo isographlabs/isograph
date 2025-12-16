@@ -755,7 +755,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
                     create_merged_selection_map_for_field_and_insert_into_global_map(
                         db,
-                        &object_selection_parent_object_entity,
+                        object_selection_parent_object_entity,
                         &object_selection.selection_set,
                         encountered_client_type_map,
                         (
