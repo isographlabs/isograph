@@ -116,10 +116,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
             match selection {
                 SelectionType::Scalar(scalar_selection) => {
-                    let scalar_selectable = selectable.as_scalar().expect(
-                        "Expected selectable to be a scalar. \
-                        This is indicative of a bug in Isograph.",
-                    );
+                    let scalar_selectable = match selectable.as_scalar() {
+                        Some(s) => s,
+                        None => {
+                            // This is validated in validate_selection_sets
+                            return;
+                        }
+                    };
                     let field_argument_definitions = match scalar_selectable {
                         DefinitionLocation::Server(server_scalar_selectable) => {
                             let server_scalar_selectable = server_scalar_selectable.lookup(db);
@@ -158,10 +161,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     );
                 }
                 SelectionType::Object(object_selection) => {
-                    let object_selectable = selectable.as_object().expect(
-                        "Expected selectable to be an object. \
-                        This is indicative of a bug in Isograph.",
-                    );
+                    let object_selectable = match selectable.as_object() {
+                        Some(s) => s,
+                        None => {
+                            // This is validated in validate_selection_sets
+                            return;
+                        }
+                    };
                     let field_argument_definitions = match object_selectable {
                         DefinitionLocation::Server(server_object_selectable) => {
                             server_object_selectable

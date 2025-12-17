@@ -286,7 +286,7 @@ fn selection_wrong_selection_type_diagnostic(
         format!(
             "In `{}.{}`, `{selectable_entity_name}.{selectable_name}` \
             is selected as {selected_as}. It should be selected \
-            as {proper_way_to_select}",
+            as {proper_way_to_select}.",
             selectable_declaration_info.parent_object_entity_name,
             selectable_declaration_info.selectable_name
         ),
@@ -304,7 +304,7 @@ fn selection_does_not_exist_diagnostic(
     Diagnostic::new_with_code_actions(
         format!(
             "In `{}.{}`, `{selectable_parent_object_entity_name}.{selectable_name}` is selected. \
-            However, `{selectable_name}` does not exist on `{selectable_parent_object_entity_name}`",
+            However, `{selectable_name}` does not exist on `{selectable_parent_object_entity_name}`.",
             selectable_declaration_info.parent_object_entity_name,
             selectable_declaration_info.selectable_name
         ),
