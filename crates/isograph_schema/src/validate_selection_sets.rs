@@ -10,8 +10,8 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerObjectEntity,
-    entity_not_defined_diagnostic, memoized_unvalidated_reader_selection_set_map,
-    selectable_is_not_defined_diagnostic, selectable_named, server_object_entity_named,
+    entity_not_defined_diagnostic, memoized_unvalidated_reader_selection_set_map, selectable_named,
+    server_object_entity_named,
 };
 
 pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
@@ -75,21 +75,17 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                         Ok(s) => match s {
                             Some(s) => s,
                             None => {
-                                errors.push(selectable_is_not_defined_diagnostic(
+                                errors.push(selection_does_not_exist_diagnostic(
                                     parent_entity.name,
                                     selectable_name,
                                     scalar_selection.name.location,
+                                    SelectionType::Scalar(()),
                                 ));
                                 continue;
                             }
                         },
-                        Err(_) => {
-                            errors.push(selection_does_not_exist_diagnostic(
-                                parent_entity.name,
-                                selectable_name,
-                                scalar_selection.name.location,
-                                SelectionType::Scalar(()),
-                            ));
+                        Err(e) => {
+                            errors.push(e);
                             continue;
                         }
                     };
@@ -179,21 +175,17 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                         Ok(s) => match s {
                             Some(s) => s,
                             None => {
-                                errors.push(selectable_is_not_defined_diagnostic(
+                                errors.push(selection_does_not_exist_diagnostic(
                                     parent_entity.name,
                                     selectable_name,
                                     object_selection.name.location,
+                                    SelectionType::Object(()),
                                 ));
                                 continue;
                             }
                         },
-                        Err(_) => {
-                            errors.push(selection_does_not_exist_diagnostic(
-                                parent_entity.name,
-                                selectable_name,
-                                object_selection.name.location,
-                                SelectionType::Object(()),
-                            ));
+                        Err(e) => {
+                            errors.push(e);
                             continue;
                         }
                     };
