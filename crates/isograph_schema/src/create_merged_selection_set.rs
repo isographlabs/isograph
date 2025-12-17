@@ -26,11 +26,11 @@ use crate::{
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, selectable_named, selectable_reader_selection_set,
-    server_id_selectable, server_object_entity_named, server_object_selectable_named,
+    initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
+    selectable_named, selectable_reader_selection_set, server_id_selectable,
+    server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -1081,7 +1081,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
-    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+    let validated_refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         newly_encountered_client_scalar_selectable.parent_object_entity_name,
         newly_encountered_client_scalar_selectable.name.item,

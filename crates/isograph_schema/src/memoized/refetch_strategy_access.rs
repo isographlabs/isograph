@@ -97,9 +97,7 @@ pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
-    TNetworkProtocol: NetworkProtocol,
->(
+pub fn refetch_strategy_for_client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
@@ -130,46 +128,6 @@ pub fn validated_refetch_strategy_for_client_scalar_selectable_named<
         None => vec![selectable_is_not_defined_diagnostic(
             parent_server_object_entity_name,
             client_scalar_selectable_name,
-            Location::Generated,
-        )]
-        .wrap_err(),
-    }
-}
-
-#[memo]
-pub fn validated_refetch_strategy_for_object_scalar_selectable_named<
-    TNetworkProtocol: NetworkProtocol,
->(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_server_object_entity_name: EntityName,
-    client_object_selectable_name: SelectableName,
-) -> DiagnosticVecResult<RefetchStrategy> {
-    let map = refetch_strategy_map(db).clone_err()?;
-
-    match map.get(&(
-        parent_server_object_entity_name,
-        client_object_selectable_name,
-    )) {
-        Some(result) => match result {
-            Ok(selection_type) => match selection_type {
-                SelectionType::Scalar(_) => vec![selectable_is_wrong_type_diagnostic(
-                    parent_server_object_entity_name,
-                    client_object_selectable_name,
-                    "an object",
-                    "a scalar",
-                    Location::Generated,
-                )]
-                .wrap_err(),
-                SelectionType::Object(s) => s
-                    .clone()
-                    .note_todo("Do not clone. Use a MemoRef.")
-                    .wrap_ok(),
-            },
-            Err(e) => e.clone().wrap_vec().wrap_err(),
-        },
-        None => vec![selectable_is_not_defined_diagnostic(
-            parent_server_object_entity_name,
-            client_object_selectable_name,
             Location::Generated,
         )]
         .wrap_err(),

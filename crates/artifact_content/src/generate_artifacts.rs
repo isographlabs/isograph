@@ -20,9 +20,10 @@ use isograph_schema::{
     ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedVariableDefinition,
     WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
     client_scalar_selectable_named, client_selectable_map, client_selectable_named,
-    fetchable_types, inline_fragment_reader_selection_set, selection_map_wrapped,
+    fetchable_types, inline_fragment_reader_selection_set,
+    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
     server_object_entity_named, server_object_selectable_named, validate_entire_schema,
-    validated_entrypoints, validated_refetch_strategy_for_client_scalar_selectable_named,
+    validated_entrypoints,
 };
 use lazy_static::lazy_static;
 use prelude::*;
@@ -337,7 +338,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             };
 
                             let validated_refetch_strategy =
-                                validated_refetch_strategy_for_client_scalar_selectable_named(
+                                refetch_strategy_for_client_scalar_selectable_named(
                                     db,
                                     client_scalar_selectable.parent_object_entity_name,
                                     client_scalar_selectable.name.item,

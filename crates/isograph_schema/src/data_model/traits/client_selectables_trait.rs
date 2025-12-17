@@ -8,7 +8,7 @@ use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
     NetworkProtocol, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
-    selectable_reader_selection_set, validated_refetch_strategy_for_client_scalar_selectable_named,
+    refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
 };
 
 #[impl_for_selection_type]
@@ -210,7 +210,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
 
     Ok(match selectable.variant {
         ClientFieldVariant::ImperativelyLoadedField(_) => {
-            let refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+            let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
                 db,
                 parent_object_entity_name,
                 client_scalar_selectable_name,

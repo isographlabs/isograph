@@ -14,9 +14,9 @@ use isograph_schema::{
     ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments, NetworkProtocol,
     NormalizationKey, PathToRefetchField, RefetchedPathsMap, ServerObjectSelectableVariant,
     VariableContext, categorize_field_loadability,
-    client_scalar_selectable_selection_set_for_parent_query, selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query,
+    refetch_strategy_for_client_scalar_selectable_named, selectable_named,
     selectable_reader_selection_set, transform_arguments_with_child_context,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -541,7 +541,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         indentation_level + 1,
     );
 
-    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+    let validated_refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         client_scalar_selectable.parent_object_entity_name,
         client_scalar_selectable.name.item,
