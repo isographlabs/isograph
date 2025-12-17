@@ -52,7 +52,16 @@ pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
         }
         .lookup(db);
 
-        validate_selection_set(db, &mut errors, selection_set, parent_entity)
+        validate_selection_set(
+            db,
+            &mut errors,
+            selection_set,
+            parent_entity,
+            ParentObjectEntityNameAndSelectableName {
+                parent_object_entity_name: key.0,
+                selectable_name: key.1,
+            },
+        )
     }
 
     errors
@@ -65,6 +74,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
     errors: &mut Vec<Diagnostic>,
     selection_set: &SelectionSet,
     parent_entity: &ServerObjectEntity<TNetworkProtocol>,
+    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
 ) {
     for selection in selection_set.selections.iter() {
         match selection.item.reference() {
@@ -80,6 +90,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                     selectable_name,
                                     scalar_selection.name.location,
                                     SelectionType::Scalar(()),
+                                    selectable_declaration_info,
                                 ));
                                 continue;
                             }
@@ -99,6 +110,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                             "an object",
                             "a scalar",
                             scalar_selection.name.location,
+                            selectable_declaration_info,
                         ));
                         continue;
                     }
@@ -180,6 +192,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                     selectable_name,
                                     object_selection.name.location,
                                     SelectionType::Object(()),
+                                    selectable_declaration_info,
                                 ));
                                 continue;
                             }
@@ -199,6 +212,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                             "an object",
                             "a scalar",
                             object_selection.name.location,
+                            selectable_declaration_info,
                         ));
                         continue;
                     }
@@ -253,6 +267,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                     errors,
                     &object_selection.selection_set.item,
                     new_parent_entity,
+                    selectable_declaration_info,
                 );
             }
         }
@@ -265,12 +280,15 @@ fn selection_wrong_selection_type_diagnostic(
     selected_as: &str,
     proper_way_to_select: &str,
     location: Location,
+    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
 ) -> Diagnostic {
     Diagnostic::new(
         format!(
-            "`{selectable_entity_name}.{selectable_name}` \
+            "In `{}.{}`, `{selectable_entity_name}.{selectable_name}` \
             is selected as {selected_as}. It should be selected \
-            as {proper_way_to_select}"
+            as {proper_way_to_select}",
+            selectable_declaration_info.parent_object_entity_name,
+            selectable_declaration_info.selectable_name
         ),
         location.wrap_some(),
     )
@@ -281,11 +299,14 @@ fn selection_does_not_exist_diagnostic(
     selectable_name: SelectableName,
     location: Location,
     selection_type: SelectionType<(), ()>,
+    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
 ) -> Diagnostic {
     Diagnostic::new_with_code_actions(
         format!(
-            "The field `{selectable_parent_object_entity_name}.{selectable_name}` is selected, but that \
-            field does not exist on `{selectable_parent_object_entity_name}`"
+            "In `{}.{}`, `{selectable_parent_object_entity_name}.{selectable_name}` is selected. \
+            However, `{selectable_name}` does not exist on `{selectable_parent_object_entity_name}`",
+            selectable_declaration_info.parent_object_entity_name,
+            selectable_declaration_info.selectable_name
         ),
         location.wrap_some(),
         match selection_type {
