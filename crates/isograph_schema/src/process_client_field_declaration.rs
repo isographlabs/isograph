@@ -204,7 +204,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
     let selections = client_field_declaration.selection_set.clone();
 
     let parent_object_entity_name = client_field_declaration.parent_type.item.0;
-    let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
+    let refetch_strategy = get_refetch_stategy(db, parent_object_entity_name)?;
 
     (
         UnprocessedClientScalarSelectableSelectionSet {
@@ -218,7 +218,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         .wrap_ok()
 }
 
-pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
+pub fn get_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy>> {
