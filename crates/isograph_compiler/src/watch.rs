@@ -116,7 +116,8 @@ fn process_create_event(
         CreateKind::File => {
             if paths.len() != 1 {
                 panic!(
-                    "File create event should contain exactly one file. This is indicative of a bug in Isograph."
+                    "File create event should contain exactly one file. \
+                    This is indicative of a bug in Isograph."
                 )
             }
             categorize_changed_file_and_filter_changes_in_artifact_directory(config, &paths[0])
@@ -137,7 +138,8 @@ fn process_modify_event(
         ModifyKind::Data(_) => {
             if paths.len() != 1 {
                 panic!(
-                    "File modify event should contain exactly one file. This is indicative of a bug in Isograph."
+                    "File modify event should contain exactly one file. \
+                    This is indicative of a bug in Isograph."
                 )
             }
             if paths[0].is_file() {
@@ -153,7 +155,8 @@ fn process_modify_event(
                 RenameMode::Any => {
                     if paths.len() != 1 {
                         panic!(
-                            "File rename event should contain exactly one file. This is indicative of a bug in Isograph."
+                            "File rename event should contain exactly one file. \
+                            This is indicative of a bug in Isograph."
                         )
                     }
                     categorize_changed_file_and_filter_changes_in_artifact_directory(
@@ -170,7 +173,8 @@ fn process_modify_event(
                 RenameMode::Both => {
                     if paths.len() != 2 {
                         panic!(
-                            "Rename event should contain exactly two paths. This is indicative of a bug in Isograph."
+                            "Rename event should contain exactly two paths. \
+                            This is indicative of a bug in Isograph."
                         )
                     }
                     categorize_changed_file_and_filter_changes_in_artifact_directory(
@@ -199,7 +203,8 @@ fn process_remove_event(
         RemoveKind::File | RemoveKind::Folder | RemoveKind::Any => {
             if paths.len() != 1 {
                 panic!(
-                    "Remove event should contain exactly one path. This is indicative of a bug in Isograph."
+                    "Remove event should contain exactly one path. \
+                    This is indicative of a bug in Isograph."
                 )
             }
             categorize_changed_file_and_filter_changes_in_artifact_directory(config, &paths[0])
