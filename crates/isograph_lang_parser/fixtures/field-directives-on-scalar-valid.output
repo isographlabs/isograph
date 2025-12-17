@@ -93,7 +93,6 @@ Ok(
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
                                                     loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
                                                         lazy_load_artifact: false,
                                                     },
                                                 },
@@ -418,7 +417,6 @@ Ok(
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
                                                     loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
                                                         lazy_load_artifact: false,
                                                     },
                                                 },
@@ -844,7 +842,6 @@ Ok(
                                             scalar_selection_directive_set: Loadable(
                                                 LoadableDirectiveSet {
                                                     loadable: LoadableDirectiveParameters {
-                                                        complete_selection_set: false,
                                                         lazy_load_artifact: true,
                                                     },
                                                 },
