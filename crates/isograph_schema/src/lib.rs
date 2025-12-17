@@ -15,6 +15,7 @@ mod refetch_strategy;
 mod validate;
 mod validate_argument_types;
 mod validate_entrypoint;
+mod validate_selection_sets;
 mod validate_use_of_arguments;
 mod validated_isograph_schema;
 mod variable_context;
