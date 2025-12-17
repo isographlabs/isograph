@@ -3,8 +3,8 @@ use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
 use crate::{
-    ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographResolvedNode,
-    IsographSemanticToken, entrypoint_directive_set::EntrypointDirectiveSet,
+    ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
+    IsographResolvedNode, IsographSemanticToken,
 };
 
 // TODO should this be ObjectTypeAndFieldNames?
@@ -22,7 +22,7 @@ pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<()>,
     pub dot: WithSpan<()>,
     pub iso_literal_text: IsoLiteralText,
-    pub entrypoint_directive_set: EntrypointDirectiveSet,
+    pub directive_set: Vec<WithSpan<IsographFieldDirective>>,
 
     pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
 }

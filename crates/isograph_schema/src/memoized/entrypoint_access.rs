@@ -2,7 +2,9 @@ use std::collections::{HashMap, hash_map::Entry};
 
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
-use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
+use isograph_lang_types::{
+    DefinitionLocation, EntrypointDeclaration, SelectionType, from_isograph_field_directives,
+};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
@@ -99,7 +101,9 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 
             Ok(EntrypointDeclarationInfo {
                 iso_literal_text: entrypoint_declaration_info.iso_literal_text,
-                directive_set: entrypoint_declaration_info.entrypoint_directive_set,
+                directive_set: from_isograph_field_directives(
+                    entrypoint_declaration_info.directive_set.reference(),
+                )?,
             })
         })();
 

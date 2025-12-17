@@ -131,16 +131,15 @@ fn parse_iso_entrypoint_declaration(
                     .to_with_embedded_location(tokens.text_source)
             })?;
 
-        let directives = parse_directives(tokens)?;
+        let directive_set = parse_directives(tokens)?;
 
-        let entrypoint_directive_set = from_isograph_field_directives(&directives)?;
         EntrypointDeclaration {
             parent_type,
             client_field_name,
             iso_literal_text,
             entrypoint_keyword: ().with_span(entrypoint_keyword),
             dot: dot.map(|_| ()),
-            entrypoint_directive_set,
+            directive_set,
             semantic_tokens: tokens.semantic_tokens(),
         }
         .wrap_ok()
