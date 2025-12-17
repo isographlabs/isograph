@@ -69,12 +69,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 ) {
     let mut reachable_variables = BTreeSet::new();
 
-    let validated_selections = match selectable_reader_selection_set(
+    let selection_set = match selectable_reader_selection_set(
         db,
         client_type.parent_object_entity_name(),
         client_type.name(),
     ) {
-        Ok(validated_selections) => validated_selections.lookup(db),
+        Ok(selection_set) => selection_set.lookup(db),
         Err(error) => {
             return errors.push(error);
         }
@@ -88,7 +88,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
     visit_selection_set(
         db,
-        validated_selections.item.selections.reference(),
+        selection_set.item.selections.reference(),
         parent_entity,
         &mut |selection, parent_object_entity| {
             let selectable = match selectable_named(

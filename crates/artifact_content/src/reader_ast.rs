@@ -541,7 +541,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         indentation_level + 1,
     );
 
-    let validated_refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
+    let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         client_scalar_selectable.parent_object_entity_name,
         client_scalar_selectable.name.item,
@@ -561,7 +561,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
         client_scalar_selectable.parent_object_entity_name,
-        validated_refetch_strategy
+        refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         indentation_level + 1,

@@ -337,7 +337,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 default_value: None,
                             };
 
-                            let validated_refetch_strategy =
+                            let refetch_strategy =
                                 refetch_strategy_for_client_scalar_selectable_named(
                                     db,
                                     client_scalar_selectable.parent_object_entity_name,
@@ -354,52 +354,51 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     This is indicative of a bug in Isograph.",
                                 );
 
-                            let (wrapped_map, variable_definitions_iter) =
-                                match validated_refetch_strategy {
-                                    RefetchStrategy::RefetchFromRoot => (
-                                        selection_map_wrapped(merged_selection_map.clone(), vec![]),
-                                        variable_definitions_iter.collect::<Vec<_>>(),
-                                    ),
-                                    RefetchStrategy::UseRefetchField(_) => {
-                                        let fetchable_types_map = fetchable_types(db)
-                                            .as_ref()
-                                            .expect(
-                                                "Expected parsing to have succeeded. \
+                            let (wrapped_map, variable_definitions_iter) = match refetch_strategy {
+                                RefetchStrategy::RefetchFromRoot => (
+                                    selection_map_wrapped(merged_selection_map.clone(), vec![]),
+                                    variable_definitions_iter.collect::<Vec<_>>(),
+                                ),
+                                RefetchStrategy::UseRefetchField(_) => {
+                                    let fetchable_types_map = fetchable_types(db)
+                                        .as_ref()
+                                        .expect(
+                                            "Expected parsing to have succeeded. \
                                                 This is indicative of a bug in Isograph.",
-                                            )
-                                            .lookup(db);
-
-                                        let query_id = fetchable_types_map
-                                            .iter()
-                                            .find(|(_, root_operation_name)| {
-                                                root_operation_name.0 == "query"
-                                            })
-                                            .expect("Expected query to be found")
-                                            .0;
-
-                                        let wrapped_map = selection_map_wrapped(
-                                            merged_selection_map.clone(),
-                                            vec![
-                                                WrappedSelectionMapSelection::InlineFragment(
-                                                    type_to_refine_to.name,
-                                                ),
-                                                WrappedSelectionMapSelection::LinkedField {
-                                                    parent_object_entity_name: *query_id,
-                                                    server_object_selectable_name: *NODE_FIELD_NAME,
-                                                    arguments: vec![id_arg.clone()],
-                                                    concrete_target_entity_name: None,
-                                                },
-                                            ],
-                                        );
-
-                                        (
-                                            wrapped_map,
-                                            variable_definitions_iter
-                                                .chain(std::iter::once(&id_var))
-                                                .collect(),
                                         )
-                                    }
-                                };
+                                        .lookup(db);
+
+                                    let query_id = fetchable_types_map
+                                        .iter()
+                                        .find(|(_, root_operation_name)| {
+                                            root_operation_name.0 == "query"
+                                        })
+                                        .expect("Expected query to be found")
+                                        .0;
+
+                                    let wrapped_map = selection_map_wrapped(
+                                        merged_selection_map.clone(),
+                                        vec![
+                                            WrappedSelectionMapSelection::InlineFragment(
+                                                type_to_refine_to.name,
+                                            ),
+                                            WrappedSelectionMapSelection::LinkedField {
+                                                parent_object_entity_name: *query_id,
+                                                server_object_selectable_name: *NODE_FIELD_NAME,
+                                                arguments: vec![id_arg.clone()],
+                                                concrete_target_entity_name: None,
+                                            },
+                                        ],
+                                    );
+
+                                    (
+                                        wrapped_map,
+                                        variable_definitions_iter
+                                            .chain(std::iter::once(&id_var))
+                                            .collect(),
+                                    )
+                                }
+                            };
 
                             let mut traversal_state = traversal_state.clone();
                             traversal_state.refetch_paths = traversal_state

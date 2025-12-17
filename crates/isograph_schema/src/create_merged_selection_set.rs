@@ -449,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet>,
+    selection_set: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
@@ -463,7 +463,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
             let field_traversal_result = create_field_traversal_result(
                 db,
                 parent_object_entity,
-                validated_selections,
+                selection_set,
                 encountered_client_type_map,
                 variable_context,
             );
@@ -480,18 +480,18 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet>,
+    selection_set: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> FieldTraversalResult {
     let mut traversal_state = ScalarClientFieldTraversalState::new();
     let mut merged_selection_map = BTreeMap::new();
 
-    merge_validated_selections_into_selection_map(
+    merge_selection_set_into_selection_map(
         db,
         &mut merged_selection_map,
         parent_object_entity,
-        validated_selections,
+        selection_set,
         &mut traversal_state,
         encountered_client_type_map,
         variable_context,
@@ -532,26 +532,22 @@ pub fn imperative_field_subfields_or_inline_fragments(
     }
 }
 
-fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
+fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet>,
+    selection_set: &WithSpan<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) {
-    for validated_selection in validated_selections.item.selections.iter() {
-        let selectable = selectable_named(
-            db,
-            parent_object_entity.name,
-            validated_selection.item.name(),
-        )
-        .as_ref()
-        .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-        .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
+    for selection in selection_set.item.selections.iter() {
+        let selectable = selectable_named(db, parent_object_entity.name, selection.item.name())
+            .as_ref()
+            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
-        match &validated_selection.item {
+        match &selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
                 match selectable.as_scalar().expect(
                     "Expected selectable to be a scalar. \
@@ -732,7 +728,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .lookup(db);
 
                     let reader_selection_set = inline_fragment_reader_selection_set();
-                    merge_validated_selections_into_selection_map(
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
@@ -741,7 +737,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         encountered_client_type_map,
                         variable_context,
                     );
-                    merge_validated_selections_into_selection_map(
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
@@ -826,7 +822,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             });
             match linked_field {
                 MergedServerSelection::LinkedField(existing_linked_field) => {
-                    merge_validated_selections_into_selection_map(
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_linked_field.selection_map,
                         object_selection_parent_object,
@@ -1081,7 +1077,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
-    let validated_refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
+    let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         newly_encountered_client_scalar_selectable.parent_object_entity_name,
         newly_encountered_client_scalar_selectable.name.item,
@@ -1101,7 +1097,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         parent_object_entity,
-        validated_refetch_strategy
+        refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         encountered_client_type_map,
@@ -1266,7 +1262,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
 
     match client_object_selectable {
         MergedServerSelection::ClientObjectSelectable(existing_client_object_selectable) => {
-            merge_validated_selections_into_selection_map(
+            merge_selection_set_into_selection_map(
                 db,
                 &mut existing_client_object_selectable.selection_map,
                 target_server_object_entity,
@@ -1299,7 +1295,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
-    let validated_selections = selectable_reader_selection_set(
+    let selections = selectable_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
         newly_encountered_client_type.name(),
@@ -1316,7 +1312,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         parent_object_entity,
-        validated_selections,
+        selections,
         encountered_client_type_map,
         newly_encountered_client_type_id.client_defined(),
         &initial_variable_context(&newly_encountered_client_type),
