@@ -35,7 +35,6 @@ const sidebars: SidebarsConfig = {
         'how-isograph-works/generated-artifacts',
         'how-isograph-works/babel-plugin',
         'how-isograph-works/one-pager',
-        'how-isograph-works/compiler-one-pager',
       ],
     },
     {
