@@ -412,7 +412,7 @@ fn validate_no_extraneous_arguments(
                 "This field has extra arguments: {0}",
                 extra_arguments
                     .iter()
-                    .map(|arg| format!("{}", arg.item.name))
+                    .map(|arg| format!("{}", arg.item.name.item))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),

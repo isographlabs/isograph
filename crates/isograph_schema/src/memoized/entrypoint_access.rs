@@ -1,6 +1,6 @@
 use std::collections::{HashMap, hash_map::Entry};
 
-use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{DefinitionLocation, EntrypointDeclaration, SelectionType};
 use pico_macros::memo;
@@ -90,7 +90,10 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 selectable_is_not_defined_diagnostic(
                     entrypoint_declaration_info.parent_type.item.0,
                     entrypoint_declaration_info.client_field_name.item.0,
-                    entrypoint_declaration_info.client_field_name.location,
+                    entrypoint_declaration_info
+                        .client_field_name
+                        .location
+                        .into(),
                 )
             })?;
 
@@ -125,6 +128,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         entrypoint_declaration_info
                             .client_field_name
                             .location
+                            .to::<Location>()
                             .wrap_some(),
                     )
                     .wrap_err()

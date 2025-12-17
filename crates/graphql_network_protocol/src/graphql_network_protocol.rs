@@ -466,14 +466,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                         .name
                                         .item,
                                     arguments: vec![],
-                                    concrete_target_entity_name: Some(
-                                        target_parent_object_entity_name,
-                                    )
-                                    .note_todo(
-                                        "This is 100% a bug when there are \
+                                    concrete_target_entity_name: target_parent_object_entity_name
+                                        .wrap_some()
+                                        .note_todo(
+                                            "This is 100% a bug when there are \
                                             multiple items in parts_reversed, or this \
                                             field is ignored.",
-                                    ),
+                                        ),
                                 }
                             }
                             ServerObjectSelectableVariant::InlineFragment => {

@@ -4,7 +4,7 @@ use crate::{
     ValidatedSelection, selectable_named,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, Location,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EntityName, IsographCodeAction, Location,
     ParentObjectEntityNameAndSelectableName, SelectableName, WithSpan, WithSpanPostfix,
 };
 use isograph_lang_types::{
@@ -95,6 +95,7 @@ fn get_validated_scalar_selection<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_name,
             scalar_selection.name.item,
             scalar_selection.name.location,
+            SelectionType::Scalar(()),
         )
     })?;
 
@@ -192,14 +193,16 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
     let selectable = selectable_named(db, parent_object_entity_name, object_selection.name.item);
 
     let selectable = selectable.clone_err()?.as_ref().ok_or_else(|| {
-        vec![selection_does_not_exist_diagnostic(
+        selection_does_not_exist_diagnostic(
             top_level_field_or_pointer.client_type(),
             type_and_field.parent_object_entity_name,
             type_and_field.selectable_name,
             parent_object_entity_name,
             object_selection.name.item,
             object_selection.name.location,
-        )]
+            SelectionType::Object(()),
+        )
+        .wrap_vec()
     })?;
 
     let (associated_data, new_parent_object_entity_name) = match selectable {
@@ -211,7 +214,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 .map_err(|server_scalar_selectable| {
                     let server_scalar_selectable = server_scalar_selectable.lookup(db);
 
-                    vec![selection_wrong_selection_type_diagnostic(
+                    selection_wrong_selection_type_diagnostic(
                         top_level_field_or_pointer.client_type(),
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
@@ -220,7 +223,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         "a scalar",
                         "an object",
                         server_scalar_selectable.name.location,
-                    )]
+                    )
+                    .wrap_vec()
                 })?
                 .lookup(db);
 
@@ -239,7 +243,7 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                 .as_object_result()
                 .as_ref()
                 .map_err(|e| {
-                    vec![selection_wrong_selection_type_diagnostic(
+                    selection_wrong_selection_type_diagnostic(
                         top_level_field_or_pointer.client_type(),
                         type_and_field.parent_object_entity_name,
                         type_and_field.selectable_name,
@@ -248,7 +252,8 @@ fn get_validated_object_selection<TNetworkProtocol: NetworkProtocol>(
                         "a scalar",
                         "an object",
                         e.lookup(db).name.location,
-                    )]
+                    )
+                    .wrap_vec()
                 })?;
 
             let client_object_selectable = client_object_selectable.lookup(db);
@@ -332,14 +337,30 @@ fn selection_does_not_exist_diagnostic(
     selectable_parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
     location: Location,
+    selection_type: SelectionType<(), ()>,
 ) -> Diagnostic {
-    Diagnostic::new(
+    Diagnostic::new_with_code_actions(
         format!(
             "In the client {client_type} `{declaration_parent_object_entity_name}.{declaration_selectable_name}`, \
             the field `{selectable_parent_object_entity_name}.{selectable_name}` is selected, but that \
             field does not exist on `{selectable_parent_object_entity_name}`"
         ),
         location.wrap_some(),
+        match selection_type {
+            SelectionType::Scalar(_) => IsographCodeAction::CreateNewScalarSelectable(
+                ParentObjectEntityNameAndSelectableName {
+                    parent_object_entity_name: selectable_parent_object_entity_name,
+                    selectable_name,
+                },
+            ),
+            SelectionType::Object(_) => IsographCodeAction::CreateNewObjectSelectable(
+                ParentObjectEntityNameAndSelectableName {
+                    parent_object_entity_name: selectable_parent_object_entity_name,
+                    selectable_name,
+                },
+            ),
+        }
+        .wrap_vec(),
     )
 }
 

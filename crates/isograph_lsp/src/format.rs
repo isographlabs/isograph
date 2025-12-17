@@ -2,7 +2,6 @@ use common_lang_types::{
     CurrentWorkingDirectory, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
-use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
 };
@@ -18,13 +17,14 @@ use lsp_types::{
 use pico_macros::memo;
 use prelude::Postfix;
 
+use crate::lsp_state::LspState;
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
 pub fn on_format<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <Formatting as Request>::Params,
 ) -> LSPRuntimeResult<<Formatting as Request>::Result> {
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
     let url = params.text_document.uri;
 
     let current_working_directory = db.get_current_working_directory();

@@ -207,6 +207,7 @@ mod tests {
     use super::*;
     use common_lang_types::{ArtifactPath, ParentObjectEntityNameAndSelectableName};
     use intern::string_key::Intern;
+    use prelude::Postfix;
     use std::path::PathBuf;
 
     fn create_artifact(
@@ -216,10 +217,11 @@ mod tests {
         content: &str,
     ) -> ArtifactPathAndContent {
         let type_and_field = match (server, selectable) {
-            (Some(s), Some(sel)) => Some(ParentObjectEntityNameAndSelectableName {
+            (Some(s), Some(sel)) => ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: s.intern().into(),
                 selectable_name: sel.intern().into(),
-            }),
+            }
+            .wrap_some(),
             _ => None,
         };
 

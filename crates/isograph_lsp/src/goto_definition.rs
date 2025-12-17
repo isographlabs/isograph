@@ -2,10 +2,10 @@ use crate::{
     hover::get_iso_literal_extraction_from_text_position_params,
     location_utils::isograph_location_to_lsp_location,
     lsp_runtime_error::{LSPRuntimeError, LSPRuntimeResult},
+    lsp_state::LspState,
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
-use isograph_compiler::CompilerState;
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
@@ -28,10 +28,10 @@ use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
 pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
-    compiler_state: &CompilerState<TNetworkProtocol>,
+    lsp_state: &LspState<TNetworkProtocol>,
     params: <GotoDefinition as Request>::Params,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
-    let db = &compiler_state.db;
+    let db = &lsp_state.compiler_state.db;
     on_goto_definition_impl(
         db,
         params.text_document_position_params.text_document.uri,

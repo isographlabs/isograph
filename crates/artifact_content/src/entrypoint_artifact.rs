@@ -352,10 +352,11 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .into(),
         artifact_path: ArtifactPath {
             file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
-            type_and_field: Some(ParentObjectEntityNameAndSelectableName {
+            type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: type_name,
                 selectable_name: field_name,
-            }),
+            }
+            .wrap_some(),
         },
     });
     path_and_contents.push(ArtifactPathAndContent {

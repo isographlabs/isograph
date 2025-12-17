@@ -80,8 +80,10 @@ const nextConfig = {
 };
 ```
 
+TanStack Start also uses `StrictMode` in the default configuration of the [client entry point](https://tanstack.com/start/latest/docs/framework/react/guide/client-entry-point). Strict mode can be disabled by creating a custom client entry point in `src/client.tsx` and omitting `StrictMode`.
+
 :::note Why is this necessary?
-See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode/) for an explanation.
+See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode) for an explanation.
 :::
 
 ## Create a `.babelrc.js`

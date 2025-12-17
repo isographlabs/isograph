@@ -105,7 +105,11 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
         &self,
         relative_path: RelativePathToSourceFile,
     ) -> Option<SourceId<IsoLiteralsSource>> {
-        self.iso_literal_map.0.get(&relative_path).cloned()
+        self.get_iso_literal_map()
+            .tracked()
+            .0
+            .get(&relative_path)
+            .cloned()
     }
 
     pub fn insert_iso_literal(&mut self, relative_path: RelativePathToSourceFile, content: String) {

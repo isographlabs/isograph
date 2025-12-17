@@ -1,11 +1,9 @@
 on:
   workflow_call:
-    inputs:
+    secrets:
       vs-marketplace-token:
-        type: string
         required: true
       open-vsx-token:
-        type: string
         required: true
 
 name: Release Isograph Extension

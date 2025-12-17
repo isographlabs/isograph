@@ -182,7 +182,7 @@ impl<TValue> Deref for GraphQLNamedTypeAnnotation<TValue> {
 
 impl<TValue: fmt::Display> fmt::Display for GraphQLNamedTypeAnnotation<TValue> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", self.0.item)
     }
 }
 

@@ -127,7 +127,6 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                         db,
                         // TODO it makes no sense to intern here
                         client_field_declaration.item.interned_value(db),
-                        text_source,
                     ) {
                         Ok(unprocessed_client_field_items) => unprocess_client_field_items
                             .push(unprocessed_client_field_items.scalar_selected()),
@@ -255,7 +254,9 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>
         content,
     } = read_iso_literals_source_from_relative_path(db, relative_path_to_source_file)
         .as_ref()
-        .expect("Expected relative path to exist");
+        .unwrap_or_else(|| {
+            panic!("Expected relative path (`{relative_path_to_source_file}`) to exist")
+        });
 
     EXTRACT_ISO_LITERAL
         .captures_iter(content)

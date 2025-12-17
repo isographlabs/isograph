@@ -1,7 +1,6 @@
 mod opt;
 
 use clap::Parser;
-use colored::Colorize;
 use common_lang_types::CurrentWorkingDirectory;
 use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::string_key::Intern;
@@ -78,18 +77,18 @@ async fn start_language_server(
         &config_location,
         current_working_directory,
     );
-    info!("Starting language server");
-    if let Err(_e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
+    if let Err(e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
         &config_location,
         current_working_directory,
     )
     .await
     {
-        error!(
-            "{}",
-            "Error encountered when running language server.".bright_red(),
-            // TODO derive Error and print e
-        );
+        // TODO use eprintln once we figure out how to make clippy not complain
+        error!("Error(s) encountered when running language server.");
+        for err in e {
+            error!("\n{:?}", err);
+        }
+
         std::process::exit(1);
     }
 }

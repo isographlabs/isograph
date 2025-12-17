@@ -20,11 +20,11 @@ use crate::{
 pub struct ClientFieldDeclaration {
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<EntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub client_scalar_selectable_directive_set:
@@ -43,13 +43,13 @@ pub struct ClientPointerDeclaration {
     pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     #[resolve_field]
-    pub parent_type: WithSpan<EntityNameWrapper>,
+    pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
+    pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithSpan<SelectionSet<(), ()>>,
     pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
