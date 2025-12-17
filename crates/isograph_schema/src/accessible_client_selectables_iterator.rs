@@ -4,8 +4,8 @@ use prelude::Postfix;
 
 use crate::{
     ClientSelectableId, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
-    client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, selectable_named,
+    selectable_reader_selection_set,
 };
 
 use isograph_lang_types::SelectionType;
@@ -31,11 +31,13 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
 
         SelectionType::Object(object) => {
             let object = object.lookup(db);
+            let parent_object_entity_name = object.parent_object_entity_name;
+            let client_object_selectable_name = object.name.item;
             (
-                client_object_selectable_selection_set_for_parent_query(
+                selectable_reader_selection_set(
                     db,
-                    object.parent_object_entity_name,
-                    object.name.item,
+                    parent_object_entity_name,
+                    client_object_selectable_name,
                 )
                 .expect("Expected selection set to be valid"),
                 object.parent_object_entity_name,

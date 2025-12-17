@@ -1,8 +1,6 @@
 use std::collections::HashMap;
 
-use common_lang_types::{
-    DiagnosticResult, DiagnosticVecResult, EntityName, SelectableName, WithSpan, WithSpanPostfix,
-};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithSpan, WithSpanPostfix};
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico_macros::memo;
 use prelude::Postfix;
@@ -14,7 +12,7 @@ use crate::{
 
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
+pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (EntityName, SelectableName),
@@ -98,35 +96,17 @@ pub fn memoized_unvalidated_reader_selection_set_map<TNetworkProtocol: NetworkPr
     map
 }
 
-#[memo]
-pub fn memoized_validated_reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> HashMap<(EntityName, SelectableName), DiagnosticVecResult<WithSpan<SelectionSet>>> {
-    let unvalidated_map = memoized_unvalidated_reader_selection_set_map(db).to_owned();
-
-    unvalidated_map
-        .into_iter()
-        .map(|(key, value)| {
-            (
-                key,
-                value
-                    .map_err(|e| vec![e])
-                    .map(|unvalidated_selection_set| unvalidated_selection_set.inner()),
-            )
-        })
-        .collect()
-}
-
-pub fn selectable_validated_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
+pub fn selectable_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticVecResult<WithSpan<SelectionSet>> {
-    let map = memoized_validated_reader_selection_set_map(db);
+) -> DiagnosticResult<WithSpan<SelectionSet>> {
+    let map = reader_selection_set_map(db);
 
     map.get(&(parent_server_object_entity_name, selectable_name))
         .unwrap_or_else(|| panic!("Expected selectable to have been defined. \
             This is indicative of a bug in Isograph. {parent_server_object_entity_name}.{selectable_name}"))
         .clone()
+        .map(|x| x.inner())
         .note_todo("Do not clone. Use a MemoRef.")
 }

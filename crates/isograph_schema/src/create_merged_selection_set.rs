@@ -26,7 +26,7 @@ use crate::{
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
+    initial_variable_context, selectable_named, selectable_reader_selection_set,
     server_id_selectable, server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
@@ -1299,7 +1299,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
-    let validated_selections = selectable_validated_reader_selection_set(
+    let validated_selections = selectable_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
         newly_encountered_client_type.name(),

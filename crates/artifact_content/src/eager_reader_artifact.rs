@@ -11,9 +11,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
     LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ServerEntityName,
-    ServerObjectSelectable, client_object_selectable_selection_set_for_parent_query,
-    client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
-    server_object_entity_named,
+    ServerObjectSelectable, client_scalar_selectable_selection_set_for_parent_query,
+    initial_variable_context, selectable_reader_selection_set, server_object_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
@@ -76,13 +75,15 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 .expect("Expected selection set to exist and to be valid.")
             }
             SelectionType::Object(object) => {
-                client_object_selectable_selection_set_for_parent_query(
+                let parent_object_entity_name = object.parent_object_entity_name;
+                let client_object_selectable_name = object.name.item;
+                selectable_reader_selection_set(
                     db,
-                    object.parent_object_entity_name,
-                    object.name.item,
+                    parent_object_entity_name,
+                    client_object_selectable_name,
                 )
-                .expect("Expected selection set to exist and to be valid.")
             }
+            .expect("Expected selection set to exist and to be valid."),
         },
         0,
         refetched_paths,
@@ -325,12 +326,16 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             scalar.name.item,
         )
         .expect("Expected selection set to be valid."),
-        SelectionType::Object(object) => client_object_selectable_selection_set_for_parent_query(
-            db,
-            object.parent_object_entity_name,
-            object.name.item,
-        )
-        .expect("Expected selection set to be valid."),
+        SelectionType::Object(object) => {
+            let parent_object_entity_name = object.parent_object_entity_name;
+            let client_object_selectable_name = object.name.item;
+            selectable_reader_selection_set(
+                db,
+                parent_object_entity_name,
+                client_object_selectable_name,
+            )
+            .expect("Expected selection set to be valid.")
+        }
     };
     let client_scalar_selectable_parameter_type = generate_client_selectable_parameter_type(
         db,

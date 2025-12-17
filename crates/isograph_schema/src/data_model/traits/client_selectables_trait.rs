@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DiagnosticResult, DiagnosticVecResult, EntityName, ParentObjectEntityNameAndSelectableName,
-    SelectableName, WithLocation, WithSpan,
+    DiagnosticResult, EntityName, ParentObjectEntityNameAndSelectableName, SelectableName,
+    WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
@@ -8,8 +8,7 @@ use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
     NetworkProtocol, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
-    selectable_validated_reader_selection_set,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    selectable_reader_selection_set, validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 #[impl_for_selection_type]
@@ -238,7 +237,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
         }
         _ => {
             // TODO don't clone
-            selectable_validated_reader_selection_set(
+            selectable_reader_selection_set(
                 db,
                 parent_object_entity_name,
                 client_scalar_selectable_name,
@@ -248,19 +247,4 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
             .clone()
         }
     })
-}
-
-pub fn client_object_selectable_selection_set_for_parent_query<
-    TNetworkProtocol: NetworkProtocol,
->(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: EntityName,
-    client_object_selectable_name: SelectableName,
-) -> DiagnosticVecResult<WithSpan<SelectionSet>> {
-    selectable_validated_reader_selection_set(
-        db,
-        parent_object_entity_name,
-        client_object_selectable_name,
-    )
-    .clone()
 }

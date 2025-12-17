@@ -14,9 +14,8 @@ use isograph_schema::{
     ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments, NetworkProtocol,
     NormalizationKey, PathToRefetchField, RefetchedPathsMap, ServerObjectSelectableVariant,
     VariableContext, categorize_field_loadability,
-    client_object_selectable_selection_set_for_parent_query,
     client_scalar_selectable_selection_set_for_parent_query, selectable_named,
-    transform_arguments_with_child_context,
+    selectable_reader_selection_set, transform_arguments_with_child_context,
     validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 use pico::MemoRef;
@@ -842,16 +841,19 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 match object_selectable {
                     DefinitionLocation::Client(client_object_selectable) => {
                         let client_object_selectable = client_object_selectable.lookup(db);
+                        let parent_object_entity_name =
+                            client_object_selectable.parent_object_entity_name;
+                        let client_object_selectable_name = client_object_selectable.name.item;
                         let new_paths = refetched_paths_with_path(
                             db,
                             client_object_selectable
                                 .target_object_entity_name
                                 .inner()
                                 .dereference(),
-                            &client_object_selectable_selection_set_for_parent_query(
+                            &selectable_reader_selection_set(
                                 db,
-                                client_object_selectable.parent_object_entity_name,
-                                client_object_selectable.name.item,
+                                parent_object_entity_name,
+                                client_object_selectable_name,
                             )
                             .expect("Expected selection set to be valid."),
                             path,

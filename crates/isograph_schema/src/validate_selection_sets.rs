@@ -10,14 +10,14 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerObjectEntity,
-    entity_not_defined_diagnostic, memoized_unvalidated_reader_selection_set_map, selectable_named,
+    entity_not_defined_diagnostic, reader_selection_set_map, selectable_named,
     server_object_entity_named,
 };
 
 pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<Diagnostic> {
-    let selection_sets = memoized_unvalidated_reader_selection_set_map(db);
+    let selection_sets = reader_selection_set_map(db);
 
     let mut errors = vec![];
     for (key, selection_set) in selection_sets {

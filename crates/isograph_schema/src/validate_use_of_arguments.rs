@@ -15,7 +15,7 @@ use prelude::{ErrClone, Postfix};
 use crate::{
     ClientScalarOrObjectSelectable, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
     ValidatedVariableDefinition, client_selectable_map, selectable_named,
-    selectable_validated_reader_selection_set, server_object_entity_named,
+    selectable_reader_selection_set, server_object_entity_named,
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
 };
 
@@ -69,14 +69,14 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 ) {
     let mut reachable_variables = BTreeSet::new();
 
-    let validated_selections = match selectable_validated_reader_selection_set(
+    let validated_selections = match selectable_reader_selection_set(
         db,
         client_type.parent_object_entity_name(),
         client_type.name(),
     ) {
         Ok(validated_selections) => validated_selections,
-        Err(new_errors) => {
-            return errors.extend(new_errors);
+        Err(error) => {
+            return errors.push(error);
         }
     };
 
