@@ -74,16 +74,15 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 )
                 .expect("Expected selection set to exist and to be valid.")
             }
-            SelectionType::Object(object) => {
-                let parent_object_entity_name = object.parent_object_entity_name;
-                let client_object_selectable_name = object.name.item;
-                selectable_reader_selection_set(
-                    db,
-                    parent_object_entity_name,
-                    client_object_selectable_name,
-                )
-            }
-            .expect("Expected selection set to exist and to be valid."),
+            SelectionType::Object(object) => selectable_reader_selection_set(
+                db,
+                object.parent_object_entity_name,
+                object.name.item,
+            )
+            .expect("Expected selection set to exist and to be valid.")
+            .lookup(db)
+            .clone()
+            .note_todo("Don't clone"),
         },
         0,
         refetched_paths,
@@ -335,6 +334,9 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
                 client_object_selectable_name,
             )
             .expect("Expected selection set to be valid.")
+            .lookup(db)
+            .clone()
+            .note_todo("Don't clone")
         }
     };
     let client_scalar_selectable_parameter_type = generate_client_selectable_parameter_type(

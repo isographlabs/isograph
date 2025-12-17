@@ -29,8 +29,8 @@ pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
             }
         };
         let selection_set = match selection_set {
-            SelectionType::Scalar(s) => &s.item,
-            SelectionType::Object(o) => &o.item,
+            SelectionType::Scalar(s) => s.lookup(db).item.reference(),
+            SelectionType::Object(o) => o.lookup(db).item.reference(),
         };
 
         let parent_entity = match server_object_entity_named(db, key.0).clone_err() {

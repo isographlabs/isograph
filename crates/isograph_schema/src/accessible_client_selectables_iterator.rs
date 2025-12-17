@@ -39,7 +39,10 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
                     parent_object_entity_name,
                     client_object_selectable_name,
                 )
-                .expect("Expected selection set to be valid"),
+                .expect("Expected selection set to be valid")
+                .lookup(db)
+                .clone()
+                .note_todo("Do not clone"),
                 object.parent_object_entity_name,
             )
         }

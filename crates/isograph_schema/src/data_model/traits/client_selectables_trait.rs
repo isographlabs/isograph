@@ -230,7 +230,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
                 .refetch_selection_set()
                 .expect(
                     "Expected imperatively loaded field to have refetch selection set. \
-                This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 // TODO don't clone
                 .clone()
@@ -244,6 +244,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
             )
             .as_ref()
             .expect("Expected selection set to be valid.")
+            .lookup(db)
             .clone()
         }
     })

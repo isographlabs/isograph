@@ -1304,7 +1304,8 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
         newly_encountered_client_type.parent_object_entity_name(),
         newly_encountered_client_type.name(),
     )
-    .expect("Expected selections to be valid.");
+    .expect("Expected selections to be valid.")
+    .lookup(db);
 
     // Here, we are doing a bunch of work, just so that we can have the refetched paths,
     // which is really really silly.
@@ -1315,7 +1316,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         parent_object_entity,
-        &validated_selections,
+        validated_selections,
         encountered_client_type_map,
         newly_encountered_client_type_id.client_defined(),
         &initial_variable_context(&newly_encountered_client_type),

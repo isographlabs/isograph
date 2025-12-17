@@ -74,7 +74,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         client_type.parent_object_entity_name(),
         client_type.name(),
     ) {
-        Ok(validated_selections) => validated_selections,
+        Ok(validated_selections) => validated_selections.lookup(db),
         Err(error) => {
             return errors.push(error);
         }
@@ -88,7 +88,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
     visit_selection_set(
         db,
-        &validated_selections.item.selections,
+        validated_selections.item.selections.reference(),
         parent_entity,
         &mut |selection, parent_object_entity| {
             let selectable = match selectable_named(

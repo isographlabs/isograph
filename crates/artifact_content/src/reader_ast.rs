@@ -850,12 +850,13 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                 .target_object_entity_name
                                 .inner()
                                 .dereference(),
-                            &selectable_reader_selection_set(
+                            selectable_reader_selection_set(
                                 db,
                                 parent_object_entity_name,
                                 client_object_selectable_name,
                             )
-                            .expect("Expected selection set to be valid."),
+                            .expect("Expected selection set to be valid.")
+                            .lookup(db),
                             path,
                             &initial_variable_context.child_variable_context(
                                 &object_selection.arguments,

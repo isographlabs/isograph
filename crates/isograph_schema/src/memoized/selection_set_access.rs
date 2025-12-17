@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithSpan, WithSpanPostfix};
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
+use pico::MemoRef;
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -16,7 +17,9 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<
     (EntityName, SelectableName),
-    DiagnosticResult<SelectionType<WithSpan<SelectionSet>, WithSpan<SelectionSet>>>,
+    DiagnosticResult<
+        SelectionType<MemoRef<WithSpan<SelectionSet>>, MemoRef<WithSpan<SelectionSet>>>,
+    >,
 > {
     // TODO use client_selectable_map
     let declaration_map = client_selectable_declaration_map_from_iso_literals(db);
@@ -29,8 +32,8 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                 *key,
                 s.lookup(db)
                     .selection_set
-                    .clone()
-                    .note_todo("Do not clone. Use a MemoRef.")
+                    .reference()
+                    .interned_ref(db)
                     .scalar_selected()
                     .wrap_ok(),
             ),
@@ -38,8 +41,8 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                 *key,
                 o.lookup(db)
                     .selection_set
-                    .clone()
-                    .note_todo("Do not clone. Use a MemoRef.")
+                    .reference()
+                    .interned_ref(db)
                     .object_selected()
                     .wrap_ok(),
             ),
@@ -59,6 +62,7 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                     ),
                     SelectionSet { selections: vec![] }
                         .with_generated_span()
+                        .interned_value(db)
                         .scalar_selected()
                         .wrap_ok(),
                 );
@@ -83,8 +87,8 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                     (*parent_object_entity_name, (*selectable_name)),
                     refetch_strategy
                         .refetch_selection_set
-                        .clone()
-                        .note_todo("Do not clone. Use a MemoRef.")
+                        .reference()
+                        .interned_ref(db)
                         .note_todo("This seems really wonky and wrong")
                         .scalar_selected()
                         .wrap_ok(),
@@ -100,7 +104,7 @@ pub fn selectable_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<WithSpan<SelectionSet>> {
+) -> DiagnosticResult<MemoRef<WithSpan<SelectionSet>>> {
     let map = reader_selection_set_map(db);
 
     map.get(&(parent_server_object_entity_name, selectable_name))
