@@ -1,4 +1,4 @@
-use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName, WithLocation};
+use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, Description, EntityNameWrapper,
@@ -19,16 +19,6 @@ use crate::{
 pub trait ServerScalarOrObjectEntity {
     fn name(&self) -> SelectionType<EntityName, EntityName>;
     fn description(&self) -> Option<Description>;
-}
-
-impl<T: ServerScalarOrObjectEntity> ServerScalarOrObjectEntity for WithLocation<T> {
-    fn name(&self) -> SelectionType<EntityName, EntityName> {
-        self.item.name()
-    }
-
-    fn description(&self) -> Option<Description> {
-        self.item.description()
-    }
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity

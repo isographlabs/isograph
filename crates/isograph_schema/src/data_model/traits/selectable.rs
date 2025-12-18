@@ -15,8 +15,6 @@ pub trait SelectableTrait {
     fn description(&self) -> Option<Description>;
     fn name(&self) -> SelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
-    // TODO convert this to &[VariableDefinition] or &[WithSpan] or &[WithLocation]
-    // i.e. settle on one!
     fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>>;
 }
 
