@@ -1,4 +1,6 @@
-use common_lang_types::{Diagnostic, IsographDirectiveName, WithLocation, WithSpan};
+use common_lang_types::{
+    DeserializationError, Diagnostic, IsographDirectiveName, WithLocation, WithSpan,
+};
 use intern::Lookup;
 use prelude::Postfix;
 use serde::{
@@ -17,7 +19,9 @@ pub struct IsographFieldDirective {
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
     directives: &'a [WithSpan<IsographFieldDirective>],
 ) -> Result<T, Diagnostic> {
-    T::deserialize(IsographFieldDirectivesDeserializer { directives })
+    T::deserialize(IsographFieldDirectivesDeserializer { directives }).map_err(|e| {
+        Diagnostic::new(e.to_string(), None).note_todo("Provide a location of the directives")
+    })
 }
 
 #[derive(Debug)]
@@ -26,7 +30,7 @@ struct IsographFieldDirectiveDeserializer<'a> {
 }
 
 impl<'de> Deserializer<'de> for IsographFieldDirectiveDeserializer<'de> {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -64,7 +68,7 @@ impl<'a> NameValuePairVecDeserializer<'a> {
 }
 
 impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -91,16 +95,12 @@ impl<'de> MapAccess<'de> for NameValuePairVecDeserializer<'de> {
                     value: &name_value_pair.item.value.item,
                 })
             }
-            _ => Diagnostic::new(
-                format!(
-                    "Unable to deserialize directive. \
+            _ => DeserializationError::Custom(format!(
+                "Unable to deserialize directive. \
                     Called deserialization of field value for a field with index {} \
                     that doesn't exist. This is indicative of a bug in Isograph.",
-                    self.field_idx
-                ),
-                // TODO location
-                None,
-            )
+                self.field_idx
+            ))
             .wrap_err(),
         }
     }
@@ -111,7 +111,7 @@ struct NameDeserializer {
 }
 
 impl<'de> Deserializer<'de> for NameDeserializer {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -131,7 +131,7 @@ pub struct NonConstantValueDeserializer<'de> {
     value: &'de NonConstantValue,
 }
 
-impl<'de> IntoDeserializer<'de, Diagnostic> for &'de NonConstantValue {
+impl<'de> IntoDeserializer<'de, DeserializationError> for &'de NonConstantValue {
     type Deserializer = NonConstantValueDeserializer<'de>;
 
     fn into_deserializer(self) -> Self::Deserializer {
@@ -140,7 +140,7 @@ impl<'de> IntoDeserializer<'de, Diagnostic> for &'de NonConstantValue {
 }
 
 impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -181,7 +181,7 @@ struct IsographFieldDirectivesDeserializer<'a> {
 }
 
 impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
@@ -223,7 +223,7 @@ impl<'a> IsographFieldDirectiveVecDeserializer<'a> {
 }
 
 impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
-    type Error = Diagnostic;
+    type Error = DeserializationError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -250,16 +250,12 @@ impl<'de> MapAccess<'de> for IsographFieldDirectiveVecDeserializer<'de> {
                     directive: &directive.item,
                 })
             }
-            _ => Diagnostic::new(
-                format!(
-                    "Unable to deserialize directive. \
-                    Called deserialization of field value for a field with index {} \
-                    that doesn't exist. This is indicative of a bug in Isograph.",
-                    self.field_index
-                ),
-                // TODO get location
-                None,
-            )
+            _ => DeserializationError::Custom(format!(
+                "Unable to deserialize directive. \
+                Called deserialization of field value for a field with index {} \
+                that doesn't exist. This is indicative of a bug in Isograph.",
+                self.field_index
+            ))
             .wrap_err(),
         }
     }

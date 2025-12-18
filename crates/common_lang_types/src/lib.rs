@@ -1,4 +1,5 @@
 mod absolute_and_relative_path;
+mod deserialization_error;
 mod diagnostic;
 mod entity_and_selectable_name;
 mod file_system_operation;
@@ -11,6 +12,7 @@ mod string_types;
 mod text_with_carats;
 
 pub use absolute_and_relative_path::*;
+pub use deserialization_error::*;
 pub use diagnostic::*;
 pub use entity_and_selectable_name::*;
 pub use file_system_operation::*;

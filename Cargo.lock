@@ -586,6 +586,7 @@ dependencies = [
  "prelude",
  "serde",
  "string_key_newtype",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
