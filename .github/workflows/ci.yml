@@ -523,7 +523,7 @@ jobs:
 
   publish-isograph-extension:
     name: Publish Isograph Extension
-    if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
+    if: github.event_name == 'push'
     uses: ./.github/workflows/publish-isograph-extension.yml
     needs: [all-checks-passed]
     secrets:
