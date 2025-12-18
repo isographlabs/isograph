@@ -1,4 +1,4 @@
-export default 'query PetCheckinsCardList($skip: Int!, $limit: Int!, $id: ID!) {\
+export default 'query PetCheckinsCardList($id: ID!, $limit: Int!, $skip: Int!) {\
   node____id___v_id: node(id: $id) {\
     ... on Pet {\
       __typename,\

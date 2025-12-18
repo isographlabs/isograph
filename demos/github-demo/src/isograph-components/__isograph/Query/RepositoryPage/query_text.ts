@@ -1,4 +1,4 @@
-export default 'query RepositoryPage($repositoryName: String!, $repositoryOwner: String!, $first: Int!) {\
+export default 'query RepositoryPage($first: Int!, $repositoryName: String!, $repositoryOwner: String!) {\
   repository____name___v_repositoryName____owner___v_repositoryOwner: repository(name: $repositoryName, owner: $repositoryOwner) {\
     id,\
     nameWithOwner,\

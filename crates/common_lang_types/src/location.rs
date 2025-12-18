@@ -132,10 +132,21 @@ impl fmt::Display for Location {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord)]
 pub struct WithLocation<T> {
     pub location: Location,
     pub item: T,
+}
+
+impl<TValue: PartialOrd> PartialOrd for WithLocation<TValue> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Compare item first
+        match self.item.partial_cmp(&other.item) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.location.partial_cmp(&other.location)
+    }
 }
 
 pub trait WithLocationPostfix
@@ -212,10 +223,21 @@ impl<T: fmt::Display> fmt::Display for WithLocationForDisplay<'_, T> {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord, PartialOrd)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord)]
 pub struct WithEmbeddedLocation<T> {
     pub location: EmbeddedLocation,
     pub item: T,
+}
+
+impl<TValue: PartialOrd> PartialOrd for WithEmbeddedLocation<TValue> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Compare item first
+        match self.item.partial_cmp(&other.item) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.location.partial_cmp(&other.location)
+    }
 }
 
 impl<T: Error> Error for WithEmbeddedLocation<T> {

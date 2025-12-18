@@ -1,4 +1,4 @@
-export default 'query RepositoryConnection($first: Int, $after: String, $id: ID!) {\
+export default 'query RepositoryConnection($after: String, $first: Int, $id: ID!) {\
   node____id___v_id: node(id: $id) {\
     ... on User {\
       __typename,\
