@@ -6,9 +6,9 @@ on:
       open-vsx-token:
         required: true
 
-name: Release Isograph Extension
+name: Publish Isograph Extension
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
