@@ -10,14 +10,11 @@ use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
 };
+use isograph_schema::process_iso_literal_extraction;
 use isograph_schema::{
-    IsoLiteralsSource, IsographDatabase, NetworkProtocol, client_object_selectable_named,
-    entity_definition_location, get_parent_and_selectable_for_object_path,
-    get_parent_and_selectable_for_scalar_path,
-};
-use isograph_schema::{
-    client_scalar_selectable_named, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
+    IsographDatabase, NetworkProtocol, entity_definition_location,
+    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
+    selectable_definition_location,
 };
 use lsp_types::{
     GotoDefinitionResponse, Position, Uri,
@@ -92,15 +89,22 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
-                if let Ok((_, selectable)) =
+                if let Ok((parent, selectable)) =
                     get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
+                    let parent = parent.lookup(db);
                     match selectable {
-                        DefinitionLocation::Server(server_selectable) => server_selectable
-                            .lookup(db)
-                            .name
-                            .location
-                            .as_embedded_location()
+                        DefinitionLocation::Server(server_selectable) => {
+                            selectable_definition_location(
+                                db,
+                                parent.name,
+                                server_selectable.lookup(db).name,
+                            )
+                            .as_ref()
+                            .ok()
+                            .copied()
+                            .flatten()
+                            .and_then(|x| x.as_embedded_location())
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -108,40 +112,50 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     &db.get_schema_source().content,
                                 )
                             })
-                            .map(lsp_location_to_scalar_response),
-                        DefinitionLocation::Client(client_selectable) => client_selectable
-                            .lookup(db)
-                            .name
-                            .location
-                            .as_embedded_location()
+                            .map(lsp_location_to_scalar_response)
+                        }
+                        DefinitionLocation::Client(client_selectable) => {
+                            selectable_definition_location(
+                                db,
+                                parent.name,
+                                client_selectable.lookup(db).name,
+                            )
+                            .as_ref()
+                            .ok()
+                            .copied()
+                            .flatten()
+                            .and_then(|x| x.as_embedded_location())
                             .and_then(|location| {
-                                let IsoLiteralsSource {
-                                    relative_path: _,
-                                    content,
-                                } = read_iso_literals_source_from_relative_path(
+                                isograph_location_to_lsp_location(
                                     db,
-                                    location.text_source.relative_path_to_source_file,
+                                    location,
+                                    &db.get_schema_source().content,
                                 )
-                                .as_ref()
-                                .expect("Expected relative path to exist");
-                                isograph_location_to_lsp_location(db, location, content)
                             })
-                            .map(lsp_location_to_scalar_response),
+                            .map(lsp_location_to_scalar_response)
+                        }
                     }
                 } else {
                     None
                 }
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
-                if let Ok((_, selectable)) =
+                if let Ok((parent, selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
                 {
+                    let parent = parent.lookup(db);
                     match selectable {
-                        DefinitionLocation::Server(server_selectable) => server_selectable
-                            .lookup(db)
-                            .name
-                            .location
-                            .as_embedded_location()
+                        DefinitionLocation::Server(server_selectable) => {
+                            selectable_definition_location(
+                                db,
+                                parent.name,
+                                server_selectable.lookup(db).name,
+                            )
+                            .as_ref()
+                            .ok()
+                            .copied()
+                            .flatten()
+                            .and_then(|x| x.as_embedded_location())
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -149,26 +163,28 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                                     &db.get_schema_source().content,
                                 )
                             })
-                            .map(lsp_location_to_scalar_response),
-                        DefinitionLocation::Client(client_selectable) => client_selectable
-                            .lookup(db)
-                            .name
-                            .location
-                            .as_embedded_location()
+                            .map(lsp_location_to_scalar_response)
+                        }
+                        DefinitionLocation::Client(client_selectable) => {
+                            selectable_definition_location(
+                                db,
+                                parent.name,
+                                client_selectable.lookup(db).name,
+                            )
+                            .as_ref()
+                            .ok()
+                            .copied()
+                            .flatten()
+                            .and_then(|x| x.as_embedded_location())
                             .and_then(|location| {
-                                let IsoLiteralsSource {
-                                    relative_path: _,
-                                    content,
-                                } = read_iso_literals_source_from_relative_path(
+                                isograph_location_to_lsp_location(
                                     db,
-                                    location.text_source.relative_path_to_source_file,
+                                    location,
+                                    &db.get_schema_source().content,
                                 )
-                                .as_ref()
-                                .expect("Expected relative path to exist");
-
-                                isograph_location_to_lsp_location(db, location, content)
                             })
-                            .map(lsp_location_to_scalar_response),
+                            .map(lsp_location_to_scalar_response)
+                        }
                     }
                 } else {
                     None
@@ -188,37 +204,18 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     }
                 };
 
-                let client_scalar_selectable = match client_scalar_selectable_named(
-                    db,
-                    parent_type_name.0.unchecked_conversion(),
-                    wrapper.inner.0,
-                )
-                .as_ref()
-                {
-                    Ok(item) => item,
-                    Err(_) => return Ok(None),
-                };
-
-                client_scalar_selectable
+                selectable_definition_location(db, parent_type_name.0, wrapper.inner.0)
                     .as_ref()
-                    .and_then(|referenced_selectable| {
-                        referenced_selectable
-                            .lookup(db)
-                            .name
-                            .location
-                            .as_embedded_location()
-                            .and_then(|location| {
-                                let IsoLiteralsSource {
-                                    relative_path: _,
-                                    content,
-                                } = read_iso_literals_source_from_relative_path(
-                                    db,
-                                    location.text_source.relative_path_to_source_file,
-                                )
-                                .as_ref()
-                                .expect("Expected relative path to exist");
-                                isograph_location_to_lsp_location(db, location, content)
-                            })
+                    .ok()
+                    .copied()
+                    .flatten()
+                    .and_then(|x| x.as_embedded_location())
+                    .and_then(|location| {
+                        isograph_location_to_lsp_location(
+                            db,
+                            location,
+                            &db.get_schema_source().content,
+                        )
                     })
                     .map(lsp_location_to_scalar_response)
             }
@@ -231,35 +228,20 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     ) => position_resolution_path.inner.parent_type.item,
                 };
 
-                let referenced_selectable = client_object_selectable_named(
-                    db,
-                    parent_type_name.0.unchecked_conversion(),
-                    object_wrapper_path.inner.0,
-                )
-                .as_ref()
-                .map_err(|_| LSPRuntimeError::ExpectedError)?
-                .as_ref()
-                .ok_or(LSPRuntimeError::ExpectedError)?;
-
-                let lsp_location_opt = referenced_selectable
-                    .lookup(db)
-                    .name
-                    .location
-                    .as_embedded_location()
+                selectable_definition_location(db, parent_type_name.0, object_wrapper_path.inner.0)
+                    .as_ref()
+                    .ok()
+                    .copied()
+                    .flatten()
+                    .and_then(|x| x.as_embedded_location())
                     .and_then(|location| {
-                        let IsoLiteralsSource {
-                            relative_path: _,
-                            content,
-                        } = read_iso_literals_source_from_relative_path(
+                        isograph_location_to_lsp_location(
                             db,
-                            location.text_source.relative_path_to_source_file,
+                            location,
+                            &db.get_schema_source().content,
                         )
-                        .as_ref()
-                        .expect("Expected relative path to exist");
-                        isograph_location_to_lsp_location(db, location, content)
-                    });
-
-                lsp_location_opt.map(lsp_location_to_scalar_response)
+                    })
+                    .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::SelectionSet(_) => None,
         }

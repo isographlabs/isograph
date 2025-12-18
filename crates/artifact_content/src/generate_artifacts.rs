@@ -1,6 +1,6 @@
 use common_lang_types::{
     ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DiagnosticVecResult,
-    WithLocation, WithSpanPostfix, derive_display,
+    EmbeddedLocation, VariableName, WithLocationPostfix, derive_display,
 };
 use core::panic;
 use graphql_lang_types::{
@@ -316,20 +316,21 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             )
                             .lookup(db);
 
-                            let variable_definitions_iter = client_scalar_selectable
-                                .variable_definitions
-                                .iter()
-                                .map(|variable_definition| &variable_definition.item);
+                            let variable_definitions_iter =
+                                client_scalar_selectable.variable_definitions.iter();
 
                             let id_var = ValidatedVariableDefinition {
-                                name: WithLocation::new_generated(
-                                    ID_FIELD_NAME.unchecked_conversion(),
-                                ),
+                                name: (*ID_FIELD_NAME)
+                                    .unchecked_conversion::<VariableName>()
+                                    .with_embedded_location(EmbeddedLocation::todo_generated()),
+
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(
                                             ServerEntityName::Scalar(*ID_ENTITY_NAME)
-                                                .with_generated_span(),
+                                                .with_embedded_location(
+                                                    EmbeddedLocation::todo_generated(),
+                                                ),
                                         ),
                                     )
                                     .boxed(),
@@ -341,7 +342,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 refetch_strategy_for_client_scalar_selectable_named(
                                     db,
                                     client_scalar_selectable.parent_object_entity_name,
-                                    client_scalar_selectable.name.item,
+                                    client_scalar_selectable.name,
                                 )
                                 .as_ref()
                                 .expect(

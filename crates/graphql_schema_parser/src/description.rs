@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use common_lang_types::{DescriptionValue, WithSpan};
+use common_lang_types::{DescriptionValue, WithEmbeddedLocation};
 use graphql_syntax::TokenKind;
 use intern::string_key::Intern;
 use prelude::Postfix;
@@ -9,11 +9,13 @@ use super::peekable_lexer::PeekableLexer;
 
 pub(crate) fn parse_optional_description(
     tokens: &mut PeekableLexer,
-) -> Option<WithSpan<DescriptionValue>> {
+) -> Option<WithEmbeddedLocation<DescriptionValue>> {
     parse_single_line_description(tokens).or_else(|| parse_multiline_description(tokens))
 }
 
-fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<DescriptionValue>> {
+fn parse_multiline_description(
+    tokens: &mut PeekableLexer,
+) -> Option<WithEmbeddedLocation<DescriptionValue>> {
     tokens
         .parse_source_of_kind(TokenKind::BlockStringLiteral)
         .map(|parsed_str| {
@@ -23,7 +25,9 @@ fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<De
         .ok()
 }
 
-fn parse_single_line_description(tokens: &mut PeekableLexer) -> Option<WithSpan<DescriptionValue>> {
+fn parse_single_line_description(
+    tokens: &mut PeekableLexer,
+) -> Option<WithEmbeddedLocation<DescriptionValue>> {
     tokens
         .parse_source_of_kind(TokenKind::StringLiteral)
         .map(|parsed_str| {

@@ -4,7 +4,7 @@ use crate::{
 };
 use common_lang_types::{
     CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
-    RelativePathToSourceFile, Span, TextSource, WithSpan,
+    RelativePathToSourceFile, Span, TextSource, WithEmbeddedLocation,
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, parse_iso_literal};
 use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
@@ -114,7 +114,7 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     contains_iso: ParsedIsoLiteralsMap,
 ) -> DiagnosticVecResult<(
     Vec<UnprocessedSelectionSet>,
-    Vec<(TextSource, WithSpan<EntrypointDeclaration>)>,
+    Vec<(TextSource, WithEmbeddedLocation<EntrypointDeclaration>)>,
 )> {
     let mut errors = vec![];
     let mut unprocess_client_field_items = vec![];
@@ -142,7 +142,6 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
                         db,
                         // TODO it makes no sense to intern here
                         client_pointer_declaration.item.interned_value(db),
-                        text_source,
                     ) {
                         Ok(unprocessed_client_pointer_item) => unprocess_client_field_items
                             .push(unprocessed_client_pointer_item.object_selected()),

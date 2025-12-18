@@ -199,7 +199,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                 entrypoint
                     .variable_definitions()
                     .iter()
-                    .find(|definition| definition.item.name.item == *variable_name)
+                    .find(|definition| definition.name.item == *variable_name)
                     .unwrap_or_else(|| {
                         panic!(
                             "Did not find matching variable definition. \
@@ -210,7 +210,6 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                             variable_name
                         )
                     })
-                    .item
                     .clone()
                     .wrap_some()
             }

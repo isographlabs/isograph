@@ -73,16 +73,10 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         entrypoint_declaration_info.client_field_name.item.0,
                         "client field",
                         actual_type,
-                        match selectable {
-                            DefinitionLocation::Server(server) => match server {
-                                SelectionType::Scalar(s) => s.lookup(db).name.location,
-                                SelectionType::Object(o) => o.lookup(db).name.location,
-                            },
-                            DefinitionLocation::Client(c) => match c {
-                                SelectionType::Scalar(s) => s.lookup(db).name.location,
-                                SelectionType::Object(o) => o.lookup(db).name.location,
-                            },
-                        },
+                        entrypoint_declaration_info
+                            .client_field_name
+                            .location
+                            .into(),
                     );
                 }
 

@@ -65,14 +65,14 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                                         SelectionType::Scalar(s) => {
                                             let scalar = s.lookup(db);
                                             (
-                                                scalar.name.item.to_string(),
+                                                scalar.name.to_string(),
                                                 scalar.description.map(|x| x.to_string()),
                                             )
                                         }
                                         SelectionType::Object(o) => {
                                             let object = o.lookup(db);
                                             (
-                                                object.name.item.to_string(),
+                                                object.name.to_string(),
                                                 object.description.map(|x| x.to_string()),
                                             )
                                         }
@@ -81,14 +81,14 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                                         SelectionType::Scalar(s) => {
                                             let scalar = s.lookup(db);
                                             (
-                                                scalar.name.item.to_string(),
+                                                scalar.name.to_string(),
                                                 scalar.description.map(|x| x.to_string()),
                                             )
                                         }
                                         SelectionType::Object(o) => {
                                             let object = o.lookup(db);
                                             (
-                                                object.name.item.to_string(),
+                                                object.name.to_string(),
                                                 object.description.map(|x| x.to_string()),
                                             )
                                         }

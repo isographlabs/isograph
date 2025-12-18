@@ -1,6 +1,6 @@
 use common_lang_types::{
     DiagnosticResult, EntityName, ParentObjectEntityNameAndSelectableName, SelectableName,
-    WithLocation, WithSpan,
+    WithEmbeddedLocation,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
@@ -18,7 +18,7 @@ pub trait ClientScalarOrObjectSelectable {
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>];
+    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>];
 
     fn client_type(&self) -> &'static str;
 }
@@ -31,13 +31,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item,
+            selectable_name: self.name,
         }
     }
 
@@ -45,7 +45,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
 
@@ -62,13 +62,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item,
+            selectable_name: self.name,
         }
     }
 
@@ -76,7 +76,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
 
@@ -93,13 +93,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item,
+            selectable_name: self.name,
         }
     }
 
@@ -107,7 +107,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
 
@@ -124,13 +124,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_object_entity_name: self.parent_object_entity_name,
-            selectable_name: self.name.item,
+            selectable_name: self.name,
         }
     }
 
@@ -138,7 +138,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn variable_definitions(&self) -> &[WithSpan<VariableDefinition<ServerEntityName>>] {
+    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
 
@@ -154,8 +154,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x)
+    fn name(&self) -> SelectableName {
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -163,7 +163,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
-        self.variable_definitions.iter().map(|x| &x.item).collect()
+        // TODO we can do better!!
+        self.variable_definitions.iter().collect()
     }
 }
 
@@ -174,8 +175,8 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
         self.description
     }
 
-    fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x)
+    fn name(&self) -> SelectableName {
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -183,7 +184,7 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     }
 
     fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
-        self.variable_definitions.iter().map(|x| &x.item).collect()
+        self.variable_definitions.iter().collect()
     }
 }
 
@@ -193,7 +194,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
-) -> DiagnosticResult<WithSpan<SelectionSet>> {
+) -> DiagnosticResult<WithEmbeddedLocation<SelectionSet>> {
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,

@@ -5,7 +5,7 @@ use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 use super::{GraphQLConstantValue, write_arguments, write_directives};
 use common_lang_types::{
     DescriptionValue, DirectiveName, EntityName, EnumLiteralValue, InputTypeName, InputValueName,
-    SelectableName, WithEmbeddedLocation, WithLocation, WithSpan,
+    SelectableName, WithEmbeddedLocation,
 };
 use strum::EnumString;
 
@@ -71,10 +71,10 @@ impl From<GraphQLSchemaDefinition> for GraphQLTypeSystemDefinition {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Default, Hash)]
-pub struct GraphQLTypeSystemDocument(pub Vec<WithLocation<GraphQLTypeSystemDefinition>>);
+pub struct GraphQLTypeSystemDocument(pub Vec<WithEmbeddedLocation<GraphQLTypeSystemDefinition>>);
 
 impl Deref for GraphQLTypeSystemDocument {
-    type Target = Vec<WithLocation<GraphQLTypeSystemDefinition>>;
+    type Target = Vec<WithEmbeddedLocation<GraphQLTypeSystemDefinition>>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
@@ -83,7 +83,7 @@ impl Deref for GraphQLTypeSystemDocument {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLTypeSystemExtensionDocument(
-    pub Vec<WithLocation<GraphQLTypeSystemExtensionOrDefinition>>,
+    pub Vec<WithEmbeddedLocation<GraphQLTypeSystemExtensionOrDefinition>>,
 );
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
@@ -111,56 +111,56 @@ impl From<GraphQLObjectTypeExtension> for GraphQLTypeSystemExtension {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLObjectTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<EntityName>,
-    pub interfaces: Vec<WithLocation<EntityName>>,
+    pub interfaces: Vec<WithEmbeddedLocation<EntityName>>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
+    pub fields: Vec<WithEmbeddedLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLObjectTypeExtension {
-    pub name: WithLocation<EntityName>,
-    pub interfaces: Vec<WithLocation<EntityName>>,
+    pub name: WithEmbeddedLocation<EntityName>,
+    pub interfaces: Vec<WithEmbeddedLocation<EntityName>>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
+    pub fields: Vec<WithEmbeddedLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLScalarTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<EntityName>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub name: WithEmbeddedLocation<EntityName>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInterfaceTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<EntityName>,
-    pub interfaces: Vec<WithLocation<EntityName>>,
+    pub interfaces: Vec<WithEmbeddedLocation<EntityName>>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLFieldDefinition>>,
+    pub fields: Vec<WithEmbeddedLocation<GraphQLFieldDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInputObjectTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<EntityName>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub fields: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub fields: Vec<WithEmbeddedLocation<GraphQLInputValueDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLSchemaDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub query: Option<WithLocation<EntityName>>,
-    pub subscription: Option<WithLocation<EntityName>>,
-    pub mutation: Option<WithLocation<EntityName>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub query: Option<WithEmbeddedLocation<EntityName>>,
+    pub subscription: Option<WithEmbeddedLocation<EntityName>>,
+    pub mutation: Option<WithEmbeddedLocation<EntityName>>,
     // These should have locations
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
@@ -191,34 +191,34 @@ pub enum DirectiveLocation {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLDirectiveDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<DirectiveName>,
-    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
-    pub repeatable: Option<WithSpan<()>>,
-    pub locations: Vec<WithSpan<DirectiveLocation>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub name: WithEmbeddedLocation<DirectiveName>,
+    pub arguments: Vec<WithEmbeddedLocation<GraphQLInputValueDefinition>>,
+    pub repeatable: Option<WithEmbeddedLocation<()>>,
+    pub locations: Vec<WithEmbeddedLocation<DirectiveLocation>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLEnumDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<EntityName>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub name: WithEmbeddedLocation<EntityName>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub enum_value_definitions: Vec<WithLocation<GraphQLEnumValueDefinition>>,
+    pub enum_value_definitions: Vec<WithEmbeddedLocation<GraphQLEnumValueDefinition>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLEnumValueDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub value: WithLocation<EnumLiteralValue>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub value: WithEmbeddedLocation<EnumLiteralValue>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLUnionTypeDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<EntityName>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-    pub union_member_types: Vec<WithLocation<EntityName>>,
+    pub union_member_types: Vec<WithEmbeddedLocation<EntityName>>,
 }
 
 impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
@@ -239,10 +239,10 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
 /// A server field definition on an object or interface
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLFieldDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<SelectableName>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub name: WithEmbeddedLocation<SelectableName>,
     pub type_: GraphQLTypeAnnotation<EntityName>,
-    pub arguments: Vec<WithLocation<GraphQLInputValueDefinition>>,
+    pub arguments: Vec<WithEmbeddedLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 
     // TODO we can probably restructure things to make this less awkward.
@@ -274,12 +274,12 @@ impl fmt::Display for GraphQLFieldDefinition {
 /// This is an argument definition, but we're using the GraphQL spec lingo here.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInputValueDefinition {
-    pub description: Option<WithSpan<DescriptionValue>>,
-    pub name: WithLocation<InputValueName>,
+    pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
+    pub name: WithEmbeddedLocation<InputValueName>,
     pub type_: GraphQLTypeAnnotation<InputTypeName>,
     // This unused, except for printing. Isograph does not care about this,
     // except inasmuch as it means that the type is nullable.
-    pub default_value: Option<WithLocation<GraphQLConstantValue>>,
+    pub default_value: Option<WithEmbeddedLocation<GraphQLConstantValue>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 }
 

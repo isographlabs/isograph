@@ -6,8 +6,8 @@ use crate::{
     process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EntityName, Location, SelectableName, WithLocation,
-    WithLocationPostfix, WithNonFatalDiagnostics,
+    Diagnostic, DiagnosticResult, EntityName, Location, SelectableName, WithEmbeddedLocation,
+    WithLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::{
@@ -27,8 +27,9 @@ type MemoRefDeclaration =
 #[memo]
 pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> WithNonFatalDiagnostics<BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefDeclaration>>>
-{
+) -> WithNonFatalDiagnostics<
+    BTreeMap<(EntityName, SelectableName), WithEmbeddedLocation<MemoRefDeclaration>>,
+> {
     let mut out: BTreeMap<(_, SelectableName), _> = BTreeMap::new();
     let mut non_fatal_diagnostics = vec![];
 
@@ -39,7 +40,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                     IsoLiteralExtractionResult::ClientPointerDeclaration(
                         client_pointer_declaration,
                     ) => {
-                        insert_selectable_or_multiple_definition_diagnostic(
+                        insert_selectable_or_multiple_definition_diagnostic_2(
                             &mut out,
                             (
                                 client_pointer_declaration.item.parent_type.item.0,
@@ -49,15 +50,14 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .object_selected()
-                                .with_generated_location()
-                                .note_todo("Real location"),
+                                .with_embedded_location(client_pointer_declaration.location),
                             &mut non_fatal_diagnostics,
                         );
                     }
                     IsoLiteralExtractionResult::ClientFieldDeclaration(
                         client_field_declaration,
                     ) => {
-                        insert_selectable_or_multiple_definition_diagnostic(
+                        insert_selectable_or_multiple_definition_diagnostic_2(
                             &mut out,
                             (
                                 client_field_declaration.item.parent_type.item.0,
@@ -67,8 +67,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .scalar_selected()
-                                .with_generated_location()
-                                .note_todo("Real location"),
+                                .with_embedded_location(client_field_declaration.location),
                             &mut non_fatal_diagnostics,
                         );
                     }
@@ -357,13 +356,13 @@ pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
 pub fn multiple_selectable_definitions_found_diagnostic(
     parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
-    location: Location,
+    location: Option<Location>,
 ) -> Diagnostic {
     Diagnostic::new(
         format!(
             "Multiple definitions of `{parent_object_entity_name}.{selectable_name}` were found"
         ),
-        location.wrap_some(),
+        location,
     )
 }
 
@@ -381,6 +380,7 @@ pub fn selectable_is_wrong_type_diagnostic(
         ),
         location.wrap_some(),
     )
+    .note_todo("Rewrite this to account for the new location (the selection location)")
 }
 
 pub fn selectable_is_not_defined_diagnostic(
@@ -405,8 +405,32 @@ pub fn insert_selectable_or_multiple_definition_diagnostic<Value>(
         Entry::Vacant(vacant_entry) => {
             vacant_entry.insert(item);
         }
-        Entry::Occupied(_) => non_fatal_diagnostics.push(
-            multiple_selectable_definitions_found_diagnostic(key.0, key.1, item.location),
-        ),
+        Entry::Occupied(_) => {
+            non_fatal_diagnostics.push(multiple_selectable_definitions_found_diagnostic(
+                key.0,
+                key.1,
+                item.location.to::<Location>().wrap_some(),
+            ))
+        }
+    }
+}
+
+pub fn insert_selectable_or_multiple_definition_diagnostic_2<Value>(
+    map: &mut BTreeMap<(EntityName, SelectableName), WithEmbeddedLocation<Value>>,
+    key: (EntityName, SelectableName),
+    item: WithEmbeddedLocation<Value>,
+    non_fatal_diagnostics: &mut Vec<Diagnostic>,
+) {
+    match map.entry(key) {
+        Entry::Vacant(vacant_entry) => {
+            vacant_entry.insert(item);
+        }
+        Entry::Occupied(_) => {
+            non_fatal_diagnostics.push(multiple_selectable_definitions_found_diagnostic(
+                key.0,
+                key.1,
+                item.location.to::<Location>().wrap_some(),
+            ))
+        }
     }
 }

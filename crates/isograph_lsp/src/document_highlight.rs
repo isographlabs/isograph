@@ -87,10 +87,10 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
                 }
             },
             IsographResolvedNode::ScalarSelection(scalar_path) => {
-                scalar_path.inner.name.location.as_embedded_location()
+                scalar_path.inner.name.location.wrap_some()
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
-                object_path.inner.name.location.as_embedded_location()
+                object_path.inner.name.location.wrap_some()
             }
             IsographResolvedNode::ClientScalarSelectableNameWrapper(scalar) => {
                 match scalar.parent {

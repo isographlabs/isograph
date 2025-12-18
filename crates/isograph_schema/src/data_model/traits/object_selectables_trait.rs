@@ -34,7 +34,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -54,7 +54,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -74,7 +74,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
@@ -94,7 +94,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn name(&self) -> SelectableName {
-        self.name.item
+        self.name
     }
 
     fn parent_object_entity_name(&self) -> EntityName {

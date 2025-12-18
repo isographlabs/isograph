@@ -1,7 +1,8 @@
 use std::fmt;
 
 use common_lang_types::{
-    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithLocation, WithSpan,
+    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithEmbeddedLocation,
+    WithSpan,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -13,7 +14,7 @@ pub enum GraphQLConstantValue {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithLocation<GraphQLConstantValue>>),
+    List(Vec<WithEmbeddedLocation<GraphQLConstantValue>>),
     Object(Vec<NameValuePair<ValueKeyName, GraphQLConstantValue>>),
 }
 
@@ -112,11 +113,10 @@ impl std::convert::From<i64> for FloatValue {
     }
 }
 
-// TODO get rid of this WithSpan and move it to the generic
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct NameValuePair<TName, TValue> {
-    pub name: WithLocation<TName>,
-    pub value: WithLocation<TValue>,
+    pub name: WithEmbeddedLocation<TName>,
+    pub value: WithEmbeddedLocation<TValue>,
 }
 
 impl<TName, TValue> NameValuePair<TName, TValue> {

@@ -581,6 +581,7 @@ name = "common_lang_types"
 version = "0.5.0"
 dependencies = [
  "intern",
+ "lazy_static",
  "pathdiff",
  "pico",
  "prelude",

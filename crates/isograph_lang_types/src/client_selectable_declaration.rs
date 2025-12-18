@@ -1,6 +1,5 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, EntityName, RelativePathToSourceFile, WithEmbeddedLocation,
-    WithSpan,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
@@ -25,13 +24,13 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet>,
+    pub selection_set: WithEmbeddedLocation<SelectionSet>,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition<EntityName>>>,
     pub definition_path: RelativePathToSourceFile,
 
-    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+    pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
 }
 
 pub type ClientFieldDeclarationPath<'a> = PositionResolutionPath<&'a ClientFieldDeclaration, ()>;
@@ -50,11 +49,11 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet>,
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<EntityName>>>,
+    pub selection_set: WithEmbeddedLocation<SelectionSet>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition<EntityName>>>,
     pub definition_path: RelativePathToSourceFile,
 
-    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+    pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
 }
 
 pub type ClientPointerDeclarationPath<'a> =
@@ -64,7 +63,7 @@ pub type ClientPointerDeclarationPath<'a> =
 #[resolve_position(parent_type=SelectionSetParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
 pub struct SelectionSet {
     #[resolve_field]
-    pub selections: Vec<WithSpan<Selection>>,
+    pub selections: Vec<WithEmbeddedLocation<Selection>>,
 }
 
 #[derive(Debug)]

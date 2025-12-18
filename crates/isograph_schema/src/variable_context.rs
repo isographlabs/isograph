@@ -1,6 +1,6 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use common_lang_types::{SelectableName, VariableName, WithLocation, WithSpan};
+use common_lang_types::{SelectableName, VariableName, WithEmbeddedLocation};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType,
@@ -18,8 +18,8 @@ pub struct VariableContext(pub HashMap<VariableName, NonConstantValue>);
 impl VariableContext {
     pub fn child_variable_context(
         &self,
-        selection_arguments: &[WithLocation<SelectionFieldArgument>],
-        child_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+        selection_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
+        child_variable_definitions: &[ValidatedVariableDefinition],
         selection_variant: &ScalarSelectionDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),
@@ -36,7 +36,7 @@ impl VariableContext {
         let variable_context = child_variable_definitions
             .iter()
             .map(|variable_definition| {
-                let variable_name = variable_definition.item.name.item;
+                let variable_name = variable_definition.name.item;
 
                 let matching_arg = match selection_arguments
                     .iter()
@@ -52,7 +52,7 @@ impl VariableContext {
                             // intended behavior.)
                             return (variable_name, NonConstantValue::Variable(variable_name));
                         } else if let Some(default_value) =
-                            variable_definition.item.default_value.as_ref()
+                            variable_definition.default_value.as_ref()
                         {
                             return (variable_name, default_value.clone().item.into());
                         } else {
@@ -113,8 +113,8 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .map(|variable_definition| {
             (
-                variable_definition.item.name.item,
-                NonConstantValue::Variable(variable_definition.item.name.item),
+                variable_definition.name.item,
+                NonConstantValue::Variable(variable_definition.name.item),
             )
         })
         .collect();
@@ -128,8 +128,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol>
             .iter()
             .map(|variable_definition| {
                 (
-                    variable_definition.item.name.item,
-                    NonConstantValue::Variable(variable_definition.item.name.item),
+                    variable_definition.name.item,
+                    NonConstantValue::Variable(variable_definition.name.item),
                 )
             })
             .collect();
@@ -145,8 +145,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol>
             .iter()
             .map(|variable_definition| {
                 (
-                    variable_definition.item.name.item,
-                    NonConstantValue::Variable(variable_definition.item.name.item),
+                    variable_definition.name.item,
+                    NonConstantValue::Variable(variable_definition.name.item),
                 )
             })
             .collect();
@@ -213,7 +213,7 @@ pub fn transform_name_and_arguments_with_child_variable_context(
 
 pub fn create_transformed_name_and_arguments(
     name: SelectableName,
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
     variable_context: &VariableContext,
 ) -> NameAndArguments {
     NameAndArguments {

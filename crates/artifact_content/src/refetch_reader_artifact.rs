@@ -1,5 +1,6 @@
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpanPostfix,
+    ArtifactPath, ArtifactPathAndContent, EmbeddedLocation,
+    ParentObjectEntityNameAndSelectableName, WithLocationPostfix,
 };
 
 use isograph_config::GenerateFileExtensionsOption;
@@ -31,12 +32,13 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     let read_out_data = get_read_out_data(field_map);
     let function_import_statement = generate_function_import_statement(read_out_data);
 
-    let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
+    let empty_selection_set = SelectionSet { selections: vec![] }
+        .with_embedded_location(EmbeddedLocation::todo_generated());
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         client_scalar_selectable.parent_object_entity_name,
-        client_scalar_selectable.name.item,
+        client_scalar_selectable.name,
     )
     .as_ref()
     .expect(
@@ -52,7 +54,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     let selection_set_for_parent_query = client_scalar_selectable_selection_set_for_parent_query(
         db,
         client_scalar_selectable.parent_object_entity_name,
-        client_scalar_selectable.name.item,
+        client_scalar_selectable.name,
     )
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -95,7 +97,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
             file_name: *REFETCH_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
-                selectable_name: client_scalar_selectable.name.item,
+                selectable_name: client_scalar_selectable.name,
             }
             .wrap_some(),
         },
@@ -113,7 +115,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         format!(
             "export type {}__{}__output_type = {};",
             client_scalar_selectable.parent_object_entity_name,
-            client_scalar_selectable.name.item,
+            client_scalar_selectable.name,
             output_type
         )
     };
@@ -128,7 +130,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
-                selectable_name: client_scalar_selectable.name.item,
+                selectable_name: client_scalar_selectable.name,
             }
             .wrap_some(),
         },

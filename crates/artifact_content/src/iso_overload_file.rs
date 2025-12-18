@@ -345,21 +345,21 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
         let (parent_1, selectable_name_1) = match client_type_1.0 {
             SelectionType::Scalar(s) => {
                 let s = s.lookup(db);
-                (s.parent_object_entity_name, s.name.item)
+                (s.parent_object_entity_name, s.name)
             }
             SelectionType::Object(o) => {
                 let o = o.lookup(db);
-                (o.parent_object_entity_name, o.name.item)
+                (o.parent_object_entity_name, o.name)
             }
         };
         let (parent_2, selectable_name_2) = match client_type_2.0 {
             SelectionType::Scalar(s) => {
                 let s = s.lookup(db);
-                (s.parent_object_entity_name, s.name.item)
+                (s.parent_object_entity_name, s.name)
             }
             SelectionType::Object(o) => {
                 let o = o.lookup(db);
-                (o.parent_object_entity_name, o.name.item)
+                (o.parent_object_entity_name, o.name)
             }
         };
 
@@ -421,8 +421,8 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,
                 Ordering::Equal => sort_field_name(
-                    client_scalar_selectable_1.name.item,
-                    client_scalar_selectable_2.name.item,
+                    client_scalar_selectable_1.name,
+                    client_scalar_selectable_2.name,
                 ),
             }
         },

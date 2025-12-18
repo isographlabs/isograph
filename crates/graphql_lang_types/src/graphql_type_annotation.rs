@@ -1,6 +1,6 @@
 use std::{fmt, ops::Deref};
 
-use common_lang_types::{Span, WithSpan};
+use common_lang_types::{EmbeddedLocation, Span, WithEmbeddedLocation, WithLocationPostfix};
 use prelude::Postfix;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -19,12 +19,16 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         }
     }
 
-    pub fn span(&self) -> Span {
+    pub fn embedded_location(&self) -> EmbeddedLocation {
         match self {
-            GraphQLTypeAnnotation::Named(named) => named.0.span,
-            GraphQLTypeAnnotation::List(list) => list.0.span(),
-            GraphQLTypeAnnotation::NonNull(non_null) => non_null.span(),
+            GraphQLTypeAnnotation::Named(named) => named.0.location,
+            GraphQLTypeAnnotation::List(list) => list.0.embedded_location(),
+            GraphQLTypeAnnotation::NonNull(non_null) => non_null.embedded_location(),
         }
+    }
+
+    pub fn span(&self) -> Span {
+        self.embedded_location().span
     }
 
     pub fn inner_mut(&mut self) -> &mut TValue {
@@ -40,9 +44,11 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         F: FnOnce(TValue) -> TNewValue,
     {
         match self {
-            GraphQLTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item), named.0.span)),
-            ),
+            GraphQLTypeAnnotation::Named(named) => {
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    f(named.0.item).with_embedded_location(named.0.location),
+                ))
+            }
             GraphQLTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.map(f).boxed()),
             GraphQLTypeAnnotation::NonNull(non_null) => {
                 GraphQLTypeAnnotation::NonNull(non_null.map(f).boxed())
@@ -55,9 +61,11 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
         match self {
-            GraphQLTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
-            ),
+            GraphQLTypeAnnotation::Named(named) => {
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    f(named.0.item)?.with_embedded_location(named.0.location),
+                ))
+            }
             GraphQLTypeAnnotation::List(list) => {
                 GraphQLTypeAnnotation::List(list.and_then(f)?.boxed())
             }
@@ -113,11 +121,15 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         }
     }
 
-    pub fn span(&self) -> Span {
+    pub fn embedded_location(&self) -> EmbeddedLocation {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => named.0.span,
-            GraphQLNonNullTypeAnnotation::List(list) => list.0.span(),
+            GraphQLNonNullTypeAnnotation::Named(named) => named.0.location,
+            GraphQLNonNullTypeAnnotation::List(list) => list.0.embedded_location(),
         }
+    }
+
+    pub fn span(&self) -> Span {
+        self.embedded_location().span
     }
 
     pub fn inner_mut(&mut self) -> &mut TValue {
@@ -132,9 +144,11 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         F: FnOnce(TValue) -> TNewValue,
     {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item), named.0.span)),
-            ),
+            GraphQLNonNullTypeAnnotation::Named(named) => {
+                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    f(named.0.item).with_embedded_location(named.0.location),
+                ))
+            }
             GraphQLNonNullTypeAnnotation::List(list) => {
                 GraphQLNonNullTypeAnnotation::List(list.map(f))
             }
@@ -149,9 +163,11 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         F: FnOnce(TValue) -> Result<TNewValue, E>,
     {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(
-                GraphQLNamedTypeAnnotation(WithSpan::new(f(named.0.item)?, named.0.span)),
-            ),
+            GraphQLNonNullTypeAnnotation::Named(named) => {
+                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                    f(named.0.item)?.with_embedded_location(named.0.location),
+                ))
+            }
             GraphQLNonNullTypeAnnotation::List(list) => {
                 GraphQLNonNullTypeAnnotation::List(list.and_then(f)?)
             }
@@ -170,10 +186,10 @@ impl<TValue: fmt::Display> fmt::Display for GraphQLNonNullTypeAnnotation<TValue>
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLNamedTypeAnnotation<TValue>(pub WithSpan<TValue>);
+pub struct GraphQLNamedTypeAnnotation<TValue>(pub WithEmbeddedLocation<TValue>);
 
 impl<TValue> Deref for GraphQLNamedTypeAnnotation<TValue> {
-    type Target = WithSpan<TValue>;
+    type Target = WithEmbeddedLocation<TValue>;
 
     fn deref(&self) -> &Self::Target {
         &self.0

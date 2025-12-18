@@ -1,4 +1,4 @@
-use common_lang_types::{EntityName, SelectableName, WithLocation};
+use common_lang_types::{EntityName, SelectableName};
 use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
 use isograph_lang_types::{DefinitionLocation, Description, VariableDefinition};
 
@@ -13,7 +13,7 @@ pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
 #[impl_for_selection_type]
 pub trait SelectableTrait {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> WithLocation<SelectableName>;
+    fn name(&self) -> SelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
     // TODO convert this to &[VariableDefinition] or &[WithSpan] or &[WithLocation]
     // i.e. settle on one!
@@ -25,7 +25,7 @@ impl<T: SelectableTrait> SelectableTrait for &T {
         (*self).description()
     }
 
-    fn name(&self) -> WithLocation<SelectableName> {
+    fn name(&self) -> SelectableName {
         (*self).name()
     }
 

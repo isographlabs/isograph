@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
-    VariableName, WithLocation, WithLocationPostfix, WithSpanPostfix,
+    DescriptionValue, Diagnostic, EmbeddedLocation, EntityName, JavascriptName, Location,
+    SelectableName, VariableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
@@ -47,13 +47,13 @@ pub fn process_graphql_type_system_document(
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
+    fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    interfaces_to_process: &mut Vec<WithEmbeddedLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
     for with_location in type_system_document.0 {
-        let WithLocation {
+        let WithEmbeddedLocation {
             location,
             item: type_system_definition,
         } = with_location;
@@ -79,7 +79,8 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
 
@@ -89,7 +90,6 @@ pub fn process_graphql_type_system_document(
                     get_typename_selectable(
                         db,
                         server_object_entity_name,
-                        location,
                         format!("\"{}\"", server_object_entity_name)
                             .intern()
                             .to::<JavascriptName>()
@@ -97,7 +97,8 @@ pub fn process_graphql_type_system_document(
                     )
                     .scalar_selected()
                     .server_defined()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
 
@@ -179,12 +180,13 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .scalar_selected()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
-                interfaces_to_process.push(interface_definition.with_location(location));
+                interfaces_to_process.push(interface_definition.with_embedded_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
                 let server_object_entity_name =
@@ -212,7 +214,8 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
 
@@ -247,7 +250,8 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .scalar_selected()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
             }
@@ -277,7 +281,8 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_location(location),
+                    .with_embedded_location(location)
+                    .into(),
                     non_fatal_diagnostics,
                 );
 
@@ -300,10 +305,11 @@ pub fn process_graphql_type_system_document(
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-                    get_typename_selectable(db, server_object_entity_name, location, None)
+                    get_typename_selectable(db, server_object_entity_name, None)
                         .scalar_selected()
                         .server_defined()
-                        .with_location(location),
+                        .with_embedded_location(location)
+                        .into(),
                     non_fatal_diagnostics,
                 );
             }
@@ -311,7 +317,7 @@ pub fn process_graphql_type_system_document(
                 if graphql_root_types.is_some() {
                     non_fatal_diagnostics.push(Diagnostic::new(
                         "Duplicate schema definition".to_string(),
-                        location.wrap_some(),
+                        location.to::<Location>().wrap_some(),
                     ));
                     continue;
                 }
@@ -344,7 +350,7 @@ fn refetch_selectable_refetch_strategy(
                 ScalarSelection {
                     name: (*ID_FIELD_NAME)
                         .to::<SelectableName>()
-                        .with_generated_location(),
+                        .with_embedded_location(EmbeddedLocation::todo_generated()),
                     reader_alias: None,
                     arguments: vec![],
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
@@ -352,10 +358,10 @@ fn refetch_selectable_refetch_strategy(
                     ),
                 }
                 .scalar_selected()
-                .with_generated_span(),
+                .with_embedded_location(EmbeddedLocation::todo_generated()),
             ],
         }
-        .with_generated_span(),
+        .with_embedded_location(EmbeddedLocation::todo_generated()),
         // TODO use the type from the schema
         "Query".intern().into(),
         subfields_or_inline_fragments,
@@ -375,7 +381,7 @@ fn get_refetch_selectable(
         .to::<DescriptionValue>()
         .wrap(Description)
         .wrap_some(),
-        name: (*REFETCH_FIELD_NAME).with_generated_location(),
+        name: (*REFETCH_FIELD_NAME),
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
             client_selection_name: (*REFETCH_FIELD_NAME),
             // TODO use the actual schema query type
@@ -388,10 +394,12 @@ fn get_refetch_selectable(
             top_level_schema_field_arguments: vec![VariableDefinition {
                 name: (*ID_FIELD_NAME)
                     .unchecked_conversion::<VariableName>()
-                    .with_generated_location(),
+                    .with_embedded_location(EmbeddedLocation::todo_generated()),
                 type_: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                        (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),
+                        (*ID_ENTITY_NAME)
+                            .scalar_selected()
+                            .with_embedded_location(EmbeddedLocation::todo_generated()),
                     ))
                     .boxed(),
                 ),
@@ -407,7 +415,6 @@ fn get_refetch_selectable(
 pub(crate) fn get_typename_selectable(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     server_object_entity_name: EntityName,
-    location: Location,
     javascript_type_override: Option<JavascriptName>,
 ) -> MemoRef<ServerScalarSelectable<GraphQLNetworkProtocol>> {
     ServerScalarSelectable {
@@ -416,7 +423,7 @@ pub(crate) fn get_typename_selectable(
             .to::<DescriptionValue>()
             .wrap(Description)
             .wrap_some(),
-        name: (*TYPENAME_FIELD_NAME).with_location(location),
+        name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
         target_scalar_entity: TypeAnnotation::Scalar("String".intern().into()),
         javascript_type_override,
@@ -434,22 +441,22 @@ pub fn process_graphql_type_system_extension_document(
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(EntityName, WithLocation<GraphQLFieldDefinition>)>,
+    fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    interfaces_to_process: &mut Vec<WithLocation<GraphQLInterfaceTypeDefinition>>,
+    interfaces_to_process: &mut Vec<WithEmbeddedLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
     let mut definitions = Vec::with_capacity(extension_document.0.len());
     let mut extensions = Vec::with_capacity(extension_document.0.len());
 
     for extension_or_definition in extension_document.0 {
-        let WithLocation { location, item } = extension_or_definition;
+        let WithEmbeddedLocation { location, item } = extension_or_definition;
         match item {
             GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
-                definitions.push(definition.with_location(location));
+                definitions.push(definition.with_embedded_location(location));
             }
             GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
-                extensions.push(extension.with_location(location))
+                extensions.push(extension.with_embedded_location(location))
             }
         }
     }

@@ -1,4 +1,4 @@
-use common_lang_types::{EntityName, WithLocation, WithLocationPostfix, WithSpan};
+use common_lang_types::{EntityName, WithEmbeddedLocation, WithLocationPostfix};
 use isograph_lang_types::{DefinitionLocation, SelectionSet, SelectionTypePostfix};
 use prelude::Postfix;
 
@@ -14,7 +14,7 @@ use isograph_lang_types::SelectionType;
 pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_type: MemoRefClientSelectable<TNetworkProtocol>,
-) -> impl Iterator<Item = WithLocation<ClientSelectableId>> {
+) -> impl Iterator<Item = WithEmbeddedLocation<ClientSelectableId>> {
     let (selection_set, parent_entity_name) = match selection_type {
         SelectionType::Scalar(scalar) => {
             let scalar = scalar.lookup(db);
@@ -22,7 +22,7 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
                 client_scalar_selectable_selection_set_for_parent_query(
                     db,
                     scalar.parent_object_entity_name,
-                    scalar.name.item,
+                    scalar.name,
                 )
                 .expect("Expected selection set to be valid"),
                 scalar.parent_object_entity_name,
@@ -32,7 +32,7 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
         SelectionType::Object(object) => {
             let object = object.lookup(db);
             let parent_object_entity_name = object.parent_object_entity_name;
-            let client_object_selectable_name = object.name.item;
+            let client_object_selectable_name = object.name;
             (
                 selectable_reader_selection_set(
                     db,
@@ -60,7 +60,7 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
 struct AccessibleClientSelectableIterator<'db, TNetworkProtocol: NetworkProtocol> {
     // TODO have a reference
     db: &'db IsographDatabase<TNetworkProtocol>,
-    selection_set: WithSpan<SelectionSet>,
+    selection_set: WithEmbeddedLocation<SelectionSet>,
     index: usize,
     sub_iterator: Option<Box<AccessibleClientSelectableIterator<'db, TNetworkProtocol>>>,
     parent_entity_name: EntityName,
@@ -69,7 +69,7 @@ struct AccessibleClientSelectableIterator<'db, TNetworkProtocol: NetworkProtocol
 impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
     for AccessibleClientSelectableIterator<'db, TNetworkProtocol>
 {
-    type Item = WithLocation<ClientSelectableId>;
+    type Item = WithEmbeddedLocation<ClientSelectableId>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(iterator) = &mut self.sub_iterator {
@@ -110,7 +110,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                                 self.index += 1;
                                 return (self.parent_entity_name, selection.item.name())
                                     .scalar_selected()
-                                    .with_location(scalar_selection.name.location)
+                                    .with_embedded_location(scalar_selection.name.location)
                                     .wrap_some();
                             }
                         };
@@ -148,7 +148,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                                 self.index += 1;
                                 return (self.parent_entity_name, object_selection.name.item)
                                     .object_selected()
-                                    .with_location(object_selection.name.location)
+                                    .with_embedded_location(object_selection.name.location)
                                     .wrap_some();
                             }
                         }

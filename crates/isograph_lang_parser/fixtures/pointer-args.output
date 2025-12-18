@@ -1,9 +1,26 @@
 Ok(
     (
         ClientPointerDeclaration(
-            WithSpan {
+            WithEmbeddedLocation {
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        current_working_directory: CurrentWorkingDirectory,
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 28,
+                                end: 143,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 11,
+                        end: 114,
+                    },
+                },
                 item: ClientPointerDeclaration {
-                    directives: [],
                     const_export_name: ConstExportName(
                         "pointer",
                     ),
@@ -32,21 +49,6 @@ Ok(
                             ),
                         ),
                     },
-                    target_type: Named(
-                        GraphQLNamedTypeAnnotation(
-                            WithSpan {
-                                item: EntityNameWrapper(
-                                    EntityName(
-                                        "User",
-                                    ),
-                                ),
-                                span: Span {
-                                    start: 44,
-                                    end: 48,
-                                },
-                            },
-                        ),
-                    ),
                     client_pointer_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
                             text_source: TextSource {
@@ -72,16 +74,254 @@ Ok(
                             ),
                         ),
                     },
+                    target_type: Named(
+                        GraphQLNamedTypeAnnotation(
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 28,
+                                                end: 143,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 44,
+                                        end: 48,
+                                    },
+                                },
+                                item: EntityNameWrapper(
+                                    EntityName(
+                                        "User",
+                                    ),
+                                ),
+                            },
+                        ),
+                    ),
+                    directives: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 28,
+                                        end: 143,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                        item: [],
+                    },
                     description: None,
-                    selection_set: WithSpan {
+                    selection_set: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 28,
+                                        end: 143,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 49,
+                                end: 114,
+                            },
+                        },
                         item: SelectionSet {
                             selections: [
-                                WithSpan {
+                                WithEmbeddedLocation {
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            current_working_directory: CurrentWorkingDirectory,
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 28,
+                                                    end: 143,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 55,
+                                            end: 110,
+                                        },
+                                    },
                                     item: Object(
                                         ObjectSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
+                                            name: WithEmbeddedLocation {
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 28,
+                                                                end: 143,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 55,
+                                                        end: 62,
+                                                    },
+                                                },
+                                                item: SelectableName(
+                                                    "friends",
+                                                ),
+                                            },
+                                            reader_alias: None,
+                                            selection_set: WithEmbeddedLocation {
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 28,
+                                                                end: 143,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 78,
+                                                        end: 110,
+                                                    },
+                                                },
+                                                item: SelectionSet {
+                                                    selections: [
+                                                        WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 28,
+                                                                            end: 143,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 86,
+                                                                    end: 88,
+                                                                },
+                                                            },
+                                                            item: Scalar(
+                                                                ScalarSelection {
+                                                                    name: WithEmbeddedLocation {
+                                                                        location: EmbeddedLocation {
+                                                                            text_source: TextSource {
+                                                                                current_working_directory: CurrentWorkingDirectory,
+                                                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                                ),
+                                                                                span: Some(
+                                                                                    Span {
+                                                                                        start: 28,
+                                                                                        end: 143,
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                            span: Span {
+                                                                                start: 86,
+                                                                                end: 88,
+                                                                            },
+                                                                        },
+                                                                        item: SelectableName(
+                                                                            "id",
+                                                                        ),
+                                                                    },
+                                                                    reader_alias: None,
+                                                                    arguments: [],
+                                                                    scalar_selection_directive_set: None(
+                                                                        EmptyDirectiveSet,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                        WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 28,
+                                                                            end: 143,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 95,
+                                                                    end: 104,
+                                                                },
+                                                            },
+                                                            item: Scalar(
+                                                                ScalarSelection {
+                                                                    name: WithEmbeddedLocation {
+                                                                        location: EmbeddedLocation {
+                                                                            text_source: TextSource {
+                                                                                current_working_directory: CurrentWorkingDirectory,
+                                                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                                ),
+                                                                                span: Some(
+                                                                                    Span {
+                                                                                        start: 28,
+                                                                                        end: 143,
+                                                                                    },
+                                                                                ),
+                                                                            },
+                                                                            span: Span {
+                                                                                start: 95,
+                                                                                end: 104,
+                                                                            },
+                                                                        },
+                                                                        item: SelectableName(
+                                                                            "closeness",
+                                                                        ),
+                                                                    },
+                                                                    reader_alias: None,
+                                                                    arguments: [],
+                                                                    scalar_selection_directive_set: None(
+                                                                        EmptyDirectiveSet,
+                                                                    ),
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                },
+                                            },
+                                            arguments: [
+                                                WithEmbeddedLocation {
+                                                    location: EmbeddedLocation {
                                                         text_source: TextSource {
                                                             current_working_directory: CurrentWorkingDirectory,
                                                             relative_path_to_source_file: RelativePathToSourceFile(
@@ -95,159 +335,53 @@ Ok(
                                                             ),
                                                         },
                                                         span: Span {
-                                                            start: 55,
-                                                            end: 62,
+                                                            start: 63,
+                                                            end: 76,
                                                         },
                                                     },
-                                                ),
-                                                item: SelectableName(
-                                                    "friends",
-                                                ),
-                                            },
-                                            reader_alias: None,
-                                            selection_set: WithSpan {
-                                                item: SelectionSet {
-                                                    selections: [
-                                                        WithSpan {
-                                                            item: Scalar(
-                                                                ScalarSelection {
-                                                                    name: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 28,
-                                                                                            end: 143,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 86,
-                                                                                    end: 88,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: SelectableName(
-                                                                            "id",
-                                                                        ),
-                                                                    },
-                                                                    reader_alias: None,
-                                                                    arguments: [],
-                                                                    scalar_selection_directive_set: None(
-                                                                        EmptyDirectiveSet,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                            span: Span {
-                                                                start: 86,
-                                                                end: 88,
-                                                            },
-                                                        },
-                                                        WithSpan {
-                                                            item: Scalar(
-                                                                ScalarSelection {
-                                                                    name: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 28,
-                                                                                            end: 143,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 95,
-                                                                                    end: 104,
-                                                                                },
-                                                                            },
-                                                                        ),
-                                                                        item: SelectableName(
-                                                                            "closeness",
-                                                                        ),
-                                                                    },
-                                                                    reader_alias: None,
-                                                                    arguments: [],
-                                                                    scalar_selection_directive_set: None(
-                                                                        EmptyDirectiveSet,
-                                                                    ),
-                                                                },
-                                                            ),
-                                                            span: Span {
-                                                                start: 95,
-                                                                end: 104,
-                                                            },
-                                                        },
-                                                    ],
-                                                },
-                                                span: Span {
-                                                    start: 78,
-                                                    end: 110,
-                                                },
-                                            },
-                                            arguments: [
-                                                WithLocation {
-                                                    location: Embedded(
-                                                        EmbeddedLocation {
-                                                            text_source: TextSource {
-                                                                current_working_directory: CurrentWorkingDirectory,
-                                                                relative_path_to_source_file: RelativePathToSourceFile(
-                                                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
-                                                                ),
-                                                                span: Some(
-                                                                    Span {
-                                                                        start: 28,
-                                                                        end: 143,
-                                                                    },
-                                                                ),
-                                                            },
-                                                            span: Span {
-                                                                start: 63,
-                                                                end: 76,
-                                                            },
-                                                        },
-                                                    ),
                                                     item: SelectionFieldArgument {
-                                                        name: WithSpan {
+                                                        name: WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 28,
+                                                                            end: 143,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 63,
+                                                                    end: 68,
+                                                                },
+                                                            },
                                                             item: FieldArgumentName(
                                                                 "first",
                                                             ),
-                                                            span: Span {
-                                                                start: 63,
-                                                                end: 68,
-                                                            },
                                                         },
-                                                        value: WithLocation {
-                                                            location: Embedded(
-                                                                EmbeddedLocation {
-                                                                    text_source: TextSource {
-                                                                        current_working_directory: CurrentWorkingDirectory,
-                                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
-                                                                        ),
-                                                                        span: Some(
-                                                                            Span {
-                                                                                start: 28,
-                                                                                end: 143,
-                                                                            },
-                                                                        ),
-                                                                    },
-                                                                    span: Span {
-                                                                        start: 71,
-                                                                        end: 76,
-                                                                    },
+                                                        value: WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 28,
+                                                                            end: 143,
+                                                                        },
+                                                                    ),
                                                                 },
-                                                            ),
+                                                                span: Span {
+                                                                    start: 71,
+                                                                    end: 76,
+                                                                },
+                                                            },
                                                             item: Variable(
                                                                 VariableName(
                                                                     "first",
@@ -262,42 +396,50 @@ Ok(
                                             ),
                                         },
                                     ),
-                                    span: Span {
-                                        start: 55,
-                                        end: 110,
-                                    },
                                 },
                             ],
                         },
-                        span: Span {
-                            start: 49,
-                            end: 114,
-                        },
                     },
                     variable_definitions: [
-                        WithSpan {
-                            item: VariableDefinition {
-                                name: WithLocation {
-                                    location: Embedded(
-                                        EmbeddedLocation {
-                                            text_source: TextSource {
-                                                current_working_directory: CurrentWorkingDirectory,
-                                                relative_path_to_source_file: RelativePathToSourceFile(
-                                                    "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
-                                                ),
-                                                span: Some(
-                                                    Span {
-                                                        start: 28,
-                                                        end: 143,
-                                                    },
-                                                ),
-                                            },
-                                            span: Span {
-                                                start: 28,
-                                                end: 33,
-                                            },
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
                                         },
                                     ),
+                                },
+                                span: Span {
+                                    start: 27,
+                                    end: 39,
+                                },
+                            },
+                            item: VariableDefinition {
+                                name: WithEmbeddedLocation {
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            current_working_directory: CurrentWorkingDirectory,
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 28,
+                                                    end: 143,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 28,
+                                            end: 33,
+                                        },
+                                    },
                                     item: VariableName(
                                         "first",
                                     ),
@@ -305,23 +447,33 @@ Ok(
                                 type_: NonNull(
                                     Named(
                                         GraphQLNamedTypeAnnotation(
-                                            WithSpan {
+                                            WithEmbeddedLocation {
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 28,
+                                                                end: 143,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 35,
+                                                        end: 38,
+                                                    },
+                                                },
                                                 item: EntityName(
                                                     "Int",
                                                 ),
-                                                span: Span {
-                                                    start: 35,
-                                                    end: 38,
-                                                },
                                             },
                                         ),
                                     ),
                                 ),
                                 default_value: None,
-                            },
-                            span: Span {
-                                start: 27,
-                                end: 39,
                             },
                         },
                     ],
@@ -329,7 +481,25 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
                     ),
                     semantic_tokens: [
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 3,
+                                    end: 10,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -343,12 +513,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 3,
-                                end: 10,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -365,12 +549,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 11,
-                                end: 15,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -387,12 +585,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 15,
-                                end: 16,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 26,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -409,12 +621,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 16,
-                                end: 26,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 26,
+                                    end: 27,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -428,12 +654,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 26,
-                                end: 27,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 27,
+                                    end: 28,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -450,12 +690,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 27,
-                                end: 28,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 28,
+                                    end: 33,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -472,12 +726,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 28,
-                                end: 33,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 33,
+                                    end: 34,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -494,12 +762,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 33,
-                                end: 34,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 35,
+                                    end: 38,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     1,
@@ -516,12 +798,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 35,
-                                end: 38,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 38,
+                                    end: 39,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     1,
@@ -538,12 +834,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 38,
-                                end: 39,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 39,
+                                    end: 40,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -557,12 +867,26 @@ Ok(
                                 ),
                                 indent_change: Dedent,
                             },
-                            span: Span {
-                                start: 39,
-                                end: 40,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 41,
+                                    end: 43,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -579,12 +903,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 41,
-                                end: 43,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 44,
+                                    end: 48,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     1,
@@ -601,12 +939,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 44,
-                                end: 48,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 49,
+                                    end: 50,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -620,12 +972,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 49,
-                                end: 50,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 55,
+                                    end: 62,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -639,12 +1005,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 55,
-                                end: 62,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 62,
+                                    end: 63,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -658,12 +1038,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 62,
-                                end: 63,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 63,
+                                    end: 68,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     7,
@@ -677,12 +1071,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 63,
-                                end: 68,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 68,
+                                    end: 69,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -699,12 +1107,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 68,
-                                end: 69,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 70,
+                                    end: 71,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -721,12 +1143,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 70,
-                                end: 71,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 71,
+                                    end: 76,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -743,12 +1179,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 71,
-                                end: 76,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 76,
+                                    end: 77,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -762,12 +1212,26 @@ Ok(
                                 ),
                                 indent_change: Dedent,
                             },
-                            span: Span {
-                                start: 76,
-                                end: 77,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 78,
+                                    end: 79,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -781,12 +1245,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 78,
-                                end: 79,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 86,
+                                    end: 88,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -800,12 +1278,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 86,
-                                end: 88,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 95,
+                                    end: 104,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -819,12 +1311,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 95,
-                                end: 104,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 109,
+                                    end: 110,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -832,29 +1338,35 @@ Ok(
                                 line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                            span: Span {
-                                start: 109,
-                                end: 110,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-args.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 28,
+                                            end: 143,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 113,
+                                    end: 114,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
                                 line_behavior: IsOwnLine,
                                 indent_change: Dedent,
-                            },
-                            span: Span {
-                                start: 113,
-                                end: 114,
                             },
                         },
                     ],
-                },
-                span: Span {
-                    start: 11,
-                    end: 114,
                 },
             },
         ),

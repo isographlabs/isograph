@@ -1,6 +1,7 @@
 use crate::IsographLangTokenKind;
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, Location, Span, TextSource,
+    WithEmbeddedLocation, WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 use intern::string_key::{Intern, StringKey};
 use isograph_lang_types::{IsographSemanticToken, semantic_token_legend};
@@ -14,7 +15,7 @@ pub(crate) struct PeekableLexer<'source> {
     /// the byte offset of the *end* of the previous token
     end_index_of_last_parsed_token: u32,
     offset: u32,
-    semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+    semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
 
     pub text_source: TextSource,
 }
@@ -52,7 +53,7 @@ impl<'source> PeekableLexer<'source> {
     fn parse_token(
         &mut self,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> WithSpan<IsographLangTokenKind> {
+    ) -> WithEmbeddedLocation<IsographLangTokenKind> {
         let kind = self
             .lexer
             .next()
@@ -66,16 +67,17 @@ impl<'source> PeekableLexer<'source> {
         let span = self.lexer_span();
 
         // TODO why does self.current = ... not work here?
-        let parsed_token = std::mem::replace(&mut self.current, kind.with_span(span));
+        let parsed_token = std::mem::replace(&mut self.current, kind.with_span(span))
+            .to_with_embedded_location(self.text_source);
 
         self.semantic_tokens
-            .push(isograph_semantic_token.with_span(parsed_token.span));
+            .push(isograph_semantic_token.with_embedded_location(parsed_token.location));
 
         parsed_token
     }
 
-    pub fn peek(&self) -> WithSpan<IsographLangTokenKind> {
-        self.current
+    pub fn peek(&self) -> WithEmbeddedLocation<IsographLangTokenKind> {
+        self.current.to_with_embedded_location(self.text_source)
     }
 
     fn lexer_span(&self) -> Span {
@@ -88,7 +90,7 @@ impl<'source> PeekableLexer<'source> {
             None
         } else {
             let next_token = self.parse_token(semantic_token_legend::ST_COMMENT);
-            Span::new(next_token.span.start, self.source.len() as u32).wrap_some()
+            Span::new(next_token.location.span.start, self.source.len() as u32).wrap_some()
         }
     }
 
@@ -111,17 +113,12 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> DiagnosticResult<WithSpan<IsographLangTokenKind>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<IsographLangTokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
             self.parse_token(isograph_semantic_token).wrap_ok()
         } else {
-            parse_token_kind_diagnostic(
-                expected_kind,
-                found.item,
-                Location::new(self.text_source, found.span),
-            )
-            .wrap_err()
+            parse_token_kind_diagnostic(expected_kind, found.item, found.location).wrap_err()
         }
     }
 
@@ -131,20 +128,25 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> DiagnosticResult<WithSpan<&'source str>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
 
-        self.source(kind.span).with_span(kind.span).wrap_ok()
+        self.source(kind.location.span)
+            .with_embedded_location(kind.location)
+            .wrap_ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: IsographLangTokenKind,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> DiagnosticResult<WithSpan<T>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
-        let source = self.source(kind.span).intern();
-        WithSpan::new(source.into(), kind.span).wrap_ok()
+        let source = self.source(kind.location.span).intern();
+        source
+            .to::<T>()
+            .with_embedded_location(kind.location)
+            .wrap_ok()
     }
 
     #[expect(dead_code)]
@@ -152,34 +154,29 @@ impl<'source> PeekableLexer<'source> {
         &mut self,
         identifier: &'static str,
         isograph_semantic_token: IsographSemanticToken,
-    ) -> DiagnosticResult<WithSpan<IsographLangTokenKind>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<IsographLangTokenKind>> {
         let peeked = self.peek();
         if peeked.item == IsographLangTokenKind::Identifier {
-            let source = self.source(peeked.span);
+            let source = self.source(peeked.location.span);
             if source == identifier {
                 self.parse_token(isograph_semantic_token).wrap_ok()
             } else {
-                parse_matching_identifier_diagnostic(
-                    identifier,
-                    source,
-                    Location::new(self.text_source, peeked.span),
-                )
-                .wrap_err()
+                parse_matching_identifier_diagnostic(identifier, source, peeked.location).wrap_err()
             }
         } else {
             parse_token_kind_diagnostic(
                 IsographLangTokenKind::Identifier,
                 peeked.item,
-                Location::new(self.text_source, peeked.span),
+                peeked.location,
             )
             .wrap_err()
         }
     }
 
-    pub fn with_span_result<T, E>(
+    pub fn with_embedded_location_result<T, E>(
         &mut self,
         do_stuff: impl FnOnce(&mut Self) -> Result<T, E>,
-    ) -> Result<WithSpan<T>, E> {
+    ) -> Result<WithEmbeddedLocation<T>, E> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
@@ -189,13 +186,16 @@ impl<'source> PeekableLexer<'source> {
         //
         // In situations like that, call with_span_optional_result!
 
-        result.with_span(Span::new(start, end)).wrap_ok()
+        result
+            .with_span(Span::new(start, end))
+            .to_with_embedded_location(self.text_source)
+            .wrap_ok()
     }
 
-    pub fn with_span_optional_result<T, E>(
+    pub fn with_embedded_location_optional_result<T, E>(
         &mut self,
         do_stuff: impl FnOnce(&mut Self) -> Result<Option<T>, E>,
-    ) -> Result<Option<WithSpan<T>>, E> {
+    ) -> Result<Option<WithEmbeddedLocation<T>>, E> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
@@ -208,18 +208,25 @@ impl<'source> PeekableLexer<'source> {
         );
 
         result
-            .map(|value| value.with_span(Span::new(start, end)))
+            .map(|value| {
+                value
+                    .with_span(Span::new(start, end))
+                    .to_with_embedded_location(self.text_source)
+            })
             .wrap_ok()
     }
 
     pub fn white_space_span(&self) -> Span {
-        Span::new(self.end_index_of_last_parsed_token, self.peek().span.start)
+        Span::new(
+            self.end_index_of_last_parsed_token,
+            self.peek().location.span.start,
+        )
     }
 
     // TODO we should instead have a .complete method that takes self, checks that
     // there are no remaining unparsed tokens, and returns the semantic token vec,
     // so that we can avoid a clone.
-    pub fn semantic_tokens(&self) -> Vec<WithSpan<IsographSemanticToken>> {
+    pub fn semantic_tokens(&self) -> Vec<WithEmbeddedLocation<IsographSemanticToken>> {
         self.semantic_tokens.clone()
     }
 }
@@ -227,21 +234,21 @@ impl<'source> PeekableLexer<'source> {
 fn parse_token_kind_diagnostic(
     expected: IsographLangTokenKind,
     found: IsographLangTokenKind,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> Diagnostic {
     Diagnostic::new(
         format!("Expected {expected}, but found {found}"),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
     )
 }
 
 fn parse_matching_identifier_diagnostic(
     expected: &str,
     found: &str,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> Diagnostic {
     Diagnostic::new(
         format!("Expected {expected}, but found {found}"),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
     )
 }

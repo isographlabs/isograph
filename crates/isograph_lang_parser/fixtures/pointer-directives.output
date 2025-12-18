@@ -1,100 +1,26 @@
 Ok(
     (
         ClientPointerDeclaration(
-            WithSpan {
+            WithEmbeddedLocation {
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        current_working_directory: CurrentWorkingDirectory,
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 112,
+                                end: 236,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 11,
+                        end: 123,
+                    },
+                },
                 item: ClientPointerDeclaration {
-                    directives: [
-                        WithSpan {
-                            item: IsographFieldDirective {
-                                name: WithSpan {
-                                    item: IsographDirectiveName(
-                                        "directives",
-                                    ),
-                                    span: Span {
-                                        start: 36,
-                                        end: 46,
-                                    },
-                                },
-                                arguments: [],
-                            },
-                            span: Span {
-                                start: 35,
-                                end: 46,
-                            },
-                        },
-                        WithSpan {
-                            item: IsographFieldDirective {
-                                name: WithSpan {
-                                    item: IsographDirectiveName(
-                                        "allowed",
-                                    ),
-                                    span: Span {
-                                        start: 48,
-                                        end: 55,
-                                    },
-                                },
-                                arguments: [],
-                            },
-                            span: Span {
-                                start: 47,
-                                end: 55,
-                            },
-                        },
-                        WithSpan {
-                            item: IsographFieldDirective {
-                                name: WithSpan {
-                                    item: IsographDirectiveName(
-                                        "at",
-                                    ),
-                                    span: Span {
-                                        start: 57,
-                                        end: 59,
-                                    },
-                                },
-                                arguments: [],
-                            },
-                            span: Span {
-                                start: 56,
-                                end: 59,
-                            },
-                        },
-                        WithSpan {
-                            item: IsographFieldDirective {
-                                name: WithSpan {
-                                    item: IsographDirectiveName(
-                                        "parse",
-                                    ),
-                                    span: Span {
-                                        start: 61,
-                                        end: 66,
-                                    },
-                                },
-                                arguments: [],
-                            },
-                            span: Span {
-                                start: 60,
-                                end: 66,
-                            },
-                        },
-                        WithSpan {
-                            item: IsographFieldDirective {
-                                name: WithSpan {
-                                    item: IsographDirectiveName(
-                                        "time",
-                                    ),
-                                    span: Span {
-                                        start: 68,
-                                        end: 72,
-                                    },
-                                },
-                                arguments: [],
-                            },
-                            span: Span {
-                                start: 67,
-                                end: 72,
-                            },
-                        },
-                    ],
                     const_export_name: ConstExportName(
                         "pointer",
                     ),
@@ -123,21 +49,6 @@ Ok(
                             ),
                         ),
                     },
-                    target_type: Named(
-                        GraphQLNamedTypeAnnotation(
-                            WithSpan {
-                                item: EntityNameWrapper(
-                                    EntityName(
-                                        "User",
-                                    ),
-                                ),
-                                span: Span {
-                                    start: 30,
-                                    end: 34,
-                                },
-                            },
-                        ),
-                    ),
                     client_pointer_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
                             text_source: TextSource {
@@ -163,66 +74,415 @@ Ok(
                             ),
                         ),
                     },
-                    description: None,
-                    selection_set: WithSpan {
-                        item: SelectionSet {
-                            selections: [
-                                WithSpan {
-                                    item: Object(
-                                        ObjectSelection {
-                                            name: WithLocation {
-                                                location: Embedded(
-                                                    EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            current_working_directory: CurrentWorkingDirectory,
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 112,
-                                                                    end: 236,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 79,
-                                                            end: 86,
-                                                        },
+                    target_type: Named(
+                        GraphQLNamedTypeAnnotation(
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 30,
+                                        end: 34,
+                                    },
+                                },
+                                item: EntityNameWrapper(
+                                    EntityName(
+                                        "User",
+                                    ),
+                                ),
+                            },
+                        ),
+                    ),
+                    directives: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 112,
+                                        end: 236,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 35,
+                                end: 72,
+                            },
+                        },
+                        item: [
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 35,
+                                        end: 46,
+                                    },
+                                },
+                                item: IsographFieldDirective {
+                                    name: WithEmbeddedLocation {
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                current_working_directory: CurrentWorkingDirectory,
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 112,
+                                                        end: 236,
                                                     },
                                                 ),
+                                            },
+                                            span: Span {
+                                                start: 36,
+                                                end: 46,
+                                            },
+                                        },
+                                        item: IsographDirectiveName(
+                                            "directives",
+                                        ),
+                                    },
+                                    arguments: [],
+                                },
+                            },
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 47,
+                                        end: 55,
+                                    },
+                                },
+                                item: IsographFieldDirective {
+                                    name: WithEmbeddedLocation {
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                current_working_directory: CurrentWorkingDirectory,
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 112,
+                                                        end: 236,
+                                                    },
+                                                ),
+                                            },
+                                            span: Span {
+                                                start: 48,
+                                                end: 55,
+                                            },
+                                        },
+                                        item: IsographDirectiveName(
+                                            "allowed",
+                                        ),
+                                    },
+                                    arguments: [],
+                                },
+                            },
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 56,
+                                        end: 59,
+                                    },
+                                },
+                                item: IsographFieldDirective {
+                                    name: WithEmbeddedLocation {
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                current_working_directory: CurrentWorkingDirectory,
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 112,
+                                                        end: 236,
+                                                    },
+                                                ),
+                                            },
+                                            span: Span {
+                                                start: 57,
+                                                end: 59,
+                                            },
+                                        },
+                                        item: IsographDirectiveName(
+                                            "at",
+                                        ),
+                                    },
+                                    arguments: [],
+                                },
+                            },
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 60,
+                                        end: 66,
+                                    },
+                                },
+                                item: IsographFieldDirective {
+                                    name: WithEmbeddedLocation {
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                current_working_directory: CurrentWorkingDirectory,
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 112,
+                                                        end: 236,
+                                                    },
+                                                ),
+                                            },
+                                            span: Span {
+                                                start: 61,
+                                                end: 66,
+                                            },
+                                        },
+                                        item: IsographDirectiveName(
+                                            "parse",
+                                        ),
+                                    },
+                                    arguments: [],
+                                },
+                            },
+                            WithEmbeddedLocation {
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        current_working_directory: CurrentWorkingDirectory,
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 112,
+                                                end: 236,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 67,
+                                        end: 72,
+                                    },
+                                },
+                                item: IsographFieldDirective {
+                                    name: WithEmbeddedLocation {
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                current_working_directory: CurrentWorkingDirectory,
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 112,
+                                                        end: 236,
+                                                    },
+                                                ),
+                                            },
+                                            span: Span {
+                                                start: 68,
+                                                end: 72,
+                                            },
+                                        },
+                                        item: IsographDirectiveName(
+                                            "time",
+                                        ),
+                                    },
+                                    arguments: [],
+                                },
+                            },
+                        ],
+                    },
+                    description: None,
+                    selection_set: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 112,
+                                        end: 236,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 73,
+                                end: 123,
+                            },
+                        },
+                        item: SelectionSet {
+                            selections: [
+                                WithEmbeddedLocation {
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            current_working_directory: CurrentWorkingDirectory,
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 112,
+                                                    end: 236,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 79,
+                                            end: 119,
+                                        },
+                                    },
+                                    item: Object(
+                                        ObjectSelection {
+                                            name: WithEmbeddedLocation {
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 112,
+                                                                end: 236,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 79,
+                                                        end: 86,
+                                                    },
+                                                },
                                                 item: SelectableName(
                                                     "friends",
                                                 ),
                                             },
                                             reader_alias: None,
-                                            selection_set: WithSpan {
+                                            selection_set: WithEmbeddedLocation {
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        current_working_directory: CurrentWorkingDirectory,
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 112,
+                                                                end: 236,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 87,
+                                                        end: 119,
+                                                    },
+                                                },
                                                 item: SelectionSet {
                                                     selections: [
-                                                        WithSpan {
+                                                        WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 112,
+                                                                            end: 236,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 95,
+                                                                    end: 97,
+                                                                },
+                                                            },
                                                             item: Scalar(
                                                                 ScalarSelection {
-                                                                    name: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 112,
-                                                                                            end: 236,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 95,
-                                                                                    end: 97,
-                                                                                },
+                                                                    name: WithEmbeddedLocation {
+                                                                        location: EmbeddedLocation {
+                                                                            text_source: TextSource {
+                                                                                current_working_directory: CurrentWorkingDirectory,
+                                                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                                ),
+                                                                                span: Some(
+                                                                                    Span {
+                                                                                        start: 112,
+                                                                                        end: 236,
+                                                                                    },
+                                                                                ),
                                                                             },
-                                                                        ),
+                                                                            span: Span {
+                                                                                start: 95,
+                                                                                end: 97,
+                                                                            },
+                                                                        },
                                                                         item: SelectableName(
                                                                             "id",
                                                                         ),
@@ -234,35 +494,47 @@ Ok(
                                                                     ),
                                                                 },
                                                             ),
-                                                            span: Span {
-                                                                start: 95,
-                                                                end: 97,
-                                                            },
                                                         },
-                                                        WithSpan {
+                                                        WithEmbeddedLocation {
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    current_working_directory: CurrentWorkingDirectory,
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 112,
+                                                                            end: 236,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 104,
+                                                                    end: 113,
+                                                                },
+                                                            },
                                                             item: Scalar(
                                                                 ScalarSelection {
-                                                                    name: WithLocation {
-                                                                        location: Embedded(
-                                                                            EmbeddedLocation {
-                                                                                text_source: TextSource {
-                                                                                    current_working_directory: CurrentWorkingDirectory,
-                                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
-                                                                                    ),
-                                                                                    span: Some(
-                                                                                        Span {
-                                                                                            start: 112,
-                                                                                            end: 236,
-                                                                                        },
-                                                                                    ),
-                                                                                },
-                                                                                span: Span {
-                                                                                    start: 104,
-                                                                                    end: 113,
-                                                                                },
+                                                                    name: WithEmbeddedLocation {
+                                                                        location: EmbeddedLocation {
+                                                                            text_source: TextSource {
+                                                                                current_working_directory: CurrentWorkingDirectory,
+                                                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                                                                ),
+                                                                                span: Some(
+                                                                                    Span {
+                                                                                        start: 112,
+                                                                                        end: 236,
+                                                                                    },
+                                                                                ),
                                                                             },
-                                                                        ),
+                                                                            span: Span {
+                                                                                start: 104,
+                                                                                end: 113,
+                                                                            },
+                                                                        },
                                                                         item: SelectableName(
                                                                             "closeness",
                                                                         ),
@@ -274,16 +546,8 @@ Ok(
                                                                     ),
                                                                 },
                                                             ),
-                                                            span: Span {
-                                                                start: 104,
-                                                                end: 113,
-                                                            },
                                                         },
                                                     ],
-                                                },
-                                                span: Span {
-                                                    start: 87,
-                                                    end: 119,
                                                 },
                                             },
                                             arguments: [],
@@ -292,16 +556,8 @@ Ok(
                                             ),
                                         },
                                     ),
-                                    span: Span {
-                                        start: 79,
-                                        end: 119,
-                                    },
                                 },
                             ],
-                        },
-                        span: Span {
-                            start: 73,
-                            end: 123,
                         },
                     },
                     variable_definitions: [],
@@ -309,7 +565,25 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
                     ),
                     semantic_tokens: [
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 3,
+                                    end: 10,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -323,12 +597,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 3,
-                                end: 10,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -345,12 +633,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 11,
-                                end: 15,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -367,12 +669,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 15,
-                                end: 16,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 26,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -389,12 +705,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 16,
-                                end: 26,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 27,
+                                    end: 29,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -411,12 +741,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 27,
-                                end: 29,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 30,
+                                    end: 34,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     1,
@@ -433,12 +777,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 30,
-                                end: 34,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 35,
+                                    end: 36,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -455,12 +813,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 35,
-                                end: 36,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 36,
+                                    end: 46,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -477,12 +849,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 36,
-                                end: 46,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 47,
+                                    end: 48,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -499,12 +885,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 47,
-                                end: 48,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 48,
+                                    end: 55,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -521,12 +921,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 48,
-                                end: 55,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 56,
+                                    end: 57,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -543,12 +957,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 56,
-                                end: 57,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 57,
+                                    end: 59,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -565,12 +993,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 57,
-                                end: 59,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 60,
+                                    end: 61,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -587,12 +1029,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 60,
-                                end: 61,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 61,
+                                    end: 66,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -609,12 +1065,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 61,
-                                end: 66,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 67,
+                                    end: 68,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -631,12 +1101,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 67,
-                                end: 68,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 68,
+                                    end: 72,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -653,12 +1137,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 68,
-                                end: 72,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 73,
+                                    end: 74,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -672,12 +1170,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 73,
-                                end: 74,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 79,
+                                    end: 86,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -691,12 +1203,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 79,
-                                end: 86,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 87,
+                                    end: 88,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -710,12 +1236,26 @@ Ok(
                                 ),
                                 indent_change: Indent,
                             },
-                            span: Span {
-                                start: 87,
-                                end: 88,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 95,
+                                    end: 97,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -729,12 +1269,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 95,
-                                end: 97,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 104,
+                                    end: 113,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -748,12 +1302,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 104,
-                                end: 113,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 118,
+                                    end: 119,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -761,29 +1329,35 @@ Ok(
                                 line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                            span: Span {
-                                start: 118,
-                                end: 119,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 112,
+                                            end: 236,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 122,
+                                    end: 123,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
                                 line_behavior: IsOwnLine,
                                 indent_change: Dedent,
-                            },
-                            span: Span {
-                                start: 122,
-                                end: 123,
                             },
                         },
                     ],
-                },
-                span: Span {
-                    start: 11,
-                    end: 123,
                 },
             },
         ),

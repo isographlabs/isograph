@@ -1,6 +1,6 @@
 use common_lang_types::{
     EnumLiteralValue, FieldArgumentName, StringLiteralValue, ValueKeyName, VariableName,
-    WithLocation, WithSpan,
+    WithEmbeddedLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{FloatValue, NameValuePair};
 use intern::string_key::Lookup;
@@ -8,8 +8,8 @@ use prelude::Postfix;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct SelectionFieldArgument {
-    pub name: WithSpan<FieldArgumentName>,
-    pub value: WithLocation<NonConstantValue>,
+    pub name: WithEmbeddedLocation<FieldArgumentName>,
+    pub value: WithEmbeddedLocation<NonConstantValue>,
 }
 
 impl SelectionFieldArgument {
@@ -53,7 +53,7 @@ pub enum NonConstantValue {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithLocation<NonConstantValue>>),
+    List(Vec<WithEmbeddedLocation<NonConstantValue>>),
     Object(Vec<NameValuePair<ValueKeyName, NonConstantValue>>),
 }
 
@@ -160,7 +160,7 @@ pub enum ConstantValue {
     Null,
     Enum(EnumLiteralValue),
     // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithLocation<ConstantValue>>),
+    List(Vec<WithEmbeddedLocation<ConstantValue>>),
     Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
 }
 
@@ -180,7 +180,10 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                 let converted_list = l
                     .into_iter()
                     .map(|x| {
-                        WithLocation::new(x.item.try_into()?, x.location).wrap_ok::<Self::Error>()
+                        let constant: ConstantValue = x.item.try_into()?;
+                        constant
+                            .with_embedded_location(x.location)
+                            .wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 ConstantValue::List(converted_list).wrap_ok()
@@ -191,10 +194,11 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                     .map(|name_value_pair| {
                         NameValuePair {
                             name: name_value_pair.name,
-                            value: WithLocation::new(
-                                name_value_pair.value.item.try_into()?,
-                                name_value_pair.value.location,
-                            ),
+                            value: {
+                                let constant: ConstantValue =
+                                    name_value_pair.value.item.try_into()?;
+                                constant.with_embedded_location(name_value_pair.value.location)
+                            },
                         }
                         .wrap_ok::<Self::Error>()
                     })

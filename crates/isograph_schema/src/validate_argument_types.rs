@@ -1,6 +1,6 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EntityName, EnumLiteralValue, Location, SelectableName,
-    ValueKeyName, VariableName, WithLocation, WithSpan,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, EnumLiteralValue, Location,
+    SelectableName, ValueKeyName, VariableName, WithEmbeddedLocation,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -42,7 +42,7 @@ fn graphql_type_to_nullable_type<TValue>(
 fn scalar_literal_satisfies_type(
     scalar_literal_name: EntityName,
     type_: &GraphQLTypeAnnotation<ServerEntityName>,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     match graphql_type_to_non_null_type(type_.clone()) {
         GraphQLNonNullTypeAnnotation::List(_) => {
@@ -126,9 +126,9 @@ fn variable_type_satisfies_argument_type(
 
 pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_supplied_argument_value: &WithLocation<NonConstantValue>,
+    selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    variable_definitions: &[ValidatedVariableDefinition],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -146,7 +146,10 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
                 Diagnostic::new(
                     format!("Expected input of type {expected}, found {actual} scalar literal"),
-                    selection_supplied_argument_value.location.wrap_some(),
+                    selection_supplied_argument_value
+                        .location
+                        .to::<Location>()
+                        .wrap_some(),
                 )
                 .wrap_err()
             }
@@ -220,7 +223,10 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 let expected = id_annotation_to_typename_annotation(field_argument_definition_type);
                 Diagnostic::new(
                     format!("Expected non null input of type {expected}, found null"),
-                    selection_supplied_argument_value.location.wrap_some(),
+                    selection_supplied_argument_value
+                        .location
+                        .to::<Location>()
+                        .wrap_some(),
                 )
                 .wrap_err()
             }
@@ -274,8 +280,8 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_supplied_argument_value: &WithLocation<NonConstantValue>,
-    variable_definitions: &[WithSpan<VariableDefinition<ServerEntityName>>],
+    selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
+    variable_definitions: &[VariableDefinition<ServerEntityName>],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: EntityName,
 ) -> DiagnosticResult<()> {
@@ -320,7 +326,10 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            selection_supplied_argument_value.location.wrap_some(),
+            selection_supplied_argument_value
+                .location
+                .to::<Location>()
+                .wrap_some(),
         )
         .wrap_err()
     }
@@ -391,7 +400,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
-    location: Location,
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     let object_fields =
         server_selectables_map_for_entity(db, parent_server_object_entity_name).clone_err()?;
@@ -421,7 +430,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            location.wrap_some(),
+            location.to::<Location>().wrap_some(),
         )
         .wrap_err();
     }
@@ -440,7 +449,7 @@ fn id_annotation_to_typename_annotation(
 fn enum_satisfies_type(
     enum_literal_value: &EnumLiteralValue,
     enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     match enum_type.item {
         SelectionType::Object(object_entity_name) => {
@@ -464,9 +473,9 @@ fn enum_satisfies_type(
 
 fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    list: &[WithLocation<NonConstantValue>],
+    list: &[WithEmbeddedLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    variable_definitions: &[ValidatedVariableDefinition],
 ) -> DiagnosticResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(db, element, &list_type.0, variable_definitions)
@@ -475,17 +484,17 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn get_variable_type<'a>(
     variable_name: &'a VariableName,
-    variable_definitions: &'a [WithSpan<ValidatedVariableDefinition>],
-    location: Location,
+    variable_definitions: &'a [ValidatedVariableDefinition],
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<&'a GraphQLTypeAnnotation<ServerEntityName>> {
     match variable_definitions
         .iter()
-        .find(|definition| definition.item.name.item == *variable_name)
+        .find(|definition| definition.name.item == *variable_name)
     {
-        Some(variable) => (&variable.item.type_).wrap_ok(),
+        Some(variable) => (&variable.type_).wrap_ok(),
         None => Diagnostic::new(
             format!("This variable is not defined: ${}", *variable_name),
-            location.wrap_some(),
+            location.to::<Location>().wrap_some(),
         )
         .wrap_err(),
     }
@@ -495,21 +504,21 @@ fn expected_type_found_something_else_named_diagnostic(
     expected: GraphQLTypeAnnotation<EntityName>,
     actual: StringKey,
     type_description: &str,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> Diagnostic {
     Diagnostic::new(
         format!("Expected input of type {expected}, found {actual} {type_description}"),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
     )
 }
 
 fn expected_type_found_something_else_anonymous_diagnostic(
     expected: GraphQLTypeAnnotation<EntityName>,
     type_description: &str,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> Diagnostic {
     Diagnostic::new(
         format!("Expected input of type {expected}, found {type_description}"),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
     )
 }

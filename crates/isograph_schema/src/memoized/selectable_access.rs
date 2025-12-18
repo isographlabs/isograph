@@ -1,12 +1,13 @@
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
+use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName};
 use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_map,
-    client_selectable_named, multiple_selectable_definitions_found_diagnostic,
-    server_selectable_named, server_selectables_map_for_entity,
+    IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_declaration,
+    client_selectable_map, client_selectable_named,
+    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
+    server_selectables_map_for_entity,
 };
 
 #[memo]
@@ -38,11 +39,11 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 
     match (server_selectable, client_selectable) {
         (Err(e), Err(_)) => e.clone().wrap_err(),
-        (Ok(server), Err(_)) => match *server.note_todo("Do not clone. Use a MemoRef.") {
+        (Ok(server), Err(_)) => match *server {
             Some(server_selectable) => server_selectable.server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
-        (Err(_), Ok(client)) => match *client.note_todo("Do not clone. Use a MemoRef.") {
+        (Err(_), Ok(client)) => match *client {
             Some(client_selectable) => client_selectable.client_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
@@ -58,13 +59,10 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
                 .server_defined()
                 .wrap_some()
                 .wrap_ok(),
-            (Some(s), Some(_)) => multiple_selectable_definitions_found_diagnostic(
+            (Some(_), Some(_)) => multiple_selectable_definitions_found_diagnostic(
                 parent_server_object_entity_name,
                 selectable_name,
-                match s {
-                    SelectionType::Scalar(s) => s.lookup(db).name.location,
-                    SelectionType::Object(o) => o.lookup(db).name.location,
-                },
+                None.note_todo("Get a real location"),
             )
             .wrap_err(),
         },
@@ -99,4 +97,31 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     );
 
     selectables.wrap_ok()
+}
+
+#[memo]
+pub fn selectable_definition_location<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> DiagnosticResult<Option<Location>> {
+    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+
+    if let Some(x) = outcome
+        .item
+        .selectables
+        .get(&(entity_name, selectable_name))
+        .map(|x| x.location)
+    {
+        return x.wrap_some().wrap_ok();
+    }
+
+    let selectable = client_selectable_declaration(db, entity_name, selectable_name);
+
+    selectable
+        .map(|x| match x {
+            SelectionType::Scalar(s) => s.lookup(db).client_field_name.location.into(),
+            SelectionType::Object(o) => o.lookup(db).client_pointer_name.location.into(),
+        })
+        .wrap_ok()
 }

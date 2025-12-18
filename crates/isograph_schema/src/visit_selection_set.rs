@@ -1,4 +1,4 @@
-use common_lang_types::WithSpan;
+use common_lang_types::WithEmbeddedLocation;
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ScalarSelection, Selection, SelectionType,
     SelectionTypePostfix,
@@ -16,7 +16,7 @@ use crate::{
 /// This function should probably be renamed, as it's not what you expect, otherwise!
 pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    selection_set: &[WithSpan<Selection>],
+    selection_set: &[WithEmbeddedLocation<Selection>],
     parent_entity: &ServerObjectEntity<TNetworkProtocol>,
     visit_selection: &mut impl FnMut(
         SelectionType<&ScalarSelection, &ObjectSelection>,

@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithSpan, WithSpanPostfix};
+use common_lang_types::{
+    DiagnosticResult, EmbeddedLocation, EntityName, SelectableName, WithEmbeddedLocation,
+    WithLocationPostfix,
+};
 use isograph_lang_types::{SelectionSet, SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
@@ -18,7 +21,10 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
 ) -> HashMap<
     (EntityName, SelectableName),
     DiagnosticResult<
-        SelectionType<MemoRef<WithSpan<SelectionSet>>, MemoRef<WithSpan<SelectionSet>>>,
+        SelectionType<
+            MemoRef<WithEmbeddedLocation<SelectionSet>>,
+            MemoRef<WithEmbeddedLocation<SelectionSet>>,
+        >,
     >,
 > {
     // TODO use client_selectable_map
@@ -58,10 +64,10 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                 map.insert(
                     (
                         scalar_selectable.parent_object_entity_name,
-                        scalar_selectable.name.item,
+                        scalar_selectable.name,
                     ),
                     SelectionSet { selections: vec![] }
-                        .with_generated_span()
+                        .with_embedded_location(EmbeddedLocation::todo_generated())
                         .interned_value(db)
                         .scalar_selected()
                         .wrap_ok(),
@@ -104,7 +110,7 @@ pub fn selectable_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<MemoRef<WithSpan<SelectionSet>>> {
+) -> DiagnosticResult<MemoRef<WithEmbeddedLocation<SelectionSet>>> {
     let map = reader_selection_set_map(db);
 
     map.get(&(parent_server_object_entity_name, selectable_name))

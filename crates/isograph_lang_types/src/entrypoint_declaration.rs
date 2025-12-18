@@ -1,4 +1,4 @@
-use common_lang_types::{IsoLiteralText, WithEmbeddedLocation, WithSpan};
+use common_lang_types::{IsoLiteralText, WithEmbeddedLocation};
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 
@@ -19,12 +19,12 @@ pub struct EntrypointDeclaration {
     pub client_field_name: WithEmbeddedLocation<ClientScalarSelectableNameWrapper>,
     // TODO consider moving this behind a cfg flag, since this is only used
     // by the language server.
-    pub entrypoint_keyword: WithSpan<()>,
-    pub dot: WithSpan<()>,
+    pub entrypoint_keyword: WithEmbeddedLocation<()>,
+    pub dot: WithEmbeddedLocation<()>,
     pub iso_literal_text: IsoLiteralText,
     pub entrypoint_directive_set: EntrypointDirectiveSet,
 
-    pub semantic_tokens: Vec<WithSpan<IsographSemanticToken>>,
+    pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
 }
 
 pub type EntrypointDeclarationPath<'a> = PositionResolutionPath<&'a EntrypointDeclaration, ()>;

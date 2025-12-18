@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    EntityName, SelectableName, VariableName, WithLocation, WithLocationPostfix, WithSpan,
-    WithSpanPostfix,
+    EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
+    WithLocationPostfix,
 };
 use graphql_lang_types::{
     GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
@@ -449,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    selection_set: &WithSpan<SelectionSet>,
+    selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
@@ -480,7 +480,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    selection_set: &WithSpan<SelectionSet>,
+    selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> FieldTraversalResult {
@@ -536,7 +536,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    selection_set: &WithSpan<SelectionSet>,
+    selection_set: &WithEmbeddedLocation<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -951,12 +951,13 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
             create_merged_selection_map_for_field_and_insert_into_global_map(
                 db,
                 parent_object_entity,
-                &client_scalar_selectable_selection_set_for_parent_query(
+                client_scalar_selectable_selection_set_for_parent_query(
                     db,
                     newly_encountered_scalar_client_selectable.parent_object_entity_name,
-                    newly_encountered_scalar_client_selectable.name.item,
+                    newly_encountered_scalar_client_selectable.name,
                 )
-                .expect("Expected selection set to be valid."),
+                .expect("Expected selection set to be valid.")
+                .reference(),
                 encountered_client_type_map,
                 (
                     parent_object_entity_name,
@@ -1044,7 +1045,6 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         linked_fields: merge_traversal_state.traversal_path.clone(),
         field_name: newly_encountered_client_scalar_selectable
             .name
-            .item
             .scalar_selected(),
     };
 
@@ -1070,17 +1070,18 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_scalar_selectable.name.item,
+            field_name: newly_encountered_client_scalar_selectable.name,
             path_to_refetch_field_info: info,
         },
     );
 
-    let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
+    let empty_selection_set = SelectionSet { selections: vec![] }
+        .with_embedded_location(EmbeddedLocation::todo_generated());
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         newly_encountered_client_scalar_selectable.parent_object_entity_name,
-        newly_encountered_client_scalar_selectable.name.item,
+        newly_encountered_client_scalar_selectable.name,
     )
     .as_ref()
     .expect(
@@ -1195,7 +1196,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         },
 
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
-            client_selection_name: newly_encountered_client_object_selectable.name.item,
+            client_selection_name: newly_encountered_client_object_selectable.name,
             top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,
@@ -1229,7 +1230,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         ),
         RootRefetchedPath {
-            field_name: newly_encountered_client_object_selectable.name.item,
+            field_name: newly_encountered_client_object_selectable.name,
             path_to_refetch_field_info: info,
         },
     );
@@ -1293,7 +1294,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     newly_encountered_client_type: ClientSelectable<TNetworkProtocol>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     parent_variable_context: &VariableContext,
-    selection_arguments: &[WithLocation<SelectionFieldArgument>],
+    selection_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
 ) {
     let selections = selectable_reader_selection_set(
         db,
@@ -1301,7 +1302,8 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
         newly_encountered_client_type.name(),
     )
     .expect("Expected selections to be valid.")
-    .lookup(db);
+    .lookup(db)
+    .reference();
 
     // Here, we are doing a bunch of work, just so that we can have the refetched paths,
     // which is really really silly.
@@ -1434,7 +1436,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
                         parent_object_entity_name: parent_object_entity.name,
-                        name: id_field.lookup(db).name.item,
+                        name: id_field.lookup(db).name,
                         arguments: vec![],
                     },
                 ));
@@ -1535,10 +1537,14 @@ fn get_aliased_mutation_field_name(
 
 pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     vec![VariableDefinition {
-        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
+        name: ID_FIELD_NAME
+            .unchecked_conversion::<VariableName>()
+            .with_embedded_location(EmbeddedLocation::todo_generated()),
         type_: GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                (*ID_ENTITY_NAME).scalar_selected().with_generated_span(),
+                (*ID_ENTITY_NAME)
+                    .scalar_selected()
+                    .with_embedded_location(EmbeddedLocation::todo_generated()),
             ))
             .boxed(),
         ),
@@ -1546,25 +1552,25 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     }]
 }
 
-pub fn inline_fragment_reader_selection_set() -> WithSpan<SelectionSet> {
+pub fn inline_fragment_reader_selection_set() -> WithEmbeddedLocation<SelectionSet> {
     let typename_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: (*TYPENAME_FIELD_NAME).with_generated_location(),
+        name: (*TYPENAME_FIELD_NAME).with_embedded_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
     })
-    .with_generated_span();
+    .with_embedded_location(EmbeddedLocation::todo_generated());
 
     let link_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: WithLocation::new_generated(*LINK_FIELD_NAME),
+        name: (*LINK_FIELD_NAME).with_embedded_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
     })
-    .with_generated_span();
+    .with_embedded_location(EmbeddedLocation::todo_generated());
 
     SelectionSet {
         selections: vec![typename_selection, link_selection],
     }
-    .with_generated_span()
+    .with_embedded_location(EmbeddedLocation::todo_generated())
 }

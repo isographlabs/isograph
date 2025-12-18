@@ -1,6 +1,5 @@
 use common_lang_types::{
     DeserializationError, Diagnostic, IsographDirectiveName, Location, WithEmbeddedLocation,
-    WithLocation, WithSpan,
 };
 use intern::Lookup;
 use prelude::Postfix;
@@ -13,8 +12,8 @@ use crate::{NonConstantValue, SelectionFieldArgument};
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct IsographFieldDirective {
-    pub name: WithSpan<IsographDirectiveName>,
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub name: WithEmbeddedLocation<IsographDirectiveName>,
+    pub arguments: Vec<WithEmbeddedLocation<SelectionFieldArgument>>,
 }
 
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
@@ -61,12 +60,12 @@ impl<'de> Deserializer<'de> for IsographFieldDirectiveDeserializer<'de> {
 }
 
 struct NameValuePairVecDeserializer<'a> {
-    arguments: &'a Vec<WithLocation<SelectionFieldArgument>>,
+    arguments: &'a Vec<WithEmbeddedLocation<SelectionFieldArgument>>,
     field_idx: usize,
 }
 
 impl<'a> NameValuePairVecDeserializer<'a> {
-    fn new(args: &'a Vec<WithLocation<SelectionFieldArgument>>) -> Self {
+    fn new(args: &'a Vec<WithEmbeddedLocation<SelectionFieldArgument>>) -> Self {
         NameValuePairVecDeserializer {
             arguments: args,
             field_idx: 0,

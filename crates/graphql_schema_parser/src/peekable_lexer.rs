@@ -4,7 +4,8 @@ use logos::Logos;
 use prelude::Postfix;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithSpan, WithSpanPostfix,
+    Diagnostic, DiagnosticResult, Location, Span, TextSource, WithEmbeddedLocation,
+    WithLocationPostfix, WithSpan, WithSpanPostfix,
 };
 
 pub(crate) struct PeekableLexer<'source> {
@@ -45,16 +46,17 @@ impl<'source> PeekableLexer<'source> {
     }
 
     /// Get the next token (and advance)
-    pub fn parse_token(&mut self) -> WithSpan<TokenKind> {
+    pub fn parse_token(&mut self) -> WithEmbeddedLocation<TokenKind> {
         let kind = self.lexer.next().unwrap_or(TokenKind::EndOfFile);
         self.end_index_of_last_parsed_token = self.current.span.end;
         let span = self.lexer_span();
         // TODO why does self.current = ... not work here?
         std::mem::replace(&mut self.current, kind.with_span(span))
+            .to_with_embedded_location(self.text_source)
     }
 
-    pub fn peek(&self) -> WithSpan<TokenKind> {
-        self.current
+    pub fn peek(&self) -> WithEmbeddedLocation<TokenKind> {
+        self.current.to_with_embedded_location(self.text_source)
     }
 
     pub fn lexer_span(&self) -> Span {
@@ -80,14 +82,14 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_token_of_kind(
         &mut self,
         expected_kind: TokenKind,
-    ) -> DiagnosticResult<WithSpan<TokenKind>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<TokenKind>> {
         let found = self.peek();
         if found.item == expected_kind {
             self.parse_token().wrap_ok()
         } else {
             Diagnostic::new(
                 format!("Expected {expected_kind}, found {}.", found.item),
-                Location::new(self.text_source, found.span).wrap_some(),
+                found.location.to::<Location>().wrap_some(),
             )
             .wrap_err()
         }
@@ -98,53 +100,61 @@ impl<'source> PeekableLexer<'source> {
     pub fn parse_source_of_kind(
         &mut self,
         expected_kind: TokenKind,
-    ) -> DiagnosticResult<WithSpan<&'source str>> {
-        let kind = self.parse_token_of_kind(expected_kind)?;
+    ) -> DiagnosticResult<WithEmbeddedLocation<&'source str>> {
+        let token = self.parse_token_of_kind(expected_kind)?;
 
-        self.source(kind.span).with_span(kind.span).wrap_ok()
+        self.source(token.location.span)
+            .with_embedded_location(token.location)
+            .wrap_ok()
     }
 
     pub fn parse_string_key_type<T: From<StringKey>>(
         &mut self,
         expected_kind: TokenKind,
-    ) -> DiagnosticResult<WithSpan<T>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
-        let source = self.source(kind.span).intern();
-        WithSpan::new(source.into(), kind.span).wrap_ok()
+        let source = self.source(kind.location.span).intern();
+        source
+            .to::<T>()
+            .with_embedded_location(kind.location)
+            .wrap_ok()
     }
 
     pub fn parse_matching_identifier(
         &mut self,
         identifier: &'static str,
-    ) -> DiagnosticResult<WithSpan<TokenKind>> {
+    ) -> DiagnosticResult<WithEmbeddedLocation<TokenKind>> {
         let peeked = self.peek();
         if peeked.item == TokenKind::Identifier {
-            let source = self.source(peeked.span);
+            let source = self.source(peeked.location.span);
             if source == identifier {
                 self.parse_token().wrap_ok()
             } else {
                 Diagnostic::new(
                     format!("Expected {identifier}, found {source}"),
-                    Location::new(self.text_source, peeked.span).wrap_some(),
+                    peeked.location.to::<Location>().wrap_some(),
                 )
                 .wrap_err()
             }
         } else {
             Diagnostic::new(
                 format!("Expected identifier, found {}", peeked.item),
-                Location::new(self.text_source, peeked.span).wrap_some(),
+                peeked.location.to::<Location>().wrap_some(),
             )
             .wrap_err()
         }
     }
 
-    pub fn with_span_result<T, E>(
+    pub fn with_embedded_location_result<T, E>(
         &mut self,
         do_stuff: impl FnOnce(&mut Self) -> Result<T, E>,
-    ) -> Result<WithSpan<T>, E> {
+    ) -> Result<WithEmbeddedLocation<T>, E> {
         let start = self.current.span.start;
         let result = do_stuff(self)?;
         let end = self.end_index_of_last_parsed_token;
-        result.with_span(Span::new(start, end)).wrap_ok()
+        result
+            .with_span(Span::new(start, end))
+            .to_with_embedded_location(self.text_source)
+            .wrap_ok()
     }
 }

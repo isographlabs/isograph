@@ -1,48 +1,168 @@
 Err(
     Diagnostic(
         DiagnosticData {
-            message: "data did not match any variant of untagged enum ScalarSelectionDirectiveSet",
-            location: None,
+            message: "Error when deserializing.\n\ndata did not match any variant of untagged enum ScalarSelectionDirectiveSet",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 31,
+                                    end: 81,
+                                },
+                            ),
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 45,
+                        },
+                    },
+                ),
+            ),
             code_actions: [],
         },
     ),
 )
+
+Error when deserializing.
 
 data did not match any variant of untagged enum ScalarSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    scalar @hello @there
+           ^^^^^^^^^^^^^
+  }
+
 ---
 Err(
     Diagnostic(
         DiagnosticData {
-            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            location: None,
+            message: "Error when deserializing.\n\ndata did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 120,
+                                    end: 186,
+                                },
+                            ),
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 53,
+                        },
+                    },
+                ),
+            ),
             code_actions: [],
         },
     ),
 )
 
+Error when deserializing.
+
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable(asdf: true) {
+           ^^^^^^^^^^^^^^^^^^^^^  
+    }
+  }
 ---
 Err(
     Diagnostic(
         DiagnosticData {
-            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            location: None,
+            message: "Error when deserializing.\n\ndata did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 225,
+                                    end: 290,
+                                },
+                            ),
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 52,
+                        },
+                    },
+                ),
+            ),
             code_actions: [],
         },
     ),
 )
 
+Error when deserializing.
+
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable @updatable {
+           ^^^^^^^^^^^^^^^^^^^^  
+    }
+  }
 ---
 Err(
     Diagnostic(
         DiagnosticData {
-            message: "data did not match any variant of untagged enum ObjectSelectionDirectiveSet",
-            location: None,
+            message: "Error when deserializing.\n\ndata did not match any variant of untagged enum ObjectSelectionDirectiveSet",
+            location: Some(
+                Embedded(
+                    EmbeddedLocation {
+                        text_source: TextSource {
+                            current_working_directory: CurrentWorkingDirectory,
+                            relative_path_to_source_file: RelativePathToSourceFile(
+                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js",
+                            ),
+                            span: Some(
+                                Span {
+                                    start: 329,
+                                    end: 406,
+                                },
+                            ),
+                        },
+                        span: Span {
+                            start: 32,
+                            end: 64,
+                        },
+                    },
+                ),
+            ),
             code_actions: [],
         },
     ),
 )
 
+Error when deserializing.
+
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
+
+  field Type.Name {
+    linked @loadable(lazyLoadArtifact: 123) {
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  
+    }
+  }
 ---

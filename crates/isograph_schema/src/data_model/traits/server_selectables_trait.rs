@@ -1,4 +1,4 @@
-use common_lang_types::{EntityName, SelectableName, WithLocation};
+use common_lang_types::{EntityName, SelectableName};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 
@@ -7,10 +7,10 @@ use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectable, ServerSca
 #[impl_for_selection_type]
 pub trait ServerScalarOrObjectSelectable {
     fn description(&self) -> Option<Description>;
-    fn name(&self) -> WithLocation<SelectableName>;
+    fn name(&self) -> SelectableName;
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName>;
     fn parent_type_name(&self) -> EntityName;
-    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>];
+    fn arguments(&self) -> &[VariableDefinition<ServerEntityName>];
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
@@ -20,8 +20,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x)
+    fn name(&self) -> SelectableName {
+        self.name
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {
@@ -34,7 +34,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>] {
+    fn arguments(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.arguments
     }
 }
@@ -46,8 +46,8 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.description
     }
 
-    fn name(&self) -> WithLocation<SelectableName> {
-        self.name.map(|x| x)
+    fn name(&self) -> SelectableName {
+        self.name
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {
@@ -60,7 +60,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
         self.parent_object_entity_name
     }
 
-    fn arguments(&self) -> &[WithLocation<VariableDefinition<ServerEntityName>>] {
+    fn arguments(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.arguments
     }
 }

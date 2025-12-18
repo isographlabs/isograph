@@ -1,7 +1,25 @@
 Ok(
     (
         EntrypointDeclaration(
-            WithSpan {
+            WithEmbeddedLocation {
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        current_working_directory: CurrentWorkingDirectory,
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 5,
+                                end: 25,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 11,
+                        end: 20,
+                    },
+                },
                 item: EntrypointDeclaration {
                     parent_type: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -53,19 +71,47 @@ Ok(
                             ),
                         ),
                     },
-                    entrypoint_keyword: WithSpan {
-                        item: (),
-                        span: Span {
-                            start: 0,
-                            end: 10,
+                    entrypoint_keyword: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 5,
+                                        end: 25,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 10,
+                            },
                         },
+                        item: (),
                     },
-                    dot: WithSpan {
-                        item: (),
-                        span: Span {
-                            start: 15,
-                            end: 16,
+                    dot: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 5,
+                                        end: 25,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 15,
+                                end: 16,
+                            },
                         },
+                        item: (),
                     },
                     iso_literal_text: IsoLiteralText(
                         "entrypoint Type.Name",
@@ -74,7 +120,25 @@ Ok(
                         EmptyDirectiveSet,
                     ),
                     semantic_tokens: [
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 25,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 0,
+                                    end: 10,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -91,12 +155,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 0,
-                                end: 10,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 25,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 11,
+                                    end: 15,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -113,12 +191,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 11,
-                                end: 15,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 25,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 15,
+                                    end: 16,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -135,12 +227,26 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 15,
-                                end: 16,
-                            },
                         },
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-basic.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 25,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 20,
+                                },
+                            },
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -157,16 +263,8 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                            span: Span {
-                                start: 16,
-                                end: 20,
-                            },
                         },
                     ],
-                },
-                span: Span {
-                    start: 11,
-                    end: 20,
                 },
             },
         ),

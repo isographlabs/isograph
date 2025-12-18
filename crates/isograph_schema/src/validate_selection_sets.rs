@@ -1,6 +1,6 @@
 use common_lang_types::{
-    Diagnostic, EntityName, IsographCodeAction, Location, ParentObjectEntityNameAndSelectableName,
-    SelectableName,
+    Diagnostic, EmbeddedLocation, EntityName, IsographCodeAction, Location,
+    ParentObjectEntityNameAndSelectableName, SelectableName,
 };
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionSet,
@@ -130,7 +130,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @loadable is not supported on selections of server scalar fields.",
                                         parent_entity.name, scalar_selection.name.item,
                                     ),
-                                    scalar_selection.name.location.wrap_some(),
+                                    scalar_selection.name.location.to::<Location>().wrap_some(),
                                 ));
                             }
                             ScalarSelectionDirectiveSet::Updatable(_) => {
@@ -153,14 +153,22 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                                 @loadable is not supported on exposed fields.",
                                                 parent_entity.name, scalar_selection.name.item,
                                             ),
-                                            scalar_selection.name.location.wrap_some(),
+                                            scalar_selection
+                                                .name
+                                                .location
+                                                .to::<Location>()
+                                                .wrap_some(),
                                         ));
                                     }
                                     ClientFieldVariant::Link => {
                                         errors.push(Diagnostic::new(
                                             "@loadable is not supported on __link fields"
                                                 .to_string(),
-                                            scalar_selection.name.location.wrap_some(),
+                                            scalar_selection
+                                                .name
+                                                .location
+                                                .to::<Location>()
+                                                .wrap_some(),
                                         ));
                                     }
                                 }
@@ -172,7 +180,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @updatable is not supported on selections of client scalar fields.",
                                         parent_entity.name, scalar_selection.name.item,
                                     ),
-                                    scalar_selection.name.location.wrap_some(),
+                                    scalar_selection.name.location.to::<Location>().wrap_some(),
                                 ));
                             }
                             ScalarSelectionDirectiveSet::None(_) => {}
@@ -232,7 +240,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @updatable is not supported on client object fields.",
                                         parent_entity.name, object_selection.name.item
                                     ),
-                                    object_selection.name.location.wrap_some(),
+                                    object_selection.name.location.to::<Location>().wrap_some(),
                                 ))
                             }
                             ObjectSelectionDirectiveSet::None(_) => {}
@@ -250,7 +258,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                 // This was probably validated elsewhere??
                                 errors.push(entity_not_defined_diagnostic(
                                     target_entity_name,
-                                    object_selection.name.location,
+                                    object_selection.name.location.to(),
                                 ));
                                 continue;
                             }
@@ -279,7 +287,7 @@ fn selection_wrong_selection_type_diagnostic(
     selectable_name: SelectableName,
     selected_as: &str,
     proper_way_to_select: &str,
-    location: Location,
+    location: EmbeddedLocation,
     selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
 ) -> Diagnostic {
     Diagnostic::new(
@@ -290,14 +298,14 @@ fn selection_wrong_selection_type_diagnostic(
             selectable_declaration_info.parent_object_entity_name,
             selectable_declaration_info.selectable_name
         ),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
     )
 }
 
 fn selection_does_not_exist_diagnostic(
     selectable_parent_object_entity_name: EntityName,
     selectable_name: SelectableName,
-    location: Location,
+    location: EmbeddedLocation,
     selection_type: SelectionType<(), ()>,
     selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
 ) -> Diagnostic {
@@ -308,7 +316,7 @@ fn selection_does_not_exist_diagnostic(
             selectable_declaration_info.parent_object_entity_name,
             selectable_declaration_info.selectable_name
         ),
-        location.wrap_some(),
+        location.to::<Location>().wrap_some(),
         match selection_type {
             SelectionType::Scalar(_) => IsographCodeAction::CreateNewScalarSelectable(
                 ParentObjectEntityNameAndSelectableName {

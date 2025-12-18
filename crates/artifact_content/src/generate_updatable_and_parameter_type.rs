@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{
     EntityName, ParentObjectEntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
-    WithLocation, WithSpan,
+    WithEmbeddedLocation,
 };
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use intern::Lookup;
@@ -29,7 +29,7 @@ use crate::{
 pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_map: &WithSpan<SelectionSet>,
+    selection_map: &WithEmbeddedLocation<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -58,7 +58,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
-    selection: &WithSpan<Selection>,
+    selection: &WithEmbeddedLocation<Selection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -185,7 +185,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    selection_map: &WithSpan<SelectionSet>,
+    selection_map: &WithEmbeddedLocation<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -219,7 +219,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
-    selection: &WithSpan<Selection>,
+    selection: &WithEmbeddedLocation<Selection>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
     loadable_fields: &mut ParamTypeImports,
     indentation_level: u8,
@@ -436,10 +436,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
                 ScalarSelectionDirectiveSet::Loadable(_) => {
                     loadable_fields.insert(client_scalar_selectable.type_and_field());
                     let provided_arguments = get_provided_arguments(
-                        client_scalar_selectable
-                            .variable_definitions
-                            .iter()
-                            .map(|x| &x.item),
+                        client_scalar_selectable.variable_definitions.iter(),
                         &scalar_selection.arguments,
                     );
 
@@ -556,7 +553,7 @@ fn format_type_for_js_inner(
 
 fn get_provided_arguments<'a>(
     argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
 ) -> Vec<ValidatedVariableDefinition> {
     argument_definitions
         .filter_map(|definition| {

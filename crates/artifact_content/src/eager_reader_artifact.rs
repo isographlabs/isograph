@@ -1,5 +1,6 @@
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
+    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName,
+    WithEmbeddedLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -70,19 +71,17 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 client_scalar_selectable_selection_set_for_parent_query(
                     db,
                     scalar.parent_object_entity_name,
-                    scalar.name.item,
+                    scalar.name,
                 )
                 .expect("Expected selection set to exist and to be valid.")
             }
-            SelectionType::Object(object) => selectable_reader_selection_set(
-                db,
-                object.parent_object_entity_name,
-                object.name.item,
-            )
-            .expect("Expected selection set to exist and to be valid.")
-            .lookup(db)
-            .clone()
-            .note_todo("Don't clone"),
+            SelectionType::Object(object) => {
+                selectable_reader_selection_set(db, object.parent_object_entity_name, object.name)
+                    .expect("Expected selection set to exist and to be valid.")
+                    .lookup(db)
+                    .clone()
+                    .note_todo("Don't clone")
+            }
         },
         0,
         refetched_paths,
@@ -177,10 +176,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             parent_object_entity.name,
             client_selectable.name()
         );
-        let parameters = client_selectable
-            .variable_definitions()
-            .iter()
-            .map(|x| &x.item);
+        let parameters = client_selectable.variable_definitions().iter();
         let parameters_types = generate_parameters(db, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
@@ -203,11 +199,11 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-    inline_fragment_reader_selections: &WithSpan<SelectionSet>,
+    inline_fragment_reader_selections: &WithEmbeddedLocation<SelectionSet>,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
-    let server_object_selectable_name = server_object_selectable.name.item;
+    let server_object_selectable_name = server_object_selectable.name;
 
     let parent_object_entity =
         &server_object_entity_named(db, server_object_selectable.parent_object_entity_name)
@@ -322,12 +318,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
             db,
             scalar.parent_object_entity_name,
-            scalar.name.item,
+            scalar.name,
         )
         .expect("Expected selection set to be valid."),
         SelectionType::Object(object) => {
             let parent_object_entity_name = object.parent_object_entity_name;
-            let client_object_selectable_name = object.name.item;
+            let client_object_selectable_name = object.name;
             selectable_reader_selection_set(
                 db,
                 parent_object_entity_name,
@@ -362,7 +358,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let reader_param_type = format!(
         "{}__{}__param",
         parent_object_entity.name,
-        isograph_schema::SelectableTrait::name(&client_selectable).item
+        isograph_schema::SelectableTrait::name(&client_selectable)
     );
 
     let start_update_imports = if updatable_fields {
@@ -389,7 +385,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         let reader_parameters_type = format!(
             "{}__{}__parameters",
             parent_object_entity.name,
-            isograph_schema::SelectableTrait::name(&client_selectable).item
+            isograph_schema::SelectableTrait::name(&client_selectable)
         );
         (
             format!(

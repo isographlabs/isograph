@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, FieldArgumentName, Location,
-    ParentObjectEntityNameAndSelectableName, VariableName, WithLocation, WithSpan,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EmbeddedLocation, FieldArgumentName,
+    Location, ParentObjectEntityNameAndSelectableName, VariableName, WithEmbeddedLocation,
 };
 
 use isograph_lang_types::{
@@ -127,19 +127,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         DefinitionLocation::Server(server_scalar_selectable) => {
                             let server_scalar_selectable = server_scalar_selectable.lookup(db);
 
-                            server_scalar_selectable
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.clone())
-                                .collect::<Vec<_>>()
+                            server_scalar_selectable.arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_scalar_selectable) => {
                             client_scalar_selectable
                                 .lookup(db)
                                 .variable_definitions
-                                .iter()
-                                .map(|x| x.item.clone())
-                                .collect()
+                                .to_vec()
                         }
                     };
 
@@ -170,20 +164,13 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     };
                     let field_argument_definitions = match object_selectable {
                         DefinitionLocation::Server(server_object_selectable) => {
-                            server_object_selectable
-                                .lookup(db)
-                                .arguments
-                                .iter()
-                                .map(|x| x.item.clone())
-                                .collect::<Vec<_>>()
+                            server_object_selectable.lookup(db).arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_object_selectable) => {
                             client_object_selectable
                                 .lookup(db)
                                 .variable_definitions
-                                .iter()
-                                .map(|x| x.item.clone())
-                                .collect()
+                                .to_vec()
                         }
                     };
 
@@ -220,10 +207,10 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     errors: &mut Vec<Diagnostic>,
     reachable_variables: &mut BTreeSet<VariableName>,
     field_argument_definitions: Vec<ValidatedVariableDefinition>,
-    client_type_variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    client_type_variable_definitions: &[ValidatedVariableDefinition],
     can_have_missing_args: bool,
-    selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
-    name_location: Location,
+    selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
+    name_location: EmbeddedLocation,
 ) {
     let mut missing_args = vec![];
     for argument_type in get_missing_and_provided_arguments(
@@ -268,7 +255,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn validate_all_variables_are_used(
-    variable_definitions: &[WithSpan<ValidatedVariableDefinition>],
+    variable_definitions: &[ValidatedVariableDefinition],
     used_variables: UsedVariables,
     top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
     location: Location,
@@ -276,7 +263,7 @@ fn validate_all_variables_are_used(
     let unused_variables = variable_definitions
         .iter()
         .filter_map(|variable| {
-            let is_used = used_variables.contains(&variable.item.name.item);
+            let is_used = used_variables.contains(&variable.name.item);
 
             if !is_used {
                 return variable.clone().wrap_some();
@@ -293,7 +280,7 @@ fn validate_all_variables_are_used(
                 "The field `{type_name}.{field_name}` has unused variables: {0}",
                 unused_variables
                     .iter()
-                    .map(|variable| format!("${}", variable.item.name.item))
+                    .map(|variable| format!("${}", variable.name.item))
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
@@ -306,7 +293,7 @@ fn validate_all_variables_are_used(
 
 fn assert_no_missing_arguments(
     missing_arguments: Vec<ValidatedVariableDefinition>,
-    location: Location,
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     if !missing_arguments.is_empty() {
         return Diagnostic::new(
@@ -318,7 +305,7 @@ fn assert_no_missing_arguments(
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            location.wrap_some(),
+            location.to::<Location>().wrap_some(),
         )
         .wrap_err();
     }
@@ -329,13 +316,13 @@ enum ArgumentType<'a> {
     Missing(&'a ValidatedVariableDefinition),
     Provided(
         &'a ValidatedVariableDefinition,
-        &'a WithLocation<SelectionFieldArgument>,
+        &'a WithEmbeddedLocation<SelectionFieldArgument>,
     ),
 }
 
 fn get_missing_and_provided_arguments<'a>(
     field_argument_definitions: &'a [ValidatedVariableDefinition],
-    selection_supplied_arguments: &'a [WithLocation<SelectionFieldArgument>],
+    selection_supplied_arguments: &'a [WithEmbeddedLocation<SelectionFieldArgument>],
 ) -> impl Iterator<Item = ArgumentType<'a>> {
     field_argument_definitions
         .iter()
@@ -359,8 +346,8 @@ fn get_missing_and_provided_arguments<'a>(
 
 fn validate_no_extraneous_arguments(
     field_argument_definitions: &[ValidatedVariableDefinition],
-    selection_supplied_arguments: &[WithLocation<SelectionFieldArgument>],
-    location: Location,
+    selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
+    location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     let extra_arguments: Vec<_> = selection_supplied_arguments
         .iter()
@@ -395,7 +382,7 @@ fn validate_no_extraneous_arguments(
                     .collect::<Vec<_>>()
                     .join(", ")
             ),
-            location.wrap_some(),
+            location.to::<Location>().wrap_some(),
         )
         .wrap_err();
     }
@@ -403,7 +390,7 @@ fn validate_no_extraneous_arguments(
 }
 
 pub fn extend_reachable_variables_with_arg(
-    non_constant_value: &WithLocation<NonConstantValue>,
+    non_constant_value: &WithEmbeddedLocation<NonConstantValue>,
     reachable_variables: &mut UsedVariables,
 ) {
     // TODO implement this more efficiently with accumulator-passing-style
@@ -427,7 +414,7 @@ pub fn extend_reachable_variables_with_arg(
 
 fn extend_reachable_variables_with_args(
     reachable_variables: &mut BTreeSet<VariableName>,
-    arguments: &[WithLocation<SelectionFieldArgument>],
+    arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
 ) {
     for arg in arguments.iter() {
         extend_reachable_variables_with_arg(&arg.item.value, reachable_variables);

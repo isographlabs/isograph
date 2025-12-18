@@ -77,20 +77,20 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     let selectable = match selectable {
         DefinitionLocation::Server(server) => match server {
             SelectionType::Scalar(scalar) => scalar.server_defined().wrap_ok(),
-            SelectionType::Object(object) => object.lookup(db).name.location.wrap_err(),
+            SelectionType::Object(_) => ().wrap_err(),
         },
         DefinitionLocation::Client(client) => match client {
             SelectionType::Scalar(scalar) => scalar.client_defined().wrap_ok(),
-            SelectionType::Object(object) => object.lookup(db).name.location.wrap_err(),
+            SelectionType::Object(_) => ().wrap_err(),
         },
     }
-    .map_err(|location| {
+    .map_err(|_| {
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
             scalar_selectable_name,
             "a scalar",
             "an object",
-            location,
+            scalar_path.inner.name.location.to::<Location>(),
         )
     })?;
 
@@ -117,16 +117,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     )?;
 
     let selectable = selectable.as_object().ok_or_else(|| {
-        let location = match &selectable {
-            DefinitionLocation::Server(server) => match server {
-                SelectionType::Scalar(s) => s.lookup(db).name.location,
-                SelectionType::Object(o) => o.lookup(db).name.location,
-            },
-            DefinitionLocation::Client(client) => match client {
-                SelectionType::Scalar(s) => s.lookup(db).name.location,
-                SelectionType::Object(o) => o.lookup(db).name.location,
-            },
-        };
+        let location = object_path.inner.name.location.to::<Location>();
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
             object_selectable_name,

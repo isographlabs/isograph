@@ -89,11 +89,11 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     let (name, description, arguments) = match &selectable {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
-                            (scalar.name.item, scalar.description, scalar.arguments())
+                            (scalar.name, scalar.description, scalar.arguments())
                         }
                         DefinitionLocation::Client(c) => {
                             let client = c.lookup(db);
-                            (client.name.item, client.description, client.arguments())
+                            (client.name, client.description, client.arguments())
                         }
                     };
 
@@ -118,11 +118,11 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     let (name, description, arguments) = match &selectable {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
-                            (scalar.name.item, scalar.description, scalar.arguments())
+                            (scalar.name, scalar.description, scalar.arguments())
                         }
                         DefinitionLocation::Client(c) => {
                             let client = c.lookup(db);
-                            (client.name.item, client.description, client.arguments())
+                            (client.name, client.description, client.arguments())
                         }
                     };
 

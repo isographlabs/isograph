@@ -1,5 +1,5 @@
 use common_lang_types::{
-    SelectableAlias, SelectableName, SelectableNameOrAlias, VariableName, WithLocation, WithSpan,
+    SelectableAlias, SelectableName, SelectableNameOrAlias, VariableName, WithEmbeddedLocation,
 };
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -13,7 +13,7 @@ use crate::{
 pub type Selection = SelectionType<ScalarSelection, ObjectSelection>;
 
 impl Selection {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithEmbeddedLocation<SelectableNameOrAlias> {
         match self {
             SelectionType::Scalar(scalar_field) => scalar_field.name_or_alias(),
             SelectionType::Object(linked_field) => linked_field.name_or_alias(),
@@ -28,10 +28,11 @@ impl Selection {
     }
 
     pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableName> + 'a {
-        let get_variable = |x: &'a WithLocation<SelectionFieldArgument>| match x.item.value.item {
-            NonConstantValue::Variable(v) => Some(v),
-            _ => None,
-        };
+        let get_variable =
+            |x: &'a WithEmbeddedLocation<SelectionFieldArgument>| match x.item.value.item {
+                NonConstantValue::Variable(v) => Some(v),
+                _ => None,
+            };
         match self {
             SelectionType::Scalar(scalar_field) => {
                 scalar_field.arguments.iter().flat_map(get_variable)
@@ -58,14 +59,10 @@ impl Selection {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
-// TODO remove type parameter
 pub struct ScalarSelection {
-    // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<SelectableName>,
-    // TODO make this WithSpan instead of WithLocation
-    pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    // TODO make this WithSpan instead of WithLocation
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub name: WithEmbeddedLocation<SelectableName>,
+    pub reader_alias: Option<WithEmbeddedLocation<SelectableAlias>>,
+    pub arguments: Vec<WithEmbeddedLocation<SelectionFieldArgument>>,
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
 
@@ -73,7 +70,7 @@ pub type ScalarSelectionPath<'a> =
     PositionResolutionPath<&'a ScalarSelection, SelectionParentType<'a>>;
 
 impl ScalarSelection {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithEmbeddedLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))
@@ -84,14 +81,11 @@ impl ScalarSelection {
 #[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
 // TODO remove the type parameters
 pub struct ObjectSelection {
-    // TODO make this WithSpan instead of WithLocation
-    pub name: WithLocation<SelectableName>,
-    // TODO make this WithSpan instead of WithLocation
-    pub reader_alias: Option<WithLocation<SelectableAlias>>,
+    pub name: WithEmbeddedLocation<SelectableName>,
+    pub reader_alias: Option<WithEmbeddedLocation<SelectableAlias>>,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet>,
-    // TODO make this WithSpan instead of WithLocation
-    pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
+    pub selection_set: WithEmbeddedLocation<SelectionSet>,
+    pub arguments: Vec<WithEmbeddedLocation<SelectionFieldArgument>>,
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
 
@@ -105,7 +99,7 @@ pub enum SelectionParentType<'a> {
 }
 
 impl ObjectSelection {
-    pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
+    pub fn name_or_alias(&self) -> WithEmbeddedLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
             .unwrap_or_else(|| self.name.map(SelectableNameOrAlias::from))

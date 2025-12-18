@@ -5,7 +5,7 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 use common_lang_types::{
-    Span, TextSource, WithSpan, relative_path_from_absolute_and_working_directory,
+    Span, TextSource, WithEmbeddedLocation, relative_path_from_absolute_and_working_directory,
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
@@ -124,11 +124,11 @@ fn concatenate_and_absolutize_relative_tokens<'a>(
 fn absolutize_relative_token<'a>(
     page_content: &'a str,
     iso_literal_extraction_span: Span,
-    relative_token: &'a WithSpan<IsographSemanticToken>,
+    relative_token: &'a WithEmbeddedLocation<IsographSemanticToken>,
 ) -> impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a {
     let span_content = &page_content[(iso_literal_extraction_span.start as usize
-        + relative_token.span.start as usize)
-        ..(iso_literal_extraction_span.start as usize + relative_token.span.end as usize)];
+        + relative_token.location.span.start as usize)
+        ..(iso_literal_extraction_span.start as usize + relative_token.location.span.end as usize)];
 
     // Note the split inclusive here. This makes it so that the lines include the
     // line break, i.e. 'foo\nbar' -> 'foo\n', 'bar'
@@ -137,7 +137,7 @@ fn absolutize_relative_token<'a>(
         .scan(0, move |iterated_so_far_within_token, line_text| {
             let token = AbsoluteIsographSemanticToken {
                 absolute_char_start: iso_literal_extraction_span.start
-                    + relative_token.span.start
+                    + relative_token.location.span.start
                     + *iterated_so_far_within_token,
                 len: line_text.len() as u32,
                 semantic_token: relative_token.item,

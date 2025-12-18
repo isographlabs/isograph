@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use intern::string_key::Intern;
 
-use common_lang_types::{DescriptionValue, WithSpan};
+use common_lang_types::{DescriptionValue, WithEmbeddedLocation};
 use isograph_lang_types::{Description, semantic_token_legend};
 use prelude::Postfix;
 
@@ -10,11 +10,13 @@ use crate::{IsographLangTokenKind, peekable_lexer::PeekableLexer};
 
 pub(crate) fn parse_optional_description(
     tokens: &mut PeekableLexer,
-) -> Option<WithSpan<Description>> {
+) -> Option<WithEmbeddedLocation<Description>> {
     parse_single_line_description(tokens).or_else(|| parse_multiline_description(tokens))
 }
 
-fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<Description>> {
+fn parse_multiline_description(
+    tokens: &mut PeekableLexer,
+) -> Option<WithEmbeddedLocation<Description>> {
     tokens
         .parse_source_of_kind(
             IsographLangTokenKind::BlockStringLiteral,
@@ -30,7 +32,9 @@ fn parse_multiline_description(tokens: &mut PeekableLexer) -> Option<WithSpan<De
         })
 }
 
-fn parse_single_line_description(tokens: &mut PeekableLexer) -> Option<WithSpan<Description>> {
+fn parse_single_line_description(
+    tokens: &mut PeekableLexer,
+) -> Option<WithEmbeddedLocation<Description>> {
     tokens
         .parse_source_of_kind(
             IsographLangTokenKind::StringLiteral,

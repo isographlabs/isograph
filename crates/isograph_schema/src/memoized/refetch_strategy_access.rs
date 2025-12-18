@@ -34,12 +34,8 @@ pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         match out.entry(*key) {
             Entry::Occupied(mut occupied_entry) => {
                 // TODO check for length instead
-                *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
-                    key.0,
-                    key.1,
-                    Location::Generated,
-                )
-                .wrap_err()
+                *occupied_entry.get_mut() =
+                    multiple_selectable_definitions_found_diagnostic(key.0, key.1, None).wrap_err()
             }
             Entry::Vacant(vacant_entry) => match item {
                 SelectionType::Scalar(_) => {
@@ -70,7 +66,7 @@ pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
                 *occupied_entry.get_mut() = multiple_selectable_definitions_found_diagnostic(
                     *parent_object_entity_name,
                     *selectable_name,
-                    with_location.location,
+                    with_location.location.wrap_some(),
                 )
                 .wrap_err();
             }

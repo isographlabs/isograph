@@ -1,6 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, SelectableName, WithLocation, WithSpan};
+use common_lang_types::{EntityName, SelectableName};
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 use pico::MemoRef;
 
@@ -25,12 +25,12 @@ pub type MemoRefClientSelectable<TNetworkProtocol> = SelectionType<
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<SelectableName>,
+    pub name: SelectableName,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
+    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
 
     pub parent_object_entity_name: EntityName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
@@ -41,10 +41,10 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
-    pub name: WithLocation<SelectableName>,
+    pub name: SelectableName,
     pub target_object_entity_name: TypeAnnotation<EntityName>,
 
-    pub variable_definitions: Vec<WithSpan<VariableDefinition<ServerEntityName>>>,
+    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
 
     pub parent_object_entity_name: EntityName,
 

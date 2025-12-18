@@ -55,6 +55,7 @@ impl Span {
         (self.start as usize, self.end as usize)
     }
 
+    /// Creates a new Span starting at left.start and ending at right.end
     pub fn join(left: Span, right: Span) -> Self {
         Span::new(left.start, right.end)
     }

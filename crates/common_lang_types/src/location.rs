@@ -1,4 +1,5 @@
 use intern::string_key::{Intern, Lookup};
+use lazy_static::lazy_static;
 use prelude::Postfix;
 use std::{error::Error, fmt, path::PathBuf};
 
@@ -14,11 +15,22 @@ use crate::{
 /// TODO consider whether to replace the span with an index,
 /// as this will probably mean that sources are more reusable
 /// during watch mode.
+///
+/// TODO do not include the cwd
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TextSource {
     pub current_working_directory: CurrentWorkingDirectory,
     pub relative_path_to_source_file: RelativePathToSourceFile,
     pub span: Option<Span>,
+}
+
+lazy_static! {
+    // This is a horrible hack! If this is printed, we presumably blow up.
+    pub static ref GENERATED_FILE_DO_NOT_PRINT: TextSource = TextSource {
+        current_working_directory: "".intern().into(),
+        relative_path_to_source_file: "generated".intern().into(),
+        span: None,
+    };
 }
 
 const ISO_PRINT_ABSOLUTE_FILEPATH: &str = "ISO_PRINT_ABSOLUTE_FILEPATH";
@@ -81,6 +93,14 @@ impl std::fmt::Display for EmbeddedLocation {
         let text_with_carats = text_with_carats(&read_out_text, self.span);
 
         write!(f, "{file_path}\n{text_with_carats}")
+    }
+}
+
+impl EmbeddedLocation {
+    /// This function will give us an embedded location that will probably cause
+    /// a panic if printed! It's use is indicative that we need to refactor somehow.
+    pub fn todo_generated() -> EmbeddedLocation {
+        EmbeddedLocation::new(*GENERATED_FILE_DO_NOT_PRINT, Span::todo_generated())
     }
 }
 
@@ -159,6 +179,10 @@ where
 
     fn with_generated_location(self) -> WithLocation<Self> {
         WithLocation::new(self, Location::Generated)
+    }
+
+    fn with_embedded_location(self, location: EmbeddedLocation) -> WithEmbeddedLocation<Self> {
+        WithEmbeddedLocation::new(self, location)
     }
 }
 

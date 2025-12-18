@@ -1,13 +1,17 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
-use common_lang_types::{EntityName, VariableName, WithLocation, WithSpan, WithSpanPostfix};
+use common_lang_types::{
+    EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
+    WithLocationPostfix,
+};
 use isograph_lang_types::{
-    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet, SelectionType,
+    EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, Selection, SelectionSet,
+    SelectionType,
 };
 
 use crate::{
-    ID_FIELD_NAME, MergedSelectionMap, UnprocessedSelection, WrappedSelectionMapSelection,
-    get_reachable_variables, selection_map_wrapped,
+    ID_FIELD_NAME, MergedSelectionMap, WrappedSelectionMapSelection, get_reachable_variables,
+    selection_map_wrapped,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -17,7 +21,7 @@ pub enum RefetchStrategy {
 }
 
 impl RefetchStrategy {
-    pub fn refetch_selection_set(&self) -> Option<&WithSpan<SelectionSet>> {
+    pub fn refetch_selection_set(&self) -> Option<&WithEmbeddedLocation<SelectionSet>> {
         match self {
             RefetchStrategy::UseRefetchField(used_refetch_field) => {
                 Some(&used_refetch_field.refetch_selection_set)
@@ -27,7 +31,7 @@ impl RefetchStrategy {
     }
 }
 pub fn generate_refetch_field_strategy(
-    refetch_selection_set: WithSpan<SelectionSet>,
+    refetch_selection_set: WithEmbeddedLocation<SelectionSet>,
     root_fetchable_type_name: EntityName,
     subfields: Vec<WrappedSelectionMapSelection>,
 ) -> UseRefetchFieldRefetchStrategy {
@@ -42,7 +46,7 @@ pub fn generate_refetch_field_strategy(
 pub struct UseRefetchFieldRefetchStrategy {
     /// If this field is fetched imperatively, what fields do we need to
     /// select in the parent query?
-    pub refetch_selection_set: WithSpan<SelectionSet>,
+    pub refetch_selection_set: WithEmbeddedLocation<SelectionSet>,
     /// Query, Mutation, etc.
     pub root_fetchable_type_name: EntityName,
 
@@ -76,12 +80,14 @@ impl GenerateRefetchQueryImpl {
     }
 }
 
-pub fn id_selection() -> UnprocessedSelection {
+pub fn id_selection() -> WithEmbeddedLocation<Selection> {
     SelectionType::Scalar(ScalarSelection {
-        name: WithLocation::new_generated(ID_FIELD_NAME.unchecked_conversion()),
+        name: ID_FIELD_NAME
+            .unchecked_conversion::<SelectableName>()
+            .with_embedded_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         arguments: vec![],
     })
-    .with_generated_span()
+    .with_embedded_location(EmbeddedLocation::todo_generated())
 }

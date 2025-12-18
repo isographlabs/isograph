@@ -4,7 +4,7 @@ use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     server_object_entities,
 };
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use pico::MemoRef;
@@ -28,7 +28,7 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
                         .intern()
                         .into(),
                 )),
-                name: field_name.with_generated_location(),
+                name: field_name,
                 parent_object_entity_name,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,

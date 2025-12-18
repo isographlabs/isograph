@@ -7,24 +7,24 @@ import type { PetDetailRoute } from './routes';
 import { FullPageLoading, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
-  field Query.PetDetailRoute(
-    $id: ID !
-  ) @component {
-    pet(
-      id: $id
-    ) {
-      custom_pet_refetch
+  Query .PetDetailRoute($
+    id:ID ! )
+  @ component{ pet
+    (id
+      :$ id)
+    { custom_pet_refetch
       fullName
       PetCheckinsCard
       PetBestFriendCard
       PetPhraseCard
       PetTaglineCard
       MutualBestFriendSetter
-      PetStatsCard(
-        id: $id
-      )
+      PetStatsCard
+      (id
+        :$ id)
+      }
     }
-  }
+  
 `)(function PetDetailRouteComponent({ data, parameters }) {
   const navigateTo = useNavigateTo();
   const { pet } = data;
@@ -77,7 +77,7 @@ export const PetDetailRouteComponent = iso(`
 
 export function PetDetailRouteLoader({ route }: { route: PetDetailRoute }) {
   const { fragmentReference } = useLazyReference(
-    iso(`entrypoint Query.PetDetailRoute`),
+    iso(`Query .PetDetailRoute`),
     { id: route.id },
     {
       onComplete: (data) => {

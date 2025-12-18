@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use common_lang_types::{VariableName, WithLocation};
+use common_lang_types::{VariableName, WithEmbeddedLocation};
 use graphql_lang_types::GraphQLTypeAnnotation;
 use prelude::Postfix;
 
@@ -8,9 +8,9 @@ use crate::ConstantValue;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct VariableDefinition<TValue: Ord + Debug> {
-    pub name: WithLocation<VariableName>,
+    pub name: WithEmbeddedLocation<VariableName>,
     pub type_: GraphQLTypeAnnotation<TValue>,
-    pub default_value: Option<WithLocation<ConstantValue>>,
+    pub default_value: Option<WithEmbeddedLocation<ConstantValue>>,
 }
 
 impl<TValue: Ord + Debug> VariableDefinition<TValue> {

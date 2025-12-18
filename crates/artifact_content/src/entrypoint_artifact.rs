@@ -82,7 +82,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         &client_scalar_selectable_selection_set_for_parent_query(
             db,
             entrypoint.parent_object_entity_name,
-            entrypoint.name.item,
+            entrypoint.name,
         )
         .expect("Expected selection set to be valid."),
         encountered_client_type_map,
@@ -102,11 +102,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
         &merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
-        entrypoint
-            .variable_definitions
-            .iter()
-            .map(|variable_definition| &variable_definition.item)
-            .collect(),
+        entrypoint.variable_definitions.iter().collect(),
         &fetchable_types(db)
             .as_ref()
             .expect(
@@ -137,7 +133,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let query_name = entrypoint.name.item.into();
+    let query_name = entrypoint.name.into();
     // TODO when we do not call generate_entrypoint_artifact extraneously,
     // we can panic instead of using a default entrypoint type
     // TODO model this better so that the RootOperationName is somehow a
@@ -291,7 +287,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         &operation_text,
         parent_object_entity,
         &refetch_query_artifact_import,
-        entrypoint.name.item,
+        entrypoint.name,
         concrete_object_entity.name,
         &directive_set,
         match &entrypoint.variant {

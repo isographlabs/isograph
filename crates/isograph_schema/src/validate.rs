@@ -103,12 +103,11 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
 
     // TODO use iterator methods
     for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
-        let (target, name_location, arguments) = match selectable {
+        let (target, arguments) = match selectable {
             SelectionType::Scalar(s) => {
                 let scalar = s.lookup(db);
                 (
                     scalar.target_scalar_entity.inner().dereference(),
-                    scalar.name.location,
                     &scalar.arguments,
                 )
             }
@@ -116,7 +115,6 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
                 let object = o.lookup(db);
                 (
                     object.target_object_entity.inner().dereference(),
-                    object.name.location,
                     &object.arguments,
                 )
             }
@@ -128,24 +126,24 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
                     "`{parent_object_entity_name}.{selectable_name}` has inner \
                     type `{target}, but that type has not been defined"
                 ),
-                name_location.wrap_some(),
+                None.note_todo("Get the location from the declaration here"),
             ))
         }
 
         for argument in arguments {
-            let arg_target = match argument.item.type_.inner().dereference() {
+            let arg_target = match argument.type_.inner().dereference() {
                 SelectionType::Scalar(s) => s,
                 SelectionType::Object(o) => o,
             };
 
             if !entities.contains_key(&arg_target) {
-                let arg_name = argument.item.name.item;
+                let arg_name = argument.name.item;
                 errors.push(Diagnostic::new(
                     format!(
                         "In `{parent_object_entity_name}.{selectable_name}`, the argument `{arg_name}` has inner \
                         type `{arg_target}, but that type has not been defined"
                     ),
-                    argument.location.wrap_some(),
+                    None.note_todo("Get the location from the declaration here"),
                 ))
             }
         }
