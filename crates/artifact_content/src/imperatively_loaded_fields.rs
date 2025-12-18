@@ -68,7 +68,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         get_used_variable_definitions(reachable_variables, entrypoint);
 
     for variable_definition in top_level_schema_field_arguments.iter() {
-        definitions_of_used_variables.push(VariableDefinition {
+        definitions_of_used_variables.insert(VariableDefinition {
             name: variable_definition.name,
             type_: variable_definition.type_.clone(),
             default_value: variable_definition.default_value.clone(),
@@ -188,7 +188,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-) -> Vec<VariableDefinition<ServerEntityName>> {
+) -> BTreeSet<VariableDefinition<ServerEntityName>> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {
@@ -215,5 +215,5 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                     .wrap_some()
             }
         })
-        .collect::<Vec<_>>()
+        .collect()
 }
