@@ -1,6 +1,6 @@
 use common_lang_types::{
-    AbsolutePathAndRelativePath, CurrentWorkingDirectory, GeneratedFileHeader,
-    relative_path_from_absolute_and_working_directory,
+    AbsolutePathAndRelativePath, CurrentWorkingDirectory, Diagnostic, GeneratedFileHeader,
+    PrintLocationFn, relative_path_from_absolute_and_working_directory,
 };
 use intern::string_key::Intern;
 use pico_macros::Singleton;
@@ -10,8 +10,6 @@ use std::path::PathBuf;
 use tracing::warn;
 
 pub static ISOGRAPH_FOLDER: &str = "__isograph";
-
-use std::error::Error;
 
 /// This struct is the internal representation of the config. It
 /// is a transformed version of IsographProjectConfig.
@@ -71,18 +69,19 @@ pub enum OptionalValidationLevel {
 }
 
 impl OptionalValidationLevel {
-    pub fn on_failure<E>(self, on_error: impl FnOnce() -> E) -> Result<(), E>
-    where
-        E: Error,
-    {
+    pub fn on_failure(
+        self,
+        on_error: impl FnOnce() -> (Diagnostic, PrintLocationFn),
+    ) -> Result<(), Diagnostic> {
         match self {
             OptionalValidationLevel::Ignore => Ok(()),
             OptionalValidationLevel::Warn => {
-                let warning = on_error();
-                warn!("{warning}");
+                let (warning, print_location) = on_error();
+                let printable = warning.printable(print_location);
+                warn!("{printable}");
                 Ok(())
             }
-            OptionalValidationLevel::Error => Err(on_error()),
+            OptionalValidationLevel::Error => Err(on_error().0),
         }
     }
 }

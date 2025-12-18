@@ -24,3 +24,4 @@ pub use selectable_name::*;
 pub use span::*;
 pub use string_key_types::*;
 pub use string_types::*;
+pub use text_with_carats::*;

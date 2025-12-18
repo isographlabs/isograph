@@ -1,7 +1,5 @@
-use std::fmt::Display;
-
 use prelude::Postfix;
-use serde::{Deserialize, Serialize, de};
+use serde::{Deserialize, Serialize};
 
 use crate::{Location, LocationFreeDiagnostic, ParentObjectEntityNameAndSelectableName};
 
@@ -50,28 +48,31 @@ impl Diagnostic {
             .boxed(),
         )
     }
+
+    pub fn printable<'a>(&'a self, print_location: PrintLocationFn) -> PrintableDiagnostic<'a> {
+        PrintableDiagnostic {
+            diagnostic: &self,
+            print_location,
+        }
+    }
 }
 
-impl Display for Diagnostic {
+pub type PrintLocationFn = Box<dyn Fn(Location, &mut std::fmt::Formatter<'_>) -> std::fmt::Result>;
+
+pub struct PrintableDiagnostic<'a> {
+    diagnostic: &'a Diagnostic,
+    print_location: PrintLocationFn,
+}
+
+impl std::fmt::Display for PrintableDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0.message)?;
-        if let Some(location) = self.0.location {
-            write!(f, "\n{}", location)?;
+        write!(f, "{}", self.diagnostic.0.message)?;
+        if let Some(location) = self.diagnostic.location() {
+            (self.print_location)(location, f)?;
         }
         Ok(())
     }
 }
-
-impl de::Error for Diagnostic {
-    fn custom<T>(msg: T) -> Self
-    where
-        T: core::fmt::Display,
-    {
-        Diagnostic::new(msg.to_string(), None)
-    }
-}
-
-impl std::error::Error for Diagnostic {}
 
 pub type DiagnosticResult<T> = Result<T, Diagnostic>;
 // TODO we should not do this

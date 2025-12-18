@@ -1,11 +1,9 @@
 use intern::string_key::{Intern, Lookup};
 use lazy_static::lazy_static;
 use prelude::Postfix;
-use std::{error::Error, fmt, path::PathBuf};
+use std::path::PathBuf;
 
-use crate::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, Span, text_with_carats::text_with_carats,
-};
+use crate::{CurrentWorkingDirectory, RelativePathToSourceFile, Span};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -86,15 +84,6 @@ pub struct EmbeddedLocation {
     pub span: Span,
 }
 
-impl std::fmt::Display for EmbeddedLocation {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let (file_path, read_out_text) = self.text_source.read_to_string();
-        let text_with_carats = text_with_carats(&read_out_text, self.span);
-
-        write!(f, "{file_path}\n{text_with_carats}")
-    }
-}
-
 impl EmbeddedLocation {
     /// This function will give us an embedded location that will probably cause
     /// a panic if printed! It's use is indicative that we need to refactor somehow.
@@ -130,17 +119,6 @@ impl Location {
 impl EmbeddedLocation {
     pub fn new(text_source: TextSource, span: Span) -> Self {
         EmbeddedLocation { text_source, span }
-    }
-}
-
-impl fmt::Display for Location {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Location::Embedded(e) => e.fmt(f),
-            Location::Generated => {
-                write!(f, "<generated>")
-            }
-        }
     }
 }
 
@@ -180,31 +158,9 @@ where
 
 impl<T> WithLocationPostfix for T {}
 
-impl<T: Error> Error for WithLocationForDisplay<'_, T> {
-    fn description(&self) -> &str {
-        #[expect(deprecated)]
-        self.inner.item.description()
-    }
-}
-
 impl<T> WithLocation<T> {
     pub fn new(item: T, location: Location) -> Self {
         WithLocation { item, location }
-    }
-}
-
-/// [WithLocation] does not implement Display. There have been a few bugs in which
-/// a field was initially T, and then changed to be WithLocation<T>, and as a result,
-/// what was printed changed unexpectedly. So, we require an explicit step to print
-/// a WithLocation, calling with_location.for_display().
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct WithLocationForDisplay<'a, T> {
-    inner: &'a WithLocation<T>,
-}
-
-impl<T: fmt::Display> fmt::Display for WithLocationForDisplay<'_, T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.inner.item, self.inner.location)
     }
 }
 
@@ -222,19 +178,6 @@ impl<TValue: PartialOrd> PartialOrd for WithEmbeddedLocation<TValue> {
             ord => return ord,
         }
         self.location.partial_cmp(&other.location)
-    }
-}
-
-impl<T: Error> Error for WithEmbeddedLocation<T> {
-    fn description(&self) -> &str {
-        #[expect(deprecated)]
-        self.item.description()
-    }
-}
-
-impl<T: fmt::Display> fmt::Display for WithEmbeddedLocation<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}\n{}", self.item, self.location)
     }
 }
 

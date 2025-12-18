@@ -11,14 +11,14 @@ enum SpanState {
 
 static LINE_COUNT_BUFFER: usize = 2;
 
-pub(crate) fn text_with_carats(text: &str, span: Span) -> String {
+pub fn text_with_carats(text: &str, span: Span) -> String {
     text_with_carats_and_line_count_buffer(text, span, LINE_COUNT_BUFFER)
 }
 
 /// For a given string and span, return a string with
 /// the span underlined with carats and LINE_COUNT_BUFFER previous and following
 /// lines.
-pub(crate) fn text_with_carats_and_line_count_buffer(
+fn text_with_carats_and_line_count_buffer(
     text: &str,
     span: Span,
     line_count_buffer: usize,

@@ -133,18 +133,21 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     {
         options.on_invalid_id_type.on_failure(|| {
             let strong_field_name = *ID_FIELD_NAME;
-            Diagnostic::new(
-                format!(
-                    "The `{strong_field_name}` field on \
+            (
+                Diagnostic::new(
+                    format!(
+                        "The `{strong_field_name}` field on \
                     `{parent_server_object_entity_name}` must have type `ID!`.\n\
                     This error can be suppressed using the \
                     \"on_invalid_id_type\" config parameter."
+                    ),
+                    entity_definition_location(db, parent_server_object_entity_name)
+                        .as_ref()
+                        .ok()
+                        .cloned()
+                        .flatten(),
                 ),
-                entity_definition_location(db, parent_server_object_entity_name)
-                    .as_ref()
-                    .ok()
-                    .cloned()
-                    .flatten(),
+                db.print_location_fn(),
             )
         })?;
     }

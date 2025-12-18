@@ -3,10 +3,14 @@ use std::{
     marker::PhantomData,
 };
 
-use common_lang_types::{CurrentWorkingDirectory, RelativePathToSourceFile, TextSource};
+use common_lang_types::{
+    CurrentWorkingDirectory, Location, PrintLocationFn, RelativePathToSourceFile, TextSource,
+    text_with_carats,
+};
 use isograph_config::CompilerConfig;
 use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source};
+use prelude::Postfix;
 
 use crate::NetworkProtocol;
 
@@ -166,5 +170,18 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
             .remove(&relative_path)
             .map(|source_id| self.remove(source_id))
             .is_some()
+    }
+
+    pub fn print_location_fn(&self) -> PrintLocationFn {
+        (move |location: Location, f: &mut std::fmt::Formatter<'_>| match location {
+            Location::Embedded(embedded_location) => {
+                let (file_path, read_out_text) = embedded_location.text_source.read_to_string();
+                let text_with_carats = text_with_carats(&read_out_text, embedded_location.span);
+
+                write!(f, "{file_path}\n{text_with_carats}")
+            }
+            Location::Generated => write!(f, "\n<generated>"),
+        })
+        .boxed()
     }
 }

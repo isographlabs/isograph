@@ -70,7 +70,7 @@ fn iso_diagnostics_to_params<TNetworkProtocol: NetworkProtocol>(
             .or_default()
             .push(lsp_types::Diagnostic {
                 range: location.range,
-                message: diagnostic.to_string(),
+                message: diagnostic.printable(db.print_location_fn()).to_string(),
                 data: serde_json::to_value(diagnostic.0.code_actions.clone())
                     .expect(
                         "Expected serialization to work. \

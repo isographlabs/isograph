@@ -9,7 +9,7 @@ use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_config::CompilerConfig;
-use isograph_schema::NetworkProtocol;
+use isograph_schema::{IsographDatabase, NetworkProtocol};
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
 use tracing::{error, info};
@@ -33,12 +33,14 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
             return ().wrap_err();
         }
     };
-    print_result(WithDuration::new(|| {
-        compile::<TNetworkProtocol>(&mut state)
-    }))
+    let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
+    print_result(&state.db, result)
 }
 
-pub fn print_result(result: WithDuration<DiagnosticVecResult<CompilationStats>>) -> Result<(), ()> {
+pub fn print_result<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    result: WithDuration<DiagnosticVecResult<CompilationStats>>,
+) -> Result<(), ()> {
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
@@ -50,7 +52,7 @@ pub fn print_result(result: WithDuration<DiagnosticVecResult<CompilationStats>>)
                 "Error when compiling.\n".bright_red(),
                 // TODO don't materialize a vec here
                 err.iter()
-                    .map(|e| e.to_string())
+                    .map(|e| e.printable(db.print_location_fn()).to_string())
                     .collect::<Vec<_>>()
                     .join("\n"),
                 format!(
