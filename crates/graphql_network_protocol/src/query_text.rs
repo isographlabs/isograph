@@ -113,7 +113,6 @@ fn write_selections_for_query_text(
                 MergedServerSelection::LinkedField(linked_field) => {
                     query_text.push_str(indent);
                     if let Some(alias) = linked_field.normalization_alias() {
-                        // This is bad, alias is WithLocation
                         query_text.push_str(&format!("{alias}: "));
                     }
                     let name = linked_field.name;

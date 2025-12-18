@@ -28,7 +28,6 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
             let serialized_arguments =
                 get_serialized_field_arguments(arguments, indentation_level + 1);
-            // TODO this is bad, name is a WithLocation and impl's Display, we should fix
 
             format!(
                 "{indent}{{\n\
