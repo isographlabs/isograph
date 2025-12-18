@@ -1,18 +1,22 @@
 import { useEffect, useState } from 'react';
-import { subscribe } from '../core/cache';
 import {
-  ExtractData,
-  FragmentReference,
+  type ExtractData,
+  type FragmentReference,
   stableIdForFragmentReference,
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import type { IsographComponentFunction } from '../core/IsographEnvironment';
+import { logMessage } from '../core/logging';
+import { readPromise } from '../core/PromiseWrapper';
 import {
-  NetworkRequestReaderOptions,
+  type NetworkRequestReaderOptions,
   readButDoNotEvaluate,
-  WithEncounteredRecords,
+  type WithEncounteredRecords,
 } from '../core/read';
 import type { ReaderAst } from '../core/reader';
+import { subscribe } from '../core/subscribe';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { maybeUnwrapNetworkRequest } from './maybeUnwrapNetworkRequest';
 import { useRerenderOnChange } from './useRerenderOnChange';
 
 /**
@@ -80,3 +84,47 @@ export function useSubscribeToMultiple<
     ],
   );
 }
+
+export const componentFunction: IsographComponentFunction = (
+  environment,
+  fragmentReference,
+  networkRequestOptions,
+  startUpdate,
+) => {
+  function Component(additionalRuntimeProps: { [key: string]: any }) {
+    maybeUnwrapNetworkRequest(
+      fragmentReference.networkRequest,
+      networkRequestOptions,
+    );
+    const readerWithRefetchQueries = readPromise(
+      fragmentReference.readerWithRefetchQueries,
+    );
+
+    const data = useReadAndSubscribe(
+      fragmentReference,
+      networkRequestOptions,
+      readerWithRefetchQueries.readerArtifact.readerAst,
+    );
+
+    logMessage(environment, () => ({
+      kind: 'ComponentRerendered',
+      componentName: fragmentReference.fieldName,
+      rootLink: fragmentReference.root,
+    }));
+
+    return readerWithRefetchQueries.readerArtifact.resolver(
+      // @ts-expect-error
+      {
+        data,
+        parameters: fragmentReference.variables,
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
+          ? startUpdate
+          : undefined,
+      },
+      additionalRuntimeProps,
+    );
+  }
+  const idString = `(type: ${fragmentReference.root.__typename}, id: ${fragmentReference.root.__link})`;
+  Component.displayName = `${fragmentReference.fieldName} ${idString} @component`;
+  return Component;
+};

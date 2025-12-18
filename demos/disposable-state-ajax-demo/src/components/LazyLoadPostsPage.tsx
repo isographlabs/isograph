@@ -3,7 +3,7 @@ import React, { useState } from 'react';
 import NoSSR from 'react-no-ssr';
 import { getOrCreateCacheForUrl } from './api';
 import { Card } from './Card';
-import { Comment, Post, User } from './networkTypes';
+import type { Comment, Post, User } from './networkTypes';
 import { useReadPromise } from './PromiseWrapper';
 
 /**

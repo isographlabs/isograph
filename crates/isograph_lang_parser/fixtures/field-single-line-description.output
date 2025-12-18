@@ -6,16 +6,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "BasicField",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-single-line-description.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 137,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 9,
+                                end: 13,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "Type",
                             ),
                         ),
-                        span: Span {
-                            start: 9,
-                            end: 13,
-                        },
                     },
                     client_field_name: WithEmbeddedLocation {
                         location: EmbeddedLocation {
@@ -37,22 +51,36 @@ Ok(
                             },
                         },
                         item: ClientScalarSelectableNameWrapper(
-                            ClientScalarSelectableName(
+                            SelectableName(
                                 "Name",
                             ),
                         ),
                     },
                     description: Some(
-                        WithSpan {
+                        WithEmbeddedLocation {
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    current_working_directory: CurrentWorkingDirectory,
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-single-line-description.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 137,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 21,
+                                    end: 100,
+                                },
+                            },
                             item: Description(
                                 DescriptionValue(
                                     "It's a bit weird to have a single line description, I think, but it's allowed",
                                 ),
                             ),
-                            span: Span {
-                                start: 21,
-                                end: 100,
-                            },
                         },
                     ),
                     selection_set: WithSpan {

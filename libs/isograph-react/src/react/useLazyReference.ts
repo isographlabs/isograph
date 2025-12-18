@@ -1,21 +1,20 @@
 import { useLazyDisposableState } from '@isograph/react-disposable-state';
+import { type NetworkResponseObject } from '../core/cache';
+import type { FetchOptions } from '../core/check';
+import { type RequiredFetchOptions } from '../core/check';
+import type { IsographEntrypoint } from '../core/entrypoint';
 import {
-  getOrCreateCacheForArtifact,
-  type NetworkResponseObject,
-} from '../core/cache';
-import { FetchOptions, type RequiredFetchOptions } from '../core/check';
-import {
-  IsographEntrypoint,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
-import {
+import type {
   ExtractParameters,
   FragmentReference,
-  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import { type UnknownTReadFromStore } from '../core/FragmentReference';
 import { logMessage } from '../core/logging';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
+import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
 
 export function useLazyReference<
   TReadFromStore extends UnknownTReadFromStore,
@@ -32,7 +31,7 @@ export function useLazyReference<
   variables: ExtractParameters<TReadFromStore>,
   ...[fetchOptions]: TNormalizationAst extends NormalizationAstLoader
     ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-    : [fetchOptions?: FetchOptions<TClientFieldValue>]
+    : [fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>]
 ): NormalizationAst | NormalizationAstLoader extends TNormalizationAst
   ? unknown
   : {

@@ -4,7 +4,7 @@ The framework for teams that move fast — without breaking things.
 
 Isograph makes it easy to build robust, performant, data-driven apps.
 
-- Read the [docs](https://isograph.dev/docs/introduction/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
+- Read the [docs](https://isograph.dev/docs/), especially the [quickstart guide](https://isograph.dev/docs/quickstart/).
 - Watch the [talk at GraphQL Conf 2024](https://www.youtube.com/watch?v=sf8ac2NtwPY) (and from [2023](https://www.youtube.com/watch?v=gO65JJRqjuc)).
 - Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).
@@ -147,8 +147,6 @@ You are not expected to use the `@loadable` field directly. Instead, always pass
 :::note
 The `@exposeField` feature will change before the next release.
 :::
-
-> Currently, `@exposeField` is only processed if it is on the Mutation type. But, it will be made more generally available at some point.
 
 Types with the `@exposeField(field: String!, path: String!, fieldMap: [FieldMap!]!)` directive have their fields re-exposed on other objects. For example, consider this schema:
 

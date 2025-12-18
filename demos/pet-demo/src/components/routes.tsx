@@ -9,7 +9,8 @@ export type Route =
   | PetByNameRoute
   | PetCheckinListRoute
   | SmartestRoute
-  | OnlyOneRootLoadableRoute;
+  | OnlyOneRootLoadableRoute
+  | RestEndpoingDemo;
 
 export type HomeRoute = {
   kind: 'Home';
@@ -44,6 +45,10 @@ export type OnlyOneRootLoadableRoute = {
   id: PetId;
 };
 
+export type RestEndpoingDemo = {
+  kind: 'RestEndpointDemo';
+};
+
 export function useNavigateTo() {
   const router = useRouter();
   return (route: Route) => router.push(toRouteUrl(route));
@@ -71,10 +76,8 @@ function toRouteUrl(route: Route): string {
     }
     case 'OnlyOneRootLoadableRoute':
       return `/only-one-root-loadble/${route.id}`;
-    default: {
-      let _: never = route;
-      throw new Error('Unhandled route');
-    }
+    case 'RestEndpointDemo':
+      return '/rest-endpoint-demo';
   }
 }
 

@@ -98,16 +98,30 @@ Ok(
                     const_export_name: ConstExportName(
                         "pointer",
                     ),
-                    parent_type: WithSpan {
+                    parent_type: WithEmbeddedLocation {
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-directives.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 112,
+                                        end: 236,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 11,
+                                end: 15,
+                            },
+                        },
                         item: EntityNameWrapper(
                             EntityName(
                                 "User",
                             ),
                         ),
-                        span: Span {
-                            start: 11,
-                            end: 15,
-                        },
                     },
                     target_type: Named(
                         GraphQLNamedTypeAnnotation(
@@ -144,7 +158,7 @@ Ok(
                             },
                         },
                         item: ClientObjectSelectableNameWrapper(
-                            ClientObjectSelectableName(
+                            SelectableName(
                                 "bestFriend",
                             ),
                         ),
@@ -177,12 +191,11 @@ Ok(
                                                         },
                                                     },
                                                 ),
-                                                item: ServerObjectSelectableName(
+                                                item: SelectableName(
                                                     "friends",
                                                 ),
                                             },
                                             reader_alias: None,
-                                            associated_data: (),
                                             selection_set: WithSpan {
                                                 item: SelectionSet {
                                                     selections: [
@@ -210,12 +223,11 @@ Ok(
                                                                                 },
                                                                             },
                                                                         ),
-                                                                        item: ScalarSelectableName(
+                                                                        item: SelectableName(
                                                                             "id",
                                                                         ),
                                                                     },
                                                                     reader_alias: None,
-                                                                    associated_data: (),
                                                                     arguments: [],
                                                                     scalar_selection_directive_set: None(
                                                                         EmptyDirectiveSet,
@@ -251,12 +263,11 @@ Ok(
                                                                                 },
                                                                             },
                                                                         ),
-                                                                        item: ScalarSelectableName(
+                                                                        item: SelectableName(
                                                                             "closeness",
                                                                         ),
                                                                     },
                                                                     reader_alias: None,
-                                                                    associated_data: (),
                                                                     arguments: [],
                                                                     scalar_selection_directive_set: None(
                                                                         EmptyDirectiveSet,

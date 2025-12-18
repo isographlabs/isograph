@@ -1,5 +1,4 @@
 import {
-  callSubscriptions,
   getParentRecordKey,
   insertEmptySetIfMissing,
   type EncounteredIds,
@@ -37,6 +36,7 @@ import {
   type ReadDataResultSuccess,
 } from './read';
 import type { ReaderAst } from './reader';
+import { callSubscriptions } from './subscribe';
 
 export function getOrCreateCachedStartUpdate<
   TReadFromStore extends UnknownTReadFromStore,
@@ -161,7 +161,7 @@ function defineCachedProperty<T>(
       }
       return value.value;
     },
-    ...(set && {
+    ...(set != null && {
       set: (newValue) => {
         set(newValue);
         mutableState.lastInvalidated++;
@@ -334,10 +334,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
       case 'Link': {
         target[field.alias] = root;
         break;
-      }
-      default: {
-        field satisfies never;
-        throw new Error('Unexpected case.');
       }
     }
   }

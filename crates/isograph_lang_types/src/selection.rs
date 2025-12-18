@@ -10,18 +10,20 @@ use crate::{
     SelectionType,
 };
 
-pub type UnvalidatedSelection = SelectionTypeContainingSelections<(), ()>;
+pub type Selection = SelectionType<ScalarSelection, ObjectSelection>;
 
-pub type UnvalidatedScalarFieldSelection = ScalarSelection<()>;
-
-pub type SelectionTypeContainingSelections<TScalarField, TLinkedField> =
-    SelectionType<ScalarSelection<TScalarField>, ObjectSelection<TScalarField, TLinkedField>>;
-
-impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField, TLinkedField> {
+impl Selection {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => scalar_field.name_or_alias(),
-            SelectionTypeContainingSelections::Object(linked_field) => linked_field.name_or_alias(),
+            SelectionType::Scalar(scalar_field) => scalar_field.name_or_alias(),
+            SelectionType::Object(linked_field) => linked_field.name_or_alias(),
+        }
+    }
+
+    pub fn name(&self) -> SelectableName {
+        match self {
+            SelectionType::Scalar(s) => s.name.item,
+            SelectionType::Object(o) => o.name.item,
         }
     }
 
@@ -31,34 +33,46 @@ impl<TScalarField, TLinkedField> SelectionTypeContainingSelections<TScalarField,
             _ => None,
         };
         match self {
-            SelectionTypeContainingSelections::Scalar(scalar_field) => {
+            SelectionType::Scalar(scalar_field) => {
                 scalar_field.arguments.iter().flat_map(get_variable)
             }
-            SelectionTypeContainingSelections::Object(linked_field) => {
+            SelectionType::Object(linked_field) => {
                 linked_field.arguments.iter().flat_map(get_variable)
             }
+        }
+    }
+
+    pub fn is_updatable(&self) -> bool {
+        match self {
+            SelectionType::Scalar(s) => matches!(
+                s.scalar_selection_directive_set,
+                ScalarSelectionDirectiveSet::Updatable(_)
+            ),
+            SelectionType::Object(o) => matches!(
+                o.object_selection_directive_set,
+                ObjectSelectionDirectiveSet::Updatable(_)
+            ),
         }
     }
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<()>)]
+#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
 // TODO remove type parameter
-pub struct ScalarSelection<TScalarField> {
+pub struct ScalarSelection {
     // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TScalarField,
     // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub scalar_selection_directive_set: ScalarSelectionDirectiveSet,
 }
 
 pub type ScalarSelectionPath<'a> =
-    PositionResolutionPath<&'a ScalarSelection<()>, SelectionParentType<'a>>;
+    PositionResolutionPath<&'a ScalarSelection, SelectionParentType<'a>>;
 
-impl<TScalarField> ScalarSelection<TScalarField> {
+impl ScalarSelection {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))
@@ -67,23 +81,22 @@ impl<TScalarField> ScalarSelection<TScalarField> {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>, self_type_generics=<(), ()>)]
+#[resolve_position(parent_type=SelectionParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
 // TODO remove the type parameters
-pub struct ObjectSelection<TScalar, TLinked> {
+pub struct ObjectSelection {
     // TODO make this WithSpan instead of WithLocation
     pub name: WithLocation<SelectableName>,
     // TODO make this WithSpan instead of WithLocation
     pub reader_alias: Option<WithLocation<SelectableAlias>>,
-    pub associated_data: TLinked,
     #[resolve_field]
-    pub selection_set: WithSpan<SelectionSet<TScalar, TLinked>>,
+    pub selection_set: WithSpan<SelectionSet>,
     // TODO make this WithSpan instead of WithLocation
     pub arguments: Vec<WithLocation<SelectionFieldArgument>>,
     pub object_selection_directive_set: ObjectSelectionDirectiveSet,
 }
 
 pub type ObjectSelectionPath<'a> =
-    PositionResolutionPath<&'a ObjectSelection<(), ()>, SelectionParentType<'a>>;
+    PositionResolutionPath<&'a ObjectSelection, SelectionParentType<'a>>;
 
 // TODO can we replace this directly with SelectionSetPath?
 #[derive(Debug)]
@@ -91,7 +104,7 @@ pub enum SelectionParentType<'a> {
     SelectionSet(SelectionSetPath<'a>),
 }
 
-impl<TScalarField, TLinkedField> ObjectSelection<TScalarField, TLinkedField> {
+impl ObjectSelection {
     pub fn name_or_alias(&self) -> WithLocation<SelectableNameOrAlias> {
         self.reader_alias
             .map(|item| item.map(SelectableNameOrAlias::from))

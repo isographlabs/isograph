@@ -1,28 +1,28 @@
-import { CleanupFn, type ItemCleanupPair } from '@isograph/disposable-types';
+import type { CleanupFn, ItemCleanupPair } from '@isograph/disposable-types';
 import {
   getParentRecordKey,
   insertEmptySetIfMissing,
   onNextChangeToRecord,
   type EncounteredIds,
 } from './cache';
-import { FetchOptions } from './check';
+import type { FetchOptions } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
-import {
+import type {
   IsographEntrypoint,
+  ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifactWrapper,
-  type ReaderWithRefetchQueries,
 } from './entrypoint';
-import {
+import type {
   ExtractData,
   FragmentReference,
+  UnknownTReadFromStore,
   Variables,
-  type UnknownTReadFromStore,
 } from './FragmentReference';
+import type { IsographEnvironment } from './IsographEnvironment';
 import {
   assertLink,
   getOrLoadIsographArtifact,
   getOrLoadReaderWithRefetchQueries,
-  IsographEnvironment,
   type DataTypeValue,
   type StoreLink,
   type StoreRecord,
@@ -30,25 +30,25 @@ import {
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import { getStoreRecordProxy } from './optimisticProxy';
+import type { PromiseWrapper } from './PromiseWrapper';
 import {
   getPromiseState,
   NOT_SET,
-  PromiseWrapper,
   readPromise,
   wrapPromise,
   wrapResolvedValue,
 } from './PromiseWrapper';
-import {
+import type {
+  LoadablySelectedField,
   ReaderAst,
-  type LoadablySelectedField,
-  type ReaderClientPointer,
-  type ReaderImperativelyLoadedField,
-  type ReaderLinkedField,
-  type ReaderNonLoadableResolverField,
-  type ReaderScalarField,
+  ReaderClientPointer,
+  ReaderImperativelyLoadedField,
+  ReaderLinkedField,
+  ReaderNonLoadableResolverField,
+  ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import { Arguments } from './util';
+import type { Arguments } from './util';
 
 export type WithEncounteredRecords<T> = {
   readonly encounteredRecords: EncounteredIds;
@@ -164,7 +164,7 @@ function readData<TReadFromStore>(
     };
   }
 
-  if (storeRecord === null) {
+  if (storeRecord == null) {
     return {
       kind: 'Success',
       data: null as any,
@@ -266,13 +266,6 @@ function readData<TReadFromStore>(
         target[field.alias] = data.data;
         break;
       }
-
-      default: {
-        // Ensure we have covered all variants
-        let _: never = field;
-        _;
-        throw new Error('Unexpected case.');
-      }
     }
   }
   return {
@@ -316,7 +309,7 @@ export function readLoadablySelectedFieldData(
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any>,
+      fetchOptions?: FetchOptions<any, never>,
     ) => {
       // TODO we should use the reader AST for this
       const includeReadOutData = (variables: any, readOutData: any) => {
@@ -528,11 +521,6 @@ function writeQueryArgsToVariables(
         targetVariables[name] = argType.value;
         break;
       }
-      default: {
-        const _: never = argType;
-        _;
-        throw new Error('Unexpected case');
-      }
     }
   }
 }
@@ -620,11 +608,6 @@ export function readResolverFieldData(
         ),
       };
     }
-    default: {
-      let _: never = field.readerArtifact;
-      _;
-      throw new Error('Unexpected kind');
-    }
   }
 }
 
@@ -667,7 +650,7 @@ export function readLinkedFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   let value = storeRecord[storeRecordName];
 
-  if (field.condition) {
+  if (field.condition != null) {
     const data = readData(field.condition.readerAst, root);
     if (data.kind === 'MissingData') {
       return {
@@ -736,7 +719,7 @@ export function readLinkedFieldData(
             JSON.stringify(item),
           recordLink: root,
         };
-      } else if (link === null) {
+      } else if (link == null) {
         results.push(null);
         continue;
       }
@@ -827,7 +810,7 @@ export function readLinkedFieldData(
     } else {
       link = altLink;
     }
-  } else if (link === null) {
+  } else if (link == null) {
     return {
       kind: 'Success',
       data: null,
@@ -869,7 +852,7 @@ export function readLinkedFieldData(
 function isClientPointer(
   field: ReaderLinkedField,
 ): field is ReaderClientPointer {
-  return field.refetchQueryIndex !== null;
+  return field.refetchQueryIndex != null;
 }
 
 export function readClientPointerData(
@@ -919,7 +902,7 @@ export function readClientPointerData(
     data: (
       args: any,
       // TODO get the associated type for FetchOptions from the loadably selected field
-      fetchOptions?: FetchOptions<any>,
+      fetchOptions?: FetchOptions<any, never>,
     ) => {
       const includeReadOutData = (variables: any, readOutData: any) => {
         variables.id = readOutData.id;

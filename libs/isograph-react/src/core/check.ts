@@ -1,12 +1,12 @@
 import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes } from './entrypoint';
-import { Variables } from './FragmentReference';
-import {
-  getLink,
+import type { NormalizationAstNodes } from './entrypoint';
+import type { Variables } from './FragmentReference';
+import type {
   IsographEnvironment,
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
+import { getLink } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { getStoreRecordProxy } from './optimisticProxy';
 
@@ -15,15 +15,21 @@ export type RequiredShouldFetch = 'Yes' | 'No';
 
 export const DEFAULT_SHOULD_FETCH_VALUE: ShouldFetch = 'IfNecessary';
 
-export type FetchOptions<TReadOutData> = {
-  shouldFetch?: ShouldFetch;
+type FetchOptionsShared<TReadOutData> = {
   onComplete?: (data: TReadOutData) => void;
   onError?: () => void;
 };
 
-export type RequiredFetchOptions<TReadOutData> = {
+export interface FetchOptions<TReadOutData, TRawResponseType>
+  extends FetchOptionsShared<TReadOutData> {
+  shouldFetch?: ShouldFetch;
+  optimisticNetworkResponse?: TRawResponseType;
+}
+
+export interface RequiredFetchOptions<TReadOutData>
+  extends FetchOptionsShared<TReadOutData> {
   shouldFetch: RequiredShouldFetch;
-} & FetchOptions<TReadOutData>;
+}
 
 export type CheckResult =
   | {
@@ -102,12 +108,12 @@ function checkFromRecord(
             kind: 'MissingData',
             record: recordLink,
           };
-        } else if (linkedValue === null) {
+        } else if (linkedValue == null) {
           continue;
         } else if (Array.isArray(linkedValue)) {
           arrayItemsLoop: for (const item of linkedValue) {
             const link = getLink(item);
-            if (link === null) {
+            if (link == null) {
               throw new Error(
                 'Unexpected non-link in the Isograph store. ' +
                   'This is indicative of a bug in Isograph.',
@@ -121,7 +127,7 @@ function checkFromRecord(
                 kind: 'MissingData',
                 record: link,
               };
-            } else if (linkedRecord === null) {
+            } else if (linkedRecord == null) {
               continue arrayItemsLoop;
             } else {
               // TODO in __DEV__ assert linkedRecord is an object
@@ -140,7 +146,7 @@ function checkFromRecord(
           }
         } else {
           const link = getLink(linkedValue);
-          if (link === null) {
+          if (link == null) {
             throw new Error(
               'Unexpected non-link in the Isograph store. ' +
                 'This is indicative of a bug in Isograph.',
@@ -154,7 +160,7 @@ function checkFromRecord(
               kind: 'MissingData',
               record: link,
             };
-          } else if (linkedRecord === null) {
+          } else if (linkedRecord == null) {
             continue normalizationAstLoop;
           } else {
             // TODO in __DEV__ assert linkedRecord is an object
@@ -199,13 +205,6 @@ function checkFromRecord(
         }
 
         continue normalizationAstLoop;
-      }
-      default: {
-        let _: never = normalizationAstNode;
-        _;
-        throw new Error(
-          'Unexpected case. This is indicative of a bug in Isograph.',
-        );
       }
     }
   }

@@ -12,7 +12,7 @@ import type { SidebarsConfig } from '@docusaurus/plugin-content-docs';
  */
 const sidebars: SidebarsConfig = {
   documentationSidebar: [
-    'introduction',
+    'index',
     'quickstart',
     'workflow',
     'isograph-config',
@@ -35,7 +35,6 @@ const sidebars: SidebarsConfig = {
         'how-isograph-works/generated-artifacts',
         'how-isograph-works/babel-plugin',
         'how-isograph-works/one-pager',
-        'how-isograph-works/compiler-one-pager',
       ],
     },
     {
@@ -49,7 +48,12 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Miscellaneous',
-      items: ['isograph-rules', 'development-workflow', 'backlog'],
+      items: [
+        'isograph-rules',
+        'development-workflow',
+        'backlog',
+        'troubleshooting',
+      ],
     },
     {
       type: 'category',

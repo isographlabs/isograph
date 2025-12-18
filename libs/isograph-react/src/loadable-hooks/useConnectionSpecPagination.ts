@@ -1,29 +1,27 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import {
-  createReferenceCountedPointer,
-  ReferenceCountedPointer,
-} from '@isograph/reference-counted-pointer';
+import type { ReferenceCountedPointer } from '@isograph/reference-counted-pointer';
+import { createReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   FragmentReference,
-  type UnknownTReadFromStore,
+  UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst } from '../core/reader';
+import type { LoadableField, ReaderAst } from '../core/reader';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { maybeUnwrapNetworkRequest } from '../react/maybeUnwrapNetworkRequest';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 export type UsePaginationReturnValue<
   TReadFromStore extends UnknownTReadFromStore,
@@ -35,13 +33,16 @@ export type UsePaginationReturnValue<
       results: ReadonlyArray<TItem>;
     }
   | {
-      kind: 'Complete';
+      kind: 'HasMoreRecords';
       fetchMore: (
         count: number,
-        fetchOptions?: FetchOptions<Connection<TItem>>,
+        fetchOptions?: FetchOptions<Connection<TItem>, never>,
       ) => void;
       results: ReadonlyArray<TItem>;
-      hasNextPage: boolean;
+    }
+  | {
+      kind: 'NoMoreRecords';
+      results: ReadonlyArray<TItem>;
     };
 
 type LoadedFragmentReferences<
@@ -207,7 +208,10 @@ export function useConnectionSpecPagination<
 
   const getFetchMore =
     (after: string | null) =>
-    (count: number, fetchOptions?: FetchOptions<Connection<TItem>>): void => {
+    (
+      count: number,
+      fetchOptions?: FetchOptions<Connection<TItem>, never>,
+    ): void => {
       const loadedField = loadableField(
         {
           after: after,
@@ -258,7 +262,7 @@ export function useConnectionSpecPagination<
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 
-  if (mostRecentItem && mostRecentFragmentReference === null) {
+  if (mostRecentItem != null && mostRecentFragmentReference == null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
       This is indicative of a bug in Isograph.',
@@ -266,11 +270,15 @@ export function useConnectionSpecPagination<
   }
 
   const networkRequestStatus =
-    mostRecentFragmentReference &&
-    getPromiseState(mostRecentFragmentReference.networkRequest);
+    mostRecentFragmentReference != null
+      ? {
+          mostRecentFragmentReference,
+          state: getPromiseState(mostRecentFragmentReference.networkRequest),
+        }
+      : null;
 
   const slicedFragmentReferences =
-    networkRequestStatus?.kind === 'Ok'
+    networkRequestStatus?.state?.kind === 'Ok'
       ? loadedReferences
       : loadedReferences.slice(0, loadedReferences.length - 1);
 
@@ -300,16 +308,22 @@ export function useConnectionSpecPagination<
     subscribeCompletedFragmentReferences(completedFragmentReferences),
   );
 
-  if (!networkRequestStatus) {
-    return {
-      kind: 'Complete',
-      fetchMore: getFetchMore(initialState?.endCursor ?? null),
-      results: [],
-      hasNextPage: initialState?.hasNextPage ?? true,
-    };
+  if (networkRequestStatus == null) {
+    if (initialState?.hasNextPage ?? true) {
+      return {
+        kind: 'HasMoreRecords',
+        fetchMore: getFetchMore(initialState?.endCursor ?? null),
+        results: [],
+      };
+    } else {
+      return {
+        kind: 'NoMoreRecords',
+        results: [],
+      };
+    }
   }
 
-  switch (networkRequestStatus.kind) {
+  switch (networkRequestStatus.state.kind) {
     case 'Pending': {
       const unsubscribe = subscribeToAnyChange(environment, () => {
         unsubscribe();
@@ -322,23 +336,29 @@ export function useConnectionSpecPagination<
       return {
         results: results.edges,
         kind: 'Pending',
-        pendingFragment: mostRecentFragmentReference,
+        pendingFragment: networkRequestStatus.mostRecentFragmentReference,
       };
     }
     case 'Err': {
-      throw networkRequestStatus.error;
+      throw networkRequestStatus.state.error;
     }
     case 'Ok': {
       const results = readCompletedFragmentReferences(
         completedFragmentReferences,
       );
 
-      return {
-        results: results.edges,
-        hasNextPage: results.pageInfo.hasNextPage,
-        kind: 'Complete',
-        fetchMore: getFetchMore(results.pageInfo.endCursor),
-      };
+      if (results.pageInfo.hasNextPage) {
+        return {
+          kind: 'HasMoreRecords',
+          fetchMore: getFetchMore(results.pageInfo.endCursor),
+          results: results.edges,
+        };
+      } else {
+        return {
+          kind: 'NoMoreRecords',
+          results: results.edges,
+        };
+      }
     }
   }
 }

@@ -1,9 +1,10 @@
-import {
+import type {
   Factory,
   ItemCleanupPair,
-  ParentCache,
 } from '@isograph/react-disposable-state';
-import { PromiseWrapper, wrapPromise } from './PromiseWrapper';
+import { ParentCache } from '@isograph/react-disposable-state';
+import type { PromiseWrapper } from './PromiseWrapper';
+import { wrapPromise } from './PromiseWrapper';
 
 const cache: { [index: string]: ParentCache<any> } = {};
 

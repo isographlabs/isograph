@@ -48,14 +48,13 @@ export const RepositoryList = iso(`
             <TableCell>
               <Button
                 variant="contained"
-                disabled={
-                  !(pagination.kind === 'Complete' && pagination.hasNextPage)
-                }
+                disabled={pagination.kind !== 'HasMoreRecords'}
                 onClick={() =>
-                  pagination.kind === 'Complete' && pagination.fetchMore(10)
+                  pagination.kind === 'HasMoreRecords' &&
+                  pagination.fetchMore(10)
                 }
               >
-                {pagination.kind === 'Complete' && !pagination.hasNextPage
+                {pagination.kind === 'NoMoreRecords'
                   ? 'All fetched'
                   : 'Fetch more'}
               </Button>

@@ -1,10 +1,7 @@
-use std::{
-    path::PathBuf,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
-use isograph_config::create_config;
+use isograph_config::CompilerConfig;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico::Database;
 use prelude::Postfix;
@@ -24,12 +21,12 @@ pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
 
 impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
     pub fn new(
-        config_location: &PathBuf,
+        config: CompilerConfig,
         current_working_directory: CurrentWorkingDirectory,
     ) -> Result<Self, Diagnostic> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
-        db.set(create_config(config_location, current_working_directory));
+        db.set(config);
         initialize_sources(&mut db)?;
         Self {
             db,

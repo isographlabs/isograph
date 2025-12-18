@@ -1,9 +1,7 @@
 import * as React from 'react';
 import { type FetchOptions } from '../core/check';
-import {
-  ExtractParameters,
-  type UnknownTReadFromStore,
-} from '../core/FragmentReference';
+import type { ExtractParameters } from '../core/FragmentReference';
+import { type UnknownTReadFromStore } from '../core/FragmentReference';
 import { type NetworkRequestReaderOptions } from '../core/read';
 import { type LoadableField } from '../core/reader';
 import { useClientSideDefer } from '../loadable-hooks/useClientSideDefer';
@@ -38,7 +36,7 @@ export function LoadableFieldRenderer<
       React.FC<TProps>,
       Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs>
     >;
-    fetchOptions?: FetchOptions<React.FC<TProps>>;
+    fetchOptions?: FetchOptions<React.FC<TProps>, never>;
     networkRequestOptions?: Partial<NetworkRequestReaderOptions>;
     additionalProps: Omit<TProps, keyof JSX.IntrinsicAttributes>;
   } & MaybeRequiredArgs<TReadFromStore, TProvidedArgs>,

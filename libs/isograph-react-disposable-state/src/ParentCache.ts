@@ -1,9 +1,10 @@
-import {
+import type {
   CleanupFn,
   Factory,
   ItemCleanupPair,
 } from '@isograph/disposable-types';
-import { CacheItem, createTemporarilyRetainedCacheItem } from './CacheItem';
+import type { CacheItem } from './CacheItem';
+import { createTemporarilyRetainedCacheItem } from './CacheItem';
 
 // TODO convert cache impl to a getter and setter and free functions
 // TODO accept options that get passed to CacheItem
@@ -51,7 +52,7 @@ export class ParentCache<T> {
   }
 
   getOrPopulateAndTemporaryRetain(): [CacheItem<T>, T, CleanupFn] {
-    return this.__cacheItem === null
+    return this.__cacheItem == null
       ? this.__populateAndTemporaryRetain()
       : temporaryRetain(this.__cacheItem);
   }
@@ -93,7 +94,7 @@ export class ParentCache<T> {
   }
 
   isEmpty(): boolean {
-    return this.__cacheItem === null;
+    return this.__cacheItem == null;
   }
 }
 

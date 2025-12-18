@@ -24,7 +24,7 @@ pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
     pub name: EntityName,
     pub is_concrete: bool,
 
-    pub network_protocol_associated_data: TNetworkProtocol::SchemaObjectAssociatedData,
+    pub network_protocol_associated_data: TNetworkProtocol::EntityAssociatedData,
 }
 
 pub type MemoRefServerEntity<TNetworkProtocol> = SelectionType<

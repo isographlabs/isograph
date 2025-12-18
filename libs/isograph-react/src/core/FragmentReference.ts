@@ -1,11 +1,11 @@
-import { ReaderWithRefetchQueries } from '../core/entrypoint';
-import { stableCopy } from './cache';
+import type { ReaderWithRefetchQueries } from './entrypoint';
 import {
   type ComponentOrFieldName,
   type StoreLink,
 } from './IsographEnvironment';
-import { PromiseWrapper } from './PromiseWrapper';
+import type { PromiseWrapper } from './PromiseWrapper';
 import type { StartUpdate } from './reader';
+import { stableCopy } from './util';
 
 // TODO type this better
 export type VariableValue =

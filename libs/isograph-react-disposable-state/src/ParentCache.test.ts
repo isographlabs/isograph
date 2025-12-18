@@ -1,6 +1,6 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { assert, describe, expect, test, vi } from 'vitest';
-import { CacheItem } from './CacheItem';
+import type { CacheItem } from './CacheItem';
 import { ParentCache } from './ParentCache';
 
 function getValue<T>(cache: ParentCache<T>): CacheItem<T> | null {
@@ -26,7 +26,7 @@ describe('ParentCache', () => {
       assert(getValue(parentCache) != null, 'Parent cache should not be empty');
 
       parentCache.empty();
-      assert(getValue(parentCache) === null);
+      assert(getValue(parentCache) == null);
 
       parentCache.getOrPopulateAndTemporaryRetain();
       expect(factory.mock.calls.length).toBe(2);
@@ -50,7 +50,7 @@ describe('ParentCache', () => {
       parentCache.getOrPopulateAndTemporaryRetain();
     clearTemporaryRetain();
 
-    assert(getValue(parentCache) === null);
+    assert(getValue(parentCache) == null);
   });
 
   test('Clearing one of two temporary retains does not remove the item from the parent cache', () => {
@@ -69,6 +69,6 @@ describe('ParentCache', () => {
     assert(getValue(parentCache) != null);
 
     clearTemporaryRetain2();
-    assert(getValue(parentCache) === null);
+    assert(getValue(parentCache) == null);
   });
 });

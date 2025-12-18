@@ -1,11 +1,11 @@
-import { getParentRecordKey } from './cache';
-import { NormalizationAstNodes, type NormalizationAst } from './entrypoint';
-import { Variables } from './FragmentReference';
+import { getParentRecordKey, TYPENAME_FIELD_NAME } from './cache';
+import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
+import type { Variables } from './FragmentReference';
 import {
   assertLink,
-  DataId,
-  IsographEnvironment,
-  StoreRecord,
+  type DataId,
+  type IsographEnvironment,
+  type StoreRecord,
   type StoreLayerData,
   type StoreLink,
   type TypeName,
@@ -101,7 +101,7 @@ export function garbageCollectBaseStoreLayer(
     const retainedTypeIds = retainedIds[typeName];
 
     // delete all objects
-    if (retainedTypeIds == undefined || retainedTypeIds.size == 0) {
+    if (retainedTypeIds === undefined || retainedTypeIds.size === 0) {
       delete baseStoreLayer.data[typeName];
       continue;
     }
@@ -135,7 +135,7 @@ function recordReachableIds(
   ] ??= new Set());
   retainedRecordsIds.add(retainedQuery.root.__link);
 
-  if (record) {
+  if (record != null) {
     recordReachableIdsFromRecord(
       dataLayer,
       record,
@@ -155,6 +155,17 @@ function recordReachableIdsFromRecord(
 ) {
   for (const selection of selections) {
     switch (selection.kind) {
+      case 'InlineFragment':
+        if (currentRecord[TYPENAME_FIELD_NAME] === selection.type) {
+          recordReachableIdsFromRecord(
+            dataLayer,
+            currentRecord,
+            mutableRetainedIds,
+            selection.selections,
+            variables,
+          );
+        }
+        continue;
       case 'Linked':
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
@@ -175,11 +186,11 @@ function recordReachableIdsFromRecord(
         }
 
         let typeStore =
-          selection.concreteType !== null
+          selection.concreteType != null
             ? dataLayer[selection.concreteType]
             : null;
 
-        if (typeStore == null && selection.concreteType !== null) {
+        if (typeStore == null && selection.concreteType != null) {
           continue;
         }
 

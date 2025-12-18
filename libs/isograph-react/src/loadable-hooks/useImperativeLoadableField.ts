@@ -2,12 +2,12 @@ import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   ExtractParameters,
   FragmentReference,
 } from '../core/FragmentReference';
-import { LoadableField } from '../core/reader';
+import type { LoadableField } from '../core/reader';
 
 export type UseImperativeLoadableFieldReturn<
   TReadFromStore extends { data: object; parameters: object },
@@ -19,7 +19,7 @@ export type UseImperativeLoadableFieldReturn<
     // TODO this should be void iff all args are provided by the query, like in
     // useClientSideDefer.
     args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-    fetchOptions?: FetchOptions<TResult>,
+    fetchOptions?: FetchOptions<TResult, never>,
   ) => void;
 };
 
@@ -40,7 +40,7 @@ export function useImperativeLoadableField<
   return {
     loadFragmentReference: (
       args: Omit<ExtractParameters<TReadFromStore>, keyof TProvidedArgs> | void,
-      fetchOptions?: FetchOptions<TResult>,
+      fetchOptions?: FetchOptions<TResult, never>,
     ) => {
       const [_id, loader] = loadableField(args, fetchOptions ?? {});
       setState(loader());

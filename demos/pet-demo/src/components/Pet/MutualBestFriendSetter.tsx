@@ -3,7 +3,7 @@ import {
   useClientSideDefer,
   useImperativeReference,
 } from '@isograph/react';
-import { iso } from '../__isograph/iso';
+import { iso } from '@iso';
 import { Button, Card, CardContent } from '@mui/material';
 
 /**
@@ -38,7 +38,7 @@ export const setMututalBestFriend = iso(`
     MutualBestFriendSetterOtherSide @loadable
   }
 `)(({ data }) => {
-  if (!data.set_pet_best_friend.pet.best_friend_relationship) {
+  if (data.set_pet_best_friend.pet.best_friend_relationship == null) {
     throw new Error('Somehow the new best friend id was not set');
   }
 
@@ -100,26 +100,27 @@ export const MutualBestFriendSetter = iso(`
     iso(`entrypoint Mutation.MututalBestFriendSetterMutation`),
   );
 
-  const cardContent = !mutationRef ? (
-    <Button
-      onClick={() => {
-        loadMutation(
-          {
-            id: data.id,
-            new_best_friend_id: '0',
-          },
-          {
-            shouldFetch: 'Yes',
-          },
-        );
-      }}
-      variant="contained"
-    >
-      Set best friend to Makayla
-    </Button>
-  ) : (
-    <FragmentRenderer fragmentReference={mutationRef} />
-  );
+  const cardContent =
+    mutationRef == null ? (
+      <Button
+        onClick={() => {
+          loadMutation(
+            {
+              id: data.id,
+              new_best_friend_id: '0',
+            },
+            {
+              shouldFetch: 'Yes',
+            },
+          );
+        }}
+        variant="contained"
+      >
+        Set best friend to Makayla
+      </Button>
+    ) : (
+      <FragmentRenderer fragmentReference={mutationRef} />
+    );
 
   return (
     <Card

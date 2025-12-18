@@ -1,19 +1,19 @@
-import { CleanupFn } from '@isograph/disposable-types';
-import { NetworkResponseObject, type EncounteredIds } from './cache';
-import { CheckResult } from './check';
-import {
+import type { CleanupFn } from '@isograph/disposable-types';
+import type { NetworkResponseObject, EncounteredIds } from './cache';
+import type { CheckResult } from './check';
+import type {
   IsographEntrypoint,
   RefetchQueryNormalizationArtifact,
-  type NormalizationAstNodes,
+  NormalizationAstNodes,
 } from './entrypoint';
-import { FragmentReference, Variables } from './FragmentReference';
-import {
+import type { FragmentReference, Variables } from './FragmentReference';
+import type {
   IsographEnvironment,
   StoreRecord,
-  type StoreLink,
+  StoreLink,
 } from './IsographEnvironment';
-import { ReadDataResult } from './read';
-import { Arguments } from './util';
+import type { ReadDataResult } from './read';
+import type { Arguments } from './util';
 import type { StoreLayer } from './optimisticProxy';
 
 /**

@@ -8,18 +8,8 @@ use crate::{ClientObjectSelectable, NetworkProtocol, ServerObjectSelectable};
 pub type ObjectSelectableId =
     DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;
 
-// This is poorly named... its not owned!
-pub type OwnedObjectSelectable<TNetworkProtocol> = DefinitionLocation<
-    // HACK: Note the owned server selectable
-    // This is fixable when memoized functions can return references with 'db lifetime
-    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
-    ClientObjectSelectable<TNetworkProtocol>,
->;
-
-pub type ObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    // HACK: Note the owned server selectable
-    // This is fixable when memoized functions can return references with 'db lifetime
-    ServerObjectSelectable<TNetworkProtocol>,
+pub type BorrowedObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
+    &'a ServerObjectSelectable<TNetworkProtocol>,
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 

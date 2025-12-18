@@ -7,7 +7,7 @@ use isograph_lang_types::{SelectionSet, SelectionTypePostfix};
 use isograph_schema::{
     ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    refetch_strategy_for_client_scalar_selectable_named,
 };
 use prelude::Postfix;
 
@@ -33,7 +33,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
-    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+    let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         client_scalar_selectable.parent_object_entity_name,
         client_scalar_selectable.name.item,
@@ -57,9 +57,10 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        client_scalar_selectable.parent_object_entity_name,
         // TODO model this better
         if was_selected_loadably {
-            validated_refetch_strategy
+            refetch_strategy
                 .refetch_selection_set()
                 .unwrap_or(&empty_selection_set)
         } else {

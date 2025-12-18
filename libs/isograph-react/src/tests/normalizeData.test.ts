@@ -1,16 +1,18 @@
+import { iso } from '@iso';
 import { beforeEach, describe, expect, test, vi } from 'vitest';
-import { getOrCreateCacheForArtifact, normalizeData } from '../core/cache';
+
 import {
-  createIsographEnvironment,
   createIsographStore,
   ROOT_ID,
   type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
+import { normalizeData } from '../core/cache';
+import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { iso } from './__isograph/iso';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
 let store: ReturnType<typeof createIsographStore>;

@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "ignorePatterns": ["__isograph", "vite-demo"],
+  "plugins": ["typescript", "import"],
+  "env": { "node": true, "browser": true },
+  "rules": {
+    "eslint/eqeqeq": ["error", "always", { "null": "never" }],
+    "eslint/no-control-regex": "off",
+    "eslint/no-constant-condition": "off",
+    "eslint/no-unassigned-vars": "off",
+    "eslint/no-unused-expressions": "off",
+    "eslint/no-unused-vars": "off",
+    "import/no-cycle": "error",
+    "typescript/no-duplicate-type-constituents": "off",
+    "typescript/no-redundant-type-constituents": "off",
+    "typescript/no-base-to-string": "off",
+    "typescript/await-thenable": "off",
+    "typescript/no-floating-promises": "off",
+    "typescript/no-implied-eval": "off",
+    "typescript/switch-exhaustiveness-check": "error",
+    "typescript/unbound-method": "off",
+    "typescript/consistent-type-imports": "error",
+    "typescript/strict-boolean-expressions": [
+      "error",
+      {
+        "allowNullableObject": false,
+        "allowString": false,
+        "allowNumber": false
+      }
+    ]
+  }
+}

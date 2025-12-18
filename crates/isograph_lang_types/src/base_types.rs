@@ -6,7 +6,7 @@ use common_lang_types::{EntityName, Location, SelectableName, WithLocation};
 use intern::Lookup;
 use resolve_position::ResolvePosition;
 
-use crate::{ScalarSelection, UnvalidatedSelection};
+use crate::{ScalarSelection, Selection};
 
 /// Distinguishes between server-defined items and locally-defined items.
 ///
@@ -300,14 +300,14 @@ impl<T> SelectionTypePostfix for T {}
 //
 // That's not the case right now, but it may come up. And in that case, we can
 // (probably) manually impl SelectionType for specific concrete types.
-impl ResolvePosition for UnvalidatedSelection {
+impl ResolvePosition for Selection {
     type Parent<'a>
-        = <ScalarSelection<()> as ResolvePosition>::Parent<'a>
+        = <ScalarSelection as ResolvePosition>::Parent<'a>
     where
         Self: 'a;
 
     type ResolvedNode<'a>
-        = <ScalarSelection<()> as ResolvePosition>::ResolvedNode<'a>
+        = <ScalarSelection as ResolvePosition>::ResolvedNode<'a>
     where
         Self: 'a;
 

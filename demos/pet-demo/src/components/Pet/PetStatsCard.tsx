@@ -34,7 +34,7 @@ export const PetStatsCard = iso(`
     >
       <CardContent>
         <h2>Stats</h2>
-        {pet.stats ? (
+        {pet.stats != null ? (
           <ul>
             <li>Weight: {pet.stats.weight}</li>
             <li>Intelligence: {pet.stats.intelligence}</li>

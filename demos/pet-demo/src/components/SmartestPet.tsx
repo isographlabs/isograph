@@ -55,7 +55,7 @@ export const SmartestPetRoute = iso(`
                         <b>{smartestPet.stats?.intelligence}</b>
                       </p>
                       <ul>
-                        {smartestPet.checkinsPointer.length ? (
+                        {smartestPet.checkinsPointer.length > 0 ? (
                           smartestPet.checkinsPointer.map(
                             (loadableCheckin, i) => {
                               return (

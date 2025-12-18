@@ -1,8 +1,5 @@
-import {
-  callSubscriptions,
-  insertEmptySetIfMissing,
-  type EncounteredIds,
-} from './cache';
+import { insertEmptySetIfMissing, type EncounteredIds } from './cache';
+import { callSubscriptions } from './subscribe';
 import type {
   BaseStoreLayerData,
   IsographEnvironment,
@@ -29,15 +26,18 @@ export function getStoreRecordProxy(
   link: StoreLink,
 ): Readonly<StoreRecord> | null | undefined {
   let startNode: StoreLayer | null = storeLayer;
-  while (startNode !== null) {
+  while (startNode != null) {
     const storeRecord = startNode.data[link.__typename]?.[link.__link];
-    if (storeRecord === null) {
+    if (storeRecord === undefined) {
+      startNode = startNode.parentStoreLayer;
+      continue;
+    }
+
+    if (storeRecord == null) {
       return null;
     }
-    if (storeRecord != null) {
-      return getMutableStoreRecordProxy(startNode, link);
-    }
-    startNode = startNode.parentStoreLayer;
+
+    return getMutableStoreRecordProxy(startNode, link);
   }
 
   return undefined;
@@ -52,13 +52,13 @@ export function getMutableStoreRecordProxy(
     {
       get(_, propertyName) {
         let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-        while (currentStoreLayer !== null) {
+        while (currentStoreLayer != null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
-          if (storeRecord === null) {
-            return undefined;
-          }
-          if (storeRecord != null) {
+          if (storeRecord !== undefined) {
+            if (storeRecord == null) {
+              return undefined;
+            }
             const value = Reflect.get(storeRecord, propertyName);
             if (value !== undefined) {
               return value;
@@ -69,15 +69,16 @@ export function getMutableStoreRecordProxy(
       },
       has(_, propertyName) {
         let currentStoreLayer: StoreLayer | null = childMostStoreLayer;
-        while (currentStoreLayer !== null) {
+        while (currentStoreLayer != null) {
           const storeRecord =
             currentStoreLayer.data[link.__typename]?.[link.__link];
-          if (storeRecord === null) {
-            return false;
-          }
-          if (storeRecord != null) {
+          if (storeRecord !== undefined) {
+            if (storeRecord == null) {
+              return false;
+            }
+
             const value = Reflect.has(storeRecord, propertyName);
-            if (value !== undefined) {
+            if (value) {
               return true;
             }
           }
@@ -122,8 +123,12 @@ export type StartUpdateStoreLayer = {
   startUpdate: DataUpdate<StartUpdateStoreLayer | BaseStoreLayer>;
 };
 
-export type OptimisticStoreLayer = {
-  readonly kind: 'OptimisticStoreLayer';
+export type OptimisticStoreLayer =
+  | OptimisticUpdaterStoreLayer
+  | OptimisticNetworkResponseStoreLayer;
+
+export type OptimisticUpdaterStoreLayer = {
+  readonly kind: 'OptimisticUpdaterStoreLayer';
   childStoreLayer:
     | OptimisticStoreLayer
     | StartUpdateStoreLayer
@@ -135,7 +140,22 @@ export type OptimisticStoreLayer = {
     | NetworkResponseStoreLayer
     | BaseStoreLayer;
   data: StoreLayerData;
-  readonly startUpdate: DataUpdate<OptimisticStoreLayer>;
+  readonly startUpdate: DataUpdate<OptimisticUpdaterStoreLayer>;
+};
+
+export type OptimisticNetworkResponseStoreLayer = {
+  readonly kind: 'OptimisticNetworkResponseStoreLayer';
+  childStoreLayer:
+    | OptimisticStoreLayer
+    | StartUpdateStoreLayer
+    | NetworkResponseStoreLayer
+    | null;
+  parentStoreLayer:
+    | OptimisticStoreLayer
+    | StartUpdateStoreLayer
+    | NetworkResponseStoreLayer
+    | BaseStoreLayer;
+  data: StoreLayerData;
 };
 
 export function addNetworkResponseStoreLayer(
@@ -147,7 +167,8 @@ export function addNetworkResponseStoreLayer(
       return parent;
     }
     case 'StartUpdateStoreLayer':
-    case 'OptimisticStoreLayer': {
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
       const node: NetworkResponseStoreLayer = {
         kind: 'NetworkResponseStoreLayer',
         parentStoreLayer: parent,
@@ -157,10 +178,6 @@ export function addNetworkResponseStoreLayer(
       parent.childStoreLayer = node;
 
       return node;
-    }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
     }
   }
 }
@@ -173,7 +190,7 @@ function mergeDataLayer(target: StoreLayerData, source: StoreLayerData): void {
     }
     const targetRecordById = (target[typeName] ??= {});
     for (const [id, sourceRecord] of Object.entries(sourceById)) {
-      if (sourceRecord === null) {
+      if (sourceRecord == null) {
         targetRecordById[id] = null;
         continue;
       }
@@ -205,7 +222,8 @@ export function addStartUpdateStoreLayer(
       return node;
     }
     case 'NetworkResponseStoreLayer':
-    case 'OptimisticStoreLayer': {
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
       const node: StartUpdateStoreLayer = {
         kind: 'StartUpdateStoreLayer',
         parentStoreLayer: parent,
@@ -218,24 +236,21 @@ export function addStartUpdateStoreLayer(
       startUpdate(node);
       return node;
     }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
-    }
   }
 }
 
-export function addOptimisticStoreLayer(
+export function addOptimisticUpdaterStoreLayer(
   parent: StoreLayer,
-  startUpdate: OptimisticStoreLayer['startUpdate'],
-): OptimisticStoreLayer {
+  startUpdate: OptimisticUpdaterStoreLayer['startUpdate'],
+): OptimisticUpdaterStoreLayer {
   switch (parent.kind) {
     case 'BaseStoreLayer':
     case 'StartUpdateStoreLayer':
     case 'NetworkResponseStoreLayer':
-    case 'OptimisticStoreLayer': {
-      const node: OptimisticStoreLayer = {
-        kind: 'OptimisticStoreLayer',
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
+      const node: OptimisticUpdaterStoreLayer = {
+        kind: 'OptimisticUpdaterStoreLayer',
         parentStoreLayer: parent,
         childStoreLayer: null,
         data: {},
@@ -247,9 +262,28 @@ export function addOptimisticStoreLayer(
 
       return node;
     }
-    default: {
-      parent satisfies never;
-      throw new Error('Unreachable. This is a bug in Isograph.');
+  }
+}
+
+export function addOptimisticNetworkResponseStoreLayer(
+  parent: StoreLayer,
+): OptimisticNetworkResponseStoreLayer {
+  switch (parent.kind) {
+    case 'BaseStoreLayer':
+    case 'StartUpdateStoreLayer':
+    case 'NetworkResponseStoreLayer':
+    case 'OptimisticNetworkResponseStoreLayer':
+    case 'OptimisticUpdaterStoreLayer': {
+      const node: OptimisticNetworkResponseStoreLayer = {
+        kind: 'OptimisticNetworkResponseStoreLayer',
+        parentStoreLayer: parent,
+        childStoreLayer: null,
+        data: {},
+      };
+
+      parent.childStoreLayer = node;
+
+      return node;
     }
   }
 }
@@ -272,8 +306,8 @@ function mergeLayersWithDataIntoBaseLayer(
   baseStoreLayer: BaseStoreLayer,
 ) {
   while (
-    storeLayerToMerge &&
-    storeLayerToMerge.kind !== 'OptimisticStoreLayer'
+    storeLayerToMerge != null &&
+    storeLayerToMerge.kind !== 'OptimisticUpdaterStoreLayer'
   ) {
     mergeDataLayer(baseStoreLayer.data, storeLayerToMerge.data);
     storeLayerToMerge = storeLayerToMerge.childStoreLayer;
@@ -306,9 +340,10 @@ function reexecuteUpdatesAndMergeData(
   // reflects whatever replaced the optimistic layer
   newMergedData: StoreLayerData,
 ): void {
-  while (storeLayer !== null) {
+  while (storeLayer != null) {
     mergeDataLayer(oldMergedData, storeLayer.data);
     switch (storeLayer.kind) {
+      case 'OptimisticNetworkResponseStoreLayer':
       case 'NetworkResponseStoreLayer':
         break;
       case 'StartUpdateStoreLayer': {
@@ -316,14 +351,10 @@ function reexecuteUpdatesAndMergeData(
         storeLayer.startUpdate(storeLayer);
         break;
       }
-      case 'OptimisticStoreLayer': {
+      case 'OptimisticUpdaterStoreLayer': {
         storeLayer.data = {};
         storeLayer.startUpdate(storeLayer);
         break;
-      }
-      default: {
-        storeLayer satisfies never;
-        throw new Error('Unreachable. This is a bug in Isograph.');
       }
     }
     mergeDataLayer(newMergedData, storeLayer.data);
@@ -344,7 +375,7 @@ function setChildOfNode<TStoreLayer extends StoreLayer>(
   newChildStoreLayer: TStoreLayer['childStoreLayer'],
 ) {
   storeLayerToModify.childStoreLayer = newChildStoreLayer;
-  if (newChildStoreLayer !== null) {
+  if (newChildStoreLayer != null) {
     newChildStoreLayer.parentStoreLayer = storeLayerToModify;
   } else {
     environment.store = storeLayerToModify;
@@ -377,7 +408,7 @@ export function revertOptimisticStoreLayerAndMaybeReplace(
 
   let newMergedData = {};
   let childNode = optimisticNode.childStoreLayer;
-  if (normalizeData !== null) {
+  if (normalizeData != null) {
     const networkResponseStoreLayer: NetworkResponseStoreLayer = {
       kind: 'NetworkResponseStoreLayer',
       data: {},
@@ -467,7 +498,10 @@ export type StoreLayer =
   | StartUpdateStoreLayer
   | BaseStoreLayer;
 
-export type StoreLayerWithData = BaseStoreLayer | NetworkResponseStoreLayer;
+export type StoreLayerWithData =
+  | BaseStoreLayer
+  | NetworkResponseStoreLayer
+  | OptimisticNetworkResponseStoreLayer;
 
 function compareData(
   oldData: StoreLayerData,

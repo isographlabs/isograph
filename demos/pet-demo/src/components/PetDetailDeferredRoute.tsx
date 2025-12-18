@@ -7,11 +7,8 @@ import {
 import { Container, Stack } from '@mui/material';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
-import {
-  FullPageLoading,
-  PetDetailDeferredRoute,
-  useNavigateTo,
-} from './routes';
+import type { PetDetailDeferredRoute } from './routes';
+import { FullPageLoading, useNavigateTo } from './routes';
 
 export const PetDetailDeferredRouteComponent = iso(`
   field Query.PetDetailDeferredRoute(

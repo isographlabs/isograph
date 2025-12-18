@@ -9,7 +9,8 @@ use crate::{
     ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map, parse_iso_literals,
     process_iso_literals, server_entities_map_without_locations, server_id_selectable,
-    server_object_entities, server_selectables_map, validate_use_of_arguments,
+    server_object_entities, server_selectables_map,
+    validate_selection_sets::validate_selection_sets, validate_use_of_arguments,
     validated_entrypoints,
 };
 
@@ -30,6 +31,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     let mut errors = BTreeSet::new();
 
     maybe_extend(&mut errors, validate_use_of_arguments(db));
+
+    errors.extend(validate_selection_sets(db));
 
     maybe_extend(
         &mut errors,

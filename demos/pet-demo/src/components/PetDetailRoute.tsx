@@ -3,7 +3,8 @@ import { FragmentRenderer, useLazyReference } from '@isograph/react';
 import { Button, Card, CardContent, Container, Stack } from '@mui/material';
 import React from 'react';
 import { ErrorBoundary } from './ErrorBoundary';
-import { FullPageLoading, PetDetailRoute, useNavigateTo } from './routes';
+import type { PetDetailRoute } from './routes';
+import { FullPageLoading, useNavigateTo } from './routes';
 
 export const PetDetailRouteComponent = iso(`
   field Query.PetDetailRoute(

@@ -1,8 +1,8 @@
 import { useEffect } from 'react';
-import { subscribe } from '../core/cache';
-import { FragmentReference } from '../core/FragmentReference';
-import { WithEncounteredRecords } from '../core/read';
+import type { FragmentReference } from '../core/FragmentReference';
+import type { WithEncounteredRecords } from '../core/read';
 import type { ReaderAst } from '../core/reader';
+import { subscribe } from '../core/subscribe';
 import { useIsographEnvironment } from './IsographEnvironmentProvider';
 
 // TODO add unit tests for this. Add integration tests that test

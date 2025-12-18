@@ -1,6 +1,6 @@
 {
   "name": "@isograph/plugin-swc",
-  "version": "0.4.3",
+  "version": "0.5.0",
   "description": "SWC plugin for Isograph",
   "homepage": "https://isograph.dev",
   "main": "swc_isograph_plugin.wasm",

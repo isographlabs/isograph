@@ -1,8 +1,8 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
-import React from 'react';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
+import React, { type MutableRefObject } from 'react';
 import { create } from 'react-test-renderer';
 import { assert, describe, expect, test, vi } from 'vitest';
-import { CacheItem, CacheItemState } from './CacheItem';
+import type { CacheItem, CacheItemState } from './CacheItem';
 import { ParentCache } from './ParentCache';
 import { useCachedResponsivePrecommitValue } from './useCachedResponsivePrecommitValue';
 
@@ -14,7 +14,13 @@ function getState<T>(cacheItem: CacheItem<T>): CacheItemState<T> {
   return (cacheItem as any).__state;
 }
 
-function Suspender({ promise, isResolvedRef }) {
+function Suspender({
+  promise,
+  isResolvedRef,
+}: {
+  promise: Promise<unknown>;
+  isResolvedRef: MutableRefObject<boolean>;
+}) {
   if (!isResolvedRef.current) {
     throw promise;
   }
@@ -22,23 +28,18 @@ function Suspender({ promise, isResolvedRef }) {
 }
 
 function shortPromise() {
-  let resolve;
-  const promise = new Promise((_resolve) => {
-    resolve = _resolve;
-  });
+  const { promise, resolve } = Promise.withResolvers<void>();
 
   setTimeout(resolve, 1);
   return promise;
 }
 
 function promiseAndResolver() {
-  let resolve;
   const isResolvedRef = {
     current: false,
   };
-  const promise = new Promise((r) => {
-    resolve = r;
-  });
+  const { promise, resolve } = Promise.withResolvers<void>();
+
   return {
     promise,
     resolve: () => {
@@ -51,7 +52,7 @@ function promiseAndResolver() {
 
 // The fact that sometimes we need to render in concurrent mode and sometimes
 // not is a bit worrisome.
-async function awaitableCreate(Component, isConcurrent) {
+async function awaitableCreate(Component, isConcurrent: boolean) {
   const element = create(
     Component,
     isConcurrent ? { unstable_isConcurrent: true } : undefined,
@@ -157,7 +158,7 @@ describe('useCachedResponsivePrecommitValue', () => {
       setState = _setState;
       const value = useCachedResponsivePrecommitValue(cache, hookOnCommit);
 
-      if (initialRender && value !== null) {
+      if (initialRender && value != null) {
         initialRender = false;
         expect(value).toEqual({ state: 1 });
       } else {

@@ -1,48 +1,33 @@
-import {
-  Factory,
-  ItemCleanupPair,
-  ParentCache,
-} from '@isograph/react-disposable-state';
-import {
-  IsographEntrypoint,
+import { type Factory, ParentCache } from '@isograph/react-disposable-state';
+import type {
+  NormalizationAstNodes,
   NormalizationInlineFragment,
   NormalizationLinkedField,
   NormalizationScalarField,
-  type NormalizationAst,
-  type NormalizationAstLoader,
-  type NormalizationAstNodes,
-} from '../core/entrypoint';
-import { mergeObjectsUsingReaderAst } from './areEqualWithDeepComparison';
-import { FetchOptions } from './check';
-import {
-  ExtractParameters,
+} from './entrypoint';
+import type {
   FragmentReference,
+  UnknownTReadFromStore,
   Variables,
-  type UnknownTReadFromStore,
-  type VariableValue,
+  VariableValue,
 } from './FragmentReference';
 import {
-  DataId,
-  DataTypeValue,
-  FragmentSubscription,
+  type DataId,
+  type DataTypeValue,
   getLink,
-  getOrLoadReaderWithRefetchQueries,
-  ROOT_ID,
-  StoreLink,
-  StoreRecord,
   type IsographEnvironment,
+  ROOT_ID,
+  type StoreLink,
+  type StoreRecord,
   type TypeName,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
-import { maybeMakeNetworkRequest } from './makeNetworkRequest';
 import {
-  addNetworkResponseStoreLayer,
   getMutableStoreRecordProxy,
   type StoreLayerWithData,
 } from './optimisticProxy';
-import { readButDoNotEvaluate, WithEncounteredRecords } from './read';
-import { ReaderLinkedField, ReaderScalarField, type ReaderAst } from './reader';
-import { Argument, ArgumentValue } from './util';
+import type { ReaderLinkedField, ReaderScalarField } from './reader';
+import { type Argument, type ArgumentValue, isArray, stableCopy } from './util';
 
 export const TYPENAME_FIELD_NAME = '__typename';
 
@@ -59,90 +44,6 @@ export function getOrCreateItemInSuspenseCache<
   }
 
   return environment.fragmentCache[index];
-}
-
-/**
- * Creates a copy of the provided value, ensuring any nested objects have their
- * keys sorted such that equivalent values would have identical JSON.stringify
- * results.
- */
-export function stableCopy<T>(value: T): T {
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-  if (isArray(value)) {
-    // @ts-ignore
-    return value.map(stableCopy);
-  }
-  const keys = Object.keys(value).sort();
-  const stable: { [index: string]: any } = {};
-  for (let i = 0; i < keys.length; i++) {
-    // @ts-ignore
-    stable[keys[i]] = stableCopy(value[keys[i]]);
-  }
-  return stable as any;
-}
-
-export function getOrCreateCacheForArtifact<
-  TReadFromStore extends UnknownTReadFromStore,
-  TClientFieldValue,
-  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
-  TRawResponseType extends NetworkResponseObject,
->(
-  environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    TClientFieldValue,
-    TNormalizationAst,
-    TRawResponseType
-  >,
-  variables: ExtractParameters<TReadFromStore>,
-  fetchOptions?: FetchOptions<TClientFieldValue>,
-): ParentCache<FragmentReference<TReadFromStore, TClientFieldValue>> {
-  let cacheKey = '';
-  switch (entrypoint.networkRequestInfo.operation.kind) {
-    case 'Operation':
-      cacheKey =
-        entrypoint.networkRequestInfo.operation.text +
-        JSON.stringify(stableCopy(variables));
-      break;
-    case 'PersistedOperation':
-      cacheKey =
-        entrypoint.networkRequestInfo.operation.operationId +
-        JSON.stringify(stableCopy(variables));
-      break;
-  }
-  const factory = () => {
-    const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
-      getOrLoadReaderWithRefetchQueries(
-        environment,
-        entrypoint.readerWithRefetchQueries,
-      );
-    const [networkRequest, disposeNetworkRequest] = maybeMakeNetworkRequest(
-      environment,
-      entrypoint,
-      variables,
-      readerWithRefetchQueries,
-      fetchOptions ?? null,
-    );
-
-    const itemCleanupPair: ItemCleanupPair<
-      FragmentReference<TReadFromStore, TClientFieldValue>
-    > = [
-      {
-        kind: 'FragmentReference',
-        readerWithRefetchQueries,
-        fieldName,
-        readerArtifactKind,
-        root: { __link: ROOT_ID, __typename: entrypoint.concreteType },
-        variables,
-        networkRequest: networkRequest,
-      },
-      disposeNetworkRequest,
-    ];
-    return itemCleanupPair;
-  };
-  return getOrCreateItemInSuspenseCache(environment, cacheKey, factory);
 }
 
 export type NetworkResponseScalarValue = string | number | boolean;
@@ -219,33 +120,6 @@ export function subscribeToAnyChangesToRecord(
   return () => environment.subscriptions.delete(subscription);
 }
 
-export function subscribe<TReadFromStore extends UnknownTReadFromStore>(
-  environment: IsographEnvironment,
-  encounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
-  fragmentReference: FragmentReference<TReadFromStore, any>,
-  callback: (
-    newEncounteredDataAndRecords: WithEncounteredRecords<TReadFromStore>,
-  ) => void,
-  readerAst: ReaderAst<TReadFromStore>,
-): () => void {
-  const fragmentSubscription: FragmentSubscription<TReadFromStore> = {
-    kind: 'FragmentSubscription',
-    callback,
-    encounteredDataAndRecords,
-    fragmentReference,
-    readerAst,
-  };
-
-  // subscribe is called in an effect. (We should actually subscribe during the
-  // initial render.) Because it's called in an effect, we might have missed some
-  // changes since the initial render! So, at this point, we re-read and call the
-  // subscription (i.e. re-render) if the fragment data has changed.
-  callSubscriptionIfDataChanged(environment, fragmentSubscription);
-
-  environment.subscriptions.add(fragmentSubscription);
-  return () => environment.subscriptions.delete(fragmentSubscription);
-}
-
 export function onNextChangeToRecord(
   environment: IsographEnvironment,
   recordLink: StoreLink,
@@ -260,161 +134,6 @@ export function onNextChangeToRecord(
       },
     );
   });
-}
-
-// Calls to readButDoNotEvaluate can suspend (i.e. throw a promise).
-// Maybe in the future, they will be able to throw errors.
-//
-// That's probably okay to ignore. We don't, however, want to prevent
-// updating other subscriptions if one subscription had missing data.
-function logAnyError(
-  environment: IsographEnvironment,
-  context: any,
-  f: () => void,
-) {
-  try {
-    f();
-  } catch (e) {
-    logMessage(environment, () => ({
-      kind: 'ErrorEncounteredInWithErrorHandling',
-      error: e,
-      context,
-    }));
-  }
-}
-
-export function callSubscriptions(
-  environment: IsographEnvironment,
-  recordsEncounteredWhenNormalizing: EncounteredIds,
-) {
-  environment.subscriptions.forEach((subscription) =>
-    logAnyError(environment, { situation: 'calling subscriptions' }, () => {
-      switch (subscription.kind) {
-        case 'FragmentSubscription': {
-          // TODO if there are multiple components subscribed to the same
-          // fragment, we will call readButNotEvaluate multiple times. We
-          // should fix that.
-          if (
-            hasOverlappingIds(
-              recordsEncounteredWhenNormalizing,
-              subscription.encounteredDataAndRecords.encounteredRecords,
-            )
-          ) {
-            callSubscriptionIfDataChanged(environment, subscription);
-          }
-          return;
-        }
-        case 'AnyRecords': {
-          logAnyError(
-            environment,
-            { situation: 'calling AnyRecords callback' },
-            () => subscription.callback(),
-          );
-          return;
-        }
-        case 'AnyChangesToRecord': {
-          if (
-            recordsEncounteredWhenNormalizing
-              .get(subscription.recordLink.__typename)
-              ?.has(subscription.recordLink.__link)
-          ) {
-            logAnyError(
-              environment,
-              { situation: 'calling AnyChangesToRecord callback' },
-              () => subscription.callback(),
-            );
-          }
-          return;
-        }
-        default: {
-          // Ensure we have covered all variants
-          const _: never = subscription;
-          _;
-          throw new Error('Unexpected case');
-        }
-      }
-    }),
-  );
-}
-
-function callSubscriptionIfDataChanged<
-  TReadFromStore extends UnknownTReadFromStore,
->(
-  environment: IsographEnvironment,
-  subscription: FragmentSubscription<TReadFromStore>,
-) {
-  const newEncounteredDataAndRecords = readButDoNotEvaluate(
-    environment,
-    subscription.fragmentReference,
-    // Is this wrong?
-    // Reasons to think no:
-    // - we are only updating the read-out value, and the network
-    //   options only affect whether we throw.
-    // - the component will re-render, and re-throw on its own, anyway.
-    //
-    // Reasons to think not:
-    // - it seems more efficient to suspend here and not update state,
-    //   if we expect that the component will just throw anyway
-    // - consistency
-    // - it's also weird, this is called from makeNetworkRequest, where
-    //   we don't currently pass network request options
-    {
-      suspendIfInFlight: false,
-      throwOnNetworkError: false,
-    },
-  );
-
-  const mergedItem = mergeObjectsUsingReaderAst(
-    subscription.readerAst,
-    subscription.encounteredDataAndRecords.item,
-    newEncounteredDataAndRecords.item,
-  );
-
-  logMessage(environment, () => ({
-    kind: 'DeepEqualityCheck',
-    fragmentReference: subscription.fragmentReference,
-    old: subscription.encounteredDataAndRecords.item,
-    new: newEncounteredDataAndRecords.item,
-    deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
-  }));
-
-  if (mergedItem !== subscription.encounteredDataAndRecords.item) {
-    logAnyError(
-      environment,
-      { situation: 'calling FragmentSubscription callback' },
-      () => {
-        subscription.callback(newEncounteredDataAndRecords);
-      },
-    );
-    subscription.encounteredDataAndRecords = newEncounteredDataAndRecords;
-  }
-}
-
-function hasOverlappingIds(
-  ids1: EncounteredIds,
-  ids2: EncounteredIds,
-): boolean {
-  for (const [typeName, set1] of ids1.entries()) {
-    const set2 = ids2.get(typeName);
-    if (set2 === undefined) {
-      continue;
-    }
-
-    if (isNotDisjointFrom(set1, set2)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// TODO use a polyfill library
-function isNotDisjointFrom<T>(set1: Set<T>, set2: Set<T>): boolean {
-  for (const id of set1) {
-    if (set2.has(id)) {
-      return true;
-    }
-  }
-  return false;
 }
 
 export type EncounteredIds = Map<TypeName, Set<DataId>>;
@@ -475,12 +194,6 @@ function normalizeDataIntoRecord(
           recordHasBeenUpdated || inlineFragmentResultedInChange;
         break;
       }
-      default: {
-        // Ensure we have covered all variants
-        let _: never = normalizationNode;
-        _;
-        throw new Error('Unexpected normalization node kind');
-      }
     }
   }
   if (recordHasBeenUpdated) {
@@ -517,7 +230,7 @@ function normalizeScalarField(
 
   if (networkResponseData == null) {
     targetStoreRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    return existingValue === undefined || existingValue != null;
   }
 
   if (isScalarOrEmptyArray(networkResponseData)) {
@@ -526,10 +239,6 @@ function normalizeScalarField(
   } else {
     throw new Error('Unexpected object array when normalizing scalar');
   }
-}
-
-export function isArray(value: unknown): value is readonly unknown[] {
-  return Array.isArray(value);
 }
 
 /**
@@ -552,7 +261,7 @@ function normalizeLinkedField(
 
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
-    return existingValue !== null;
+    return existingValue === undefined || existingValue != null;
   }
 
   if (
@@ -738,7 +447,7 @@ function isScalarOrEmptyArray(
     return data.every((x) => isScalarOrEmptyArray(x));
   }
   const isScalarValue =
-    data === null ||
+    data == null ||
     typeof data === 'string' ||
     typeof data === 'number' ||
     typeof data === 'boolean';
@@ -755,7 +464,7 @@ function isNullOrEmptyArray(
     return data.every((x) => isNullOrEmptyArray(x));
   }
 
-  return data === null;
+  return data == null;
 }
 
 export function getParentRecordKey(
@@ -804,13 +513,6 @@ function getStoreKeyChunkForArgumentValue(
     }
     case 'Enum': {
       return argumentValue.value;
-    }
-    default: {
-      // TODO configure eslint to allow unused vars starting with _
-      // Ensure we have covered all variants
-      const _: never = argumentValue;
-      _;
-      throw new Error('Unexpected case');
     }
   }
 }
@@ -872,12 +574,6 @@ function getArgumentValueChunk(argumentValue: ArgumentValue): string {
     case 'Enum': {
       return 'e_' + argumentValue.value;
     }
-    default: {
-      // Ensure we have covered all variants
-      let _: never = argumentValue;
-      _;
-      throw new Error('Unexpected case');
-    }
   }
 }
 
@@ -922,38 +618,4 @@ function getDataIdOfNetworkResponse(
     storeKey += getStoreKeyChunkForArgument(fieldParameter, variables);
   }
   return storeKey;
-}
-
-export function writeData<
-  TReadFromStore extends UnknownTReadFromStore,
-  TRawResponseType extends NetworkResponseObject,
->(
-  environment: IsographEnvironment,
-  entrypoint: IsographEntrypoint<
-    TReadFromStore,
-    unknown,
-    NormalizationAst,
-    TRawResponseType
-  >,
-  data: TRawResponseType,
-  variables: ExtractParameters<TReadFromStore>,
-) {
-  const encounteredIds: EncounteredIds = new Map();
-  environment.store = addNetworkResponseStoreLayer(environment.store);
-  normalizeData(
-    environment,
-    environment.store,
-    entrypoint.networkRequestInfo.normalizationAst.selections,
-    data,
-    variables,
-    { __link: ROOT_ID, __typename: entrypoint.concreteType },
-    encounteredIds,
-  );
-  logMessage(environment, () => ({
-    kind: 'AfterNormalization',
-    store: environment.store,
-    encounteredIds,
-  }));
-
-  callSubscriptions(environment, encounteredIds);
 }

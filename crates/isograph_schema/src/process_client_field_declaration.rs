@@ -4,8 +4,8 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
-    TypeAnnotation, UnvalidatedSelection, VariableDefinition,
+    ClientScalarSelectableDirectiveSet, NonConstantValue, Selection, SelectionSet, SelectionType,
+    TypeAnnotation, VariableDefinition,
 };
 use pico::MemoRef;
 use prelude::{ErrClone, Postfix};
@@ -20,22 +20,22 @@ use crate::{
     server_selectable_named,
 };
 
-pub type UnprocessedSelection = WithSpan<UnvalidatedSelection>;
+pub type UnprocessedSelection = WithSpan<Selection>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientScalarSelectableSelectionSet {
     pub parent_object_entity_name: EntityName,
     pub client_scalar_selectable_name: SelectableName,
-    pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
-    pub refetch_strategy: Option<RefetchStrategy<(), ()>>,
+    pub reader_selection_set: WithSpan<SelectionSet>,
+    pub refetch_strategy: Option<RefetchStrategy>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientObjectSelectableSelectionSet {
     pub parent_object_entity_name: EntityName,
     pub client_object_selectable_name: SelectableName,
-    pub reader_selection_set: WithSpan<SelectionSet<(), ()>>,
-    pub refetch_selection_set: WithSpan<SelectionSet<(), ()>>,
+    pub reader_selection_set: WithSpan<SelectionSet>,
+    pub refetch_selection_set: WithSpan<SelectionSet>,
 }
 pub type UnprocessedSelectionSet = SelectionType<
     UnprocessedClientScalarSelectableSelectionSet,
@@ -204,7 +204,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
     let selections = client_field_declaration.selection_set.clone();
 
     let parent_object_entity_name = client_field_declaration.parent_type.item.0;
-    let refetch_strategy = get_unvalidated_refetch_stategy(db, parent_object_entity_name)?;
+    let refetch_strategy = get_refetch_stategy(db, parent_object_entity_name)?;
 
     (
         UnprocessedClientScalarSelectableSelectionSet {
@@ -218,10 +218,10 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         .wrap_ok()
 }
 
-pub fn get_unvalidated_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
+pub fn get_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<RefetchStrategy<(), ()>>> {
+) -> DiagnosticResult<Option<RefetchStrategy>> {
     let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
 
     let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);

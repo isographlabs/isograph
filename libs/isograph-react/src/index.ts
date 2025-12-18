@@ -18,15 +18,14 @@ export {
   NOT_SET,
 } from './core/PromiseWrapper';
 export {
-  callSubscriptions,
-  subscribe,
   normalizeData,
-  writeData,
   type NetworkResponseObject,
   type NetworkResponseValue,
   type NetworkResponseScalarValue,
   type EncounteredIds,
 } from './core/cache';
+export { callSubscriptions, subscribe } from './core/subscribe';
+export { writeData } from './core/writeData';
 export { makeNetworkRequest } from './core/makeNetworkRequest';
 export {
   ROOT_ID,
@@ -40,7 +39,6 @@ export {
   type Link,
   type StoreRecord,
   type CacheMap,
-  createIsographEnvironment,
   createIsographStore,
   type FieldCache,
   type Subscriptions,
@@ -86,7 +84,9 @@ export {
   type RefetchQueryNormalizationArtifactWrapper,
   type ExtractProps,
   type ExtractReadFromStore,
+  type ExtractClientFieldValue,
   type ExtractResolverResult,
+  type FragmentReferenceOfEntrypoint,
   type NetworkRequestInfo,
   type NormalizationInlineFragment,
   type ReaderWithRefetchQueries,
@@ -157,6 +157,7 @@ export {
 export { useLazyReference } from './react/useLazyReference';
 export { useRerenderOnChange } from './react/useRerenderOnChange';
 export { RenderAfterCommit__DO_NOT_USE } from './react/RenderAfterCommit__DO_NOT_USE';
+export { createIsographEnvironment } from './react/createIsographEnvironment';
 
 export { useClientSideDefer } from './loadable-hooks/useClientSideDefer';
 export {

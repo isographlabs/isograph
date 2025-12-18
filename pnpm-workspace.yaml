@@ -1,18 +1,21 @@
 packages:
-  - 'libs/*'
-  - 'demos/*'
-  - 'docs-website'
-  - 'tree-sitter'
+  - libs/*
+  - demos/*
+  - docs-website
+  - tree-sitter
 
 ignoredBuiltDependencies:
   - '@swc/core'
-  - 'core-js'
-  - 'core-js-pure'
-  - 'es5-ext'
-  - 'esbuild'
-  - 'fsevents'
-  - 'unrs-resolver'
+  - core-js
+  - core-js-pure
+  - es5-ext
+  - esbuild
+  - fsevents
+  - unrs-resolver
 
 onlyBuiltDependencies:
-  - 'tree-sitter'
-  - 'tree-sitter-cli'
+  - tree-sitter
+  - tree-sitter-cli
+
+patchedDependencies:
+  '@docusaurus/tsconfig': patches/@docusaurus__tsconfig.patch

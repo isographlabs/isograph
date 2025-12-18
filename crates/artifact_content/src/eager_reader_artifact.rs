@@ -1,31 +1,33 @@
 use common_lang_types::{
     ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, WithSpan,
 };
+use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
+    VariableDefinition,
 };
 use isograph_schema::{
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ObjectSelectableId,
-    ScalarSelectableId, ServerObjectSelectable,
-    client_object_selectable_selection_set_for_parent_query,
-    client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
-    server_object_entity_named,
+    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ServerEntityName,
+    ServerObjectSelectable, client_scalar_selectable_selection_set_for_parent_query,
+    initial_variable_context, selectable_reader_selection_set, server_object_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
 use std::{borrow::Cow, collections::BTreeSet, path::PathBuf};
 
+use crate::format_parameter_type::format_parameter_type;
+use crate::generate_updatable_and_parameter_type::{
+    generate_client_selectable_parameter_type, generate_client_selectable_updatable_data_type,
+};
 use crate::{
     generate_artifacts::{
         ClientScalarSelectableFunctionImportStatement, ClientScalarSelectableOutputType,
         RESOLVER_OUTPUT_TYPE, RESOLVER_OUTPUT_TYPE_FILE_NAME, RESOLVER_PARAM_TYPE,
         RESOLVER_PARAM_TYPE_FILE_NAME, RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-        RESOLVER_READER_FILE_NAME, generate_client_scalar_selectable_parameter_type,
-        generate_client_scalar_selectable_updatable_data_type, generate_output_type,
-        generate_parameters,
+        RESOLVER_READER_FILE_NAME, generate_output_type,
     },
     import_statements::{
         param_type_imports_to_import_param_statement, param_type_imports_to_import_statement,
@@ -62,6 +64,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        client_selectable.parent_object_entity_name(),
         &match client_selectable {
             SelectionType::Scalar(scalar) => {
                 client_scalar_selectable_selection_set_for_parent_query(
@@ -71,14 +74,15 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 )
                 .expect("Expected selection set to exist and to be valid.")
             }
-            SelectionType::Object(object) => {
-                client_object_selectable_selection_set_for_parent_query(
-                    db,
-                    object.parent_object_entity_name,
-                    object.name.item,
-                )
-                .expect("Expected selection set to exist and to be valid.")
-            }
+            SelectionType::Object(object) => selectable_reader_selection_set(
+                db,
+                object.parent_object_entity_name,
+                object.name.item,
+            )
+            .expect("Expected selection set to exist and to be valid.")
+            .lookup(db)
+            .clone()
+            .note_todo("Don't clone"),
         },
         0,
         refetched_paths,
@@ -199,9 +203,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
 pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-    inline_fragment_reader_selections: &WithSpan<
-        SelectionSet<ScalarSelectableId, ObjectSelectableId>,
-    >,
+    inline_fragment_reader_selections: &WithSpan<SelectionSet>,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
@@ -238,6 +240,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
+        server_object_selectable.parent_object_entity_name,
         inline_fragment_reader_selections,
         0,
         refetch_paths,
@@ -303,12 +306,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     .as_ref()
     .expect(
         "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
         "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+        This is indicative of a bug in Isograph.",
     )
     .lookup(db);
 
@@ -322,22 +325,31 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
             scalar.name.item,
         )
         .expect("Expected selection set to be valid."),
-        SelectionType::Object(object) => client_object_selectable_selection_set_for_parent_query(
-            db,
-            object.parent_object_entity_name,
-            object.name.item,
-        )
-        .expect("Expected selection set to be valid."),
+        SelectionType::Object(object) => {
+            let parent_object_entity_name = object.parent_object_entity_name;
+            let client_object_selectable_name = object.name.item;
+            selectable_reader_selection_set(
+                db,
+                parent_object_entity_name,
+                client_object_selectable_name,
+            )
+            .expect("Expected selection set to be valid.")
+            .lookup(db)
+            .clone()
+            .note_todo("Don't clone")
+        }
     };
-    let client_scalar_selectable_parameter_type = generate_client_scalar_selectable_parameter_type(
+    let client_scalar_selectable_parameter_type = generate_client_selectable_parameter_type(
         db,
+        client_selectable.parent_object_entity_name(),
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
         1,
     );
-    let updatable_data_type = generate_client_scalar_selectable_updatable_data_type(
+    let updatable_data_type = generate_client_selectable_updatable_data_type(
         db,
+        client_selectable.parent_object_entity_name(),
         &selection_set_for_parent_query,
         &mut param_type_imports,
         &mut loadable_fields,
@@ -580,4 +592,23 @@ fn generate_function_import_statement(
     ClientScalarSelectableFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{file_name}';"
     ))
+}
+
+fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
+) -> String {
+    let mut s = "{\n".to_string();
+    let indent = "  ";
+    for arg in argument_definitions {
+        let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
+        s.push_str(&format!(
+            "{indent}readonly {}{}: {},\n",
+            arg.name.item,
+            if is_optional { "?" } else { "" },
+            format_parameter_type(db, arg.type_.clone(), 1)
+        ));
+    }
+    s.push_str("};");
+    s
 }

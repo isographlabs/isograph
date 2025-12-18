@@ -1,41 +1,45 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
-  callSubscriptions,
   normalizeData,
   type EncounteredIds,
   type NetworkResponseObject,
 } from './cache';
-import { check, DEFAULT_SHOULD_FETCH_VALUE, FetchOptions } from './check';
+import type { FetchOptions } from './check';
+import { check, DEFAULT_SHOULD_FETCH_VALUE } from './check';
 import { getOrCreateCachedComponent } from './componentCache';
-import {
+import type {
   IsographEntrypoint,
+  NormalizationAst,
+  NormalizationAstLoader,
   ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifact,
-  type NormalizationAst,
-  type NormalizationAstLoader,
 } from './entrypoint';
-import {
+import type {
   ExtractParameters,
-  type FragmentReference,
-  type UnknownTReadFromStore,
+  FragmentReference,
+  UnknownTReadFromStore,
 } from './FragmentReference';
+import type { RetainedQuery } from './garbageCollection';
 import {
   garbageCollectEnvironment,
-  RetainedQuery,
   retainQuery,
   unretainQuery,
 } from './garbageCollection';
-import { IsographEnvironment, ROOT_ID, StoreLink } from './IsographEnvironment';
+import type { IsographEnvironment, StoreLink } from './IsographEnvironment';
+import { ROOT_ID } from './IsographEnvironment';
 import { logMessage } from './logging';
-import { addNetworkResponseStoreLayer } from './optimisticProxy';
 import {
-  AnyError,
-  PromiseWrapper,
-  wrapPromise,
-  wrapResolvedValue,
-} from './PromiseWrapper';
+  addNetworkResponseStoreLayer,
+  addOptimisticNetworkResponseStoreLayer,
+  revertOptimisticStoreLayerAndMaybeReplace,
+  type OptimisticStoreLayer,
+  type StoreLayerWithData,
+} from './optimisticProxy';
+import type { AnyError, PromiseWrapper } from './PromiseWrapper';
+import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
 import { readButDoNotEvaluate } from './read';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
+import { callSubscriptions } from './subscribe';
 
 let networkRequestId = 0;
 
@@ -58,7 +62,7 @@ export function maybeMakeNetworkRequest<
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   > | null,
-  fetchOptions: FetchOptions<TClientFieldValue> | null,
+  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   switch (fetchOptions?.shouldFetch ?? DEFAULT_SHOULD_FETCH_VALUE) {
     case 'Yes': {
@@ -83,7 +87,8 @@ export function maybeMakeNetworkRequest<
         'NormalizationAstLoader'
       ) {
         throw new Error(
-          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is not supported as it will lead to slower initial load time.',
+          'Using lazy loaded normalizationAst with shouldFetch: "IfNecessary" is ' +
+            'not supported as it will lead to a network waterfall.',
         );
       }
       const result = check(
@@ -115,7 +120,7 @@ export function maybeMakeNetworkRequest<
   }
 }
 
-function retainQueryWithoutMakingNetworkRequest<
+export function retainQueryWithoutMakingNetworkRequest<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TRawResponseType extends NetworkResponseObject,
@@ -131,8 +136,10 @@ function retainQueryWithoutMakingNetworkRequest<
       >,
   variables: ExtractParameters<TReadFromStore>,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
-  let status: NetworkRequestStatus = {
-    kind: 'Undisposed',
+  let status:
+    | NetworkRequestStatusUndisposedComplete
+    | NetworkRequestStatusDisposed = {
+    kind: 'UndisposedComplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
@@ -142,12 +149,9 @@ function retainQueryWithoutMakingNetworkRequest<
   return [
     wrapResolvedValue(undefined),
     () => {
-      if (status.kind === 'Undisposed') {
-        unretainAndGarbageCollect(environment, status);
+      if (status.kind !== 'Disposed') {
+        status = unretainAndGarbageCollect(environment, status);
       }
-      status = {
-        kind: 'Disposed',
-      };
     },
   ];
 }
@@ -171,18 +175,27 @@ export function makeNetworkRequest<
   readerWithRefetchQueries: PromiseWrapper<
     ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   > | null,
-  fetchOptions: FetchOptions<TClientFieldValue> | null,
+  fetchOptions: FetchOptions<TClientFieldValue, TRawResponseType> | null,
 ): ItemCleanupPair<PromiseWrapper<void, AnyError>> {
   // TODO this should be a DataId and stored in the store
   const myNetworkRequestId = networkRequestId + '';
   networkRequestId++;
   let status: NetworkRequestStatus = {
-    kind: 'Undisposed',
+    kind: 'UndisposedIncomplete',
     retainedQuery: fetchNormalizationAstAndRetainArtifact(
       environment,
       artifact,
       variables,
     ),
+    optimistic:
+      fetchOptions?.optimisticNetworkResponse != null
+        ? makeOptimisticUpdate(
+            environment,
+            artifact,
+            variables,
+            fetchOptions?.optimisticNetworkResponse,
+          )
+        : null,
   };
 
   logMessage(environment, () => ({
@@ -212,32 +225,56 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('GraphQL network response had errors', {
+        throw new Error('Network response had errors', {
           cause: networkResponse,
         });
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
-      if (status.kind === 'Undisposed') {
-        const encounteredIds: EncounteredIds = new Map();
-        environment.store = addNetworkResponseStoreLayer(environment.store);
-        normalizeData(
-          environment,
-          environment.store,
-          normalizationAst.selections,
-          networkResponse.data ?? {},
-          variables,
-          root,
-          encounteredIds,
-        );
 
-        logMessage(environment, () => ({
-          kind: 'AfterNormalization',
-          store: environment.store,
-          encounteredIds: encounteredIds,
-        }));
+      if (status.kind === 'UndisposedIncomplete') {
+        if (status.optimistic != null) {
+          status =
+            revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+              environment,
+              status,
+              (storeLayer) =>
+                normalizeData(
+                  environment,
+                  storeLayer,
+                  normalizationAst.selections,
+                  networkResponse.data ?? {},
+                  variables,
+                  root,
+                  new Map(),
+                ),
+            );
+        } else {
+          const encounteredIds: EncounteredIds = new Map();
+          environment.store = addNetworkResponseStoreLayer(environment.store);
+          normalizeData(
+            environment,
+            environment.store,
+            normalizationAst.selections,
+            networkResponse.data ?? {},
+            variables,
+            root,
+            encounteredIds,
+          );
 
-        callSubscriptions(environment, encounteredIds);
+          logMessage(environment, () => ({
+            kind: 'AfterNormalization',
+            store: environment.store,
+            encounteredIds: encounteredIds,
+          }));
+
+          callSubscriptions(environment, encounteredIds);
+
+          status = {
+            kind: 'UndisposedComplete',
+            retainedQuery: status.retainedQuery,
+          };
+        }
       }
 
       const onComplete = fetchOptions?.onComplete;
@@ -268,6 +305,16 @@ export function makeNetworkRequest<
       try {
         fetchOptions?.onError?.();
       } catch {}
+
+      if (status.kind === 'UndisposedIncomplete') {
+        status =
+          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+            environment,
+            status,
+            null,
+          );
+      }
+
       throw e;
     });
 
@@ -276,27 +323,41 @@ export function makeNetworkRequest<
   const response: ItemCleanupPair<PromiseWrapper<void, AnyError>> = [
     wrapper,
     () => {
-      if (status.kind === 'Undisposed') {
-        unretainAndGarbageCollect(environment, status);
+      if (status.kind === 'UndisposedIncomplete') {
+        status =
+          revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+            environment,
+            status,
+            null,
+          );
       }
-      status = {
-        kind: 'Disposed',
-      };
+      if (status.kind !== 'Disposed') {
+        status = unretainAndGarbageCollect(environment, status);
+      }
     },
   ];
   return response;
 }
 
-type NetworkRequestStatusUndisposed = {
-  readonly kind: 'Undisposed';
+type NetworkRequestStatusUndisposedIncomplete = {
+  readonly kind: 'UndisposedIncomplete';
+  readonly retainedQuery: RetainedQuery;
+  readonly optimistic: OptimisticStoreLayer | null;
+};
+
+type NetworkRequestStatusUndisposedComplete = {
+  readonly kind: 'UndisposedComplete';
   readonly retainedQuery: RetainedQuery;
 };
 
+type NetworkRequestStatusDisposed = {
+  readonly kind: 'Disposed';
+};
+
 type NetworkRequestStatus =
-  | NetworkRequestStatusUndisposed
-  | {
-      readonly kind: 'Disposed';
-    };
+  | NetworkRequestStatusUndisposedIncomplete
+  | NetworkRequestStatusUndisposedComplete
+  | NetworkRequestStatusDisposed;
 
 function readDataForOnComplete<
   TReadFromStore extends UnknownTReadFromStore,
@@ -397,11 +458,6 @@ function readDataForOnComplete<
             : undefined),
         });
       }
-      default: {
-        const _: never = readerArtifact;
-        _;
-        throw new Error('Expected case');
-      }
     }
   }
   return null;
@@ -438,12 +494,86 @@ function fetchNormalizationAstAndRetainArtifact<
   return retainedQuery;
 }
 
+function makeOptimisticUpdate<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+  TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType extends NetworkResponseObject,
+>(
+  environment: IsographEnvironment,
+  artifact:
+    | RefetchQueryNormalizationArtifact
+    | IsographEntrypoint<
+        TReadFromStore,
+        TClientFieldValue,
+        TNormalizationAst,
+        TRawResponseType
+      >,
+  variables: ExtractParameters<TReadFromStore>,
+  optimisticNetworkResponse: TRawResponseType,
+): OptimisticStoreLayer {
+  const root = { __link: ROOT_ID, __typename: artifact.concreteType };
+
+  if (
+    artifact.networkRequestInfo.normalizationAst.kind ===
+    'NormalizationAstLoader'
+  ) {
+    throw new Error(
+      'Using lazy loaded normalizationAst with optimisticNetworkResponse is not supported.',
+    );
+  }
+  const encounteredIds: EncounteredIds = new Map();
+  const optimistic = (environment.store =
+    addOptimisticNetworkResponseStoreLayer(environment.store));
+  normalizeData(
+    environment,
+    environment.store,
+    artifact.networkRequestInfo.normalizationAst.selections,
+    optimisticNetworkResponse,
+    variables,
+    root,
+    encounteredIds,
+  );
+
+  logMessage(environment, () => ({
+    kind: 'AfterNormalization',
+    store: environment.store,
+    encounteredIds: encounteredIds,
+  }));
+
+  callSubscriptions(environment, encounteredIds);
+  return optimistic;
+}
+
+function revertOptimisticStoreLayerAndMaybeReplaceIfUndisposedIncomplete(
+  environment: IsographEnvironment,
+  status: NetworkRequestStatusUndisposedIncomplete,
+  normalizeData: null | ((storeLayer: StoreLayerWithData) => void),
+): NetworkRequestStatusUndisposedComplete {
+  if (status.optimistic != null) {
+    revertOptimisticStoreLayerAndMaybeReplace(
+      environment,
+      status.optimistic,
+      normalizeData,
+    );
+  }
+
+  return {
+    kind: 'UndisposedComplete',
+    retainedQuery: status.retainedQuery,
+  };
+}
+
 function unretainAndGarbageCollect(
   environment: IsographEnvironment,
-  status: NetworkRequestStatusUndisposed,
-) {
+  status: NetworkRequestStatusUndisposedComplete,
+): NetworkRequestStatusDisposed {
   const didUnretainSomeQuery = unretainQuery(environment, status.retainedQuery);
   if (didUnretainSomeQuery) {
     garbageCollectEnvironment(environment);
   }
+
+  return {
+    kind: 'Disposed',
+  };
 }

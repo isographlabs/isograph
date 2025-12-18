@@ -30,6 +30,13 @@ corepack install
 
 These commands will install the appropriate node.js and pnpm version used by Isograph and configure them for your shell session.
 
+You will probably need at least node v24, which you can get via installing nvm, then:
+
+```sh
+nvm install v24.12.0
+nvm use v24.12.0
+```
+
 ### Rust
 
 Isograph is built (in CI) using the latest stable version. Rust is fairly stable and we don't rely on anything crazy, so it should be safe to keep your `rustc` up-to-date.
@@ -206,7 +213,7 @@ Every commit to `main` results in a build, which you can see in [npm](https://ww
 
 - In all package.json files, bump the version number. Don't forget to bump the version number of imports.
 - `pnpm i`
-- `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push`
+- `git add . && git commit -m 'v0.1.0' && git tag v0.1.0 && git push && git push --tags`
 - See [this commit releasing 0.2.0](https://github.com/isographlabs/isograph/commit/e36acab1a018e18bdae0558be08952693af3b6a8)
 
 ## Workflow for using Isograph

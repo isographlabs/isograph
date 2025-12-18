@@ -3,6 +3,7 @@ Err(
         DiagnosticData {
             message: "data did not match any variant of untagged enum EntrypointDirectiveSet",
             location: None,
+            code_actions: [],
         },
     ),
 )

@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[memo]
-pub fn entrypoints<TNetworkProtocol: NetworkProtocol>(
+pub fn entrypoint_declarations<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> Vec<EntrypointDeclaration> {
     let mut out = vec![];
@@ -33,7 +33,7 @@ pub fn entrypoints<TNetworkProtocol: NetworkProtocol>(
 pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
 ) -> HashMap<(EntityName, SelectableName), DiagnosticResult<EntrypointDeclarationInfo>> {
-    let entrypoints = entrypoints(db);
+    let entrypoints = entrypoint_declarations(db);
 
     let mut out: HashMap<_, Result<EntrypointDeclarationInfo, _>> = HashMap::new();
 

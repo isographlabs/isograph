@@ -71,11 +71,11 @@ class RefCounter<T> {
   }
 
   getIfNotDisposed(): T | null {
-    return this.__state === null ? null : this.__state.item;
+    return this.__state == null ? null : this.__state.item;
   }
 
   retainIfNotDisposed(): ItemCleanupPair<ReferenceCountedPointer<T>> | null {
-    if (this.__state !== null) {
+    if (this.__state != null) {
       this.__state.activeReferenceCount++;
 
       const activeReference = new ActiveReference(this);
@@ -88,14 +88,14 @@ class RefCounter<T> {
           );
         }
         disposed = true;
-        if (activeReference.__original === null) {
+        if (activeReference.__original == null) {
           throw new Error(
             'Attempted to dispose an active reference, but it was already disposed. ' +
               'This indicates a bug in reference-counted-pointer.',
           );
         }
         activeReference.__original = null;
-        if (this.__state === null) {
+        if (this.__state == null) {
           throw new Error(
             'Attempted to dispose, but the underlying reference counted pointer was disposed. ' +
               'This indicates a bug in reference-counted-pointer.',
@@ -112,7 +112,7 @@ class RefCounter<T> {
   }
 
   private __maybeDispose() {
-    if (this.__state === null) {
+    if (this.__state == null) {
       throw new Error(
         '__maybeDispose was called, but the reference counted pointer was disposed. ' +
           'This indicates a bug in reference-counted-pointer.',
@@ -134,7 +134,7 @@ class ActiveReference<T> implements ReferenceCountedPointer<T> {
   }
 
   isDisposed(): boolean {
-    return this.__original === null;
+    return this.__original == null;
   }
 
   cloneIfNotDisposed(): ItemCleanupPair<ReferenceCountedPointer<T>> | null {

@@ -5,6 +5,7 @@ Err(
             location: Some(
                 Generated,
             ),
+            code_actions: [],
         },
     ),
 )

@@ -3,17 +3,18 @@ import {
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
 import type { NetworkResponseObject } from '../core/cache';
-import { FetchOptions, type RequiredFetchOptions } from '../core/check';
+import type { FetchOptions } from '../core/check';
+import { type RequiredFetchOptions } from '../core/check';
+import type { IsographEntrypoint } from '../core/entrypoint';
 import {
-  IsographEntrypoint,
   type NormalizationAst,
   type NormalizationAstLoader,
 } from '../core/entrypoint';
-import {
+import type {
   ExtractParameters,
   FragmentReference,
-  type UnknownTReadFromStore,
 } from '../core/FragmentReference';
+import { type UnknownTReadFromStore } from '../core/FragmentReference';
 import {
   getOrLoadReaderWithRefetchQueries,
   ROOT_ID,
@@ -25,6 +26,7 @@ export type UseImperativeReferenceResult<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
   TNormalizationAst extends NormalizationAst | NormalizationAstLoader,
+  TRawResponseType,
 > = {
   fragmentReference: FragmentReference<
     TReadFromStore,
@@ -34,7 +36,7 @@ export type UseImperativeReferenceResult<
     variables: ExtractParameters<TReadFromStore>,
     ...[fetchOptions]: NormalizationAstLoader extends TNormalizationAst
       ? [fetchOptions: RequiredFetchOptions<TClientFieldValue>]
-      : [fetchOptions?: FetchOptions<TClientFieldValue>]
+      : [fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>]
   ) => void;
 };
 
@@ -53,7 +55,8 @@ export function useImperativeReference<
 ): UseImperativeReferenceResult<
   TReadFromStore,
   TClientFieldValue,
-  TNormalizationAst
+  TNormalizationAst,
+  TRawResponseType
 > {
   const { state, setState } =
     useUpdatableDisposableState<
@@ -64,7 +67,7 @@ export function useImperativeReference<
     fragmentReference: state !== UNASSIGNED_STATE ? state : null,
     loadFragmentReference: (
       variables: ExtractParameters<TReadFromStore>,
-      fetchOptions?: FetchOptions<TClientFieldValue>,
+      fetchOptions?: FetchOptions<TClientFieldValue, TRawResponseType>,
     ) => {
       const { fieldName, readerArtifactKind, readerWithRefetchQueries } =
         getOrLoadReaderWithRefetchQueries(

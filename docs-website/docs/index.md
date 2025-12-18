@@ -2,7 +2,7 @@
 
 The framework for teams that move fast — without breaking things.
 
-- Make sure to check out the [quickstart guide](../quickstart/)!
+- Make sure to check out the [quickstart guide](./quickstart/)!
 - Watch the [talk at GraphQL Conf](https://www.youtube.com/watch?v=gO65JJRqjuc).
 - Join the [Discord](https://discord.gg/qcHUxb6deQ).
 - [Follow the official Twitter account](https://twitter.com/isographlabs).

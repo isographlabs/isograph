@@ -3,6 +3,7 @@ mod entrypoint_artifact;
 mod file_system_state;
 mod format_parameter_type;
 pub mod generate_artifacts;
+mod generate_updatable_and_parameter_type;
 mod imperatively_loaded_fields;
 mod import_statements;
 mod iso_overload_file;

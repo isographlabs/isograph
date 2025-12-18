@@ -12,9 +12,8 @@ use isograph_lang_types::{
     ClientFieldDeclaration, ClientPointerDeclaration, ClientScalarSelectableNameWrapper,
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
-    ScalarSelection, SelectionFieldArgument, SelectionSet, SelectionTypeContainingSelections,
-    UnvalidatedSelection, VariableDefinition, from_isograph_field_directives,
-    semantic_token_legend,
+    ScalarSelection, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
+    VariableDefinition, from_isograph_field_directives, semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -345,7 +344,7 @@ fn parse_client_pointer_declaration_inner(
 // Note: for now, top-level selection sets are required
 fn parse_optional_selection_set(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<Option<WithSpan<SelectionSet<(), ()>>>> {
+) -> DiagnosticResult<Option<WithSpan<SelectionSet>>> {
     tokens.with_span_optional_result(|tokens| {
         let selections = parse_optional_selection_set_inner(tokens)?;
         selections
@@ -357,7 +356,7 @@ fn parse_optional_selection_set(
 // TODO this should not parse an optional selection set, but a required one
 fn parse_optional_selection_set_inner(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<Option<Vec<WithSpan<UnvalidatedSelection>>>> {
+) -> DiagnosticResult<Option<Vec<WithSpan<Selection>>>> {
     let open_brace: DiagnosticResult<WithSpan<IsographLangTokenKind>> = tokens.parse_token_of_kind(
         IsographLangTokenKind::OpenBrace,
         semantic_token_legend::ST_OPEN_BRACE,
@@ -452,9 +451,7 @@ fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<()> {
     }
 }
 
-fn parse_selection(
-    tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<WithSpan<UnvalidatedSelection>> {
+fn parse_selection(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<WithSpan<Selection>> {
     tokens.with_span_result(|tokens| {
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
         let field_name = field_name.to_with_location(tokens.text_source);
@@ -472,24 +469,22 @@ fn parse_selection(
         match selection_set {
             Some(selection_set) => {
                 let object_selection_directive_set = from_isograph_field_directives(&directives)?;
-                SelectionTypeContainingSelections::Object(ObjectSelection {
+                SelectionType::Object(ObjectSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
                     object_selection_directive_set,
                     selection_set,
                     arguments,
-                    associated_data: (),
                 })
             }
             None => {
                 let scalar_selection_directive_set = from_isograph_field_directives(&directives)?;
 
-                SelectionTypeContainingSelections::Scalar(ScalarSelection {
+                SelectionType::Scalar(ScalarSelection {
                     name: field_name.map(|string_key| string_key.into()),
                     reader_alias: alias
                         .map(|with_span| with_span.map(|string_key| string_key.into())),
-                    associated_data: (),
                     arguments,
                     scalar_selection_directive_set,
                 })

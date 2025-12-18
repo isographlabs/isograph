@@ -1,8 +1,8 @@
 'use strict';
 
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { useEffect, useRef, useState } from 'react';
-import { ParentCache } from './ParentCache';
+import type { ParentCache } from './ParentCache';
 
 /**
  * useCachedResponsivePrecommitValue<T>
@@ -70,14 +70,14 @@ export function useCachedResponsivePrecommitValue<T>(
     const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
       disposeOfTemporaryRetain,
     );
-    if (undisposedPair !== null) {
+    if (undisposedPair != null) {
       onCommit(undisposedPair);
     } else {
       // The cache item we created during render has been disposed. Check if the parent
       // cache is populated.
       const existingCacheItemCleanupPair =
         parentCache.getAndPermanentRetainIfPresent();
-      if (existingCacheItemCleanupPair !== null) {
+      if (existingCacheItemCleanupPair != null) {
         onCommit(existingCacheItemCleanupPair);
       } else {
         // We did not find an item in the parent cache, create a new one.

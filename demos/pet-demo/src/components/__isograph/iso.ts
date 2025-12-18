@@ -35,6 +35,7 @@ import { type Query__PetDetailDeferredRoute__param } from './Query/PetDetailDefe
 import { type Query__PetDetailRoute__param } from './Query/PetDetailRoute/param_type';
 import { type Query__PetFavoritePhrase2__param } from './Query/PetFavoritePhrase2/param_type';
 import { type Query__PetFavoritePhrase__param } from './Query/PetFavoritePhrase/param_type';
+import { type Query__PetNameList__param } from './Query/PetNameList/param_type';
 import { type Query__SmartestPetRoute__param } from './Query/SmartestPetRoute/param_type';
 import { type Query__smartestPet__param } from './Query/smartestPet/param_type';
 import { type Viewer__NewsfeedPaginationComponent__param } from './Viewer/NewsfeedPaginationComponent/param_type';
@@ -50,6 +51,7 @@ import entrypoint_Query__PetCheckinListRoute from '../__isograph/Query/PetChecki
 import entrypoint_Query__PetDetailDeferredRoute from '../__isograph/Query/PetDetailDeferredRoute/entrypoint';
 import entrypoint_Query__PetDetailRoute from '../__isograph/Query/PetDetailRoute/entrypoint';
 import entrypoint_Query__PetFavoritePhrase from '../__isograph/Query/PetFavoritePhrase/entrypoint';
+import entrypoint_Query__PetNameList from '../__isograph/Query/PetNameList/entrypoint';
 import entrypoint_Query__SmartestPetRoute from '../__isograph/Query/SmartestPetRoute/entrypoint';
 
 // This is the type given to regular client fields.
@@ -245,6 +247,10 @@ export function iso<T>(
 ): IdentityWithParamComponent<Query__PetFavoritePhrase__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.PetNameList', T>
+): IdentityWithParamComponent<Query__PetNameList__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.SmartestPetRoute', T>
 ): IdentityWithParamComponent<Query__SmartestPetRoute__param>;
 
@@ -295,6 +301,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.PetFavoritePhrase', T>
 ): typeof entrypoint_Query__PetFavoritePhrase;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.PetNameList', T>
+): typeof entrypoint_Query__PetNameList;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.SmartestPetRoute', T>

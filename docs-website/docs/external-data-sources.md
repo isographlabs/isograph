@@ -11,20 +11,24 @@ In this example, we call `getRawResponseData()`, which somehow procures data in 
 ```tsx
 import { iso } from '@iso';
 import { useIsographEnvironment, writeData } from '@isograph/react';
+import { useUpdatableDisposableState } from '@isograph/react-disposable-state';
 
 export const Button = iso(`
   field Query.PreloadUserDetailPageButton @component {}`)(({ data }) => {
   const environment = useIsographEnvironment();
+  const { state: fragmentReference, setState } = useUpdatableDisposableState();
   return (
     <button
       onClick={() => {
-        writeData(
-          environment,
-          iso(`entrypoint Query.UserDetailPage`),
-          getRawResponseData(),
-          {
-            id: '0',
-          },
+        setState(
+          writeData(
+            environment,
+            iso(`entrypoint Query.UserDetailPage`),
+            getRawResponseData(),
+            {
+              id: '0',
+            },
+          ),
         );
       }}
     >
@@ -43,63 +47,62 @@ Let's modify this example to integrate with another data source.
 ```tsx
 import { iso } from '@iso';
 import { useIsographEnvironment, writeData } from '@isograph/react';
+import {
+  useUpdatableDisposableState,
+  UNASSIGNED_STATE,
+} from '@isograph/react-disposable-state';
 
-type State = { kind: 'NotLoaded' } | { kind: 'Loading' } | { kind: 'Loaded' };
+type State = { kind: 'NotLoaded' } | { kind: 'Loading' };
 
 export const Button = iso(`
   field Query.PreloadUserDetailPageButton @component {}`)(({ data }) => {
   const [state, setState] = useState<State>({ kind: 'NotLoaded' });
   const environment = useIsographEnvironment();
+  const { state: fragmentReference, setState: setFragmentReference } =
+    useUpdatableDisposableState();
+
+  if (fragmentReference !== UNASSIGNED_STATE) {
+    return (
+      <Suspense>
+        <FragmentRenderer fragmentReference={fragmentReference} />
+      </Suspense>
+    );
+  }
+
   if (state.kind === 'NotLoaded') {
     return (
       <button
         onClick={() => {
-          // Note: this will return a fragmentReference in the future and this documentation will be updated.
           setState({ kind: 'Loading' });
           makeRestNetworkRequest().then((restResponse) => {
-            writeData(
-              environment,
-              iso(`entrypoint Query.UserDetailPage`),
-              transformRestResponseToRawResponseShape(restResponse),
-              {
-                id: '0',
-              },
+            setFragmentReference(
+              writeData(
+                environment,
+                iso(`entrypoint Query.UserDetailPage`),
+                transformRestResponseToRawResponseShape(restResponse),
+                {
+                  id: '0',
+                },
+              ),
             );
-            setState({ kind: 'Loaded' });
           });
         }}
       >
         Preload data
       </button>
     );
-  } else if (state.kind === 'Loading') {
-    return <Loading />;
   } else {
-    return <PreloadedChildComponent />;
+    return <Loading />;
   }
 });
-
-function PreloadedChildComponent() {
-  // This will not make a network call, as the data is already in the store!
-  const { fragmentReference } = useLazyReference(
-    iso(`entrypoint Query.UserDetailPage`),
-    { id: '0' },
-  );
-
-  return (
-    <ErrorBoundary>
-      <React.Suspense fallback={<FullPageLoading />}>
-        <FragmentRenderer
-          fragmentReference={fragmentReference}
-          networkRequestOptions={{ suspendIfInFlight: false }}
-        />
-      </React.Suspense>
-    </ErrorBoundary>
-  );
-}
 ```
 
-In the future, `writeData` will return a fragment reference, so this example can be cleaned up some more.
+## Retaining data
+
+The `writeData` function returns a fragment reference wrapped in an item cleanup pair.
+Data will be retained by `writeData` until the cleanup function is called. After the cleanup function is called there's no guarantee the data will remain in the store.
+
+The `@isograph/react-disposable-state` package can be used for common cleanup scenarios.
 
 ## Example: subscriptions
 
@@ -125,7 +128,7 @@ export const MySubscriptionComponent = iso(`
         {
           chatId: subscriptionPayload.chatId,
         },
-      );
+      )[1](); // immediately call cleanup to prevent data from never being garbage collected
     },
   );
 

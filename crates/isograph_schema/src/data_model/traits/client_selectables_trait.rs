@@ -1,15 +1,14 @@
 use common_lang_types::{
-    DiagnosticResult, DiagnosticVecResult, EntityName, ParentObjectEntityNameAndSelectableName,
-    SelectableName, WithLocation, WithSpan,
+    DiagnosticResult, EntityName, ParentObjectEntityNameAndSelectableName, SelectableName,
+    WithLocation, WithSpan,
 };
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    NetworkProtocol, ObjectSelectableId, ScalarSelectableId, SelectableTrait, ServerEntityName,
-    client_scalar_selectable_named, selectable_validated_reader_selection_set,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
+    NetworkProtocol, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
+    refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
 };
 
 #[impl_for_selection_type]
@@ -194,7 +193,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
-) -> DiagnosticResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
+) -> DiagnosticResult<WithSpan<SelectionSet>> {
     let selectable = client_scalar_selectable_named(
         db,
         parent_object_entity_name,
@@ -211,7 +210,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
 
     Ok(match selectable.variant {
         ClientFieldVariant::ImperativelyLoadedField(_) => {
-            let refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+            let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
                 db,
                 parent_object_entity_name,
                 client_scalar_selectable_name,
@@ -231,36 +230,22 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
                 .refetch_selection_set()
                 .expect(
                     "Expected imperatively loaded field to have refetch selection set. \
-                This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 // TODO don't clone
                 .clone()
         }
         _ => {
             // TODO don't clone
-            selectable_validated_reader_selection_set(
+            selectable_reader_selection_set(
                 db,
                 parent_object_entity_name,
                 client_scalar_selectable_name,
             )
             .as_ref()
             .expect("Expected selection set to be valid.")
+            .lookup(db)
             .clone()
         }
     })
-}
-
-pub fn client_object_selectable_selection_set_for_parent_query<
-    TNetworkProtocol: NetworkProtocol,
->(
-    db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity_name: EntityName,
-    client_object_selectable_name: SelectableName,
-) -> DiagnosticVecResult<WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>> {
-    selectable_validated_reader_selection_set(
-        db,
-        parent_object_entity_name,
-        client_object_selectable_name,
-    )
-    .clone()
 }

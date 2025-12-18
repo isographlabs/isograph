@@ -1,29 +1,27 @@
-import { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
   UNASSIGNED_STATE,
   useUpdatableDisposableState,
 } from '@isograph/react-disposable-state';
-import {
-  createReferenceCountedPointer,
-  ReferenceCountedPointer,
-} from '@isograph/reference-counted-pointer';
+import type { ReferenceCountedPointer } from '@isograph/reference-counted-pointer';
+import { createReferenceCountedPointer } from '@isograph/reference-counted-pointer';
 import { useState } from 'react';
 import { subscribeToAnyChange } from '../core/cache';
-import { FetchOptions } from '../core/check';
-import {
+import type { FetchOptions } from '../core/check';
+import type {
   FragmentReference,
-  type UnknownTReadFromStore,
+  UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import { getPromiseState, readPromise } from '../core/PromiseWrapper';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
 } from '../core/read';
-import { LoadableField, type ReaderAst } from '../core/reader';
+import type { LoadableField, ReaderAst } from '../core/reader';
 import { getOrCreateCachedStartUpdate } from '../core/startUpdate';
 import { useIsographEnvironment } from '../react/IsographEnvironmentProvider';
+import { maybeUnwrapNetworkRequest } from '../react/maybeUnwrapNetworkRequest';
 import { useSubscribeToMultiple } from '../react/useReadAndSubscribe';
-import { maybeUnwrapNetworkRequest } from '../react/useResult';
 
 export type UseSkipLimitReturnValue<
   TReadFromStore extends UnknownTReadFromStore,
@@ -33,7 +31,7 @@ export type UseSkipLimitReturnValue<
       readonly kind: 'Complete';
       readonly fetchMore: (
         count: number,
-        fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+        fetchOptions?: FetchOptions<ReadonlyArray<TItem>, never>,
       ) => void;
       readonly results: ReadonlyArray<TItem>;
     }
@@ -196,7 +194,7 @@ export function useSkipLimitPagination<
     (loadedSoFar: number) =>
     (
       count: number,
-      fetchOptions?: FetchOptions<ReadonlyArray<TItem>>,
+      fetchOptions?: FetchOptions<ReadonlyArray<TItem>, never>,
     ): void => {
       const loadedField = loadableField(
         {
@@ -248,7 +246,7 @@ export function useSkipLimitPagination<
   const mostRecentFragmentReference =
     mostRecentItem?.[0].getItemIfNotDisposed();
 
-  if (mostRecentItem && mostRecentFragmentReference === null) {
+  if (mostRecentItem != null && mostRecentFragmentReference == null) {
     throw new Error(
       'FragmentReference is unexpectedly disposed. \
       This is indicative of a bug in Isograph.',
@@ -256,11 +254,15 @@ export function useSkipLimitPagination<
   }
 
   const networkRequestStatus =
-    mostRecentFragmentReference &&
-    getPromiseState(mostRecentFragmentReference.networkRequest);
+    mostRecentFragmentReference != null
+      ? {
+          mostRecentFragmentReference,
+          state: getPromiseState(mostRecentFragmentReference.networkRequest),
+        }
+      : null;
 
   const slicedFragmentReferences =
-    networkRequestStatus?.kind === 'Ok'
+    networkRequestStatus?.state?.kind === 'Ok'
       ? loadedReferences
       : loadedReferences.slice(0, loadedReferences.length - 1);
 
@@ -290,7 +292,7 @@ export function useSkipLimitPagination<
     subscribeCompletedFragmentReferences(completedFragmentReferences),
   );
 
-  if (!networkRequestStatus) {
+  if (networkRequestStatus == null) {
     return {
       kind: 'Complete',
       fetchMore: getFetchMore(initialState?.skip ?? 0),
@@ -298,7 +300,7 @@ export function useSkipLimitPagination<
     };
   }
 
-  switch (networkRequestStatus.kind) {
+  switch (networkRequestStatus.state.kind) {
     case 'Pending': {
       const unsubscribe = subscribeToAnyChange(environment, () => {
         unsubscribe();
@@ -307,12 +309,12 @@ export function useSkipLimitPagination<
 
       return {
         kind: 'Pending',
-        pendingFragment: mostRecentFragmentReference,
+        pendingFragment: networkRequestStatus.mostRecentFragmentReference,
         results: readCompletedFragmentReferences(completedFragmentReferences),
       };
     }
     case 'Err': {
-      throw networkRequestStatus.error;
+      throw networkRequestStatus.state.error;
     }
     case 'Ok': {
       const results = readCompletedFragmentReferences(

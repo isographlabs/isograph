@@ -1,5 +1,12 @@
 # GitHub Demo
 
+## Prerequisites:
+
+The project depends on `Cargo` and `Rust` for the compiler, as well as `pnpm` to build
+
+- `Rust`: [https://rust-lang.org/tools/install/](https://rust-lang.org/tools/install/)
+- `pnpm`: [https://pnpm.io/installation](https://pnpm.io/installation)
+
 ## Running locally
 
 In order to run this demo locally:
@@ -16,7 +23,7 @@ Then, run the following from the root of the repository:
 
 ```sh
 pnpm i
-pnpm -r compile
+pnpm -r compile-libs
 ```
 
 Then, run the project as follows from the `demos/github-demo` folder:
@@ -39,3 +46,7 @@ pnpm run watch-github-demo
 Changes to the `libs/*` folders must be followed by a `pnpm -r compile`.
 
 Changes to the components in the demo will automatically be picked up by Next, but you will probably have to manually refresh the page.
+
+## Issues
+
+For issues setting up the demo, checkout out [troubleshooting](/docs-website/docs/troubleshooting.md)

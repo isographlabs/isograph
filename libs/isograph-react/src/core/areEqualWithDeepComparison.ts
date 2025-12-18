@@ -6,12 +6,8 @@ function mergeUsingReaderAst(
   oldItem: unknown,
   newItem: unknown,
 ): unknown {
-  if (newItem === null) {
-    return oldItem === null ? oldItem : newItem;
-  }
-
-  if (newItem === undefined) {
-    return oldItem === undefined ? oldItem : newItem;
+  if (newItem == null || oldItem == null) {
+    return newItem;
   }
 
   if (Array.isArray(newItem)) {
@@ -31,12 +27,6 @@ function mergeUsingReaderAst(
       }
 
       return mergeObjectsUsingReaderAst(field.selections, oldItem, newItem);
-    default: {
-      // Ensure we have covered all variants
-      let _: never = field;
-      _;
-      throw new Error('Unexpected case.');
-    }
   }
 }
 
@@ -124,12 +114,6 @@ export function mergeObjectsUsingReaderAst(
       case 'ImperativelyLoadedField':
       case 'LoadablySelectedField':
         break;
-      default: {
-        // Ensure we have covered all variants
-        let _: never = field;
-        _;
-        throw new Error('Unexpected case.');
-      }
     }
   }
 

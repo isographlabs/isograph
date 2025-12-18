@@ -1,22 +1,19 @@
-import { Factory } from '@isograph/disposable-types';
-import { FetchOptions } from './check';
-import {
+import type { Factory } from '@isograph/disposable-types';
+import type { FetchOptions } from './check';
+import type {
   IsographEntrypoint,
   IsographEntrypointLoader,
   RefetchQueryNormalizationArtifact,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import {
-  ExtractParameters,
-  FragmentReference,
-  type UnknownTReadFromStore,
-} from './FragmentReference';
-import {
+import type { ExtractParameters, FragmentReference } from './FragmentReference';
+import { type UnknownTReadFromStore } from './FragmentReference';
+import type {
   ComponentOrFieldName,
   IsographEnvironment,
-  type StoreLink,
 } from './IsographEnvironment';
-import { Arguments } from './util';
+import { type StoreLink } from './IsographEnvironment';
+import type { Arguments } from './util';
 
 export type TopLevelReaderArtifact<
   TReadFromStore extends UnknownTReadFromStore,
@@ -177,5 +174,5 @@ export type LoadableField<
   // user-facing API. Users should only interact with LoadableFields via APIs
   // like useClientSideDefer. These APIs should have a nullable fetchOptions
   // parameter, and provide a default value ({}) to the LoadableField.
-  fetchOptions: FetchOptions<TResult>,
+  fetchOptions: FetchOptions<TResult, never>,
 ) => [StableId, Factory<FragmentReference<TReadFromStore, TResult>>];

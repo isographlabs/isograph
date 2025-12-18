@@ -10,8 +10,8 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
-    NonConstantValue, ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypeContainingSelections,
+    NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
     SelectionTypePostfix, VariableDefinition,
 };
 use lazy_static::lazy_static;
@@ -21,18 +21,16 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
     ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
     ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, ObjectSelectableId, PathToRefetchField, ScalarSelectableId,
-    ServerEntityName, ServerObjectEntity, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ValidatedObjectSelection, ValidatedScalarSelection, VariableContext,
-    client_object_selectable_named, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName, ServerObjectEntity,
+    ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, selectable_named, selectable_validated_reader_selection_set,
-    server_id_selectable, server_object_entity_named, server_object_selectable_named,
+    initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
+    selectable_named, selectable_reader_selection_set, server_id_selectable,
+    server_object_entity_named, server_object_selectable_named,
     transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
-    validated_refetch_strategy_for_client_scalar_selectable_named,
 };
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
@@ -451,7 +449,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 >(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
     variable_context: &VariableContext,
@@ -465,7 +463,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
             let field_traversal_result = create_field_traversal_result(
                 db,
                 parent_object_entity,
-                validated_selections,
+                selection_set,
                 encountered_client_type_map,
                 variable_context,
             );
@@ -482,18 +480,18 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) -> FieldTraversalResult {
     let mut traversal_state = ScalarClientFieldTraversalState::new();
     let mut merged_selection_map = BTreeMap::new();
 
-    merge_validated_selections_into_selection_map(
+    merge_selection_set_into_selection_map(
         db,
         &mut merged_selection_map,
         parent_object_entity,
-        validated_selections,
+        selection_set,
         &mut traversal_state,
         encountered_client_type_map,
         variable_context,
@@ -520,8 +518,6 @@ pub fn imperative_field_subfields_or_inline_fragments(
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
         .iter()
-        // TODO don't clone
-        .cloned()
         .map(|variable_definition| ArgumentKeyAndValue {
             key: variable_definition.name.item.unchecked_conversion(),
             value: NonConstantValue::Variable(variable_definition.name.item),
@@ -536,19 +532,27 @@ pub fn imperative_field_subfields_or_inline_fragments(
     }
 }
 
-fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtocol>(
+fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
-    validated_selections: &WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>>,
+    selection_set: &WithSpan<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
 ) {
-    for validated_selection in validated_selections.item.selections.iter() {
-        match &validated_selection.item {
+    for selection in selection_set.item.selections.iter() {
+        let selectable = selectable_named(db, parent_object_entity.name, selection.item.name())
+            .as_ref()
+            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
+            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
+
+        match &selection.item {
             SelectionType::Scalar(scalar_field_selection) => {
-                match &scalar_field_selection.associated_data {
+                match selectable.as_scalar().expect(
+                    "Expected selectable to be a scalar. \
+                    This is indicative of a bug in Isograph.",
+                ) {
                     DefinitionLocation::Server(_) => {
                         merge_server_scalar_field(
                             scalar_field_selection,
@@ -558,10 +562,7 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             parent_object_entity.name,
                         );
                     }
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        newly_encountered_scalar_client_selectable_id,
-                    )) => {
+                    DefinitionLocation::Client(_) => {
                         merge_client_scalar_field(
                             db,
                             parent_map,
@@ -570,79 +571,53 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_type_map,
                             variable_context,
                             scalar_field_selection,
-                            parent_object_entity_name,
-                            newly_encountered_scalar_client_selectable_id,
+                            parent_object_entity.name,
+                            scalar_field_selection.name.item,
                         );
                     }
                 };
             }
             SelectionType::Object(object_selection) => {
-                let (parent_object_entity_name, selectable_name) =
-                    match object_selection.associated_data {
-                        DefinitionLocation::Server((
-                            parent_object_entity_name,
-                            server_object_selectable_name,
-                        )) => (parent_object_entity_name, server_object_selectable_name),
-                        DefinitionLocation::Client((
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )) => (parent_object_entity_name, client_object_selectable_name),
-                    };
-
-                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
-                    .clone() // TODO don't clone
-                    .expect("Expected selectable to be valid.")
-                    .expect(
-                        "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                    )
+                let object_selectable = selectable
                     .as_object()
                     .expect("Expected selectable to be object.");
 
-                let target_object_entity_name = match selectable {
-                    DefinitionLocation::Server(s) => {
-                        s.lookup(db).target_object_entity.inner().dereference()
-                    }
-                    DefinitionLocation::Client(c) => {
-                        c.lookup(db).target_object_entity_name.inner().dereference()
-                    }
-                };
+                match object_selectable {
+                    DefinitionLocation::Server(server_object_entity) => {
+                        let server_object_entity = server_object_entity.lookup(db);
+                        let target_object_entity_name = server_object_entity
+                            .target_object_entity
+                            .inner()
+                            .dereference();
 
-                let object_selection_parent_object_entity =
-                    &server_object_entity_named(db, target_object_entity_name)
-                        .as_ref()
-                        .expect(
-                            "Expected validation to have worked. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db);
+                        let object_selection_parent_object_entity =
+                            &server_object_entity_named(db, target_object_entity_name)
+                                .as_ref()
+                                .expect(
+                                    "Expected validation to have worked. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .as_ref()
+                                .expect(
+                                    "Expected entity to exist. \
+                                    This is indicative of a bug in Isograph.",
+                                )
+                                .lookup(db);
 
-                match object_selection.associated_data {
-                    DefinitionLocation::Client((
-                        parent_object_entity_name,
-                        newly_encountered_client_object_selectable_name,
-                    )) => {
-                        let newly_encountered_client_object_selectable =
-                            client_object_selectable_named(
-                                db,
-                                parent_object_entity_name,
-                                newly_encountered_client_object_selectable_name,
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected selectable to be valid. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected selectable to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                        merge_server_object_field(
+                            db,
+                            parent_map,
+                            merge_traversal_state,
+                            encountered_client_type_map,
+                            variable_context,
+                            object_selection,
+                            target_object_entity_name,
+                            object_selection_parent_object_entity,
+                            parent_object_entity.name,
+                            object_selection.name.item,
+                        );
+                    }
+                    DefinitionLocation::Client(client_object_selectable) => {
                         merge_client_object_field(
                             db,
                             parent_map,
@@ -651,8 +626,8 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             encountered_client_type_map,
                             variable_context,
                             object_selection,
-                            parent_object_entity_name,
-                            newly_encountered_client_object_selectable_name,
+                            parent_object_entity.name,
+                            object_selection.name.item,
                         );
 
                         insert_client_object_selectable_into_refetch_paths(
@@ -660,28 +635,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
                             parent_map,
                             encountered_client_type_map,
                             merge_traversal_state,
-                            newly_encountered_client_object_selectable_name,
-                            newly_encountered_client_object_selectable.lookup(db),
+                            object_selection.name.item,
+                            client_object_selectable.lookup(db),
                             object_selection,
                             variable_context,
-                        );
-                    }
-                    DefinitionLocation::Server((
-                        field_parent_object_entity_name,
-                        field_object_selectable_name,
-                    )) => {
-                        merge_server_object_field(
-                            db,
-                            parent_map,
-                            parent_object_entity,
-                            merge_traversal_state,
-                            encountered_client_type_map,
-                            variable_context,
-                            object_selection,
-                            target_object_entity_name,
-                            object_selection_parent_object_entity,
-                            field_parent_object_entity_name,
-                            field_object_selectable_name,
                         );
                     }
                 }
@@ -698,11 +655,10 @@ fn merge_validated_selections_into_selection_map<TNetworkProtocol: NetworkProtoc
 fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
     object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
     field_parent_object_entity_name: EntityName,
@@ -771,9 +727,8 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             )
                             .lookup(db);
 
-                    let reader_selection_set =
-                        inline_fragment_reader_selection_set(server_object_selectable);
-                    merge_validated_selections_into_selection_map(
+                    let reader_selection_set = inline_fragment_reader_selection_set();
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
@@ -782,7 +737,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         encountered_client_type_map,
                         variable_context,
                     );
-                    merge_validated_selections_into_selection_map(
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_inline_fragment.selection_map,
                         object_selection_parent_object_entity,
@@ -794,7 +749,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 
                     create_merged_selection_map_for_field_and_insert_into_global_map(
                         db,
-                        parent_object_entity,
+                        object_selection_parent_object_entity,
                         &object_selection.selection_set,
                         encountered_client_type_map,
                         (
@@ -826,36 +781,12 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             //
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
-                let (parent_object_entity_name, selectable_name) =
-                    match object_selection.associated_data {
-                        DefinitionLocation::Server((
-                            parent_object_entity_name,
-                            server_object_selectable_name,
-                        )) => (parent_object_entity_name, server_object_selectable_name),
-                        DefinitionLocation::Client((
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )) => (parent_object_entity_name, client_object_selectable_name),
-                    };
+                let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
 
-                let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
-                    .clone() // TODO don't clone
-                    .expect("Expected selectable to be valid.")
-                    .expect(
-                        "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .as_object()
-                    .expect("Expected selectable to be object.");
-
-                let concrete_object_entity_name = match selectable {
-                    DefinitionLocation::Server(s) => {
-                        s.lookup(db).target_object_entity.inner().dereference()
-                    }
-                    DefinitionLocation::Client(o) => {
-                        o.lookup(db).target_object_entity_name.inner().dereference()
-                    }
-                };
+                let concrete_object_entity_name = server_object_selectable
+                    .target_object_entity
+                    .inner()
+                    .dereference();
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -869,7 +800,6 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     )
                     .lookup(db)
-                    .note_todo("We are looking up the same object for no reason")
                     .is_concrete;
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
@@ -892,7 +822,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             });
             match linked_field {
                 MergedServerSelection::LinkedField(existing_linked_field) => {
-                    merge_validated_selections_into_selection_map(
+                    merge_selection_set_into_selection_map(
                         db,
                         &mut existing_linked_field.selection_map,
                         object_selection_parent_object,
@@ -923,7 +853,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
     newly_encountered_client_object_selectable_name: SelectableName,
 ) {
@@ -993,14 +923,14 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
-    scalar_field_selection: &ValidatedScalarSelection,
-    parent_object_entity_name: &EntityName,
-    newly_encountered_scalar_client_selectable_name: &SelectableName,
+    scalar_field_selection: &ScalarSelection,
+    parent_object_entity_name: EntityName,
+    newly_encountered_scalar_client_selectable_name: SelectableName,
 ) {
     let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
         db,
-        *parent_object_entity_name,
-        *newly_encountered_scalar_client_selectable_name,
+        parent_object_entity_name,
+        newly_encountered_scalar_client_selectable_name,
     )
     .as_ref()
     .expect(
@@ -1029,8 +959,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 .expect("Expected selection set to be valid."),
                 encountered_client_type_map,
                 (
-                    *parent_object_entity_name,
-                    *newly_encountered_scalar_client_selectable_name,
+                    parent_object_entity_name,
+                    newly_encountered_scalar_client_selectable_name,
                 )
                     .scalar_selected()
                     .client_defined(),
@@ -1042,8 +972,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
             let state = encountered_client_type_map
                 .get_mut(
                     &(
-                        *parent_object_entity_name,
-                        *newly_encountered_scalar_client_selectable_name,
+                        parent_object_entity_name,
+                        newly_encountered_scalar_client_selectable_name,
                     )
                         .scalar_selected()
                         .client_defined(),
@@ -1059,9 +989,9 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 db,
                 encountered_client_type_map,
                 merge_traversal_state,
-                *newly_encountered_scalar_client_selectable_name,
+                newly_encountered_scalar_client_selectable_name,
                 newly_encountered_scalar_client_selectable,
-                *parent_object_entity_name,
+                parent_object_entity_name,
                 parent_object_entity,
                 variant,
             );
@@ -1075,8 +1005,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                     parent_map,
                     merge_traversal_state,
                     (
-                        *parent_object_entity_name,
-                        *newly_encountered_scalar_client_selectable_name,
+                        parent_object_entity_name,
+                        newly_encountered_scalar_client_selectable_name,
                     )
                         .scalar_selected(),
                     newly_encountered_scalar_client_selectable.scalar_selected(),
@@ -1092,8 +1022,8 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
         .accessible_client_scalar_selectables
         .insert(
             (
-                *parent_object_entity_name,
-                *newly_encountered_scalar_client_selectable_name,
+                parent_object_entity_name,
+                newly_encountered_scalar_client_selectable_name,
             )
                 .scalar_selected(),
         );
@@ -1147,7 +1077,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let empty_selection_set = SelectionSet { selections: vec![] }.with_generated_span();
 
-    let validated_refetch_strategy = validated_refetch_strategy_for_client_scalar_selectable_named(
+    let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
         newly_encountered_client_scalar_selectable.parent_object_entity_name,
         newly_encountered_client_scalar_selectable.name.item,
@@ -1167,7 +1097,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         parent_object_entity,
-        validated_refetch_strategy
+        refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
         encountered_client_type_map,
@@ -1189,7 +1119,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_object_selectable_name: SelectableName,
     newly_encountered_client_object_selectable: &ClientObjectSelectable<TNetworkProtocol>,
-    object_selection: &ValidatedObjectSelection,
+    object_selection: &ObjectSelection,
     variable_context: &VariableContext,
 ) {
     let target_server_object_entity_name = *newly_encountered_client_object_selectable
@@ -1332,7 +1262,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
 
     match client_object_selectable {
         MergedServerSelection::ClientObjectSelectable(existing_client_object_selectable) => {
-            merge_validated_selections_into_selection_map(
+            merge_selection_set_into_selection_map(
                 db,
                 &mut existing_client_object_selectable.selection_map,
                 target_server_object_entity,
@@ -1365,12 +1295,13 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     parent_variable_context: &VariableContext,
     selection_arguments: &[WithLocation<SelectionFieldArgument>],
 ) {
-    let validated_selections = selectable_validated_reader_selection_set(
+    let selections = selectable_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
         newly_encountered_client_type.name(),
     )
-    .expect("Expected selections to be valid.");
+    .expect("Expected selections to be valid.")
+    .lookup(db);
 
     // Here, we are doing a bunch of work, just so that we can have the refetched paths,
     // which is really really silly.
@@ -1381,7 +1312,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     } = create_merged_selection_map_for_field_and_insert_into_global_map(
         db,
         parent_object_entity,
-        &validated_selections,
+        selections,
         encountered_client_type_map,
         newly_encountered_client_type_id.client_defined(),
         &initial_variable_context(&newly_encountered_client_type),
@@ -1404,7 +1335,7 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn merge_server_scalar_field(
-    scalar_field_selection: &ValidatedScalarSelection,
+    scalar_field_selection: &ScalarSelection,
     parent_map: &mut MergedSelectionMap,
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
@@ -1615,30 +1546,17 @@ pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
     }]
 }
 
-pub fn inline_fragment_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
-    server_object_selectable: &ServerObjectSelectable<TNetworkProtocol>,
-) -> WithSpan<SelectionSet<ScalarSelectableId, ObjectSelectableId>> {
-    let typename_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+pub fn inline_fragment_reader_selection_set() -> WithSpan<SelectionSet> {
+    let typename_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        // What is this for???
-        associated_data: (
-            server_object_selectable.parent_object_entity_name,
-            *TYPENAME_FIELD_NAME,
-        )
-            .server_defined(),
         name: (*TYPENAME_FIELD_NAME).with_generated_location(),
         reader_alias: None,
     })
     .with_generated_span();
 
-    let link_selection = SelectionTypeContainingSelections::Scalar(ScalarSelection {
+    let link_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
-        associated_data: (
-            server_object_selectable.parent_object_entity_name,
-            *LINK_FIELD_NAME,
-        )
-            .client_defined(),
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         name: WithLocation::new_generated(*LINK_FIELD_NAME),
         reader_alias: None,
