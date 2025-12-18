@@ -1,8 +1,8 @@
-use std::{fmt, ops::Deref};
+use std::ops::Deref;
 
 use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
-use super::{GraphQLConstantValue, write_arguments, write_directives};
+use super::GraphQLConstantValue;
 use common_lang_types::{
     DescriptionValue, DirectiveName, EntityName, EnumLiteralValue, InputTypeName, InputValueName,
     SelectableName, WithEmbeddedLocation,
@@ -258,19 +258,6 @@ pub struct GraphQLFieldDefinition {
     pub is_inline_fragment: bool,
 }
 
-impl fmt::Display for GraphQLFieldDefinition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.name.item)?;
-        write_arguments(
-            f,
-            &self.arguments.iter().map(|x| &x.item).collect::<Vec<_>>(),
-        )?;
-        write!(f, ": {}", self.type_)?;
-        write_directives(f, &self.directives)?;
-        Ok(())
-    }
-}
-
 /// This is an argument definition, but we're using the GraphQL spec lingo here.
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct GraphQLInputValueDefinition {
@@ -281,19 +268,6 @@ pub struct GraphQLInputValueDefinition {
     // except inasmuch as it means that the type is nullable.
     pub default_value: Option<WithEmbeddedLocation<GraphQLConstantValue>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-}
-
-impl fmt::Display for GraphQLInputValueDefinition {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}: {}", self.name.item, self.type_)?;
-        if let Some(v) = &self.default_value {
-            write!(f, " = {}", v.item)?;
-        }
-
-        write_directives(f, &self.directives)?;
-
-        Ok(())
-    }
 }
 
 #[derive(Debug)]

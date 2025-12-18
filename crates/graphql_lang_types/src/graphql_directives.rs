@@ -1,6 +1,6 @@
-use std::{collections::HashSet, fmt};
+use std::collections::HashSet;
 
-use super::{NameValuePair, write::write_arguments};
+use super::NameValuePair;
 use crate::GraphQLConstantValue;
 use common_lang_types::{
     DeserializationError, Diagnostic, DirectiveArgumentName, DirectiveName, Location,
@@ -18,14 +18,6 @@ use serde::{
 pub struct GraphQLDirective<T> {
     pub name: WithEmbeddedLocation<DirectiveName>,
     pub arguments: Vec<NameValuePair<DirectiveArgumentName, T>>,
-}
-
-impl<T: fmt::Display> fmt::Display for GraphQLDirective<T> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "@{}", self.name)?;
-        write_arguments(f, &self.arguments)?;
-        Ok(())
-    }
 }
 
 pub fn from_graphql_directives<'a, T: Deserialize<'a>>(
