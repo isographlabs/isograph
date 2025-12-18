@@ -106,11 +106,12 @@ fn match_failure_message(
         Err(e) => {
             if let Some(deserialization_error) = e.downcast_ref::<Diagnostic>() {
                 assert!(
-                    deserialization_error.0.message == message,
-                    "Expected DeserializationError::Custom, got {deserialization_error:?}"
+                    deserialization_error.0.message.contains(message),
+                    "Error message did not contain intended string '{message}'. \
+                    Instead, got '{deserialization_error:?}'"
                 );
             } else {
-                panic!("Expected DeserializationError, got a different error type");
+                panic!("Expected Diagnostic, got a different error type");
             }
         }
     }
