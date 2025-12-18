@@ -3,7 +3,7 @@ use std::fmt::Display;
 use prelude::Postfix;
 use serde::{Deserialize, Serialize, de};
 
-use crate::{Location, ParentObjectEntityNameAndSelectableName};
+use crate::{Location, LocationFreeDiagnostic, ParentObjectEntityNameAndSelectableName};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diagnostic(pub Box<DiagnosticData>);
@@ -25,17 +25,6 @@ impl Diagnostic {
         Diagnostic(
             DiagnosticData {
                 message,
-                location,
-                code_actions: vec![],
-            }
-            .boxed(),
-        )
-    }
-
-    pub fn from_error(e: impl std::error::Error, location: Option<Location>) -> Diagnostic {
-        Diagnostic(
-            DiagnosticData {
-                message: e.to_string(),
                 location,
                 code_actions: vec![],
             }
@@ -115,4 +104,17 @@ impl<T> WithNonFatalDiagnostics<T> {
 pub enum IsographCodeAction {
     CreateNewScalarSelectable(ParentObjectEntityNameAndSelectableName),
     CreateNewObjectSelectable(ParentObjectEntityNameAndSelectableName),
+}
+
+impl From<LocationFreeDiagnostic> for Diagnostic {
+    fn from(value: LocationFreeDiagnostic) -> Self {
+        Self(
+            DiagnosticData {
+                message: value.to_string(),
+                location: None,
+                code_actions: vec![],
+            }
+            .boxed(),
+        )
+    }
 }

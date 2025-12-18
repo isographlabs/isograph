@@ -1,7 +1,10 @@
-use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
+use common_lang_types::{
+    CurrentWorkingDirectory, LocationFreeDiagnostic, LocationFreeDiagnosticVecResult,
+};
 use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use lsp_server::Connection;
+use prelude::Postfix;
 
 mod code_action;
 mod commands;
@@ -25,13 +28,13 @@ mod uri_file_path_ext;
 pub async fn start_language_server<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticVecResult<()> {
+) -> LocationFreeDiagnosticVecResult<()> {
     eprintln!("Starting language server");
     let (connection, io_handles) = Connection::stdio();
-    let params = server::initialize(&connection)?;
+    let params = server::initialize(&connection).map_err(|e| e.wrap_vec())?;
     server::run::<TNetworkProtocol>(connection, config, params, current_working_directory).await?;
     io_handles
         .join()
-        .map_err(|e| Diagnostic::from_error(e, None))?;
+        .map_err(|e| LocationFreeDiagnostic::from_error(e).wrap_vec())?;
     Ok(())
 }

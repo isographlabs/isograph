@@ -5,7 +5,7 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, DiagnosticResult, RelativePathToSourceFile,
+    CurrentWorkingDirectory, LocationFreeDiagnosticResult, RelativePathToSourceFile,
     relative_path_from_absolute_and_working_directory,
 };
 use isograph_config::ISOGRAPH_FOLDER;
@@ -16,7 +16,7 @@ use crate::write_artifacts::unable_to_do_something_at_path_diagnostic;
 pub fn read_files_in_folder(
     folder: &Path,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticResult<Vec<(RelativePathToSourceFile, String)>> {
+) -> LocationFreeDiagnosticResult<Vec<(RelativePathToSourceFile, String)>> {
     read_dir_recursive(folder)?
         .into_iter()
         .filter(|p| {
@@ -39,7 +39,7 @@ pub fn read_files_in_folder(
 pub fn read_file(
     path: PathBuf,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticResult<(RelativePathToSourceFile, String)> {
+) -> LocationFreeDiagnosticResult<(RelativePathToSourceFile, String)> {
     // N.B. we have previously ensured that path is a file
     let contents = std::fs::read(&path).map_err(|e| {
         unable_to_do_something_at_path_diagnostic(&path, &e.to_string(), "read file")
@@ -57,7 +57,7 @@ pub fn read_file(
     (relative_path, contents).wrap_ok()
 }
 
-fn read_dir_recursive(root_js_path: &Path) -> DiagnosticResult<Vec<PathBuf>> {
+fn read_dir_recursive(root_js_path: &Path) -> LocationFreeDiagnosticResult<Vec<PathBuf>> {
     let mut paths = vec![];
 
     visit_dirs_skipping_isograph(root_js_path, &mut |dir_entry| {

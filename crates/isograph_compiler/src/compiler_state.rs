@@ -1,6 +1,6 @@
 use std::time::{Duration, Instant};
 
-use common_lang_types::{CurrentWorkingDirectory, Diagnostic};
+use common_lang_types::{CurrentWorkingDirectory, LocationFreeDiagnosticResult};
 use isograph_config::CompilerConfig;
 use isograph_schema::{IsographDatabase, NetworkProtocol};
 use pico::Database;
@@ -23,7 +23,7 @@ impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
     pub fn new(
         config: CompilerConfig,
         current_working_directory: CurrentWorkingDirectory,
-    ) -> Result<Self, Diagnostic> {
+    ) -> LocationFreeDiagnosticResult<Self> {
         let mut db = IsographDatabase::default();
         db.set(current_working_directory);
         db.set(config);

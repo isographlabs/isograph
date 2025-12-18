@@ -785,7 +785,7 @@ fn parse_field(
                 directives,
                 is_inline_fragment: false,
             }
-            .wrap_ok()
+            .wrap_ok::<Diagnostic>()
         })?
         .wrap_ok()
 }

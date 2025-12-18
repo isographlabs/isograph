@@ -137,7 +137,7 @@ fn parse_iso_entrypoint_declaration(
             entrypoint_directive_set,
             semantic_tokens: tokens.semantic_tokens(),
         }
-        .wrap_ok()
+        .wrap_ok::<Diagnostic>()
     })?;
 
     if let Some(span) = tokens.remaining_token_span() {
@@ -532,7 +532,7 @@ fn parse_directives(
             }
 
             if directives.is_empty() {
-                None.wrap_ok()
+                None.wrap_ok::<Diagnostic>()
             } else {
                 directives.wrap_some().wrap_ok()
             }
@@ -753,7 +753,7 @@ fn parse_variable_definition(
                 type_,
                 default_value,
             }
-            .wrap_ok()
+            .wrap_ok::<Diagnostic>()
         })?
         .wrap_ok()
 }

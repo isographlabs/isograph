@@ -7,7 +7,7 @@ use crate::{
 };
 use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, DiagnosticVecResult};
+use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_config::CompilerConfig;
 use isograph_schema::NetworkProtocol;
 use prelude::Postfix;
@@ -24,21 +24,25 @@ pub struct CompilationStats {
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticVecResult<()> {
+) -> Result<(), ()> {
     info!("{}", "Starting to compile.".cyan());
-    let mut state = CompilerState::new(config, current_working_directory)?;
+    let mut state = match CompilerState::new(config, current_working_directory) {
+        Ok(s) => s,
+        Err(e) => {
+            error!("{}", e);
+            return ().wrap_err();
+        }
+    };
     print_result(WithDuration::new(|| {
         compile::<TNetworkProtocol>(&mut state)
     }))
 }
 
-pub fn print_result(
-    result: WithDuration<DiagnosticVecResult<CompilationStats>>,
-) -> DiagnosticVecResult<()> {
+pub fn print_result(result: WithDuration<DiagnosticVecResult<CompilationStats>>) -> Result<(), ()> {
     match result.item {
         Ok(stats) => {
             print_stats(result.elapsed_time, stats);
-            Ok(())
+            ().wrap_ok()
         }
         Err(err) => {
             error!(
@@ -55,7 +59,7 @@ pub fn print_result(
                 )
                 .bright_red()
             );
-            Err(err)
+            ().wrap_err()
         }
     }
 }
@@ -98,8 +102,8 @@ pub fn compile<TNetworkProtocol: NetworkProtocol>(
         &mut state.file_system_state,
     );
 
-    let total_artifacts_written =
-        apply_file_system_operations(&file_system_operations, &artifacts)?;
+    let total_artifacts_written = apply_file_system_operations(&file_system_operations, &artifacts)
+        .map_err(Diagnostic::from)?;
 
     CompilationStats {
         client_field_count: stats.client_field_count,

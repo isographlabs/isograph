@@ -4,8 +4,9 @@ use std::{
 };
 
 use common_lang_types::{
-    AbsolutePathAndRelativePath, Diagnostic, DiagnosticResult, DiagnosticVecResult,
-    RelativePathToSourceFile, TextSource, relative_path_from_absolute_and_working_directory,
+    AbsolutePathAndRelativePath, LocationFreeDiagnostic, LocationFreeDiagnosticResult,
+    LocationFreeDiagnosticVecResult, RelativePathToSourceFile, TextSource,
+    relative_path_from_absolute_and_working_directory,
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
@@ -21,7 +22,7 @@ use crate::{
 
 pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
     let schema_extension_sources = read_schema_extensions(db)?;
@@ -35,7 +36,7 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
 pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     changes: &[SourceFileEvent],
-) -> DiagnosticVecResult<()> {
+) -> LocationFreeDiagnosticVecResult<()> {
     let errors = changes
         .iter()
         .filter_map(|(event, change_kind)| match change_kind {
@@ -58,7 +59,7 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
     match event_kind {
         SourceEventKind::CreateOrModify(_) => {
@@ -85,7 +86,7 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_schema_extension(db, path)?;
@@ -120,7 +121,7 @@ fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
 fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     let absolute_and_relative =
         absolute_and_relative_paths(db.get_current_working_directory(), path.to_path_buf());
     let schema_id = read_schema(db, &absolute_and_relative)?;
@@ -134,7 +135,7 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(path) => {
             create_or_update_iso_literals(db, path)?;
@@ -162,7 +163,7 @@ fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
 fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     path: &Path,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     let (relative_path, content) =
         // TODO this function should live here
         read_file(path.to_path_buf(), db.get_current_working_directory())?;
@@ -173,7 +174,7 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
 fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     event_kind: &SourceEventKind,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
         SourceEventKind::CreateOrModify(folder) => {
             read_iso_literals_from_folder(db, folder)?;
@@ -205,7 +206,7 @@ fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
 fn read_schema<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     schema_path: &AbsolutePathAndRelativePath,
-) -> DiagnosticResult<SourceId<SchemaSource>> {
+) -> LocationFreeDiagnosticResult<SourceId<SchemaSource>> {
     let content = read_schema_file(&schema_path.absolute_path)?;
     let text_source = TextSource {
         relative_path_to_source_file: schema_path.relative_path,
@@ -220,7 +221,7 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn read_schema_file(path: &PathBuf) -> DiagnosticResult<String> {
+fn read_schema_file(path: &PathBuf) -> LocationFreeDiagnosticResult<String> {
     let current_dir = std::env::current_dir().expect("current_dir should exist");
     let joined = current_dir.join(path);
     let canonicalized_existing_path = joined.canonicalize().map_err(|e| {
@@ -232,13 +233,11 @@ fn read_schema_file(path: &PathBuf) -> DiagnosticResult<String> {
     })?;
 
     if !canonicalized_existing_path.is_file() {
-        return Diagnostic::new(
-            format!(
-                "Attempted to load the schema at the following path: \
-                {canonicalized_existing_path:?}, but that is not a file."
-            ),
-            None,
+        return format!(
+            "Attempted to load the schema at the following path: \
+            {canonicalized_existing_path:?}, but that is not a file."
         )
+        .to::<LocationFreeDiagnostic>()
         .wrap_err();
     }
 
@@ -260,7 +259,7 @@ fn read_schema_file(path: &PathBuf) -> DiagnosticResult<String> {
 
 fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>> {
+) -> LocationFreeDiagnosticResult<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>> {
     let config_schema_extensions = db.get_isograph_config().schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
     for schema_extension_path in config_schema_extensions.iter() {
@@ -272,7 +271,7 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
 
 fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     let project_root = db.get_isograph_config().project_root.clone();
     read_iso_literals_from_folder(db, &project_root)
 }
@@ -280,7 +279,7 @@ fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
 fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db: &mut IsographDatabase<TNetworkProtocol>,
     folder: &Path,
-) -> DiagnosticResult<()> {
+) -> LocationFreeDiagnosticResult<()> {
     for (relative_path, content) in
         // TODO this function should live here
         read_files_in_folder(folder, db.get_current_working_directory())?
@@ -290,9 +289,8 @@ fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn schema_not_found_diagnostic() -> Diagnostic {
-    Diagnostic::new(
-        "Schema not found. Cannot proceed without a schema".to_string(),
-        None,
-    )
+fn schema_not_found_diagnostic() -> LocationFreeDiagnostic {
+    "Schema not found. Cannot proceed without a schema"
+        .to_string()
+        .into()
 }

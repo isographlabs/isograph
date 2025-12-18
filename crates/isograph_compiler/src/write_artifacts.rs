@@ -4,7 +4,8 @@ use std::{
 };
 
 use common_lang_types::{
-    ArtifactPathAndContent, Diagnostic, DiagnosticResult, FileSystemOperation,
+    ArtifactPathAndContent, FileSystemOperation, LocationFreeDiagnostic,
+    LocationFreeDiagnosticResult,
 };
 
 use artifact_content::FileSystemState;
@@ -33,7 +34,7 @@ pub(crate) fn get_file_system_operations(
 pub(crate) fn apply_file_system_operations(
     operations: &[FileSystemOperation],
     artifacts: &[ArtifactPathAndContent],
-) -> DiagnosticResult<usize> {
+) -> LocationFreeDiagnosticResult<usize> {
     let mut count = 0;
 
     for operation in operations {
@@ -88,12 +89,10 @@ pub fn unable_to_do_something_at_path_diagnostic(
     path: &PathBuf,
     message: &str,
     what: &str,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!(
-            "Unable to {what} at path {path:?}. \
-            \nReason: {message}"
-        ),
-        None,
+) -> LocationFreeDiagnostic {
+    format!(
+        "Unable to {what} at path {path:?}. \
+        \nReason: {message}"
     )
+    .into()
 }

@@ -81,7 +81,7 @@ async fn start_language_server(
         // TODO use eprintln once we figure out how to make clippy not complain
         error!("Error(s) encountered when running language server.");
         for err in e {
-            error!("\n{:?}", err);
+            error!("\n{}", err);
         }
 
         std::process::exit(1);

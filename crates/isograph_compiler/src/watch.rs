@@ -1,5 +1,7 @@
 use colored::Colorize;
-use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
+use common_lang_types::{
+    CurrentWorkingDirectory, LocationFreeDiagnostic, LocationFreeDiagnosticVecResult,
+};
 use isograph_config::{CompilerConfig, create_config};
 use isograph_schema::NetworkProtocol;
 use notify::{
@@ -24,8 +26,9 @@ use crate::{
 pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticVecResult<()> {
-    let mut state = CompilerState::new(config, current_working_directory)?;
+) -> LocationFreeDiagnosticVecResult<()> {
+    let mut state =
+        CompilerState::new(config, current_working_directory).map_err(|e| e.wrap_vec())?;
 
     let config = state.db.get_isograph_config().clone();
 
@@ -45,7 +48,8 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                         "Config change detected. Starting a full compilation.".cyan()
                     );
                     let config = create_config(&config.config_location, current_working_directory);
-                    state = CompilerState::new(config.clone(), current_working_directory)?;
+                    state = CompilerState::new(config.clone(), current_working_directory)
+                        .map_err(|e| e.wrap_vec())?;
                     file_system_watcher.stop();
                     // TODO is this a bug? Will we continue to watch the old folders? I think so.
                     (file_system_receiver, file_system_watcher) =
@@ -61,7 +65,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
             Err(errors) => {
                 return errors
                     .into_iter()
-                    .map(|e| Diagnostic::from_error(e, None))
+                    .map(|x| x.to_string().to::<LocationFreeDiagnostic>())
                     .collect::<Vec<_>>()
                     .wrap_err();
             }

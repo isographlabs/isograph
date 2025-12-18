@@ -19,7 +19,8 @@ use crate::{
     },
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult,
+    CurrentWorkingDirectory, LocationFreeDiagnostic, LocationFreeDiagnosticResult,
+    LocationFreeDiagnosticVecResult,
 };
 use isograph_compiler::{
     CompilerState, WithDuration, update_sources,
@@ -50,7 +51,7 @@ use tokio::time::{Instant, sleep};
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
 /// handshake.
-pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams> {
+pub fn initialize(connection: &Connection) -> LocationFreeDiagnosticResult<InitializeParams> {
     let server_capabilities = ServerCapabilities {
         // Enable text document syncing so we can know when files are opened/changed/saved/closed
         text_document_sync: TextDocumentSyncCapability::Kind(TextDocumentSyncKind::FULL)
@@ -82,13 +83,13 @@ pub fn initialize(connection: &Connection) -> DiagnosticResult<InitializeParams>
         ..Default::default()
     };
     let server_capabilities =
-        serde_json::to_value(server_capabilities).map_err(|e| Diagnostic::from_error(e, None))?;
+        serde_json::to_value(server_capabilities).map_err(LocationFreeDiagnostic::from_error)?;
     let params = connection
         .initialize(server_capabilities)
-        .map_err(|e| Diagnostic::from_error(e, None))?;
+        .map_err(LocationFreeDiagnostic::from_error)?;
 
     serde_json::from_value::<InitializeParams>(params)
-        .map_err(|e| Diagnostic::from_error(e, None))?
+        .map_err(LocationFreeDiagnostic::from_error)?
         .wrap_ok()
 }
 
@@ -101,14 +102,14 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     _params: InitializeParams,
     current_working_directory: CurrentWorkingDirectory,
-) -> DiagnosticVecResult<()> {
+) -> LocationFreeDiagnosticVecResult<()> {
     let config_location = config.config_location.clone();
 
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
 
     let compiler_state: CompilerState<TNetworkProtocol> =
-        CompilerState::new(config, current_working_directory)?;
+        CompilerState::new(config, current_working_directory).map_err(|e| e.wrap_vec())?;
     let mut lsp_state = LspState::new(compiler_state, &connection.sender);
 
     #[allow(clippy::mutable_key_type)]
@@ -168,7 +169,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
                         // TODO is this a bug? Will we continue to watch the old folders? I think so.
                         (file_system_receiver, file_system_watcher) =
                             create_debounced_file_watcher(&config);
-                        let compiler_state = CompilerState::new(config, current_working_directory)?;
+                        let compiler_state = CompilerState::new(config, current_working_directory).map_err(|e| e.wrap_vec())?;
                         lsp_state = LspState::new(compiler_state, &connection.sender);
 
                         // TODO this is a temporary expedient. We need a good way to copy the old DB state to the
