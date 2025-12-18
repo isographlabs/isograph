@@ -15,10 +15,6 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - name: Debug - Print secret values
-        run: |
-          echo "open-vsx-token: $(echo -n '${{ secrets.open-vsx-token }}' | base64)"
-          echo "vs-marketplace-token: $(echo -n '${{ secrets.vs-marketplace-token }}' | base64)"
       - run: npm ci
         working-directory: vscode-extension
       - name: Publish to Open VSX Registry
