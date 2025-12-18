@@ -283,7 +283,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let parent_object_entity_name = client_pointer_declaration.parent_type.item.0;
     let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
-    if let Some(directive) = client_pointer_declaration.directives.first() {
+    if let Some(directive) = client_pointer_declaration.directives.item.first() {
         let directive_name = directive.item.name.item;
         return Diagnostic::new(
             format!("Directive `@{directive_name}` is not supported on client pointers."),

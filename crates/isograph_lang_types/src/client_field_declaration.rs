@@ -46,7 +46,7 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
     pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
-    pub directives: Vec<WithEmbeddedLocation<IsographFieldDirective>>,
+    pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]

@@ -521,27 +521,39 @@ fn parse_optional_alias_and_field_name(
 
 fn parse_directives(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithEmbeddedLocation<IsographFieldDirective>>> {
-    let mut directives = vec![];
-    while let Ok(token) = tokens.parse_token_of_kind(
-        IsographLangTokenKind::At,
-        semantic_token_legend::ST_DIRECTIVE_AT,
-    ) {
-        let name = tokens.parse_string_key_type(
-            IsographLangTokenKind::Identifier,
-            semantic_token_legend::ST_DIRECTIVE,
-        )?;
-        let directive_span = Span::join(token.span, name.span);
+) -> DiagnosticResult<WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>> {
+    tokens
+        .with_span_optional_result(|tokens| {
+            let mut directives = vec![];
+            while let Ok(token) = tokens.parse_token_of_kind(
+                IsographLangTokenKind::At,
+                semantic_token_legend::ST_DIRECTIVE_AT,
+            ) {
+                let name = tokens.parse_string_key_type(
+                    IsographLangTokenKind::Identifier,
+                    semantic_token_legend::ST_DIRECTIVE,
+                )?;
+                let directive_span = Span::join(token.span, name.span);
 
-        let arguments = parse_optional_arguments(tokens)?;
+                let arguments = parse_optional_arguments(tokens)?;
 
-        directives.push(
-            IsographFieldDirective { name, arguments }
-                .with_span(directive_span)
-                .to_with_embedded_location(tokens.text_source),
-        );
-    }
-    Ok(directives)
+                directives.push(
+                    IsographFieldDirective { name, arguments }
+                        .with_span(directive_span)
+                        .to_with_embedded_location(tokens.text_source),
+                );
+            }
+
+            if directives.is_empty() {
+                None.wrap_ok()
+            } else {
+                directives.wrap_some().wrap_ok()
+            }
+        })?
+        .unwrap_or_else(|| vec![].with_generated_span())
+        .note_todo("What are we doing here?")
+        .to_with_embedded_location(tokens.text_source)
+        .wrap_ok()
 }
 
 fn parse_optional_arguments(

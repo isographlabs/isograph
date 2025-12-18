@@ -1,6 +1,6 @@
 use common_lang_types::{
-    DeserializationError, Diagnostic, IsographDirectiveName, WithEmbeddedLocation, WithLocation,
-    WithSpan,
+    DeserializationError, Diagnostic, IsographDirectiveName, Location, WithEmbeddedLocation,
+    WithLocation, WithSpan,
 };
 use intern::Lookup;
 use prelude::Postfix;
@@ -18,10 +18,16 @@ pub struct IsographFieldDirective {
 }
 
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
-    directives: &'a [WithEmbeddedLocation<IsographFieldDirective>],
+    directives: &'a WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
 ) -> Result<T, Diagnostic> {
-    T::deserialize(IsographFieldDirectivesDeserializer { directives }).map_err(|e| {
-        Diagnostic::new(e.to_string(), None).note_todo("Provide a location of the directives")
+    T::deserialize(IsographFieldDirectivesDeserializer {
+        directives: &directives.item,
+    })
+    .map_err(|e| {
+        Diagnostic::new(
+            e.to_string(),
+            directives.location.to::<Location>().wrap_some(),
+        )
     })
 }
 
