@@ -1,5 +1,6 @@
 use common_lang_types::{
-    DeserializationError, Diagnostic, IsographDirectiveName, WithLocation, WithSpan,
+    DeserializationError, Diagnostic, IsographDirectiveName, WithEmbeddedLocation, WithLocation,
+    WithSpan,
 };
 use intern::Lookup;
 use prelude::Postfix;
@@ -17,7 +18,7 @@ pub struct IsographFieldDirective {
 }
 
 pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
-    directives: &'a [WithSpan<IsographFieldDirective>],
+    directives: &'a [WithEmbeddedLocation<IsographFieldDirective>],
 ) -> Result<T, Diagnostic> {
     T::deserialize(IsographFieldDirectivesDeserializer { directives }).map_err(|e| {
         Diagnostic::new(e.to_string(), None).note_todo("Provide a location of the directives")
@@ -177,7 +178,7 @@ impl<'de> Deserializer<'de> for NonConstantValueDeserializer<'de> {
 
 #[derive(Debug)]
 struct IsographFieldDirectivesDeserializer<'a> {
-    directives: &'a [WithSpan<IsographFieldDirective>],
+    directives: &'a [WithEmbeddedLocation<IsographFieldDirective>],
 }
 
 impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
@@ -209,12 +210,12 @@ impl<'de> Deserializer<'de> for IsographFieldDirectivesDeserializer<'de> {
 }
 
 struct IsographFieldDirectiveVecDeserializer<'a> {
-    directives: &'a [WithSpan<IsographFieldDirective>],
+    directives: &'a [WithEmbeddedLocation<IsographFieldDirective>],
     field_index: usize,
 }
 
 impl<'a> IsographFieldDirectiveVecDeserializer<'a> {
-    pub fn new(directives: &'a [WithSpan<IsographFieldDirective>]) -> Self {
+    pub fn new(directives: &'a [WithEmbeddedLocation<IsographFieldDirective>]) -> Self {
         Self {
             field_index: 0,
             directives,

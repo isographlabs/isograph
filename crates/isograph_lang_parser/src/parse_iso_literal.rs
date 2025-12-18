@@ -521,7 +521,7 @@ fn parse_optional_alias_and_field_name(
 
 fn parse_directives(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithSpan<IsographFieldDirective>>> {
+) -> DiagnosticResult<Vec<WithEmbeddedLocation<IsographFieldDirective>>> {
     let mut directives = vec![];
     while let Ok(token) = tokens.parse_token_of_kind(
         IsographLangTokenKind::At,
@@ -535,7 +535,11 @@ fn parse_directives(
 
         let arguments = parse_optional_arguments(tokens)?;
 
-        directives.push(IsographFieldDirective { name, arguments }.with_span(directive_span));
+        directives.push(
+            IsographFieldDirective { name, arguments }
+                .with_span(directive_span)
+                .to_with_embedded_location(tokens.text_source),
+        );
     }
     Ok(directives)
 }

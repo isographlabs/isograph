@@ -39,14 +39,14 @@ pub type ClientFieldDeclarationPath<'a> = PositionResolutionPath<&'a ClientField
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
 #[resolve_position(parent_type=(), resolved_node=IsographResolvedNode<'a>)]
 pub struct ClientPointerDeclaration {
-    pub directives: Vec<WithSpan<IsographFieldDirective>>,
     pub const_export_name: ConstExportName,
     #[resolve_field]
     pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
-    pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
-    #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
+    #[resolve_field]
+    pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
+    pub directives: Vec<WithEmbeddedLocation<IsographFieldDirective>>,
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
