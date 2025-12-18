@@ -4,8 +4,7 @@ use prelude::Postfix;
 use std::{error::Error, fmt, path::PathBuf};
 
 use crate::{
-    CurrentWorkingDirectory, RelativePathToSourceFile, Span, WithSpan,
-    text_with_carats::text_with_carats,
+    CurrentWorkingDirectory, RelativePathToSourceFile, Span, text_with_carats::text_with_carats,
 };
 
 /// A source, which consists of a filename, and an optional span
@@ -121,13 +120,6 @@ impl Location {
         Location::Embedded(EmbeddedLocation::new(text_source, span))
     }
 
-    pub fn span(self) -> Option<Span> {
-        match self {
-            Location::Embedded(embedded) => embedded.span.wrap_some(),
-            Location::Generated => None,
-        }
-    }
-
     pub fn as_embedded_location(self) -> Option<EmbeddedLocation> {
         match self {
             Location::Embedded(embedded_location) => embedded_location.wrap_some(),
@@ -198,37 +190,6 @@ impl<T: Error> Error for WithLocationForDisplay<'_, T> {
 impl<T> WithLocation<T> {
     pub fn new(item: T, location: Location) -> Self {
         WithLocation { item, location }
-    }
-
-    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithLocation<U> {
-        WithLocation::new(map(self.item), self.location)
-    }
-
-    pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithLocation<U>, E> {
-        WithLocation::new(map(self.item)?, self.location).wrap_ok()
-    }
-
-    /// This method should not be called. It exists because in some places,
-    /// we have locations where we want spans, which needs to be fixed with
-    /// refactoring. We can probably instead enforce that the type has a
-    /// EmbeddedLocation or WithEmbeddedLocation
-    pub fn hack_to_with_span(self) -> WithSpan<T> {
-        let span = match self.location {
-            Location::Embedded(EmbeddedLocation { span, .. }) => span,
-            Location::Generated => Span::todo_generated(),
-        };
-        WithSpan {
-            item: self.item,
-            span,
-        }
-    }
-
-    pub fn for_display(&self) -> WithLocationForDisplay<'_, T> {
-        WithLocationForDisplay { inner: self }
-    }
-
-    pub fn new_generated(item: T) -> WithLocation<T> {
-        WithLocation::new(item, Location::Generated)
     }
 }
 
