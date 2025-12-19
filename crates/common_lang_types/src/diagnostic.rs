@@ -49,7 +49,7 @@ impl Diagnostic {
         )
     }
 
-    pub fn printable<'a>(&'a self, print_location: PrintLocationFn) -> PrintableDiagnostic<'a> {
+    pub fn printable<'a>(&'a self, print_location: PrintLocationFn<'a>) -> PrintableDiagnostic<'a> {
         PrintableDiagnostic {
             diagnostic: self,
             print_location,
@@ -57,11 +57,12 @@ impl Diagnostic {
     }
 }
 
-pub type PrintLocationFn = Box<dyn Fn(Location, &mut std::fmt::Formatter<'_>) -> std::fmt::Result>;
+pub type PrintLocationFn<'a> =
+    Box<dyn Fn(Location, &mut std::fmt::Formatter<'_>) -> std::fmt::Result + 'a>;
 
 pub struct PrintableDiagnostic<'a> {
     diagnostic: &'a Diagnostic,
-    print_location: PrintLocationFn,
+    print_location: PrintLocationFn<'a>,
 }
 
 impl std::fmt::Display for PrintableDiagnostic<'_> {

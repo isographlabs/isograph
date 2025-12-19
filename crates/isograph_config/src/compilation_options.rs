@@ -69,9 +69,9 @@ pub enum OptionalValidationLevel {
 }
 
 impl OptionalValidationLevel {
-    pub fn on_failure(
+    pub fn on_failure<'a>(
         self,
-        on_error: impl FnOnce() -> (Diagnostic, PrintLocationFn),
+        on_error: impl FnOnce() -> (Diagnostic, PrintLocationFn<'a>),
     ) -> Result<(), Diagnostic> {
         match self {
             OptionalValidationLevel::Ignore => Ok(()),

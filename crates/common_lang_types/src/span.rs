@@ -4,6 +4,10 @@ use prelude::Postfix;
 
 use crate::{EmbeddedLocation, Location, TextSource, WithEmbeddedLocation, WithLocation};
 
+// TODO have two newtype wrappers: Span's that identify where an iso literal is in a file,
+// and Span's that refer to where something is within an iso literal.
+//
+// For schema sources, the first span is missing, and everything is the second type.
 // Invariant: end >= start
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Span {

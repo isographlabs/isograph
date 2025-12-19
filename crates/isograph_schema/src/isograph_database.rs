@@ -4,12 +4,12 @@ use std::{
 };
 
 use common_lang_types::{
-    CurrentWorkingDirectory, Location, PrintLocationFn, RelativePathToSourceFile, TextSource,
+    CurrentWorkingDirectory, Location, PrintLocationFn, RelativePathToSourceFile, Span, TextSource,
     text_with_carats,
 };
 use isograph_config::CompilerConfig;
 use pico::{Database, SourceId, Storage};
-use pico_macros::{Db, Source};
+use pico_macros::{Db, Source, memo};
 use prelude::Postfix;
 
 use crate::NetworkProtocol;
@@ -172,16 +172,95 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
             .is_some()
     }
 
-    pub fn print_location_fn(&self) -> PrintLocationFn {
+    pub fn print_location_fn<'a>(&'a self) -> PrintLocationFn<'a> {
         (move |location: Location, f: &mut std::fmt::Formatter<'_>| match location {
             Location::Embedded(embedded_location) => {
-                let (file_path, read_out_text) = embedded_location.text_source.read_to_string();
+                let read_out_text = match file_text_at_span_at_location(
+                    self,
+                    embedded_location.text_source.relative_path_to_source_file,
+                    // The TextSource span
+                    embedded_location.text_source.span,
+                ) {
+                    Some(text) => text,
+                    None => {
+                        return write!(
+                            f,
+                            "\nERROR: File not found. This is indicative of a bug in Isograph."
+                        );
+                    }
+                };
+
+                // The inner span
                 let text_with_carats = text_with_carats(&read_out_text, embedded_location.span);
 
-                write!(f, "\n{file_path}\n{text_with_carats}")
+                let file_path = embedded_location.text_source.relative_path_to_source_file;
+                write!(f, "{file_path}\n{text_with_carats}")
             }
             Location::Generated => write!(f, "\n<generated>"),
         })
         .boxed()
     }
+}
+
+// TODO can we return &'db str?
+#[memo]
+pub fn file_text_at_span_at_location<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    relative_path: RelativePathToSourceFile,
+    // Note: we pass the span as well, so that if unrelated text changes (e.g. surrounding JavaScript,
+    // or the iso literal is moved around), then we can recalculate this fn but short circuit the surrounding
+    // fn.
+    span: Option<Span>,
+) -> Option<String> {
+    let file_content = match file_text_at_location(db, relative_path) {
+        Some(s) => s,
+        None => return None,
+    };
+
+    match span {
+        Some(span) => file_content[span.as_usize_range()].to_string().wrap_some(),
+        None => file_content.clone().wrap_some(),
+    }
+}
+
+#[memo]
+fn file_text_at_location<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    relative_path: RelativePathToSourceFile,
+) -> Option<String> {
+    // TODO do something smarter
+
+    // First, check if its open
+    if let Some(text) = db.get_open_file(relative_path) {
+        return db.get(text).content.clone().wrap_some();
+    }
+
+    // Check if it's an iso literal
+    if let Some(iso_literal) = db.get_iso_literal_map().tracked().0.get(&relative_path) {
+        return db
+            .get(iso_literal.dereference())
+            .content
+            .clone()
+            .wrap_some();
+    }
+
+    let standard_sources = db.get_standard_sources();
+    let standard_sources = standard_sources.tracked();
+    let config = db.get_isograph_config();
+
+    // Then schema source
+    if relative_path == config.schema.relative_path {
+        return db
+            .get(standard_sources.schema_source_id)
+            .content
+            .clone()
+            .wrap_some();
+    }
+
+    // Is it a schema extension? Maybe! Try that.
+    return db
+        .standard_sources
+        .schema_extension_sources
+        .get(&relative_path)
+        .map(|extension_source| db.get(extension_source.dereference()).content.clone());
 }

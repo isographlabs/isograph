@@ -9,7 +9,7 @@
     "lint": "next lint",
     "tsc": "tsc",
     "tsc-force": "tsc --build --clean && tsc --build --force",
-    "iso": "cross-env ISO_PRINT_ABSOLUTE_FILEPATH=1 ../../target/debug/isograph_cli --config ./isograph.config.json"
+    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json"
   },
   "dependencies": {
     "@isograph/react": "workspace:*",

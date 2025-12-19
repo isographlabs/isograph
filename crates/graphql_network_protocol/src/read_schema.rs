@@ -16,6 +16,7 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
     GraphQLTypeSystemDocument,
     BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
 )> {
+    // TODO use db.get_standard_sources()
     let SchemaSource {
         content,
         text_source,
