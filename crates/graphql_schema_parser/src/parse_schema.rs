@@ -80,7 +80,7 @@ fn parse_type_system_extension_document(
                     format!(
                         "Expected extend, scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""
                     ),
-                    unexpected_token.location.to::<Location>().wrap_some(),
+                    unexpected_token.embedded_location.to::<Location>().wrap_some(),
                 ).wrap_err()
             }
         }?;
@@ -109,7 +109,7 @@ fn parse_type_system_extension(
                 let found_text = identifier.item;
                 Diagnostic::new(
                     format!("Expected scalar, type, interface, union, enum, input object, schema or directive, found \"{found_text}\""),
-                    identifier.location.to::<Location>().wrap_some()
+                    identifier.embedded_location.to::<Location>().wrap_some()
                 )
                 .wrap_err()
             },
@@ -150,7 +150,7 @@ fn parse_type_system_definition(
                             "Expected extend, scalar, type, interface, union, \
                             enum, input object, schema or directive, found \"{found_text}\""
                         ),
-                        identifier.location.to::<Location>().wrap_some(),
+                        identifier.embedded_location.to::<Location>().wrap_some(),
                     )
                     .wrap_err()
                 }
@@ -302,12 +302,12 @@ fn parse_directive_location(
             .map_err(|_| {
                 Diagnostic::new(
                     format!("Expected directive location, found {}", text.item),
-                    text.location.to::<Location>().wrap_some(),
+                    text.embedded_location.to::<Location>().wrap_some(),
                 )
             })
-            .map(|x| x.with_embedded_location(text.location)),
+            .map(|x| x.with_embedded_location(text.embedded_location)),
         Err(diagnostic) => {
-            let text = tokens.source(peek.location.span);
+            let text = tokens.source(peek.embedded_location.span);
             Diagnostic::new(
                 format!("Expected directive location, found {text}"),
                 diagnostic.0.location,
@@ -360,7 +360,10 @@ fn parse_enum_value_definition(
             {
                 Diagnostic::new(
                     "Enum values cannot be true, false or  null.".to_string(),
-                    enum_literal_value_str.location.to::<Location>().wrap_some(),
+                    enum_literal_value_str
+                        .embedded_location
+                        .to::<Location>()
+                        .wrap_some(),
                 )
                 .wrap_err()
             } else {
@@ -479,7 +482,11 @@ fn reassign_or_error(
             "Root operation types (query, subscription or mutation) \
             cannot be defined twice in a schema definition."
                 .to_string(),
-            operation_type.0.location.to::<Location>().wrap_some(),
+            operation_type
+                .0
+                .embedded_location
+                .to::<Location>()
+                .wrap_some(),
         )
         .wrap_err();
     }
@@ -496,13 +503,15 @@ fn parse_root_operation_type(
     let name = tokens.parse_source_of_kind(TokenKind::Identifier)?;
 
     let root_operation_type = match name.item {
-        "query" => RootOperationKind::Query.with_embedded_location(name.location),
-        "subscription" => RootOperationKind::Subscription.with_embedded_location(name.location),
-        "mutation" => RootOperationKind::Mutation.with_embedded_location(name.location),
+        "query" => RootOperationKind::Query.with_embedded_location(name.embedded_location),
+        "subscription" => {
+            RootOperationKind::Subscription.with_embedded_location(name.embedded_location)
+        }
+        "mutation" => RootOperationKind::Mutation.with_embedded_location(name.embedded_location),
         _ => {
             return Diagnostic::new(
                 "Expected schema, mutation or subscription".to_string(),
-                name.location.to::<Location>().wrap_some(),
+                name.embedded_location.to::<Location>().wrap_some(),
             )
             .wrap_err();
         }
@@ -627,7 +636,10 @@ fn parse_constant_value(
                             Ok(value) => GraphQLConstantValue::Int(value).wrap_ok(),
                             Err(_) => Diagnostic::new(
                                 format!("Invalid integer value. Received {raw_int_value}"),
-                                int_literal_string.location.to::<Location>().wrap_some(),
+                                int_literal_string
+                                    .embedded_location
+                                    .to::<Location>()
+                                    .wrap_some(),
                             )
                             .wrap_err(),
                         }
@@ -644,7 +656,10 @@ fn parse_constant_value(
                             Ok(value) => GraphQLConstantValue::Float(value.into()).wrap_ok(),
                             Err(_) => Diagnostic::new(
                                 format!("Invalid float value. Received {raw_float_value}."),
-                                float_literal_string.location.to::<Location>().wrap_some(),
+                                float_literal_string
+                                    .embedded_location
+                                    .to::<Location>()
+                                    .wrap_some(),
                             )
                             .wrap_err(),
                         }
@@ -720,7 +735,7 @@ fn parse_constant_value(
 
         ControlFlow::Continue(Diagnostic::new(
             "Unable to parse constant value".to_string(),
-            tokens.peek().location.to::<Location>().wrap_some(),
+            tokens.peek().embedded_location.to::<Location>().wrap_some(),
         ))
     })
 }
@@ -841,7 +856,7 @@ fn parse_type_annotation<T: From<StringKey>>(
 
         ControlFlow::Continue(Diagnostic::new(
             "Expected a type (e.g. String, [String] or String!)".to_string(),
-            tokens.peek().location.to::<Location>().wrap_some(),
+            tokens.peek().embedded_location.to::<Location>().wrap_some(),
         ))
     })
 }
@@ -913,7 +928,7 @@ fn peek_type_system_doc_type(
         TokenKind::StringLiteral => TypeSystemDocType::Definition.wrap_ok(),
         TokenKind::BlockStringLiteral => TypeSystemDocType::Definition.wrap_ok(),
         TokenKind::Identifier => {
-            let text = tokens.source(peeked.location.span);
+            let text = tokens.source(peeked.embedded_location.span);
             match text {
                 "extend" => TypeSystemDocType::Extension,
                 _ => TypeSystemDocType::Definition,

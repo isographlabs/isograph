@@ -50,7 +50,9 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .object_selected()
-                                .with_embedded_location(client_pointer_declaration.location),
+                                .with_embedded_location(
+                                    client_pointer_declaration.embedded_location,
+                                ),
                             &mut non_fatal_diagnostics,
                         );
                     }
@@ -67,7 +69,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .scalar_selected()
-                                .with_embedded_location(client_field_declaration.location),
+                                .with_embedded_location(client_field_declaration.embedded_location),
                             &mut non_fatal_diagnostics,
                         );
                     }
@@ -122,7 +124,7 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
             client_scalar_selectable_name,
             "a scalar",
             "an object",
-            o.lookup(db).client_pointer_name.location.into(),
+            o.lookup(db).client_pointer_name.embedded_location.into(),
         )
         .wrap_err(),
     }
@@ -151,7 +153,7 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             client_object_selectable_name,
             "a scalar",
             "an object",
-            s.lookup(db).client_field_name.location.into(),
+            s.lookup(db).client_field_name.embedded_location.into(),
         )
         .wrap_err(),
     }
@@ -429,7 +431,7 @@ pub fn insert_selectable_or_multiple_definition_diagnostic_2<Value>(
             non_fatal_diagnostics.push(multiple_selectable_definitions_found_diagnostic(
                 key.0,
                 key.1,
-                item.location.to::<Location>().wrap_some(),
+                item.embedded_location.to::<Location>().wrap_some(),
             ))
         }
     }

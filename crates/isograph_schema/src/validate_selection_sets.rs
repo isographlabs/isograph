@@ -88,7 +88,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                 errors.push(selection_does_not_exist_diagnostic(
                                     parent_entity.name,
                                     selectable_name,
-                                    scalar_selection.name.location,
+                                    scalar_selection.name.embedded_location,
                                     SelectionType::Scalar(()),
                                     selectable_declaration_info,
                                 ));
@@ -109,7 +109,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                             selectable_name,
                             "an object",
                             "a scalar",
-                            scalar_selection.name.location,
+                            scalar_selection.name.embedded_location,
                             selectable_declaration_info,
                         ));
                         continue;
@@ -130,7 +130,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @loadable is not supported on selections of server scalar fields.",
                                         parent_entity.name, scalar_selection.name.item,
                                     ),
-                                    scalar_selection.name.location.to::<Location>().wrap_some(),
+                                    scalar_selection.name.embedded_location.to::<Location>().wrap_some(),
                                 ));
                             }
                             ScalarSelectionDirectiveSet::Updatable(_) => {
@@ -155,7 +155,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                             ),
                                             scalar_selection
                                                 .name
-                                                .location
+                                                .embedded_location
                                                 .to::<Location>()
                                                 .wrap_some(),
                                         ));
@@ -166,7 +166,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                                 .to_string(),
                                             scalar_selection
                                                 .name
-                                                .location
+                                                .embedded_location
                                                 .to::<Location>()
                                                 .wrap_some(),
                                         ));
@@ -180,7 +180,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @updatable is not supported on selections of client scalar fields.",
                                         parent_entity.name, scalar_selection.name.item,
                                     ),
-                                    scalar_selection.name.location.to::<Location>().wrap_some(),
+                                    scalar_selection.name.embedded_location.to::<Location>().wrap_some(),
                                 ));
                             }
                             ScalarSelectionDirectiveSet::None(_) => {}
@@ -198,7 +198,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                 errors.push(selection_does_not_exist_diagnostic(
                                     parent_entity.name,
                                     selectable_name,
-                                    object_selection.name.location,
+                                    object_selection.name.embedded_location,
                                     SelectionType::Object(()),
                                     selectable_declaration_info,
                                 ));
@@ -219,7 +219,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                             selectable_name,
                             "an object",
                             "a scalar",
-                            object_selection.name.location,
+                            object_selection.name.embedded_location,
                             selectable_declaration_info,
                         ));
                         continue;
@@ -240,7 +240,11 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                         @updatable is not supported on client object fields.",
                                         parent_entity.name, object_selection.name.item
                                     ),
-                                    object_selection.name.location.to::<Location>().wrap_some(),
+                                    object_selection
+                                        .name
+                                        .embedded_location
+                                        .to::<Location>()
+                                        .wrap_some(),
                                 ))
                             }
                             ObjectSelectionDirectiveSet::None(_) => {}
@@ -258,7 +262,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                                 // This was probably validated elsewhere??
                                 errors.push(entity_not_defined_diagnostic(
                                     target_entity_name,
-                                    object_selection.name.location.to(),
+                                    object_selection.name.embedded_location.to(),
                                 ));
                                 continue;
                             }

@@ -127,8 +127,9 @@ fn absolutize_relative_token<'a>(
     relative_token: &'a WithEmbeddedLocation<IsographSemanticToken>,
 ) -> impl Iterator<Item = AbsoluteIsographSemanticToken> + 'a {
     let span_content = &page_content[(iso_literal_extraction_span.start as usize
-        + relative_token.location.span.start as usize)
-        ..(iso_literal_extraction_span.start as usize + relative_token.location.span.end as usize)];
+        + relative_token.embedded_location.span.start as usize)
+        ..(iso_literal_extraction_span.start as usize
+            + relative_token.embedded_location.span.end as usize)];
 
     // Note the split inclusive here. This makes it so that the lines include the
     // line break, i.e. 'foo\nbar' -> 'foo\n', 'bar'
@@ -137,7 +138,7 @@ fn absolutize_relative_token<'a>(
         .scan(0, move |iterated_so_far_within_token, line_text| {
             let token = AbsoluteIsographSemanticToken {
                 absolute_char_start: iso_literal_extraction_span.start
-                    + relative_token.location.span.start
+                    + relative_token.embedded_location.span.start
                     + *iterated_so_far_within_token,
                 len: line_text.len() as u32,
                 semantic_token: relative_token.item,

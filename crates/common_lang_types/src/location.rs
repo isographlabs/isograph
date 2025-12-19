@@ -120,7 +120,7 @@ impl<T> WithLocation<T> {
 
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord)]
 pub struct WithEmbeddedLocation<T> {
-    pub location: EmbeddedLocation,
+    pub embedded_location: EmbeddedLocation,
     pub item: T,
 }
 
@@ -131,24 +131,27 @@ impl<TValue: PartialOrd> PartialOrd for WithEmbeddedLocation<TValue> {
             Some(core::cmp::Ordering::Equal) => {}
             ord => return ord,
         }
-        self.location.partial_cmp(&other.location)
+        self.embedded_location.partial_cmp(&other.embedded_location)
     }
 }
 
 impl<T> WithEmbeddedLocation<T> {
     pub fn new(item: T, location: EmbeddedLocation) -> Self {
-        WithEmbeddedLocation { item, location }
+        WithEmbeddedLocation {
+            item,
+            embedded_location: location,
+        }
     }
 
     pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithEmbeddedLocation<U> {
-        WithEmbeddedLocation::new(map(self.item), self.location)
+        WithEmbeddedLocation::new(map(self.item), self.embedded_location)
     }
 
     pub fn and_then<U, E>(
         self,
         map: impl FnOnce(T) -> Result<U, E>,
     ) -> Result<WithEmbeddedLocation<U>, E> {
-        WithEmbeddedLocation::new(map(self.item)?, self.location).wrap_ok()
+        WithEmbeddedLocation::new(map(self.item)?, self.embedded_location).wrap_ok()
     }
 
     pub fn into_with_location(self) -> WithLocation<T> {
@@ -171,7 +174,7 @@ where
 impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
     fn from(value: WithEmbeddedLocation<T>) -> Self {
         WithLocation {
-            location: Location::Embedded(value.location),
+            location: Location::Embedded(value.embedded_location),
             item: value.item,
         }
     }

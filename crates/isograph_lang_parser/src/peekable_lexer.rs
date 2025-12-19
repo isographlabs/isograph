@@ -71,7 +71,7 @@ impl<'source> PeekableLexer<'source> {
             .to_with_embedded_location(self.text_source);
 
         self.semantic_tokens
-            .push(isograph_semantic_token.with_embedded_location(parsed_token.location));
+            .push(isograph_semantic_token.with_embedded_location(parsed_token.embedded_location));
 
         parsed_token
     }
@@ -90,7 +90,11 @@ impl<'source> PeekableLexer<'source> {
             None
         } else {
             let next_token = self.parse_token(semantic_token_legend::ST_COMMENT);
-            Span::new(next_token.location.span.start, self.source.len() as u32).wrap_some()
+            Span::new(
+                next_token.embedded_location.span.start,
+                self.source.len() as u32,
+            )
+            .wrap_some()
         }
     }
 
@@ -118,7 +122,8 @@ impl<'source> PeekableLexer<'source> {
         if found.item == expected_kind {
             self.parse_token(isograph_semantic_token).wrap_ok()
         } else {
-            parse_token_kind_diagnostic(expected_kind, found.item, found.location).wrap_err()
+            parse_token_kind_diagnostic(expected_kind, found.item, found.embedded_location)
+                .wrap_err()
         }
     }
 
@@ -131,8 +136,8 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<&'source str>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
 
-        self.source(kind.location.span)
-            .with_embedded_location(kind.location)
+        self.source(kind.embedded_location.span)
+            .with_embedded_location(kind.embedded_location)
             .wrap_ok()
     }
 
@@ -142,10 +147,10 @@ impl<'source> PeekableLexer<'source> {
         isograph_semantic_token: IsographSemanticToken,
     ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
-        let source = self.source(kind.location.span).intern();
+        let source = self.source(kind.embedded_location.span).intern();
         source
             .to::<T>()
-            .with_embedded_location(kind.location)
+            .with_embedded_location(kind.embedded_location)
             .wrap_ok()
     }
 
@@ -157,17 +162,18 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<IsographLangTokenKind>> {
         let peeked = self.peek();
         if peeked.item == IsographLangTokenKind::Identifier {
-            let source = self.source(peeked.location.span);
+            let source = self.source(peeked.embedded_location.span);
             if source == identifier {
                 self.parse_token(isograph_semantic_token).wrap_ok()
             } else {
-                parse_matching_identifier_diagnostic(identifier, source, peeked.location).wrap_err()
+                parse_matching_identifier_diagnostic(identifier, source, peeked.embedded_location)
+                    .wrap_err()
             }
         } else {
             parse_token_kind_diagnostic(
                 IsographLangTokenKind::Identifier,
                 peeked.item,
-                peeked.location,
+                peeked.embedded_location,
             )
             .wrap_err()
         }
@@ -219,7 +225,7 @@ impl<'source> PeekableLexer<'source> {
     pub fn white_space_span(&self) -> Span {
         Span::new(
             self.end_index_of_last_parsed_token,
-            self.peek().location.span.start,
+            self.peek().embedded_location.span.start,
         )
     }
 

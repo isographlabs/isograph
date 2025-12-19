@@ -54,7 +54,7 @@ pub fn process_graphql_type_system_document(
 ) {
     for with_location in type_system_document.0 {
         let WithEmbeddedLocation {
-            location,
+            embedded_location: location,
             item: type_system_definition,
         } = with_location;
         match type_system_definition {
@@ -450,7 +450,10 @@ pub fn process_graphql_type_system_extension_document(
     let mut extensions = Vec::with_capacity(extension_document.0.len());
 
     for extension_or_definition in extension_document.0 {
-        let WithEmbeddedLocation { location, item } = extension_or_definition;
+        let WithEmbeddedLocation {
+            embedded_location: location,
+            item,
+        } = extension_or_definition;
         match item {
             GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
                 definitions.push(definition.with_embedded_location(location));

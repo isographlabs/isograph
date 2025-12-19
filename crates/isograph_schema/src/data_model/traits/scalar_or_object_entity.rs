@@ -80,7 +80,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
             scalar_selectable_name,
             "a scalar",
             "an object",
-            scalar_path.inner.name.location.to::<Location>(),
+            scalar_path.inner.name.embedded_location.to::<Location>(),
         )
     })?;
 
@@ -107,7 +107,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     )?;
 
     let selectable = selectable.as_object().ok_or_else(|| {
-        let location = object_path.inner.name.location.to::<Location>();
+        let location = object_path.inner.name.embedded_location.to::<Location>();
         selectable_is_wrong_type_diagnostic(
             parent.lookup(db).name,
             object_selectable_name,

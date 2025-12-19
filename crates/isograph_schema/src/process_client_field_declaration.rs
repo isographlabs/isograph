@@ -54,7 +54,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
                 client_field_declaration_item
                     .parent_type
-                    .location
+                    .embedded_location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -77,7 +77,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 ),
                 client_field_declaration_item
                     .parent_type
-                    .location
+                    .embedded_location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -100,7 +100,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item
                     .parent_type
-                    .location
+                    .embedded_location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -284,7 +284,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             format!("Directive `@{directive_name}` is not supported on client pointers."),
             client_pointer_declaration
                 .client_pointer_name
-                .location
+                .embedded_location
                 .to::<Location>()
                 .wrap_some(),
         )
@@ -416,7 +416,10 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
                             `{parent_object_entity_name}.{selectable_name}` \
                             has inner type `{input_type_name}`, which does not exist."
                         ),
-                        variable_definition.location.to::<Location>().wrap_some(),
+                        variable_definition
+                            .embedded_location
+                            .to::<Location>()
+                            .wrap_some(),
                     )
                 })
         })?;
@@ -426,6 +429,6 @@ pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
         type_,
         default_value: variable_definition.item.default_value.clone(),
     }
-    .with_embedded_location(variable_definition.location)
+    .with_embedded_location(variable_definition.embedded_location)
     .wrap_ok()
 }

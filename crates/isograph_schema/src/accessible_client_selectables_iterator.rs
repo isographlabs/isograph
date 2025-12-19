@@ -110,7 +110,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                                 self.index += 1;
                                 return (self.parent_entity_name, selection.item.name())
                                     .scalar_selected()
-                                    .with_embedded_location(scalar_selection.name.location)
+                                    .with_embedded_location(scalar_selection.name.embedded_location)
                                     .wrap_some();
                             }
                         };
@@ -148,7 +148,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                                 self.index += 1;
                                 return (self.parent_entity_name, object_selection.name.item)
                                     .object_selected()
-                                    .with_embedded_location(object_selection.name.location)
+                                    .with_embedded_location(object_selection.name.embedded_location)
                                     .wrap_some();
                             }
                         }

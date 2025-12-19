@@ -147,7 +147,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 }
                 .interned_value(db)
                 .object_selected()
-                .with_embedded_location(with_location.location)
+                .with_embedded_location(with_location.embedded_location)
                 .into(),
                 &mut non_fatal_diagnostics,
             );
@@ -167,7 +167,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 get_typename_selectable(db, server_object_entity_name, None)
                     .scalar_selected()
                     .server_defined()
-                    .with_embedded_location(with_location.location)
+                    .with_embedded_location(with_location.embedded_location)
                     .into(),
                 &mut non_fatal_diagnostics,
             );
@@ -239,7 +239,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .object_selected()
                     .server_defined()
-                    .with_embedded_location(field.location)
+                    .with_embedded_location(field.embedded_location)
                     .into(),
                     &mut non_fatal_diagnostics,
                 );
@@ -297,7 +297,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .scalar_selected()
                     .server_defined()
-                    .with_embedded_location(field.location)
+                    .with_embedded_location(field.embedded_location)
                     .into(),
                     &mut non_fatal_diagnostics,
                 );

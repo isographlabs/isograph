@@ -21,7 +21,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
 
     pub fn embedded_location(&self) -> EmbeddedLocation {
         match self {
-            GraphQLTypeAnnotation::Named(named) => named.0.location,
+            GraphQLTypeAnnotation::Named(named) => named.0.embedded_location,
             GraphQLTypeAnnotation::List(list) => list.0.embedded_location(),
             GraphQLTypeAnnotation::NonNull(non_null) => non_null.embedded_location(),
         }
@@ -46,7 +46,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         match self {
             GraphQLTypeAnnotation::Named(named) => {
                 GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item).with_embedded_location(named.0.location),
+                    f(named.0.item).with_embedded_location(named.0.embedded_location),
                 ))
             }
             GraphQLTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.map(f).boxed()),
@@ -63,7 +63,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         match self {
             GraphQLTypeAnnotation::Named(named) => {
                 GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item)?.with_embedded_location(named.0.location),
+                    f(named.0.item)?.with_embedded_location(named.0.embedded_location),
                 ))
             }
             GraphQLTypeAnnotation::List(list) => {
@@ -123,7 +123,7 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
 
     pub fn embedded_location(&self) -> EmbeddedLocation {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => named.0.location,
+            GraphQLNonNullTypeAnnotation::Named(named) => named.0.embedded_location,
             GraphQLNonNullTypeAnnotation::List(list) => list.0.embedded_location(),
         }
     }
@@ -146,7 +146,7 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         match self {
             GraphQLNonNullTypeAnnotation::Named(named) => {
                 GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item).with_embedded_location(named.0.location),
+                    f(named.0.item).with_embedded_location(named.0.embedded_location),
                 ))
             }
             GraphQLNonNullTypeAnnotation::List(list) => {
@@ -165,7 +165,7 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
         match self {
             GraphQLNonNullTypeAnnotation::Named(named) => {
                 GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item)?.with_embedded_location(named.0.location),
+                    f(named.0.item)?.with_embedded_location(named.0.embedded_location),
                 ))
             }
             GraphQLNonNullTypeAnnotation::List(list) => {
