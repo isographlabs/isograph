@@ -51,7 +51,7 @@ impl Diagnostic {
 
     pub fn printable<'a>(&'a self, print_location: PrintLocationFn) -> PrintableDiagnostic<'a> {
         PrintableDiagnostic {
-            diagnostic: &self,
+            diagnostic: self,
             print_location,
         }
     }

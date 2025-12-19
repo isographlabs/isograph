@@ -21,6 +21,7 @@ pub struct CompilationStats {
     pub total_artifacts_written: usize,
 }
 
+#[expect(clippy::result_unit_err)]
 pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
@@ -37,6 +38,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     print_result(&state.db, result)
 }
 
+#[expect(clippy::result_unit_err)]
 pub fn print_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     result: WithDuration<DiagnosticVecResult<CompilationStats>>,
