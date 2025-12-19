@@ -94,10 +94,13 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     let reader_import_statement =
         reader_imports_to_import_statement(&reader_imports, file_extensions);
 
+    let client_selectable_name = match client_selectable {
+        SelectionType::Object(o) => o.name,
+        SelectionType::Scalar(s) => s.name,
+    };
     let reader_param_type = format!(
         "{}__{}__param",
-        parent_object_entity.name,
-        client_selectable.name()
+        parent_object_entity.name, client_selectable_name
     );
 
     let reader_content = if let ClientScalarSelectableDirectiveSet::None(_) =
@@ -105,11 +108,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             "Expected component variant to be valid. \
             This is indicative of a bug in Isograph.",
         ) {
-        let eager_reader_name = client_selectable.name();
         let reader_output_type = format!(
             "{}__{}__output_type",
-            parent_object_entity.name,
-            client_selectable.name()
+            parent_object_entity.name, client_selectable_name
         );
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         let output_type_file_name = *RESOLVER_OUTPUT_TYPE;
@@ -125,7 +126,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             {}{reader_output_type}\n\
             > = {{\n\
             {}kind: \"EagerReaderArtifact\",\n\
-            {}fieldName: \"{eager_reader_name}\",\n\
+            {}fieldName: \"{client_selectable_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: {has_updatable},\n\
@@ -134,7 +135,6 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
     } else {
-        let component_name = client_selectable.name();
         let param_type_file_name = *RESOLVER_PARAM_TYPE;
         format!(
             "import type {{ComponentReaderArtifact, ExtractSecondParam, \
@@ -148,7 +148,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             {}ExtractSecondParam<typeof resolver>\n\
             > = {{\n\
             {}kind: \"ComponentReaderArtifact\",\n\
-            {}fieldName: \"{component_name}\",\n\
+            {}fieldName: \"{client_selectable_name}\",\n\
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: {has_updatable},\n\
@@ -164,7 +164,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name(),
+                selectable_name: client_selectable_name,
             }
             .wrap_some(),
         },
@@ -173,8 +173,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     if !client_selectable.variable_definitions().is_empty() {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
-            parent_object_entity.name,
-            client_selectable.name()
+            parent_object_entity.name, client_selectable_name
         );
         let parameters = client_selectable.variable_definitions().iter();
         let parameters_types = generate_parameters(db, parameters);
@@ -186,7 +185,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
                 file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
                     parent_entity_name: parent_object_entity.name,
-                    selectable_name: client_selectable.name(),
+                    selectable_name: client_selectable_name,
                 }
                 .wrap_some(),
             },
@@ -424,13 +423,18 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         {start_update_type}\
         }};\n",
     );
+    let client_selectable_name = match client_selectable {
+        SelectionType::Object(o) => o.name,
+        SelectionType::Scalar(s) => s.name,
+    };
+
     ArtifactPathAndContent {
         file_content: param_type_content.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name(),
+                selectable_name: client_selectable_name,
             }
             .wrap_some(),
         },
@@ -470,13 +474,16 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         }
     };
 
+    let client_selectable_name = match client_selectable {
+        SelectionType::Object(o) => o.name,
+        SelectionType::Scalar(s) => s.name,
+    };
+
     let output_type_text = format!(
         "import type React from 'react';\n\
         {function_import_statement}\n\
         export type {}__{}__output_type = {};",
-        parent_object_entity.name,
-        client_selectable.name(),
-        client_scalar_selectable_output_type
+        parent_object_entity.name, client_selectable_name, client_scalar_selectable_output_type
     );
 
     let final_output_type_text = if let ClientScalarSelectableDirectiveSet::None(_) =
@@ -499,7 +506,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
-                selectable_name: client_selectable.name(),
+                selectable_name: client_selectable_name,
             }
             .wrap_some(),
         },
@@ -530,7 +537,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
         "import type {{ Link }} from '@isograph/react';\n\
         export type {}__{}__output_type = {};",
         parent_object_entity.name,
-        client_scalar_selectable.name(),
+        client_scalar_selectable.name,
         client_scalar_selectable_output_type
     );
 
@@ -540,7 +547,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
-                selectable_name: client_scalar_selectable.name(),
+                selectable_name: client_scalar_selectable.name,
             }
             .wrap_some(),
         },

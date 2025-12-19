@@ -97,7 +97,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
     let query_text_selection_map_wrapped =
         selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
-    let root_fetchable_field = entrypoint.name();
+    let root_fetchable_field = entrypoint.name;
 
     let query_text = TNetworkProtocol::generate_query_text(
         db,
@@ -206,8 +206,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                                 This might not be validated yet. For now, each client field \
                                 containing a __refetch field must re-defined all used variables. \
                                 Client field {} is missing variable definition {}",
-                            entrypoint.name(),
-                            variable_name
+                            entrypoint.name, variable_name
                         )
                     })
                     .clone()

@@ -1299,7 +1299,10 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     let selections = selectable_reader_selection_set(
         db,
         newly_encountered_client_type.parent_object_entity_name(),
-        newly_encountered_client_type.name(),
+        match newly_encountered_client_type {
+            SelectionType::Scalar(s) => s.name,
+            SelectionType::Object(o) => o.name,
+        },
     )
     .expect("Expected selections to be valid.")
     .lookup(db)
