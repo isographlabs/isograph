@@ -7,7 +7,7 @@ use isograph_lang_types::{Description, SelectionSet, VariableDefinition};
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    NetworkProtocol, SelectableTrait, ServerEntityName, client_scalar_selectable_named,
+    NetworkProtocol, ServerEntityName, client_scalar_selectable_named,
     refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
 };
 
@@ -144,22 +144,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn client_type(&self) -> &'static str {
         "pointer"
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
-    for ClientScalarSelectable<TNetworkProtocol>
-{
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
-    for ClientObjectSelectable<TNetworkProtocol>
-{
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
     }
 }
 

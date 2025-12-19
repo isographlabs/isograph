@@ -6,7 +6,7 @@ use isograph_lang_types::{
 };
 use pico::MemoRef;
 
-use crate::{NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectSelectableVariant};
+use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
@@ -23,14 +23,6 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
-    for ServerScalarSelectable<TNetworkProtocol>
-{
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
-    }
-}
-
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,14 +37,6 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub parent_object_entity_name: EntityName,
     pub arguments: Vec<VariableDefinition<ServerEntityName>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
-}
-
-impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
-    for ServerObjectSelectable<TNetworkProtocol>
-{
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
-    }
 }
 
 pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<

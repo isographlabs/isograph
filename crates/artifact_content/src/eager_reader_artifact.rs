@@ -297,7 +297,10 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let ts_file_extension = file_extensions.ts();
     let parent_object_entity = &server_object_entity_named(
         db,
-        isograph_schema::SelectableTrait::parent_object_entity_name(&client_selectable),
+        match client_selectable {
+            SelectionType::Object(o) => o.parent_object_entity_name,
+            SelectionType::Scalar(s) => s.parent_object_entity_name,
+        },
     )
     .as_ref()
     .expect(
