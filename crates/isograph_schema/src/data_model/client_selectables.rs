@@ -42,7 +42,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
-    pub target_object_entity_name: TypeAnnotation<EntityName>,
+    pub target_entity_name: TypeAnnotation<EntityName>,
 
     pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
 

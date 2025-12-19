@@ -42,7 +42,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
-        self.target_object_entity_name.clone()
+        self.target_entity_name.clone()
     }
 }
 
@@ -62,7 +62,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
-        self.target_object_entity_name.clone()
+        self.target_entity_name.clone()
     }
 }
 
@@ -82,7 +82,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
-        self.target_object_entity.clone()
+        self.target_entity_name.clone()
     }
 }
 
@@ -102,6 +102,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientOrServerObjectSelectable
     }
 
     fn target_object_entity_name(&self) -> TypeAnnotation<EntityName> {
-        self.target_object_entity.clone()
+        self.target_entity_name.clone()
     }
 }

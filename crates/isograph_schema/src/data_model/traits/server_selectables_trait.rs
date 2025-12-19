@@ -25,7 +25,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {
-        self.target_object_entity
+        self.target_entity_name
             .clone()
             .map(&mut SelectionType::Object)
     }
@@ -51,7 +51,7 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectSelectable
     }
 
     fn target_entity_name(&self) -> TypeAnnotation<ServerEntityName> {
-        self.target_scalar_entity
+        self.target_entity_name
             .clone()
             .map(&mut SelectionType::Scalar)
     }

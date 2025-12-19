@@ -194,7 +194,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .description
                             .map(|with_span| with_span.item.into()),
                         name: field.item.name.item.unchecked_conversion(),
-                        target_object_entity: TypeAnnotation::from_graphql_type_annotation(
+                        target_entity_name: TypeAnnotation::from_graphql_type_annotation(
                             field
                                 .item
                                 .type_
@@ -285,7 +285,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             })
                             .collect(),
                         phantom_data: std::marker::PhantomData,
-                        target_scalar_entity: TypeAnnotation::from_graphql_type_annotation(
+                        target_entity_name: TypeAnnotation::from_graphql_type_annotation(
                             field
                                 .item
                                 .type_
@@ -325,7 +325,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         name: format!("as{}", concrete_child_entity_name)
                             .intern()
                             .to::<SelectableName>(),
-                        target_object_entity: TypeAnnotation::Union(UnionTypeAnnotation {
+                        target_entity_name: TypeAnnotation::Union(UnionTypeAnnotation {
                             variants: {
                                 let mut variants = BTreeSet::new();
                                 variants.insert(UnionVariant::Scalar(
@@ -393,7 +393,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 };
 
-                let payload_object_entity_name = *mutation_field.target_object_entity.inner();
+                let payload_object_entity_name = *mutation_field.target_entity_name.inner();
 
                 let client_field_scalar_selection_name = expose_field_directive
                     .expose_as
@@ -472,7 +472,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             }
                             ServerObjectSelectableVariant::InlineFragment => {
                                 WrappedSelectionMapSelection::InlineFragment(
-                                    *server_object_selectable.target_object_entity.inner(),
+                                    *server_object_selectable.target_entity_name.inner(),
                                 )
                             }
                         }
@@ -783,7 +783,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_object_entity.inner().dereference();
+        let next_entity_name = selectable.target_entity_name.inner().dereference();
 
         current_entity = outcome
             .entities

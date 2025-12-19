@@ -425,7 +425,7 @@ pub(crate) fn get_typename_selectable(
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
-        target_scalar_entity: TypeAnnotation::Scalar("String".intern().into()),
+        target_entity_name: TypeAnnotation::Scalar("String".intern().into()),
         javascript_type_override,
         parent_object_entity_name: server_object_entity_name,
         arguments: vec![],

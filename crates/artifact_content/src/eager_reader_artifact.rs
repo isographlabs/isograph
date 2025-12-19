@@ -220,7 +220,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             .lookup(db);
 
     let concrete_type =
-        &server_object_entity_named(db, *server_object_selectable.target_object_entity.inner())
+        &server_object_entity_named(db, *server_object_selectable.target_entity_name.inner())
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

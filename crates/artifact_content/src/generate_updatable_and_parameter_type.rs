@@ -86,7 +86,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let name_or_alias: SelectableNameOrAlias =
                         (*scalar_field_selection).name_or_alias().item;
 
-                    let output_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
+                    let output_type = server_scalar_selectable.target_entity_name.as_ref().map(
                         &mut |scalar_entity_name| match server_scalar_selectable
                             .javascript_type_override
                         {
@@ -138,8 +138,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_object_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .dereference();
 
@@ -252,7 +252,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = selection.item.name_or_alias().item;
 
-                    let output_type = server_scalar_selectable.target_scalar_entity.clone().map(
+                    let output_type = server_scalar_selectable.target_entity_name.clone().map(
                         &mut |scalar_entity_name| {
                             server_scalar_entity_javascript_name(db, scalar_entity_name)
                                 .as_ref()
@@ -314,8 +314,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_object_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .dereference();
 

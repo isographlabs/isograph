@@ -229,7 +229,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                 // @updatable is not supported on client fields
                 let target_entity_name = match selectable {
                     DefinitionLocation::Server(s) => {
-                        s.lookup(db).target_object_entity.inner().dereference()
+                        s.lookup(db).target_entity_name.inner().dereference()
                     }
                     DefinitionLocation::Client(c) => {
                         match object_selection.object_selection_directive_set {
@@ -250,7 +250,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                             ObjectSelectionDirectiveSet::None(_) => {}
                         }
 
-                        c.lookup(db).target_object_entity_name.inner().dereference()
+                        c.lookup(db).target_entity_name.inner().dereference()
                     }
                 };
 

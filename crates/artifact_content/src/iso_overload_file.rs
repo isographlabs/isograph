@@ -99,7 +99,7 @@ export function iso<T>(
             type_and_field.underscore_separated(),
         ));
     } else if let SelectionType::Object(client_object_selectable) = client_type {
-        link_types.insert(*client_object_selectable.target_object_entity_name.inner());
+        link_types.insert(*client_object_selectable.target_entity_name.inner());
         s.push_str(&format!(
             "
 export function iso<T>(
@@ -108,16 +108,15 @@ export function iso<T>(
             formatted_field,
             type_and_field.underscore_separated(),
             print_javascript_type_declaration(
-                &client_object_selectable
-                    .target_object_entity_name
-                    .clone()
-                    .map(&mut |target_object_entity_name| {
+                &client_object_selectable.target_entity_name.clone().map(
+                    &mut |target_object_entity_name| {
                         let link_field_name = *LINK_FIELD_NAME;
                         format!(
                             "{}__{link_field_name}__output_type",
                             &target_object_entity_name
                         )
-                    })
+                    }
+                )
             )
         ));
     } else {

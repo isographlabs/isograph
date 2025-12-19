@@ -357,14 +357,14 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
             let iso_type_annotation = match selectable.as_ref() {
                 SelectionType::Scalar(server_scalar_selectable) => {
                     let field_type_annotation =
-                        &server_scalar_selectable.lookup(db).target_scalar_entity;
+                        &server_scalar_selectable.lookup(db).target_entity_name;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Scalar)
                 }
                 SelectionType::Object(server_object_selectable) => {
                     let field_type_annotation =
-                        &server_object_selectable.lookup(db).target_object_entity;
+                        &server_object_selectable.lookup(db).target_entity_name;
                     field_type_annotation
                         .clone()
                         .map(&mut SelectionType::Object)

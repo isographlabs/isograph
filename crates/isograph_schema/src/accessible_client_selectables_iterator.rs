@@ -124,13 +124,11 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                         // TODO don't match on object_selectable twice
                         let target_entity_name = match object_selectable {
                             DefinitionLocation::Server(s) => {
-                                s.lookup(self.db).target_object_entity.inner().dereference()
+                                s.lookup(self.db).target_entity_name.inner().dereference()
                             }
-                            DefinitionLocation::Client(c) => c
-                                .lookup(self.db)
-                                .target_object_entity_name
-                                .inner()
-                                .dereference(),
+                            DefinitionLocation::Client(c) => {
+                                c.lookup(self.db).target_entity_name.inner().dereference()
+                            }
                         };
 
                         let mut iterator = AccessibleClientSelectableIterator {

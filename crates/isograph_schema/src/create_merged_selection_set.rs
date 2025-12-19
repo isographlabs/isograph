@@ -586,7 +586,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(server_object_entity) => {
                         let server_object_entity = server_object_entity.lookup(db);
                         let target_object_entity_name = server_object_entity
-                            .target_object_entity
+                            .target_entity_name
                             .inner()
                             .dereference();
 
@@ -784,7 +784,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
 
                 let concrete_object_entity_name = server_object_selectable
-                    .target_object_entity
+                    .target_entity_name
                     .inner()
                     .dereference();
 
@@ -907,7 +907,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         .insert(
             (
                 *newly_encountered_client_object_selectable
-                    .target_object_entity_name
+                    .target_entity_name
                     .inner(),
                 *LINK_FIELD_NAME,
             )
@@ -1124,7 +1124,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     variable_context: &VariableContext,
 ) {
     let target_server_object_entity_name = *newly_encountered_client_object_selectable
-        .target_object_entity_name
+        .target_entity_name
         .inner();
     let target_server_object_entity =
         &server_object_entity_named(db, target_server_object_entity_name)
@@ -1190,7 +1190,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             None
         } else {
             (*newly_encountered_client_object_selectable
-                .target_object_entity_name
+                .target_entity_name
                 .inner())
             .wrap_some()
         },

@@ -315,7 +315,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             .collect::<Result<_, _>>()?,
 
         parent_object_entity_name,
-        target_object_entity_name: TypeAnnotation::from_graphql_type_annotation(
+        target_entity_name: TypeAnnotation::from_graphql_type_annotation(
             client_pointer_declaration.target_type.clone().map(|x| x.0),
         ),
         network_protocol: std::marker::PhantomData,

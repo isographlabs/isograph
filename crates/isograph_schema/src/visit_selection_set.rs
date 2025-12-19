@@ -48,8 +48,8 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
                 };
 
                 let target_entity_name = match target_entity {
-                    DefinitionLocation::Server(s) => s.lookup(db).target_object_entity.inner(),
-                    DefinitionLocation::Client(c) => c.lookup(db).target_object_entity_name.inner(),
+                    DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                    DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
                 }
                 .dereference();
 

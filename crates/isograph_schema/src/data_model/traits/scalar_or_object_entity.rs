@@ -135,10 +135,10 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
 
             match selectable {
                 DefinitionLocation::Server(s) => {
-                    s.lookup(db).target_object_entity.inner().dereference()
+                    s.lookup(db).target_entity_name.inner().dereference()
                 }
                 DefinitionLocation::Client(c) => {
-                    c.lookup(db).target_object_entity_name.inner().dereference()
+                    c.lookup(db).target_entity_name.inner().dereference()
                 }
             }
         }
@@ -176,10 +176,10 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
 
             let object_parent_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => {
-                    s.lookup(db).target_object_entity.inner().dereference()
+                    s.lookup(db).target_entity_name.inner().dereference()
                 }
                 DefinitionLocation::Client(c) => {
-                    c.lookup(db).target_object_entity_name.inner().dereference()
+                    c.lookup(db).target_entity_name.inner().dereference()
                 }
             };
 

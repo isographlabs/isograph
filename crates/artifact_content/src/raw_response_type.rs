@@ -62,7 +62,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
                 )
                 .lookup(db);
 
-                let raw_type = server_scalar_selectable.target_scalar_entity.as_ref().map(
+                let raw_type = server_scalar_selectable.target_entity_name.as_ref().map(
                     &mut |scalar_entity_name| match server_scalar_selectable
                         .javascript_type_override
                     {
@@ -82,7 +82,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_scalar_selectable.target_scalar_entity.is_nullable() {
+                    if server_scalar_selectable.target_entity_name.is_nullable() {
                         "?"
                     } else {
                         ""
@@ -115,7 +115,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let raw_type =
                     server_object_selectable
-                        .target_object_entity
+                        .target_entity_name
                         .as_ref()
                         .map(&mut |_| {
                             let mut raw_response_type_declaration = String::new();
@@ -132,7 +132,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_object_selectable.target_object_entity.is_nullable() {
+                    if server_object_selectable.target_entity_name.is_nullable() {
                         "?"
                     } else {
                         ""

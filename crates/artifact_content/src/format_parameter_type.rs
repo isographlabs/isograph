@@ -120,9 +120,9 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .lookup(db);
 
             (
-                is_nullable(&server_scalar_selectable.target_scalar_entity),
+                is_nullable(&server_scalar_selectable.target_entity_name),
                 server_scalar_selectable
-                    .target_scalar_entity
+                    .target_entity_name
                     .clone()
                     .map(&mut SelectionType::Scalar),
             )
@@ -148,9 +148,9 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             )
             .lookup(db);
             (
-                is_nullable(&server_object_selectable.target_object_entity),
+                is_nullable(&server_object_selectable.target_entity_name),
                 server_object_selectable
-                    .target_object_entity
+                    .target_entity_name
                     .clone()
                     .map(&mut SelectionType::Object),
             )
