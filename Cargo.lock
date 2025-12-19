@@ -3664,6 +3664,7 @@ dependencies = [
  "isograph_lang_types",
  "isograph_schema",
  "lazy_static",
+ "prelude",
  "serde",
  "thiserror 1.0.69",
 ]

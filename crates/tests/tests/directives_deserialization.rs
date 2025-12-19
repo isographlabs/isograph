@@ -1,22 +1,25 @@
-use common_lang_types::{Diagnostic, SelectableName, StringLiteralValue, TextSource};
+use common_lang_types::{
+    Diagnostic, Location, PrintLocationFn, SelectableName, StringLiteralValue, TextSource,
+};
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directives};
 use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
 use intern::string_key::Intern;
 use isograph_schema::ServerObjectEntityDirectives;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem, ID_FIELD_NAME};
+use prelude::Postfix;
 use std::error::Error;
 
 fn unwrap_directive(
     extension_or_definition: GraphQLTypeSystemExtensionOrDefinition,
-) -> Result<Vec<GraphQLDirective<GraphQLConstantValue>>, Box<dyn Error>> {
+) -> Result<Vec<GraphQLDirective<GraphQLConstantValue>>, Diagnostic> {
     if let GraphQLTypeSystemExtensionOrDefinition::Extension(extension) = extension_or_definition {
         let GraphQLTypeSystemExtension::ObjectTypeExtension(object_type_extension) = extension;
         return Ok(object_type_extension.directives.clone());
     }
-    Err("unexpected structure of directive".into())
+    Diagnostic::new("unexpected structure of directive".to_string(), None).wrap_err()
 }
 
-fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Error>> {
+fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Diagnostic> {
     let text_source = TextSource {
         relative_path_to_source_file: "dummy".intern().into(),
         span: None,
@@ -38,7 +41,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Box<dyn Err
 }
 
 #[test]
-fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
+fn test_test_mutation_extension_expose_as() -> Result<(), Diagnostic> {
     let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid_as.graphql"
     ))?;
@@ -59,7 +62,7 @@ fn test_test_mutation_extension_expose_as() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
-fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn Error>> {
+fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Diagnostic> {
     let expose_field_mutations = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
@@ -79,7 +82,7 @@ fn test_test_mutation_extension_set_pet_tagline_parsing() -> Result<(), Box<dyn 
 }
 
 #[test]
-fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Error>> {
+fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Diagnostic> {
     let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_valid.graphql"
     ))?;
@@ -98,21 +101,17 @@ fn test_mutation_extension_set_pet_bestfriend_parsing() -> Result<(), Box<dyn Er
 }
 
 fn match_failure_message(
-    expose_field_directives: Result<Vec<ExposeFieldDirective>, Box<dyn Error>>,
+    expose_field_directives: Result<Vec<ExposeFieldDirective>, String>,
     message: &str,
 ) {
     match expose_field_directives {
         Ok(_) => panic!("Expected an error, but got Ok"),
         Err(e) => {
-            if let Some(deserialization_error) = e.downcast_ref::<Diagnostic>() {
-                assert!(
-                    deserialization_error.0.message.contains(message),
-                    "Error message did not contain intended string '{message}'. \
-                    Instead, got '{deserialization_error:?}'"
-                );
-            } else {
-                panic!("Expected Diagnostic, got a different error type");
-            }
+            assert!(
+                e.contains(message),
+                "Error message did not contain intended string '{message}'. \
+                Instead, got '{e}'"
+            );
         }
     }
 }
@@ -122,7 +121,7 @@ fn test_mutation_extension_extra_topfield_parsing_failure() -> Result<(), Box<dy
         "fixtures/directives/mutation_extension_extra_toplevelfield.graphql"
     ));
     match_failure_message(
-        expose_field_directives,
+        stringify_err(expose_field_directives),
         "unknown field `weight`, expected one of `as`, `fieldMap`, `field`",
     );
     Ok(())
@@ -134,7 +133,7 @@ fn test_mutation_extension_extra_nestedfield_parsing_failure() -> Result<(), Box
         "fixtures/directives/mutation_extension_extra_nestedfield.graphql"
     ));
     match_failure_message(
-        expose_field_directives,
+        stringify_err(expose_field_directives),
         "unknown field `day`, expected `from` or `to`",
     );
     Ok(())
@@ -145,7 +144,10 @@ fn test_mutation_extension_missing_topfield_parsing_failure() -> Result<(), Box<
     let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_missing_toplevelfield.graphql"
     ));
-    match_failure_message(expose_field_directives, "missing field `field`");
+    match_failure_message(
+        stringify_err(expose_field_directives),
+        "missing field `field`",
+    );
     Ok(())
 }
 
@@ -154,6 +156,21 @@ fn test_mutation_extension_missing_nestedfield_parsing_failure() -> Result<(), B
     let expose_field_directives = parse_mutation(include_str!(
         "fixtures/directives/mutation_extension_missing_nestedfield.graphql"
     ));
-    match_failure_message(expose_field_directives, "missing field `from`");
+    match_failure_message(
+        stringify_err(expose_field_directives),
+        "missing field `from`",
+    );
     Ok(())
+}
+
+fn stringify_err<T>(result: Result<T, Diagnostic>) -> Result<T, String> {
+    result.map_err(print_diagnostic_for_test)
+}
+
+fn print_diagnostic_for_test(e: Diagnostic) -> String {
+    e.printable(noop_printer()).to_string()
+}
+
+fn noop_printer<'a>() -> PrintLocationFn<'a> {
+    (|_: Location, _: &mut std::fmt::Formatter<'_>| ().wrap_ok()).boxed()
 }
