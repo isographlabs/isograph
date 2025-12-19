@@ -26,10 +26,6 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerScalarSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-
     fn name(&self) -> SelectableName {
         self.name
     }
@@ -63,10 +59,6 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-
     fn name(&self) -> SelectableName {
         self.name
     }

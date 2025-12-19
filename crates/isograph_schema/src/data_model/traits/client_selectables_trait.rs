@@ -150,10 +150,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ClientScalarSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-
     fn name(&self) -> SelectableName {
         self.name
     }
@@ -171,10 +167,6 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ClientObjectSelectable<TNetworkProtocol>
 {
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-
     fn name(&self) -> SelectableName {
         self.name
     }
