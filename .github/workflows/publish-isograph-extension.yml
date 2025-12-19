@@ -6,25 +6,25 @@ on:
       open-vsx-token:
         required: true
 
-name: Release Isograph Extension
+name: Publish Isograph Extension
 jobs:
-  deploy:
+  publish:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: npm ci
         working-directory: vscode-extension
       - name: Publish to Open VSX Registry
         uses: HaaLeo/publish-vscode-extension@v2
         with:
-          pat: ${{ inputs.open-vsx-token }}
+          pat: ${{ secrets.open-vsx-token }}
           packagePath: vscode-extension
       - name: Publish to Visual Studio Marketplace
         uses: HaaLeo/publish-vscode-extension@v2
         with:
-          pat: ${{ inputs.vs-marketplace-token }}
+          pat: ${{ secrets.vs-marketplace-token }}
           registryUrl: https://marketplace.visualstudio.com
           packagePath: vscode-extension

@@ -521,10 +521,10 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{secrets.NPM_TOKEN}}
 
-  deploy-isograph-extension:
-    name: Deploy Isograph Extension
+  publish-isograph-extension:
+    name: Publish Isograph Extension
     if: github.event_name == 'push' && github.repository == 'isographlabs/isograph' && github.ref_type == 'tag' && startsWith(github.ref_name, 'v')
-    uses: ./.github/workflows/release-isograph-extension.yml
+    uses: ./.github/workflows/publish-isograph-extension.yml
     needs: [all-checks-passed]
     secrets:
       vs-marketplace-token: ${{ secrets.VS_MARKETPLACE_TOKEN }}
