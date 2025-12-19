@@ -59,7 +59,7 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_name_and_selectable_name,
         ) => {
             let parent_entity_name =
-                parent_object_entity_name_and_selectable_name.parent_object_entity_name;
+                parent_object_entity_name_and_selectable_name.parent_entity_name;
             let selectable_name = parent_object_entity_name_and_selectable_name.selectable_name;
             let new_file_path_string = format!(
                 "{}/{}/{}.ts",
@@ -111,7 +111,7 @@ fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
             parent_object_entity_name_and_selectable_name,
         ) => {
             let parent_entity_name =
-                parent_object_entity_name_and_selectable_name.parent_object_entity_name;
+                parent_object_entity_name_and_selectable_name.parent_entity_name;
             let selectable_name = parent_object_entity_name_and_selectable_name.selectable_name;
             let new_file_path_string = format!(
                 "{}/{}/{}.ts",

@@ -70,13 +70,13 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             SelectionType::Scalar(scalar) => {
                 client_scalar_selectable_selection_set_for_parent_query(
                     db,
-                    scalar.parent_object_entity_name,
+                    scalar.parent_entity_name,
                     scalar.name,
                 )
                 .expect("Expected selection set to exist and to be valid.")
             }
             SelectionType::Object(object) => {
-                selectable_reader_selection_set(db, object.parent_object_entity_name, object.name)
+                selectable_reader_selection_set(db, object.parent_entity_name, object.name)
                     .expect("Expected selection set to exist and to be valid.")
                     .lookup(db)
                     .clone()
@@ -163,7 +163,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
+                parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable.name(),
             }
             .wrap_some(),
@@ -185,7 +185,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             artifact_path: ArtifactPath {
                 file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
                 type_and_field: ParentObjectEntityNameAndSelectableName {
-                    parent_object_entity_name: parent_object_entity.name,
+                    parent_entity_name: parent_object_entity.name,
                     selectable_name: client_selectable.name(),
                 }
                 .wrap_some(),
@@ -206,7 +206,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let server_object_selectable_name = server_object_selectable.name;
 
     let parent_object_entity =
-        &server_object_entity_named(db, server_object_selectable.parent_object_entity_name)
+        &server_object_entity_named(db, server_object_selectable.parent_entity_name)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -236,7 +236,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        server_object_selectable.parent_object_entity_name,
+        server_object_selectable.parent_entity_name,
         inline_fragment_reader_selections,
         0,
         refetch_paths,
@@ -276,7 +276,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
+                parent_entity_name: parent_object_entity.name,
                 selectable_name: server_object_selectable_name,
             }
             .wrap_some(),
@@ -298,8 +298,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let parent_object_entity = &server_object_entity_named(
         db,
         match client_selectable {
-            SelectionType::Object(o) => o.parent_object_entity_name,
-            SelectionType::Scalar(s) => s.parent_object_entity_name,
+            SelectionType::Object(o) => o.parent_entity_name,
+            SelectionType::Scalar(s) => s.parent_entity_name,
         },
     )
     .as_ref()
@@ -320,12 +320,12 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let selection_set_for_parent_query = match client_selectable {
         SelectionType::Scalar(scalar) => client_scalar_selectable_selection_set_for_parent_query(
             db,
-            scalar.parent_object_entity_name,
+            scalar.parent_entity_name,
             scalar.name,
         )
         .expect("Expected selection set to be valid."),
         SelectionType::Object(object) => {
-            let parent_object_entity_name = object.parent_object_entity_name;
+            let parent_object_entity_name = object.parent_entity_name;
             let client_object_selectable_name = object.name;
             selectable_reader_selection_set(
                 db,
@@ -429,7 +429,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
+                parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable.name(),
             }
             .wrap_some(),
@@ -498,7 +498,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
+                parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable.name(),
             }
             .wrap_some(),
@@ -539,7 +539,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: parent_object_entity.name,
+                parent_entity_name: parent_object_entity.name,
                 selectable_name: client_scalar_selectable.name(),
             }
             .wrap_some(),

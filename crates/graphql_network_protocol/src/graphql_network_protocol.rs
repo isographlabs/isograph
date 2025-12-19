@@ -181,13 +181,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         // and handle them now. A future refactor will get rid of this: selectables will all be the
         // the same struct, and you will have to do a follow up request for the target entity to
         // know whether it is an object or scalar selectable.
-        for (parent_object_entity_name, field) in fields_to_process {
+        for (parent_entity_name, field) in fields_to_process {
             let target: EntityName = (*field.item.type_.inner()).unchecked_conversion();
 
             if is_object_entity(&outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (parent_object_entity_name, field.item.name.item),
+                    (parent_entity_name, field.item.name.item),
                     ServerObjectSelectable {
                         description: field
                             .item
@@ -202,7 +202,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 .map(|entity_name| entity_name.unchecked_conversion()),
                         ),
                         object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
-                        parent_object_entity_name,
+                        parent_entity_name,
                         arguments: field
                             .item
                             .arguments
@@ -246,14 +246,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             } else {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
-                    (parent_object_entity_name, field.item.name.item),
+                    (parent_entity_name, field.item.name.item),
                     ServerScalarSelectable {
                         description: field
                             .item
                             .description
                             .map(|with_span| with_span.item.into()),
                         name: field.item.name.item.unchecked_conversion(),
-                        parent_object_entity_name,
+                        parent_entity_name,
                         arguments: field
                             .item
                             .arguments
@@ -336,8 +336,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             nullable: true,
                         }),
                         object_selectable_variant: ServerObjectSelectableVariant::InlineFragment,
-                        parent_object_entity_name: abstract_parent_entity_name
-                            .unchecked_conversion(),
+                        parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                         arguments: vec![],
                         phantom_data: std::marker::PhantomData,
                     }
@@ -399,7 +398,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .expose_as
                     .unwrap_or(mutation_field.name);
                 let top_level_schema_field_parent_object_entity_name =
-                    mutation_field.parent_object_entity_name;
+                    mutation_field.parent_entity_name;
                 let mutation_field_arguments = mutation_field.arguments.clone();
 
                 let top_level_schema_field_is_concrete = outcome
@@ -458,7 +457,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             ServerObjectSelectableVariant::LinkedField => {
                                 WrappedSelectionMapSelection::LinkedField {
                                     parent_object_entity_name: server_object_selectable
-                                        .parent_object_entity_name,
+                                        .parent_entity_name,
                                     server_object_selectable_name: server_object_selectable.name,
                                     arguments: vec![],
                                     concrete_target_entity_name: target_parent_object_entity_name
@@ -507,7 +506,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         },
                     ),
                     variable_definitions: vec![],
-                    parent_object_entity_name: target_parent_object_entity_name,
+                    parent_entity_name: target_parent_object_entity_name,
                     network_protocol: std::marker::PhantomData::<GraphQLNetworkProtocol>,
                 };
 

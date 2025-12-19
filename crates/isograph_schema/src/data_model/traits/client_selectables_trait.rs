@@ -29,13 +29,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: self.parent_object_entity_name,
+            parent_entity_name: self.parent_entity_name,
             selectable_name: self.name,
         }
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
+        self.parent_entity_name
     }
 
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
@@ -52,13 +52,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: self.parent_object_entity_name,
+            parent_entity_name: self.parent_entity_name,
             selectable_name: self.name,
         }
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
+        self.parent_entity_name
     }
 
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
@@ -75,13 +75,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: self.parent_object_entity_name,
+            parent_entity_name: self.parent_entity_name,
             selectable_name: self.name,
         }
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
+        self.parent_entity_name
     }
 
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
@@ -98,13 +98,13 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
-            parent_object_entity_name: self.parent_object_entity_name,
+            parent_entity_name: self.parent_entity_name,
             selectable_name: self.name,
         }
     }
 
     fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_object_entity_name
+        self.parent_entity_name
     }
 
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {

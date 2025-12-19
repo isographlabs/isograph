@@ -31,7 +31,7 @@ pub struct UnprocessedClientScalarSelectableSelectionSet {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct UnprocessedClientObjectSelectableSelectionSet {
-    pub parent_object_entity_name: EntityName,
+    pub parent_entity_name: EntityName,
     pub client_object_selectable_name: SelectableName,
     pub reader_selection_set: WithEmbeddedLocation<SelectionSet>,
     pub refetch_selection_set: WithEmbeddedLocation<SelectionSet>,
@@ -192,7 +192,7 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
             })
             .collect::<Result<_, _>>()?,
 
-        parent_object_entity_name: client_field_declaration.parent_type.item.0,
+        parent_entity_name: client_field_declaration.parent_type.item.0,
         network_protocol: std::marker::PhantomData,
     };
 
@@ -275,7 +275,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
 )> {
     let client_pointer_declaration = client_pointer_declaration.lookup(db);
-    let parent_object_entity_name = client_pointer_declaration.parent_type.item.0;
+    let parent_entity_name = client_pointer_declaration.parent_type.item.0;
     let client_pointer_name = client_pointer_declaration.client_pointer_name.item.0;
 
     if let Some(directive) = client_pointer_declaration.directives.item.first() {
@@ -307,14 +307,14 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
                 validate_variable_definition(
                     db,
                     variable_definition,
-                    parent_object_entity_name,
+                    parent_entity_name,
                     client_pointer_name,
                 )
                 .map(|x| x.item)
             })
             .collect::<Result<_, _>>()?,
 
-        parent_object_entity_name,
+        parent_entity_name,
         target_entity_name: TypeAnnotation::from_graphql_type_annotation(
             client_pointer_declaration.target_type.clone().map(|x| x.0),
         ),
@@ -329,7 +329,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     Ok((
         UnprocessedClientObjectSelectableSelectionSet {
             client_object_selectable_name: client_pointer_name,
-            parent_object_entity_name,
+            parent_entity_name,
             reader_selection_set: unprocessed_fields,
             refetch_selection_set: SelectionSet {
                 selections: vec![id_selection()],

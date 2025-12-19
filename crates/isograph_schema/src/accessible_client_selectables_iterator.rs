@@ -21,17 +21,17 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
             (
                 client_scalar_selectable_selection_set_for_parent_query(
                     db,
-                    scalar.parent_object_entity_name,
+                    scalar.parent_entity_name,
                     scalar.name,
                 )
                 .expect("Expected selection set to be valid"),
-                scalar.parent_object_entity_name,
+                scalar.parent_entity_name,
             )
         }
 
         SelectionType::Object(object) => {
             let object = object.lookup(db);
-            let parent_object_entity_name = object.parent_object_entity_name;
+            let parent_object_entity_name = object.parent_entity_name;
             let client_object_selectable_name = object.name;
             (
                 selectable_reader_selection_set(
@@ -43,7 +43,7 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
                 .lookup(db)
                 .clone()
                 .note_todo("Do not clone"),
-                object.parent_object_entity_name,
+                object.parent_entity_name,
             )
         }
     };

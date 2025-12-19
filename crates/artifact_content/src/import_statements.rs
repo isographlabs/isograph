@@ -37,7 +37,7 @@ pub(crate) fn reader_imports_to_import_statement(
             "import {}__{} from '../../{}/{}/{}{}';\n",
             type_and_field.underscore_separated(),
             artifact_type.filename(),
-            type_and_field.parent_object_entity_name,
+            type_and_field.parent_entity_name,
             type_and_field.selectable_name,
             artifact_type.filename(),
             file_extensions.ts()
@@ -55,7 +55,7 @@ pub(crate) fn param_type_imports_to_import_statement(
         output.push_str(&format!(
             "import {{ type {}__output_type }} from '../../{}/{}/output_type{}';\n",
             type_and_field.underscore_separated(),
-            type_and_field.parent_object_entity_name,
+            type_and_field.parent_entity_name,
             type_and_field.selectable_name,
             file_extensions.ts(),
         ));
@@ -72,7 +72,7 @@ pub(crate) fn param_type_imports_to_import_param_statement(
         output.push_str(&format!(
             "import {{ type {}__param }} from '../../{}/{}/param_type{}';\n",
             type_and_field.underscore_separated(),
-            type_and_field.parent_object_entity_name,
+            type_and_field.parent_entity_name,
             type_and_field.selectable_name,
             file_extensions.ts()
         ));

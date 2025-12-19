@@ -18,7 +18,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     /// target scalar entity. However, there are
     pub javascript_type_override: Option<JavascriptName>,
 
-    pub parent_object_entity_name: EntityName,
+    pub parent_entity_name: EntityName,
     pub arguments: Vec<VariableDefinition<ServerEntityName>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
@@ -34,7 +34,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub object_selectable_variant: ServerObjectSelectableVariant,
 
-    pub parent_object_entity_name: EntityName,
+    pub parent_entity_name: EntityName,
     pub arguments: Vec<VariableDefinition<ServerEntityName>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }

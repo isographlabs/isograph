@@ -21,15 +21,15 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .map(|object| {
             let field_name = *LINK_FIELD_NAME;
-            let parent_object_entity_name = object.lookup(db).name;
+            let parent_entity_name = object.lookup(db).name;
             ClientScalarSelectable {
                 description: Some(Description(
-                    format!("A store Link for the {} type.", parent_object_entity_name)
+                    format!("A store Link for the {} type.", parent_entity_name)
                         .intern()
                         .into(),
                 )),
                 name: field_name,
-                parent_object_entity_name,
+                parent_entity_name,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,
                 network_protocol: std::marker::PhantomData,
@@ -54,7 +54,7 @@ pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
         .map(|link_selectable| {
             (
                 (
-                    link_selectable.lookup(db).parent_object_entity_name,
+                    link_selectable.lookup(db).parent_entity_name,
                     (*LINK_FIELD_NAME),
                 ),
                 link_selectable,

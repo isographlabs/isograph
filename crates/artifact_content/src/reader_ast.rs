@@ -218,8 +218,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = ParentObjectEntityNameAndSelectableName {
                         selectable_name: object_selection.name.item,
-                        parent_object_entity_name: server_object_selectable
-                            .parent_object_entity_name,
+                        parent_entity_name: server_object_selectable.parent_entity_name,
                     };
 
                     let reader_artifact_import_name =
@@ -498,9 +497,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         format!("{type_and_field}__entrypoint")
     } else {
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
-        let field_parent_type = client_scalar_selectable
-            .type_and_field()
-            .parent_object_entity_name;
+        let field_parent_type = client_scalar_selectable.type_and_field().parent_entity_name;
         let field_directive_set = match &client_scalar_selectable.variant {
             ClientFieldVariant::UserWritten(info) => {
                 info.client_scalar_selectable_directive_set.clone().expect(
@@ -544,7 +541,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
-        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.parent_entity_name,
         client_scalar_selectable.name,
     )
     .as_ref()
@@ -562,7 +559,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         .with_embedded_location(EmbeddedLocation::todo_generated());
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
-        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.parent_entity_name,
         refetch_strategy
             .refetch_selection_set()
             .unwrap_or(&empty_selection_set),
@@ -751,10 +748,10 @@ fn refetched_paths_for_client_scalar_selectable<TNetworkProtocol: NetworkProtoco
     // TODO return a BTreeSet
     let path_set = refetched_paths_with_path(
         db,
-        nested_client_scalar_selectable.parent_object_entity_name,
+        nested_client_scalar_selectable.parent_entity_name,
         &client_scalar_selectable_selection_set_for_parent_query(
             db,
-            nested_client_scalar_selectable.parent_object_entity_name,
+            nested_client_scalar_selectable.parent_entity_name,
             nested_client_scalar_selectable.name,
         )
         .expect("Expected selection set to be valid."),
@@ -811,10 +808,10 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                             None => {
                                 let new_paths = refetched_paths_with_path(
                                     db,
-                                    client_scalar_selectable.parent_object_entity_name,
+                                    client_scalar_selectable.parent_entity_name,
                                     &client_scalar_selectable_selection_set_for_parent_query(
                                         db,
-                                        client_scalar_selectable.parent_object_entity_name,
+                                        client_scalar_selectable.parent_entity_name,
                                         client_scalar_selectable.name,
                                     )
                                     .expect("Expected selection set to be valid."),
@@ -840,8 +837,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 match object_selectable {
                     DefinitionLocation::Client(client_object_selectable) => {
                         let client_object_selectable = client_object_selectable.lookup(db);
-                        let parent_object_entity_name =
-                            client_object_selectable.parent_object_entity_name;
+                        let parent_object_entity_name = client_object_selectable.parent_entity_name;
                         let client_object_selectable_name = client_object_selectable.name;
                         let new_paths = refetched_paths_with_path(
                             db,

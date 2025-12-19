@@ -781,7 +781,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             //
             // This might be indicative of poor modeling.
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
-                let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
+                let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
                 let concrete_object_entity_name = server_object_selectable
                     .target_entity_name
@@ -953,7 +953,7 @@ fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity,
                 client_scalar_selectable_selection_set_for_parent_query(
                     db,
-                    newly_encountered_scalar_client_selectable.parent_object_entity_name,
+                    newly_encountered_scalar_client_selectable.parent_entity_name,
                     newly_encountered_scalar_client_selectable.name,
                 )
                 .expect("Expected selection set to be valid.")
@@ -1058,7 +1058,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         },
         imperatively_loaded_field_variant: variant.clone(),
         client_selectable_id: (
-            newly_encountered_client_scalar_selectable.parent_object_entity_name,
+            newly_encountered_client_scalar_selectable.parent_entity_name,
             newly_encountered_scalar_client_selectable_name,
         )
             .scalar_selected(),
@@ -1080,7 +1080,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
-        newly_encountered_client_scalar_selectable.parent_object_entity_name,
+        newly_encountered_client_scalar_selectable.parent_entity_name,
         newly_encountered_client_scalar_selectable.name,
     )
     .as_ref()

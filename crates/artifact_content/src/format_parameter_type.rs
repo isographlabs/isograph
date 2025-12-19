@@ -100,7 +100,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     let (is_optional, selection_type) = match server_selectable {
         SelectionType::Scalar(server_scalar_selectable) => {
             let server_scalar_selectable = server_scalar_selectable.lookup(db);
-            let parent_object_entity_name = server_scalar_selectable.parent_object_entity_name;
+            let parent_object_entity_name = server_scalar_selectable.parent_entity_name;
             let server_scalar_selectable_name = server_scalar_selectable.name;
             let server_scalar_selectable = server_scalar_selectable_named(
                 db,
@@ -129,7 +129,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
         }
         SelectionType::Object(server_object_selectable) => {
             let server_object_selectable = server_object_selectable.lookup(db);
-            let parent_object_entity_name = server_object_selectable.parent_object_entity_name;
+            let parent_object_entity_name = server_object_selectable.parent_entity_name;
             let server_object_selectable_name = server_object_selectable.name;
             let server_object_selectable = server_object_selectable_named(
                 db,

@@ -273,7 +273,7 @@ fn validate_all_variables_are_used(
         .collect::<Vec<_>>();
 
     if !unused_variables.is_empty() {
-        let type_name = top_level_type_and_field_name.parent_object_entity_name;
+        let type_name = top_level_type_and_field_name.parent_entity_name;
         let field_name = top_level_type_and_field_name.selectable_name;
         return Diagnostic::new(
             format!(

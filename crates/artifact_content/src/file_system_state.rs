@@ -183,7 +183,7 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
             match &artifact.artifact_path.type_and_field {
                 Some(type_and_field) => {
                     nested_files
-                        .entry(type_and_field.parent_object_entity_name)
+                        .entry(type_and_field.parent_entity_name)
                         .or_default()
                         .entry(type_and_field.selectable_name)
                         .or_default()
@@ -218,7 +218,7 @@ mod tests {
     ) -> ArtifactPathAndContent {
         let type_and_field = match (server, selectable) {
             (Some(s), Some(sel)) => ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: s.intern().into(),
+                parent_entity_name: s.intern().into(),
                 selectable_name: sel.intern().into(),
             }
             .wrap_some(),

@@ -24,13 +24,13 @@ fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
     let type_and_field = client_scalar_selectable.lookup(db).type_and_field();
     let formatted_field = format!(
         "entrypoint {}.{}",
-        type_and_field.parent_object_entity_name, type_and_field.selectable_name
+        type_and_field.parent_entity_name, type_and_field.selectable_name
     );
     let mut s: String = "".to_string();
     let import = format!(
         "import entrypoint_{} from '../__isograph/{}/{}/entrypoint{}';\n",
         type_and_field.underscore_separated(),
-        type_and_field.parent_object_entity_name,
+        type_and_field.parent_entity_name,
         type_and_field.selectable_name,
         file_extensions.ts()
     );
@@ -71,7 +71,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
     let import = format!(
         "import {{ type {}__param }} from './{}/{}/param_type{}';\n",
         type_and_field.underscore_separated(),
-        type_and_field.parent_object_entity_name,
+        type_and_field.parent_entity_name,
         type_and_field.selectable_name,
         file_extensions.ts()
     );
@@ -82,7 +82,7 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
             SelectionType::Scalar(_) => "field",
             SelectionType::Object(_) => "pointer",
         },
-        type_and_field.parent_object_entity_name,
+        type_and_field.parent_entity_name,
         type_and_field.selectable_name
     );
     let client_type = match client_type {
@@ -344,21 +344,21 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
         let (parent_1, selectable_name_1) = match client_type_1.0 {
             SelectionType::Scalar(s) => {
                 let s = s.lookup(db);
-                (s.parent_object_entity_name, s.name)
+                (s.parent_entity_name, s.name)
             }
             SelectionType::Object(o) => {
                 let o = o.lookup(db);
-                (o.parent_object_entity_name, o.name)
+                (o.parent_entity_name, o.name)
             }
         };
         let (parent_2, selectable_name_2) = match client_type_2.0 {
             SelectionType::Scalar(s) => {
                 let s = s.lookup(db);
-                (s.parent_object_entity_name, s.name)
+                (s.parent_entity_name, s.name)
             }
             SelectionType::Object(o) => {
                 let o = o.lookup(db);
-                (o.parent_object_entity_name, o.name)
+                (o.parent_entity_name, o.name)
             }
         };
 
@@ -414,8 +414,8 @@ fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
             let client_scalar_selectable_2 = client_scalar_selectable_2.lookup(db);
 
             match client_scalar_selectable_1
-                .parent_object_entity_name
-                .cmp(&client_scalar_selectable_2.parent_object_entity_name)
+                .parent_entity_name
+                .cmp(&client_scalar_selectable_2.parent_entity_name)
             {
                 Ordering::Less => Ordering::Less,
                 Ordering::Greater => Ordering::Greater,

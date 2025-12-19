@@ -37,7 +37,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
-        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.parent_entity_name,
         client_scalar_selectable.name,
     )
     .as_ref()
@@ -53,13 +53,13 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
 
     let selection_set_for_parent_query = client_scalar_selectable_selection_set_for_parent_query(
         db,
-        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.parent_entity_name,
         client_scalar_selectable.name,
     )
     .expect("Expected selection set to be valid.");
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        client_scalar_selectable.parent_object_entity_name,
+        client_scalar_selectable.parent_entity_name,
         // TODO model this better
         if was_selected_loadably {
             refetch_strategy
@@ -96,7 +96,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         artifact_path: ArtifactPath {
             file_name: *REFETCH_READER_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
+                parent_entity_name: client_scalar_selectable.parent_entity_name,
                 selectable_name: client_scalar_selectable.name,
             }
             .wrap_some(),
@@ -114,9 +114,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         let output_type = client_scalar_selectable_output_type;
         format!(
             "export type {}__{}__output_type = {};",
-            client_scalar_selectable.parent_object_entity_name,
-            client_scalar_selectable.name,
-            output_type
+            client_scalar_selectable.parent_entity_name, client_scalar_selectable.name, output_type
         )
     };
     let output_type_text = format!(
@@ -129,7 +127,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
             type_and_field: ParentObjectEntityNameAndSelectableName {
-                parent_object_entity_name: client_scalar_selectable.parent_object_entity_name,
+                parent_entity_name: client_scalar_selectable.parent_entity_name,
                 selectable_name: client_scalar_selectable.name,
             }
             .wrap_some(),

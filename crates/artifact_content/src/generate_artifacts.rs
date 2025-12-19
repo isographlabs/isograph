@@ -341,7 +341,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             let refetch_strategy =
                                 refetch_strategy_for_client_scalar_selectable_named(
                                     db,
-                                    client_scalar_selectable.parent_object_entity_name,
+                                    client_scalar_selectable.parent_entity_name,
                                     client_scalar_selectable.name,
                                 )
                                 .as_ref()
@@ -725,12 +725,9 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 ) -> ClientScalarSelectableOutputType {
     let variant = &client_scalar_selectable.variant;
     match variant {
-        ClientFieldVariant::Link => {
-            ClientScalarSelectableOutputType(TNetworkProtocol::generate_link_type(
-                db,
-                &client_scalar_selectable.parent_object_entity_name,
-            ))
-        }
+        ClientFieldVariant::Link => ClientScalarSelectableOutputType(
+            TNetworkProtocol::generate_link_type(db, &client_scalar_selectable.parent_entity_name),
+        ),
         ClientFieldVariant::UserWritten(info) => match info
             .client_scalar_selectable_directive_set
             .clone()

@@ -62,10 +62,7 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
             for field in fields {
                 let scalar_selectable = field.lookup(db);
                 map.insert(
-                    (
-                        scalar_selectable.parent_object_entity_name,
-                        scalar_selectable.name,
-                    ),
+                    (scalar_selectable.parent_entity_name, scalar_selectable.name),
                     SelectionSet { selections: vec![] }
                         .with_embedded_location(EmbeddedLocation::todo_generated())
                         .interned_value(db)

@@ -32,7 +32,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
 
-    pub parent_object_entity_name: EntityName,
+    pub parent_entity_name: EntityName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
@@ -46,7 +46,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
 
-    pub parent_object_entity_name: EntityName,
+    pub parent_entity_name: EntityName,
 
     pub network_protocol: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
