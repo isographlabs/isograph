@@ -29,8 +29,7 @@ Err(
     ),
 )
 
-Expected non-variable identifier (e.g. 'x' or 'Foo'), but found period ('.')
-crates/isograph_lang_parser/fixtures/field-no-type-name.input.js
+Expected non-variable identifier (e.g. 'x' or 'Foo'), but found period ('.')crates/isograph_lang_parser/fixtures/field-no-type-name.input.js
 
   field .Name {
         ^      

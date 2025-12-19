@@ -22,7 +22,7 @@ pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithEmbeddedLocation<()>,
     pub dot: WithEmbeddedLocation<()>,
     pub iso_literal_text: IsoLiteralText,
-    pub directive_set: Vec<WithSpan<IsographFieldDirective>>,
+    pub directive_set: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
 
     pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
 }

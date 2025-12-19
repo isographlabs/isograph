@@ -29,7 +29,6 @@ Err(
     ),
 )
 
-Isograph literals must be immediately called, and passed a function
-crates/isograph_lang_parser/fixtures/field-no-parens.input.js
+Isograph literals must be immediately called, and passed a functioncrates/isograph_lang_parser/fixtures/field-no-parens.input.js
 
 ---

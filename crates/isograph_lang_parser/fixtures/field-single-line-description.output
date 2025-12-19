@@ -2,7 +2,7 @@ Ok(
     (
         ClientFieldDeclaration(
             WithEmbeddedLocation {
-                location: EmbeddedLocation {
+                embedded_location: EmbeddedLocation {
                     text_source: TextSource {
                         current_working_directory: CurrentWorkingDirectory,
                         relative_path_to_source_file: RelativePathToSourceFile(
@@ -25,7 +25,7 @@ Ok(
                         "BasicField",
                     ),
                     parent_type: WithEmbeddedLocation {
-                        location: EmbeddedLocation {
+                        embedded_location: EmbeddedLocation {
                             text_source: TextSource {
                                 current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
@@ -50,7 +50,7 @@ Ok(
                         ),
                     },
                     client_field_name: WithEmbeddedLocation {
-                        location: EmbeddedLocation {
+                        embedded_location: EmbeddedLocation {
                             text_source: TextSource {
                                 current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
@@ -76,7 +76,7 @@ Ok(
                     },
                     description: Some(
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -102,7 +102,7 @@ Ok(
                         },
                     ),
                     selection_set: WithEmbeddedLocation {
-                        location: EmbeddedLocation {
+                        embedded_location: EmbeddedLocation {
                             text_source: TextSource {
                                 current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
@@ -135,7 +135,7 @@ Ok(
                     ),
                     semantic_tokens: [
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -168,7 +168,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -204,7 +204,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -240,7 +240,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -276,7 +276,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -303,7 +303,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
@@ -336,7 +336,7 @@ Ok(
                             },
                         },
                         WithEmbeddedLocation {
-                            location: EmbeddedLocation {
+                            embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
                                     current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(

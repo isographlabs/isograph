@@ -29,8 +29,7 @@ Err(
     ),
 )
 
-Expected a line break.
-crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js
+Expected a line break.crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js
     scalar
     linked {
       scalarWithComma,
