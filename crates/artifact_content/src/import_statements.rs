@@ -1,6 +1,6 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::ParentObjectEntityNameAndSelectableName;
+use common_lang_types::EntityNameAndSelectableName;
 use isograph_config::GenerateFileExtensionsOption;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
@@ -20,11 +20,8 @@ impl ImportedFileCategory {
     }
 }
 
-pub(crate) type ReaderImports = BTreeSet<(
-    ParentObjectEntityNameAndSelectableName,
-    ImportedFileCategory,
-)>;
-pub(crate) type ParamTypeImports = BTreeSet<ParentObjectEntityNameAndSelectableName>;
+pub(crate) type ReaderImports = BTreeSet<(EntityNameAndSelectableName, ImportedFileCategory)>;
+pub(crate) type ParamTypeImports = BTreeSet<EntityNameAndSelectableName>;
 pub(crate) type UpdatableImports = bool;
 
 pub(crate) fn reader_imports_to_import_statement(

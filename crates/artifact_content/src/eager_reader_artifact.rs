@@ -1,6 +1,5 @@
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName,
-    WithEmbeddedLocation,
+    ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName, WithEmbeddedLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
@@ -162,7 +161,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         file_content: reader_content.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_READER_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable_name,
             }
@@ -183,7 +182,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
             file_content: parameters_content.into(),
             artifact_path: ArtifactPath {
                 file_name: *RESOLVER_PARAMETERS_TYPE_FILE_NAME,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
+                type_and_field: EntityNameAndSelectableName {
                     parent_entity_name: parent_object_entity.name,
                     selectable_name: client_selectable_name,
                 }
@@ -274,7 +273,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
         file_content: reader_content.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_READER_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
                 selectable_name: server_object_selectable_name,
             }
@@ -432,7 +431,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         file_content: param_type_content.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_PARAM_TYPE_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable_name,
             }
@@ -504,7 +503,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         file_content: final_output_type_text.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
                 selectable_name: client_selectable_name,
             }
@@ -545,7 +544,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
         file_content: output_type_text.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name,
                 selectable_name: client_scalar_selectable.name,
             }

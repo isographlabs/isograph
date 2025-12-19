@@ -1,6 +1,6 @@
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, EmbeddedLocation,
-    ParentObjectEntityNameAndSelectableName, WithLocationPostfix,
+    ArtifactPath, ArtifactPathAndContent, EmbeddedLocation, EntityNameAndSelectableName,
+    WithLocationPostfix,
 };
 
 use isograph_config::GenerateFileExtensionsOption;
@@ -95,7 +95,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
         file_content: reader_content.into(),
         artifact_path: ArtifactPath {
             file_name: *REFETCH_READER_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: client_scalar_selectable.parent_entity_name,
                 selectable_name: client_scalar_selectable.name,
             }
@@ -126,7 +126,7 @@ pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkPro
         file_content: output_type_text.into(),
         artifact_path: ArtifactPath {
             file_name: *RESOLVER_OUTPUT_TYPE_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: client_scalar_selectable.parent_entity_name,
                 selectable_name: client_scalar_selectable.name,
             }

@@ -1,7 +1,7 @@
 use std::collections::{BTreeSet, HashSet};
 
 use common_lang_types::{
-    EmbeddedLocation, EntityName, ParentObjectEntityNameAndSelectableName, SelectableName,
+    EmbeddedLocation, EntityName, EntityNameAndSelectableName, SelectableName,
     WithEmbeddedLocation, WithLocationPostfix,
 };
 use isograph_lang_types::{
@@ -216,7 +216,7 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         DefinitionLocation::Server(server_object_selectable) => {
             match &server_object_selectable.object_selectable_variant {
                 ServerObjectSelectableVariant::InlineFragment => {
-                    let type_and_field = ParentObjectEntityNameAndSelectableName {
+                    let type_and_field = EntityNameAndSelectableName {
                         selectable_name: object_selection.name.item,
                         parent_entity_name: server_object_selectable.parent_entity_name,
                     };

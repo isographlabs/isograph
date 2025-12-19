@@ -1,4 +1,4 @@
-use crate::{ArtifactFileName, ParentObjectEntityNameAndSelectableName};
+use crate::{ArtifactFileName, EntityNameAndSelectableName};
 
 #[derive(Debug, Clone)]
 pub struct FileContent(pub String);
@@ -29,7 +29,7 @@ pub struct ArtifactPathAndContent {
 }
 
 pub struct ArtifactPath {
-    pub type_and_field: Option<ParentObjectEntityNameAndSelectableName>,
+    pub type_and_field: Option<EntityNameAndSelectableName>,
     pub file_name: ArtifactFileName,
 }
 

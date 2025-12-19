@@ -1,8 +1,8 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, DiagnosticVecResult, EmbeddedLocation, FieldArgumentName,
-    Location, ParentObjectEntityNameAndSelectableName, VariableName, WithEmbeddedLocation,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, EmbeddedLocation,
+    EntityNameAndSelectableName, FieldArgumentName, Location, VariableName, WithEmbeddedLocation,
 };
 
 use isograph_lang_types::{
@@ -195,7 +195,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
         validate_all_variables_are_used(
             variable_definitions,
             reachable_variables,
-            ParentObjectEntityNameAndSelectableName {
+            EntityNameAndSelectableName {
                 parent_entity_name,
                 selectable_name: client_selectable_name,
             },
@@ -261,7 +261,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
 fn validate_all_variables_are_used(
     variable_definitions: &[ValidatedVariableDefinition],
     used_variables: UsedVariables,
-    top_level_type_and_field_name: ParentObjectEntityNameAndSelectableName,
+    top_level_type_and_field_name: EntityNameAndSelectableName,
     location: Location,
 ) -> DiagnosticResult<()> {
     let unused_variables = variable_definitions

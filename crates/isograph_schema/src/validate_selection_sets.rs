@@ -1,6 +1,6 @@
 use common_lang_types::{
-    Diagnostic, EmbeddedLocation, EntityName, IsographCodeAction, Location,
-    ParentObjectEntityNameAndSelectableName, SelectableName,
+    Diagnostic, EmbeddedLocation, EntityName, EntityNameAndSelectableName, IsographCodeAction,
+    Location, SelectableName,
 };
 use isograph_lang_types::{
     DefinitionLocation, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionSet,
@@ -57,7 +57,7 @@ pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
             &mut errors,
             selection_set,
             parent_entity,
-            ParentObjectEntityNameAndSelectableName {
+            EntityNameAndSelectableName {
                 parent_entity_name: key.0,
                 selectable_name: key.1,
             },
@@ -74,7 +74,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
     errors: &mut Vec<Diagnostic>,
     selection_set: &SelectionSet,
     parent_entity: &ServerObjectEntity<TNetworkProtocol>,
-    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
+    selectable_declaration_info: EntityNameAndSelectableName,
 ) {
     for selection in selection_set.selections.iter() {
         match selection.item.reference() {
@@ -292,7 +292,7 @@ fn selection_wrong_selection_type_diagnostic(
     selected_as: &str,
     proper_way_to_select: &str,
     location: EmbeddedLocation,
-    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
+    selectable_declaration_info: EntityNameAndSelectableName,
 ) -> Diagnostic {
     Diagnostic::new(
         format!(
@@ -311,7 +311,7 @@ fn selection_does_not_exist_diagnostic(
     selectable_name: SelectableName,
     location: EmbeddedLocation,
     selection_type: SelectionType<(), ()>,
-    selectable_declaration_info: ParentObjectEntityNameAndSelectableName,
+    selectable_declaration_info: EntityNameAndSelectableName,
 ) -> Diagnostic {
     Diagnostic::new_with_code_actions(
         format!(
@@ -322,18 +322,18 @@ fn selection_does_not_exist_diagnostic(
         ),
         location.to::<Location>().wrap_some(),
         match selection_type {
-            SelectionType::Scalar(_) => IsographCodeAction::CreateNewScalarSelectable(
-                ParentObjectEntityNameAndSelectableName {
+            SelectionType::Scalar(_) => {
+                IsographCodeAction::CreateNewScalarSelectable(EntityNameAndSelectableName {
                     parent_entity_name: selectable_parent_object_entity_name,
                     selectable_name,
-                },
-            ),
-            SelectionType::Object(_) => IsographCodeAction::CreateNewObjectSelectable(
-                ParentObjectEntityNameAndSelectableName {
+                })
+            }
+            SelectionType::Object(_) => {
+                IsographCodeAction::CreateNewObjectSelectable(EntityNameAndSelectableName {
                     parent_entity_name: selectable_parent_object_entity_name,
                     selectable_name,
-                },
-            ),
+                })
+            }
         }
         .wrap_vec(),
     )

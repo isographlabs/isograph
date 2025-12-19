@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    EntityName, ParentObjectEntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
+    EntityName, EntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
     WithEmbeddedLocation,
 };
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
@@ -388,8 +388,8 @@ fn write_getter_and_setter(
 fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_type_declaration: &mut String,
-    nested_client_scalar_selectable_imports: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
-    loadable_fields: &mut BTreeSet<ParentObjectEntityNameAndSelectableName>,
+    nested_client_scalar_selectable_imports: &mut BTreeSet<EntityNameAndSelectableName>,
+    loadable_fields: &mut BTreeSet<EntityNameAndSelectableName>,
     indentation_level: u8,
     scalar_selection: &ScalarSelection,
     parent_object_entity_name: EntityName,

@@ -205,7 +205,7 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use common_lang_types::{ArtifactPath, ParentObjectEntityNameAndSelectableName};
+    use common_lang_types::{ArtifactPath, EntityNameAndSelectableName};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use std::path::PathBuf;
@@ -217,7 +217,7 @@ mod tests {
         content: &str,
     ) -> ArtifactPathAndContent {
         let type_and_field = match (server, selectable) {
-            (Some(s), Some(sel)) => ParentObjectEntityNameAndSelectableName {
+            (Some(s), Some(sel)) => EntityNameAndSelectableName {
                 parent_entity_name: s.intern().into(),
                 selectable_name: sel.intern().into(),
             }

@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, ParentObjectEntityNameAndSelectableName, VariableName,
+    ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
@@ -164,7 +164,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
             file_content: format!("export default '{query_text}';").into(),
             artifact_path: ArtifactPath {
                 file_name: query_text_file_name_with_extension,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
+                type_and_field: EntityNameAndSelectableName {
                     parent_entity_name: root_parent_object,
                     selectable_name: root_fetchable_field,
                 }
@@ -175,7 +175,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
             file_content: imperatively_loaded_field_file_contents.into(),
             artifact_path: ArtifactPath {
                 file_name: file_name_prefix,
-                type_and_field: ParentObjectEntityNameAndSelectableName {
+                type_and_field: EntityNameAndSelectableName {
                     parent_entity_name: root_parent_object,
                     selectable_name: root_fetchable_field,
                 }

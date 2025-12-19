@@ -1,7 +1,7 @@
 use prelude::Postfix;
 use serde::{Deserialize, Serialize};
 
-use crate::{Location, LocationFreeDiagnostic, ParentObjectEntityNameAndSelectableName};
+use crate::{EntityNameAndSelectableName, Location, LocationFreeDiagnostic};
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Diagnostic(pub Box<DiagnosticData>);
@@ -104,8 +104,8 @@ impl<T> WithNonFatalDiagnostics<T> {
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Copy, Serialize, Deserialize)]
 pub enum IsographCodeAction {
-    CreateNewScalarSelectable(ParentObjectEntityNameAndSelectableName),
-    CreateNewObjectSelectable(ParentObjectEntityNameAndSelectableName),
+    CreateNewScalarSelectable(EntityNameAndSelectableName),
+    CreateNewObjectSelectable(EntityNameAndSelectableName),
 }
 
 impl From<LocationFreeDiagnostic> for Diagnostic {

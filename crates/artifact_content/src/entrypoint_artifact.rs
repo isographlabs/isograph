@@ -11,7 +11,7 @@ use crate::{
     raw_response_type::generate_raw_response_type,
 };
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, EntityName, ParentObjectEntityNameAndSelectableName,
+    ArtifactPath, ArtifactPathAndContent, EntityName, EntityNameAndSelectableName,
     QueryOperationName, SelectableName, VariableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
@@ -313,7 +313,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         file_content: format!("export default '{query_text}';").into(),
         artifact_path: ArtifactPath {
             file_name: *QUERY_TEXT_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: type_name,
                 selectable_name: field_name,
             }
@@ -333,7 +333,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .into(),
         artifact_path: ArtifactPath {
             file_name: *NORMALIZATION_AST_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: type_name,
                 selectable_name: field_name,
             }
@@ -348,7 +348,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .into(),
         artifact_path: ArtifactPath {
             file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: type_name,
                 selectable_name: field_name,
             }
@@ -359,7 +359,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         file_content: entrypoint_file_content.into(),
         artifact_path: ArtifactPath {
             file_name: *ENTRYPOINT_FILE_NAME,
-            type_and_field: ParentObjectEntityNameAndSelectableName {
+            type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: type_name,
                 selectable_name: field_name,
             }

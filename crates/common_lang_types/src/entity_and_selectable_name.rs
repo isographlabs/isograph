@@ -2,15 +2,13 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ArtifactFilePrefix, EntityName, SelectableName};
 
-// TODO consider making this generic over the type of field_name. We sometimes know
-// that the field is e.g. a scalar field
 #[derive(Debug, PartialEq, Eq, Hash, Ord, PartialOrd, Clone, Copy, Serialize, Deserialize)]
-pub struct ParentObjectEntityNameAndSelectableName {
+pub struct EntityNameAndSelectableName {
     pub parent_entity_name: EntityName,
     pub selectable_name: SelectableName,
 }
 
-impl ParentObjectEntityNameAndSelectableName {
+impl EntityNameAndSelectableName {
     pub fn underscore_separated(&self) -> String {
         format!("{}__{}", self.parent_entity_name, self.selectable_name)
     }
@@ -20,7 +18,7 @@ impl ParentObjectEntityNameAndSelectableName {
         current_file_type_name: EntityName,
         file_type: ArtifactFilePrefix,
     ) -> String {
-        let ParentObjectEntityNameAndSelectableName {
+        let EntityNameAndSelectableName {
             parent_entity_name: type_name,
             selectable_name: field_name,
         } = *self;
