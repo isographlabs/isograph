@@ -191,7 +191,7 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
                 };
 
                 // The inner span
-                let text_with_carats = text_with_carats(&read_out_text, embedded_location.span);
+                let text_with_carats = text_with_carats(read_out_text, embedded_location.span);
 
                 let file_path = embedded_location.text_source.relative_path_to_source_file;
                 write!(f, "{file_path}\n{text_with_carats}")
