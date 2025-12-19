@@ -13,7 +13,6 @@ use crate::{
 
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
-    fn name(&self) -> SelectableName;
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
 
@@ -23,10 +22,6 @@ pub trait ClientScalarOrObjectSelectable {
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientScalarSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_entity_name: self.parent_entity_name,
@@ -46,10 +41,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientScalarSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_entity_name: self.parent_entity_name,
@@ -69,10 +60,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_entity_name: self.parent_entity_name,
@@ -92,10 +79,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientObjectSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn type_and_field(&self) -> ParentObjectEntityNameAndSelectableName {
         ParentObjectEntityNameAndSelectableName {
             parent_entity_name: self.parent_entity_name,
