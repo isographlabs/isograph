@@ -125,16 +125,15 @@ fn parse_iso_entrypoint_declaration(
                 with_embedded_location.map(ClientScalarSelectableNameWrapper)
             })?;
 
-        let directives = parse_directives(tokens)?;
+        let directive_set = parse_directives(tokens)?;
 
-        let entrypoint_directive_set = from_isograph_field_directives(&directives)?;
         EntrypointDeclaration {
             parent_type,
             client_field_name,
             iso_literal_text,
             entrypoint_keyword: ().with_embedded_location(entrypoint_keyword_location),
             dot: dot.map(|_| ()),
-            entrypoint_directive_set,
+            directive_set,
             semantic_tokens: tokens.semantic_tokens(),
         }
         .wrap_ok::<Diagnostic>()
