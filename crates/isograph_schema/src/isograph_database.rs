@@ -178,7 +178,7 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
                 let (file_path, read_out_text) = embedded_location.text_source.read_to_string();
                 let text_with_carats = text_with_carats(&read_out_text, embedded_location.span);
 
-                write!(f, "{file_path}\n{text_with_carats}")
+                write!(f, "\n{file_path}\n{text_with_carats}")
             }
             Location::Generated => write!(f, "\n<generated>"),
         })
