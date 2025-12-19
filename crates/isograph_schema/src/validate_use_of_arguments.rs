@@ -149,7 +149,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         errors,
                         &mut reachable_variables,
                         field_argument_definitions,
-                        &variable_definitions,
+                        variable_definitions,
                         can_have_missing_args,
                         &scalar_selection.arguments,
                         scalar_selection.name.embedded_location,
@@ -180,7 +180,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         errors,
                         &mut reachable_variables,
                         field_argument_definitions,
-                        &variable_definitions,
+                        variable_definitions,
                         true,
                         &object_selection.arguments,
                         object_selection.name.embedded_location,
@@ -193,7 +193,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     maybe_push_errors(
         errors,
         validate_all_variables_are_used(
-            &variable_definitions,
+            variable_definitions,
             reachable_variables,
             ParentObjectEntityNameAndSelectableName {
                 parent_entity_name,
