@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientScalarOrObjectSelectable, ID_FIELD_NAME, IsographDatabase, NetworkProtocol,
+    ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
     ValidatedVariableDefinition, client_selectable_map, selectable_named,
     selectable_reader_selection_set, server_object_entity_named,
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
@@ -45,14 +45,7 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())
     {
-        match client_selectable {
-            SelectionType::Scalar(s) => {
-                validate_use_of_arguments_for_client_type(db, s.lookup(db), &mut errors);
-            }
-            SelectionType::Object(o) => {
-                validate_use_of_arguments_for_client_type(db, o.lookup(db), &mut errors);
-            }
-        }
+        validate_use_of_arguments_for_client_type(db, client_selectable.dereference(), &mut errors);
     }
 
     if errors.is_empty() {
@@ -64,23 +57,31 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    client_type: impl ClientScalarOrObjectSelectable,
+    client_type: MemoRefClientSelectable<TNetworkProtocol>,
     errors: &mut Vec<Diagnostic>,
 ) {
     let mut reachable_variables = BTreeSet::new();
 
-    let selection_set = match selectable_reader_selection_set(
-        db,
-        client_type.parent_object_entity_name(),
-        client_type.name(),
-    ) {
-        Ok(selection_set) => selection_set.lookup(db),
-        Err(error) => {
-            return errors.push(error);
+    let (parent_entity_name, client_selectable_name, variable_definitions) = match client_type {
+        SelectionType::Scalar(s) => {
+            let s = s.lookup(db);
+            (s.parent_entity_name, s.name, &s.variable_definitions)
+        }
+        SelectionType::Object(o) => {
+            let o = o.lookup(db);
+            (o.parent_entity_name, o.name, &o.variable_definitions)
         }
     };
 
-    let parent_entity = server_object_entity_named(db, client_type.parent_object_entity_name())
+    let selection_set =
+        match selectable_reader_selection_set(db, parent_entity_name, client_selectable_name) {
+            Ok(selection_set) => selection_set.lookup(db),
+            Err(error) => {
+                return errors.push(error);
+            }
+        };
+
+    let parent_entity = server_object_entity_named(db, parent_entity_name)
         .as_ref()
         .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
         .expect("Expected entity to exist. This is indicative of a bug in Isograph.")
@@ -148,7 +149,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         errors,
                         &mut reachable_variables,
                         field_argument_definitions,
-                        client_type.variable_definitions(),
+                        &variable_definitions,
                         can_have_missing_args,
                         &scalar_selection.arguments,
                         scalar_selection.name.embedded_location,
@@ -179,7 +180,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         errors,
                         &mut reachable_variables,
                         field_argument_definitions,
-                        client_type.variable_definitions(),
+                        &variable_definitions,
                         true,
                         &object_selection.arguments,
                         object_selection.name.embedded_location,
@@ -192,9 +193,12 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
     maybe_push_errors(
         errors,
         validate_all_variables_are_used(
-            client_type.variable_definitions(),
+            &variable_definitions,
             reachable_variables,
-            client_type.type_and_field(),
+            ParentObjectEntityNameAndSelectableName {
+                parent_entity_name,
+                selectable_name: client_selectable_name,
+            },
             // TODO client_type name needs a location
             Location::Generated,
         ),
