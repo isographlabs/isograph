@@ -9,7 +9,7 @@ use isograph_schema::{
     read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, SelectableTrait, ServerEntityName, ServerObjectEntity,
+    IsographDatabase, NetworkProtocol, ServerEntityName, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     server_object_entity_named,
 };
@@ -89,11 +89,19 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     let (name, description, arguments) = match &selectable {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
-                            (scalar.name, scalar.description, scalar.arguments())
+                            (
+                                scalar.name,
+                                scalar.description,
+                                scalar.arguments.reference(),
+                            )
                         }
                         DefinitionLocation::Client(c) => {
                             let client = c.lookup(db);
-                            (client.name, client.description, client.arguments())
+                            (
+                                client.name,
+                                client.description,
+                                client.variable_definitions.reference(),
+                            )
                         }
                     };
 
@@ -118,11 +126,19 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     let (name, description, arguments) = match &selectable {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
-                            (scalar.name, scalar.description, scalar.arguments())
+                            (
+                                scalar.name,
+                                scalar.description,
+                                scalar.arguments.reference(),
+                            )
                         }
                         DefinitionLocation::Client(c) => {
                             let client = c.lookup(db);
-                            (client.name, client.description, client.arguments())
+                            (
+                                client.name,
+                                client.description,
+                                client.variable_definitions.reference(),
+                            )
                         }
                     };
 
@@ -301,7 +317,7 @@ fn hover_text_for_selectable(
     server_or_client: &'static str,
     selectable_name: SelectableName,
     selectable_description: Option<Description>,
-    selectable_arguments: Vec<&VariableDefinition<ServerEntityName>>,
+    selectable_arguments: &[VariableDefinition<ServerEntityName>],
     parent_type_name: EntityName,
     parent_description: Option<Description>,
 ) -> String {

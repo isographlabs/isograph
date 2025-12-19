@@ -157,11 +157,6 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
-
-    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
-        // TODO we can do better!!
-        self.variable_definitions.iter().collect()
-    }
 }
 
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
@@ -173,10 +168,6 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
 
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
-    }
-
-    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
-        self.variable_definitions.iter().collect()
     }
 }
 

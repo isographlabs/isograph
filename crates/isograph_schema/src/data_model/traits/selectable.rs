@@ -1,8 +1,8 @@
 use common_lang_types::{EntityName, SelectableName};
 use impl_base_types_macro::{impl_for_definition_location, impl_for_selection_type};
-use isograph_lang_types::{DefinitionLocation, VariableDefinition};
+use isograph_lang_types::DefinitionLocation;
 
-use crate::{MemoRefClientSelectable, MemoRefServerSelectable, ServerEntityName};
+use crate::{MemoRefClientSelectable, MemoRefServerSelectable};
 
 pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
     MemoRefServerSelectable<TNetworkProtocol>,
@@ -14,7 +14,6 @@ pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
 pub trait SelectableTrait {
     fn name(&self) -> SelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
-    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>>;
 }
 
 impl<T: SelectableTrait> SelectableTrait for &T {
@@ -24,9 +23,5 @@ impl<T: SelectableTrait> SelectableTrait for &T {
 
     fn parent_object_entity_name(&self) -> EntityName {
         (*self).parent_object_entity_name()
-    }
-
-    fn arguments(&self) -> Vec<&VariableDefinition<ServerEntityName>> {
-        (*self).arguments()
     }
 }
