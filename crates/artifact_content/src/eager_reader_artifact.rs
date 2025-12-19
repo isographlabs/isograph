@@ -358,7 +358,10 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     let reader_param_type = format!(
         "{}__{}__param",
         parent_object_entity.name,
-        isograph_schema::SelectableTrait::name(&client_selectable)
+        match client_selectable {
+            SelectionType::Scalar(s) => s.name,
+            SelectionType::Object(o) => o.name,
+        }
     );
 
     let start_update_imports = if updatable_fields {
@@ -385,7 +388,10 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         let reader_parameters_type = format!(
             "{}__{}__parameters",
             parent_object_entity.name,
-            isograph_schema::SelectableTrait::name(&client_selectable)
+            match client_selectable {
+                SelectionType::Scalar(s) => s.name,
+                SelectionType::Object(o) => o.name,
+            }
         );
         (
             format!(

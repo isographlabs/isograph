@@ -150,10 +150,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ClientScalarSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
@@ -162,10 +158,6 @@ impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ClientObjectSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }

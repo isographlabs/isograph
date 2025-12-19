@@ -26,10 +26,6 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerScalarSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
@@ -54,10 +50,6 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 impl<TNetworkProtocol: NetworkProtocol> SelectableTrait
     for ServerObjectSelectable<TNetworkProtocol>
 {
-    fn name(&self) -> SelectableName {
-        self.name
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_object_entity_name
     }
