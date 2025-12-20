@@ -12,7 +12,7 @@ import type {
   IsographEnvironment,
   StoreLink,
   StoreRecord,
-  type WithErrors,
+  WithErrors,
 } from './IsographEnvironment';
 import type { NonEmptyArray } from './NonEmptyArray';
 import type { StoreLayer } from './optimisticProxy';

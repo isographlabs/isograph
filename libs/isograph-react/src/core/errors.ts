@@ -1,7 +1,6 @@
 import type { Brand } from './brand';
 import type { WithErrors } from './IsographEnvironment';
 import { isNonEmptyArray, type NonEmptyArray } from './NonEmptyArray';
-import { assertNever } from './read';
 
 export interface PayloadErrorExtensions {}
 export type PayloadErrorPath = string | number;
@@ -33,9 +32,9 @@ export class GraphqlError extends Error implements PayloadError {
   constructor(error: PayloadError) {
     super(error.message);
     this.name = 'GraphqlError';
-    if (error.path) this.path = error.path;
-    if (error.locations) this.locations = error.locations;
-    if (error.extensions) this.extensions = error.extensions;
+    if (error.path != null) this.path = error.path;
+    if (error.locations != null) this.locations = error.locations;
+    if (error.extensions != null) this.extensions = error.extensions;
   }
 }
 
@@ -66,7 +65,7 @@ export function findErrors(
   const joinedPath = joinPayloadErrorPath(path);
   let errors: PayloadError[] = [];
   for (const [errorPath, suberrors] of errorsByPath) {
-    if (suberrors && errorPath.startsWith(joinedPath)) {
+    if (suberrors != null && errorPath.startsWith(joinedPath)) {
       errors.push(...suberrors);
     }
   }
@@ -83,9 +82,6 @@ export function readDataWithErrors<T>(
       return null;
     case 'Data': {
       return result.value;
-    }
-    default: {
-      assertNever(result);
     }
   }
 }

@@ -32,7 +32,6 @@ import {
 } from './optimisticProxy';
 import { readPromise, type PromiseWrapper } from './PromiseWrapper';
 import {
-  assertNever,
   readImperativelyLoadedField,
   readLinkedFieldData,
   readLoadablySelectedFieldData,
@@ -212,9 +211,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                 throw new Error(data.reason);
               case 'Success':
                 return readDataOrThrowOnError(data.item);
-              default: {
-                assertNever(data);
-              }
             }
           },
           field.isUpdatable
@@ -310,9 +306,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               throw new Error(data.reason);
             case 'Success':
               return readDataOrThrowOnError(data.item);
-            default: {
-              assertNever(data);
-            }
           }
         });
         break;
@@ -335,9 +328,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
 
             case 'Success':
               return readDataOrThrowOnError(data.item);
-            default: {
-              assertNever(data);
-            }
           }
         });
         break;
@@ -359,9 +349,6 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               throw new Error(data.reason);
             case 'Success':
               return readDataOrThrowOnError(data.item);
-            default: {
-              assertNever(data);
-            }
           }
         });
         break;
@@ -388,9 +375,6 @@ function readDataOrThrowOnError<T>(result: WithErrors<T>) {
       throw new GraphqlAggregateError(result.errors);
     case 'Data': {
       return result.value;
-    }
-    default: {
-      assertNever(result);
     }
   }
 }

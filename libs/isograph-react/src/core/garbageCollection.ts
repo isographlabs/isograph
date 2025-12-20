@@ -16,6 +16,7 @@ import {
   type PromiseWrapper,
   type PromiseWrapperOk,
 } from './PromiseWrapper';
+import { isArray } from './util';
 
 export type RetainedQuery = {
   readonly normalizationAst: PromiseWrapper<NormalizationAst>;

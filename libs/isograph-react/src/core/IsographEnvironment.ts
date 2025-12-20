@@ -154,6 +154,7 @@ export type StoreRecord = {
   [index: NetworkResponseKey]: WithErrors<DataTypeValue>;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
+  readonly __typename?: WithErrorsData<TypeName>;
   readonly id?: WithErrorsData<DataId>;
 };
 

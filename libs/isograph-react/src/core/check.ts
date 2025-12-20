@@ -183,10 +183,7 @@ function checkFromRecord(
       case 'InlineFragment': {
         const existingRecordTypename = record['__typename'];
 
-        if (
-          existingRecordTypename?.kind === 'Errors' ||
-          existingRecordTypename == null
-        ) {
+        if (existingRecordTypename?.value == null) {
           return {
             kind: 'MissingData',
             record: recordLink,
