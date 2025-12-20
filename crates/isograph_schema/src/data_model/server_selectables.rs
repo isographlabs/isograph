@@ -1,6 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, JavascriptName, SelectableName};
+use common_lang_types::{EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName};
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
 };
@@ -23,6 +23,12 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
+impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
+    pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
+    }
+}
+
 impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -37,6 +43,12 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub parent_entity_name: EntityName,
     pub arguments: Vec<VariableDefinition<ServerEntityName>>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
+    pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
+    }
 }
 
 pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<

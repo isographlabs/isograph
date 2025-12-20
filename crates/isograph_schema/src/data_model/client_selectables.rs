@@ -1,6 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, SelectableName};
+use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName};
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 use pico::MemoRef;
 
@@ -36,6 +36,12 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub network_protocol: PhantomData<TNetworkProtocol>,
 }
 
+impl<TNetworkProtocol: NetworkProtocol> ClientScalarSelectable<TNetworkProtocol> {
+    pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
+    }
+}
+
 /// The struct formally known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -50,4 +56,10 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub network_protocol: PhantomData<TNetworkProtocol>,
     pub info: UserWrittenClientPointerInfo,
+}
+
+impl<TNetworkProtocol: NetworkProtocol> ClientObjectSelectable<TNetworkProtocol> {
+    pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
+        EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
+    }
 }
