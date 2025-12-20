@@ -1,49 +1,18 @@
-use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName};
-use impl_base_types_macro::impl_for_selection_type;
+use common_lang_types::{DiagnosticResult, Location, SelectableName};
 use isograph_lang_types::{
-    DefinitionLocation, DefinitionLocationPostfix, Description, EntityNameWrapper,
-    ObjectSelectionPath, ScalarSelectionPath, SelectionParentType, SelectionSetParentType,
-    SelectionSetPath, SelectionType, SelectionTypePostfix,
+    DefinitionLocation, DefinitionLocationPostfix, EntityNameWrapper, ObjectSelectionPath,
+    ScalarSelectionPath, SelectionParentType, SelectionSetParentType, SelectionSetPath,
+    SelectionType,
 };
 use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
     IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable, NetworkProtocol,
-    ScalarSelectable, ServerObjectEntity, ServerScalarEntity, entity_not_defined_diagnostic,
+    ScalarSelectable, ServerObjectEntity, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_object_entity_named,
 };
-
-#[impl_for_selection_type]
-pub trait ServerScalarOrObjectEntity {
-    fn name(&self) -> SelectionType<EntityName, EntityName>;
-    fn description(&self) -> Option<Description>;
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
-    for ServerScalarEntity<TNetworkProtocol>
-{
-    fn name(&self) -> SelectionType<EntityName, EntityName> {
-        self.name.scalar_selected()
-    }
-
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarOrObjectEntity
-    for ServerObjectEntity<TNetworkProtocol>
-{
-    fn name(&self) -> SelectionType<EntityName, EntityName> {
-        self.name.object_selected()
-    }
-
-    fn description(&self) -> Option<Description> {
-        self.description
-    }
-}
 
 // TODO return only selectable. The caller can look up the entity.
 pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
