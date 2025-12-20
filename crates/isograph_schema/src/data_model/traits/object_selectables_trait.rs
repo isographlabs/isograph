@@ -1,11 +1,7 @@
-use common_lang_types::{EntityName, SelectableName};
 use isograph_lang_types::DefinitionLocation;
 use pico::MemoRef;
 
 use crate::{ClientObjectSelectable, ServerObjectSelectable};
-
-pub type ObjectSelectableId =
-    DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;
 
 pub type BorrowedObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
     &'a ServerObjectSelectable<TNetworkProtocol>,
