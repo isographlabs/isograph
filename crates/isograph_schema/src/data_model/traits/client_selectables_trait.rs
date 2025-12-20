@@ -10,18 +10,12 @@ use crate::{
 
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
-    fn parent_object_entity_name(&self) -> EntityName;
-
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>];
 }
 
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientScalarSelectable<TNetworkProtocol>
 {
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_entity_name
-    }
-
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
@@ -30,10 +24,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientScalarSelectable<TNetworkProtocol>
 {
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_entity_name
-    }
-
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
@@ -42,10 +32,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_entity_name
-    }
-
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
@@ -54,10 +40,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientObjectSelectable<TNetworkProtocol>
 {
-    fn parent_object_entity_name(&self) -> EntityName {
-        self.parent_entity_name
-    }
-
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
         &self.variable_definitions
     }
