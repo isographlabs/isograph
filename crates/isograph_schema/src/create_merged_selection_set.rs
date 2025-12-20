@@ -18,11 +18,11 @@ use lazy_static::lazy_static;
 use prelude::Postfix;
 
 use crate::{
-    ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
-    ClientScalarSelectable, ClientSelectable, ClientSelectableId, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments, NetworkProtocol,
-    PathToRefetchField, ServerEntityName, ServerObjectEntity, ServerObjectSelectableVariant,
-    VariableContext, client_object_selectable_named, client_scalar_selectable_named,
+    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
+    ClientSelectableId, ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
+    IsographDatabase, NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName,
+    ServerObjectEntity, ServerObjectSelectableVariant, VariableContext,
+    client_object_selectable_named, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
     fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
@@ -1140,9 +1140,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             )
             .lookup(db);
 
-    let parent_object_entity_name = ClientOrServerObjectSelectable::parent_object_entity_name(
-        &newly_encountered_client_object_selectable,
-    );
+    let parent_object_entity_name = newly_encountered_client_object_selectable.parent_entity_name;
 
     let fetchable_types_map = fetchable_types(db)
         .as_ref()
