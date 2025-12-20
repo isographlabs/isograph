@@ -12,15 +12,15 @@ import type {
   ReaderWithRefetchQueries,
   RefetchQueryNormalizationArtifactWrapper,
 } from './entrypoint';
-import type { PayloadError } from './errors';
-import { GraphqlAggregateError, readDataWithErrors } from './errors';
+import type { ReadFieldErrorPath } from './errors';
+import { readDataWithErrors, ReadFieldAggregateError } from './errors';
 import type {
   ExtractData,
   FragmentReference,
   UnknownTReadFromStore,
   Variables,
 } from './FragmentReference';
-import type { IsographEnvironment } from './IsographEnvironment';
+import type { IsographEnvironment, StoreError } from './IsographEnvironment';
 import {
   assertLink,
   getOrLoadIsographArtifact,
@@ -32,7 +32,7 @@ import {
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { maybeMakeNetworkRequest } from './makeNetworkRequest';
-import { isNonEmptyArray } from './NonEmptyArray';
+import { isNonEmptyArray, type NonEmptyArray } from './NonEmptyArray';
 import { getStoreRecordProxy } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import {
@@ -52,7 +52,7 @@ import type {
   ReaderScalarField,
 } from './reader';
 import { getOrCreateCachedStartUpdate } from './startUpdate';
-import type { Arguments } from './util';
+import { isArray, type Arguments } from './util';
 
 export type WithEncounteredRecords<T> =
   | {
@@ -63,8 +63,15 @@ export type WithEncounteredRecords<T> =
   | {
       readonly kind: 'Errors';
       readonly encounteredRecords: EncounteredIds;
-      readonly errors: GraphqlAggregateError;
+      readonly errors: ReadFieldAggregateError;
     };
+
+export type WithReadFieldErrorPath<T> = {
+  readonly path: readonly ReadFieldErrorPath[];
+  readonly errors: T;
+};
+
+export type ReadFieldErrors = WithReadFieldErrorPath<NonEmptyArray<StoreError>>;
 
 export function readButDoNotEvaluate<
   TReadFromStore extends UnknownTReadFromStore,
@@ -89,6 +96,7 @@ export function readButDoNotEvaluate<
     fragmentReference.networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
+    [],
   );
 
   logMessage(environment, () => ({
@@ -133,7 +141,7 @@ export function readButDoNotEvaluate<
     return {
       kind: 'Errors',
       encounteredRecords: mutableEncounteredRecords,
-      errors: new GraphqlAggregateError(response.item.errors),
+      errors: new ReadFieldAggregateError(response.item.errors),
     };
   } else {
     return {
@@ -169,7 +177,8 @@ function readData<TReadFromStore>(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<WithErrors<ExtractData<TReadFromStore>>> {
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<ExtractData<TReadFromStore>, ReadFieldErrors>> {
   const encounteredIds = insertEmptySetIfMissing(
     mutableEncounteredRecords,
     root.__typename,
@@ -195,11 +204,19 @@ function readData<TReadFromStore>(
   }
 
   let target: { [index: string]: any } = {};
-  let errors: PayloadError[] = [];
+  let errors: ReadFieldErrors[] = [];
   for (const field of ast) {
     switch (field.kind) {
       case 'Scalar': {
-        const data = readScalarFieldData(field, storeRecord, root, variables);
+        path.push(field.alias ?? field.fieldName);
+        const data = readScalarFieldData(
+          field,
+          storeRecord,
+          root,
+          variables,
+          path,
+        );
+        path.pop();
 
         switch (data.kind) {
           case 'MissingData':
@@ -218,6 +235,7 @@ function readData<TReadFromStore>(
         break;
       }
       case 'Linked': {
+        path.push(field.alias ?? field.fieldName);
         const data = readLinkedFieldData(
           environment,
           field,
@@ -227,7 +245,7 @@ function readData<TReadFromStore>(
           nestedRefetchQueries,
           networkRequest,
           networkRequestOptions,
-          (ast, root) =>
+          (ast, root, path) =>
             readData(
               environment,
               ast,
@@ -237,8 +255,11 @@ function readData<TReadFromStore>(
               networkRequest,
               networkRequestOptions,
               mutableEncounteredRecords,
+              path,
             ),
+          path,
         );
+        path.pop();
 
         switch (data.kind) {
           case 'MissingData':
@@ -253,6 +274,7 @@ function readData<TReadFromStore>(
         break;
       }
       case 'ImperativelyLoadedField': {
+        path.push(field.alias);
         const data = readImperativelyLoadedField(
           environment,
           field,
@@ -262,7 +284,9 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          path,
         );
+        path.pop();
         switch (data.kind) {
           case 'MissingData':
             return data;
@@ -273,6 +297,7 @@ function readData<TReadFromStore>(
         break;
       }
       case 'Resolver': {
+        path.push(field.alias);
         const data = readResolverFieldData(
           environment,
           field,
@@ -282,7 +307,9 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          path,
         );
+        path.pop();
         switch (data.kind) {
           case 'MissingData':
             return data;
@@ -293,6 +320,7 @@ function readData<TReadFromStore>(
         break;
       }
       case 'LoadablySelectedField': {
+        path.push(field.alias);
         const data = readLoadablySelectedFieldData(
           environment,
           field,
@@ -301,7 +329,9 @@ function readData<TReadFromStore>(
           networkRequest,
           networkRequestOptions,
           mutableEncounteredRecords,
+          path,
         );
+        path.pop();
         switch (data.kind) {
           case 'MissingData':
             return data;
@@ -333,7 +363,8 @@ export function readLoadablySelectedFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<WithErrors<unknown>> {
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<unknown, ReadFieldErrors>> {
   const refetchReaderParams = readData(
     environment,
     field.refetchReaderAst,
@@ -344,6 +375,7 @@ export function readLoadablySelectedFieldData(
     networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
+    path,
   );
 
   if (refetchReaderParams.kind === 'MissingData') {
@@ -597,7 +629,8 @@ export function readResolverFieldData(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<WithErrors<unknown>> {
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<unknown, ReadFieldErrors>> {
   const usedRefetchQueries = field.usedRefetchQueries;
   const resolverRefetchQueries = usedRefetchQueries.map((index) => {
     const resolverRefetchQuery = nestedRefetchQueries[index];
@@ -636,6 +669,7 @@ export function readResolverFieldData(
         networkRequest,
         networkRequestOptions,
         mutableEncounteredRecords,
+        path,
       );
       if (data.kind === 'MissingData') {
         return {
@@ -690,7 +724,8 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadDataResult<WithErrors<DataTypeValue>> {
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<DataTypeValue, ReadFieldErrors>> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
@@ -700,6 +735,21 @@ export function readScalarFieldData(
       kind: 'MissingData',
       reason: 'No value for ' + storeRecordName + ' on root ' + root.__link,
       recordLink: root,
+    };
+  }
+
+  if (value.kind === 'Errors') {
+    return {
+      kind: 'Success',
+      item: {
+        kind: 'Errors',
+        errors: [
+          {
+            path: path.slice(),
+            errors: value.errors,
+          },
+        ],
+      },
     };
   }
 
@@ -718,22 +768,32 @@ export function readLinkedFieldData(
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
-  ) => ReadDataResult<WithErrors<object>>,
-): ReadDataResult<WithErrors<unknown>> {
+    path: ReadFieldErrorPath[],
+  ) => ReadDataResult<WithErrors<object, ReadFieldErrors>>,
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<unknown, ReadFieldErrors>> {
   const storeRecordName = getParentRecordKey(field, variables);
   let item = storeRecord[storeRecordName];
 
   if (item?.kind === 'Errors') {
     return {
       kind: 'Success',
-      item: item,
+      item: {
+        kind: 'Errors',
+        errors: [
+          {
+            path: path.slice(),
+            errors: item.errors,
+          },
+        ],
+      },
     };
   }
 
   let value = item?.value;
 
   if (field.condition != null) {
-    const data = readData(field.condition.readerAst, root);
+    const data = readData(field.condition.readerAst, root, path);
     if (data.kind === 'MissingData') {
       return {
         kind: 'MissingData',
@@ -789,10 +849,12 @@ export function readLinkedFieldData(
     value = condition;
   }
 
-  if (Array.isArray(value)) {
-    let errors: PayloadError[] = [];
+  if (isArray(value)) {
+    let errors: ReadFieldErrors[] = [];
     const results = [];
-    for (const item of value) {
+    for (let i = 0; i < value.length; i++) {
+      const item = value[i];
+
       const link = assertLink(item);
       if (link === undefined) {
         return {
@@ -812,6 +874,7 @@ export function readLinkedFieldData(
       }
 
       if (isClientPointer(field)) {
+        path.push(i);
         const result = readClientPointerData(
           environment,
           field,
@@ -819,7 +882,9 @@ export function readLinkedFieldData(
           variables,
           nestedRefetchQueries,
           readData,
+          path,
         );
+        path.pop();
 
         switch (result.kind) {
           case 'MissingData':
@@ -844,7 +909,10 @@ export function readLinkedFieldData(
         continue;
       }
 
-      const result = readData(field.selections, link);
+      path.push(i);
+      const result = readData(field.selections, link, path);
+      path.pop();
+
       if (result.kind === 'MissingData') {
         return {
           kind: 'MissingData',
@@ -924,6 +992,7 @@ export function readLinkedFieldData(
       variables,
       nestedRefetchQueries,
       readData,
+      path,
     );
 
     switch (data.kind) {
@@ -939,7 +1008,7 @@ export function readLinkedFieldData(
         return data;
     }
   }
-  const data = readData(field.selections, link);
+  const data = readData(field.selections, link, path);
   if (data.kind === 'MissingData') {
     return {
       kind: 'MissingData',
@@ -966,8 +1035,10 @@ export function readClientPointerData(
   readData: <TReadFromStore>(
     ast: ReaderAst<TReadFromStore>,
     root: StoreLink,
-  ) => ReadDataResult<WithErrors<object>>,
-): ReadDataResult<WithErrors<unknown>> {
+    path: ReadFieldErrorPath[],
+  ) => ReadDataResult<WithErrors<object, ReadFieldErrors>>,
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<unknown, ReadFieldErrors>> {
   const refetchReaderParams = readData(
     [
       {
@@ -979,6 +1050,7 @@ export function readClientPointerData(
       },
     ],
     root,
+    path,
   );
 
   if (refetchReaderParams.kind === 'MissingData') {
@@ -1112,7 +1184,8 @@ export function readImperativelyLoadedField(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableEncounteredRecords: EncounteredIds,
-): ReadDataResult<WithErrors<unknown>> {
+  path: ReadFieldErrorPath[],
+): ReadDataResult<WithErrors<unknown, ReadFieldErrors>> {
   // First, we read the data using the refetch reader AST (i.e. read out the
   // id field).
   const data = readData(
@@ -1127,6 +1200,7 @@ export function readImperativelyLoadedField(
     networkRequest,
     networkRequestOptions,
     mutableEncounteredRecords,
+    path,
   );
   if (data.kind === 'MissingData') {
     return {

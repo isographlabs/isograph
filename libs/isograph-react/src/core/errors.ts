@@ -1,58 +1,54 @@
 import type { Brand } from './brand';
-import type { WithErrors } from './IsographEnvironment';
+import type { NetworkResponseError, NetworkResponseErrorPath } from './cache';
+import type { StoreError, WithErrors } from './IsographEnvironment';
 import { isNonEmptyArray, type NonEmptyArray } from './NonEmptyArray';
+import type { ReadFieldErrors } from './read';
 
-export interface PayloadErrorExtensions {}
-export type PayloadErrorPath = string | number;
-export type PayloadError = {
-  readonly message: string;
-  readonly locations?: { readonly line: number; readonly column: number }[];
-  readonly path?: PayloadErrorPath[];
-  readonly extensions?: PayloadErrorExtensions;
-};
+declare const NetworkResponseErrorPathJoinedBrand: unique symbol;
+type NetworkResponseErrorPathJoined = Brand<
+  string,
+  typeof NetworkResponseErrorPathJoinedBrand
+>;
 
-declare const PayloadErrorPathJoinedBrand: unique symbol;
-type PayloadErrorPathJoined = Brand<string, typeof PayloadErrorPathJoinedBrand>;
-
-export class GraphqlAggregateError extends AggregateError {
-  readonly errors!: GraphqlError[];
-  constructor(errors: NonEmptyArray<PayloadError>, message?: string) {
+export class ReadFieldAggregateError extends AggregateError {
+  readonly errors!: ReadFieldError[];
+  constructor(errors: NonEmptyArray<ReadFieldErrors>, message?: string) {
     super(
-      errors.map((error) => new GraphqlError(error)),
+      errors.flatMap(({ errors, path }) =>
+        errors.map((error) => new ReadFieldError(error, path)),
+      ),
       message,
     );
-    this.name = 'GraphqlAggregateError';
+    this.name = new.target.name;
   }
 }
 
-export class GraphqlError extends Error implements PayloadError {
-  readonly locations?: { line: number; column: number }[];
-  readonly path?: (string | number)[];
-  readonly extensions?: PayloadErrorExtensions;
-  constructor(error: PayloadError) {
-    super(error.message);
-    this.name = 'GraphqlError';
-    if (error.path != null) this.path = error.path;
-    if (error.locations != null) this.locations = error.locations;
-    if (error.extensions != null) this.extensions = error.extensions;
+export type ReadFieldErrorPath = string | number;
+export class ReadFieldError extends Error {
+  constructor(
+    readonly error: StoreError,
+    readonly path: ReadFieldErrorPath[],
+  ) {
+    super('Read field error');
+    this.name = new.target.name;
   }
 }
 
-function joinPayloadErrorPath(
-  path: PayloadErrorPath[] | undefined,
-): PayloadErrorPathJoined {
-  return (path?.join('.') ?? '') as PayloadErrorPathJoined;
+function joinNetworkResponseErrorPath(
+  path: readonly NetworkResponseErrorPath[] | undefined,
+): NetworkResponseErrorPathJoined {
+  return (path?.join('.') ?? '') as NetworkResponseErrorPathJoined;
 }
 
 export type ErrorsByPath = Map<
-  PayloadErrorPathJoined,
-  NonEmptyArray<PayloadError>
+  NetworkResponseErrorPathJoined,
+  NonEmptyArray<NetworkResponseError>
 >;
 
 export function groupErrorsByPath(
-  errors: readonly PayloadError[],
+  errors: readonly NetworkResponseError[],
 ): ErrorsByPath {
-  return groupBy(errors, (error) => joinPayloadErrorPath(error.path));
+  return groupBy(errors, (error) => joinNetworkResponseErrorPath(error.path));
 }
 
 /**
@@ -60,21 +56,26 @@ export function groupErrorsByPath(
  */
 export function findErrors(
   errorsByPath: ErrorsByPath,
-  path: PayloadErrorPath[],
+  path: readonly NetworkResponseErrorPath[],
 ) {
-  const joinedPath = joinPayloadErrorPath(path);
-  let errors: PayloadError[] = [];
+  const joinedPath = joinNetworkResponseErrorPath(path);
+  let errors: StoreError[] = [];
   for (const [errorPath, suberrors] of errorsByPath) {
     if (suberrors != null && errorPath.startsWith(joinedPath)) {
-      errors.push(...suberrors);
+      errors.push(
+        ...suberrors.map(({ extensions, locations }) => ({
+          extensions,
+          locations,
+        })),
+      );
     }
   }
   return isNonEmptyArray(errors) ? errors : undefined;
 }
 
 export function readDataWithErrors<T>(
-  result: WithErrors<T>,
-  errors: PayloadError[],
+  result: WithErrors<T, ReadFieldErrors>,
+  errors: ReadFieldErrors[],
 ): T | null {
   switch (result.kind) {
     case 'Errors':

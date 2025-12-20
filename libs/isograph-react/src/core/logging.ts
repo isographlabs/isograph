@@ -1,12 +1,16 @@
 import type { CleanupFn } from '@isograph/disposable-types';
-import type { EncounteredIds, NetworkResponseObject } from './cache';
+import type {
+  EncounteredIds,
+  NetworkResponseError,
+  NetworkResponseObject,
+} from './cache';
 import type { CheckResult } from './check';
 import type {
   IsographEntrypoint,
   NormalizationAstNodes,
   RefetchQueryNormalizationArtifact,
 } from './entrypoint';
-import type { PayloadError } from './errors';
+
 import type { FragmentReference, Variables } from './FragmentReference';
 import type {
   IsographEnvironment,
@@ -16,7 +20,7 @@ import type {
 } from './IsographEnvironment';
 import type { NonEmptyArray } from './NonEmptyArray';
 import type { StoreLayer } from './optimisticProxy';
-import type { ReadDataResult } from './read';
+import type { ReadDataResult, ReadFieldErrors } from './read';
 import type { Arguments } from './util';
 
 /**
@@ -36,7 +40,7 @@ export type LogMessage =
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
       networkResponse: NetworkResponseObject | undefined;
-      errors: NonEmptyArray<PayloadError> | undefined;
+      errors: NonEmptyArray<NetworkResponseError> | undefined;
       variables: Variables;
     }
   | {
@@ -85,7 +89,7 @@ export type LogMessage =
     }
   | {
       kind: 'DoneReading';
-      response: ReadDataResult<WithErrors<unknown>>;
+      response: ReadDataResult<WithErrors<unknown, ReadFieldErrors>>;
       fieldName: string;
       root: StoreLink;
     }

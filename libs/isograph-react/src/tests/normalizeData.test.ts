@@ -2,17 +2,14 @@ import { iso } from '@iso';
 import { beforeEach, describe, expect, test, vi, vitest } from 'vitest';
 
 import { normalizeData } from '../core/cache';
-import {
-  GraphqlAggregateError,
-  GraphqlError,
-  type PayloadError,
-} from '../core/errors';
+import { ReadFieldAggregateError } from '../core/errors';
 import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
 import {
   createIsographStore,
   ROOT_ID,
   type BaseStoreLayerData,
   type DataTypeValue,
+  type StoreError,
   type WithErrors,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
@@ -36,7 +33,9 @@ function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
   };
 }
 
-function err(errors: NonEmptyArray<PayloadError>): WithErrors<DataTypeValue> {
+function err(
+  errors: NonEmptyArray<StoreError>,
+): WithErrors<DataTypeValue, StoreError> {
   return {
     kind: 'Errors',
     errors,
@@ -350,8 +349,8 @@ describe('errors', () => {
           [ROOT_ID]: {
             node____id___1: err([
               {
-                message: 'Not found',
-                path: ['node____id___v_id'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -399,8 +398,8 @@ describe('errors', () => {
             id: ok('1'),
             nickname: err([
               {
-                message: 'Missing nickname',
-                path: ['node____id___v_id', 'nickname'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -445,8 +444,8 @@ describe('errors', () => {
           [ROOT_ID]: {
             node____id___1: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'name'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -460,8 +459,8 @@ describe('errors', () => {
           [ROOT_ID]: {
             node____id___1: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'name'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -502,8 +501,8 @@ describe('errors', () => {
             id: ok('1'),
             nickname: err([
               {
-                message: 'Missing nickname',
-                path: ['node____id___v_id', 'nickname'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -569,8 +568,8 @@ describe('errors', () => {
           [ROOT_ID]: {
             node____id___1: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'name'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -627,8 +626,8 @@ describe('errors', () => {
           [ROOT_ID]: {
             node____id___1: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'name'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -648,14 +647,14 @@ describe('errors', () => {
         throwOnNetworkError: false,
       });
 
-      expect(data).toStrictEqual<WithEncounteredRecords<Query__errors__param>>({
+      expect(data).toEqual<WithEncounteredRecords<Query__errors__param>>({
         kind: 'Errors',
         encounteredRecords: new Map([['Query', new Set([ROOT_ID])]]),
-        errors: new GraphqlAggregateError([
-          new GraphqlError({
-            message: 'Missing name',
-            path: ['node____id___v_id', 'name'],
-          }),
+        errors: new ReadFieldAggregateError([
+          {
+            errors: [{ extensions: undefined, locations: undefined }],
+            path: ['node'],
+          },
         ]),
       });
     });
@@ -668,8 +667,8 @@ describe('errors', () => {
             id: ok('1'),
             nickname: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'nickname'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -706,11 +705,11 @@ describe('errors', () => {
           ['Query', new Set([ROOT_ID])],
           ['Economist', new Set(['1'])],
         ]),
-        errors: new GraphqlAggregateError([
-          new GraphqlError({
-            message: 'Missing name',
-            path: ['node____id___v_id', 'nickname'],
-          }),
+        errors: new ReadFieldAggregateError([
+          {
+            errors: [{ extensions: undefined, locations: undefined }],
+            path: ['node', 'asEconomist', 'errorsClientFieldField', 'nickname'],
+          },
         ]),
       });
     });
@@ -723,8 +722,8 @@ describe('errors', () => {
             id: ok('1'),
             nickname: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'nickname'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -783,8 +782,8 @@ describe('errors', () => {
             id: ok('1'),
             nickname: err([
               {
-                message: 'Missing name',
-                path: ['node____id___v_id', 'nickname'],
+                extensions: undefined,
+                locations: undefined,
               },
             ]),
           },
@@ -825,11 +824,16 @@ describe('errors', () => {
           ['Query', new Set([ROOT_ID])],
           ['Economist', new Set(['1'])],
         ]),
-        errors: new GraphqlAggregateError([
-          new GraphqlError({
-            message: 'Missing name',
-            path: ['node____id___v_id', 'nickname'],
-          }),
+        errors: new ReadFieldAggregateError([
+          {
+            errors: [{ extensions: undefined, locations: undefined }],
+            path: [
+              'node',
+              'asEconomist',
+              'errorsClientPointerField',
+              'nickname',
+            ],
+          },
         ]),
       });
     });

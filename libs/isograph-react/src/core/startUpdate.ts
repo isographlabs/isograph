@@ -4,7 +4,7 @@ import {
   type EncounteredIds,
 } from './cache';
 import type { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
-import { GraphqlAggregateError } from './errors';
+import { ReadFieldAggregateError } from './errors';
 
 import {
   stableIdForFragmentReference,
@@ -39,6 +39,7 @@ import {
   readScalarFieldData,
   type NetworkRequestReaderOptions,
   type ReadDataResultSuccess,
+  type ReadFieldErrors,
 } from './read';
 import type { ReaderAst } from './reader';
 import { callSubscriptions } from './subscribe';
@@ -205,6 +206,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               storeRecord,
               root,
               variables,
+              [],
             );
             switch (data.kind) {
               case 'MissingData':
@@ -259,6 +261,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                   mutableState,
                   mutableUpdatedIds,
                 ),
+              [],
             );
             if (data.kind === 'MissingData') {
               throw new Error(data.reason);
@@ -300,6 +303,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
           switch (data.kind) {
             case 'MissingData':
@@ -321,6 +325,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
           switch (data.kind) {
             case 'MissingData':
@@ -342,6 +347,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
 
           switch (data.kind) {
@@ -369,10 +375,10 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   };
 }
 
-function readDataOrThrowOnError<T>(result: WithErrors<T>) {
+function readDataOrThrowOnError<T>(result: WithErrors<T, ReadFieldErrors>) {
   switch (result.kind) {
     case 'Errors':
-      throw new GraphqlAggregateError(result.errors);
+      throw new ReadFieldAggregateError(result.errors);
     case 'Data': {
       return result.value;
     }

@@ -1,6 +1,9 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import type { NetworkResponseKey } from './cache';
+import type {
+  NetworkResponseErrorExtensions,
+  NetworkResponseKey,
+} from './cache';
 import type {
   IsographEntrypoint,
   IsographOperation,
@@ -8,7 +11,6 @@ import type {
   ReaderWithRefetchQueries,
   ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
-import type { PayloadError } from './errors';
 import type {
   ExtractStartUpdate,
   FragmentReference,
@@ -143,15 +145,22 @@ export type WithErrorsData<T> = {
   readonly value: T;
 };
 
-export type WithErrors<T> =
+export type WithErrors<T, Err> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';
-      readonly errors: NonEmptyArray<PayloadError>;
+      readonly errors: NonEmptyArray<Err>;
     };
 
+export interface StoreError {
+  readonly locations:
+    | { readonly line: number; readonly column: number }[]
+    | undefined;
+  readonly extensions: NetworkResponseErrorExtensions | undefined;
+}
+
 export type StoreRecord = {
-  [index: NetworkResponseKey]: WithErrors<DataTypeValue>;
+  [index: NetworkResponseKey]: WithErrors<DataTypeValue, StoreError>;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
   readonly __typename?: WithErrorsData<TypeName>;
