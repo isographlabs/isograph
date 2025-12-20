@@ -1,49 +1,10 @@
 use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithEmbeddedLocation};
-use impl_base_types_macro::impl_for_selection_type;
-use isograph_lang_types::{SelectionSet, VariableDefinition};
+use isograph_lang_types::SelectionSet;
 
 use crate::{
-    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, IsographDatabase,
-    NetworkProtocol, ServerEntityName, client_scalar_selectable_named,
+    ClientFieldVariant, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
     refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
 };
-
-#[impl_for_selection_type]
-pub trait ClientScalarOrObjectSelectable {
-    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>];
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
-    for &ClientScalarSelectable<TNetworkProtocol>
-{
-    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
-        &self.variable_definitions
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
-    for ClientScalarSelectable<TNetworkProtocol>
-{
-    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
-        &self.variable_definitions
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
-    for &ClientObjectSelectable<TNetworkProtocol>
-{
-    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
-        &self.variable_definitions
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
-    for ClientObjectSelectable<TNetworkProtocol>
-{
-    fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>] {
-        &self.variable_definitions
-    }
-}
 
 pub fn client_scalar_selectable_selection_set_for_parent_query<
     TNetworkProtocol: NetworkProtocol,
