@@ -20,11 +20,11 @@ use isograph_lang_types::{
     EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable,
-    EntrypointDeclarationInfo, FieldToCompletedMergeTraversalStateMap, FieldTraversalResult,
-    Format, IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey,
-    RootOperationName, RootRefetchedPath, ScalarClientFieldTraversalState, ServerObjectEntity,
-    ValidatedVariableDefinition, WrappedSelectionMapSelection, client_scalar_selectable_named,
+    ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
+    MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
+    ScalarClientFieldTraversalState, ServerObjectEntity, ValidatedVariableDefinition,
+    WrappedSelectionMapSelection, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
@@ -59,19 +59,18 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     )
     .lookup(db);
 
-    let parent_object_entity =
-        &server_object_entity_named(db, entrypoint.parent_object_entity_name())
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
+    let parent_object_entity = &server_object_entity_named(db, entrypoint.parent_entity_name)
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
+        )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
+        )
+        .lookup(db);
     let FieldTraversalResult {
         traversal_state,
         merged_selection_map,
@@ -159,19 +158,18 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                 })
         });
 
-    let parent_object_entity =
-        &server_object_entity_named(db, entrypoint.parent_object_entity_name())
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
+    let parent_object_entity = &server_object_entity_named(db, entrypoint.parent_entity_name)
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
+        )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
+        )
+        .lookup(db);
 
     let reachable_variables =
         get_used_variable_definitions(merged_selection_map, variable_definitions);

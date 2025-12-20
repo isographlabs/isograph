@@ -14,16 +14,15 @@ use isograph_lang_types::{
 };
 use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, ClientScalarSelectable, FieldMapItem,
-    FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, ServerEntityName,
-    ServerObjectSelectableVariant, UserWrittenClientTypeInfo, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
-    client_scalar_selectable_named, client_selectable_map, client_selectable_named,
-    fetchable_types, inline_fragment_reader_selection_set,
-    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    server_object_entity_named, server_object_selectable_named, validate_entire_schema,
-    validated_entrypoints,
+    ClientFieldVariant, ClientScalarSelectable, FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME,
+    ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol,
+    NormalizationKey, RefetchStrategy, ServerEntityName, ServerObjectSelectableVariant,
+    UserWrittenClientTypeInfo, ValidatedVariableDefinition, WrappedSelectionMapSelection,
+    accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, client_selectable_named, fetchable_types,
+    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
+    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
+    validate_entire_schema, validated_entrypoints,
 };
 use lazy_static::lazy_static;
 use prelude::*;
@@ -302,7 +301,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                             let type_to_refine_to = &server_object_entity_named(
                                 db,
-                                client_scalar_selectable.parent_object_entity_name(),
+                                client_scalar_selectable.parent_entity_name,
                             )
                             .as_ref()
                             .expect(
