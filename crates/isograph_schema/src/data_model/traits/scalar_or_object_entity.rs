@@ -8,11 +8,16 @@ use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
-    IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable, NetworkProtocol,
-    ScalarSelectable, ServerObjectEntity, entity_not_defined_diagnostic,
+    ClientScalarSelectable, IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable,
+    NetworkProtocol, ServerObjectEntity, ServerScalarSelectable, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_object_entity_named,
 };
+
+type ScalarSelectable<TNetworkProtocol> = DefinitionLocation<
+    MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+>;
 
 // TODO return only selectable. The caller can look up the entity.
 pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
