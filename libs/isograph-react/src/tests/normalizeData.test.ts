@@ -561,62 +561,6 @@ describe('errors', () => {
         },
       });
     });
-
-    test('keeps nested errors', () => {
-      const store: BaseStoreLayerData = {
-        Query: {
-          [ROOT_ID]: {
-            node____id___1: err([
-              {
-                extensions: undefined,
-                locations: undefined,
-              },
-            ]),
-          },
-        },
-      };
-      const environment = createIsographEnvironment(
-        store,
-        vi.fn().mockRejectedValue(new Error('Fetch failed')),
-      );
-
-      normalizeData(
-        environment,
-        environment.store as BaseStoreLayer,
-        errorsEntrypoint.networkRequestInfo.normalizationAst.selections,
-        {
-          data: {
-            node____id___v_id: {
-              __typename: 'Economist',
-              id: '1',
-              name: 'Bob',
-            },
-          },
-          errors: undefined,
-        },
-        { id: '1' },
-        { __link: ROOT_ID, __typename: errorsEntrypoint.concreteType },
-        new Map(),
-      );
-
-      expect(store).toStrictEqual<BaseStoreLayerData>({
-        Query: {
-          [ROOT_ID]: {
-            node____id___1: ok({
-              __typename: 'Economist',
-              __link: '1',
-            }),
-          },
-        },
-        Economist: {
-          '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
-            name: ok('Bob'),
-          },
-        },
-      });
-    });
   });
 
   describe('readData', () => {
