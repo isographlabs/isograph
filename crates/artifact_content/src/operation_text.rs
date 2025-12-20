@@ -1,9 +1,10 @@
 use common_lang_types::{EntityName, QueryExtraInfo, QueryOperationName, derive_display};
 use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsHashAlgorithm;
+use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
     Format, IsographDatabase, MergedSelectionMap, NetworkProtocol, RootOperationName,
-    ValidatedVariableDefinition,
+    ServerEntityName,
 };
 use md5::{Digest, Md5};
 use sha2::Sha256;
@@ -19,7 +20,7 @@ pub(crate) fn generate_operation_text<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     query_name: QueryOperationName,
     merged_selection_map: &MergedSelectionMap,
-    query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
     root_operation_name: &RootOperationName,
     operation_name: EntityName,
     persisted_documents: &mut Option<PersistedDocuments>,

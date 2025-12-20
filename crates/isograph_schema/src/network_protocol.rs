@@ -4,10 +4,11 @@ use common_lang_types::{
     DiagnosticResult, EntityName, QueryExtraInfo, QueryOperationName, QueryText, SelectableName,
     WithLocation, WithNonFatalDiagnostics,
 };
+use isograph_lang_types::VariableDefinition;
 
 use crate::{
     MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap, RefetchStrategy, RootOperationName,
-    ValidatedVariableDefinition, isograph_database::IsographDatabase,
+    ServerEntityName, isograph_database::IsographDatabase,
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
@@ -40,7 +41,7 @@ pub trait NetworkProtocol:
         db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
-        query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+        query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText;

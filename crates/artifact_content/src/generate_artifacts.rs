@@ -10,19 +10,19 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, EmptyDirectiveSet, NonConstantValue, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, UnionVariant,
+    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition,
 };
 use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME,
     ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol,
     NormalizationKey, RefetchStrategy, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, ValidatedVariableDefinition, WrappedSelectionMapSelection,
-    accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, client_selectable_named, fetchable_types,
-    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
-    selection_map_wrapped, server_object_entity_named, server_object_selectable_named,
-    validate_entire_schema, validated_entrypoints,
+    UserWrittenClientTypeInfo, WrappedSelectionMapSelection, accessible_client_selectables,
+    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
+    client_selectable_named, fetchable_types, inline_fragment_reader_selection_set,
+    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
+    server_object_entity_named, server_object_selectable_named, validate_entire_schema,
+    validated_entrypoints,
 };
 use lazy_static::lazy_static;
 use prelude::*;
@@ -318,7 +318,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             let variable_definitions_iter =
                                 client_scalar_selectable.variable_definitions.iter();
 
-                            let id_var = ValidatedVariableDefinition {
+                            let id_var = VariableDefinition {
                                 name: (*ID_FIELD_NAME)
                                     .unchecked_conversion::<VariableName>()
                                     .with_embedded_location(EmbeddedLocation::todo_generated()),

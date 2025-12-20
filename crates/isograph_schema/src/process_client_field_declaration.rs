@@ -15,8 +15,8 @@ use pico_macros::memo;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, ValidatedVariableDefinition,
-    WrappedSelectionMapSelection, defined_entity, fetchable_types,
+    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, WrappedSelectionMapSelection,
+    defined_entity, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
@@ -352,7 +352,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
     /// but we nonetheless need to put them into the query definition, and we need
     /// the variable's type, not just the variable.
-    pub top_level_schema_field_arguments: Vec<ValidatedVariableDefinition>,
+    pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityName>>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

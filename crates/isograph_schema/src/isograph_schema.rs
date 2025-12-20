@@ -4,14 +4,12 @@ use common_lang_types::{
     Diagnostic, DiagnosticResult, EntityName, JavascriptName, SelectableName, VariableName,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocation, SelectionType, VariableDefinition,
-};
+use isograph_lang_types::{ArgumentKeyAndValue, SelectionType};
 use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, NormalizationKey, ServerEntityName, ServerObjectSelectable,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ServerObjectSelectable,
     server_selectable_named,
 };
 
@@ -108,8 +106,3 @@ pub enum ServerObjectSelectableVariant {
     LinkedField,
     InlineFragment,
 }
-
-pub type ValidatedVariableDefinition = VariableDefinition<ServerEntityName>;
-
-pub type ScalarSelectableId =
-    DefinitionLocation<(EntityName, SelectableName), (EntityName, SelectableName)>;

@@ -1,9 +1,11 @@
 use common_lang_types::{EntityName, QueryOperationName, QueryText};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, SelectionType};
+use isograph_lang_types::{
+    ArgumentKeyAndValue, NonConstantValue, SelectionType, VariableDefinition,
+};
 use isograph_schema::{
     Format, IsographDatabase, MergedSelectionMap, MergedServerSelection, RootOperationName,
-    ValidatedVariableDefinition, server_entity_named,
+    ServerEntityName, server_entity_named,
 };
 
 use crate::GraphQLNetworkProtocol;
@@ -12,7 +14,7 @@ pub(crate) fn generate_query_text<'a>(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     query_name: QueryOperationName,
     selection_map: &MergedSelectionMap,
-    query_variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
     root_operation_name: &RootOperationName,
     format: Format,
 ) -> QueryText {
@@ -34,7 +36,7 @@ pub(crate) fn generate_query_text<'a>(
 
 fn write_variables_to_string<'a>(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
-    variables: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
 ) -> String {
     let mut empty = true;
     let mut first = true;

@@ -16,8 +16,7 @@ use isograph_lang_types::{
 
 use crate::{
     BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
-    NetworkProtocol, STRING_ENTITY_NAME, ServerEntityName, ValidatedVariableDefinition,
-    server_selectables_map_for_entity,
+    NetworkProtocol, STRING_ENTITY_NAME, ServerEntityName, server_selectables_map_for_entity,
 };
 
 fn graphql_type_to_non_null_type<TValue>(
@@ -128,7 +127,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
     field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[ValidatedVariableDefinition],
+    variable_definitions: &[VariableDefinition<ServerEntityName>],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -475,7 +474,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     list: &[WithEmbeddedLocation<NonConstantValue>],
     list_type: GraphQLListTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[ValidatedVariableDefinition],
+    variable_definitions: &[VariableDefinition<ServerEntityName>],
 ) -> DiagnosticResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(db, element, &list_type.0, variable_definitions)
@@ -484,7 +483,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn get_variable_type<'a>(
     variable_name: &'a VariableName,
-    variable_definitions: &'a [ValidatedVariableDefinition],
+    variable_definitions: &'a [VariableDefinition<ServerEntityName>],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<&'a GraphQLTypeAnnotation<ServerEntityName>> {
     match variable_definitions

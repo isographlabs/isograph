@@ -9,12 +9,12 @@ use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation,
+    TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
     ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, ServerEntityName,
-    ValidatedVariableDefinition, client_scalar_selectable_named, description,
-    output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
+    client_scalar_selectable_named, description, output_type_annotation, selectable_named,
+    server_scalar_entity_javascript_name,
 };
 use prelude::Postfix;
 
@@ -481,7 +481,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
 
 fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    arguments: Vec<ValidatedVariableDefinition>,
+    arguments: Vec<VariableDefinition<ServerEntityName>>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
     let mut is_first = true;
@@ -554,9 +554,9 @@ fn format_type_for_js_inner(
 }
 
 fn get_provided_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a ValidatedVariableDefinition> + 'a,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
     arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
-) -> Vec<ValidatedVariableDefinition> {
+) -> Vec<VariableDefinition<ServerEntityName>> {
     argument_definitions
         .filter_map(|definition| {
             let user_has_supplied_argument = arguments

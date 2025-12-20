@@ -18,12 +18,13 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
     EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
+    VariableDefinition,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, ServerObjectEntity, ValidatedVariableDefinition,
+    ScalarClientFieldTraversalState, ServerEntityName, ServerObjectEntity,
     WrappedSelectionMapSelection, client_scalar_selectable_named,
     client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
@@ -126,7 +127,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: Vec<&ValidatedVariableDefinition>,
+    variable_definitions: Vec<&VariableDefinition<ServerEntityName>>,
     // TODO this implements copy, don't take reference
     default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
@@ -390,8 +391,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
 
 fn get_used_variable_definitions<'a>(
     merged_selection_map: &MergedSelectionMap,
-    variable_definitions: Vec<&'a ValidatedVariableDefinition>,
-) -> BTreeSet<&'a ValidatedVariableDefinition> {
+    variable_definitions: Vec<&'a VariableDefinition<ServerEntityName>>,
+) -> BTreeSet<&'a VariableDefinition<ServerEntityName>> {
     get_reachable_variables(merged_selection_map)
         .map(|variable_name| {
             *variable_definitions
