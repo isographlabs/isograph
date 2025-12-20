@@ -1,6 +1,4 @@
-use common_lang_types::{
-    DiagnosticResult, EntityName, EntityNameAndSelectableName, SelectableName, WithEmbeddedLocation,
-};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithEmbeddedLocation};
 use impl_base_types_macro::impl_for_selection_type;
 use isograph_lang_types::{SelectionSet, VariableDefinition};
 
@@ -12,7 +10,6 @@ use crate::{
 
 #[impl_for_selection_type]
 pub trait ClientScalarOrObjectSelectable {
-    fn type_and_field(&self) -> EntityNameAndSelectableName;
     fn parent_object_entity_name(&self) -> EntityName;
 
     fn variable_definitions(&self) -> &[VariableDefinition<ServerEntityName>];
@@ -21,13 +18,6 @@ pub trait ClientScalarOrObjectSelectable {
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientScalarSelectable<TNetworkProtocol>
 {
-    fn type_and_field(&self) -> EntityNameAndSelectableName {
-        EntityNameAndSelectableName {
-            parent_entity_name: self.parent_entity_name,
-            selectable_name: self.name,
-        }
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_entity_name
     }
@@ -40,13 +30,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientScalarSelectable<TNetworkProtocol>
 {
-    fn type_and_field(&self) -> EntityNameAndSelectableName {
-        EntityNameAndSelectableName {
-            parent_entity_name: self.parent_entity_name,
-            selectable_name: self.name,
-        }
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_entity_name
     }
@@ -59,13 +42,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for &ClientObjectSelectable<TNetworkProtocol>
 {
-    fn type_and_field(&self) -> EntityNameAndSelectableName {
-        EntityNameAndSelectableName {
-            parent_entity_name: self.parent_entity_name,
-            selectable_name: self.name,
-        }
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_entity_name
     }
@@ -78,13 +54,6 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
 impl<TNetworkProtocol: NetworkProtocol> ClientScalarOrObjectSelectable
     for ClientObjectSelectable<TNetworkProtocol>
 {
-    fn type_and_field(&self) -> EntityNameAndSelectableName {
-        EntityNameAndSelectableName {
-            parent_entity_name: self.parent_entity_name,
-            selectable_name: self.name,
-        }
-    }
-
     fn parent_object_entity_name(&self) -> EntityName {
         self.parent_entity_name
     }

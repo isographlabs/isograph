@@ -12,9 +12,9 @@ use isograph_lang_types::{
     TypeAnnotation,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarOrObjectSelectable, IsographDatabase, LINK_FIELD_NAME,
-    NetworkProtocol, ServerEntityName, ValidatedVariableDefinition, client_scalar_selectable_named,
-    description, output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
+    ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, ServerEntityName,
+    ValidatedVariableDefinition, client_scalar_selectable_named, description,
+    output_type_annotation, selectable_named, server_scalar_entity_javascript_name,
 };
 use prelude::Postfix;
 
@@ -163,13 +163,14 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 match object_selectable {
                     DefinitionLocation::Client(client_object_selectable) => {
                         let client_object_selectable = client_object_selectable.lookup(db);
-                        loadable_fields.insert(client_object_selectable.type_and_field());
+                        loadable_fields
+                            .insert(client_object_selectable.entity_name_and_selectable_name());
 
                         print_javascript_type_declaration(&type_annotation.map(&mut |target| {
                             format!(
                                 "LoadableField<{}__param, {target}>",
                                 client_object_selectable
-                                    .type_and_field()
+                                    .entity_name_and_selectable_name()
                                     .underscore_separated(),
                             )
                         }))
@@ -423,18 +424,19 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
         | ClientFieldVariant::UserWritten(_)
         | ClientFieldVariant::ImperativelyLoadedField(_) => {
             nested_client_scalar_selectable_imports
-                .insert(client_scalar_selectable.type_and_field());
+                .insert(client_scalar_selectable.entity_name_and_selectable_name());
             let inner_output_type = format!(
                 "{}__output_type",
                 client_scalar_selectable
-                    .type_and_field()
+                    .entity_name_and_selectable_name()
                     .underscore_separated()
             );
             let output_type = match scalar_selection.scalar_selection_directive_set {
                 ScalarSelectionDirectiveSet::Updatable(_)
                 | ScalarSelectionDirectiveSet::None(_) => inner_output_type,
                 ScalarSelectionDirectiveSet::Loadable(_) => {
-                    loadable_fields.insert(client_scalar_selectable.type_and_field());
+                    loadable_fields
+                        .insert(client_scalar_selectable.entity_name_and_selectable_name());
                     let provided_arguments = get_provided_arguments(
                         client_scalar_selectable.variable_definitions.iter(),
                         &scalar_selection.arguments,
@@ -447,7 +449,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
                         format!(
                             ",\n{indent}Omit<ExtractParameters<{}__param>, keyof {}>",
                             client_scalar_selectable
-                                .type_and_field()
+                                .entity_name_and_selectable_name()
                                 .underscore_separated(),
                             get_loadable_field_type_from_arguments(db, provided_arguments)
                         )
@@ -460,7 +462,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
                         {provided_args_type}\n\
                         {}>",
                         client_scalar_selectable
-                            .type_and_field()
+                            .entity_name_and_selectable_name()
                             .underscore_separated(),
                         "  ".repeat(indentation_level as usize),
                     )

@@ -11,11 +11,10 @@ use isograph_lang_types::{
     SelectionTypePostfix,
 };
 use isograph_schema::{
-    BorrowedObjectSelectable, ClientFieldVariant, ClientScalarOrObjectSelectable,
-    ClientScalarSelectable, IsographDatabase, Loadability, NameAndArguments, NetworkProtocol,
-    NormalizationKey, PathToRefetchField, RefetchedPathsMap, ServerObjectSelectableVariant,
-    VariableContext, categorize_field_loadability,
-    client_scalar_selectable_selection_set_for_parent_query,
+    BorrowedObjectSelectable, ClientFieldVariant, ClientScalarSelectable, IsographDatabase,
+    Loadability, NameAndArguments, NetworkProtocol, NormalizationKey, PathToRefetchField,
+    RefetchedPathsMap, ServerObjectSelectableVariant, VariableContext,
+    categorize_field_loadability, client_scalar_selectable_selection_set_for_parent_query,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
     selectable_reader_selection_set, transform_arguments_with_child_context,
 };
@@ -235,12 +234,12 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
             let reader_artifact_import_name = format!(
                 "{}__resolver_reader",
                 client_object_selectable
-                    .type_and_field()
+                    .entity_name_and_selectable_name()
                     .underscore_separated()
             );
 
             reader_imports.insert((
-                client_object_selectable.type_and_field(),
+                client_object_selectable.entity_name_and_selectable_name(),
                 ImportedFileCategory::ResolverReader,
             ));
 
@@ -406,12 +405,12 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     let reader_artifact_import_name = format!(
         "{}__resolver_reader",
         nested_client_scalar_selectable
-            .type_and_field()
+            .entity_name_and_selectable_name()
             .underscore_separated()
     );
 
     reader_imports.insert((
-        nested_client_scalar_selectable.type_and_field(),
+        nested_client_scalar_selectable.entity_name_and_selectable_name(),
         ImportedFileCategory::ResolverReader,
     ));
 
@@ -441,12 +440,12 @@ fn imperatively_loaded_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     let refetch_reader_artifact_import_name = format!(
         "{}__refetch_reader",
         nested_client_scalar_selectable
-            .type_and_field()
+            .entity_name_and_selectable_name()
             .underscore_separated()
     );
 
     reader_imports.insert((
-        nested_client_scalar_selectable.type_and_field(),
+        nested_client_scalar_selectable.entity_name_and_selectable_name(),
         ImportedFileCategory::RefetchReader,
     ));
 
@@ -487,17 +486,19 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
     let type_and_field = client_scalar_selectable
-        .type_and_field()
+        .entity_name_and_selectable_name()
         .underscore_separated();
     let entrypoint_text = if !loadable_directive_parameters.lazy_load_artifact {
         reader_imports.insert((
-            client_scalar_selectable.type_and_field(),
+            client_scalar_selectable.entity_name_and_selectable_name(),
             ImportedFileCategory::Entrypoint,
         ));
         format!("{type_and_field}__entrypoint")
     } else {
         let indent_3 = "  ".repeat((indentation_level + 2) as usize);
-        let field_parent_type = client_scalar_selectable.type_and_field().parent_entity_name;
+        let field_parent_type = client_scalar_selectable
+            .entity_name_and_selectable_name()
+            .parent_entity_name;
         let field_directive_set = match &client_scalar_selectable.variant {
             ClientFieldVariant::UserWritten(info) => {
                 info.client_scalar_selectable_directive_set.clone().expect(

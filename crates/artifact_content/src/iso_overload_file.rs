@@ -9,9 +9,9 @@ use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, EntrypointDeclarationInfo,
-    IsographDatabase, LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol,
-    client_scalar_selectable_named, client_selectable_map, validated_entrypoints,
+    ClientScalarSelectable, EntrypointDeclarationInfo, IsographDatabase, LINK_FIELD_NAME,
+    MemoRefClientSelectable, NetworkProtocol, client_scalar_selectable_named,
+    client_selectable_map, validated_entrypoints,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -21,7 +21,9 @@ fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
     client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
-    let type_and_field = client_scalar_selectable.lookup(db).type_and_field();
+    let type_and_field = client_scalar_selectable
+        .lookup(db)
+        .entity_name_and_selectable_name();
     let formatted_field = format!(
         "entrypoint {}.{}",
         type_and_field.parent_entity_name, type_and_field.selectable_name
@@ -59,11 +61,11 @@ fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>
     let type_and_field = match client_type_and_variant.0 {
         SelectionType::Scalar(s) => {
             let scalar = s.lookup(db);
-            scalar.type_and_field()
+            scalar.entity_name_and_selectable_name()
         }
         SelectionType::Object(o) => {
             let object = o.lookup(db);
-            object.type_and_field()
+            object.entity_name_and_selectable_name()
         }
     };
 
@@ -251,7 +253,9 @@ export function iso(_isographLiteralText: string):
                             "    case '{}':
       return entrypoint_{};\n",
                             entrypoint_declaration_info.iso_literal_text,
-                            field.type_and_field().underscore_separated()
+                            field
+                                .entity_name_and_selectable_name()
+                                .underscore_separated()
                         )
                     });
 
