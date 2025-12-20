@@ -1050,7 +1050,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
 
     let info = PathToRefetchFieldInfo {
         wrap_refetch_field_with_inline_fragment: if parent_object_entity_name
-            != newly_encountered_client_scalar_selectable.parent_object_entity_name()
+            != newly_encountered_client_scalar_selectable.parent_entity_name
         {
             parent_object_entity_name.wrap_some()
         } else {
@@ -1298,7 +1298,10 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
 ) {
     let selections = selectable_reader_selection_set(
         db,
-        newly_encountered_client_type.parent_object_entity_name(),
+        match newly_encountered_client_type {
+            SelectionType::Scalar(s) => s.parent_entity_name,
+            SelectionType::Object(o) => o.parent_entity_name,
+        },
         match newly_encountered_client_type {
             SelectionType::Scalar(s) => s.name,
             SelectionType::Object(o) => o.name,
