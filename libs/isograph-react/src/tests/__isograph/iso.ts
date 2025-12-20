@@ -5,7 +5,6 @@ import { type Economist__errorsClientPointerField__param } from './Economist/err
 import { type Query__errorsClientFieldComponent__param } from './Query/errorsClientFieldComponent/param_type';
 import { type Query__errorsClientField__param } from './Query/errorsClientField/param_type';
 import { type Query__errorsClientPointer__param } from './Query/errorsClientPointer/param_type';
-import { type Query__errorsSecond__param } from './Query/errorsSecond/param_type';
 import { type Query__errors__param } from './Query/errors/param_type';
 import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
@@ -19,7 +18,6 @@ import { type Economist____link__output_type } from './Economist/__link/output_t
 import entrypoint_Query__errorsClientFieldComponent from '../__isograph/Query/errorsClientFieldComponent/entrypoint';
 import entrypoint_Query__errorsClientField from '../__isograph/Query/errorsClientField/entrypoint';
 import entrypoint_Query__errorsClientPointer from '../__isograph/Query/errorsClientPointer/entrypoint';
-import entrypoint_Query__errorsSecond from '../__isograph/Query/errorsSecond/entrypoint';
 import entrypoint_Query__errors from '../__isograph/Query/errors/entrypoint';
 import entrypoint_Query__linkedUpdate from '../__isograph/Query/linkedUpdate/entrypoint';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
@@ -103,10 +101,6 @@ export function iso<T>(
 ): IdentityWithParam<Query__errorsClientPointer__param>;
 
 export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'field Query.errorsSecond', T>
-): IdentityWithParam<Query__errorsSecond__param>;
-
-export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.errors', T>
 ): IdentityWithParam<Query__errors__param>;
 
@@ -153,10 +147,6 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientPointer', T>
 ): typeof entrypoint_Query__errorsClientPointer;
-
-export function iso<T>(
-  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsSecond', T>
-): typeof entrypoint_Query__errorsSecond;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.errors', T>
