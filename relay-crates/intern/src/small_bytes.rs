@@ -94,7 +94,7 @@ impl Deref for SmallBytes {
 
 impl AsRef<[u8]> for SmallBytes {
     fn as_ref(&self) -> &[u8] {
-        self.deref()
+        &**self
     }
 }
 
@@ -152,7 +152,7 @@ impl From<String> for SmallBytes {
 impl Borrow<[u8]> for SmallBytes {
     #[inline]
     fn borrow(&self) -> &[u8] {
-        self.deref()
+        &**self
     }
 }
 
@@ -174,7 +174,7 @@ impl From<SmallBytes> for serde_bytes::ByteBuf {
 
 impl PartialEq for SmallBytes {
     fn eq(&self, other: &Self) -> bool {
-        self.deref() == other.deref()
+        &**self == &**other
     }
 }
 
