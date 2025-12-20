@@ -1,5 +1,6 @@
 use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithEmbeddedLocation};
 use isograph_lang_types::SelectionSet;
+use prelude::ErrClone;
 
 use crate::{
     ClientFieldVariant, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
@@ -18,8 +19,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
         parent_object_entity_name,
         client_scalar_selectable_name,
     )
-    .as_ref()
-    .map_err(|e| e.clone())?
+    .clone_err()?
     .as_ref()
     .expect(
         "Expected selectable to exist. \
