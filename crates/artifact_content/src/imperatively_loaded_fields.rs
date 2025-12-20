@@ -7,10 +7,10 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, Format, ID_FIELD_NAME,
-    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
-    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName,
-    WrappedSelectionMapSelection, fetchable_types, selection_map_wrapped,
+    ClientScalarSelectable, Format, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
+    REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName, WrappedSelectionMapSelection,
+    fetchable_types, selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -197,7 +197,7 @@ fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
                 None
             } else {
                 entrypoint
-                    .variable_definitions()
+                    .variable_definitions
                     .iter()
                     .find(|definition| definition.name.item == *variable_name)
                     .unwrap_or_else(|| {

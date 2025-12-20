@@ -5,11 +5,11 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarSelectionDirectiveSet,
     SelectionFieldArgument, SelectionType,
 };
+use prelude::Postfix;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarOrObjectSelectable, ClientScalarSelectable,
-    NameAndArguments, NetworkProtocol, ServerObjectSelectable, ServerScalarSelectable,
-    ValidatedVariableDefinition,
+    ClientObjectSelectable, ClientScalarSelectable, NameAndArguments, NetworkProtocol,
+    ServerObjectSelectable, ServerScalarSelectable, ValidatedVariableDefinition,
 };
 
 #[derive(Debug)]
@@ -108,16 +108,18 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     // For reader ASTs:
     // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
     // that we do not need to call this.
-    let variable_context = selection_type
-        .variable_definitions()
-        .iter()
-        .map(|variable_definition| {
-            (
-                variable_definition.name.item,
-                NonConstantValue::Variable(variable_definition.name.item),
-            )
-        })
-        .collect();
+    let variable_context = match selection_type {
+        SelectionType::Scalar(s) => s.variable_definitions.reference(),
+        SelectionType::Object(o) => o.variable_definitions.reference(),
+    }
+    .iter()
+    .map(|variable_definition| {
+        (
+            variable_definition.name.item,
+            NonConstantValue::Variable(variable_definition.name.item),
+        )
+    })
+    .collect();
     VariableContext(variable_context)
 }
 

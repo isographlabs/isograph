@@ -9,10 +9,10 @@ use isograph_lang_types::{
     VariableDefinition,
 };
 use isograph_schema::{
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, IsographDatabase,
-    LINK_FIELD_NAME, MemoRefClientSelectable, NetworkProtocol, ServerEntityName,
-    ServerObjectSelectable, client_scalar_selectable_selection_set_for_parent_query,
-    initial_variable_context, selectable_reader_selection_set, server_object_entity_named,
+    ClientScalarSelectable, ClientSelectable, IsographDatabase, LINK_FIELD_NAME,
+    MemoRefClientSelectable, NetworkProtocol, ServerEntityName, ServerObjectSelectable,
+    client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
+    selectable_reader_selection_set, server_object_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
@@ -173,12 +173,16 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         },
     }];
 
-    if !client_selectable.variable_definitions().is_empty() {
+    let variable_definitions = match client_selectable {
+        SelectionType::Scalar(s) => s.variable_definitions.reference(),
+        SelectionType::Object(o) => o.variable_definitions.reference(),
+    };
+    if !variable_definitions.is_empty() {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
             parent_object_entity.name, client_selectable_name
         );
-        let parameters = client_selectable.variable_definitions().iter();
+        let parameters = variable_definitions.iter();
         let parameters_types = generate_parameters(db, parameters);
         let parameters_content =
             format!("export type {reader_parameters_type} = {parameters_types}\n");
@@ -384,10 +388,11 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         "".to_string()
     };
 
-    let (parameters_import, parameters_type) = if !client_selectable
-        .variable_definitions()
-        .is_empty()
-    {
+    let variable_definitions = match client_selectable {
+        SelectionType::Scalar(s) => s.variable_definitions.reference(),
+        SelectionType::Object(o) => o.variable_definitions.reference(),
+    };
+    let (parameters_import, parameters_type) = if !variable_definitions.is_empty() {
         let reader_parameters_type = format!(
             "{}__{}__parameters",
             parent_object_entity.name,

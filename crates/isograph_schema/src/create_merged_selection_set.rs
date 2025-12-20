@@ -19,12 +19,12 @@ use prelude::Postfix;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientOrServerObjectSelectable,
-    ClientScalarOrObjectSelectable, ClientScalarSelectable, ClientSelectable, ClientSelectableId,
-    ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase,
-    NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName, ServerObjectEntity,
-    ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    ClientScalarSelectable, ClientSelectable, ClientSelectableId, ID_ENTITY_NAME, ID_FIELD_NAME,
+    ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments, NetworkProtocol,
+    PathToRefetchField, ServerEntityName, ServerObjectEntity, ServerObjectSelectableVariant,
+    VariableContext, client_object_selectable_named, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
+    fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, selectable_reader_selection_set, server_id_selectable,
@@ -1328,7 +1328,10 @@ fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
 
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
-        newly_encountered_client_type.variable_definitions(),
+        match newly_encountered_client_type {
+            SelectionType::Scalar(s) => &s.variable_definitions,
+            SelectionType::Object(o) => &o.variable_definitions,
+        },
         &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
     );
     transform_and_merge_child_selection_map_into_parent_map(
