@@ -1,4 +1,4 @@
-use std::ops::Deref;
+use std::ops::{Deref, Not};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub enum LineBehavior {
@@ -6,10 +6,11 @@ pub enum LineBehavior {
     EndsLine(EndsLineBehavior),
     Inline(InlineBehavior),
     IsOwnLine,
+    Remove,
 }
 
 impl LineBehavior {
-    pub fn start_new_line(&self) -> bool {
+    pub fn starts_new_line(&self) -> bool {
         matches!(
             self,
             LineBehavior::IsOwnLine | LineBehavior::StartsNewLine(_)
@@ -28,6 +29,7 @@ impl LineBehavior {
             LineBehavior::EndsLine(_) => SpaceAfter(false),
             LineBehavior::Inline(inline_behavior) => inline_behavior.space_after,
             LineBehavior::IsOwnLine => SpaceAfter(false),
+            LineBehavior::Remove => SpaceAfter(false),
         }
     }
 
@@ -37,7 +39,12 @@ impl LineBehavior {
             LineBehavior::EndsLine(ends_line_behavior) => ends_line_behavior.space_before,
             LineBehavior::Inline(inline_behavior) => inline_behavior.space_before,
             LineBehavior::IsOwnLine => SpaceBefore(false),
+            LineBehavior::Remove => SpaceBefore(false),
         }
+    }
+
+    pub fn should_keep(&self) -> bool {
+        matches!(self, LineBehavior::Remove).not()
     }
 }
 
