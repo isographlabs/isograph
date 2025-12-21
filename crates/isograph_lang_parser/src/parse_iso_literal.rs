@@ -433,6 +433,13 @@ fn parse_comma(
     )
 }
 
+fn parse_optional_trailing_comma_and_required_line_break(
+    tokens: &mut PeekableLexer<'_>,
+) -> DiagnosticResult<()> {
+    let _ = parse_comma(tokens);
+    parse_line_break(tokens)
+}
+
 fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
 ) -> DiagnosticResult<WithEmbeddedLocation<Selection>> {
@@ -446,7 +453,7 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens)?;
 
-        parse_line_break(tokens)?;
+        parse_optional_trailing_comma_and_required_line_break(tokens)?;
 
         match selection_set {
             Some(selection_set) => {
@@ -557,7 +564,7 @@ fn parse_optional_arguments(
         let arguments = parse_delimited_list(
             tokens,
             parse_argument,
-            drop_result(parse_comma),
+            parse_optional_trailing_comma_and_required_line_break,
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
@@ -643,7 +650,7 @@ fn parse_non_constant_value(
             let entries = parse_delimited_list(
                 tokens,
                 parse_object_entry,
-                drop_result(parse_comma),
+                parse_optional_trailing_comma_and_required_line_break,
                 IsographLangTokenKind::CloseBrace,
                 semantic_token_legend::ST_CLOSE_BRACE,
             )?;
@@ -717,7 +724,7 @@ fn parse_variable_definitions(
         parse_delimited_list(
             tokens,
             move |item| parse_variable_definition(item),
-            drop_result(parse_comma),
+            parse_optional_trailing_comma_and_required_line_break,
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
@@ -917,10 +924,4 @@ fn expected_literal_to_be_exported_diagnostic(
         ),
         location.wrap_some(),
     )
-}
-
-fn drop_result<'a, T>(
-    parse_fn: impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<T> + 'a,
-) -> impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<()> + 'a {
-    move |tokens| parse_fn(tokens).map(|_| ())
 }
