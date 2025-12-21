@@ -5,7 +5,7 @@ use crate::{
     lsp_state::LspState,
     uri_file_path_ext::UriFilePathExt,
 };
-use common_lang_types::{Span, relative_path_from_absolute_and_working_directory};
+use common_lang_types::{EntityName, Span, relative_path_from_absolute_and_working_directory};
 use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
@@ -69,23 +69,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::EntityNameWrapper(entity) => {
-                let location = entity_definition_location(db, entity.inner.0)
-                    .to_owned()
-                    .ok()
-                    .ok_or(LSPRuntimeError::ExpectedError)?
-                    .ok_or(LSPRuntimeError::ExpectedError)?;
-
-                GotoDefinitionResponse::Scalar(
-                    isograph_location_to_lsp_location(
-                        db,
-                        location
-                            .as_embedded_location()
-                            .ok_or(LSPRuntimeError::ExpectedError)?,
-                        &db.get_schema_source().content,
-                    )
-                    .ok_or(LSPRuntimeError::ExpectedError)?,
-                )
-                .wrap_some()
+                goto_entity_definition(db, entity.inner.0)?
             }
             IsographResolvedNode::Description(_) => None,
             IsographResolvedNode::ScalarSelection(scalar_path) => {
@@ -244,7 +228,10 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::SelectionSet(_) => None,
-            IsographResolvedNode::TypeAnnotation(_) => None,
+            IsographResolvedNode::TypeAnnotation(type_annotation_path) => {
+                let target_entity_name = type_annotation_path.inner.inner();
+                goto_entity_definition(db, target_entity_name.0)?
+            }
         }
     } else {
         None
@@ -255,4 +242,28 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
 
 fn lsp_location_to_scalar_response(location: lsp_types::Location) -> GotoDefinitionResponse {
     GotoDefinitionResponse::Scalar(location)
+}
+
+fn goto_entity_definition<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    entity_name: EntityName,
+) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
+    let location = entity_definition_location(db, entity_name)
+        .to_owned()
+        .ok()
+        .ok_or(LSPRuntimeError::ExpectedError)?
+        .ok_or(LSPRuntimeError::ExpectedError)?;
+
+    GotoDefinitionResponse::Scalar(
+        isograph_location_to_lsp_location(
+            db,
+            location
+                .as_embedded_location()
+                .ok_or(LSPRuntimeError::ExpectedError)?,
+            &db.get_schema_source().content,
+        )
+        .ok_or(LSPRuntimeError::ExpectedError)?,
+    )
+    .wrap_some()
+    .wrap_ok()
 }
