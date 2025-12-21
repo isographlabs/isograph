@@ -74,37 +74,69 @@ Ok(
                             ),
                         ),
                     },
-                    target_type: List(
-                        GraphQLListTypeAnnotation(
-                            Named(
-                                GraphQLNamedTypeAnnotation(
-                                    WithEmbeddedLocation {
-                                        embedded_location: EmbeddedLocation {
-                                            text_source: TextSource {
-                                                current_working_directory: CurrentWorkingDirectory,
-                                                relative_path_to_source_file: RelativePathToSourceFile(
-                                                    "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
-                                                ),
-                                                span: Some(
-                                                    Span {
-                                                        start: 28,
-                                                        end: 116,
-                                                    },
-                                                ),
-                                            },
-                                            span: Span {
-                                                start: 31,
-                                                end: 35,
-                                            },
-                                        },
-                                        item: EntityName(
-                                            "User",
-                                        ),
+                    target_type: WithEmbeddedLocation {
+                        embedded_location: EmbeddedLocation {
+                            text_source: TextSource {
+                                current_working_directory: CurrentWorkingDirectory,
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 28,
+                                        end: 116,
                                     },
                                 ),
-                            ),
+                            },
+                            span: Span {
+                                start: 30,
+                                end: 36,
+                            },
+                        },
+                        item: Union(
+                            UnionTypeAnnotation {
+                                variants: {
+                                    Plural(
+                                        WithEmbeddedLocation {
+                                            embedded_location: EmbeddedLocation {
+                                                text_source: TextSource {
+                                                    current_working_directory: CurrentWorkingDirectory,
+                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                        "crates/isograph_lang_parser/fixtures/pointer-list.input.js",
+                                                    ),
+                                                    span: Some(
+                                                        Span {
+                                                            start: 28,
+                                                            end: 116,
+                                                        },
+                                                    ),
+                                                },
+                                                span: Span {
+                                                    start: 31,
+                                                    end: 35,
+                                                },
+                                            },
+                                            item: Union(
+                                                UnionTypeAnnotation {
+                                                    variants: {
+                                                        Scalar(
+                                                            EntityNameWrapper(
+                                                                EntityName(
+                                                                    "User",
+                                                                ),
+                                                            ),
+                                                        ),
+                                                    },
+                                                    nullable: true,
+                                                },
+                                            ),
+                                        },
+                                    ),
+                                },
+                                nullable: true,
+                            },
                         ),
-                    ),
+                    },
                     directives: WithEmbeddedLocation {
                         embedded_location: EmbeddedLocation {
                             text_source: TextSource {

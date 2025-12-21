@@ -205,8 +205,10 @@ Ok(
                                                                 },
                                                             },
                                                             item: Variable(
-                                                                VariableName(
-                                                                    "var",
+                                                                VariableNameWrapper(
+                                                                    VariableName(
+                                                                        "var",
+                                                                    ),
                                                                 ),
                                                             ),
                                                         },
