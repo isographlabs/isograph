@@ -433,11 +433,20 @@ fn parse_comma(
     )
 }
 
-fn parse_optional_trailing_comma_and_required_line_break(
-    tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<()> {
-    let _ = parse_comma(tokens);
-    parse_line_break(tokens)
+/// Parse at least one of comma or line break
+fn parse_comma_or_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<()> {
+    let parsed_comma_or_line_break =
+        parse_comma(tokens).is_ok() || parse_line_break(tokens).is_ok();
+
+    if parsed_comma_or_line_break {
+        ().wrap_ok()
+    } else {
+        Diagnostic::new(
+            "Expected comma or line break".to_string(),
+            tokens.peek().embedded_location.to::<Location>().wrap_some(),
+        )
+        .wrap_err()
+    }
 }
 
 fn parse_selection(
@@ -453,7 +462,7 @@ fn parse_selection(
         // If we encounter a selection set, we are parsing a linked field. Otherwise, a scalar field.
         let selection_set = parse_optional_selection_set(tokens)?;
 
-        parse_optional_trailing_comma_and_required_line_break(tokens)?;
+        parse_comma_or_line_break(tokens)?;
 
         match selection_set {
             Some(selection_set) => {
@@ -564,7 +573,7 @@ fn parse_optional_arguments(
         let arguments = parse_delimited_list(
             tokens,
             parse_argument,
-            parse_optional_trailing_comma_and_required_line_break,
+            parse_comma_or_line_break,
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
@@ -650,7 +659,7 @@ fn parse_non_constant_value(
             let entries = parse_delimited_list(
                 tokens,
                 parse_object_entry,
-                parse_optional_trailing_comma_and_required_line_break,
+                parse_comma_or_line_break,
                 IsographLangTokenKind::CloseBrace,
                 semantic_token_legend::ST_CLOSE_BRACE,
             )?;
@@ -724,7 +733,7 @@ fn parse_variable_definitions(
         parse_delimited_list(
             tokens,
             move |item| parse_variable_definition(item),
-            parse_optional_trailing_comma_and_required_line_break,
+            parse_comma_or_line_break,
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
