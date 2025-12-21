@@ -64,7 +64,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
         relative_path_to_source_file,
         current_working_directory,
     ) {
-        match result.resolve((), Span::new(offset, offset)) {
+        match result.resolve((), Span::new(offset, offset)).dbg() {
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
@@ -233,6 +233,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 goto_entity_definition(db, target_entity_name.0)?
             }
             IsographResolvedNode::VariableNameWrapper(_) => None,
+            IsographResolvedNode::VariableDefinition(_) => None,
         }
     } else {
         None

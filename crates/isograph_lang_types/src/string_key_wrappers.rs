@@ -1,6 +1,6 @@
 use crate::{
     ClientFieldDeclarationPath, ClientPointerDeclarationPath, EntrypointDeclarationPath,
-    IsographResolvedNode,
+    IsographResolvedNode, VariableDefinitionPath,
 };
 
 macro_rules! define_wrapper {
@@ -99,6 +99,11 @@ pub enum ClientObjectSelectableNameWrapperParent<'a> {
 define_wrapper!(
     VariableNameWrapper,
     common_lang_types::VariableName,
-    (),
+    VariableNameWrapperParentType<'a>,
     VariableNameWrapperPath
 );
+
+#[derive(Debug)]
+pub enum VariableNameWrapperParentType<'a> {
+    VariableDefinition(VariableDefinitionPath<'a>),
+}

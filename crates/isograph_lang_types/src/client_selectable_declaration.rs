@@ -26,6 +26,7 @@ pub struct ClientFieldDeclaration {
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
+    #[resolve_field]
     pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
     pub definition_path: RelativePathToSourceFile,
 
@@ -42,7 +43,6 @@ pub struct ClientPointerDeclaration {
     pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
-    // TODO re-enable
     #[resolve_field]
     pub target_type: WithEmbeddedLocation<TypeAnnotation>,
     pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
@@ -50,6 +50,7 @@ pub struct ClientPointerDeclaration {
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
+    #[resolve_field]
     pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
     pub definition_path: RelativePathToSourceFile,
 

@@ -16,7 +16,9 @@ use graphql_lang_types::{
 use prelude::Postfix;
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 
-use crate::{ClientPointerDeclarationPath, EntityNameWrapper, IsographResolvedNode};
+use crate::{
+    ClientPointerDeclarationPath, EntityNameWrapper, IsographResolvedNode, VariableDefinitionPath,
+};
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
@@ -54,8 +56,8 @@ impl ResolvePosition for TypeAnnotation {
 
 #[derive(Debug)]
 pub enum TypeAnnotationParentType<'a> {
-    // TODO variable
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+    VariableDefinition(VariableDefinitionPath<'a>),
 }
 
 pub type TypeAnnotationPath<'a> =
