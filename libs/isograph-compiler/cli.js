@@ -3,6 +3,7 @@
 
 var bin = require('.');
 var spawn = require('child_process').spawn;
+var chmodSync = require('fs').chmodSync;
 
 var input = process.argv.slice(2);
 
