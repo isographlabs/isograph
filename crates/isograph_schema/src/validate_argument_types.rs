@@ -1,16 +1,16 @@
+use std::collections::BTreeSet;
+
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location, SelectableName,
     ValueKeyName, WithEmbeddedLocation,
 };
-use graphql_lang_types::{
-    GraphQLListTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation, NameValuePair,
-};
+use graphql_lang_types::NameValuePair;
 use intern::{Lookup, string_key::StringKey};
 use prelude::{ErrClone, Postfix};
 
 use isograph_lang_types::{
-    NonConstantValue, SelectionType, VariableDefinition, VariableNameWrapper,
-    graphql_type_annotation_from_type_annotation,
+    EntityNameWrapper, NonConstantValue, SelectionType, TypeAnnotation, UnionTypeAnnotation,
+    UnionVariant, VariableDefinition, VariableNameWrapper,
 };
 
 use crate::{
@@ -18,107 +18,135 @@ use crate::{
     NetworkProtocol, STRING_ENTITY_NAME, server_selectables_map_for_entity,
 };
 
-fn graphql_type_to_non_null_type(value: GraphQLTypeAnnotation) -> GraphQLNonNullTypeAnnotation {
-    match value {
-        GraphQLTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(named),
-        GraphQLTypeAnnotation::List(list) => GraphQLNonNullTypeAnnotation::List(*list),
-        GraphQLTypeAnnotation::NonNull(non_null) => *non_null,
-    }
-}
-
-fn graphql_type_to_nullable_type(value: GraphQLNonNullTypeAnnotation) -> GraphQLTypeAnnotation {
-    match value {
-        GraphQLNonNullTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(named),
-        GraphQLNonNullTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.boxed()),
-    }
-}
-
 fn scalar_literal_satisfies_type(
-    scalar_literal_name: EntityName,
-    type_: &GraphQLTypeAnnotation,
+    // We supplied an int literal
+    supplied_scalar_literal_entity_name: EntityName,
+    target_type: &TypeAnnotation,
     location: EmbeddedLocation,
+    type_description: &'static str,
 ) -> DiagnosticResult<()> {
-    match graphql_type_to_non_null_type(type_.clone()) {
-        GraphQLNonNullTypeAnnotation::List(_) => {
-            expected_type_found_something_else_named_diagnostic(
-                id_annotation_to_typename_annotation(type_),
-                scalar_literal_name.unchecked_conversion(),
-                "scalar literal",
-                location,
-            )
-            .wrap_err()
+    let matches = match target_type {
+        TypeAnnotation::Scalar(target_entity_name_wrapper) => {
+            target_entity_name_wrapper.0 == supplied_scalar_literal_entity_name
         }
-        GraphQLNonNullTypeAnnotation::Named(named_type) => {
-            let expected_name = named_type.0;
-            if expected_name == scalar_literal_name {
-                return Ok(());
-            }
-
-            let expected = id_annotation_to_typename_annotation(type_);
-
-            expected_type_found_something_else_named_diagnostic(
-                expected,
-                scalar_literal_name.unchecked_conversion(),
-                "scalar literal",
-                location,
-            )
-            .wrap_err()
+        TypeAnnotation::Union(target_union) => {
+            // The union must contain an int
+            target_union.variants.contains(&UnionVariant::Scalar(
+                supplied_scalar_literal_entity_name.into(),
+            ))
         }
+        TypeAnnotation::Plural(_) => false,
+    };
+
+    if !matches {
+        return expected_type_found_something_else_named_diagnostic(
+            target_type,
+            supplied_scalar_literal_entity_name.unchecked_conversion(),
+            type_description,
+            location,
+        )
+        .wrap_err();
     }
+    Ok(())
 }
 
 fn variable_type_satisfies_argument_type(
-    variable_type: &GraphQLTypeAnnotation,
-    argument_type: &GraphQLTypeAnnotation,
+    supplied_type: &TypeAnnotation,
+    target_type: &TypeAnnotation,
 ) -> bool {
-    match argument_type {
-        GraphQLTypeAnnotation::List(list_type) => {
-            match graphql_type_to_non_null_type(variable_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(list_variable_type) => {
-                    // [Value]! satisfies [Value]
-                    // or [Value] satisfies [Value]
-                    variable_type_satisfies_argument_type(
-                        list_variable_type.item.reference(),
-                        list_type.item.reference(),
+    match target_type {
+        TypeAnnotation::Scalar(target_scalar) => match supplied_type {
+            TypeAnnotation::Scalar(supplied_scalar) => target_scalar == supplied_scalar,
+            TypeAnnotation::Union(supplied_union) => {
+                // Each variant of the union must match the scalar_arg, and it must not be
+                // nullable
+                //
+                // (Is that a safe assumption? What if scalar is part of a nullable union...?
+                // Hopefully our types are well-formed!)
+                !supplied_union.nullable
+                    && supplied_union.variants.iter().all(|union_variant| {
+                        union_variant_matches_scalar_arg(union_variant, target_scalar.dereference())
+                    })
+            }
+            TypeAnnotation::Plural(_supplied_plural) => false,
+        },
+        TypeAnnotation::Union(target_union) => {
+            match supplied_type {
+                TypeAnnotation::Scalar(supplied_scalar) => {
+                    // This scalar must be a member of the union
+                    union_contains(target_union, &UnionVariant::Scalar(*supplied_scalar))
+                }
+                TypeAnnotation::Union(supplied_union) => {
+                    // If the variable is a union and the source is a union, then each variant
+                    // in the variable must be a valid union member, and
+                    // the union_arg must be nullable or the union_var must be not nullable
+                    (target_union.nullable || !supplied_union.nullable)
+                        && supplied_union.variants.iter().all(|union_variant_var| {
+                            union_contains(target_union, union_variant_var)
+                        })
+                }
+                TypeAnnotation::Plural(supplied_plural) => {
+                    // This plural must be a member of the union
+                    union_contains(
+                        target_union,
+                        &UnionVariant::Plural(*supplied_plural.clone()),
                     )
                 }
-                GraphQLNonNullTypeAnnotation::Named(_) => false,
             }
         }
-
-        GraphQLTypeAnnotation::Named(named_type) => {
-            match graphql_type_to_non_null_type(variable_type.clone()) {
-                GraphQLNonNullTypeAnnotation::Named(named_variable_type) => {
-                    // Value! satisfies Value
-                    // or Value satisfies Value
-                    named_variable_type == named_type.dereference()
-                }
-                GraphQLNonNullTypeAnnotation::List(_) => false,
+        TypeAnnotation::Plural(target_plural) => match supplied_type {
+            TypeAnnotation::Scalar(_supplied_scalar) => false,
+            TypeAnnotation::Union(supplied_union) => {
+                // each variant of the union must match the plural_arg_type, and
+                // it must not be nullable. Again, assuming that the types are well-formed
+                !supplied_union.nullable
+                    && supplied_union
+                        .variants
+                        .iter()
+                        .all(|variant_var| match variant_var {
+                            UnionVariant::Scalar(_) => false,
+                            UnionVariant::Plural(plural_var) => {
+                                variable_type_satisfies_argument_type(
+                                    plural_var.item.reference(),
+                                    target_plural.item.reference(),
+                                )
+                            }
+                        })
             }
-        }
-        GraphQLTypeAnnotation::NonNull(non_null_argument_type) => match variable_type {
-            // Value! satisfies Value!
-            GraphQLTypeAnnotation::NonNull(variable_type) => variable_type_satisfies_argument_type(
-                &graphql_type_to_nullable_type(*variable_type.clone()),
-                &graphql_type_to_nullable_type(*non_null_argument_type.clone()),
+            TypeAnnotation::Plural(supplied_plural) => variable_type_satisfies_argument_type(
+                supplied_plural.item.reference(),
+                target_plural.item.reference(),
             ),
-            // Value does not satisfy Value!
-            // or [Value] does not satisfy Value!
-            GraphQLTypeAnnotation::Named(_) | GraphQLTypeAnnotation::List(_) => false,
         },
     }
+}
+
+fn union_variant_matches_scalar_arg(
+    union_variant_var: &UnionVariant,
+    scalar_arg: EntityNameWrapper,
+) -> bool {
+    match union_variant_var {
+        UnionVariant::Scalar(union_var_entity_name_wrapper) => {
+            union_var_entity_name_wrapper.dereference() == scalar_arg
+        }
+        UnionVariant::Plural(_) => false,
+    }
+}
+
+fn union_contains(union: &UnionTypeAnnotation, potential_member: &UnionVariant) -> bool {
+    union.variants.contains(potential_member)
 }
 
 pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
-    field_argument_definition_type: &GraphQLTypeAnnotation,
+    field_argument_definition_type: &TypeAnnotation,
     variable_definitions: &[VariableDefinition],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
-        NonConstantValue::Variable(variable_name) => {
+        NonConstantValue::Variable(supplied_variable_name) => {
             let variable_type = get_variable_type(
-                variable_name,
+                supplied_variable_name,
                 variable_definitions,
                 selection_supplied_argument_value.embedded_location,
             )?;
@@ -126,11 +154,11 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             {
                 Ok(())
             } else {
-                let expected = id_annotation_to_typename_annotation(field_argument_definition_type);
-                let actual = id_annotation_to_typename_annotation(variable_type);
-
                 Diagnostic::new(
-                    format!("Expected input of type {expected}, found {actual} scalar literal"),
+                    format!(
+                        "Mismatched type. Received ${supplied_variable_name}, with type {variable_type}, \
+                        expected {field_argument_definition_type}."
+                    ),
                     selection_supplied_argument_value
                         .embedded_location
                         .to::<Location>()
@@ -143,12 +171,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             *INT_ENTITY_NAME,
             field_argument_definition_type,
             selection_supplied_argument_value.embedded_location,
+            "an integer literal",
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
                 *FLOAT_ENTITY_NAME,
                 field_argument_definition_type,
                 selection_supplied_argument_value.embedded_location,
+                "an integer literal",
             )
             .map_err(|_| error)
         })
@@ -157,6 +187,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 *ID_ENTITY_NAME,
                 field_argument_definition_type,
                 selection_supplied_argument_value.embedded_location,
+                "an integer literal",
             )
             .map_err(|_| error)
         }),
@@ -164,17 +195,20 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             *BOOLEAN_ENTITY_NAME,
             field_argument_definition_type,
             selection_supplied_argument_value.embedded_location,
+            "a boolean literal",
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
             *STRING_ENTITY_NAME,
             field_argument_definition_type,
             selection_supplied_argument_value.embedded_location,
+            "a string literal",
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
                 *ID_ENTITY_NAME,
                 field_argument_definition_type,
                 selection_supplied_argument_value.embedded_location,
+                "a string literal",
             )
             .map_err(|_| error)
         }),
@@ -182,28 +216,17 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             *FLOAT_ENTITY_NAME,
             field_argument_definition_type,
             selection_supplied_argument_value.embedded_location,
+            "a float literal",
         ),
-        NonConstantValue::Enum(enum_literal_value) => {
-            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(_) => {
-                    expected_type_found_something_else_named_diagnostic(
-                        id_annotation_to_typename_annotation(field_argument_definition_type),
-                        (*enum_literal_value).unchecked_conversion(),
-                        "enum literal",
-                        selection_supplied_argument_value.embedded_location,
-                    )
-                    .wrap_err()
-                }
-                GraphQLNonNullTypeAnnotation::Named(_) => enum_satisfies_type(),
-            }
+        NonConstantValue::Enum(_enum_literal_value) => {
+            todo!("Support validation of enum literals")
         }
         NonConstantValue::Null => {
             if field_argument_definition_type.is_nullable() {
                 Ok(())
             } else {
-                let expected = id_annotation_to_typename_annotation(field_argument_definition_type);
                 Diagnostic::new(
-                    format!("Expected non null input of type {expected}, found null"),
+                    format!("Expected non null input of type {field_argument_definition_type}, found null"),
                     selection_supplied_argument_value
                         .embedded_location
                         .to::<Location>()
@@ -212,38 +235,59 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 .wrap_err()
             }
         }
-        NonConstantValue::List(list) => {
-            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(list_type) => {
-                    list_satisfies_type(db, list, list_type, variable_definitions)
-                }
-                GraphQLNonNullTypeAnnotation::Named(_) => {
-                    expected_type_found_something_else_anonymous_diagnostic(
-                        id_annotation_to_typename_annotation(field_argument_definition_type),
-                        "list literal",
-                        selection_supplied_argument_value.embedded_location,
-                    )
-                    .wrap_err()
-                }
-            }
-        }
+        NonConstantValue::List(list) => list_satisfies_type(
+            db,
+            list,
+            field_argument_definition_type,
+            variable_definitions,
+        ),
         NonConstantValue::Object(object_literal) => {
-            match graphql_type_to_non_null_type(field_argument_definition_type.clone()) {
-                GraphQLNonNullTypeAnnotation::List(_) => {
-                    expected_type_found_something_else_anonymous_diagnostic(
-                        id_annotation_to_typename_annotation(field_argument_definition_type),
-                        "object literal",
-                        selection_supplied_argument_value.embedded_location,
-                    )
-                    .wrap_err()
-                }
-                GraphQLNonNullTypeAnnotation::Named(named_type) => object_satisfies_type(
+            match field_argument_definition_type {
+                TypeAnnotation::Scalar(target_scalar) => object_satisfies_type(
                     db,
                     selection_supplied_argument_value,
                     variable_definitions,
                     object_literal,
-                    named_type.0,
+                    target_scalar.0,
                 ),
+                TypeAnnotation::Union(target_union) => {
+                    let matches = target_union.variants.iter().any(|target_union_variant| {
+                        match target_union_variant {
+                            UnionVariant::Scalar(target_union_name) => object_satisfies_type(
+                                db,
+                                selection_supplied_argument_value,
+                                variable_definitions,
+                                object_literal,
+                                target_union_name.0,
+                            )
+                            .is_ok(),
+                            UnionVariant::Plural(_) => false,
+                        }
+                    });
+
+                    if !matches {
+                        return Diagnostic::new(
+                            "Item did not match any union variants".to_string(),
+                            selection_supplied_argument_value
+                                .embedded_location
+                                .to::<Location>()
+                                .wrap_some(),
+                        )
+                        .wrap_err();
+                    }
+
+                    Ok(())
+
+                    // Object must satisfy at least one union variant
+                }
+                TypeAnnotation::Plural(_) => Diagnostic::new(
+                    "Mismatched type.".to_string(),
+                    selection_supplied_argument_value
+                        .embedded_location
+                        .to::<Location>()
+                        .wrap_some(),
+                )
+                .wrap_err(),
             }
         }
     }
@@ -306,9 +350,10 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
+#[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
 enum ObjectLiteralFieldType {
     Provided(
-        WithEmbeddedLocation<GraphQLTypeAnnotation>,
+        WithEmbeddedLocation<TypeAnnotation>,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -318,7 +363,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
     db: &IsographDatabase<TNetworkProtocol>,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     server_object_entity_name: EntityName,
-) -> DiagnosticResult<Vec<ObjectLiteralFieldType>> {
+) -> DiagnosticResult<BTreeSet<ObjectLiteralFieldType>> {
     let server_selectables =
         server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
 
@@ -338,29 +383,26 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 }
             };
 
-            let field_type_annotation = iso_type_annotation
-                .as_ref()
-                .map(graphql_type_annotation_from_type_annotation);
-
             let object_literal_supplied_field = object_literal
                 .iter()
                 .find(|field| field.name.item.lookup() == (*field_name).lookup());
 
             match object_literal_supplied_field {
                 Some(selection_supplied_argument_value) => ObjectLiteralFieldType::Provided(
-                    field_type_annotation,
+                    iso_type_annotation,
                     selection_supplied_argument_value.clone(),
                 )
                 .wrap_some(),
-                None => match field_type_annotation.item {
-                    GraphQLTypeAnnotation::NonNull(_) => {
+                None => match iso_type_annotation.item {
+                    TypeAnnotation::Scalar(_) => {
                         ObjectLiteralFieldType::Missing(*field_name).wrap_some()
                     }
-                    GraphQLTypeAnnotation::List(_) | GraphQLTypeAnnotation::Named(_) => None,
+                    TypeAnnotation::Union(_union_type_annotation) => None,
+                    TypeAnnotation::Plural(_) => None,
                 },
             }
         })
-        .collect::<Vec<_>>()
+        .collect::<BTreeSet<_>>()
         .wrap_ok()
 }
 
@@ -405,28 +447,14 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-// TODO this should not exist
-fn id_annotation_to_typename_annotation(type_: &GraphQLTypeAnnotation) -> GraphQLTypeAnnotation {
-    type_.clone()
-}
-
-fn enum_satisfies_type() -> DiagnosticResult<()> {
-    todo!("Validate enum literal. Parser doesn't support enum literals yet")
-}
-
 fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    list: &[WithEmbeddedLocation<NonConstantValue>],
-    list_type: GraphQLListTypeAnnotation,
+    supplied_list: &[WithEmbeddedLocation<NonConstantValue>],
+    target_type: &TypeAnnotation,
     variable_definitions: &[VariableDefinition],
 ) -> DiagnosticResult<()> {
-    list.iter().try_for_each(|element| {
-        value_satisfies_type(
-            db,
-            element,
-            list_type.item.reference(),
-            variable_definitions,
-        )
+    supplied_list.iter().try_for_each(|element| {
+        value_satisfies_type(db, element, target_type.reference(), variable_definitions)
     })
 }
 
@@ -434,7 +462,7 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableNameWrapper,
     variable_definitions: &'a [VariableDefinition],
     location: EmbeddedLocation,
-) -> DiagnosticResult<&'a GraphQLTypeAnnotation> {
+) -> DiagnosticResult<&'a TypeAnnotation> {
     match variable_definitions
         .iter()
         .find(|definition| definition.name.item == *variable_name)
@@ -449,24 +477,13 @@ fn get_variable_type<'a>(
 }
 
 fn expected_type_found_something_else_named_diagnostic(
-    expected: GraphQLTypeAnnotation,
+    expected: &TypeAnnotation,
     actual: StringKey,
     type_description: &str,
     location: EmbeddedLocation,
 ) -> Diagnostic {
     Diagnostic::new(
         format!("Expected input of type {expected}, found {actual} {type_description}"),
-        location.to::<Location>().wrap_some(),
-    )
-}
-
-fn expected_type_found_something_else_anonymous_diagnostic(
-    expected: GraphQLTypeAnnotation,
-    type_description: &str,
-    location: EmbeddedLocation,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!("Expected input of type {expected}, found {type_description}"),
         location.to::<Location>().wrap_some(),
     )
 }

@@ -228,7 +228,7 @@ fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
         };
 
         for argument in arguments {
-            let target = argument.type_.item.inner();
+            let target = argument.type_.item.inner().0;
 
             match server_entity_named_2(db, target).clone_err() {
                 Ok(entity) => {

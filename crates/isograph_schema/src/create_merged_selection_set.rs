@@ -4,15 +4,12 @@ use common_lang_types::{
     EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
     WithLocationPostfix,
 };
-use graphql_lang_types::{
-    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
-};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
-    SelectionTypePostfix, VariableDefinition, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotation, VariableDefinition, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -1553,11 +1550,8 @@ pub fn id_arguments() -> Vec<VariableDefinition> {
             .unchecked_conversion::<VariableName>()
             .to::<VariableNameWrapper>()
             .with_embedded_location(EmbeddedLocation::todo_generated()),
-        type_: GraphQLTypeAnnotation::NonNull(
-            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*ID_ENTITY_NAME))
-                .boxed(),
-        )
-        .with_embedded_location(EmbeddedLocation::todo_generated()),
+        type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+            .with_embedded_location(EmbeddedLocation::todo_generated()),
         default_value: None,
     }]
 }

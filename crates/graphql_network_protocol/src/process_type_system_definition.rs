@@ -6,7 +6,6 @@ use common_lang_types::{
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
-    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
@@ -396,13 +395,8 @@ fn get_refetch_selectable(
                     .unchecked_conversion::<VariableName>()
                     .to::<VariableNameWrapper>()
                     .with_embedded_location(EmbeddedLocation::todo_generated()),
-                type_: GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                        *ID_ENTITY_NAME,
-                    ))
-                    .boxed(),
-                )
-                .with_embedded_location(EmbeddedLocation::todo_generated()),
+                type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+                    .with_embedded_location(EmbeddedLocation::todo_generated()),
                 default_value: None,
             }],
         }),

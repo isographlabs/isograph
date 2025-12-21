@@ -3,9 +3,6 @@ use common_lang_types::{
     EmbeddedLocation, VariableName, WithLocationPostfix, derive_display,
 };
 use core::panic;
-use graphql_lang_types::{
-    GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation,
-};
 use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
@@ -324,13 +321,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     .to::<VariableNameWrapper>()
                                     .with_embedded_location(EmbeddedLocation::todo_generated()),
 
-                                type_: GraphQLTypeAnnotation::NonNull(
-                                    GraphQLNonNullTypeAnnotation::Named(
-                                        GraphQLNamedTypeAnnotation(*ID_ENTITY_NAME),
-                                    )
-                                    .boxed(),
-                                )
-                                .with_embedded_location(EmbeddedLocation::todo_generated()),
+                                type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+                                    .with_embedded_location(EmbeddedLocation::todo_generated()),
                                 default_value: None,
                             };
 

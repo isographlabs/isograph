@@ -27,6 +27,16 @@ pub enum TypeAnnotation {
     Plural(Box<WithEmbeddedLocation<TypeAnnotation>>),
 }
 
+impl std::fmt::Display for TypeAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TypeAnnotation::Scalar(entity_name_wrapper) => write!(f, "{}", entity_name_wrapper),
+            TypeAnnotation::Union(union_type_annotation) => write!(f, "{}", union_type_annotation),
+            TypeAnnotation::Plural(plural) => write!(f, "[{}]", &plural.item),
+        }
+    }
+}
+
 impl ResolvePosition for TypeAnnotation {
     type Parent<'a> = TypeAnnotationParentType<'a>;
 
@@ -111,7 +121,11 @@ impl TypeAnnotation {
     pub fn is_nullable(&self) -> bool {
         // TODO this will have to change at some point, but for now, a Union is only used
         // to represent nullability.
-        matches!(self, TypeAnnotation::Union(_))
+        match self {
+            TypeAnnotation::Scalar(entity_name_wrapper) => false,
+            TypeAnnotation::Union(union_type_annotation) => union_type_annotation.nullable,
+            TypeAnnotation::Plural(_) => false,
+        }
     }
 }
 
@@ -121,6 +135,24 @@ pub struct UnionTypeAnnotation {
     // TODO this is incredibly hacky. null should be in the variants set, but
     // that doesn't work for a variety of reasons, namely mapping, etc.
     pub nullable: bool,
+}
+
+impl std::fmt::Display for UnionTypeAnnotation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        let count = self.variants.len();
+        for (index, variant) in self.variants.iter().enumerate() {
+            let add_pipe = self.nullable || (index != count - 1);
+            write!(f, "{}", variant)?;
+            if add_pipe {
+                write!(f, " | ")?;
+            }
+        }
+        if self.nullable {
+            write!(f, "null")?;
+        }
+        write!(f, ")")
+    }
 }
 
 impl UnionTypeAnnotation {
@@ -149,6 +181,15 @@ impl UnionTypeAnnotation {
 pub enum UnionVariant {
     Scalar(EntityNameWrapper),
     Plural(WithEmbeddedLocation<TypeAnnotation>),
+}
+
+impl std::fmt::Display for UnionVariant {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            UnionVariant::Scalar(entity_name_wrapper) => write!(f, "{}", entity_name_wrapper),
+            UnionVariant::Plural(plural) => write!(f, "{}", &plural.item),
+        }
+    }
 }
 
 fn graphql_type_annotation_from_union_variant(
@@ -192,9 +233,10 @@ pub fn graphql_type_annotation_from_type_annotation(
     other: &TypeAnnotation,
 ) -> GraphQLTypeAnnotation {
     match other {
-        TypeAnnotation::Scalar(scalar_entity_name) => {
-            GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(scalar_entity_name.0))
-        }
+        TypeAnnotation::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::NonNull(
+            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(scalar_entity_name.0))
+                .boxed(),
+        ),
         TypeAnnotation::Plural(type_annotation) => GraphQLTypeAnnotation::List(
             GraphQLListTypeAnnotation(
                 type_annotation

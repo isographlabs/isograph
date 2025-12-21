@@ -230,7 +230,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                     errors,
                     value_satisfies_type(
                         db,
-                        &selection_supplied_argument.item.value,
+                        selection_supplied_argument.item.value.reference(),
                         field_argument_definition.type_.item.reference(),
                         client_type_variable_definitions,
                     ),

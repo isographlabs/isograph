@@ -1,5 +1,4 @@
 use common_lang_types::{EntityName, SelectableName};
-use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
@@ -11,34 +10,58 @@ use prelude::Postfix;
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    // TODO accept reference?
-    type_: GraphQLTypeAnnotation,
+    type_: &TypeAnnotation,
     indentation_level: u8,
 ) -> String {
     match type_ {
-        GraphQLTypeAnnotation::Named(named_inner_type) => {
-            format!(
-                "{} | null | void",
-                format_server_field_type(db, named_inner_type.0, indentation_level)
-            )
+        TypeAnnotation::Scalar(entity_name_wrapper) => {
+            format_server_field_type(db, entity_name_wrapper.0, indentation_level)
         }
-        GraphQLTypeAnnotation::List(list) => {
-            format!(
-                "ReadonlyArray<{}> | null",
-                format_server_field_type(db, list.item.inner(), indentation_level)
-            )
+        TypeAnnotation::Union(union_type_annotation) => {
+            let mut s = String::new();
+            let count = union_type_annotation.variants.len();
+            for (index, variant) in union_type_annotation.variants.iter().enumerate() {
+                let add_pipe = union_type_annotation.nullable || (index != count - 1);
+                match variant {
+                    UnionVariant::Scalar(entity_name_wrapper) => {
+                        s.push_str(&format_server_field_type(
+                            db,
+                            entity_name_wrapper.0,
+                            indentation_level,
+                        ));
+                    }
+                    UnionVariant::Plural(p) => {
+                        s.push_str("ReadonlyArray<");
+                        s.push_str(&format_parameter_type(
+                            db,
+                            p.item.reference(),
+                            indentation_level,
+                        ));
+                        s.push('>');
+                    }
+                }
+                if add_pipe {
+                    s.push_str(" | ");
+                }
+            }
+
+            if union_type_annotation.nullable {
+                s.push_str("null | void");
+            }
+
+            s
         }
-        GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
-                format_server_field_type(db, named_inner_type.0, indentation_level)
-            }
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                format!(
-                    "ReadonlyArray<{}>",
-                    format_server_field_type(db, list.item.inner(), indentation_level)
-                )
-            }
-        },
+        TypeAnnotation::Plural(plural) => {
+            let mut s = String::new();
+            s.push_str("ReadonlyArray<");
+            s.push_str(&format_parameter_type(
+                db,
+                plural.item.reference(),
+                indentation_level,
+            ));
+            s.push('>');
+            s
+        }
     }
 }
 

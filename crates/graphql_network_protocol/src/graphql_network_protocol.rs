@@ -214,7 +214,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             .unchecked_conversion::<VariableName>()
                                             .into()
                                     }),
-                                    type_: arg.type_,
+                                    type_: arg
+                                        .type_
+                                        .map(TypeAnnotation::from_graphql_type_annotation),
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),
@@ -253,7 +255,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             .unchecked_conversion::<VariableName>()
                                             .into()
                                     }),
-                                    type_: arg.type_,
+                                    type_: arg
+                                        .type_
+                                        .map(TypeAnnotation::from_graphql_type_annotation),
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),

@@ -1,6 +1,10 @@
 use common_lang_types::{QueryOperationName, QueryText};
-use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, VariableDefinition};
+use isograph_lang_types::{
+    ArgumentKeyAndValue, NonConstantValue, VariableDefinition,
+    graphql_type_annotation_from_type_annotation,
+};
 use isograph_schema::{Format, MergedSelectionMap, MergedServerSelection, RootOperationName};
+use prelude::Postfix;
 
 pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,
@@ -39,9 +43,11 @@ fn write_variables_to_string<'a>(
         } else {
             first = false;
         }
-        // TODO can we consume the variables here?
-        let x = variable.type_.item.clone();
-        variable_text.push_str(&format!("${}: {}", variable.name.item, x));
+        variable_text.push_str(&format!(
+            "${}: {}",
+            variable.name.item,
+            graphql_type_annotation_from_type_annotation(variable.type_.item.reference())
+        ));
         if let Some(default_value) = &variable.default_value {
             variable_text.push_str(&format!(" = {}", default_value.item.print_to_string()));
         }

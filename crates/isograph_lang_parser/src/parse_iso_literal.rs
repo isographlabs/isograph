@@ -752,7 +752,8 @@ fn parse_variable_definition(
                 IsographLangTokenKind::Colon,
                 semantic_token_legend::ST_COLON,
             )?;
-            let type_ = parse_type_annotation(tokens)?;
+            let type_ =
+                parse_type_annotation(tokens)?.map(TypeAnnotation::from_graphql_type_annotation);
 
             let default_value = parse_optional_default_value(tokens)?;
 

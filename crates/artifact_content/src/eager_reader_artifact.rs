@@ -1,7 +1,6 @@
 use common_lang_types::{
     ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName, WithEmbeddedLocation,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
@@ -624,12 +623,12 @@ fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     let mut s = "{\n".to_string();
     let indent = "  ";
     for arg in argument_definitions {
-        let is_optional = !matches!(arg.type_.item, GraphQLTypeAnnotation::NonNull(_));
+        let is_optional = arg.type_.item.is_nullable();
         s.push_str(&format!(
             "{indent}readonly {}{}: {},\n",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_parameter_type(db, arg.type_.item.clone(), 1)
+            format_parameter_type(db, arg.type_.item.reference(), 1)
         ));
     }
     s.push_str("};");

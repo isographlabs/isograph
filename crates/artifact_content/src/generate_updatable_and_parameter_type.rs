@@ -1,10 +1,9 @@
 use std::{collections::BTreeSet, fmt::Display};
 
 use common_lang_types::{
-    EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, SelectableNameOrAlias,
+    EntityName, EntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
     WithEmbeddedLocation,
 };
-use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
@@ -19,6 +18,7 @@ use isograph_schema::{
 use prelude::Postfix;
 
 use crate::{
+    format_parameter_type::format_parameter_type,
     generate_artifacts::{
         ClientScalarSelectableParameterType, ClientScalarSelectableUpdatableDataType,
         print_javascript_type_declaration,
@@ -500,58 +500,16 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
             loadable_field_type.push_str(", ");
         }
         is_first = false;
-        let is_optional = !matches!(arg.type_.item, GraphQLTypeAnnotation::NonNull(_));
+        let is_optional = arg.type_.item.is_nullable();
         loadable_field_type.push_str(&format!(
             "readonly {}{}: {}",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_type_for_js(db, arg.type_.item.clone())
+            format_parameter_type(db, arg.type_.item.reference(), 1)
         ));
     }
     loadable_field_type.push('}');
     loadable_field_type
-}
-
-fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    // TODO accept reference?
-    type_: GraphQLTypeAnnotation,
-) -> String {
-    let inner = server_scalar_entity_javascript_name(db, type_.inner())
-        .as_ref()
-        .expect(
-            "Expected parsing to not have failed. \
-            This is indicative of a bug in Isograph.",
-        )
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
-
-    format_type_for_js_inner(type_, inner)
-}
-
-fn format_type_for_js_inner(new_type: GraphQLTypeAnnotation, inner: JavascriptName) -> String {
-    match new_type {
-        GraphQLTypeAnnotation::Named(_) => {
-            format!("{} | null | void", inner)
-        }
-        GraphQLTypeAnnotation::List(list) => {
-            format!(
-                "ReadonlyArray<{}> | null",
-                format_type_for_js_inner(list.0.item, inner)
-            )
-        }
-        GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            GraphQLNonNullTypeAnnotation::Named(_) => inner.to_string(),
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                format!(
-                    "ReadonlyArray<{}>",
-                    format_type_for_js_inner(list.0.item, inner)
-                )
-            }
-        },
-    }
 }
 
 fn get_provided_arguments<'a>(
