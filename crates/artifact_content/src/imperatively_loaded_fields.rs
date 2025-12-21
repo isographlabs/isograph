@@ -9,8 +9,8 @@ use isograph_lang_types::VariableDefinition;
 use isograph_schema::{
     ClientScalarSelectable, Format, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
     IsographDatabase, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
-    REFETCH_FIELD_NAME, RootRefetchedPath, ServerEntityName, WrappedSelectionMapSelection,
-    fetchable_types, selection_map_wrapped,
+    REFETCH_FIELD_NAME, RootRefetchedPath, WrappedSelectionMapSelection, fetchable_types,
+    selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -188,7 +188,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableName>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-) -> BTreeSet<VariableDefinition<ServerEntityName>> {
+) -> BTreeSet<VariableDefinition> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {

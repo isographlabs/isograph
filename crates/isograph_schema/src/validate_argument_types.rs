@@ -1,10 +1,9 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, EnumLiteralValue, Location,
-    SelectableName, ValueKeyName, VariableName, WithEmbeddedLocation,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location, SelectableName,
+    ValueKeyName, VariableName, WithEmbeddedLocation,
 };
 use graphql_lang_types::{
-    GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
-    GraphQLTypeAnnotation, NameValuePair,
+    GraphQLListTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation, NameValuePair,
 };
 use intern::{Lookup, string_key::StringKey};
 use prelude::{ErrClone, Postfix};
@@ -16,12 +15,10 @@ use isograph_lang_types::{
 
 use crate::{
     BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
-    NetworkProtocol, STRING_ENTITY_NAME, ServerEntityName, server_selectables_map_for_entity,
+    NetworkProtocol, STRING_ENTITY_NAME, server_selectables_map_for_entity,
 };
 
-fn graphql_type_to_non_null_type<TValue>(
-    value: GraphQLTypeAnnotation<TValue>,
-) -> GraphQLNonNullTypeAnnotation<TValue> {
+fn graphql_type_to_non_null_type(value: GraphQLTypeAnnotation) -> GraphQLNonNullTypeAnnotation {
     match value {
         GraphQLTypeAnnotation::Named(named) => GraphQLNonNullTypeAnnotation::Named(named),
         GraphQLTypeAnnotation::List(list) => GraphQLNonNullTypeAnnotation::List(*list),
@@ -29,9 +26,7 @@ fn graphql_type_to_non_null_type<TValue>(
     }
 }
 
-fn graphql_type_to_nullable_type<TValue>(
-    value: GraphQLNonNullTypeAnnotation<TValue>,
-) -> GraphQLTypeAnnotation<TValue> {
+fn graphql_type_to_nullable_type(value: GraphQLNonNullTypeAnnotation) -> GraphQLTypeAnnotation {
     match value {
         GraphQLNonNullTypeAnnotation::Named(named) => GraphQLTypeAnnotation::Named(named),
         GraphQLNonNullTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.boxed()),
@@ -40,7 +35,7 @@ fn graphql_type_to_nullable_type<TValue>(
 
 fn scalar_literal_satisfies_type(
     scalar_literal_name: EntityName,
-    type_: &GraphQLTypeAnnotation<ServerEntityName>,
+    type_: &GraphQLTypeAnnotation,
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     match graphql_type_to_non_null_type(type_.clone()) {
@@ -53,40 +48,28 @@ fn scalar_literal_satisfies_type(
             )
             .wrap_err()
         }
-        GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.item {
-            SelectionType::Scalar(expected_scalar_entity_name) => {
-                if expected_scalar_entity_name == scalar_literal_name {
-                    return Ok(());
-                }
-
-                let expected = id_annotation_to_typename_annotation(type_);
-
-                expected_type_found_something_else_named_diagnostic(
-                    expected,
-                    scalar_literal_name.unchecked_conversion(),
-                    "scalar literal",
-                    location,
-                )
-                .wrap_err()
+        GraphQLNonNullTypeAnnotation::Named(named_type) => {
+            let expected_name = named_type.item;
+            if expected_name == scalar_literal_name {
+                return Ok(());
             }
-            SelectionType::Object(_) => {
-                let expected = id_annotation_to_typename_annotation(type_);
 
-                expected_type_found_something_else_named_diagnostic(
-                    expected,
-                    scalar_literal_name.unchecked_conversion(),
-                    "scalar literal",
-                    location,
-                )
-                .wrap_err()
-            }
-        },
+            let expected = id_annotation_to_typename_annotation(type_);
+
+            expected_type_found_something_else_named_diagnostic(
+                expected,
+                scalar_literal_name.unchecked_conversion(),
+                "scalar literal",
+                location,
+            )
+            .wrap_err()
+        }
     }
 }
 
 fn variable_type_satisfies_argument_type(
-    variable_type: &GraphQLTypeAnnotation<ServerEntityName>,
-    argument_type: &GraphQLTypeAnnotation<ServerEntityName>,
+    variable_type: &GraphQLTypeAnnotation,
+    argument_type: &GraphQLTypeAnnotation,
 ) -> bool {
     match argument_type {
         GraphQLTypeAnnotation::List(list_type) => {
@@ -126,8 +109,8 @@ fn variable_type_satisfies_argument_type(
 pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
-    field_argument_definition_type: &GraphQLTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[VariableDefinition<ServerEntityName>],
+    field_argument_definition_type: &GraphQLTypeAnnotation,
+    variable_definitions: &[VariableDefinition],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(variable_name) => {
@@ -208,11 +191,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     )
                     .wrap_err()
                 }
-                GraphQLNonNullTypeAnnotation::Named(named_type) => enum_satisfies_type(
-                    enum_literal_value,
-                    &named_type,
-                    selection_supplied_argument_value.embedded_location,
-                ),
+                GraphQLNonNullTypeAnnotation::Named(_) => enum_satisfies_type(),
             }
         }
         NonConstantValue::Null => {
@@ -255,23 +234,13 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     )
                     .wrap_err()
                 }
-                GraphQLNonNullTypeAnnotation::Named(named_type) => match named_type.0.item {
-                    SelectionType::Scalar(_) => {
-                        expected_type_found_something_else_anonymous_diagnostic(
-                            id_annotation_to_typename_annotation(field_argument_definition_type),
-                            "object literal",
-                            selection_supplied_argument_value.embedded_location,
-                        )
-                        .wrap_err()
-                    }
-                    SelectionType::Object(object_entity_name) => object_satisfies_type(
-                        db,
-                        selection_supplied_argument_value,
-                        variable_definitions,
-                        object_literal,
-                        object_entity_name,
-                    ),
-                },
+                GraphQLNonNullTypeAnnotation::Named(named_type) => object_satisfies_type(
+                    db,
+                    selection_supplied_argument_value,
+                    variable_definitions,
+                    object_literal,
+                    named_type.item,
+                ),
             }
         }
     }
@@ -280,7 +249,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
-    variable_definitions: &[VariableDefinition<ServerEntityName>],
+    variable_definitions: &[VariableDefinition],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: EntityName,
 ) -> DiagnosticResult<()> {
@@ -336,7 +305,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 enum ObjectLiteralFieldType {
     Provided(
-        GraphQLTypeAnnotation<ServerEntityName>,
+        GraphQLTypeAnnotation,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -357,16 +326,12 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 SelectionType::Scalar(server_scalar_selectable) => {
                     let field_type_annotation =
                         &server_scalar_selectable.lookup(db).target_entity_name;
-                    field_type_annotation
-                        .clone()
-                        .map(&mut SelectionType::Scalar)
+                    field_type_annotation.clone()
                 }
                 SelectionType::Object(server_object_selectable) => {
                     let field_type_annotation =
                         &server_object_selectable.lookup(db).target_entity_name;
-                    field_type_annotation
-                        .clone()
-                        .map(&mut SelectionType::Object)
+                    field_type_annotation.clone()
                 }
             };
 
@@ -436,45 +401,20 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn id_annotation_to_typename_annotation(
-    type_: &GraphQLTypeAnnotation<ServerEntityName>,
-) -> GraphQLTypeAnnotation<EntityName> {
-    type_.clone().map(|type_id| match type_id {
-        SelectionType::Scalar(scalar_entity_name) => scalar_entity_name,
-        SelectionType::Object(object_entity_name) => object_entity_name,
-    })
+// TODO this should not exist
+fn id_annotation_to_typename_annotation(type_: &GraphQLTypeAnnotation) -> GraphQLTypeAnnotation {
+    type_.clone()
 }
 
-fn enum_satisfies_type(
-    enum_literal_value: &EnumLiteralValue,
-    enum_type: &GraphQLNamedTypeAnnotation<ServerEntityName>,
-    location: EmbeddedLocation,
-) -> DiagnosticResult<()> {
-    match enum_type.item {
-        SelectionType::Object(object_entity_name) => {
-            let expected = GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                enum_type.clone().map(|_| object_entity_name),
-            ));
-
-            expected_type_found_something_else_named_diagnostic(
-                expected,
-                (*enum_literal_value).unchecked_conversion(),
-                "enum literal",
-                location,
-            )
-            .wrap_err()
-        }
-        SelectionType::Scalar(_scalar_entity_name) => {
-            todo!("Validate enum literal. Parser doesn't support enum literals yet")
-        }
-    }
+fn enum_satisfies_type() -> DiagnosticResult<()> {
+    todo!("Validate enum literal. Parser doesn't support enum literals yet")
 }
 
 fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     list: &[WithEmbeddedLocation<NonConstantValue>],
-    list_type: GraphQLListTypeAnnotation<ServerEntityName>,
-    variable_definitions: &[VariableDefinition<ServerEntityName>],
+    list_type: GraphQLListTypeAnnotation,
+    variable_definitions: &[VariableDefinition],
 ) -> DiagnosticResult<()> {
     list.iter().try_for_each(|element| {
         value_satisfies_type(db, element, &list_type.0, variable_definitions)
@@ -483,9 +423,9 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn get_variable_type<'a>(
     variable_name: &'a VariableName,
-    variable_definitions: &'a [VariableDefinition<ServerEntityName>],
+    variable_definitions: &'a [VariableDefinition],
     location: EmbeddedLocation,
-) -> DiagnosticResult<&'a GraphQLTypeAnnotation<ServerEntityName>> {
+) -> DiagnosticResult<&'a GraphQLTypeAnnotation> {
     match variable_definitions
         .iter()
         .find(|definition| definition.name.item == *variable_name)
@@ -500,7 +440,7 @@ fn get_variable_type<'a>(
 }
 
 fn expected_type_found_something_else_named_diagnostic(
-    expected: GraphQLTypeAnnotation<EntityName>,
+    expected: GraphQLTypeAnnotation,
     actual: StringKey,
     type_description: &str,
     location: EmbeddedLocation,
@@ -512,7 +452,7 @@ fn expected_type_found_something_else_named_diagnostic(
 }
 
 fn expected_type_found_something_else_anonymous_diagnostic(
-    expected: GraphQLTypeAnnotation<EntityName>,
+    expected: GraphQLTypeAnnotation,
     type_description: &str,
     location: EmbeddedLocation,
 ) -> Diagnostic {

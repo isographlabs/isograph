@@ -4,7 +4,7 @@ use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName}
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 use pico::MemoRef;
 
-use crate::{ClientFieldVariant, NetworkProtocol, ServerEntityName, UserWrittenClientPointerInfo};
+use crate::{ClientFieldVariant, NetworkProtocol, UserWrittenClientPointerInfo};
 
 // TODO rename
 pub type ClientSelectableId =
@@ -30,7 +30,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
+    pub variable_definitions: Vec<VariableDefinition>,
 
     pub parent_entity_name: EntityName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
@@ -48,9 +48,9 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarSelectable<TNetworkProtocol>
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
-    pub target_entity_name: TypeAnnotation<EntityName>,
+    pub target_entity_name: TypeAnnotation,
 
-    pub variable_definitions: Vec<VariableDefinition<ServerEntityName>>,
+    pub variable_definitions: Vec<VariableDefinition>,
 
     pub parent_entity_name: EntityName,
 

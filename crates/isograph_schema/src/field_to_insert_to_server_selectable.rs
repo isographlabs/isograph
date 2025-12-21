@@ -1,4 +1,4 @@
-use common_lang_types::{EntityName, WithLocationPostfix};
+use common_lang_types::WithLocationPostfix;
 use graphql_lang_types::{GraphQLConstantValue, GraphQLNamedTypeAnnotation, NameValuePair};
 use isograph_lang_types::ConstantValue;
 
@@ -6,7 +6,7 @@ use crate::ServerScalarSelectable;
 
 pub type ScalarSelectionAndNonNullType<TNetworkProtocol> = (
     ServerScalarSelectable<TNetworkProtocol>,
-    Option<GraphQLNamedTypeAnnotation<EntityName>>,
+    Option<GraphQLNamedTypeAnnotation>,
 );
 
 pub fn to_isograph_constant_value(graphql_constant_value: GraphQLConstantValue) -> ConstantValue {

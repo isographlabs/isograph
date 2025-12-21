@@ -149,6 +149,22 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
+#[memo]
+pub fn server_entity_named_2<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+    name: EntityName,
+) -> DiagnosticResult<Option<MemoRefServerEntity<TNetworkProtocol>>> {
+    if let Ok(Some(server_object_entity)) = server_object_entity_named(db, name).to_owned() {
+        return server_object_entity.object_selected().wrap_some().wrap_ok();
+    };
+
+    let server_scalar_entity = server_scalar_entity_named(db, name).to_owned()?;
+    if let Some(server_scalar_entity) = server_scalar_entity {
+        return server_scalar_entity.scalar_selected().wrap_some().wrap_ok();
+    }
+    Ok(None)
+}
+
 // TODO what is this for?? We should get rid of this.
 #[memo]
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(

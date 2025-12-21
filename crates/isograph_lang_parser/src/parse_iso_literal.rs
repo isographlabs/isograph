@@ -1,5 +1,5 @@
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, IsoLiteralText, Location,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, IsoLiteralText, Location,
     RelativePathToSourceFile, SelectableName, Span, TextSource, ValueKeyName, WithEmbeddedLocation,
     WithLocationPostfix, WithSpanPostfix,
 };
@@ -241,7 +241,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<GraphQLTypeAnnotation<EntityNameWrapper>> {
+) -> DiagnosticResult<GraphQLTypeAnnotation> {
     let keyword = tokens.parse_source_of_kind(
         IsographLangTokenKind::Identifier,
         semantic_token_legend::ST_TO,
@@ -254,9 +254,7 @@ fn parse_client_pointer_target_type(
         )
         .wrap_err()
     } else {
-        parse_type_annotation(tokens).map(|with_embedded_location| {
-            with_embedded_location.map(|x| EntityNameWrapper(x.unchecked_conversion()))
-        })
+        parse_type_annotation(tokens)
     }
 }
 
@@ -707,7 +705,7 @@ fn parse_object_entry(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithEmbeddedLocation<VariableDefinition<EntityName>>>> {
+) -> DiagnosticResult<Vec<WithEmbeddedLocation<VariableDefinition>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -732,7 +730,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<WithEmbeddedLocation<VariableDefinition<EntityName>>> {
+) -> DiagnosticResult<WithEmbeddedLocation<VariableDefinition>> {
     tokens
         .with_embedded_location_result(|tokens| {
             let _dollar = tokens.parse_token_of_kind(
@@ -791,9 +789,7 @@ fn parse_optional_default_value(
     }
 }
 
-fn parse_type_annotation(
-    tokens: &mut PeekableLexer,
-) -> DiagnosticResult<GraphQLTypeAnnotation<EntityName>> {
+fn parse_type_annotation(tokens: &mut PeekableLexer) -> DiagnosticResult<GraphQLTypeAnnotation> {
     from_control_flow(|| {
         to_control_flow::<_, Diagnostic>(|| {
             let type_ = tokens.parse_string_key_type(

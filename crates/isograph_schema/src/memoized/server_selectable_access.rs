@@ -99,7 +99,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let selectable = memo_ref.lookup(db);
 
     let target_scalar_entity_name = selectable.target_entity_name.inner();
-    let target_scalar_entity = server_scalar_entity_named(db, *target_scalar_entity_name)
+    let target_scalar_entity = server_scalar_entity_named(db, target_scalar_entity_name)
         .clone_err()?
         .as_ref()
         // It must exist
@@ -114,7 +114,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                     \"on_invalid_id_type\" config parameter."
                 ),
                 // TODO use the location of the selectable
-                entity_definition_location(db, *target_scalar_entity_name)
+                entity_definition_location(db, target_scalar_entity_name)
                     .as_ref()
                     .ok()
                     .cloned()

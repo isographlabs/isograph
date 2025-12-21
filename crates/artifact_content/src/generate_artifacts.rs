@@ -16,10 +16,10 @@ use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME,
     ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol,
-    NormalizationKey, RefetchStrategy, ServerEntityName, ServerObjectSelectableVariant,
-    UserWrittenClientTypeInfo, WrappedSelectionMapSelection, accessible_client_selectables,
-    client_object_selectable_named, client_scalar_selectable_named, client_selectable_map,
-    client_selectable_named, fetchable_types, inline_fragment_reader_selection_set,
+    NormalizationKey, RefetchStrategy, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
+    WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
+    client_scalar_selectable_named, client_selectable_map, client_selectable_named,
+    fetchable_types, inline_fragment_reader_selection_set,
     refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
     server_object_entity_named, server_object_selectable_named, validate_entire_schema,
     validated_entrypoints,
@@ -28,7 +28,7 @@ use lazy_static::lazy_static;
 use prelude::*;
 use std::{
     collections::{BTreeMap, HashSet},
-    fmt::{Debug, Display},
+    fmt::Debug,
 };
 
 use crate::{
@@ -326,10 +326,9 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
                                         GraphQLNamedTypeAnnotation(
-                                            ServerEntityName::Scalar(*ID_ENTITY_NAME)
-                                                .with_embedded_location(
-                                                    EmbeddedLocation::todo_generated(),
-                                                ),
+                                            (*ID_ENTITY_NAME).with_embedded_location(
+                                                EmbeddedLocation::todo_generated(),
+                                            ),
                                         ),
                                     )
                                     .boxed(),
@@ -750,21 +749,27 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub(crate) fn print_javascript_type_declaration<T: Display + Ord + Debug>(
-    type_annotation: &TypeAnnotation<T>,
+// TODO accept an inner param... this is broken right now
+pub(crate) fn print_javascript_type_declaration<T: std::fmt::Display>(
+    type_annotation: &TypeAnnotation,
+    inner_text: T,
 ) -> String {
     let mut s = String::new();
-    print_javascript_type_declaration_impl(type_annotation, &mut s);
+    print_javascript_type_declaration_impl(type_annotation, &mut s, &inner_text);
     s
 }
 
-fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
-    type_annotation: &TypeAnnotation<T>,
+// Note: we unwrap the type_annotation, but we must be careful to not accidentally
+// print the inner EntityName! That's wrong. The entity's name is a concept in the
+// type system (i.e. in the schema), and is not a valid Javascript type.
+fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
+    type_annotation: &TypeAnnotation,
     s: &mut String,
+    inner_text: &T,
 ) {
     match &type_annotation {
-        TypeAnnotation::Scalar(scalar) => {
-            s.push_str(&scalar.to_string());
+        TypeAnnotation::Scalar(_) => {
+            s.push_str(&inner_text.to_string());
         }
         TypeAnnotation::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
@@ -779,12 +784,12 @@ fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
                     }
 
                     match variant {
-                        UnionVariant::Scalar(scalar) => {
-                            s.push_str(&scalar.to_string());
+                        UnionVariant::Scalar(_) => {
+                            s.push_str(&inner_text.to_string());
                         }
                         UnionVariant::Plural(type_annotation) => {
                             s.push_str("ReadonlyArray<");
-                            print_javascript_type_declaration_impl(type_annotation, s);
+                            print_javascript_type_declaration_impl(type_annotation, s, inner_text);
                             s.push('>');
                         }
                     }
@@ -799,12 +804,12 @@ fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
                     .first()
                     .expect("Expected variant to exist");
                 match variant {
-                    UnionVariant::Scalar(scalar) => {
-                        s.push_str(&scalar.to_string());
+                    UnionVariant::Scalar(_) => {
+                        s.push_str(&inner_text.to_string());
                     }
                     UnionVariant::Plural(type_annotation) => {
                         s.push_str("ReadonlyArray<");
-                        print_javascript_type_declaration_impl(type_annotation, s);
+                        print_javascript_type_declaration_impl(type_annotation, s, inner_text);
                         s.push('>');
                     }
                 }
@@ -812,7 +817,7 @@ fn print_javascript_type_declaration_impl<T: Display + Ord + Debug>(
         }
         TypeAnnotation::Plural(type_annotation) => {
             s.push_str("ReadonlyArray<");
-            print_javascript_type_declaration_impl(type_annotation, s);
+            print_javascript_type_declaration_impl(type_annotation, s, inner_text);
             s.push('>');
         }
     }

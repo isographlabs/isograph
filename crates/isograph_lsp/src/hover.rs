@@ -9,7 +9,7 @@ use isograph_schema::{
     read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, ServerEntityName, ServerObjectEntity,
+    IsographDatabase, NetworkProtocol, ServerObjectEntity,
     get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
     server_object_entity_named,
 };
@@ -317,7 +317,7 @@ fn hover_text_for_selectable(
     server_or_client: &'static str,
     selectable_name: SelectableName,
     selectable_description: Option<Description>,
-    selectable_arguments: &[VariableDefinition<ServerEntityName>],
+    selectable_arguments: &[VariableDefinition],
     parent_type_name: EntityName,
     parent_description: Option<Description>,
 ) -> String {

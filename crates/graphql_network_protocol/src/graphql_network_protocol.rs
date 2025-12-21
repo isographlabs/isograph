@@ -19,7 +19,7 @@ use isograph_schema::{
     FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
     MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
     RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE,
-    ServerEntityName, ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
+    ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
     ServerObjectSelectableVariant, ServerScalarSelectable, TYPENAME_FIELD_NAME,
     WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments,
@@ -182,7 +182,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         // the same struct, and you will have to do a follow up request for the target entity to
         // know whether it is an object or scalar selectable.
         for (parent_entity_name, field) in fields_to_process {
-            let target: EntityName = (*field.item.type_.inner()).unchecked_conversion();
+            let target: EntityName = field.item.type_.inner().unchecked_conversion();
 
             if is_object_entity(&outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
@@ -195,11 +195,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .map(|with_span| with_span.item.into()),
                         name: field.item.name.item.unchecked_conversion(),
                         target_entity_name: TypeAnnotation::from_graphql_type_annotation(
-                            field
-                                .item
-                                .type_
-                                .clone()
-                                .map(|entity_name| entity_name.unchecked_conversion()),
+                            field.item.type_.clone(),
                         ),
                         object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
                         parent_entity_name,
@@ -213,21 +209,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     name: arg.name.map(|input_value_name| {
                                         input_value_name.unchecked_conversion()
                                     }),
-                                    type_: arg.type_.map(|input_type_name| {
-                                        // Another linear scan!
-                                        if is_object_entity(
-                                            &outcome.entities,
-                                            input_type_name.unchecked_conversion(),
-                                        ) {
-                                            input_type_name
-                                                .unchecked_conversion::<EntityName>()
-                                                .object_selected()
-                                        } else {
-                                            input_type_name
-                                                .unchecked_conversion::<EntityName>()
-                                                .scalar_selected()
-                                        }
-                                    }),
+                                    type_: arg.type_,
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),
@@ -264,20 +246,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                     name: arg.name.map(|input_value_name| {
                                         input_value_name.unchecked_conversion()
                                     }),
-                                    type_: arg.type_.map(|input_type_name| {
-                                        if is_object_entity(
-                                            &outcome.entities,
-                                            input_type_name.unchecked_conversion(),
-                                        ) {
-                                            input_type_name
-                                                .unchecked_conversion::<EntityName>()
-                                                .object_selected()
-                                        } else {
-                                            input_type_name
-                                                .unchecked_conversion::<EntityName>()
-                                                .scalar_selected()
-                                        }
-                                    }),
+                                    type_: arg.type_,
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),
@@ -286,11 +255,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .collect(),
                         phantom_data: std::marker::PhantomData,
                         target_entity_name: TypeAnnotation::from_graphql_type_annotation(
-                            field
-                                .item
-                                .type_
-                                .clone()
-                                .map(|entity_name| entity_name.unchecked_conversion()),
+                            field.item.type_.clone(),
                         ),
                         javascript_type_override: None,
                     }
@@ -392,7 +357,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 };
 
-                let payload_object_entity_name = *mutation_field.target_entity_name.inner();
+                let payload_object_entity_name = mutation_field.target_entity_name.inner();
 
                 let client_field_scalar_selection_name = expose_field_directive
                     .expose_as
@@ -471,7 +436,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             }
                             ServerObjectSelectableVariant::InlineFragment => {
                                 WrappedSelectionMapSelection::InlineFragment(
-                                    *server_object_selectable.target_entity_name.inner(),
+                                    server_object_selectable.target_entity_name.inner(),
                                 )
                             }
                         }
@@ -583,15 +548,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 
     fn generate_query_text<'a>(
-        db: &IsographDatabase<Self>,
+        _db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
-        query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
+        query_variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText {
         generate_query_text(
-            db,
             query_name,
             selection_map,
             query_variables,
@@ -782,7 +746,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_entity_name.inner().dereference();
+        let next_entity_name = selectable.target_entity_name.inner();
 
         current_entity = outcome
             .entities

@@ -8,7 +8,7 @@ use isograph_lang_types::VariableDefinition;
 
 use crate::{
     MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap, RefetchStrategy, RootOperationName,
-    ServerEntityName, isograph_database::IsographDatabase,
+    isograph_database::IsographDatabase,
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
@@ -41,7 +41,7 @@ pub trait NetworkProtocol:
         db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
-        query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
+        query_variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText;

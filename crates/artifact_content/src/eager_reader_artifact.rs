@@ -10,7 +10,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientScalarSelectable, ClientSelectable, IsographDatabase, LINK_FIELD_NAME,
-    MemoRefClientSelectable, NetworkProtocol, ServerEntityName, ServerObjectSelectable,
+    MemoRefClientSelectable, NetworkProtocol, ServerObjectSelectable,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     selectable_reader_selection_set, server_object_entity_named,
 };
@@ -226,7 +226,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             .lookup(db);
 
     let concrete_type =
-        &server_object_entity_named(db, *server_object_selectable.target_entity_name.inner())
+        &server_object_entity_named(db, server_object_selectable.target_entity_name.inner())
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -617,7 +617,7 @@ fn generate_function_import_statement(
 
 fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>>,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition>,
 ) -> String {
     let mut s = "{\n".to_string();
     let indent = "  ";

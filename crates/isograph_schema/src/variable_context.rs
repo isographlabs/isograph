@@ -9,7 +9,7 @@ use prelude::Postfix;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, NameAndArguments, NetworkProtocol,
-    ServerEntityName, ServerObjectSelectable, ServerScalarSelectable,
+    ServerObjectSelectable, ServerScalarSelectable,
 };
 
 #[derive(Debug)]
@@ -19,7 +19,7 @@ impl VariableContext {
     pub fn child_variable_context(
         &self,
         selection_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
-        child_variable_definitions: &[VariableDefinition<ServerEntityName>],
+        child_variable_definitions: &[VariableDefinition],
         selection_variant: &ScalarSelectionDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),

@@ -1,11 +1,9 @@
-use std::fmt::Debug;
-
-use common_lang_types::SelectableName;
+use common_lang_types::{EntityName, SelectableName};
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
 
 use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
 use isograph_schema::{
-    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, ServerEntityName,
+    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named_2,
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named, server_selectables_map_for_entity,
 };
@@ -13,7 +11,7 @@ use prelude::Postfix;
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    type_: GraphQLTypeAnnotation<ServerEntityName>,
+    type_: GraphQLTypeAnnotation,
     indentation_level: u8,
 ) -> String {
     match type_ {
@@ -26,7 +24,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
         GraphQLTypeAnnotation::List(list) => {
             format!(
                 "ReadonlyArray<{}> | null",
-                format_server_field_type(db, *list.inner(), indentation_level)
+                format_server_field_type(db, list.inner(), indentation_level)
             )
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
@@ -36,7 +34,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
             GraphQLNonNullTypeAnnotation::List(list) => {
                 format!(
                     "ReadonlyArray<{}>",
-                    format_server_field_type(db, *list.inner(), indentation_level)
+                    format_server_field_type(db, list.inner(), indentation_level)
                 )
             }
         },
@@ -45,23 +43,33 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
 
 fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    field: ServerEntityName,
+    entity_name: EntityName,
     indentation_level: u8,
 ) -> String {
-    match field {
-        ServerEntityName::Object(parent_object_entity_name) => {
+    let entity = server_entity_named_2(db, entity_name)
+        .as_ref()
+        .expect(
+            "Expected parsing to not have failed. \
+            This is indicative of a bug in Isograph.",
+        )
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
+
+    match entity {
+        SelectionType::Object(_o) => {
             // TODO this is bad; we should never create a type containing all of the fields
             // on a given object. This is currently used for input objects, and we should
             // consider how to do this is a not obviously broken manner.
             let mut s = "{\n".to_string();
 
-            for (name, server_selectable) in
-                server_selectables_map_for_entity(db, parent_object_entity_name)
-                    .as_ref()
-                    .expect(
-                        "Expected type system document to be valid. \
-                        This is indicative of a bug in Isograph.",
-                    )
+            for (name, server_selectable) in server_selectables_map_for_entity(db, entity_name)
+                .as_ref()
+                .expect(
+                    "Expected type system document to be valid. \
+                    This is indicative of a bug in Isograph.",
+                )
             {
                 let field_type = format_field_definition(
                     db,
@@ -75,19 +83,17 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        ServerEntityName::Scalar(scalar_entity_name) => {
-            server_scalar_entity_javascript_name(db, scalar_entity_name)
-                .as_ref()
-                .expect(
-                    "Expected parsing to not have failed. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .to_string()
-        }
+        SelectionType::Scalar(_s) => server_scalar_entity_javascript_name(db, entity_name)
+            .as_ref()
+            .expect(
+                "Expected parsing to not have failed. \
+                This is indicative of a bug in Isograph.",
+            )
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .to_string(),
     }
 }
 
@@ -121,10 +127,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
 
             (
                 is_nullable(&server_scalar_selectable.target_entity_name),
-                server_scalar_selectable
-                    .target_entity_name
-                    .clone()
-                    .map(&mut SelectionType::Scalar),
+                server_scalar_selectable.target_entity_name.clone(),
             )
         }
         SelectionType::Object(server_object_selectable) => {
@@ -149,10 +152,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .lookup(db);
             (
                 is_nullable(&server_object_selectable.target_entity_name),
-                server_object_selectable
-                    .target_entity_name
-                    .clone()
-                    .map(&mut SelectionType::Object),
+                server_object_selectable.target_entity_name.clone(),
             )
         }
     };
@@ -166,7 +166,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     )
 }
 
-fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
+fn is_nullable(type_annotation: &TypeAnnotation) -> bool {
     match type_annotation {
         TypeAnnotation::Union(union) => union.nullable,
         TypeAnnotation::Plural(_) => false,
@@ -176,7 +176,7 @@ fn is_nullable<T: Ord + Debug>(type_annotation: &TypeAnnotation<T>) -> bool {
 
 fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    type_annotation: &TypeAnnotation<ServerEntityName>,
+    type_annotation: &TypeAnnotation,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {
@@ -234,7 +234,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
                                 db,
-                                *type_annotation.inner(),
+                                type_annotation.inner(),
                                 indentation_level + 1
                             )
                         )
@@ -245,7 +245,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(db, *type_annotation.inner(), indentation_level + 1)
+                format_server_field_type(db, type_annotation.inner(), indentation_level + 1)
             )
         }
     }

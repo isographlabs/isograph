@@ -4,8 +4,8 @@ use crate::{GraphQLDirective, GraphQLTypeAnnotation};
 
 use super::GraphQLConstantValue;
 use common_lang_types::{
-    DescriptionValue, DirectiveName, EntityName, EnumLiteralValue, InputTypeName, InputValueName,
-    SelectableName, WithEmbeddedLocation,
+    DescriptionValue, DirectiveName, EntityName, EnumLiteralValue, InputValueName, SelectableName,
+    WithEmbeddedLocation,
 };
 use strum::EnumString;
 
@@ -227,7 +227,7 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
             description: value.description,
             // TODO make this zero cost?
             name: value.name.map(|x| x.unchecked_conversion()),
-            type_: value.type_.map(|x| x.unchecked_conversion()),
+            type_: value.type_,
             // Input object fields do not take arguments
             arguments: vec![],
             directives: value.directives,
@@ -241,7 +241,7 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
 pub struct GraphQLFieldDefinition {
     pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<SelectableName>,
-    pub type_: GraphQLTypeAnnotation<EntityName>,
+    pub type_: GraphQLTypeAnnotation,
     pub arguments: Vec<WithEmbeddedLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
 
@@ -263,7 +263,7 @@ pub struct GraphQLFieldDefinition {
 pub struct GraphQLInputValueDefinition {
     pub description: Option<WithEmbeddedLocation<DescriptionValue>>,
     pub name: WithEmbeddedLocation<InputValueName>,
-    pub type_: GraphQLTypeAnnotation<InputTypeName>,
+    pub type_: GraphQLTypeAnnotation,
     // This unused, except for printing. Isograph does not care about this,
     // except inasmuch as it means that the type is nullable.
     pub default_value: Option<WithEmbeddedLocation<GraphQLConstantValue>>,

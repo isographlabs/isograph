@@ -1,26 +1,18 @@
-use common_lang_types::{EntityName, QueryOperationName, QueryText};
+use common_lang_types::{QueryOperationName, QueryText};
 use graphql_lang_types::GraphQLTypeAnnotation;
-use isograph_lang_types::{
-    ArgumentKeyAndValue, NonConstantValue, SelectionType, VariableDefinition,
-};
-use isograph_schema::{
-    Format, IsographDatabase, MergedSelectionMap, MergedServerSelection, RootOperationName,
-    ServerEntityName, server_entity_named,
-};
-
-use crate::GraphQLNetworkProtocol;
+use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, VariableDefinition};
+use isograph_schema::{Format, MergedSelectionMap, MergedServerSelection, RootOperationName};
 
 pub(crate) fn generate_query_text<'a>(
-    db: &IsographDatabase<GraphQLNetworkProtocol>,
     query_name: QueryOperationName,
     selection_map: &MergedSelectionMap,
-    query_variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
+    query_variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
     root_operation_name: &RootOperationName,
     format: Format,
 ) -> QueryText {
     let mut query_text = String::new();
 
-    let variable_text = write_variables_to_string(db, query_variables);
+    let variable_text = write_variables_to_string(query_variables);
     query_text.push_str(&format!(
         "{} {}{} {{",
         root_operation_name.0, query_name, variable_text
@@ -35,8 +27,7 @@ pub(crate) fn generate_query_text<'a>(
 }
 
 fn write_variables_to_string<'a>(
-    db: &IsographDatabase<GraphQLNetworkProtocol>,
-    variables: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
+    variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
 ) -> String {
     let mut empty = true;
     let mut first = true;
@@ -50,26 +41,7 @@ fn write_variables_to_string<'a>(
             first = false;
         }
         // TODO can we consume the variables here?
-        let x: GraphQLTypeAnnotation<EntityName> = variable.type_.clone().map(|input_type_id| {
-            let schema_input_type = server_entity_named(db, input_type_id)
-                .as_ref()
-                .expect(
-                    "Expected this not to have failed. \
-                        This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
-                    "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                );
-            match schema_input_type {
-                SelectionType::Scalar(s) => s.lookup(db).name,
-                SelectionType::Object(o) => o.lookup(db).name,
-            }
-        });
-        // TODO this is dangerous, since variable.item.name is a WithLocation, which impl's Display.
-        // We should find a way to make WithLocation not impl display, without making error's hard
-        // to work with.
+        let x: GraphQLTypeAnnotation = variable.type_.clone();
         variable_text.push_str(&format!("${}: {}", variable.name.item, x));
         if let Some(default_value) = &variable.default_value {
             variable_text.push_str(&format!(" = {}", default_value.item.print_to_string()));

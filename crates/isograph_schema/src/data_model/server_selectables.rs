@@ -13,13 +13,13 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
 
-    pub target_entity_name: TypeAnnotation<EntityName>,
+    pub target_entity_name: TypeAnnotation,
     /// Normally, we look up the JavaScript type to use by going through the
     /// target scalar entity. However, there are
     pub javascript_type_override: Option<JavascriptName>,
 
     pub parent_entity_name: EntityName,
-    pub arguments: Vec<VariableDefinition<ServerEntityName>>,
+    pub arguments: Vec<VariableDefinition>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
@@ -36,12 +36,12 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
 
-    pub target_entity_name: TypeAnnotation<EntityName>,
+    pub target_entity_name: TypeAnnotation,
 
     pub object_selectable_variant: ServerObjectSelectableVariant,
 
     pub parent_entity_name: EntityName,
-    pub arguments: Vec<VariableDefinition<ServerEntityName>>,
+    pub arguments: Vec<VariableDefinition>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 

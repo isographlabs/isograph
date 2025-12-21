@@ -1,7 +1,6 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location,
-    RelativePathToSourceFile, SelectableName, VariableName, WithEmbeddedLocation,
-    WithLocationPostfix,
+    RelativePathToSourceFile, SelectableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -106,7 +105,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
-    let target_type_id = defined_entity(db, client_pointer_declaration_item.target_type.inner().0)
+    let target_type_id = defined_entity(db, client_pointer_declaration_item.target_type.inner())
         .to_owned()?
         .ok_or_else(|| {
             let target_type = client_pointer_declaration_item.target_type.inner();
@@ -181,17 +180,8 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         variable_definitions: client_field_declaration
             .variable_definitions
             .iter()
-            .map(|variable_definition| {
-                validate_variable_definition(
-                    db,
-                    variable_definition,
-                    client_field_declaration.parent_type.item.0,
-                    client_scalar_selectable_name.0,
-                )
-                .map(|x| x.item)
-            })
-            .collect::<Result<_, _>>()?,
-
+            .map(|x| x.item.clone())
+            .collect(),
         parent_entity_name: client_field_declaration.parent_type.item.0,
         network_protocol: std::marker::PhantomData,
     };
@@ -303,20 +293,12 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
         variable_definitions: client_pointer_declaration
             .variable_definitions
             .iter()
-            .map(|variable_definition| {
-                validate_variable_definition(
-                    db,
-                    variable_definition,
-                    parent_entity_name,
-                    client_pointer_name,
-                )
-                .map(|x| x.item)
-            })
-            .collect::<Result<_, _>>()?,
+            .map(|variable_definition| variable_definition.item.clone())
+            .collect(),
 
         parent_entity_name,
         target_entity_name: TypeAnnotation::from_graphql_type_annotation(
-            client_pointer_declaration.target_type.clone().map(|x| x.0),
+            client_pointer_declaration.target_type.clone(),
         ),
         network_protocol: std::marker::PhantomData,
 
@@ -352,7 +334,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
     /// but we nonetheless need to put them into the query definition, and we need
     /// the variable's type, not just the variable.
-    pub top_level_schema_field_arguments: Vec<VariableDefinition<ServerEntityName>>,
+    pub top_level_schema_field_arguments: Vec<VariableDefinition>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -393,42 +375,4 @@ pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
         key: ID_FIELD_NAME.unchecked_conversion(),
         value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
     }]
-}
-
-pub fn validate_variable_definition<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    variable_definition: &WithEmbeddedLocation<VariableDefinition<EntityName>>,
-    parent_object_entity_name: EntityName,
-    selectable_name: SelectableName,
-) -> DiagnosticResult<WithEmbeddedLocation<VariableDefinition<ServerEntityName>>> {
-    let type_ = variable_definition
-        .item
-        .type_
-        .clone()
-        .and_then(|input_type_name| {
-            defined_entity(db, *variable_definition.item.type_.inner())
-                .to_owned()?
-                .ok_or_else(|| {
-                    let argument_name = variable_definition.item.name.item;
-                    Diagnostic::new(
-                        format!(
-                            "The argument `{argument_name}` on field \
-                            `{parent_object_entity_name}.{selectable_name}` \
-                            has inner type `{input_type_name}`, which does not exist."
-                        ),
-                        variable_definition
-                            .embedded_location
-                            .to::<Location>()
-                            .wrap_some(),
-                    )
-                })
-        })?;
-
-    VariableDefinition {
-        name: variable_definition.item.name.map(VariableName::from),
-        type_,
-        default_value: variable_definition.item.default_value.clone(),
-    }
-    .with_embedded_location(variable_definition.embedded_location)
-    .wrap_ok()
 }

@@ -1,19 +1,18 @@
 use std::{fmt, ops::Deref};
 
-use common_lang_types::{EmbeddedLocation, Span, WithEmbeddedLocation, WithLocationPostfix};
-use prelude::Postfix;
+use common_lang_types::{EmbeddedLocation, EntityName, Span, WithEmbeddedLocation};
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum GraphQLTypeAnnotation<TValue> {
-    Named(GraphQLNamedTypeAnnotation<TValue>),
-    List(Box<GraphQLListTypeAnnotation<TValue>>),
-    NonNull(Box<GraphQLNonNullTypeAnnotation<TValue>>),
+pub enum GraphQLTypeAnnotation {
+    Named(GraphQLNamedTypeAnnotation),
+    List(Box<GraphQLListTypeAnnotation>),
+    NonNull(Box<GraphQLNonNullTypeAnnotation>),
 }
 
-impl<TValue> GraphQLTypeAnnotation<TValue> {
-    pub fn inner(&self) -> &TValue {
+impl GraphQLTypeAnnotation {
+    pub fn inner(&self) -> EntityName {
         match self {
-            GraphQLTypeAnnotation::Named(named) => &named.0.item,
+            GraphQLTypeAnnotation::Named(named) => named.0.item,
             GraphQLTypeAnnotation::List(list) => list.0.inner(),
             GraphQLTypeAnnotation::NonNull(non_null) => non_null.inner(),
         }
@@ -31,54 +30,9 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
         self.embedded_location().span
     }
 
-    pub fn inner_mut(&mut self) -> &mut TValue {
-        match self {
-            GraphQLTypeAnnotation::Named(named) => &mut named.0.item,
-            GraphQLTypeAnnotation::List(list) => list.0.inner_mut(),
-            GraphQLTypeAnnotation::NonNull(non_null) => non_null.inner_mut(),
-        }
-    }
-
-    pub fn map<F, TNewValue>(self, f: F) -> GraphQLTypeAnnotation<TNewValue>
-    where
-        F: FnOnce(TValue) -> TNewValue,
-    {
-        match self {
-            GraphQLTypeAnnotation::Named(named) => {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item).with_embedded_location(named.0.embedded_location),
-                ))
-            }
-            GraphQLTypeAnnotation::List(list) => GraphQLTypeAnnotation::List(list.map(f).boxed()),
-            GraphQLTypeAnnotation::NonNull(non_null) => {
-                GraphQLTypeAnnotation::NonNull(non_null.map(f).boxed())
-            }
-        }
-    }
-
-    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<GraphQLTypeAnnotation<TNewValue>, E>
-    where
-        F: FnOnce(TValue) -> Result<TNewValue, E>,
-    {
-        match self {
-            GraphQLTypeAnnotation::Named(named) => {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item)?.with_embedded_location(named.0.embedded_location),
-                ))
-            }
-            GraphQLTypeAnnotation::List(list) => {
-                GraphQLTypeAnnotation::List(list.and_then(f)?.boxed())
-            }
-            GraphQLTypeAnnotation::NonNull(non_null) => {
-                GraphQLTypeAnnotation::NonNull(non_null.and_then(f)?.boxed())
-            }
-        }
-        .wrap_ok()
-    }
-
     /// If a TypeAnnotation is of the form X!, i.e. it is a NonNull named type, then
     /// this method returns Some(X). Otherwise, returns None.
-    pub fn inner_non_null_named_type(&self) -> Option<&GraphQLNamedTypeAnnotation<TValue>> {
+    pub fn inner_non_null_named_type(&self) -> Option<&GraphQLNamedTypeAnnotation> {
         match self {
             GraphQLTypeAnnotation::Named(_) => None,
             GraphQLTypeAnnotation::List(_) => None,
@@ -97,7 +51,7 @@ impl<TValue> GraphQLTypeAnnotation<TValue> {
     }
 }
 
-impl<TValue: fmt::Display> fmt::Display for GraphQLTypeAnnotation<TValue> {
+impl fmt::Display for GraphQLTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GraphQLTypeAnnotation::Named(named) => named.fmt(f),
@@ -108,15 +62,15 @@ impl<TValue: fmt::Display> fmt::Display for GraphQLTypeAnnotation<TValue> {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum GraphQLNonNullTypeAnnotation<TValue> {
-    Named(GraphQLNamedTypeAnnotation<TValue>),
-    List(GraphQLListTypeAnnotation<TValue>),
+pub enum GraphQLNonNullTypeAnnotation {
+    Named(GraphQLNamedTypeAnnotation),
+    List(GraphQLListTypeAnnotation),
 }
 
-impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
-    pub fn inner(&self) -> &TValue {
+impl GraphQLNonNullTypeAnnotation {
+    pub fn inner(&self) -> EntityName {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => &named.0.item,
+            GraphQLNonNullTypeAnnotation::Named(named) => named.0.item,
             GraphQLNonNullTypeAnnotation::List(list) => list.0.inner(),
         }
     }
@@ -131,52 +85,9 @@ impl<TValue> GraphQLNonNullTypeAnnotation<TValue> {
     pub fn span(&self) -> Span {
         self.embedded_location().span
     }
-
-    pub fn inner_mut(&mut self) -> &mut TValue {
-        match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => &mut named.0.item,
-            GraphQLNonNullTypeAnnotation::List(list) => list.0.inner_mut(),
-        }
-    }
-
-    pub fn map<F, TNewValue>(self, f: F) -> GraphQLNonNullTypeAnnotation<TNewValue>
-    where
-        F: FnOnce(TValue) -> TNewValue,
-    {
-        match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => {
-                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item).with_embedded_location(named.0.embedded_location),
-                ))
-            }
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                GraphQLNonNullTypeAnnotation::List(list.map(f))
-            }
-        }
-    }
-
-    pub fn and_then<F, TNewValue, E>(
-        self,
-        f: F,
-    ) -> Result<GraphQLNonNullTypeAnnotation<TNewValue>, E>
-    where
-        F: FnOnce(TValue) -> Result<TNewValue, E>,
-    {
-        match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => {
-                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    f(named.0.item)?.with_embedded_location(named.0.embedded_location),
-                ))
-            }
-            GraphQLNonNullTypeAnnotation::List(list) => {
-                GraphQLNonNullTypeAnnotation::List(list.and_then(f)?)
-            }
-        }
-        .wrap_ok()
-    }
 }
 
-impl<TValue: fmt::Display> fmt::Display for GraphQLNonNullTypeAnnotation<TValue> {
+impl fmt::Display for GraphQLNonNullTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             GraphQLNonNullTypeAnnotation::Named(named) => f.write_fmt(format_args!("{named}!")),
@@ -186,50 +97,34 @@ impl<TValue: fmt::Display> fmt::Display for GraphQLNonNullTypeAnnotation<TValue>
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLNamedTypeAnnotation<TValue>(pub WithEmbeddedLocation<TValue>);
+pub struct GraphQLNamedTypeAnnotation(pub WithEmbeddedLocation<EntityName>);
 
-impl<TValue> Deref for GraphQLNamedTypeAnnotation<TValue> {
-    type Target = WithEmbeddedLocation<TValue>;
+impl Deref for GraphQLNamedTypeAnnotation {
+    type Target = WithEmbeddedLocation<EntityName>;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<TValue: fmt::Display> fmt::Display for GraphQLNamedTypeAnnotation<TValue> {
+impl fmt::Display for GraphQLNamedTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0.item)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLListTypeAnnotation<TValue>(pub GraphQLTypeAnnotation<TValue>);
+pub struct GraphQLListTypeAnnotation(pub GraphQLTypeAnnotation);
 
-impl<TValue> GraphQLListTypeAnnotation<TValue> {
-    pub fn map<F, TNewValue>(self, f: F) -> GraphQLListTypeAnnotation<TNewValue>
-    where
-        F: FnOnce(TValue) -> TNewValue,
-    {
-        GraphQLListTypeAnnotation(self.0.map(f))
-    }
-
-    pub fn and_then<F, TNewValue, E>(self, f: F) -> Result<GraphQLListTypeAnnotation<TNewValue>, E>
-    where
-        F: FnOnce(TValue) -> Result<TNewValue, E>,
-    {
-        GraphQLListTypeAnnotation(self.0.and_then(f)?).wrap_ok()
-    }
-}
-
-impl<TValue> Deref for GraphQLListTypeAnnotation<TValue> {
-    type Target = GraphQLTypeAnnotation<TValue>;
+impl Deref for GraphQLListTypeAnnotation {
+    type Target = GraphQLTypeAnnotation;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
-impl<TValue: fmt::Display> fmt::Display for GraphQLListTypeAnnotation<TValue> {
+impl fmt::Display for GraphQLListTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("[{}]", self.0))
     }

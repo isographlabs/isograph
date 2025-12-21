@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable, NetworkProtocol, ServerEntityName,
+    ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
     client_selectable_map, selectable_named, selectable_reader_selection_set,
     server_object_entity_named, validate_argument_types::value_satisfies_type,
     visit_selection_set::visit_selection_set,
@@ -210,8 +210,8 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     errors: &mut Vec<Diagnostic>,
     reachable_variables: &mut BTreeSet<VariableName>,
-    field_argument_definitions: Vec<VariableDefinition<ServerEntityName>>,
-    client_type_variable_definitions: &[VariableDefinition<ServerEntityName>],
+    field_argument_definitions: Vec<VariableDefinition>,
+    client_type_variable_definitions: &[VariableDefinition],
     can_have_missing_args: bool,
     selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
     name_location: EmbeddedLocation,
@@ -259,7 +259,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn validate_all_variables_are_used(
-    variable_definitions: &[VariableDefinition<ServerEntityName>],
+    variable_definitions: &[VariableDefinition],
     used_variables: UsedVariables,
     top_level_type_and_field_name: EntityNameAndSelectableName,
     location: Location,
@@ -296,7 +296,7 @@ fn validate_all_variables_are_used(
 }
 
 fn assert_no_missing_arguments(
-    missing_arguments: Vec<VariableDefinition<ServerEntityName>>,
+    missing_arguments: Vec<VariableDefinition>,
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     if !missing_arguments.is_empty() {
@@ -317,15 +317,15 @@ fn assert_no_missing_arguments(
 }
 
 enum ArgumentType<'a> {
-    Missing(&'a VariableDefinition<ServerEntityName>),
+    Missing(&'a VariableDefinition),
     Provided(
-        &'a VariableDefinition<ServerEntityName>,
+        &'a VariableDefinition,
         &'a WithEmbeddedLocation<SelectionFieldArgument>,
     ),
 }
 
 fn get_missing_and_provided_arguments<'a>(
-    field_argument_definitions: &'a [VariableDefinition<ServerEntityName>],
+    field_argument_definitions: &'a [VariableDefinition],
     selection_supplied_arguments: &'a [WithEmbeddedLocation<SelectionFieldArgument>],
 ) -> impl Iterator<Item = ArgumentType<'a>> {
     field_argument_definitions
@@ -349,7 +349,7 @@ fn get_missing_and_provided_arguments<'a>(
 }
 
 fn validate_no_extraneous_arguments(
-    field_argument_definitions: &[VariableDefinition<ServerEntityName>],
+    field_argument_definitions: &[VariableDefinition],
     selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {

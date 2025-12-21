@@ -398,7 +398,6 @@ fn get_refetch_selectable(
                 type_: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
                         (*ID_ENTITY_NAME)
-                            .scalar_selected()
                             .with_embedded_location(EmbeddedLocation::todo_generated()),
                     ))
                     .boxed(),

@@ -3,7 +3,6 @@ use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ScalarSelection, Selection, SelectionType,
     SelectionTypePostfix,
 };
-use prelude::Postfix;
 
 use crate::{
     IsographDatabase, NetworkProtocol, ServerObjectEntity, selectable_named,
@@ -50,8 +49,7 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
                 let target_entity_name = match target_entity {
                     DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
                     DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
-                }
-                .dereference();
+                };
 
                 let target_entity = server_object_entity_named(db, target_entity_name)
                     .as_ref()

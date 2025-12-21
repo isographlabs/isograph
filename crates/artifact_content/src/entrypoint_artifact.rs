@@ -24,9 +24,8 @@ use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, ServerEntityName, ServerObjectEntity,
-    WrappedSelectionMapSelection, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query,
+    ScalarClientFieldTraversalState, ServerObjectEntity, WrappedSelectionMapSelection,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
     initial_variable_context, server_object_entity_named,
@@ -127,7 +126,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: Vec<&VariableDefinition<ServerEntityName>>,
+    variable_definitions: Vec<&VariableDefinition>,
     // TODO this implements copy, don't take reference
     default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
@@ -391,8 +390,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
 
 fn get_used_variable_definitions<'a>(
     merged_selection_map: &MergedSelectionMap,
-    variable_definitions: Vec<&'a VariableDefinition<ServerEntityName>>,
-) -> BTreeSet<&'a VariableDefinition<ServerEntityName>> {
+    variable_definitions: Vec<&'a VariableDefinition>,
+) -> BTreeSet<&'a VariableDefinition> {
     get_reachable_variables(merged_selection_map)
         .map(|variable_name| {
             *variable_definitions

@@ -20,11 +20,10 @@ use prelude::Postfix;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
     ClientSelectableId, ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
-    IsographDatabase, NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntityName,
-    ServerObjectEntity, ServerObjectSelectableVariant, VariableContext,
-    client_object_selectable_named, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    IsographDatabase, NameAndArguments, NetworkProtocol, PathToRefetchField, ServerObjectEntity,
+    ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, selectable_reader_selection_set, server_id_selectable,
@@ -512,7 +511,7 @@ pub fn get_reachable_variables(
 
 pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_name: SelectableName,
-    top_level_schema_field_arguments: &[VariableDefinition<ServerEntityName>],
+    top_level_schema_field_arguments: &[VariableDefinition],
     top_level_schema_field_concrete_target_entity_name: Option<EntityName>,
     top_level_schema_field_parent_object_entity_name: EntityName,
 ) -> WrappedSelectionMapSelection {
@@ -585,10 +584,8 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                 match object_selectable {
                     DefinitionLocation::Server(server_object_entity) => {
                         let server_object_entity = server_object_entity.lookup(db);
-                        let target_object_entity_name = server_object_entity
-                            .target_entity_name
-                            .inner()
-                            .dereference();
+                        let target_object_entity_name =
+                            server_object_entity.target_entity_name.inner();
 
                         let object_selection_parent_object_entity =
                             &server_object_entity_named(db, target_object_entity_name)
@@ -783,10 +780,8 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
             let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
                 let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
-                let concrete_object_entity_name = server_object_selectable
-                    .target_entity_name
-                    .inner()
-                    .dereference();
+                let concrete_object_entity_name =
+                    server_object_selectable.target_entity_name.inner();
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -906,7 +901,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
         .accessible_client_scalar_selectables
         .insert(
             (
-                *newly_encountered_client_object_selectable
+                newly_encountered_client_object_selectable
                     .target_entity_name
                     .inner(),
                 *LINK_FIELD_NAME,
@@ -1123,7 +1118,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     object_selection: &ObjectSelection,
     variable_context: &VariableContext,
 ) {
-    let target_server_object_entity_name = *newly_encountered_client_object_selectable
+    let target_server_object_entity_name = newly_encountered_client_object_selectable
         .target_entity_name
         .inner();
     let target_server_object_entity =
@@ -1187,7 +1182,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         wrap_refetch_field_with_inline_fragment: if target_server_object_entity.is_concrete {
             None
         } else {
-            (*newly_encountered_client_object_selectable
+            (newly_encountered_client_object_selectable
                 .target_entity_name
                 .inner())
             .wrap_some()
@@ -1542,16 +1537,14 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments() -> Vec<VariableDefinition<ServerEntityName>> {
+pub fn id_arguments() -> Vec<VariableDefinition> {
     vec![VariableDefinition {
         name: ID_FIELD_NAME
             .unchecked_conversion::<VariableName>()
             .with_embedded_location(EmbeddedLocation::todo_generated()),
         type_: GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                (*ID_ENTITY_NAME)
-                    .scalar_selected()
-                    .with_embedded_location(EmbeddedLocation::todo_generated()),
+                (*ID_ENTITY_NAME).with_embedded_location(EmbeddedLocation::todo_generated()),
             ))
             .boxed(),
         ),

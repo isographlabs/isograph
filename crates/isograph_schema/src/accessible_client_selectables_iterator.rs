@@ -124,10 +124,10 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                         // TODO don't match on object_selectable twice
                         let target_entity_name = match object_selectable {
                             DefinitionLocation::Server(s) => {
-                                s.lookup(self.db).target_entity_name.inner().dereference()
+                                s.lookup(self.db).target_entity_name.inner()
                             }
                             DefinitionLocation::Client(c) => {
-                                c.lookup(self.db).target_entity_name.inner().dereference()
+                                c.lookup(self.db).target_entity_name.inner()
                             }
                         };
 

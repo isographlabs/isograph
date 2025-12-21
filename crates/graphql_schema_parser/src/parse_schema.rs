@@ -805,9 +805,7 @@ fn parse_field(
         .wrap_ok()
 }
 
-fn parse_type_annotation<T: From<StringKey>>(
-    tokens: &mut PeekableLexer,
-) -> DiagnosticResult<GraphQLTypeAnnotation<T>> {
+fn parse_type_annotation(tokens: &mut PeekableLexer) -> DiagnosticResult<GraphQLTypeAnnotation> {
     from_control_flow(|| {
         to_control_flow::<_, Diagnostic>(|| {
             let type_ = tokens.parse_string_key_type(TokenKind::Identifier)?;

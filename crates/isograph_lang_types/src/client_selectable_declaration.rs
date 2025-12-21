@@ -1,5 +1,5 @@
 use common_lang_types::{
-    ConstExportName, Diagnostic, EntityName, RelativePathToSourceFile, WithEmbeddedLocation,
+    ConstExportName, Diagnostic, RelativePathToSourceFile, WithEmbeddedLocation,
 };
 use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
@@ -27,7 +27,7 @@ pub struct ClientFieldDeclaration {
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
-    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition<EntityName>>>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
@@ -43,14 +43,15 @@ pub struct ClientPointerDeclaration {
     pub parent_type: WithEmbeddedLocation<EntityNameWrapper>,
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
-    #[resolve_field]
-    pub target_type: GraphQLTypeAnnotation<EntityNameWrapper>,
+    // TODO re-enable
+    // #[resolve_field]
+    pub target_type: GraphQLTypeAnnotation,
     pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
-    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition<EntityName>>>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,

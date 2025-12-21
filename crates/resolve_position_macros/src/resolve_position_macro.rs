@@ -212,7 +212,7 @@ fn parse_resolve_field_type(
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
-        // Base cases: WithLocation<T>, WithEmbeddedLocation<T>, GraphQLTypeAnnotation<T> or WithSpan<T>
+        // Base cases: WithLocation<T>, WithEmbeddedLocation<T>, GraphQLTypeAnnotation or WithSpan<T>
         match last_segment.ident.to_string().as_str() {
             "WithLocation" => {
                 return handle_case(
@@ -258,7 +258,7 @@ fn parse_resolve_field_type(
 
     Err(Error::new_spanned(
         path,
-        "Expected WithLocation<T>, WithSpan<T>, GraphQLTypeAnnotation<T>, Vec<T>, or Option<T> where T is a valid resolve field type",
+        "Expected WithLocation<T>, WithSpan<T>, GraphQLTypeAnnotation, Vec<T>, or Option<T> where T is a valid resolve field type",
     )
     .to_compile_error())
 }

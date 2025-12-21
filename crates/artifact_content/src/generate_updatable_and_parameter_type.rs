@@ -1,7 +1,7 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, fmt::Display};
 
 use common_lang_types::{
-    EntityName, EntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
+    EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, SelectableNameOrAlias,
     WithEmbeddedLocation,
 };
 use graphql_lang_types::{GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation};
@@ -12,7 +12,7 @@ use isograph_lang_types::{
     TypeAnnotation, VariableDefinition,
 };
 use isograph_schema::{
-    ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol, ServerEntityName,
+    ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
     server_scalar_entity_javascript_name,
 };
@@ -86,29 +86,31 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let name_or_alias: SelectableNameOrAlias =
                         (*scalar_field_selection).name_or_alias().item;
 
-                    let output_type = server_scalar_selectable.target_entity_name.as_ref().map(
-                        &mut |scalar_entity_name| match server_scalar_selectable
-                            .javascript_type_override
-                        {
-                            Some(javascript_name) => javascript_name,
-                            None => server_scalar_entity_javascript_name(db, *scalar_entity_name)
-                                .as_ref()
-                                .expect(
-                                    "Expected parsing to not have failed. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                ),
-                        },
-                    );
+                    let inner_text = match server_scalar_selectable.javascript_type_override {
+                        Some(javascript_name) => javascript_name,
+                        None => server_scalar_entity_javascript_name(
+                            db,
+                            server_scalar_selectable.target_entity_name.inner(),
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected parsing to not have failed. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        ),
+                    };
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
                         "  ".repeat(indentation_level as usize),
                         name_or_alias,
-                        print_javascript_type_declaration(&output_type)
+                        print_javascript_type_declaration(
+                            &server_scalar_selectable.target_entity_name,
+                            inner_text
+                        )
                     ));
                 }
                 DefinitionLocation::Client(_) => write_param_type_from_client_scalar_selectable(
@@ -140,22 +142,9 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
-            }
-            .dereference();
+            };
 
-            let type_annotation =
-                output_type_annotation(db, object_selectable)
-                    .clone()
-                    .map(&mut |_| {
-                        generate_client_selectable_parameter_type(
-                            db,
-                            new_parent_object_entity_name,
-                            &object_selection.selection_set,
-                            nested_client_scalar_selectable_imports,
-                            loadable_fields,
-                            indentation_level,
-                        )
-                    });
+            let type_annotation = output_type_annotation(db, object_selectable);
 
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
@@ -166,17 +155,34 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         loadable_fields
                             .insert(client_object_selectable.entity_name_and_selectable_name());
 
-                        print_javascript_type_declaration(&type_annotation.map(&mut |target| {
-                            format!(
-                                "LoadableField<{}__param, {target}>",
-                                client_object_selectable
-                                    .entity_name_and_selectable_name()
-                                    .underscore_separated(),
+                        let inner = format!(
+                            "LoadableField<{}__param, {}>",
+                            client_object_selectable
+                                .entity_name_and_selectable_name()
+                                .underscore_separated(),
+                            generate_client_selectable_parameter_type(
+                                db,
+                                new_parent_object_entity_name,
+                                &object_selection.selection_set,
+                                nested_client_scalar_selectable_imports,
+                                loadable_fields,
+                                indentation_level,
                             )
-                        }))
+                        );
+
+                        print_javascript_type_declaration(type_annotation, inner)
                     }
-                    DefinitionLocation::Server(_) =>
-                        print_javascript_type_declaration(&type_annotation),
+                    DefinitionLocation::Server(_) => {
+                        let inner_text = generate_client_selectable_parameter_type(
+                            db,
+                            new_parent_object_entity_name,
+                            &object_selection.selection_set,
+                            nested_client_scalar_selectable_imports,
+                            loadable_fields,
+                            indentation_level,
+                        );
+                        print_javascript_type_declaration(type_annotation, inner_text)
+                    }
                 }
             ));
         }
@@ -253,20 +259,17 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let name_or_alias = selection.item.name_or_alias().item;
 
-                    let output_type = server_scalar_selectable.target_entity_name.clone().map(
-                        &mut |scalar_entity_name| {
-                            server_scalar_entity_javascript_name(db, scalar_entity_name)
-                                .as_ref()
-                                .expect(
-                                    "Expected parsing to not have failed. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                        },
-                    );
+                    let output_type = server_scalar_selectable.target_entity_name.clone();
+                    let inner_text = server_scalar_entity_javascript_name(db, output_type.inner())
+                        .as_ref()
+                        .expect(
+                            "Expected parsing to not have failed. \
+                                This is indicative of a bug in Isograph.",
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                                This is indicative of a bug in Isograph.",
+                        );
 
                     if selection.item.is_updatable() {
                         *updatable_fields = true;
@@ -275,14 +278,14 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
                             name_or_alias,
-                            print_javascript_type_declaration(&output_type)
+                            print_javascript_type_declaration(&output_type, inner_text)
                         ));
                     } else {
                         query_type_declaration.push_str(&format!(
                             "{}readonly {}: {},\n",
                             "  ".repeat(indentation_level as usize),
                             name_or_alias,
-                            print_javascript_type_declaration(&output_type)
+                            print_javascript_type_declaration(&output_type, inner_text)
                         ));
                     }
                 }
@@ -314,26 +317,21 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = (*object_selection).name_or_alias().item;
 
+            let type_annotation = output_type_annotation(db, object_selectable).clone();
+
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
-            }
-            .dereference();
-
-            let type_annotation =
-                output_type_annotation(db, object_selectable)
-                    .clone()
-                    .map(&mut |_| {
-                        generate_client_selectable_updatable_data_type(
-                            db,
-                            new_parent_object_entity_name,
-                            &object_selection.selection_set,
-                            nested_client_scalar_selectable_imports,
-                            loadable_fields,
-                            indentation_level,
-                            updatable_fields,
-                        )
-                    });
+            };
+            let inner_text = generate_client_selectable_updatable_data_type(
+                db,
+                new_parent_object_entity_name,
+                &object_selection.selection_set,
+                nested_client_scalar_selectable_imports,
+                loadable_fields,
+                indentation_level,
+                updatable_fields,
+            );
 
             match object_selection.object_selection_directive_set {
                 ObjectSelectionDirectiveSet::Updatable(_) => {
@@ -344,13 +342,14 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         name_or_alias,
                         output_type_annotation(db, object_selectable),
                         &type_annotation,
+                        inner_text,
                     );
                 }
                 ObjectSelectionDirectiveSet::None(_) => {
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,
-                        print_javascript_type_declaration(&type_annotation),
+                        print_javascript_type_declaration(&type_annotation, inner_text),
                     ));
                 }
             }
@@ -362,26 +361,28 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation<EntityName>,
-    type_annotation: &TypeAnnotation<ClientScalarSelectableUpdatableDataType>,
+    output_type_annotation: &TypeAnnotation,
+    type_annotation: &TypeAnnotation,
+    getter_inner_text: impl Display,
 ) {
     query_type_declaration.push_str(&format!(
         "get {}(): {},\n",
         name_or_alias,
-        print_javascript_type_declaration(type_annotation),
+        print_javascript_type_declaration(type_annotation, getter_inner_text),
     ));
-    let setter_type_annotation =
-        output_type_annotation
-            .clone()
-            .map(&mut |server_object_entity_name| {
-                let link_field_name = *LINK_FIELD_NAME;
-                format!("{{ {link_field_name}: {server_object_entity_name}__{link_field_name}__output_type }}")
-            });
+    let setter_type_annotation = output_type_annotation.clone();
     query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
+
+    let link_field_name = *LINK_FIELD_NAME;
+    let setter_inner_text = format!(
+        "{{ {link_field_name}: {}__{link_field_name}__output_type }}",
+        type_annotation.inner()
+    );
+
     query_type_declaration.push_str(&format!(
         "set {}(value: {}),\n",
         name_or_alias,
-        print_javascript_type_declaration(&setter_type_annotation),
+        print_javascript_type_declaration(&setter_type_annotation, setter_inner_text),
     ));
 }
 
@@ -481,7 +482,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
 
 fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    arguments: Vec<VariableDefinition<ServerEntityName>>,
+    arguments: Vec<VariableDefinition>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
     let mut is_first = true;
@@ -504,59 +505,46 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
 
 fn format_type_for_js<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    type_: GraphQLTypeAnnotation<ServerEntityName>,
+    type_: GraphQLTypeAnnotation,
 ) -> String {
-    let new_type = type_.map(
-        |selectable_server_field_id| match selectable_server_field_id {
-            ServerEntityName::Object(_) => {
-                panic!(
-                    "Unexpected object. Objects are not supported as parameters, yet. \
-                    This is indicative of an unimplemented feature in Isograph."
-                )
-            }
-            ServerEntityName::Scalar(scalar_entity_name) => {
-                server_scalar_entity_javascript_name(db, scalar_entity_name)
-                    .as_ref()
-                    .expect(
-                        "Expected parsing to not have failed. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-            }
-        },
-    );
+    let inner = server_scalar_entity_javascript_name(db, type_.inner())
+        .as_ref()
+        .expect(
+            "Expected parsing to not have failed. \
+            This is indicative of a bug in Isograph.",
+        )
+        .expect(
+            "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+        );
 
-    format_type_for_js_inner(new_type)
+    format_type_for_js_inner(type_, inner)
 }
 
-fn format_type_for_js_inner(
-    new_type: GraphQLTypeAnnotation<common_lang_types::JavascriptName>,
-) -> String {
+fn format_type_for_js_inner(new_type: GraphQLTypeAnnotation, inner: JavascriptName) -> String {
     match new_type {
-        GraphQLTypeAnnotation::Named(named_inner_type) => {
-            format!("{} | null | void", named_inner_type.0.item)
+        GraphQLTypeAnnotation::Named(_) => {
+            format!("{} | null | void", inner)
         }
         GraphQLTypeAnnotation::List(list) => {
-            format!("ReadonlyArray<{}> | null", format_type_for_js_inner(list.0))
+            format!(
+                "ReadonlyArray<{}> | null",
+                format_type_for_js_inner(list.0, inner)
+            )
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
-            GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
-                named_inner_type.0.item.to_string()
-            }
+            GraphQLNonNullTypeAnnotation::Named(_) => inner.to_string(),
             GraphQLNonNullTypeAnnotation::List(list) => {
-                format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0))
+                format!("ReadonlyArray<{}>", format_type_for_js_inner(list.0, inner))
             }
         },
     }
 }
 
 fn get_provided_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition<ServerEntityName>> + 'a,
+    argument_definitions: impl Iterator<Item = &'a VariableDefinition> + 'a,
     arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
-) -> Vec<VariableDefinition<ServerEntityName>> {
+) -> Vec<VariableDefinition> {
     argument_definitions
         .filter_map(|definition| {
             let user_has_supplied_argument = arguments

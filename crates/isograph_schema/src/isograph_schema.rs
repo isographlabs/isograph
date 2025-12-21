@@ -56,7 +56,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                     SelectionType::Object(object) => {
                         let object = object.lookup(db);
                         path.push(object.clone().note_todo("We should not clone here!!!"));
-                        current_entity_name = *object.target_entity_name.inner();
+                        current_entity_name = object.target_entity_name.inner();
                     }
                 }
             }
