@@ -18,7 +18,7 @@ use isograph_lang_types::{
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
-use std::{collections::HashSet, ops::ControlFlow};
+use std::ops::ControlFlow;
 
 use crate::{IsographLangTokenKind, parse_optional_description, peekable_lexer::PeekableLexer};
 
@@ -348,7 +348,6 @@ fn parse_optional_selection_set_inner(
         return Ok(None);
     }
 
-    let mut encountered_names_or_aliases = HashSet::new();
     let mut selections = vec![];
     while tokens
         .parse_token_of_kind(
@@ -358,19 +357,6 @@ fn parse_optional_selection_set_inner(
         .is_err()
     {
         let selection = parse_selection(tokens)?;
-        let selection_name_or_alias = selection.item.name_or_alias().item;
-        if !encountered_names_or_aliases.insert(selection_name_or_alias) {
-            // TODO we should not error here! This should instead be a problem for a later
-            // stage, i.e. for validation.
-            return Diagnostic::new(
-                format!(
-                    "A field with name or alias `{selection_name_or_alias}` \
-                    has already been defined"
-                ),
-                selection.embedded_location.to::<Location>().wrap_some(),
-            )
-            .wrap_err();
-        }
         selections.push(selection);
     }
     selections.wrap_some().wrap_ok()

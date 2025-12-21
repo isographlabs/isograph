@@ -7,6 +7,7 @@ use isograph_lang_types::{
     SelectionType,
 };
 use prelude::{ErrClone, Postfix};
+use std::collections::HashSet;
 
 use crate::{
     ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerObjectEntity,
@@ -76,7 +77,20 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
     parent_entity: &ServerObjectEntity<TNetworkProtocol>,
     selectable_declaration_info: EntityNameAndSelectableName,
 ) {
+    let mut encountered_names_or_aliases = HashSet::new();
+
     for selection in selection_set.selections.iter() {
+        if !encountered_names_or_aliases.insert(selection.item.name_or_alias().item) {
+            errors.push(Diagnostic::new(
+                format!(
+                    "A field with name or alias `{}` \
+                    has already been defined",
+                    selection.item.name_or_alias().item
+                ),
+                selection.embedded_location.to::<Location>().wrap_some(),
+            ));
+        }
+
         match selection.item.reference() {
             SelectionType::Scalar(scalar_selection) => {
                 let selectable_name = scalar_selection.name.item;
