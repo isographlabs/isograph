@@ -72,8 +72,8 @@ You might select it like
 ```tsx
 export const PetTaglineInput = iso`
   Pet.PetTaglineInput @component {
-    set_tagline,
-    tagline,
+    set_tagline
+    tagline
   }
 `(PetTaglineInputComponent);
 ```
