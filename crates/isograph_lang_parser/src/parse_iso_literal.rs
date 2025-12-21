@@ -380,8 +380,7 @@ fn parse_optional_selection_set_inner(
 fn parse_delimited_list<'a, TResult>(
     tokens: &mut PeekableLexer<'a>,
     parse_item: impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<TResult> + 'a,
-    delimiter: IsographLangTokenKind,
-    delimiter_isograph_semantic_token: IsographSemanticToken,
+    parse_delimiter: impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<()> + 'a,
     closing_token: IsographLangTokenKind,
     closing_isograph_semantic_token: IsographSemanticToken,
 ) -> DiagnosticResult<WithEmbeddedLocation<Vec<TResult>>> {
@@ -402,16 +401,7 @@ fn parse_delimited_list<'a, TResult>(
             return end_span.map(|_| items).wrap_ok();
         }
 
-        if tokens
-            .parse_token_of_kind(delimiter, delimiter_isograph_semantic_token)
-            .is_err()
-        {
-            return Diagnostic::new(
-                format!("Expected delimited `{delimiter}` or `{closing_token}`"),
-                tokens.peek().embedded_location.to::<Location>().wrap_some(),
-            )
-            .wrap_err();
-        }
+        parse_delimiter(tokens)?;
 
         // Check if the next token is the closing token (allows for trailing delimiter)
         if let Ok(end_span) =
@@ -432,6 +422,15 @@ fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<()> {
         )
         .wrap_err()
     }
+}
+
+fn parse_comma(
+    tokens: &mut PeekableLexer<'_>,
+) -> DiagnosticResult<WithEmbeddedLocation<IsographLangTokenKind>> {
+    tokens.parse_token_of_kind(
+        IsographLangTokenKind::Comma,
+        semantic_token_legend::ST_COMMA,
+    )
 }
 
 fn parse_selection(
@@ -558,8 +557,7 @@ fn parse_optional_arguments(
         let arguments = parse_delimited_list(
             tokens,
             parse_argument,
-            IsographLangTokenKind::Comma,
-            semantic_token_legend::ST_COMMA,
+            drop_result(parse_comma),
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
@@ -645,8 +643,7 @@ fn parse_non_constant_value(
             let entries = parse_delimited_list(
                 tokens,
                 parse_object_entry,
-                IsographLangTokenKind::Comma,
-                semantic_token_legend::ST_COMMA,
+                drop_result(parse_comma),
                 IsographLangTokenKind::CloseBrace,
                 semantic_token_legend::ST_CLOSE_BRACE,
             )?;
@@ -720,8 +717,7 @@ fn parse_variable_definitions(
         parse_delimited_list(
             tokens,
             move |item| parse_variable_definition(item),
-            IsographLangTokenKind::Comma,
-            semantic_token_legend::ST_COMMA,
+            drop_result(parse_comma),
             IsographLangTokenKind::CloseParen,
             semantic_token_legend::ST_CLOSE_PAREN,
         )?
@@ -921,4 +917,10 @@ fn expected_literal_to_be_exported_diagnostic(
         ),
         location.wrap_some(),
     )
+}
+
+fn drop_result<'a, T>(
+    parse_fn: impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<T> + 'a,
+) -> impl Fn(&mut PeekableLexer<'a>) -> DiagnosticResult<()> + 'a {
+    move |tokens| parse_fn(tokens).map(|_| ())
 }
