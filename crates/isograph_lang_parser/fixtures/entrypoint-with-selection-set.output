@@ -29,7 +29,9 @@ Err(
     ),
 )
 
-Leftover tokens remainingcrates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js
+
+Leftover tokens remaining
+crates/isograph_lang_parser/fixtures/entrypoint-with-selection-set.input.js
 entrypoint Type.Name {
                      ^
   wat

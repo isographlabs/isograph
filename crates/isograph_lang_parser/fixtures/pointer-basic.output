@@ -95,10 +95,8 @@ Ok(
                                         end: 34,
                                     },
                                 },
-                                item: EntityNameWrapper(
-                                    EntityName(
-                                        "User",
-                                    ),
+                                item: EntityName(
+                                    "User",
                                 ),
                             },
                         ),

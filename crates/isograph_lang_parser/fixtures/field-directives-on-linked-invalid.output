@@ -29,9 +29,11 @@ Err(
     ),
 )
 
+
 Error when deserializing.
 
-data did not match any variant of untagged enum ObjectSelectionDirectiveSetcrates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
     linked @hello @there {
@@ -70,9 +72,11 @@ Err(
     ),
 )
 
+
 Error when deserializing.
 
-data did not match any variant of untagged enum ObjectSelectionDirectiveSetcrates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
     linked @loadable(asdf: true) {
@@ -111,9 +115,11 @@ Err(
     ),
 )
 
+
 Error when deserializing.
 
-data did not match any variant of untagged enum ObjectSelectionDirectiveSetcrates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
+data did not match any variant of untagged enum ObjectSelectionDirectiveSet
+crates/isograph_lang_parser/fixtures/field-directives-on-linked-invalid.input.js
 
   field Type.Name {
     linked @loadable @updatable {
