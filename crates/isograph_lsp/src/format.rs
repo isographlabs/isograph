@@ -117,14 +117,16 @@ fn format_extraction<TNetworkProtocol: NetworkProtocol>(
             indent -= 1;
         }
 
-        if last_line_behavior.ends_line() || new_line_behavior.start_new_line() {
+        if last_line_behavior.ends_line() || new_line_behavior.starts_new_line() {
             push_indented_line_break(&mut output, indent as usize);
             // for spacing, the least amount of spacing wins
         } else if *last_line_behavior.has_space_after() && *new_line_behavior.has_space_before() {
             output.push(' ');
         }
 
-        output.push_str(content);
+        if new_line_behavior.should_keep() {
+            output.push_str(content);
+        }
 
         last_line_behavior = new_line_behavior;
 

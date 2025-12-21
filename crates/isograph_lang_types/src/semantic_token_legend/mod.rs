@@ -190,9 +190,7 @@ pub const ST_CLOSE_PAREN: IsographSemanticToken = IsographSemanticToken {
 
 pub const ST_COMMA: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_OPERATOR,
-    line_behavior: LineBehavior::EndsLine(EndsLineBehavior {
-        space_before: SpaceBefore(false),
-    }),
+    line_behavior: LineBehavior::Remove,
     indent_change: IndentChange::Same,
 };
 // TODO split this up
