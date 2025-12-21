@@ -136,7 +136,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                             index: 0,
                             sub_iterator: None,
                             db: self.db,
-                            parent_entity_name: target_entity_name,
+                            parent_entity_name: target_entity_name.0,
                         };
 
                         match object_selectable {

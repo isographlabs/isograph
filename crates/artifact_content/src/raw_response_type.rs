@@ -67,7 +67,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let inner_text = match server_scalar_selectable.javascript_type_override {
                     Some(javascript_name) => javascript_name,
-                    None => server_scalar_entity_javascript_name(db, raw_type.item.inner())
+                    None => server_scalar_entity_javascript_name(db, raw_type.item.inner().0)
                         .as_ref()
                         .expect(
                             "Expected parsing to not have failed. \

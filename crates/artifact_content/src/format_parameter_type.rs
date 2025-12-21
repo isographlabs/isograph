@@ -182,7 +182,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match &type_annotation {
         TypeAnnotation::Scalar(scalar) => {
-            format_server_field_type(db, *scalar, indentation_level + 1)
+            format_server_field_type(db, scalar.0, indentation_level + 1)
         }
         TypeAnnotation::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
@@ -201,7 +201,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                         UnionVariant::Scalar(scalar) => {
                             s.push_str(&format_server_field_type(
                                 db,
-                                *scalar,
+                                scalar.0,
                                 indentation_level + 1,
                             ));
                         }
@@ -228,14 +228,14 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                     .expect("Expected variant to exist");
                 match variant {
                     UnionVariant::Scalar(scalar) => {
-                        format_server_field_type(db, *scalar, indentation_level + 1)
+                        format_server_field_type(db, scalar.0, indentation_level + 1)
                     }
                     UnionVariant::Plural(type_annotation) => {
                         format!(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
                                 db,
-                                type_annotation.item.inner(),
+                                type_annotation.item.inner().0,
                                 indentation_level + 1
                             )
                         )
@@ -246,7 +246,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(db, type_annotation.item.inner(), indentation_level + 1)
+                format_server_field_type(db, type_annotation.item.inner().0, indentation_level + 1)
             )
         }
     }

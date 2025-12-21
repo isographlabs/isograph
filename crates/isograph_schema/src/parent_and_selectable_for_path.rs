@@ -113,12 +113,13 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
-            client_field_declaration_path.inner.parent_type.item.0
+            client_field_declaration_path.inner.parent_type.item
         }
         SelectionSetParentType::ClientPointerDeclaration(client_pointer_declaration_path) => {
-            client_pointer_declaration_path.inner.parent_type.item.0
+            client_pointer_declaration_path.inner.parent_type.item
         }
-    };
+    }
+    .0;
 
     server_object_entity_named(db, parent_object_entity_name)
         .clone()?
@@ -149,11 +150,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
             };
 
-            parent_object_entity_and_selectable(
-                db,
-                object_parent_entity_name.into(),
-                selectable_name,
-            )
+            parent_object_entity_and_selectable(db, object_parent_entity_name, selectable_name)
         }
         SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
             let parent_type_name = client_field_declaration_path.inner.parent_type.item;

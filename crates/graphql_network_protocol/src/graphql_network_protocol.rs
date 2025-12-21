@@ -300,7 +300,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             variants: {
                                 let mut variants = BTreeSet::new();
                                 variants.insert(UnionVariant::Scalar(
-                                    concrete_child_entity_name.unchecked_conversion(),
+                                    concrete_child_entity_name.dereference().into(),
                                 ));
                                 variants
                             },
@@ -364,7 +364,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     }
                 };
 
-                let payload_object_entity_name = mutation_field.target_entity_name.item.inner();
+                let payload_object_entity_name = mutation_field.target_entity_name.item.inner().0;
 
                 let client_field_scalar_selection_name = expose_field_directive
                     .expose_as
@@ -443,7 +443,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             }
                             ServerObjectSelectableVariant::InlineFragment => {
                                 WrappedSelectionMapSelection::InlineFragment(
-                                    server_object_selectable.target_entity_name.item.inner(),
+                                    server_object_selectable.target_entity_name.item.inner().0,
                                 )
                             }
                         }

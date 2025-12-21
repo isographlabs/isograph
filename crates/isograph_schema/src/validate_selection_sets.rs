@@ -250,7 +250,8 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
 
                         c.lookup(db).target_entity_name.item.inner()
                     }
-                };
+                }
+                .0;
 
                 let new_parent_entity =
                     match server_object_entity_named(db, target_entity_name).clone_err() {

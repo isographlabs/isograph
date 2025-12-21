@@ -105,20 +105,22 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
-    let target_type_id =
-        defined_entity(db, client_pointer_declaration_item.target_type.item.inner())
-            .to_owned()?
-            .ok_or_else(|| {
-                let target_type = client_pointer_declaration_item.target_type.item.inner();
-                Diagnostic::new(
-                    format!("`{target_type}` is not a type that has been defined."),
-                    client_pointer_declaration_item
-                        .target_type
-                        .embedded_location
-                        .to::<Location>()
-                        .wrap_some(),
-                )
-            })?;
+    let target_type_id = defined_entity(
+        db,
+        client_pointer_declaration_item.target_type.item.inner().0,
+    )
+    .to_owned()?
+    .ok_or_else(|| {
+        let target_type = client_pointer_declaration_item.target_type.item.inner();
+        Diagnostic::new(
+            format!("`{target_type}` is not a type that has been defined."),
+            client_pointer_declaration_item
+                .target_type
+                .embedded_location
+                .to::<Location>()
+                .wrap_some(),
+        )
+    })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {

@@ -101,7 +101,7 @@ export function iso<T>(
             type_and_field.underscore_separated(),
         ));
     } else if let SelectionType::Object(client_object_selectable) = client_type {
-        link_types.insert(client_object_selectable.target_entity_name.item.inner());
+        link_types.insert(client_object_selectable.target_entity_name.item.inner().0);
 
         let link_field_name = *LINK_FIELD_NAME;
         let inner_text = format!(

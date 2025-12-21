@@ -90,7 +90,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         Some(javascript_name) => javascript_name,
                         None => server_scalar_entity_javascript_name(
                             db,
-                            server_scalar_selectable.target_entity_name.item.inner(),
+                            server_scalar_selectable.target_entity_name.item.inner().0,
                         )
                         .as_ref()
                         .expect(
@@ -142,7 +142,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
-            };
+            }
+            .0;
 
             let type_annotation = output_type_annotation(db, object_selectable);
 
@@ -261,7 +262,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let output_type = server_scalar_selectable.target_entity_name.clone();
                     let inner_text =
-                        server_scalar_entity_javascript_name(db, output_type.item.inner())
+                        server_scalar_entity_javascript_name(db, output_type.item.inner().0)
                             .as_ref()
                             .expect(
                                 "Expected parsing to not have failed. \
@@ -329,7 +330,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
-            };
+            }
+            .0;
             let inner_text = generate_client_selectable_updatable_data_type(
                 db,
                 new_parent_object_entity_name,
