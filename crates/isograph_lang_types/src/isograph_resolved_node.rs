@@ -2,7 +2,7 @@ use crate::{
     ClientFieldDeclarationPath, ClientObjectSelectableNameWrapperPath,
     ClientPointerDeclarationPath, ClientScalarSelectableNameWrapperPath, DescriptionPath,
     EntityNameWrapperPath, EntrypointDeclarationPath, ObjectSelectionPath, ScalarSelectionPath,
-    SelectionParentType, SelectionSetParentType, SelectionSetPath,
+    SelectionParentType, SelectionSetParentType, SelectionSetPath, TypeAnnotationPath,
 };
 
 #[derive(Debug)]
@@ -18,6 +18,7 @@ pub enum IsographResolvedNode<'a> {
     ClientScalarSelectableNameWrapper(ClientScalarSelectableNameWrapperPath<'a>),
     ClientObjectSelectableNameWrapper(ClientObjectSelectableNameWrapperPath<'a>),
     SelectionSet(SelectionSetPath<'a>),
+    TypeAnnotation(TypeAnnotationPath<'a>),
 }
 
 // TODO remove this, this is just a demonstration.

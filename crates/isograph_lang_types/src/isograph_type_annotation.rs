@@ -14,8 +14,9 @@ use graphql_lang_types::{
     GraphQLTypeAnnotation,
 };
 use prelude::Postfix;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
 
-use crate::EntityNameWrapper;
+use crate::{ClientPointerDeclarationPath, EntityNameWrapper, IsographResolvedNode};
 
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
@@ -25,6 +26,30 @@ pub enum TypeAnnotation {
     Union(UnionTypeAnnotation),
     Plural(Box<WithEmbeddedLocation<TypeAnnotation>>),
 }
+
+impl ResolvePosition for TypeAnnotation {
+    type Parent<'a> = TypeAnnotationParentType<'a>;
+
+    type ResolvedNode<'a> = IsographResolvedNode<'a>;
+
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, _position: Span) -> Self::ResolvedNode<'a> {
+        // Note: we are implementing this manually because EntityNameWrapper and UnionTypeAnnotation
+        // are not wrapped in WithEmbeddedLocation, and it would be a hassle to modify the parser
+        // to do so (and of limited immediate value.)
+        //
+        // But we should eventually do just that!
+        Self::ResolvedNode::TypeAnnotation(self.path(parent).into())
+    }
+}
+
+#[derive(Debug)]
+pub enum TypeAnnotationParentType<'a> {
+    // TODO variable
+    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
+}
+
+pub type TypeAnnotationPath<'a> =
+    PositionResolutionPath<&'a TypeAnnotation, TypeAnnotationParentType<'a>>;
 
 impl TypeAnnotation {
     pub fn from_graphql_type_annotation(other: GraphQLTypeAnnotation) -> Self {

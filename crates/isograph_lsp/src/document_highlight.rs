@@ -112,6 +112,7 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
                 .wrap_some()
             }
             IsographResolvedNode::SelectionSet(_) => None,
+            IsographResolvedNode::TypeAnnotation(_) => None,
         }
     } else {
         None

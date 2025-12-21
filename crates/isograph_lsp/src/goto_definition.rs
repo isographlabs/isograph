@@ -244,6 +244,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                     .map(lsp_location_to_scalar_response)
             }
             IsographResolvedNode::SelectionSet(_) => None,
+            IsographResolvedNode::TypeAnnotation(_) => None,
         }
     } else {
         None

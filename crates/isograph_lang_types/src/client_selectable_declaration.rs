@@ -43,7 +43,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     // TODO re-enable
-    // #[resolve_field]
+    #[resolve_field]
     pub target_type: WithEmbeddedLocation<TypeAnnotation>,
     pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
