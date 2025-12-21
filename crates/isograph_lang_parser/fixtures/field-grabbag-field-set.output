@@ -17,8 +17,8 @@ Err(
                             ),
                         },
                         span: Span {
-                            start: 68,
-                            end: 69,
+                            start: 130,
+                            end: 132,
                         },
                     },
                 ),
@@ -31,10 +31,10 @@ Err(
 
 Expected a line break.
 crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js
-    scalar
-    linked {
-      scalarWithComma,
-                     ^
-    }
-    linkedWithComma {
+      blah
+    },
+    multiple, on, the, same, line
+              ^^                 
+    including, youCanEndWithALinkedField {
+      butWhyWouldYouDoThat
 ---
