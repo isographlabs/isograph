@@ -71,7 +71,6 @@ pub enum EntityNameWrapperParent<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
 
-// This is more of a selection wrapper... TODO rename
 define_wrapper!(
     ClientScalarSelectableNameWrapper,
     common_lang_types::SelectableName,
