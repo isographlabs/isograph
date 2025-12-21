@@ -71,3 +71,4 @@ strip = "symbols"
 [workspace.lints.clippy]
 print_stderr = "deny"
 print_stdout = "deny"
+non_std_lazy_statics = "deny"
