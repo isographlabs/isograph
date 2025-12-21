@@ -18,7 +18,7 @@ use isograph_lang_types::{
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
-use std::{collections::HashSet, ops::ControlFlow};
+use std::ops::ControlFlow;
 
 use crate::{IsographLangTokenKind, parse_optional_description, peekable_lexer::PeekableLexer};
 
@@ -357,7 +357,6 @@ fn parse_optional_selection_set_inner(
         .is_err()
     {
         let selection = parse_selection(tokens)?;
-        let selection_name_or_alias = selection.item.name_or_alias().item;
         selections.push(selection);
     }
     selections.wrap_some().wrap_ok()
