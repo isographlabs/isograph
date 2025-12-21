@@ -64,7 +64,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
         relative_path_to_source_file,
         current_working_directory,
     ) {
-        match result.resolve((), Span::new(offset, offset)).dbg() {
+        match result.resolve((), Span::new(offset, offset)) {
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
