@@ -157,6 +157,13 @@ impl<T> WithEmbeddedLocation<T> {
     pub fn into_with_location(self) -> WithLocation<T> {
         self.into()
     }
+
+    pub fn as_ref(&self) -> WithEmbeddedLocation<&T> {
+        WithEmbeddedLocation {
+            embedded_location: self.embedded_location,
+            item: &self.item,
+        }
+    }
 }
 
 pub trait WithEmbeddedLocationPostfix

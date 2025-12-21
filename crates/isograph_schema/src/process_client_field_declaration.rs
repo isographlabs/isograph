@@ -5,7 +5,7 @@ use common_lang_types::{
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
     ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDefinition,
+    VariableDefinition,
 };
 use pico::MemoRef;
 use prelude::{ErrClone, Postfix};
@@ -105,19 +105,20 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             )
         })?;
 
-    let target_type_id = defined_entity(db, client_pointer_declaration_item.target_type.inner())
-        .to_owned()?
-        .ok_or_else(|| {
-            let target_type = client_pointer_declaration_item.target_type.inner();
-            Diagnostic::new(
-                format!("`{target_type}` is not a type that has been defined."),
-                client_pointer_declaration_item
-                    .target_type
-                    .embedded_location()
-                    .to::<Location>()
-                    .wrap_some(),
-            )
-        })?;
+    let target_type_id =
+        defined_entity(db, client_pointer_declaration_item.target_type.item.inner())
+            .to_owned()?
+            .ok_or_else(|| {
+                let target_type = client_pointer_declaration_item.target_type.item.inner();
+                Diagnostic::new(
+                    format!("`{target_type}` is not a type that has been defined."),
+                    client_pointer_declaration_item
+                        .target_type
+                        .embedded_location
+                        .to::<Location>()
+                        .wrap_some(),
+                )
+            })?;
 
     match parent_type_id {
         ServerEntityName::Object(_) => match target_type_id {
@@ -135,7 +136,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                     ),
                     client_pointer_declaration_item
                         .target_type
-                        .embedded_location()
+                        .embedded_location
                         .to::<Location>()
                         .wrap_some(),
                 )
@@ -147,7 +148,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{scalar_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item
                     .target_type
-                    .embedded_location()
+                    .embedded_location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -297,9 +298,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             .collect(),
 
         parent_entity_name,
-        target_entity_name: TypeAnnotation::from_graphql_type_annotation(
-            client_pointer_declaration.target_type.clone(),
-        ),
+        target_entity_name: client_pointer_declaration.target_type.clone(),
         network_protocol: std::marker::PhantomData,
 
         info: UserWrittenClientPointerInfo {

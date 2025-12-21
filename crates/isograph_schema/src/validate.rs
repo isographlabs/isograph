@@ -109,11 +109,11 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
         let (target, arguments) = match selectable {
             SelectionType::Scalar(s) => {
                 let scalar = s.lookup(db);
-                (scalar.target_entity_name.inner(), &scalar.arguments)
+                (scalar.target_entity_name.item.inner(), &scalar.arguments)
             }
             SelectionType::Object(o) => {
                 let object = o.lookup(db);
-                (object.target_entity_name.inner(), &object.arguments)
+                (object.target_entity_name.item.inner(), &object.arguments)
             }
         };
 
@@ -128,7 +128,7 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
         }
 
         for argument in arguments {
-            let arg_target = argument.type_.inner();
+            let arg_target = argument.type_.item.inner();
 
             if !entities.contains_key(&arg_target) {
                 let arg_name = argument.name.item;
@@ -228,7 +228,7 @@ fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
         };
 
         for argument in arguments {
-            let target = argument.type_.inner();
+            let target = argument.type_.item.inner();
 
             match server_entity_named_2(db, target).clone_err() {
                 Ok(entity) => {

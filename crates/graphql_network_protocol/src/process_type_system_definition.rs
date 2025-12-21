@@ -397,11 +397,11 @@ fn get_refetch_selectable(
                     .with_embedded_location(EmbeddedLocation::todo_generated()),
                 type_: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                        (*ID_ENTITY_NAME)
-                            .with_embedded_location(EmbeddedLocation::todo_generated()),
+                        *ID_ENTITY_NAME,
                     ))
                     .boxed(),
-                ),
+                )
+                .with_embedded_location(EmbeddedLocation::todo_generated()),
                 default_value: None,
             }],
         }),
@@ -424,7 +424,8 @@ pub(crate) fn get_typename_selectable(
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
-        target_entity_name: TypeAnnotation::Scalar("String".intern().into()),
+        target_entity_name: TypeAnnotation::Scalar("String".intern().into())
+            .with_embedded_location(EmbeddedLocation::todo_generated()),
         javascript_type_override,
         parent_entity_name: server_object_entity_name,
         arguments: vec![],

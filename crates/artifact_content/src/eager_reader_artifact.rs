@@ -226,7 +226,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             .lookup(db);
 
     let concrete_type =
-        &server_object_entity_named(db, server_object_selectable.target_entity_name.inner())
+        &server_object_entity_named(db, server_object_selectable.target_entity_name.item.inner())
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -622,12 +622,12 @@ fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     let mut s = "{\n".to_string();
     let indent = "  ";
     for arg in argument_definitions {
-        let is_optional = !matches!(arg.type_, GraphQLTypeAnnotation::NonNull(_));
+        let is_optional = !matches!(arg.type_.item, GraphQLTypeAnnotation::NonNull(_));
         s.push_str(&format!(
             "{indent}readonly {}{}: {},\n",
             arg.name.item,
             if is_optional { "?" } else { "" },
-            format_parameter_type(db, arg.type_.clone(), 1)
+            format_parameter_type(db, arg.type_.item.clone(), 1)
         ));
     }
     s.push_str("};");

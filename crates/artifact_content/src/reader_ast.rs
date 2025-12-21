@@ -95,7 +95,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        client_object_selectable.target_entity_name.inner(),
+                        client_object_selectable.target_entity_name.item.inner(),
                         &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -138,7 +138,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                         .normalization_key(),
                         ServerObjectSelectableVariant::InlineFragment => {
                             NormalizationKey::InlineFragment(
-                                server_object_selectable.target_entity_name.inner(),
+                                server_object_selectable.target_entity_name.item.inner(),
                             )
                         }
                     };
@@ -147,7 +147,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        server_object_selectable.target_entity_name.inner(),
+                        server_object_selectable.target_entity_name.item.inner(),
                         &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -835,7 +835,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                         let client_object_selectable_name = client_object_selectable.name;
                         let new_paths = refetched_paths_with_path(
                             db,
-                            client_object_selectable.target_entity_name.inner(),
+                            client_object_selectable.target_entity_name.item.inner(),
                             selectable_reader_selection_set(
                                 db,
                                 parent_object_entity_name,
@@ -878,7 +878,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         let new_paths = refetched_paths_with_path(
                             db,
-                            client_object_selectable.target_entity_name.inner(),
+                            client_object_selectable.target_entity_name.item.inner(),
                             &object_selection.selection_set,
                             path,
                             initial_variable_context,
@@ -909,7 +909,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                                 .normalization_key(),
                                 ServerObjectSelectableVariant::InlineFragment => {
                                     NormalizationKey::InlineFragment(
-                                        server_object_selectable.target_entity_name.inner(),
+                                        server_object_selectable.target_entity_name.item.inner(),
                                     )
                                 }
                             };
@@ -918,7 +918,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
                         let new_paths = refetched_paths_with_path(
                             db,
-                            server_object_selectable.target_entity_name.inner(),
+                            server_object_selectable.target_entity_name.item.inner(),
                             &object_selection.selection_set,
                             path,
                             initial_variable_context,

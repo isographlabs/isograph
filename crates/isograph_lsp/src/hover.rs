@@ -334,7 +334,7 @@ fn hover_text_for_selectable(
     } else {
         let mut s = "\nArguments:".to_string();
         for arg in selectable_arguments {
-            s.push_str(&format!("\n- {}: `{}`", arg.name.item, arg.type_));
+            s.push_str(&format!("\n- {}: `{}`", arg.name.item, arg.type_.item));
             // TODO display default values
         }
         s.push('\n');

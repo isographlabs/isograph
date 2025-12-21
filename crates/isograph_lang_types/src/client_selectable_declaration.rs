@@ -1,7 +1,6 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, RelativePathToSourceFile, WithEmbeddedLocation,
 };
-use graphql_lang_types::GraphQLTypeAnnotation;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use std::fmt::Debug;
@@ -9,7 +8,7 @@ use std::fmt::Debug;
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
     ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionPath, Selection, VariableDefinition,
+    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotation, VariableDefinition,
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
 };
 
@@ -45,7 +44,7 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     // TODO re-enable
     // #[resolve_field]
-    pub target_type: GraphQLTypeAnnotation,
+    pub target_type: WithEmbeddedLocation<TypeAnnotation>,
     pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,

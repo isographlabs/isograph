@@ -805,57 +805,64 @@ fn parse_field(
         .wrap_ok()
 }
 
-fn parse_type_annotation(tokens: &mut PeekableLexer) -> DiagnosticResult<GraphQLTypeAnnotation> {
-    from_control_flow(|| {
-        to_control_flow::<_, Diagnostic>(|| {
-            let type_ = tokens.parse_string_key_type(TokenKind::Identifier)?;
+fn parse_type_annotation(
+    tokens: &mut PeekableLexer,
+) -> DiagnosticResult<WithEmbeddedLocation<GraphQLTypeAnnotation>> {
+    tokens.with_embedded_location_result(|tokens| {
+        from_control_flow(|| {
+            to_control_flow::<_, Diagnostic>(|| {
+                let entity_name = tokens.parse_string_key_type(TokenKind::Identifier)?.item;
 
-            let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
-            if is_non_null {
-                GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).boxed(),
-                )
-                .wrap_ok()
-            } else {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).wrap_ok()
-            }
-        })?;
+                let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
+                if is_non_null {
+                    GraphQLTypeAnnotation::NonNull(
+                        GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                            entity_name,
+                        ))
+                        .boxed(),
+                    )
+                    .wrap_ok()
+                } else {
+                    GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(entity_name)).wrap_ok()
+                }
+            })?;
 
-        to_control_flow::<_, Diagnostic>(|| {
-            // TODO: atomically parse everything here:
-            tokens.parse_token_of_kind(TokenKind::OpenBracket)?;
+            to_control_flow::<_, Diagnostic>(|| {
+                // TODO: atomically parse everything here:
+                tokens.parse_token_of_kind(TokenKind::OpenBracket)?;
 
-            let inner_type_annotation = parse_type_annotation(tokens)?;
-            tokens.parse_token_of_kind(TokenKind::CloseBracket)?;
-            let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
+                let inner_type_annotation = parse_type_annotation(tokens)?;
+                tokens.parse_token_of_kind(TokenKind::CloseBracket)?;
+                let is_non_null = tokens.parse_token_of_kind(TokenKind::Exclamation).is_ok();
 
-            if is_non_null {
-                GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
-                        inner_type_annotation,
-                    ))
-                    .boxed(),
-                )
-                .wrap_ok()
-            } else {
-                GraphQLTypeAnnotation::List(
-                    GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
-                )
-                .wrap_ok()
-            }
-        })?;
+                if is_non_null {
+                    GraphQLTypeAnnotation::NonNull(
+                        GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                            inner_type_annotation,
+                        ))
+                        .boxed(),
+                    )
+                    .wrap_ok()
+                } else {
+                    GraphQLTypeAnnotation::List(
+                        GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
+                    )
+                    .wrap_ok()
+                }
+            })?;
 
-        // One **cannot** add additional cases here (though of course none exist in the spec.)
-        // Because, if we successfully parse the OpenBracket for a list type, we must parse the
-        // entirety of the list type. Otherwise, we will have eaten the OpenBracket and will
-        // leave the parser in an inconsistent state.
-        //
-        // We don't get a great error message with this current approach.
+            // One **cannot** add additional cases here (though of course none exist in the spec.)
+            // Because, if we successfully parse the OpenBracket for a list type, we must parse the
+            // entirety of the list type. Otherwise, we will have eaten the OpenBracket and will
+            // leave the parser in an inconsistent state.
+            //
+            // We don't get a great error message with this current approach.
 
-        ControlFlow::Continue(Diagnostic::new(
-            "Expected a type (e.g. String, [String] or String!)".to_string(),
-            tokens.peek().embedded_location.to::<Location>().wrap_some(),
-        ))
+            ControlFlow::Continue(Diagnostic::new(
+                "Expected a type (e.g. String, [String] or String!)".to_string(),
+                tokens.peek().embedded_location.to::<Location>().wrap_some(),
+            ))
+        })
     })
 }
 

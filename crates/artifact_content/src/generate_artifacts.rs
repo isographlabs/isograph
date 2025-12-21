@@ -325,14 +325,11 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
 
                                 type_: GraphQLTypeAnnotation::NonNull(
                                     GraphQLNonNullTypeAnnotation::Named(
-                                        GraphQLNamedTypeAnnotation(
-                                            (*ID_ENTITY_NAME).with_embedded_location(
-                                                EmbeddedLocation::todo_generated(),
-                                            ),
-                                        ),
+                                        GraphQLNamedTypeAnnotation(*ID_ENTITY_NAME),
                                     )
                                     .boxed(),
-                                ),
+                                )
+                                .with_embedded_location(EmbeddedLocation::todo_generated()),
                                 default_value: None,
                             };
 
@@ -789,7 +786,11 @@ fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
                         }
                         UnionVariant::Plural(type_annotation) => {
                             s.push_str("ReadonlyArray<");
-                            print_javascript_type_declaration_impl(type_annotation, s, inner_text);
+                            print_javascript_type_declaration_impl(
+                                type_annotation.item.reference(),
+                                s,
+                                inner_text,
+                            );
                             s.push('>');
                         }
                     }
@@ -809,7 +810,11 @@ fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
                     }
                     UnionVariant::Plural(type_annotation) => {
                         s.push_str("ReadonlyArray<");
-                        print_javascript_type_declaration_impl(type_annotation, s, inner_text);
+                        print_javascript_type_declaration_impl(
+                            type_annotation.item.reference(),
+                            s,
+                            inner_text,
+                        );
                         s.push('>');
                     }
                 }
@@ -817,7 +822,7 @@ fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
         }
         TypeAnnotation::Plural(type_annotation) => {
             s.push_str("ReadonlyArray<");
-            print_javascript_type_declaration_impl(type_annotation, s, inner_text);
+            print_javascript_type_declaration_impl(type_annotation.item.reference(), s, inner_text);
             s.push('>');
         }
     }

@@ -13,7 +13,7 @@ use isograph_lang_types::{
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
     ScalarSelection, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    VariableDefinition, from_isograph_field_directives, semantic_token_legend,
+    TypeAnnotation, VariableDefinition, from_isograph_field_directives, semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -241,7 +241,7 @@ fn parse_iso_client_pointer_declaration(
 
 fn parse_client_pointer_target_type(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<GraphQLTypeAnnotation> {
+) -> DiagnosticResult<WithEmbeddedLocation<GraphQLTypeAnnotation>> {
     let keyword = tokens.parse_source_of_kind(
         IsographLangTokenKind::Identifier,
         semantic_token_legend::ST_TO,
@@ -282,7 +282,8 @@ fn parse_client_pointer_declaration_inner(
 
         let variable_definitions = parse_variable_definitions(tokens)?;
 
-        let target_type = parse_client_pointer_target_type(tokens)?;
+        let target_type = parse_client_pointer_target_type(tokens)?
+            .map(TypeAnnotation::from_graphql_type_annotation);
 
         let directives = parse_directives(tokens)?;
 
@@ -789,76 +790,85 @@ fn parse_optional_default_value(
     }
 }
 
-fn parse_type_annotation(tokens: &mut PeekableLexer) -> DiagnosticResult<GraphQLTypeAnnotation> {
-    from_control_flow(|| {
-        to_control_flow::<_, Diagnostic>(|| {
-            let type_ = tokens.parse_string_key_type(
-                IsographLangTokenKind::Identifier,
-                semantic_token_legend::ST_TYPE_ANNOTATION,
-            )?;
+fn parse_type_annotation(
+    tokens: &mut PeekableLexer,
+) -> DiagnosticResult<WithEmbeddedLocation<GraphQLTypeAnnotation>> {
+    tokens.with_embedded_location_result(|tokens| {
+        from_control_flow(|| {
+            to_control_flow::<_, Diagnostic>(|| {
+                let entity_name = tokens
+                    .parse_string_key_type(
+                        IsographLangTokenKind::Identifier,
+                        semantic_token_legend::ST_TYPE_ANNOTATION,
+                    )?
+                    .item;
 
-            let is_non_null = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Exclamation,
+                let is_non_null = tokens
+                    .parse_token_of_kind(
+                        IsographLangTokenKind::Exclamation,
+                        semantic_token_legend::ST_TYPE_ANNOTATION,
+                    )
+                    .is_ok();
+                if is_non_null {
+                    GraphQLTypeAnnotation::NonNull(
+                        GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
+                            entity_name,
+                        ))
+                        .boxed(),
+                    )
+                    .wrap_ok()
+                } else {
+                    GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(entity_name)).wrap_ok()
+                }
+            })?;
+
+            to_control_flow::<_, Diagnostic>(|| {
+                // TODO: atomically parse everything here:
+                tokens.parse_token_of_kind(
+                    IsographLangTokenKind::OpenBracket,
                     semantic_token_legend::ST_TYPE_ANNOTATION,
-                )
-                .is_ok();
-            if is_non_null {
-                GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).boxed(),
-                )
-                .wrap_ok()
-            } else {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(type_)).wrap_ok()
-            }
-        })?;
+                )?;
 
-        to_control_flow::<_, Diagnostic>(|| {
-            // TODO: atomically parse everything here:
-            tokens.parse_token_of_kind(
-                IsographLangTokenKind::OpenBracket,
-                semantic_token_legend::ST_TYPE_ANNOTATION,
-            )?;
-
-            let inner_type_annotation = parse_type_annotation(tokens)?;
-            tokens.parse_token_of_kind(
-                IsographLangTokenKind::CloseBracket,
-                semantic_token_legend::ST_TYPE_ANNOTATION,
-            )?;
-            let is_non_null = tokens
-                .parse_token_of_kind(
-                    IsographLangTokenKind::Exclamation,
+                let inner_type_annotation = parse_type_annotation(tokens)?;
+                tokens.parse_token_of_kind(
+                    IsographLangTokenKind::CloseBracket,
                     semantic_token_legend::ST_TYPE_ANNOTATION,
-                )
-                .is_ok();
+                )?;
+                let is_non_null = tokens
+                    .parse_token_of_kind(
+                        IsographLangTokenKind::Exclamation,
+                        semantic_token_legend::ST_TYPE_ANNOTATION,
+                    )
+                    .is_ok();
 
-            if is_non_null {
-                GraphQLTypeAnnotation::NonNull(
-                    GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
-                        inner_type_annotation,
-                    ))
-                    .boxed(),
-                )
-                .wrap_ok()
-            } else {
-                GraphQLTypeAnnotation::List(
-                    GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
-                )
-                .wrap_ok()
-            }
-        })?;
+                if is_non_null {
+                    GraphQLTypeAnnotation::NonNull(
+                        GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
+                            inner_type_annotation,
+                        ))
+                        .boxed(),
+                    )
+                    .wrap_ok()
+                } else {
+                    GraphQLTypeAnnotation::List(
+                        GraphQLListTypeAnnotation(inner_type_annotation).boxed(),
+                    )
+                    .wrap_ok()
+                }
+            })?;
 
-        // One **cannot** add additional cases here (though of course none exist in the spec.)
-        // Because, if we successfully parse the OpenBracket for a list type, we must parse the
-        // entirety of the list type. Otherwise, we will have eaten the OpenBracket and will
-        // leave the parser in an inconsistent state.
-        //
-        // We don't get a great error message with this current approach.
+            // One **cannot** add additional cases here (though of course none exist in the spec.)
+            // Because, if we successfully parse the OpenBracket for a list type, we must parse the
+            // entirety of the list type. Otherwise, we will have eaten the OpenBracket and will
+            // leave the parser in an inconsistent state.
+            //
+            // We don't get a great error message with this current approach.
 
-        ControlFlow::Continue(Diagnostic::new(
-            "Expected a type (e.g. String, [String], or String!)".to_string(),
-            tokens.peek().embedded_location.to::<Location>().wrap_some(),
-        ))
+            ControlFlow::Continue(Diagnostic::new(
+                "Expected a type (e.g. String, [String], or String!)".to_string(),
+                tokens.peek().embedded_location.to::<Location>().wrap_some(),
+            ))
+        })
     })
 }
 

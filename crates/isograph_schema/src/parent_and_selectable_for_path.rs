@@ -108,8 +108,8 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
             // _parent is Query, selectable is pet. So, we need to get the target of the selectable.
 
             match selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
             }
         }
         SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
@@ -145,8 +145,8 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
                 get_parent_and_selectable_for_object_path(db, object_selection_path)?;
 
             let object_parent_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
             };
 
             parent_object_entity_and_selectable(

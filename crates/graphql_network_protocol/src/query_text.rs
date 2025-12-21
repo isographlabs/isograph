@@ -1,5 +1,4 @@
 use common_lang_types::{QueryOperationName, QueryText};
-use graphql_lang_types::GraphQLTypeAnnotation;
 use isograph_lang_types::{ArgumentKeyAndValue, NonConstantValue, VariableDefinition};
 use isograph_schema::{Format, MergedSelectionMap, MergedServerSelection, RootOperationName};
 
@@ -41,7 +40,7 @@ fn write_variables_to_string<'a>(
             first = false;
         }
         // TODO can we consume the variables here?
-        let x: GraphQLTypeAnnotation = variable.type_.clone();
+        let x = variable.type_.item.clone();
         variable_text.push_str(&format!("${}: {}", variable.name.item, x));
         if let Some(default_value) = &variable.default_value {
             variable_text.push_str(&format!(" = {}", default_value.item.print_to_string()));

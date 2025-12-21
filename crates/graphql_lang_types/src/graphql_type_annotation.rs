@@ -1,6 +1,7 @@
 use std::{fmt, ops::Deref};
 
-use common_lang_types::{EmbeddedLocation, EntityName, Span, WithEmbeddedLocation};
+use common_lang_types::{EntityName, WithEmbeddedLocation};
+use prelude::Postfix;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum GraphQLTypeAnnotation {
@@ -12,22 +13,10 @@ pub enum GraphQLTypeAnnotation {
 impl GraphQLTypeAnnotation {
     pub fn inner(&self) -> EntityName {
         match self {
-            GraphQLTypeAnnotation::Named(named) => named.0.item,
-            GraphQLTypeAnnotation::List(list) => list.0.inner(),
+            GraphQLTypeAnnotation::Named(named) => named.0,
+            GraphQLTypeAnnotation::List(list) => list.0.item.inner(),
             GraphQLTypeAnnotation::NonNull(non_null) => non_null.inner(),
         }
-    }
-
-    pub fn embedded_location(&self) -> EmbeddedLocation {
-        match self {
-            GraphQLTypeAnnotation::Named(named) => named.0.embedded_location,
-            GraphQLTypeAnnotation::List(list) => list.0.embedded_location(),
-            GraphQLTypeAnnotation::NonNull(non_null) => non_null.embedded_location(),
-        }
-    }
-
-    pub fn span(&self) -> Span {
-        self.embedded_location().span
     }
 
     pub fn is_nullable(&self) -> bool {
@@ -38,6 +27,7 @@ impl GraphQLTypeAnnotation {
     }
 }
 
+// Should this impl Display??
 impl fmt::Display for GraphQLTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -57,20 +47,9 @@ pub enum GraphQLNonNullTypeAnnotation {
 impl GraphQLNonNullTypeAnnotation {
     pub fn inner(&self) -> EntityName {
         match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => named.0.item,
-            GraphQLNonNullTypeAnnotation::List(list) => list.0.inner(),
+            GraphQLNonNullTypeAnnotation::Named(named) => named.0,
+            GraphQLNonNullTypeAnnotation::List(list) => list.0.item.inner(),
         }
-    }
-
-    pub fn embedded_location(&self) -> EmbeddedLocation {
-        match self {
-            GraphQLNonNullTypeAnnotation::Named(named) => named.0.embedded_location,
-            GraphQLNonNullTypeAnnotation::List(list) => list.0.embedded_location(),
-        }
-    }
-
-    pub fn span(&self) -> Span {
-        self.embedded_location().span
     }
 }
 
@@ -84,35 +63,37 @@ impl fmt::Display for GraphQLNonNullTypeAnnotation {
 }
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLNamedTypeAnnotation(pub WithEmbeddedLocation<EntityName>);
+pub struct GraphQLNamedTypeAnnotation(pub EntityName);
 
 impl Deref for GraphQLNamedTypeAnnotation {
-    type Target = WithEmbeddedLocation<EntityName>;
+    type Target = EntityName;
 
     fn deref(&self) -> &Self::Target {
         &self.0
     }
 }
 
+// TODO should we impl Display here??
 impl fmt::Display for GraphQLNamedTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0.item)
+        write!(f, "{}", self.0)
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct GraphQLListTypeAnnotation(pub GraphQLTypeAnnotation);
+pub struct GraphQLListTypeAnnotation(pub WithEmbeddedLocation<GraphQLTypeAnnotation>);
 
 impl Deref for GraphQLListTypeAnnotation {
-    type Target = GraphQLTypeAnnotation;
+    type Target = WithEmbeddedLocation<GraphQLTypeAnnotation>;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.reference()
     }
 }
 
+// TODO should we impl Display here??
 impl fmt::Display for GraphQLListTypeAnnotation {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_fmt(format_args!("[{}]", self.0))
+        f.write_fmt(format_args!("[{}]", self.0.item))
     }
 }

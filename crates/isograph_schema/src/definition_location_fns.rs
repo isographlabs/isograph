@@ -1,4 +1,5 @@
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotation};
+use prelude::Postfix;
 
 use crate::{IsographDatabase, MemoRefObjectSelectable, NetworkProtocol};
 
@@ -17,7 +18,13 @@ pub fn output_type_annotation<TNetworkProtocol: NetworkProtocol>(
     definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
 ) -> &TypeAnnotation {
     match definition_location {
-        DefinitionLocation::Client(client_pointer) => &client_pointer.lookup(db).target_entity_name,
-        DefinitionLocation::Server(server_field) => &server_field.lookup(db).target_entity_name,
+        DefinitionLocation::Client(client_pointer) => client_pointer
+            .lookup(db)
+            .target_entity_name
+            .item
+            .reference(),
+        DefinitionLocation::Server(server_field) => {
+            server_field.lookup(db).target_entity_name.item.reference()
+        }
     }
 }

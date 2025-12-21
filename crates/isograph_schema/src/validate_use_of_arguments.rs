@@ -231,7 +231,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
                     value_satisfies_type(
                         db,
                         &selection_supplied_argument.item.value,
-                        &field_argument_definition.type_,
+                        field_argument_definition.type_.item.reference(),
                         client_type_variable_definitions,
                     ),
                 );
@@ -339,7 +339,7 @@ fn get_missing_and_provided_arguments<'a>(
                 ArgumentType::Provided(field_argument_definition, selection_supplied_argument)
                     .wrap_some()
             } else if field_argument_definition.default_value.is_some()
-                || field_argument_definition.type_.is_nullable()
+                || field_argument_definition.type_.item.is_nullable()
             {
                 None
             } else {

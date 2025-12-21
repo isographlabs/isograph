@@ -585,7 +585,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(server_object_entity) => {
                         let server_object_entity = server_object_entity.lookup(db);
                         let target_object_entity_name =
-                            server_object_entity.target_entity_name.inner();
+                            server_object_entity.target_entity_name.item.inner();
 
                         let object_selection_parent_object_entity =
                             &server_object_entity_named(db, target_object_entity_name)
@@ -781,7 +781,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
                 let concrete_object_entity_name =
-                    server_object_selectable.target_entity_name.inner();
+                    server_object_selectable.target_entity_name.item.inner();
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -903,6 +903,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
             (
                 newly_encountered_client_object_selectable
                     .target_entity_name
+                    .item
                     .inner(),
                 *LINK_FIELD_NAME,
             )
@@ -1120,6 +1121,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
 ) {
     let target_server_object_entity_name = newly_encountered_client_object_selectable
         .target_entity_name
+        .item
         .inner();
     let target_server_object_entity =
         &server_object_entity_named(db, target_server_object_entity_name)
@@ -1184,6 +1186,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         } else {
             (newly_encountered_client_object_selectable
                 .target_entity_name
+                .item
                 .inner())
             .wrap_some()
         },
@@ -1543,11 +1546,10 @@ pub fn id_arguments() -> Vec<VariableDefinition> {
             .unchecked_conversion::<VariableName>()
             .with_embedded_location(EmbeddedLocation::todo_generated()),
         type_: GraphQLTypeAnnotation::NonNull(
-            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                (*ID_ENTITY_NAME).with_embedded_location(EmbeddedLocation::todo_generated()),
-            ))
-            .boxed(),
-        ),
+            GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*ID_ENTITY_NAME))
+                .boxed(),
+        )
+        .with_embedded_location(EmbeddedLocation::todo_generated()),
         default_value: None,
     }]
 }

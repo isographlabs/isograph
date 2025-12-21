@@ -6,7 +6,8 @@ use std::{
 };
 
 use common_lang_types::{
-    EmbeddedLocation, EntityName, Span, TextSource, WithLocationPostfix, WithSpan, WithSpanPostfix,
+    EmbeddedLocation, EntityName, Span, TextSource, WithEmbeddedLocation, WithLocationPostfix,
+    WithSpan, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -20,19 +21,20 @@ use prelude::Postfix;
 pub enum TypeAnnotation {
     Scalar(EntityName),
     Union(UnionTypeAnnotation),
-    Plural(Box<TypeAnnotation>),
+    Plural(Box<WithEmbeddedLocation<TypeAnnotation>>),
 }
 
 impl TypeAnnotation {
     pub fn from_graphql_type_annotation(other: GraphQLTypeAnnotation) -> Self {
         match other {
-            GraphQLTypeAnnotation::Named(named_type_annotation) => {
-                TypeAnnotation::Union(UnionTypeAnnotation::new_nullable(UnionVariant::Scalar(
-                    named_type_annotation.0.item,
-                )))
-            }
+            GraphQLTypeAnnotation::Named(named_type_annotation) => TypeAnnotation::Union(
+                UnionTypeAnnotation::new_nullable(UnionVariant::Scalar(named_type_annotation.0)),
+            ),
             GraphQLTypeAnnotation::List(list_type_annotation) => {
-                let inner = TypeAnnotation::from_graphql_type_annotation((*list_type_annotation).0);
+                let inner = (*list_type_annotation)
+                    .0
+                    .map(TypeAnnotation::from_graphql_type_annotation);
+
                 TypeAnnotation::Union(UnionTypeAnnotation::new_nullable(UnionVariant::Plural(
                     inner,
                 )))
@@ -46,10 +48,12 @@ impl TypeAnnotation {
     pub fn from_non_null_type_annotation(other: GraphQLNonNullTypeAnnotation) -> Self {
         match other {
             GraphQLNonNullTypeAnnotation::Named(named_type_annotation) => {
-                TypeAnnotation::Scalar(named_type_annotation.0.item)
+                TypeAnnotation::Scalar(named_type_annotation.0)
             }
             GraphQLNonNullTypeAnnotation::List(list_type_annotation) => {
-                let inner = TypeAnnotation::from_graphql_type_annotation(list_type_annotation.0);
+                let inner = list_type_annotation
+                    .0
+                    .map(TypeAnnotation::from_graphql_type_annotation);
                 TypeAnnotation::Plural(inner.boxed())
             }
         }
@@ -61,7 +65,7 @@ impl TypeAnnotation {
         match self {
             TypeAnnotation::Scalar(s) => s.dereference(),
             TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
-            TypeAnnotation::Plural(type_annotation) => type_annotation.inner(),
+            TypeAnnotation::Plural(type_annotation) => type_annotation.item.inner(),
         }
     }
 
@@ -71,7 +75,7 @@ impl TypeAnnotation {
         match self {
             TypeAnnotation::Scalar(s) => s.dereference(),
             TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
-            TypeAnnotation::Plural(type_annotation) => type_annotation.inner_non_null(),
+            TypeAnnotation::Plural(type_annotation) => type_annotation.item.inner_non_null(),
         }
     }
 
@@ -104,7 +108,7 @@ impl UnionTypeAnnotation {
         if let Some(item) = self.variants.first() {
             match item {
                 UnionVariant::Scalar(s) => s.dereference(),
-                UnionVariant::Plural(type_annotation) => type_annotation.inner_non_null(),
+                UnionVariant::Plural(type_annotation) => type_annotation.item.inner_non_null(),
             }
         } else {
             panic!("Expected self.variants to not be empty");
@@ -115,7 +119,7 @@ impl UnionTypeAnnotation {
 #[derive(Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
 pub enum UnionVariant {
     Scalar(EntityName),
-    Plural(TypeAnnotation),
+    Plural(WithEmbeddedLocation<TypeAnnotation>),
 }
 
 fn graphql_type_annotation_from_union_variant(
@@ -124,15 +128,14 @@ fn graphql_type_annotation_from_union_variant(
     if union_type_annotation.nullable {
         return match union_type_annotation.variants.iter().next().unwrap() {
             UnionVariant::Scalar(scalar_entity_name) => {
-                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    (*scalar_entity_name)
-                        .with_embedded_location(EmbeddedLocation::todo_generated()),
-                ))
+                GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*scalar_entity_name))
             }
             UnionVariant::Plural(type_annotation) => GraphQLTypeAnnotation::List(
-                GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
-                    type_annotation,
-                ))
+                GraphQLListTypeAnnotation(
+                    type_annotation
+                        .as_ref()
+                        .map(graphql_type_annotation_from_type_annotation),
+                )
                 .boxed(),
             ),
         };
@@ -141,15 +144,14 @@ fn graphql_type_annotation_from_union_variant(
     GraphQLTypeAnnotation::NonNull(
         match union_type_annotation.variants.iter().next().unwrap() {
             UnionVariant::Scalar(scalar_entity_name) => {
-                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                    (*scalar_entity_name)
-                        .with_embedded_location(EmbeddedLocation::todo_generated()),
-                ))
-                .boxed()
+                GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*scalar_entity_name))
+                    .boxed()
             }
             UnionVariant::Plural(type_annotation) => {
                 GraphQLNonNullTypeAnnotation::List(GraphQLListTypeAnnotation(
-                    graphql_type_annotation_from_type_annotation(type_annotation),
+                    type_annotation
+                        .as_ref()
+                        .map(graphql_type_annotation_from_type_annotation),
                 ))
                 .boxed()
             }
@@ -162,14 +164,15 @@ pub fn graphql_type_annotation_from_type_annotation(
 ) -> GraphQLTypeAnnotation {
     match other {
         TypeAnnotation::Scalar(scalar_entity_name) => {
-            GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(
-                (*scalar_entity_name).with_embedded_location(EmbeddedLocation::todo_generated()),
-            ))
+            GraphQLTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*scalar_entity_name))
         }
         TypeAnnotation::Plural(type_annotation) => GraphQLTypeAnnotation::List(
-            GraphQLListTypeAnnotation(graphql_type_annotation_from_type_annotation(
-                type_annotation,
-            ))
+            GraphQLListTypeAnnotation(
+                type_annotation
+                    .as_ref()
+                    .as_ref()
+                    .map(graphql_type_annotation_from_type_annotation),
+            )
             .boxed(),
         ),
         TypeAnnotation::Union(union_type_annotation) => {

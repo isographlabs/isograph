@@ -4,6 +4,7 @@ use isograph_schema::{
     server_object_selectable_named, server_scalar_entity_javascript_name,
     server_scalar_selectable_named,
 };
+use prelude::Postfix;
 use std::collections::BTreeMap;
 
 use crate::generate_artifacts::print_javascript_type_declaration;
@@ -66,7 +67,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let inner_text = match server_scalar_selectable.javascript_type_override {
                     Some(javascript_name) => javascript_name,
-                    None => server_scalar_entity_javascript_name(db, raw_type.inner())
+                    None => server_scalar_entity_javascript_name(db, raw_type.item.inner())
                         .as_ref()
                         .expect(
                             "Expected parsing to not have failed. \
@@ -80,12 +81,16 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_scalar_selectable.target_entity_name.is_nullable() {
+                    if server_scalar_selectable
+                        .target_entity_name
+                        .item
+                        .is_nullable()
+                    {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(&raw_type, inner_text)
+                    print_javascript_type_declaration(raw_type.item.reference(), inner_text)
                 ));
             }
             MergedServerSelection::LinkedField(linked_field) => {
@@ -128,12 +133,16 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_object_selectable.target_entity_name.is_nullable() {
+                    if server_object_selectable
+                        .target_entity_name
+                        .item
+                        .is_nullable()
+                    {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(&raw_type, inner_text)
+                    print_javascript_type_declaration(raw_type.item.reference(), inner_text)
                 ));
             }
             MergedServerSelection::ClientObjectSelectable(_) => {}

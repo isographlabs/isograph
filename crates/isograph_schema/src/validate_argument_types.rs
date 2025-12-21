@@ -49,7 +49,7 @@ fn scalar_literal_satisfies_type(
             .wrap_err()
         }
         GraphQLNonNullTypeAnnotation::Named(named_type) => {
-            let expected_name = named_type.item;
+            let expected_name = named_type.0;
             if expected_name == scalar_literal_name {
                 return Ok(());
             }
@@ -77,7 +77,10 @@ fn variable_type_satisfies_argument_type(
                 GraphQLNonNullTypeAnnotation::List(list_variable_type) => {
                     // [Value]! satisfies [Value]
                     // or [Value] satisfies [Value]
-                    variable_type_satisfies_argument_type(&list_variable_type, &list_type.0)
+                    variable_type_satisfies_argument_type(
+                        list_variable_type.item.reference(),
+                        list_type.item.reference(),
+                    )
                 }
                 GraphQLNonNullTypeAnnotation::Named(_) => false,
             }
@@ -88,7 +91,7 @@ fn variable_type_satisfies_argument_type(
                 GraphQLNonNullTypeAnnotation::Named(named_variable_type) => {
                     // Value! satisfies Value
                     // or Value satisfies Value
-                    named_variable_type.item == named_type.item
+                    named_variable_type == named_type.dereference()
                 }
                 GraphQLNonNullTypeAnnotation::List(_) => false,
             }
@@ -239,7 +242,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     selection_supplied_argument_value,
                     variable_definitions,
                     object_literal,
-                    named_type.item,
+                    named_type.0,
                 ),
             }
         }
@@ -270,7 +273,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 ) => match value_satisfies_type(
                     db,
                     &selection_supplied_argument_value.value,
-                    field_type_annotation,
+                    field_type_annotation.item.reference(),
                     variable_definitions,
                 ) {
                     Ok(_) => None,
@@ -305,7 +308,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 enum ObjectLiteralFieldType {
     Provided(
-        GraphQLTypeAnnotation,
+        WithEmbeddedLocation<GraphQLTypeAnnotation>,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -335,8 +338,9 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 }
             };
 
-            let field_type_annotation =
-                graphql_type_annotation_from_type_annotation(&iso_type_annotation);
+            let field_type_annotation = iso_type_annotation
+                .as_ref()
+                .map(graphql_type_annotation_from_type_annotation);
 
             let object_literal_supplied_field = object_literal
                 .iter()
@@ -348,7 +352,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                     selection_supplied_argument_value.clone(),
                 )
                 .wrap_some(),
-                None => match field_type_annotation {
+                None => match field_type_annotation.item {
                     GraphQLTypeAnnotation::NonNull(_) => {
                         ObjectLiteralFieldType::Missing(*field_name).wrap_some()
                     }
@@ -417,7 +421,12 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     variable_definitions: &[VariableDefinition],
 ) -> DiagnosticResult<()> {
     list.iter().try_for_each(|element| {
-        value_satisfies_type(db, element, &list_type.0, variable_definitions)
+        value_satisfies_type(
+            db,
+            element,
+            list_type.item.reference(),
+            variable_definitions,
+        )
     })
 }
 
@@ -430,7 +439,7 @@ fn get_variable_type<'a>(
         .iter()
         .find(|definition| definition.name.item == *variable_name)
     {
-        Some(variable) => (&variable.type_).wrap_ok(),
+        Some(variable) => (variable.type_.item.reference()).wrap_ok(),
         None => Diagnostic::new(
             format!("This variable is not defined: ${}", *variable_name),
             location.to::<Location>().wrap_some(),

@@ -1,6 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName};
+use common_lang_types::{
+    EntityName, EntityNameAndSelectableName, SelectableName, WithEmbeddedLocation,
+};
 use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
 use pico::MemoRef;
 
@@ -48,7 +50,8 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarSelectable<TNetworkProtocol>
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
-    pub target_entity_name: TypeAnnotation,
+    // TODO drop the location
+    pub target_entity_name: WithEmbeddedLocation<TypeAnnotation>,
 
     pub variable_definitions: Vec<VariableDefinition>,
 

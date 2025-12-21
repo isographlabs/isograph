@@ -11,6 +11,7 @@ use prelude::Postfix;
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
+    // TODO accept reference?
     type_: GraphQLTypeAnnotation,
     indentation_level: u8,
 ) -> String {
@@ -18,23 +19,23 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
         GraphQLTypeAnnotation::Named(named_inner_type) => {
             format!(
                 "{} | null | void",
-                format_server_field_type(db, named_inner_type.item, indentation_level)
+                format_server_field_type(db, named_inner_type.0, indentation_level)
             )
         }
         GraphQLTypeAnnotation::List(list) => {
             format!(
                 "ReadonlyArray<{}> | null",
-                format_server_field_type(db, list.inner(), indentation_level)
+                format_server_field_type(db, list.item.inner(), indentation_level)
             )
         }
         GraphQLTypeAnnotation::NonNull(non_null) => match *non_null {
             GraphQLNonNullTypeAnnotation::Named(named_inner_type) => {
-                format_server_field_type(db, named_inner_type.item, indentation_level)
+                format_server_field_type(db, named_inner_type.0, indentation_level)
             }
             GraphQLNonNullTypeAnnotation::List(list) => {
                 format!(
                     "ReadonlyArray<{}>",
-                    format_server_field_type(db, list.inner(), indentation_level)
+                    format_server_field_type(db, list.item.inner(), indentation_level)
                 )
             }
         },
@@ -126,7 +127,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .lookup(db);
 
             (
-                is_nullable(&server_scalar_selectable.target_entity_name),
+                is_nullable(server_scalar_selectable.target_entity_name.item.reference()),
                 server_scalar_selectable.target_entity_name.clone(),
             )
         }
@@ -151,7 +152,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             )
             .lookup(db);
             (
-                is_nullable(&server_object_selectable.target_entity_name),
+                is_nullable(server_object_selectable.target_entity_name.item.reference()),
                 server_object_selectable.target_entity_name.clone(),
             )
         }
@@ -162,7 +163,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
         "  ".repeat(indentation_level as usize),
         name,
         if is_optional { "?" } else { "" },
-        format_type_annotation(db, &selection_type, indentation_level + 1),
+        format_type_annotation(db, selection_type.item.reference(), indentation_level + 1),
     )
 }
 
@@ -208,7 +209,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                             s.push_str("ReadonlyArray<");
                             s.push_str(&format_type_annotation(
                                 db,
-                                type_annotation,
+                                type_annotation.item.reference(),
                                 indentation_level + 1,
                             ));
                             s.push('>');
@@ -234,7 +235,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                             "ReadonlyArray<{}>",
                             format_server_field_type(
                                 db,
-                                type_annotation.inner(),
+                                type_annotation.item.inner(),
                                 indentation_level + 1
                             )
                         )
@@ -245,7 +246,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
         TypeAnnotation::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(db, type_annotation.inner(), indentation_level + 1)
+                format_server_field_type(db, type_annotation.item.inner(), indentation_level + 1)
             )
         }
     }
