@@ -21,11 +21,11 @@ use isograph_schema::{
     server_object_entity_named, server_object_selectable_named, validate_entire_schema,
     validated_entrypoints,
 };
-use lazy_static::lazy_static;
 use prelude::*;
 use std::{
     collections::{BTreeMap, HashSet},
     fmt::Debug,
+    sync::LazyLock,
 };
 
 use crate::{
@@ -46,36 +46,47 @@ use crate::{
     ts_config::generate_ts_config,
 };
 
-lazy_static! {
-    pub static ref ENTRYPOINT_FILE_NAME: ArtifactFileName = "entrypoint.ts".intern().into();
-    pub static ref ENTRYPOINT: ArtifactFilePrefix = "entrypoint".intern().into();
-    pub static ref ISO_TS_FILE_NAME: ArtifactFileName = "iso.ts".intern().into();
-    pub static ref ISO_TS: ArtifactFilePrefix = "iso".intern().into();
-    pub static ref NORMALIZATION_AST_FILE_NAME: ArtifactFileName =
-        "normalization_ast.ts".intern().into();
-    pub static ref RAW_RESPONSE_TYPE: ArtifactFilePrefix = "raw_response_type".intern().into();
-    pub static ref RAW_RESPONSE_TYPE_FILE_NAME: ArtifactFileName =
-        "raw_response_type.ts".intern().into();
-    pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
-    pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
-    pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
-    pub static ref REFETCH_READER_FILE_NAME: ArtifactFileName = "refetch_reader.ts".intern().into();
-    pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
-    pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =
-        "output_type.ts".intern().into();
-    pub static ref RESOLVER_OUTPUT_TYPE: ArtifactFilePrefix = "output_type".intern().into();
-    pub static ref RESOLVER_PARAM_TYPE_FILE_NAME: ArtifactFileName =
-        "param_type.ts".intern().into();
-    pub static ref RESOLVER_PARAM_TYPE: ArtifactFilePrefix = "param_type".intern().into();
-    pub static ref RESOLVER_PARAMETERS_TYPE_FILE_NAME: ArtifactFileName =
-        "parameters_type.ts".intern().into();
-    pub static ref RESOLVER_PARAMETERS_TYPE: ArtifactFilePrefix = "parameters_type".intern().into();
-    pub static ref RESOLVER_READER_FILE_NAME: ArtifactFileName =
-        "resolver_reader.ts".intern().into();
-    pub static ref RESOLVER_READER: ArtifactFilePrefix = "resolver_reader".intern().into();
-    pub static ref PERSISTED_DOCUMENT_FILE_NAME: ArtifactFileName =
-        "persisted_documents.json".intern().into();
-}
+pub static ENTRYPOINT_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "entrypoint.ts".intern().into());
+pub static ENTRYPOINT: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "entrypoint".intern().into());
+pub static ISO_TS_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "iso.ts".intern().into());
+pub static ISO_TS: LazyLock<ArtifactFilePrefix> = LazyLock::new(|| "iso".intern().into());
+pub static NORMALIZATION_AST_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "normation_ast.ts".intern().into());
+pub static RAW_RESPONSE_TYPE: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "raw_response_type".intern().into());
+pub static RAW_RESPONSE_TYPE_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "raw_rnse_type.ts".intern().into());
+pub static NORMALIZATION_AST: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "normalization_ast".intern().into());
+pub static QUERY_TEXT_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "query_text.ts".intern().into());
+pub static QUERY_TEXT: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "query_text".intern().into());
+pub static REFETCH_READER_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "refetch_reader.ts".intern().into());
+pub static REFETCH_READER: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "refetch_reader".intern().into());
+pub static RESOLVER_OUTPUT_TYPE_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "outpupe.ts".intern().into());
+pub static RESOLVER_OUTPUT_TYPE: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "output_type".intern().into());
+pub static RESOLVER_PARAM_TYPE_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "parame.ts".intern().into());
+pub static RESOLVER_PARAM_TYPE: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "param_type".intern().into());
+pub static RESOLVER_PARAMETERS_TYPE_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "params_type.ts".intern().into());
+pub static RESOLVER_PARAMETERS_TYPE: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "parameters_type".intern().into());
+pub static RESOLVER_READER_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "resolreader.ts".intern().into());
+pub static RESOLVER_READER: LazyLock<ArtifactFilePrefix> =
+    LazyLock::new(|| "resolver_reader".intern().into());
+pub static PERSISTED_DOCUMENT_FILE_NAME: LazyLock<ArtifactFileName> =
+    LazyLock::new(|| "persisted_documents.json".intern().into());
 
 /// Get all artifacts according to the following scheme:
 ///

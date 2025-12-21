@@ -15,7 +15,6 @@ isograph_schema = { path = "../isograph_schema" }
 pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
-lazy_static = { workspace = true }
 pathdiff = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }

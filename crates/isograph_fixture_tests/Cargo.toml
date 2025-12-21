@@ -18,7 +18,6 @@ isograph_schema = { path = "../isograph_schema" }
 pico = { path = "../pico" }
 clap = { workspace = true }
 regex = { workspace = true }
-lazy_static = { workspace = true }
 
 [lints]
 workspace = true

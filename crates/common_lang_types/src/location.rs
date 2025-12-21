@@ -1,7 +1,7 @@
 use intern::string_key::{Intern, Lookup};
-use lazy_static::lazy_static;
 use prelude::Postfix;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 
 use crate::{CurrentWorkingDirectory, RelativePathToSourceFile, Span};
 
@@ -20,13 +20,11 @@ pub struct TextSource {
     pub span: Option<Span>,
 }
 
-lazy_static! {
-    // This is a horrible hack! If this is printed, we presumably blow up.
-    pub static ref GENERATED_FILE_DO_NOT_PRINT: TextSource = TextSource {
-        relative_path_to_source_file: "generated".intern().into(),
-        span: None,
-    };
-}
+// This is a horrible hack! If this is printed, we presumably blow up.
+pub static GENERATED_FILE_DO_NOT_PRINT: LazyLock<TextSource> = LazyLock::new(|| TextSource {
+    relative_path_to_source_file: "generated".intern().into(),
+    span: None,
+});
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EmbeddedLocation {

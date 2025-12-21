@@ -144,7 +144,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
- "lazy_static",
  "md-5",
  "pathdiff",
  "pico",
@@ -581,7 +580,6 @@ name = "common_lang_types"
 version = "0.5.1"
 dependencies = [
  "intern",
- "lazy_static",
  "pathdiff",
  "pico",
  "prelude",
@@ -916,7 +914,6 @@ dependencies = [
  "clap 3.2.25",
  "colored",
  "diff",
- "lazy_static",
  "signedsource",
  "tokio",
 ]
@@ -1143,7 +1140,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
- "lazy_static",
  "pathdiff",
  "pico",
  "pico_macros",
@@ -1613,7 +1609,6 @@ dependencies = [
  "isograph_compiler",
  "isograph_config",
  "isograph_lsp",
- "lazy_static",
  "notify",
  "notify-debouncer-full",
  "opentelemetry",
@@ -1639,7 +1634,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
- "lazy_static",
  "notify",
  "notify-debouncer-full",
  "pathdiff",
@@ -1678,7 +1672,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
- "lazy_static",
  "pico",
  "regex",
 ]
@@ -1752,7 +1745,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_parser",
  "isograph_lang_types",
- "lazy_static",
  "pico",
  "pico_macros",
  "prelude",
@@ -2947,7 +2939,6 @@ name = "signedsource"
 version = "0.0.0"
 dependencies = [
  "hex",
- "lazy_static",
  "md-5",
  "regex",
 ]
@@ -3663,7 +3654,6 @@ dependencies = [
  "isograph_config",
  "isograph_lang_types",
  "isograph_schema",
- "lazy_static",
  "prelude",
  "serde",
  "thiserror 1.0.69",

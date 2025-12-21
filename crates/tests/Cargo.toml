@@ -15,7 +15,6 @@ graphql_lang_types = { path = "../graphql_lang_types" }
 intern = { path = "../../relay-crates/intern" }
 prelude = { path = "../prelude" }
 thiserror = { workspace = true }
-lazy_static = { workspace = true }
 serde = { workspace = true }
 
 [dev-dependencies]
