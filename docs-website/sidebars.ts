@@ -48,12 +48,7 @@ const sidebars: SidebarsConfig = {
     {
       type: 'category',
       label: 'Miscellaneous',
-      items: [
-        'isograph-rules',
-        'development-workflow',
-        'backlog',
-        'troubleshooting',
-      ],
+      items: ['isograph-rules', 'development-workflow', 'troubleshooting'],
     },
     {
       type: 'category',
