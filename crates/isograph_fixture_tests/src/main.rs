@@ -136,11 +136,7 @@ fn generate_content_for_output_file(
         &absolute_path,
     );
     let mut out_str = String::new();
-    for result in parse_iso_literals_in_file_content(
-        db,
-        relative_path_to_source_file,
-        current_working_directory,
-    ) {
+    for result in parse_iso_literals_in_file_content(db, relative_path_to_source_file) {
         match result {
             Ok(item) => {
                 let item: Result<_, ()> = Ok(item);

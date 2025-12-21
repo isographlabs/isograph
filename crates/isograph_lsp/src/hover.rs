@@ -61,12 +61,9 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    let hover_markup = if let Ok((result, _text_source)) = process_iso_literal_extraction(
-        db,
-        &extraction,
-        relative_path_to_source_file,
-        current_working_directory,
-    ) {
+    let hover_markup = if let Ok((result, _text_source)) =
+        process_iso_literal_extraction(db, &extraction, relative_path_to_source_file)
+    {
         match result.resolve((), Span::new(offset, offset)) {
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,

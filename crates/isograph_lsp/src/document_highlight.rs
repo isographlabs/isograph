@@ -55,12 +55,9 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    if let Ok((result, _text_source)) = process_iso_literal_extraction(
-        db,
-        &extraction,
-        relative_path_to_source_file,
-        current_working_directory,
-    ) {
+    if let Ok((result, _text_source)) =
+        process_iso_literal_extraction(db, &extraction, relative_path_to_source_file)
+    {
         // TODO this exposes the need to have incredibly fine grained resolution...
         match result.resolve((), Span::new(offset, offset)) {
             IsographResolvedNode::ClientFieldDeclaration(_) => None,

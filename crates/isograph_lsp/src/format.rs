@@ -1,6 +1,5 @@
 use common_lang_types::{
-    CurrentWorkingDirectory, RelativePathToSourceFile,
-    relative_path_from_absolute_and_working_directory,
+    RelativePathToSourceFile, relative_path_from_absolute_and_working_directory,
 };
 use isograph_lang_types::{
     InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
@@ -48,13 +47,8 @@ pub fn on_format<TNetworkProtocol: NetworkProtocol>(
         .flat_map(|extraction| {
             TextEdit {
                 range: get_range_of_extraction(extraction, content),
-                new_text: format_extraction(
-                    db,
-                    extraction,
-                    relative_path_to_source_file,
-                    current_working_directory,
-                )
-                .to_owned()?,
+                new_text: format_extraction(db, extraction, relative_path_to_source_file)
+                    .to_owned()?,
             }
             .wrap_some()
         })
@@ -101,15 +95,9 @@ fn format_extraction<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
-    current_working_directory: CurrentWorkingDirectory,
 ) -> Option<String> {
-    let (extraction_result, _) = process_iso_literal_extraction(
-        db,
-        extraction,
-        relative_path_to_source_file,
-        current_working_directory,
-    )
-    .ok()?;
+    let (extraction_result, _) =
+        process_iso_literal_extraction(db, extraction, relative_path_to_source_file).ok()?;
 
     let semantic_tokens = extraction_result.semantic_tokens();
 

@@ -58,12 +58,9 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    let goto_response = if let Ok((result, _text_source)) = process_iso_literal_extraction(
-        db,
-        &extraction,
-        relative_path_to_source_file,
-        current_working_directory,
-    ) {
+    let goto_response = if let Ok((result, _text_source)) =
+        process_iso_literal_extraction(db, &extraction, relative_path_to_source_file)
+    {
         match result.resolve((), Span::new(offset, offset)) {
             IsographResolvedNode::ClientFieldDeclaration(_) => None,
             IsographResolvedNode::ClientPointerDeclaration(_) => None,

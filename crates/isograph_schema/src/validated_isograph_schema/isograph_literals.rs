@@ -3,8 +3,8 @@ use crate::{
     UnprocessedSelectionSet, process_client_field_declaration, process_client_pointer_declaration,
 };
 use common_lang_types::{
-    CurrentWorkingDirectory, Diagnostic, DiagnosticResult, DiagnosticVecResult, Location,
-    RelativePathToSourceFile, Span, TextSource, WithEmbeddedLocation,
+    Diagnostic, DiagnosticResult, DiagnosticVecResult, Location, RelativePathToSourceFile, Span,
+    TextSource, WithEmbeddedLocation,
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, parse_iso_literal};
 use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
@@ -22,7 +22,6 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
     // Normally, this would not be a parameter, but instead read from the db. But,
     // we are using it in crates/isograph_fixture_tests/src/main.rs.
     // We should reconsider this!
-    current_working_directory: CurrentWorkingDirectory,
 ) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     let mut extraction_results = vec![];
 
@@ -33,7 +32,6 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
             db,
             iso_literal_extraction,
             relative_path_to_source_file,
-            current_working_directory,
         ))
     }
 
@@ -44,17 +42,11 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
 pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     relative_path_to_source_file: RelativePathToSourceFile,
-    current_working_directory: CurrentWorkingDirectory,
 ) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     extract_iso_literals_from_file_content(db, relative_path_to_source_file)
         .iter()
         .map(|iso_literal_extraction| {
-            process_iso_literal_extraction(
-                db,
-                iso_literal_extraction,
-                relative_path_to_source_file,
-                current_working_directory,
-            )
+            process_iso_literal_extraction(db, iso_literal_extraction, relative_path_to_source_file)
         })
         .collect()
 }
@@ -69,7 +61,7 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
         content: _,
     } = read_iso_literals_source(db, iso_literals_source_id);
 
-    parse_iso_literals_in_file_content(db, *relative_path, db.get_current_working_directory())
+    parse_iso_literals_in_file_content(db, *relative_path)
 }
 
 #[memo]
@@ -168,7 +160,6 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
-    current_working_directory: CurrentWorkingDirectory,
 ) -> DiagnosticResult<(IsoLiteralExtractionResult, TextSource)> {
     let IsoLiteralExtraction {
         iso_literal_text,
@@ -184,7 +175,6 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
             (iso_literal_start_index + iso_literal_text.len()) as u32,
         )
         .wrap_some(),
-        current_working_directory,
     };
 
     if !has_paren {

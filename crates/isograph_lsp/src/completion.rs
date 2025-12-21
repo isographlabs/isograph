@@ -43,12 +43,9 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
         None => return Ok(None),
     };
 
-    let completion_response = if let Ok((result, _text_source)) = process_iso_literal_extraction(
-        db,
-        &extraction,
-        relative_path_to_source_file,
-        current_working_directory,
-    ) {
+    let completion_response = if let Ok((result, _text_source)) =
+        process_iso_literal_extraction(db, &extraction, relative_path_to_source_file)
+    {
         match result.resolve((), Span::new(offset, offset)) {
             IsographResolvedNode::SelectionSet(selection_set_path) => {
                 if let Ok(parent_object_entity) =

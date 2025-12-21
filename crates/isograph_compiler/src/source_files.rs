@@ -211,7 +211,6 @@ fn read_schema<TNetworkProtocol: NetworkProtocol>(
     let text_source = TextSource {
         relative_path_to_source_file: schema_path.relative_path,
         span: None,
-        current_working_directory: db.get_current_working_directory(),
     };
     db.set(SchemaSource {
         relative_path: schema_path.relative_path,

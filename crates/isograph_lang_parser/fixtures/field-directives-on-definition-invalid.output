@@ -4,7 +4,6 @@ Ok(
             WithEmbeddedLocation {
                 embedded_location: EmbeddedLocation {
                     text_source: TextSource {
-                        current_working_directory: CurrentWorkingDirectory,
                         relative_path_to_source_file: RelativePathToSourceFile(
                             "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                         ),
@@ -27,7 +26,6 @@ Ok(
                     parent_type: WithEmbeddedLocation {
                         embedded_location: EmbeddedLocation {
                             text_source: TextSource {
-                                current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                 ),
@@ -52,7 +50,6 @@ Ok(
                     client_field_name: WithEmbeddedLocation {
                         embedded_location: EmbeddedLocation {
                             text_source: TextSource {
-                                current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                 ),
@@ -78,7 +75,6 @@ Ok(
                     selection_set: WithEmbeddedLocation {
                         embedded_location: EmbeddedLocation {
                             text_source: TextSource {
-                                current_working_directory: CurrentWorkingDirectory,
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                 ),
@@ -106,7 +102,6 @@ Ok(
                                     Embedded(
                                         EmbeddedLocation {
                                             text_source: TextSource {
-                                                current_working_directory: CurrentWorkingDirectory,
                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                     "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                                 ),
@@ -136,7 +131,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -169,7 +163,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -205,7 +198,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -241,7 +233,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -277,7 +268,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -313,7 +303,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -349,7 +338,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -385,7 +373,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -421,7 +408,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -454,7 +440,6 @@ Ok(
                         WithEmbeddedLocation {
                             embedded_location: EmbeddedLocation {
                                 text_source: TextSource {
-                                    current_working_directory: CurrentWorkingDirectory,
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
                                     ),
@@ -483,7 +468,6 @@ Ok(
             },
         ),
         TextSource {
-            current_working_directory: CurrentWorkingDirectory,
             relative_path_to_source_file: RelativePathToSourceFile(
                 "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
             ),

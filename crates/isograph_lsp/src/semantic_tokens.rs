@@ -67,11 +67,8 @@ fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
         &uri.to_file_path().expect("Expected file path to be valid."),
     );
 
-    let parse_results = parse_iso_literals_in_file_content_and_return_all(
-        db,
-        relative_path_to_source_file,
-        current_working_directory,
-    );
+    let parse_results =
+        parse_iso_literals_in_file_content_and_return_all(db, relative_path_to_source_file);
 
     // TODO call this earlier, pass it as a param to parse_iso_literal_in_relative_file
     let page_content: &str =

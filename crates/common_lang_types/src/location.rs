@@ -16,7 +16,6 @@ use crate::{CurrentWorkingDirectory, RelativePathToSourceFile, Span};
 /// TODO do not include the cwd
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TextSource {
-    pub current_working_directory: CurrentWorkingDirectory,
     pub relative_path_to_source_file: RelativePathToSourceFile,
     pub span: Option<Span>,
 }
@@ -24,7 +23,6 @@ pub struct TextSource {
 lazy_static! {
     // This is a horrible hack! If this is printed, we presumably blow up.
     pub static ref GENERATED_FILE_DO_NOT_PRINT: TextSource = TextSource {
-        current_working_directory: "".intern().into(),
         relative_path_to_source_file: "generated".intern().into(),
         span: None,
     };

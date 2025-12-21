@@ -6,7 +6,6 @@ Err(
                 Embedded(
                     EmbeddedLocation {
                         text_source: TextSource {
-                            current_working_directory: CurrentWorkingDirectory,
                             relative_path_to_source_file: RelativePathToSourceFile(
                                 "crates/isograph_lang_parser/fixtures/field-no-field-name.input.js",
                             ),
