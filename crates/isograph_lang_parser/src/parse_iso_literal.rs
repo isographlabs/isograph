@@ -365,7 +365,7 @@ fn parse_optional_selection_set_inner(
             return Diagnostic::new(
                 format!(
                     "A field with name or alias `{selection_name_or_alias}` \
-                 has already been defined"
+                    has already been defined"
                 ),
                 selection.embedded_location.to::<Location>().wrap_some(),
             )
