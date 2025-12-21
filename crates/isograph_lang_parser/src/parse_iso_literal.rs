@@ -557,7 +557,7 @@ fn parse_optional_arguments(
     {
         let arguments = parse_delimited_list(
             tokens,
-            move |tokens| parse_argument(tokens),
+            parse_argument,
             IsographLangTokenKind::Comma,
             semantic_token_legend::ST_COMMA,
             IsographLangTokenKind::CloseParen,
@@ -644,7 +644,7 @@ fn parse_non_constant_value(
 
             let entries = parse_delimited_list(
                 tokens,
-                move |tokens| parse_object_entry(tokens),
+                parse_object_entry,
                 IsographLangTokenKind::Comma,
                 semantic_token_legend::ST_COMMA,
                 IsographLangTokenKind::CloseBrace,
