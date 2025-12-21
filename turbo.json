@@ -1,5 +1,6 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": ["RUSTUP_HOME", "CARGO_HOME"],
   "tasks": {
     "iso": {
       "cache": false,
