@@ -1143,13 +1143,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1323,13 +1317,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1387,13 +1375,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1451,13 +1433,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1515,13 +1491,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1579,13 +1549,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
@@ -1675,13 +1639,7 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
                         },
