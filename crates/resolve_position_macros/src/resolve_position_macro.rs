@@ -1,4 +1,4 @@
-use std::{collections::HashMap, ops::Deref};
+use std::collections::HashMap;
 
 use prelude::Postfix;
 use proc_macro::TokenStream;
@@ -312,7 +312,7 @@ fn generate_resolve_code_recursive(
     field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     match wrapper {
-        ResolveFieldInfoTypeWrapper::None(inner) => match inner.deref() {
+        ResolveFieldInfoTypeWrapper::None(inner) => match &**inner {
             ResolveFieldInfoType::WithLocation(inner_type) => quote! {
                 if let Some(span) = #field_expr.location.span() {
                     if span.contains(position) {
