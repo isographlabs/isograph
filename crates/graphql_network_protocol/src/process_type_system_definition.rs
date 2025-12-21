@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, HashMap};
-use std::sync::LazyLock;
 
 use common_lang_types::{
     DescriptionValue, Diagnostic, EmbeddedLocation, EntityName, JavascriptName, Location,
@@ -23,6 +22,7 @@ use isograph_schema::{
     ServerScalarEntity, ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
+use lazy_static::lazy_static;
 use pico::MemoRef;
 use prelude::Postfix;
 
@@ -31,9 +31,13 @@ use crate::{
     GraphQLSchemaOriginalDefinitionType, insert_entity_or_multiple_definition_diagnostic,
 };
 
-pub static REFETCH_FIELD_NAME: LazyLock<SelectableName> =
-    LazyLock::new(|| "__refetch".intern().into());
-pub static STRING_TYPE_NAME: LazyLock<EntityName> = LazyLock::new(|| "String".intern().into());
+lazy_static! {
+    // TODO use schema_data.string_type_id or something
+    static ref STRING_TYPE_NAME: EntityName = "String".intern().into();
+    static ref NODE_INTERFACE_NAME: EntityName= "Node".intern().into();
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+
+}
 
 #[expect(clippy::too_many_arguments)]
 pub fn process_graphql_type_system_document(

@@ -1,4 +1,4 @@
-use std::{ffi::OsStr, fs, path::PathBuf, sync::LazyLock};
+use std::{ffi::OsStr, fs, path::PathBuf};
 
 use clap::Parser;
 use common_lang_types::{
@@ -8,6 +8,7 @@ use graphql_network_protocol::GraphQLNetworkProtocol;
 use intern::{Lookup, string_key::Intern};
 use isograph_schema::IsographDatabase;
 use isograph_schema::parse_iso_literals_in_file_content;
+use lazy_static::lazy_static;
 use regex::Regex;
 
 fn main() {
@@ -52,7 +53,9 @@ struct FixtureOpt {
     dir: Vec<PathBuf>,
 }
 
-static INPUT_SUFFIX: LazyLock<Regex> = LazyLock::new(|| Regex::new(r"(.+)\.input\.js$").unwrap());
+lazy_static! {
+    static ref INPUT_SUFFIX: Regex = Regex::new(r"(.+)\.input\.js$").unwrap();
+}
 const OUTPUT_SUFFIX: &str = r"output";
 
 fn generate_fixtures_for_files_in_folder(

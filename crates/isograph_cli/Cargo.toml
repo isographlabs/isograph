@@ -14,6 +14,7 @@ isograph_lsp = { path = "../isograph_lsp" }
 colored = { workspace = true }
 clap = { workspace = true }
 thiserror = { workspace = true }
+lazy_static = { workspace = true }
 regex = { workspace = true }
 notify = { workspace = true }
 tokio = { workspace = true }

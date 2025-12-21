@@ -56,11 +56,14 @@ use std::future::Future;
 use std::io::prelude::*;
 use std::path::PathBuf;
 use std::process::Command;
-use std::sync::{Arc, LazyLock};
+use std::sync::Arc;
 
+use lazy_static::lazy_static;
 use tokio::sync::Mutex;
 
-static LOCK: LazyLock<Arc<Mutex<usize>>> = LazyLock::new(|| Arc::new(Mutex::new(0)));
+lazy_static! {
+    static ref LOCK: Arc<Mutex<usize>> = Arc::new(Mutex::new(0));
+}
 
 /// Passed to the `transform_fixture` from the test as the input to transform.
 pub struct Fixture<'a> {

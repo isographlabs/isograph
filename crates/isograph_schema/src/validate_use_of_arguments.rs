@@ -1,5 +1,4 @@
 use std::collections::BTreeSet;
-use std::sync::LazyLock;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, DiagnosticVecResult, EmbeddedLocation,
@@ -10,6 +9,7 @@ use isograph_lang_types::{
     DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
     SelectionType, VariableDefinition, VariableNameWrapper,
 };
+use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
@@ -21,7 +21,9 @@ use crate::{
 
 type UsedVariables = BTreeSet<VariableNameWrapper>;
 
-static ID: LazyLock<FieldArgumentName> = LazyLock::new(|| ID_FIELD_NAME.unchecked_conversion());
+lazy_static! {
+    static ref ID: FieldArgumentName = ID_FIELD_NAME.unchecked_conversion();
+}
 
 /// For all client types, validate that
 /// - there are no unused arguments

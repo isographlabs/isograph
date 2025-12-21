@@ -1,11 +1,11 @@
 use std::fmt::Debug;
-use std::sync::LazyLock;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EntityName, JavascriptName, SelectableName, VariableName,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{ArgumentKeyAndValue, SelectionType};
+use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
@@ -13,19 +13,18 @@ use crate::{
     server_selectable_named,
 };
 
-pub static ID_ENTITY_NAME: LazyLock<EntityName> = LazyLock::new(|| "ID".intern().into());
-pub static STRING_ENTITY_NAME: LazyLock<EntityName> = LazyLock::new(|| "String".intern().into());
-pub static INT_ENTITY_NAME: LazyLock<EntityName> = LazyLock::new(|| "Int".intern().into());
-pub static FLOAT_ENTITY_NAME: LazyLock<EntityName> = LazyLock::new(|| "Float".intern().into());
-pub static BOOLEAN_ENTITY_NAME: LazyLock<EntityName> = LazyLock::new(|| "Boolean".intern().into());
-pub static ID_FIELD_NAME: LazyLock<SelectableName> = LazyLock::new(|| "id".intern().into());
-pub static ID_VARIABLE_NAME: LazyLock<VariableName> = LazyLock::new(|| "id".intern().into());
-pub static STRING_JAVASCRIPT_TYPE: LazyLock<JavascriptName> =
-    LazyLock::new(|| "string".intern().into());
-pub static BOOLEAN_JAVASCRIPT_TYPE: LazyLock<JavascriptName> =
-    LazyLock::new(|| "boolean".intern().into());
-pub static NUMBER_JAVASCRIPT_TYPE: LazyLock<JavascriptName> =
-    LazyLock::new(|| "number".intern().into());
+lazy_static! {
+    pub static ref ID_ENTITY_NAME: EntityName = "ID".intern().into();
+    pub static ref STRING_ENTITY_NAME: EntityName = "String".intern().into();
+    pub static ref INT_ENTITY_NAME: EntityName = "Int".intern().into();
+    pub static ref FLOAT_ENTITY_NAME: EntityName = "Float".intern().into();
+    pub static ref BOOLEAN_ENTITY_NAME: EntityName = "Boolean".intern().into();
+    pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
+    pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
+    pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+    pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
+    pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
+}
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct RootOperationName(pub &'static str);

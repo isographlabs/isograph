@@ -16,6 +16,7 @@ pico = { path = "../pico" }
 pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 colored = { workspace = true }
+lazy_static = { workspace = true }
 notify = { workspace = true }
 notify-debouncer-full = { workspace = true }
 pathdiff = { workspace = true }

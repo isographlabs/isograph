@@ -8,11 +8,11 @@ use common_lang_types::{
 };
 use isograph_lang_parser::{IsoLiteralExtractionResult, parse_iso_literal};
 use isograph_lang_types::{EntrypointDeclaration, SelectionTypePostfix};
+use lazy_static::lazy_static;
 use pico::SourceId;
 use pico_macros::memo;
 use prelude::Postfix;
 use regex::Regex;
-use std::sync::LazyLock;
 
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
@@ -213,9 +213,11 @@ pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
     Ok((iso_literal_extraction_result, text_source))
 }
 
-static EXTRACT_ISO_LITERAL: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?\s*`([^`]+)`,?\s*(\))?(\()?").unwrap()
-});
+lazy_static! {
+    static ref EXTRACT_ISO_LITERAL: Regex =
+        Regex::new(r"(// )?(export const ([^ ]+) =\s+)?iso(\()?\s*`([^`]+)`,?\s*(\))?(\()?")
+            .unwrap();
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct IsoLiteralExtraction {

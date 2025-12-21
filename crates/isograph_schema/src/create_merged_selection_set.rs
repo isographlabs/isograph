@@ -1,5 +1,4 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
-use std::sync::LazyLock;
 
 use common_lang_types::{
     EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
@@ -12,6 +11,7 @@ use isograph_lang_types::{
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
     SelectionTypePostfix, TypeAnnotation, VariableDefinition, VariableNameWrapper,
 };
+use lazy_static::lazy_static;
 use prelude::Postfix;
 
 use crate::{
@@ -46,12 +46,12 @@ pub struct FieldTraversalResult {
     pub was_ever_selected_loadably: bool,
 }
 
-pub static REFETCH_FIELD_NAME: LazyLock<SelectableName> =
-    LazyLock::new(|| "__refetch".intern().into());
-pub static NODE_FIELD_NAME: LazyLock<SelectableName> = LazyLock::new(|| "node".intern().into());
-pub static TYPENAME_FIELD_NAME: LazyLock<SelectableName> =
-    LazyLock::new(|| "__typename".intern().into());
-pub static LINK_FIELD_NAME: LazyLock<SelectableName> = LazyLock::new(|| "__link".intern().into());
+lazy_static! {
+    pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
+    pub static ref NODE_FIELD_NAME: SelectableName = "node".intern().into();
+    pub static ref TYPENAME_FIELD_NAME: SelectableName = "__typename".intern().into();
+    pub static ref LINK_FIELD_NAME: SelectableName = "__link".intern().into();
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct RootRefetchedPath {
