@@ -1,14 +1,15 @@
 use std::collections::BTreeSet;
 
-use common_lang_types::{Diagnostic, DiagnosticVecResult};
-use isograph_lang_types::SelectionType;
+use common_lang_types::{Diagnostic, DiagnosticVecResult, Location};
+use isograph_lang_types::{DefinitionLocation, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
-    client_selectable_declaration_map_from_iso_literals, client_selectable_map, parse_iso_literals,
-    process_iso_literals, server_entities_map_without_locations, server_id_selectable,
+    client_selectable_declaration_map_from_iso_literals, client_selectable_map,
+    entity_not_defined_diagnostic, parse_iso_literals, process_iso_literals, selectables,
+    server_entities_map_without_locations, server_entity_named_2, server_id_selectable,
     server_object_entities, server_selectables_map,
     validate_selection_sets::validate_selection_sets, validate_use_of_arguments,
     validated_entrypoints,
@@ -31,6 +32,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     let mut errors = BTreeSet::new();
 
     maybe_extend(&mut errors, validate_use_of_arguments(db));
+
+    errors.extend(validate_selectables(db));
 
     errors.extend(validate_selection_sets(db));
 
@@ -197,4 +200,57 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
             None
         })
         .collect()
+}
+
+/// Validate selectables:
+/// - that each variable definition points to an actual type
+/// - TODO move the rest of the valuations that relate to entities into this
+fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> Vec<Diagnostic> {
+    let selectables = match selectables(db).clone_err() {
+        Ok(selectables) => selectables,
+        Err(e) => return e.wrap_vec(),
+    };
+
+    let mut errors = vec![];
+
+    for selectable in selectables {
+        let arguments = match selectable {
+            DefinitionLocation::Server(s) => match s {
+                SelectionType::Scalar(s) => s.lookup(db).arguments.reference(),
+                SelectionType::Object(o) => o.lookup(db).arguments.reference(),
+            },
+            DefinitionLocation::Client(c) => match c {
+                SelectionType::Scalar(s) => s.lookup(db).variable_definitions.reference(),
+                SelectionType::Object(o) => o.lookup(db).variable_definitions.reference(),
+            },
+        };
+
+        for argument in arguments {
+            let target = argument.type_.inner();
+
+            match server_entity_named_2(db, target).clone_err() {
+                Ok(entity) => {
+                    match entity {
+                        Some(_) => {
+                            // Note: we should also validate that the entity is an input entity (i.e.
+                            // scalar or input type). That's a GraphQL-ism, though, so we have to figure
+                            // out a good mechanism for that (realistically, call out to a method on
+                            // NetworkProtocol).
+                        }
+                        None => errors.push(entity_not_defined_diagnostic(
+                            target,
+                            argument.name.embedded_location.to::<Location>().note_todo(
+                                "Variable definition will not have location at some point",
+                            ),
+                        )),
+                    }
+                }
+                Err(e) => errors.push(e),
+            }
+        }
+    }
+
+    errors
 }

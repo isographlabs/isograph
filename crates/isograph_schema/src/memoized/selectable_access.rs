@@ -7,7 +7,7 @@ use crate::{
     IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_declaration,
     client_selectable_map, client_selectable_named,
     multiple_selectable_definitions_found_diagnostic, server_selectable_named,
-    server_selectables_map_for_entity,
+    server_selectables_map, server_selectables_map_for_entity,
 };
 
 #[memo]
@@ -49,16 +49,12 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
         },
         (Ok(server), Ok(client)) => match (server, client) {
             (None, None) => Ok(None),
-            (None, Some(client_selectable)) => (*client_selectable)
-                .note_todo("Do not clone. Use a MemoRef.")
-                .client_defined()
-                .wrap_some()
-                .wrap_ok(),
-            (Some(server_selectable), None) => (*server_selectable)
-                .note_todo("Do not clone. Use a MemoRef.")
-                .server_defined()
-                .wrap_some()
-                .wrap_ok(),
+            (None, Some(client_selectable)) => {
+                (*client_selectable).client_defined().wrap_some().wrap_ok()
+            }
+            (Some(server_selectable), None) => {
+                (*server_selectable).server_defined().wrap_some().wrap_ok()
+            }
             (Some(_), Some(_)) => multiple_selectable_definitions_found_diagnostic(
                 parent_server_object_entity_name,
                 selectable_name,
@@ -75,12 +71,9 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
     parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TNetworkProtocol>>>> {
     let mut selectables = server_selectables_map_for_entity(db, parent_server_object_entity_name)
-        .to_owned()?.into_values().map(|value| {
-            value
-                .server_defined()
-                .note_todo("Do not wrap in a Result here when client selectables aren't wrapped in results")
-                .wrap_ok()
-        })
+        .to_owned()?
+        .into_values()
+        .map(|value| value.server_defined().wrap_ok())
         .collect::<Vec<_>>();
 
     selectables.extend(
@@ -91,7 +84,7 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
                 *entity_name == parent_server_object_entity_name
             })
             .map(|(_key, value)| {
-                let value = value.clone().note_todo("Do not clone. Use a MemoRef.")?;
+                let value = value.clone()?;
                 value.client_defined().wrap_ok()
             }),
     );
@@ -124,4 +117,27 @@ pub fn selectable_definition_location<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(o) => o.lookup(db).client_pointer_name.embedded_location.into(),
         })
         .wrap_ok()
+}
+
+#[memo]
+pub fn selectables<TNetworkProtocol: NetworkProtocol>(
+    db: &IsographDatabase<TNetworkProtocol>,
+) -> DiagnosticResult<Vec<MemoRefSelectable<TNetworkProtocol>>> {
+    let mut selectables = server_selectables_map(db)
+        .to_owned()?
+        .into_values()
+        .map(|value| value.server_defined())
+        .collect::<Vec<_>>();
+
+    selectables.extend(
+        client_selectable_map(db)
+            .clone_err()?
+            .iter()
+            .flat_map(|(_key, value)| {
+                let value = value.clone().ok()?;
+                value.client_defined().wrap_some()
+            }),
+    );
+
+    selectables.wrap_ok()
 }
