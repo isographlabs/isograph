@@ -30,19 +30,6 @@ impl GraphQLTypeAnnotation {
         self.embedded_location().span
     }
 
-    /// If a TypeAnnotation is of the form X!, i.e. it is a NonNull named type, then
-    /// this method returns Some(X). Otherwise, returns None.
-    pub fn inner_non_null_named_type(&self) -> Option<&GraphQLNamedTypeAnnotation> {
-        match self {
-            GraphQLTypeAnnotation::Named(_) => None,
-            GraphQLTypeAnnotation::List(_) => None,
-            GraphQLTypeAnnotation::NonNull(non_null) => match non_null.as_ref() {
-                GraphQLNonNullTypeAnnotation::Named(named) => Some(named),
-                GraphQLNonNullTypeAnnotation::List(_) => None,
-            },
-        }
-    }
-
     pub fn is_nullable(&self) -> bool {
         matches!(
             self,
