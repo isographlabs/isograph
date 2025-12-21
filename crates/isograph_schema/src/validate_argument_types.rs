@@ -1,6 +1,6 @@
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location, SelectableName,
-    ValueKeyName, VariableName, WithEmbeddedLocation,
+    ValueKeyName, WithEmbeddedLocation,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNonNullTypeAnnotation, GraphQLTypeAnnotation, NameValuePair,
@@ -9,7 +9,7 @@ use intern::{Lookup, string_key::StringKey};
 use prelude::{ErrClone, Postfix};
 
 use isograph_lang_types::{
-    NonConstantValue, SelectionType, VariableDefinition,
+    NonConstantValue, SelectionType, VariableDefinition, VariableNameWrapper,
     graphql_type_annotation_from_type_annotation,
 };
 
@@ -431,7 +431,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn get_variable_type<'a>(
-    variable_name: &'a VariableName,
+    variable_name: &'a VariableNameWrapper,
     variable_definitions: &'a [VariableDefinition],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<&'a GraphQLTypeAnnotation> {

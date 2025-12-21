@@ -95,3 +95,10 @@ define_wrapper!(
 pub enum ClientObjectSelectableNameWrapperParent<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
+
+define_wrapper!(
+    VariableNameWrapper,
+    common_lang_types::VariableName,
+    (),
+    VariableNameWrapperPath
+);

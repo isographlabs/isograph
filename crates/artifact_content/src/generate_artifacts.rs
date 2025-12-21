@@ -10,7 +10,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, EmptyDirectiveSet, NonConstantValue, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition,
+    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition, VariableNameWrapper,
 };
 use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
@@ -295,7 +295,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             let id_arg = ArgumentKeyAndValue {
                                 key: ID_FIELD_NAME.unchecked_conversion(),
                                 value: NonConstantValue::Variable(
-                                    ID_FIELD_NAME.unchecked_conversion(),
+                                    ID_FIELD_NAME.unchecked_conversion::<VariableName>().into(),
                                 ),
                             };
 
@@ -321,6 +321,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             let id_var = VariableDefinition {
                                 name: (*ID_FIELD_NAME)
                                     .unchecked_conversion::<VariableName>()
+                                    .to::<VariableNameWrapper>()
                                     .with_embedded_location(EmbeddedLocation::todo_generated()),
 
                                 type_: GraphQLTypeAnnotation::NonNull(

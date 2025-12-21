@@ -38,7 +38,7 @@ impl ResolvePosition for TypeAnnotation {
         // to do so (and of limited immediate value.)
         //
         // But we should eventually do just that!
-        Self::ResolvedNode::TypeAnnotation(self.path(parent).into())
+        Self::ResolvedNode::TypeAnnotation(self.path(parent))
     }
 }
 

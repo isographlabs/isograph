@@ -14,7 +14,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
     NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypePostfix, TypeAnnotation, VariableDefinition,
+    SelectionTypePostfix, TypeAnnotation, VariableDefinition, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
@@ -123,7 +123,7 @@ pub fn process_graphql_type_system_document(
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: vec![ArgumentKeyAndValue {
                             key: (*ID_FIELD_NAME).unchecked_conversion(),
-                            value: NonConstantValue::Variable(*ID_VARIABLE_NAME),
+                            value: NonConstantValue::Variable((*ID_VARIABLE_NAME).into()),
                         }],
                         // None -> node is not concrete.
                         // Note that this doesn't matter!
@@ -394,6 +394,7 @@ fn get_refetch_selectable(
             top_level_schema_field_arguments: vec![VariableDefinition {
                 name: (*ID_FIELD_NAME)
                     .unchecked_conversion::<VariableName>()
+                    .to::<VariableNameWrapper>()
                     .with_embedded_location(EmbeddedLocation::todo_generated()),
                 type_: GraphQLTypeAnnotation::NonNull(
                     GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(

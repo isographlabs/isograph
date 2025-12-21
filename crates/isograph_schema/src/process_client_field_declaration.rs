@@ -1,6 +1,7 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location,
-    RelativePathToSourceFile, SelectableName, WithEmbeddedLocation, WithLocationPostfix,
+    RelativePathToSourceFile, SelectableName, VariableName, WithEmbeddedLocation,
+    WithLocationPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -374,6 +375,8 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
 pub fn id_top_level_arguments() -> Vec<ArgumentKeyAndValue> {
     vec![ArgumentKeyAndValue {
         key: ID_FIELD_NAME.unchecked_conversion(),
-        value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
+        value: NonConstantValue::Variable(
+            ID_FIELD_NAME.unchecked_conversion::<VariableName>().into(),
+        ),
     }]
 }

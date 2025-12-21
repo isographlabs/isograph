@@ -1,10 +1,12 @@
 use common_lang_types::{
-    EnumLiteralValue, FieldArgumentName, StringLiteralValue, ValueKeyName, VariableName,
-    WithEmbeddedLocation, WithLocationPostfix,
+    EnumLiteralValue, FieldArgumentName, StringLiteralValue, ValueKeyName, WithEmbeddedLocation,
+    WithLocationPostfix,
 };
 use graphql_lang_types::{FloatValue, NameValuePair};
 use intern::string_key::Lookup;
 use prelude::Postfix;
+
+use crate::VariableNameWrapper;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub struct SelectionFieldArgument {
@@ -45,7 +47,7 @@ impl ArgumentKeyAndValue {
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
 pub enum NonConstantValue {
-    Variable(VariableName),
+    Variable(VariableNameWrapper),
     Integer(i64),
     Boolean(bool),
     String(StringLiteralValue),
@@ -100,7 +102,7 @@ impl NonConstantValue {
         }
     }
 
-    pub fn variables(&self) -> Vec<VariableName> {
+    pub fn variables(&self) -> Vec<VariableNameWrapper> {
         // TODO return impl Iterator
         match self {
             NonConstantValue::Variable(variable_name) => vec![*variable_name],
@@ -165,7 +167,7 @@ pub enum ConstantValue {
 }
 
 impl TryFrom<NonConstantValue> for ConstantValue {
-    type Error = VariableName;
+    type Error = VariableNameWrapper;
 
     fn try_from(value: NonConstantValue) -> Result<Self, Self::Error> {
         match value {

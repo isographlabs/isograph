@@ -1,12 +1,11 @@
 use std::{collections::BTreeSet, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
-    EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
-    WithLocationPostfix,
+    EmbeddedLocation, EntityName, SelectableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use isograph_lang_types::{
     EmptyDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet, Selection, SelectionSet,
-    SelectionType,
+    SelectionType, VariableNameWrapper,
 };
 
 use crate::{
@@ -70,7 +69,7 @@ impl GenerateRefetchQueryImpl {
     pub fn generate_refetch_query(
         &self,
         inner_selection_map: MergedSelectionMap,
-    ) -> (MergedSelectionMap, BTreeSet<VariableName>) {
+    ) -> (MergedSelectionMap, BTreeSet<VariableNameWrapper>) {
         let new_selection_map = selection_map_wrapped(inner_selection_map, self.subfields.clone());
 
         // TODO this seems like a bunch of extra work, and we shouldn't need to do it

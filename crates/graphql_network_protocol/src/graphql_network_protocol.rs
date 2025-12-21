@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, QueryExtraInfo,
-    QueryOperationName, QueryText, SelectableName, WithLocation, WithLocationPostfix,
+    QueryOperationName, QueryText, SelectableName, VariableName, WithLocation, WithLocationPostfix,
     WithNonFatalDiagnostics,
 };
 use graphql_lang_types::from_graphql_directives;
@@ -210,7 +210,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 let arg = with_location.item;
                                 VariableDefinition {
                                     name: arg.name.map(|input_value_name| {
-                                        input_value_name.unchecked_conversion()
+                                        input_value_name
+                                            .unchecked_conversion::<VariableName>()
+                                            .into()
                                     }),
                                     type_: arg.type_,
                                     default_value: arg.default_value.map(|with_location| {
@@ -247,7 +249,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 let arg = with_location.item;
                                 VariableDefinition {
                                     name: arg.name.map(|input_value_name| {
-                                        input_value_name.unchecked_conversion()
+                                        input_value_name
+                                            .unchecked_conversion::<VariableName>()
+                                            .into()
                                     }),
                                     type_: arg.type_,
                                     default_value: arg.default_value.map(|with_location| {

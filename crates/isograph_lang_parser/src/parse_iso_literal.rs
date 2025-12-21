@@ -1,7 +1,7 @@
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EmbeddedLocation, IsoLiteralText, Location,
-    RelativePathToSourceFile, SelectableName, Span, TextSource, ValueKeyName, WithEmbeddedLocation,
-    WithLocationPostfix, WithSpanPostfix,
+    RelativePathToSourceFile, SelectableName, Span, TextSource, ValueKeyName, VariableName,
+    WithEmbeddedLocation, WithLocationPostfix, WithSpanPostfix,
 };
 use graphql_lang_types::{
     GraphQLListTypeAnnotation, GraphQLNamedTypeAnnotation, GraphQLNonNullTypeAnnotation,
@@ -13,7 +13,8 @@ use isograph_lang_types::{
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
     ScalarSelection, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDefinition, from_isograph_field_directives, semantic_token_legend,
+    TypeAnnotation, VariableDefinition, VariableNameWrapper, from_isograph_field_directives,
+    semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -597,10 +598,12 @@ fn parse_non_constant_value(
                 semantic_token_legend::ST_VARIABLE_DOLLAR,
             )?;
 
-            let name = tokens.parse_string_key_type(
+            let name: WithEmbeddedLocation<VariableName> = tokens.parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_VARIABLE,
             )?;
+            let name = name.map(VariableNameWrapper::from);
+
             name.map(NonConstantValue::Variable).wrap_ok()
         })?;
 
@@ -738,10 +741,13 @@ fn parse_variable_definition(
                 IsographLangTokenKind::Dollar,
                 semantic_token_legend::ST_VARIABLE_DOLLAR,
             )?;
-            let name = tokens.parse_string_key_type(
+
+            let name: WithEmbeddedLocation<VariableName> = tokens.parse_string_key_type(
                 IsographLangTokenKind::Identifier,
                 semantic_token_legend::ST_VARIABLE,
             )?;
+            let name = name.map(VariableNameWrapper::from);
+
             tokens.parse_token_of_kind(
                 IsographLangTokenKind::Colon,
                 semantic_token_legend::ST_COLON,

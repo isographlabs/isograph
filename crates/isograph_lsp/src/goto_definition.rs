@@ -232,6 +232,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 let target_entity_name = type_annotation_path.inner.inner();
                 goto_entity_definition(db, target_entity_name.0)?
             }
+            IsographResolvedNode::VariableNameWrapper(_) => None,
         }
     } else {
         None

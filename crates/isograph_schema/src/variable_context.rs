@@ -1,9 +1,9 @@
 use std::{collections::HashMap, fmt::Debug};
 
-use common_lang_types::{SelectableName, VariableName, WithEmbeddedLocation};
+use common_lang_types::{SelectableName, WithEmbeddedLocation};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, VariableDefinition,
+    SelectionFieldArgument, SelectionType, VariableDefinition, VariableNameWrapper,
 };
 use prelude::Postfix;
 
@@ -13,7 +13,7 @@ use crate::{
 };
 
 #[derive(Debug)]
-pub struct VariableContext(pub HashMap<VariableName, NonConstantValue>);
+pub struct VariableContext(pub HashMap<VariableNameWrapper, NonConstantValue>);
 
 impl VariableContext {
     pub fn child_variable_context(
@@ -40,7 +40,7 @@ impl VariableContext {
 
                 let matching_arg = match selection_arguments
                     .iter()
-                    .find(|s| s.item.name.item == variable_name)
+                    .find(|s| s.item.name.item == variable_name.0)
                 {
                     Some(arg) => arg,
                     None => {

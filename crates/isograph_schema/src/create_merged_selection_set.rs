@@ -12,7 +12,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
-    SelectionTypePostfix, VariableDefinition,
+    SelectionTypePostfix, VariableDefinition, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -73,7 +73,7 @@ pub enum MergedServerSelection {
 }
 
 impl MergedServerSelection {
-    pub fn reachable_variables(&self) -> BTreeSet<VariableName> {
+    pub fn reachable_variables(&self) -> BTreeSet<VariableNameWrapper> {
         match self {
             MergedServerSelection::ScalarField(field) => get_variables(&field.arguments).collect(),
             MergedServerSelection::ClientObjectSelectable(field)
@@ -94,7 +94,9 @@ impl MergedServerSelection {
     }
 }
 
-fn get_variables(arguments: &[ArgumentKeyAndValue]) -> impl Iterator<Item = VariableName> + '_ {
+fn get_variables(
+    arguments: &[ArgumentKeyAndValue],
+) -> impl Iterator<Item = VariableNameWrapper> + '_ {
     arguments.iter().flat_map(|arg| match arg.value {
         isograph_lang_types::NonConstantValue::Variable(v) => Some(v),
         // TODO handle variables in objects and lists
@@ -505,7 +507,7 @@ fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
 
 pub fn get_reachable_variables(
     selection_map: &MergedSelectionMap,
-) -> impl Iterator<Item = VariableName> {
+) -> impl Iterator<Item = VariableNameWrapper> {
     selection_map.values().flat_map(|x| x.reachable_variables())
 }
 
@@ -1177,7 +1179,9 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         server_object_selectable_name: *NODE_FIELD_NAME,
         arguments: vec![ArgumentKeyAndValue {
             key: ID_FIELD_NAME.unchecked_conversion(),
-            value: NonConstantValue::Variable(ID_FIELD_NAME.unchecked_conversion()),
+            value: NonConstantValue::Variable(
+                ID_FIELD_NAME.unchecked_conversion::<VariableName>().into(),
+            ),
         }],
         concrete_target_entity_name: None,
     });
@@ -1547,6 +1551,7 @@ pub fn id_arguments() -> Vec<VariableDefinition> {
     vec![VariableDefinition {
         name: ID_FIELD_NAME
             .unchecked_conversion::<VariableName>()
+            .to::<VariableNameWrapper>()
             .with_embedded_location(EmbeddedLocation::todo_generated()),
         type_: GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(*ID_ENTITY_NAME))

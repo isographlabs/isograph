@@ -2,12 +2,12 @@ use std::collections::BTreeSet;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, DiagnosticVecResult, EmbeddedLocation,
-    EntityNameAndSelectableName, FieldArgumentName, Location, VariableName, WithEmbeddedLocation,
+    EntityNameAndSelectableName, FieldArgumentName, Location, WithEmbeddedLocation,
 };
 
 use isograph_lang_types::{
     DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, VariableDefinition,
+    SelectionType, VariableDefinition, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
@@ -19,7 +19,7 @@ use crate::{
     visit_selection_set::visit_selection_set,
 };
 
-type UsedVariables = BTreeSet<VariableName>;
+type UsedVariables = BTreeSet<VariableNameWrapper>;
 
 lazy_static! {
     static ref ID: FieldArgumentName = ID_FIELD_NAME.unchecked_conversion();
@@ -209,7 +209,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     errors: &mut Vec<Diagnostic>,
-    reachable_variables: &mut BTreeSet<VariableName>,
+    reachable_variables: &mut UsedVariables,
     field_argument_definitions: Vec<VariableDefinition>,
     client_type_variable_definitions: &[VariableDefinition],
     can_have_missing_args: bool,
@@ -333,7 +333,7 @@ fn get_missing_and_provided_arguments<'a>(
         .filter_map(move |field_argument_definition| {
             let selection_supplied_argument = selection_supplied_arguments
                 .iter()
-                .find(|arg| field_argument_definition.name.item == arg.item.name.item);
+                .find(|arg| field_argument_definition.name.item.0 == arg.item.name.item);
 
             if let Some(selection_supplied_argument) = selection_supplied_argument {
                 ArgumentType::Provided(field_argument_definition, selection_supplied_argument)
@@ -367,7 +367,7 @@ fn validate_no_extraneous_arguments(
 
             let is_defined = field_argument_definitions
                 .iter()
-                .any(|definition| definition.name.item == arg.item.name.item);
+                .any(|definition| definition.name.item.0 == arg.item.name.item);
 
             if !is_defined {
                 return arg.clone().wrap_some();
@@ -417,7 +417,7 @@ pub fn extend_reachable_variables_with_arg(
 }
 
 fn extend_reachable_variables_with_args(
-    reachable_variables: &mut BTreeSet<VariableName>,
+    reachable_variables: &mut UsedVariables,
     arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
 ) {
     for arg in arguments.iter() {

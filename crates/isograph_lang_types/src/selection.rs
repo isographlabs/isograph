@@ -1,5 +1,5 @@
 use common_lang_types::{
-    SelectableAlias, SelectableName, SelectableNameOrAlias, VariableName, WithEmbeddedLocation,
+    SelectableAlias, SelectableName, SelectableNameOrAlias, WithEmbeddedLocation,
 };
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -7,7 +7,7 @@ use resolve_position_macros::ResolvePosition;
 use crate::{
     IsographResolvedNode, NonConstantValue, ObjectSelectionDirectiveSet,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionSetPath,
-    SelectionType,
+    SelectionType, VariableNameWrapper,
 };
 
 pub type Selection = SelectionType<ScalarSelection, ObjectSelection>;
@@ -27,7 +27,7 @@ impl Selection {
         }
     }
 
-    pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableName> + 'a {
+    pub fn variables<'a>(&'a self) -> impl Iterator<Item = VariableNameWrapper> + 'a {
         let get_variable =
             |x: &'a WithEmbeddedLocation<SelectionFieldArgument>| match x.item.value.item {
                 NonConstantValue::Variable(v) => Some(v),

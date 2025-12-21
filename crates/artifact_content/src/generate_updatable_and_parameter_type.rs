@@ -562,7 +562,7 @@ fn get_provided_arguments<'a>(
         .filter_map(|definition| {
             let user_has_supplied_argument = arguments
                 .iter()
-                .any(|arg| definition.name.item == arg.item.name.item);
+                .any(|arg| definition.name.item.0 == arg.item.name.item);
             if user_has_supplied_argument {
                 definition.clone().wrap_some()
             } else {

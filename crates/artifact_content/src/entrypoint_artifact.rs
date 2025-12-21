@@ -12,13 +12,13 @@ use crate::{
 };
 use common_lang_types::{
     ArtifactPath, ArtifactPathAndContent, EntityName, EntityNameAndSelectableName,
-    QueryOperationName, SelectableName, VariableName,
+    QueryOperationName, SelectableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
     EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
-    VariableDefinition,
+    VariableDefinition, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
@@ -409,7 +409,7 @@ fn generate_refetch_query_artifact_import(
     root_refetched_paths: &[(
         RootRefetchedPath,
         &MergedSelectionMap,
-        BTreeSet<VariableName>,
+        BTreeSet<VariableNameWrapper>,
     )],
     file_extensions: GenerateFileExtensionsOption,
 ) -> RefetchQueryArtifactImport {
@@ -577,8 +577,8 @@ fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn variable_names_to_string(
-    variable_names: &BTreeSet<VariableName>,
-    field_variables: impl Iterator<Item = VariableName>,
+    variable_names: &BTreeSet<VariableNameWrapper>,
+    field_variables: impl Iterator<Item = VariableNameWrapper>,
 ) -> String {
     let mut s = "[".to_string();
 
@@ -596,7 +596,7 @@ fn variable_names_to_string(
 
 fn get_used_variables_for_refetch_query_import(
     inline_fragments_or_linked_fields: &[WrappedSelectionMapSelection],
-) -> BTreeSet<VariableName> {
+) -> BTreeSet<VariableNameWrapper> {
     // TODO return impl iterator
     let mut variables = BTreeSet::new();
 
