@@ -69,7 +69,7 @@ impl std::fmt::Display for PrintableDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "\n{}", self.diagnostic.0.message)?;
         if let Some(location) = self.diagnostic.location() {
-            write!(f, "\n")?;
+            writeln!(f)?;
             (self.print_location)(location, f)?;
         }
         Ok(())
