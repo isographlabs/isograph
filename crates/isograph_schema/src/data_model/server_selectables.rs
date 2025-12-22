@@ -1,6 +1,8 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName};
+use common_lang_types::{
+    EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, WithNoLocation,
+};
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration, impl_with_target_id,
 };
@@ -10,7 +12,7 @@ use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<Description>,
+    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
     pub target_entity_name: TypeAnnotationDeclaration,
@@ -34,7 +36,7 @@ impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, 
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<Description>,
+    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
     pub target_entity_name: TypeAnnotationDeclaration,

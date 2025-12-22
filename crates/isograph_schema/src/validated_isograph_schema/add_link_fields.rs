@@ -4,7 +4,7 @@ use crate::{
     ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     server_object_entities,
 };
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName};
+use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use pico::MemoRef;
@@ -23,11 +23,13 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
             let field_name = *LINK_FIELD_NAME;
             let parent_entity_name = object.lookup(db).name;
             ClientScalarSelectable {
-                description: Some(Description(
+                description: Description(
                     format!("A store Link for the {} type.", parent_entity_name)
                         .intern()
                         .into(),
-                )),
+                )
+                .with_no_location()
+                .wrap_some(),
                 name: field_name,
                 parent_entity_name,
                 variable_definitions: vec![],

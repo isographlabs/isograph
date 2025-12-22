@@ -1,7 +1,7 @@
 use common_lang_types::{
     ConstExportName, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location,
     RelativePathToSourceFile, SelectableName, VariableName, WithEmbeddedLocation,
-    WithLocationPostfix,
+    WithGenericLocation, WithLocationPostfix,
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
@@ -175,7 +175,9 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
     let variant = get_client_variant(client_field_declaration);
 
     let selectable = ClientScalarSelectable {
-        description: client_field_declaration.description.map(|x| x.item),
+        description: client_field_declaration
+            .description
+            .map(WithGenericLocation::drop_location),
         name: client_field_declaration
             .client_field_name
             .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
@@ -288,7 +290,9 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
     let unprocessed_fields = client_pointer_declaration.selection_set.clone();
 
     let client_object_selectable = ClientObjectSelectable {
-        description: client_pointer_declaration.description.map(|x| x.item),
+        description: client_pointer_declaration
+            .description
+            .map(WithGenericLocation::drop_location),
         name: client_pointer_declaration
             .client_pointer_name
             .map(|client_object_selectable_name| *client_object_selectable_name)

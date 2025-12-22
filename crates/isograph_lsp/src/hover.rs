@@ -1,5 +1,6 @@
 use common_lang_types::{
-    EntityName, SelectableName, Span, relative_path_from_absolute_and_working_directory,
+    EntityName, SelectableName, Span, WithGenericLocation,
+    relative_path_from_absolute_and_working_directory,
 };
 use isograph_lang_types::{
     DefinitionLocation, Description, IsographResolvedNode, VariableDeclaration,
@@ -106,7 +107,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     hover_text_for_selectable(
                         selectable.variant_name(),
                         name,
-                        description,
+                        description.map(WithGenericLocation::item),
                         arguments,
                         parent_object.name,
                         parent_object.description,
@@ -143,7 +144,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                     hover_text_for_selectable(
                         selectable.variant_name(),
                         name,
-                        description,
+                        description.map(WithGenericLocation::item),
                         arguments,
                         parent_object.name,
                         parent_object.description,

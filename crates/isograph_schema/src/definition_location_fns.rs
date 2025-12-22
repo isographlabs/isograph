@@ -1,3 +1,4 @@
+use common_lang_types::WithGenericLocation;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotationDeclaration};
 use prelude::Postfix;
 
@@ -8,8 +9,14 @@ pub fn description<TNetworkProtocol: NetworkProtocol>(
     definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
 ) -> Option<Description> {
     match definition_location {
-        DefinitionLocation::Server(server_field) => server_field.lookup(db).description,
-        DefinitionLocation::Client(client_field) => client_field.lookup(db).description,
+        DefinitionLocation::Server(server_field) => server_field
+            .lookup(db)
+            .description
+            .map(WithGenericLocation::item),
+        DefinitionLocation::Client(client_field) => client_field
+            .lookup(db)
+            .description
+            .map(WithGenericLocation::item),
     }
 }
 

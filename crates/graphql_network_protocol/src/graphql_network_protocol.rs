@@ -3,8 +3,8 @@ use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
     DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, QueryExtraInfo,
-    QueryOperationName, QueryText, SelectableName, VariableName, WithLocation, WithLocationPostfix,
-    WithNonFatalDiagnostics,
+    QueryOperationName, QueryText, SelectableName, VariableName, WithGenericLocation, WithLocation,
+    WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -192,7 +192,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         description: field
                             .item
                             .description
-                            .map(|with_span| with_span.item.into()),
+                            .map(WithGenericLocation::drop_location)
+                            .map(|x| x.map(Description::from)),
+
                         name: field.item.name.item.unchecked_conversion(),
                         target_entity_name: field
                             .item
@@ -241,7 +243,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         description: field
                             .item
                             .description
-                            .map(|with_span| with_span.item.into()),
+                            .map(|x| x.drop_location().map(Description::from)),
                         name: field.item.name.item.unchecked_conversion(),
                         parent_entity_name,
                         arguments: field
@@ -302,6 +304,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         .intern()
                         .to::<DescriptionValue>()
                         .wrap(Description)
+                        .with_no_location()
                         .wrap_some(),
                         name: format!("as{}", concrete_child_entity_name)
                             .intern()

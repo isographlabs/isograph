@@ -379,6 +379,7 @@ fn get_refetch_selectable(
         .intern()
         .to::<DescriptionValue>()
         .wrap(Description)
+        .with_no_location()
         .wrap_some(),
         name: (*REFETCH_FIELD_NAME),
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
@@ -416,6 +417,7 @@ pub(crate) fn get_typename_selectable(
             .intern()
             .to::<DescriptionValue>()
             .wrap(Description)
+            .with_no_location()
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?

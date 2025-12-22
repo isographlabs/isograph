@@ -2,7 +2,7 @@ use std::{collections::BTreeSet, fmt::Display};
 
 use common_lang_types::{
     EntityName, EntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
-    WithEmbeddedLocation,
+    WithEmbeddedLocation, WithGenericLocation,
 };
 use intern::Lookup;
 use isograph_lang_types::{
@@ -78,7 +78,9 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Server(server_scalar_selectable) => {
                     let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
-                        server_scalar_selectable.description,
+                        server_scalar_selectable
+                            .description
+                            .map(WithGenericLocation::item),
                         query_type_declaration,
                         indentation_level,
                     );
@@ -253,7 +255,9 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                 DefinitionLocation::Server(server_scalar_selectable) => {
                     let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
-                        server_scalar_selectable.description,
+                        server_scalar_selectable
+                            .description
+                            .map(WithGenericLocation::item),
                         query_type_declaration,
                         indentation_level,
                     );
@@ -418,7 +422,9 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     .lookup(db);
 
     write_optional_description(
-        client_scalar_selectable.description,
+        client_scalar_selectable
+            .description
+            .map(WithGenericLocation::item),
         query_type_declaration,
         indentation_level,
     );

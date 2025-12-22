@@ -89,6 +89,10 @@ where
     fn with_embedded_location(self, location: EmbeddedLocation) -> WithEmbeddedLocation<Self> {
         WithEmbeddedLocation::new(self, location)
     }
+
+    fn with_no_location(self) -> WithNoLocation<Self> {
+        WithGenericLocation::new(self, ())
+    }
 }
 
 impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
@@ -163,6 +167,10 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
             location: (),
         }
     }
+
+    pub fn item(self) -> T {
+        self.item
+    }
 }
 
 impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
@@ -179,3 +187,9 @@ impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
 }
 
 pub type WithNoLocation<TItem> = WithGenericLocation<TItem, ()>;
+
+impl<TItem: std::fmt::Display> std::fmt::Display for WithNoLocation<TItem> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.item.fmt(f)
+    }
+}

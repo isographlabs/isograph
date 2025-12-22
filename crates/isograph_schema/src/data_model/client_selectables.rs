@@ -1,6 +1,6 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName};
+use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName, WithNoLocation};
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
@@ -26,7 +26,7 @@ pub type MemoRefClientSelectable<TNetworkProtocol> = SelectionType<
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<Description>,
+    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
     // TODO we should probably model this differently
@@ -48,7 +48,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarSelectable<TNetworkProtocol>
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<Description>,
+    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
     pub target_entity_name: TypeAnnotationDeclaration,
 
