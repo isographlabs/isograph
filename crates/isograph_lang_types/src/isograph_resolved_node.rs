@@ -21,7 +21,7 @@ pub enum IsographResolvedNode<'a> {
     SelectionSet(SelectionSetPath<'a>),
     TypeAnnotation(TypeAnnotationDeclarationPath<'a>),
     VariableNameWrapper(VariableNameWrapperPath<'a>),
-    VariableDeclaration(VariableDeclarationPath<'a>),
+    VariableDeclarationInner(VariableDeclarationPath<'a>),
 }
 
 // TODO remove this, this is just a demonstration.

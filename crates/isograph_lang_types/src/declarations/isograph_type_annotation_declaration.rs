@@ -61,7 +61,7 @@ impl ResolvePosition for TypeAnnotationDeclaration {
 #[derive(Debug)]
 pub enum TypeAnnotationDeclarationParentType<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    VariableDeclaration(VariableDeclarationPath<'a>),
+    VariableDeclarationInner(VariableDeclarationPath<'a>),
 }
 
 pub type TypeAnnotationDeclarationPath<'a> =

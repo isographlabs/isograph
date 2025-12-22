@@ -105,5 +105,5 @@ define_wrapper!(
 
 #[derive(Debug)]
 pub enum VariableNameWrapperParentType<'a> {
-    VariableDeclaration(VariableDeclarationPath<'a>),
+    VariableDeclarationInner(VariableDeclarationPath<'a>),
 }

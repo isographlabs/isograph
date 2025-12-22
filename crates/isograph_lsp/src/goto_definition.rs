@@ -230,7 +230,7 @@ pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
                 goto_entity_definition(db, target_entity_name.0)?
             }
             IsographResolvedNode::VariableNameWrapper(_) => None,
-            IsographResolvedNode::VariableDeclaration(_) => None,
+            IsographResolvedNode::VariableDeclarationInner(_) => None,
         }
     } else {
         None
