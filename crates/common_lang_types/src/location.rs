@@ -74,22 +74,7 @@ impl EmbeddedLocation {
     }
 }
 
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord)]
-pub struct WithLocation<T> {
-    pub location: Location,
-    pub item: T,
-}
-
-impl<TValue: PartialOrd> PartialOrd for WithLocation<TValue> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Compare item first
-        match self.item.partial_cmp(&other.item) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.location.partial_cmp(&other.location)
-    }
-}
+pub type WithLocation<TItem> = WithGenericLocation<TItem, Location>;
 
 pub trait WithLocationPostfix
 where
@@ -108,79 +93,18 @@ where
     }
 }
 
-impl<T> WithLocationPostfix for T {}
-
-impl<T> WithLocation<T> {
-    pub fn new(item: T, location: Location) -> Self {
-        WithLocation { item, location }
-    }
-}
-
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, Ord)]
-pub struct WithEmbeddedLocation<T> {
-    pub location: EmbeddedLocation,
-    pub item: T,
-}
-
-impl<TValue: PartialOrd> PartialOrd for WithEmbeddedLocation<TValue> {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Compare item first
-        match self.item.partial_cmp(&other.item) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.location.partial_cmp(&other.location)
-    }
-}
-
-impl<T> WithEmbeddedLocation<T> {
-    pub fn new(item: T, location: EmbeddedLocation) -> Self {
-        WithEmbeddedLocation { item, location }
-    }
-
-    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithEmbeddedLocation<U> {
-        WithEmbeddedLocation::new(map(self.item), self.location)
-    }
-
-    pub fn and_then<U, E>(
-        self,
-        map: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<WithEmbeddedLocation<U>, E> {
-        WithEmbeddedLocation::new(map(self.item)?, self.location).wrap_ok()
-    }
-
-    pub fn into_with_location(self) -> WithLocation<T> {
-        self.into()
-    }
-
-    pub fn as_ref(&self) -> WithEmbeddedLocation<&T> {
-        WithEmbeddedLocation {
-            location: self.location,
-            item: &self.item,
-        }
-    }
-}
-
-pub trait WithEmbeddedLocationPostfix
-where
-    Self: Sized,
-{
-    fn with_embedded_location(
-        self,
-        embedded_location: EmbeddedLocation,
-    ) -> WithEmbeddedLocation<Self> {
-        WithEmbeddedLocation::new(self, embedded_location)
-    }
-}
-
-impl<T> From<WithEmbeddedLocation<T>> for WithLocation<T> {
-    fn from(value: WithEmbeddedLocation<T>) -> Self {
-        WithLocation {
-            location: Location::Embedded(value.location),
+impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
+    fn from(value: WithEmbeddedLocation<TItem>) -> Self {
+        WithGenericLocation {
             item: value.item,
+            location: value.location.into(),
         }
     }
 }
+
+pub type WithEmbeddedLocation<TItem> = WithGenericLocation<TItem, EmbeddedLocation>;
+
+impl<T> WithLocationPostfix for T {}
 
 pub fn relative_path_from_absolute_and_working_directory(
     current_working_directory: CurrentWorkingDirectory,
@@ -195,4 +119,56 @@ pub fn relative_path_from_absolute_and_working_directory(
     .expect("Expected path to be able to be stringified")
     .intern()
     .into()
+}
+
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, Hash)]
+pub struct WithGenericLocation<TItem, TLocation> {
+    pub item: TItem,
+    pub location: TLocation,
+}
+
+impl<T, TLocation> WithGenericLocation<T, TLocation> {
+    pub fn new(item: T, location: TLocation) -> Self {
+        WithGenericLocation { item, location }
+    }
+
+    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithGenericLocation<U, TLocation>
+    where
+        TLocation: Copy,
+    {
+        WithGenericLocation::new(map(self.item), self.location)
+    }
+
+    pub fn and_then<U, E>(
+        self,
+        map: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<WithGenericLocation<U, TLocation>, E>
+    where
+        TLocation: Copy,
+    {
+        WithGenericLocation::new(map(self.item)?, self.location).wrap_ok()
+    }
+
+    pub fn as_ref(&self) -> WithGenericLocation<&T, TLocation>
+    where
+        TLocation: Copy,
+    {
+        WithGenericLocation {
+            location: self.location,
+            item: &self.item,
+        }
+    }
+}
+
+impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
+    for WithGenericLocation<TValue, TLocation>
+{
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        // Compare item first
+        match self.item.partial_cmp(&other.item) {
+            Some(core::cmp::Ordering::Equal) => {}
+            ord => return ord,
+        }
+        self.location.partial_cmp(&other.location)
+    }
 }
