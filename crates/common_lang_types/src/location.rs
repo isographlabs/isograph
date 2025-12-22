@@ -78,10 +78,6 @@ pub trait WithLocationPostfix
 where
     Self: Sized,
 {
-    fn with_location(self, location: Location) -> WithLocation<Self> {
-        WithLocation::new(self, location)
-    }
-
     fn with_generated_location(self) -> WithLocation<Self> {
         WithLocation::new(self, Location::Generated)
     }
@@ -90,10 +86,7 @@ where
         WithGenericLocation::new(self, ())
     }
 
-    fn with_generic_location<TLocation>(
-        self,
-        item: TLocation,
-    ) -> WithGenericLocation<Self, TLocation> {
+    fn with_location<TLocation>(self, item: TLocation) -> WithGenericLocation<Self, TLocation> {
         WithGenericLocation::new(self, item)
     }
 }

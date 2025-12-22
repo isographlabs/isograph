@@ -320,10 +320,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 name: (*ID_FIELD_NAME)
                                     .unchecked_conversion::<VariableName>()
                                     .to::<VariableNameWrapper>()
-                                    .with_generic_location(EmbeddedLocation::todo_generated()),
+                                    .with_location(EmbeddedLocation::todo_generated()),
 
                                 type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
-                                    .with_generic_location(EmbeddedLocation::todo_generated()),
+                                    .with_location(EmbeddedLocation::todo_generated()),
                                 default_value: None,
                             };
 

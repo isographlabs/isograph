@@ -549,8 +549,8 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         This is indicative of a bug in Isograph.",
     );
 
-    let empty_selection_set = SelectionSet { selections: vec![] }
-        .with_generic_location(EmbeddedLocation::todo_generated());
+    let empty_selection_set =
+        SelectionSet { selections: vec![] }.with_location(EmbeddedLocation::todo_generated());
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
         client_scalar_selectable.parent_entity_name,

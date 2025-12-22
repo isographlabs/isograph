@@ -185,9 +185,7 @@ impl<TLocation> TryFrom<NonConstantValueInner<TLocation>> for ConstantValueInner
                     .into_iter()
                     .map(|x| {
                         let constant: ConstantValueInner<TLocation> = x.item.try_into()?;
-                        constant
-                            .with_generic_location(x.location)
-                            .wrap_ok::<Self::Error>()
+                        constant.with_location(x.location).wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
                 ConstantValueInner::List(converted_list).wrap_ok()
@@ -201,7 +199,7 @@ impl<TLocation> TryFrom<NonConstantValueInner<TLocation>> for ConstantValueInner
                             value: {
                                 let constant: ConstantValueInner<TLocation> =
                                     name_value_pair.value.item.try_into()?;
-                                constant.with_generic_location(name_value_pair.value.location)
+                                constant.with_location(name_value_pair.value.location)
                             },
                         }
                         .wrap_ok::<Self::Error>()

@@ -20,7 +20,7 @@ pub fn to_isograph_constant_value(graphql_constant_value: GraphQLConstantValue) 
         GraphQLConstantValue::List(l) => {
             let converted_list = l
                 .into_iter()
-                .map(|x| to_isograph_constant_value(x.item).with_generic_location(x.location))
+                .map(|x| to_isograph_constant_value(x.item).with_location(x.location))
                 .collect::<Vec<_>>();
             ConstantValue::List(converted_list)
         }
@@ -30,7 +30,7 @@ pub fn to_isograph_constant_value(graphql_constant_value: GraphQLConstantValue) 
                 .map(|name_value_pair| NameValuePair {
                     name: name_value_pair.name,
                     value: to_isograph_constant_value(name_value_pair.value.item)
-                        .with_generic_location(name_value_pair.value.location),
+                        .with_location(name_value_pair.value.location),
                 })
                 .collect::<Vec<_>>();
             ConstantValue::Object(converted_object)

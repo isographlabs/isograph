@@ -104,7 +104,7 @@ impl<'source> PeekableLexer<'source> {
         let token = self.parse_token_of_kind(expected_kind)?;
 
         self.source(token.location.span)
-            .with_generic_location(token.location)
+            .with_location(token.location)
             .wrap_ok()
     }
 
@@ -114,10 +114,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
         let source = self.source(kind.location.span).intern();
-        source
-            .to::<T>()
-            .with_generic_location(kind.location)
-            .wrap_ok()
+        source.to::<T>().with_location(kind.location).wrap_ok()
     }
 
     pub fn parse_matching_identifier(

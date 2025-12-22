@@ -71,7 +71,7 @@ impl<'source> PeekableLexer<'source> {
             .to_with_embedded_location(self.text_source);
 
         self.semantic_tokens
-            .push(isograph_semantic_token.with_generic_location(parsed_token.location));
+            .push(isograph_semantic_token.with_location(parsed_token.location));
 
         parsed_token
     }
@@ -132,7 +132,7 @@ impl<'source> PeekableLexer<'source> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
 
         self.source(kind.location.span)
-            .with_generic_location(kind.location)
+            .with_location(kind.location)
             .wrap_ok()
     }
 
@@ -143,10 +143,7 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind, isograph_semantic_token)?;
         let source = self.source(kind.location.span).intern();
-        source
-            .to::<T>()
-            .with_generic_location(kind.location)
-            .wrap_ok()
+        source.to::<T>().with_location(kind.location).wrap_ok()
     }
 
     #[expect(dead_code)]

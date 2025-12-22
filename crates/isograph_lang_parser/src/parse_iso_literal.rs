@@ -132,7 +132,7 @@ fn parse_iso_entrypoint_declaration(
             parent_type,
             client_field_name,
             iso_literal_text,
-            entrypoint_keyword: ().with_generic_location(entrypoint_keyword_location),
+            entrypoint_keyword: ().with_location(entrypoint_keyword_location),
             dot: dot.map(|_| ()),
             directive_set,
             semantic_tokens: tokens.semantic_tokens(),
@@ -780,7 +780,7 @@ fn parse_optional_default_value(
             )
         })?;
         constant_value
-            .with_generic_location(non_constant_value.location)
+            .with_location(non_constant_value.location)
             .wrap_some()
             .wrap_ok()
     } else {

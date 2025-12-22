@@ -1070,8 +1070,8 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
         },
     );
 
-    let empty_selection_set = SelectionSet { selections: vec![] }
-        .with_generic_location(EmbeddedLocation::todo_generated());
+    let empty_selection_set =
+        SelectionSet { selections: vec![] }.with_location(EmbeddedLocation::todo_generated());
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,
@@ -1546,9 +1546,9 @@ pub fn id_arguments() -> Vec<VariableDeclaration> {
         name: ID_FIELD_NAME
             .unchecked_conversion::<VariableName>()
             .to::<VariableNameWrapper>()
-            .with_generic_location(EmbeddedLocation::todo_generated()),
+            .with_location(EmbeddedLocation::todo_generated()),
         type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
-            .with_generic_location(EmbeddedLocation::todo_generated()),
+            .with_location(EmbeddedLocation::todo_generated()),
         default_value: None,
     }]
 }
@@ -1557,21 +1557,21 @@ pub fn inline_fragment_reader_selection_set() -> WithEmbeddedLocation<SelectionS
     let typename_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: (*TYPENAME_FIELD_NAME).with_generic_location(EmbeddedLocation::todo_generated()),
+        name: (*TYPENAME_FIELD_NAME).with_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
     })
-    .with_generic_location(EmbeddedLocation::todo_generated());
+    .with_location(EmbeddedLocation::todo_generated());
 
     let link_selection = SelectionType::Scalar(ScalarSelection {
         arguments: vec![],
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
-        name: (*LINK_FIELD_NAME).with_generic_location(EmbeddedLocation::todo_generated()),
+        name: (*LINK_FIELD_NAME).with_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
     })
-    .with_generic_location(EmbeddedLocation::todo_generated());
+    .with_location(EmbeddedLocation::todo_generated());
 
     SelectionSet {
         selections: vec![typename_selection, link_selection],
     }
-    .with_generic_location(EmbeddedLocation::todo_generated())
+    .with_location(EmbeddedLocation::todo_generated())
 }

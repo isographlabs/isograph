@@ -50,7 +50,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .object_selected()
-                                .with_generic_location(client_pointer_declaration.location),
+                                .with_location(client_pointer_declaration.location),
                             &mut non_fatal_diagnostics,
                         );
                     }
@@ -67,7 +67,7 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
                                 .item
                                 .interned_value(db)
                                 .scalar_selected()
-                                .with_generic_location(client_field_declaration.location),
+                                .with_location(client_field_declaration.location),
                             &mut non_fatal_diagnostics,
                         );
                     }

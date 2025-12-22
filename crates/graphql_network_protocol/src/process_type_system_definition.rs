@@ -78,7 +78,7 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
@@ -96,7 +96,7 @@ pub fn process_graphql_type_system_document(
                     )
                     .scalar_selected()
                     .server_defined()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
@@ -179,13 +179,13 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .scalar_selected()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
-                interfaces_to_process.push(interface_definition.with_generic_location(location));
+                interfaces_to_process.push(interface_definition.with_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
                 let server_object_entity_name =
@@ -213,7 +213,7 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
@@ -249,7 +249,7 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .scalar_selected()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
@@ -280,7 +280,7 @@ pub fn process_graphql_type_system_document(
                     }
                     .interned_value(db)
                     .object_selected()
-                    .with_generic_location(location)
+                    .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
                 );
@@ -307,7 +307,7 @@ pub fn process_graphql_type_system_document(
                     get_typename_selectable(db, server_object_entity_name, None)
                         .scalar_selected()
                         .server_defined()
-                        .with_generic_location(location)
+                        .with_location(location)
                         .into(),
                     non_fatal_diagnostics,
                 );
@@ -349,7 +349,7 @@ fn refetch_selectable_refetch_strategy(
                 ScalarSelection {
                     name: (*ID_FIELD_NAME)
                         .to::<SelectableName>()
-                        .with_generic_location(EmbeddedLocation::todo_generated()),
+                        .with_location(EmbeddedLocation::todo_generated()),
                     reader_alias: None,
                     arguments: vec![],
                     scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(
@@ -357,10 +357,10 @@ fn refetch_selectable_refetch_strategy(
                     ),
                 }
                 .scalar_selected()
-                .with_generic_location(EmbeddedLocation::todo_generated()),
+                .with_location(EmbeddedLocation::todo_generated()),
             ],
         }
-        .with_generic_location(EmbeddedLocation::todo_generated()),
+        .with_location(EmbeddedLocation::todo_generated()),
         // TODO use the type from the schema
         "Query".intern().into(),
         subfields_or_inline_fragments,
@@ -395,9 +395,9 @@ fn get_refetch_selectable(
                 name: (*ID_FIELD_NAME)
                     .unchecked_conversion::<VariableName>()
                     .to::<VariableNameWrapper>()
-                    .with_generic_location(EmbeddedLocation::todo_generated()),
+                    .with_location(EmbeddedLocation::todo_generated()),
                 type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
-                    .with_generic_location(EmbeddedLocation::todo_generated()),
+                    .with_location(EmbeddedLocation::todo_generated()),
                 default_value: None,
             }],
         }),
@@ -449,10 +449,10 @@ pub fn process_graphql_type_system_extension_document(
         let WithEmbeddedLocation { location, item } = extension_or_definition;
         match item {
             GraphQLTypeSystemExtensionOrDefinition::Definition(definition) => {
-                definitions.push(definition.with_generic_location(location));
+                definitions.push(definition.with_location(location));
             }
             GraphQLTypeSystemExtensionOrDefinition::Extension(extension) => {
-                extensions.push(extension.with_generic_location(location))
+                extensions.push(extension.with_location(location))
             }
         }
     }
