@@ -301,7 +301,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             .collect(),
 
         parent_entity_name,
-        target_entity_name: client_pointer_declaration.target_type.clone(),
+        target_entity_name: client_pointer_declaration.target_type.item.clone(),
         network_protocol: std::marker::PhantomData,
 
         info: UserWrittenClientPointerInfo {

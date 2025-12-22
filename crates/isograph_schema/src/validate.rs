@@ -109,11 +109,11 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
         let (target, arguments) = match selectable {
             SelectionType::Scalar(s) => {
                 let scalar = s.lookup(db);
-                (scalar.target_entity_name.item.inner(), &scalar.arguments)
+                (scalar.target_entity_name.inner(), &scalar.arguments)
             }
             SelectionType::Object(o) => {
                 let object = o.lookup(db);
-                (object.target_entity_name.item.inner(), &object.arguments)
+                (object.target_entity_name.inner(), &object.arguments)
             }
         };
 

@@ -224,22 +224,20 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             )
             .lookup(db);
 
-    let concrete_type = &server_object_entity_named(
-        db,
-        server_object_selectable.target_entity_name.item.inner().0,
-    )
-    .as_ref()
-    .expect(
-        "Expected validation to have worked. \
+    let concrete_type =
+        &server_object_entity_named(db, server_object_selectable.target_entity_name.inner().0)
+            .as_ref()
+            .expect(
+                "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-    )
-    .as_ref()
-    .expect(
-        "Expected entity to exist. \
+            )
+            .as_ref()
+            .expect(
+                "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-    )
-    .lookup(db)
-    .name;
+            )
+            .lookup(db)
+            .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,

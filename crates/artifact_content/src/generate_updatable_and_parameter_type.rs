@@ -90,7 +90,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         Some(javascript_name) => javascript_name,
                         None => server_scalar_entity_javascript_name(
                             db,
-                            server_scalar_selectable.target_entity_name.item.inner().0,
+                            server_scalar_selectable.target_entity_name.inner().0,
                         )
                         .as_ref()
                         .expect(
@@ -108,7 +108,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         "  ".repeat(indentation_level as usize),
                         name_or_alias,
                         print_javascript_type_declaration(
-                            server_scalar_selectable.target_entity_name.item.reference(),
+                            server_scalar_selectable.target_entity_name.reference(),
                             inner_text
                         )
                     ));
@@ -140,8 +140,8 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;
 
@@ -262,7 +262,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let output_type = server_scalar_selectable.target_entity_name.clone();
                     let inner_text =
-                        server_scalar_entity_javascript_name(db, output_type.item.inner().0)
+                        server_scalar_entity_javascript_name(db, output_type.inner().0)
                             .as_ref()
                             .expect(
                                 "Expected parsing to not have failed. \
@@ -280,20 +280,14 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
                             name_or_alias,
-                            print_javascript_type_declaration(
-                                output_type.item.reference(),
-                                inner_text
-                            )
+                            print_javascript_type_declaration(output_type.reference(), inner_text)
                         ));
                     } else {
                         query_type_declaration.push_str(&format!(
                             "{}readonly {}: {},\n",
                             "  ".repeat(indentation_level as usize),
                             name_or_alias,
-                            print_javascript_type_declaration(
-                                output_type.item.reference(),
-                                inner_text
-                            )
+                            print_javascript_type_declaration(output_type.reference(), inner_text)
                         ));
                     }
                 }
@@ -328,8 +322,8 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             let type_annotation = output_type_annotation(db, object_selectable).clone();
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.item.inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.item.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;
             let inner_text = generate_client_selectable_updatable_data_type(

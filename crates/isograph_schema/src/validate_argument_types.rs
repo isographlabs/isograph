@@ -317,7 +317,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 ) => match value_satisfies_type(
                     db,
                     &selection_supplied_argument_value.value,
-                    field_type_annotation.item.reference(),
+                    field_type_annotation.reference(),
                     variable_definitions,
                 ) {
                     Ok(_) => None,
@@ -353,7 +353,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
 enum ObjectLiteralFieldType {
     Provided(
-        WithEmbeddedLocation<TypeAnnotation>,
+        TypeAnnotation,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -393,7 +393,7 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                     selection_supplied_argument_value.clone(),
                 )
                 .wrap_some(),
-                None => match iso_type_annotation.item {
+                None => match iso_type_annotation {
                     TypeAnnotation::Scalar(_) => {
                         ObjectLiteralFieldType::Missing(*field_name).wrap_some()
                     }

@@ -150,7 +150,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             .lookup(db);
 
             (
-                is_nullable(server_scalar_selectable.target_entity_name.item.reference()),
+                is_nullable(server_scalar_selectable.target_entity_name.reference()),
                 server_scalar_selectable.target_entity_name.clone(),
             )
         }
@@ -175,7 +175,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
             )
             .lookup(db);
             (
-                is_nullable(server_object_selectable.target_entity_name.item.reference()),
+                is_nullable(server_object_selectable.target_entity_name.reference()),
                 server_object_selectable.target_entity_name.clone(),
             )
         }
@@ -186,7 +186,7 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
         "  ".repeat(indentation_level as usize),
         name,
         if is_optional { "?" } else { "" },
-        format_type_annotation(db, selection_type.item.reference(), indentation_level + 1),
+        format_type_annotation(db, selection_type.reference(), indentation_level + 1),
     )
 }
 

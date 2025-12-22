@@ -18,13 +18,11 @@ pub fn output_type_annotation<TNetworkProtocol: NetworkProtocol>(
     definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
 ) -> &TypeAnnotation {
     match definition_location {
-        DefinitionLocation::Client(client_pointer) => client_pointer
-            .lookup(db)
-            .target_entity_name
-            .item
-            .reference(),
+        DefinitionLocation::Client(client_pointer) => {
+            client_pointer.lookup(db).target_entity_name.reference()
+        }
         DefinitionLocation::Server(server_field) => {
-            server_field.lookup(db).target_entity_name.item.reference()
+            server_field.lookup(db).target_entity_name.reference()
         }
     }
 }

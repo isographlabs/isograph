@@ -584,7 +584,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(server_object_entity) => {
                         let server_object_entity = server_object_entity.lookup(db);
                         let target_object_entity_name =
-                            server_object_entity.target_entity_name.item.inner().0;
+                            server_object_entity.target_entity_name.inner().0;
 
                         let object_selection_parent_object_entity =
                             &server_object_entity_named(db, target_object_entity_name)
@@ -780,7 +780,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
                 let concrete_object_entity_name =
-                    server_object_selectable.target_entity_name.item.inner().0;
+                    server_object_selectable.target_entity_name.inner().0;
 
                 let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
                     .as_ref()
@@ -902,7 +902,6 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
             (
                 newly_encountered_client_object_selectable
                     .target_entity_name
-                    .item
                     .inner()
                     .0,
                 *LINK_FIELD_NAME,
@@ -1121,7 +1120,6 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
 ) {
     let target_server_object_entity_name = newly_encountered_client_object_selectable
         .target_entity_name
-        .item
         .inner()
         .0;
     let target_server_object_entity =
@@ -1189,7 +1187,6 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         } else {
             (newly_encountered_client_object_selectable
                 .target_entity_name
-                .item
                 .inner()
                 .0)
                 .wrap_some()

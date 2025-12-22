@@ -67,7 +67,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let inner_text = match server_scalar_selectable.javascript_type_override {
                     Some(javascript_name) => javascript_name,
-                    None => server_scalar_entity_javascript_name(db, raw_type.item.inner().0)
+                    None => server_scalar_entity_javascript_name(db, raw_type.inner().0)
                         .as_ref()
                         .expect(
                             "Expected parsing to not have failed. \
@@ -81,16 +81,12 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_scalar_selectable
-                        .target_entity_name
-                        .item
-                        .is_nullable()
-                    {
+                    if server_scalar_selectable.target_entity_name.is_nullable() {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(raw_type.item.reference(), inner_text)
+                    print_javascript_type_declaration(raw_type.reference(), inner_text)
                 ));
             }
             MergedServerSelection::LinkedField(linked_field) => {
@@ -133,16 +129,12 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_object_selectable
-                        .target_entity_name
-                        .item
-                        .is_nullable()
-                    {
+                    if server_object_selectable.target_entity_name.is_nullable() {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(raw_type.item.reference(), inner_text)
+                    print_javascript_type_declaration(raw_type.reference(), inner_text)
                 ));
             }
             MergedServerSelection::ClientObjectSelectable(_) => {}

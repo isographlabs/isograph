@@ -98,7 +98,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
 
     let selectable = memo_ref.lookup(db);
 
-    let target_scalar_entity_name = selectable.target_entity_name.item.inner().0;
+    let target_scalar_entity_name = selectable.target_entity_name.inner().0;
     let target_scalar_entity = server_scalar_entity_named(db, target_scalar_entity_name)
         .clone_err()?
         .as_ref()
