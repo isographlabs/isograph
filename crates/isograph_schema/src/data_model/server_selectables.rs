@@ -22,6 +22,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     pub javascript_type_override: Option<JavascriptName>,
 
     pub parent_entity_name: EntityName,
+    // TODO we shouldn't support default values here
     pub arguments: Vec<VariableDefinition>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
@@ -45,6 +46,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub object_selectable_variant: ServerObjectSelectableVariant,
 
     pub parent_entity_name: EntityName,
+    // TODO we shouldn't support default values here
     pub arguments: Vec<VariableDefinition>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
