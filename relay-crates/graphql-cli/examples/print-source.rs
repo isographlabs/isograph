@@ -45,7 +45,7 @@ fn main() {
         111..111,
     ];
     let printer = SourcePrinter::default();
-    for test_case in test_cases.into_iter() {
+    for test_case in test_cases {
         let mut res = String::new();
         printer
             .write_span(&mut res, test_case.into(), EXAMPLE, 0)
