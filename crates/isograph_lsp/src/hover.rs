@@ -2,7 +2,7 @@ use common_lang_types::{
     EntityName, SelectableName, Span, relative_path_from_absolute_and_working_directory,
 };
 use isograph_lang_types::{
-    DefinitionLocation, Description, IsographResolvedNode, VariableDefinition,
+    DefinitionLocation, Description, IsographResolvedNode, VariableDeclaration,
 };
 use isograph_schema::{
     IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
@@ -158,7 +158,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::SelectionSet(_) => None,
             IsographResolvedNode::TypeAnnotation(_) => None,
             IsographResolvedNode::VariableNameWrapper(_) => None,
-            IsographResolvedNode::VariableDefinition(_) => None,
+            IsographResolvedNode::VariableDeclaration(_) => None,
         }
     } else {
         None
@@ -317,7 +317,7 @@ fn hover_text_for_selectable(
     server_or_client: &'static str,
     selectable_name: SelectableName,
     selectable_description: Option<Description>,
-    selectable_arguments: &[VariableDefinition],
+    selectable_arguments: &[VariableDeclaration],
     parent_type_name: EntityName,
     parent_description: Option<Description>,
 ) -> String {

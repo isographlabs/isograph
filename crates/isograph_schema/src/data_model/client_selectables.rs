@@ -3,7 +3,7 @@ use std::{fmt::Debug, marker::PhantomData};
 use common_lang_types::{
     EntityName, EntityNameAndSelectableName, SelectableName, WithEmbeddedLocation,
 };
-use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDefinition};
+use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDeclaration};
 use pico::MemoRef;
 
 use crate::{ClientFieldVariant, NetworkProtocol, UserWrittenClientPointerInfo};
@@ -32,7 +32,7 @@ pub struct ClientScalarSelectable<TNetworkProtocol: NetworkProtocol> {
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions: Vec<VariableDefinition>,
+    pub variable_definitions: Vec<VariableDeclaration>,
 
     pub parent_entity_name: EntityName,
     pub network_protocol: PhantomData<TNetworkProtocol>,
@@ -53,7 +53,7 @@ pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     // TODO drop the location
     pub target_entity_name: WithEmbeddedLocation<TypeAnnotation>,
 
-    pub variable_definitions: Vec<VariableDefinition>,
+    pub variable_definitions: Vec<VariableDeclaration>,
 
     pub parent_entity_name: EntityName,
 

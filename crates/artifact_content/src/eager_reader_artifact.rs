@@ -5,7 +5,7 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
-    VariableDefinition,
+    VariableDeclaration,
 };
 use isograph_schema::{
     ClientScalarSelectable, ClientSelectable, IsographDatabase, LINK_FIELD_NAME,
@@ -618,7 +618,7 @@ fn generate_function_import_statement(
 
 fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition>,
+    argument_definitions: impl Iterator<Item = &'a VariableDeclaration>,
 ) -> String {
     let mut s = "{\n".to_string();
     let indent = "  ";

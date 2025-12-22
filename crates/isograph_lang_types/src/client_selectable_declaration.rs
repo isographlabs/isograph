@@ -8,7 +8,7 @@ use std::fmt::Debug;
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
     ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotation, VariableDefinition,
+    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotation, VariableDeclaration,
     isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
 };
 
@@ -27,7 +27,7 @@ pub struct ClientFieldDeclaration {
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
     #[resolve_field]
-    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDeclaration>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,
@@ -51,7 +51,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
     #[resolve_field]
-    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDefinition>>,
+    pub variable_definitions: Vec<WithEmbeddedLocation<VariableDeclaration>>,
     pub definition_path: RelativePathToSourceFile,
 
     pub semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>,

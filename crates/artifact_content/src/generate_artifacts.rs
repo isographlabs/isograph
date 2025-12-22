@@ -7,7 +7,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, EmptyDirectiveSet, NonConstantValue, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDefinition, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
@@ -315,7 +315,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                             let variable_definitions_iter =
                                 client_scalar_selectable.variable_definitions.iter();
 
-                            let id_var = VariableDefinition {
+                            let id_var = VariableDeclaration {
                                 name: (*ID_FIELD_NAME)
                                     .unchecked_conversion::<VariableName>()
                                     .to::<VariableNameWrapper>()

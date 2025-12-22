@@ -4,7 +4,7 @@ use common_lang_types::{
     EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, WithEmbeddedLocation,
 };
 use isograph_lang_types::{
-    Description, SelectionType, TypeAnnotation, VariableDefinition, impl_with_target_id,
+    Description, SelectionType, TypeAnnotation, VariableDeclaration, impl_with_target_id,
 };
 use pico::MemoRef;
 
@@ -23,7 +23,7 @@ pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub parent_entity_name: EntityName,
     // TODO we shouldn't support default values here
-    pub arguments: Vec<VariableDefinition>,
+    pub arguments: Vec<VariableDeclaration>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 
@@ -47,7 +47,7 @@ pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
 
     pub parent_entity_name: EntityName,
     // TODO we shouldn't support default values here
-    pub arguments: Vec<VariableDefinition>,
+    pub arguments: Vec<VariableDeclaration>,
     pub phantom_data: PhantomData<TNetworkProtocol>,
 }
 

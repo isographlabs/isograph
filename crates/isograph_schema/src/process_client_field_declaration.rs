@@ -6,7 +6,7 @@ use common_lang_types::{
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
     ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
-    VariableDefinition,
+    VariableDeclaration,
 };
 use pico::MemoRef;
 use prelude::{ErrClone, Postfix};
@@ -336,7 +336,7 @@ pub struct ImperativelyLoadedFieldVariant {
     /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
     /// but we nonetheless need to put them into the query definition, and we need
     /// the variable's type, not just the variable.
-    pub top_level_schema_field_arguments: Vec<VariableDefinition>,
+    pub top_level_schema_field_arguments: Vec<VariableDeclaration>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

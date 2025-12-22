@@ -17,7 +17,7 @@ use prelude::Postfix;
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 
 use crate::{
-    ClientPointerDeclarationPath, EntityNameWrapper, IsographResolvedNode, VariableDefinitionPath,
+    ClientPointerDeclarationPath, EntityNameWrapper, IsographResolvedNode, VariableDeclarationPath,
 };
 
 /// This is annoying! We should find a better way to model lists.
@@ -57,7 +57,7 @@ impl ResolvePosition for TypeAnnotation {
 #[derive(Debug)]
 pub enum TypeAnnotationParentType<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    VariableDefinition(VariableDefinitionPath<'a>),
+    VariableDeclaration(VariableDeclarationPath<'a>),
 }
 
 pub type TypeAnnotationPath<'a> =

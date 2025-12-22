@@ -10,8 +10,8 @@ use crate::{
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
-#[resolve_position(parent_type=VariableDefinitionParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
-pub struct VariableDefinition {
+#[resolve_position(parent_type=VariableDeclarationParentType<'a>, resolved_node=IsographResolvedNode<'a>)]
+pub struct VariableDeclaration {
     #[resolve_field]
     pub name: WithEmbeddedLocation<VariableNameWrapper>,
     #[resolve_field]
@@ -19,11 +19,11 @@ pub struct VariableDefinition {
     pub default_value: Option<WithEmbeddedLocation<ConstantValue>>,
 }
 
-pub type VariableDefinitionPath<'a> =
-    PositionResolutionPath<&'a VariableDefinition, VariableDefinitionParentType<'a>>;
+pub type VariableDeclarationPath<'a> =
+    PositionResolutionPath<&'a VariableDeclaration, VariableDeclarationParentType<'a>>;
 
 #[derive(Debug)]
-pub enum VariableDefinitionParentType<'a> {
+pub enum VariableDeclarationParentType<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
 }

@@ -9,7 +9,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, VariableDefinition, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotation, VariableDeclaration, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -510,7 +510,7 @@ pub fn get_reachable_variables(
 
 pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_name: SelectableName,
-    top_level_schema_field_arguments: &[VariableDefinition],
+    top_level_schema_field_arguments: &[VariableDeclaration],
     top_level_schema_field_concrete_target_entity_name: Option<EntityName>,
     top_level_schema_field_parent_object_entity_name: EntityName,
 ) -> WrappedSelectionMapSelection {
@@ -1544,8 +1544,8 @@ fn get_aliased_mutation_field_name(
     s
 }
 
-pub fn id_arguments() -> Vec<VariableDefinition> {
-    vec![VariableDefinition {
+pub fn id_arguments() -> Vec<VariableDeclaration> {
+    vec![VariableDeclaration {
         name: ID_FIELD_NAME
             .unchecked_conversion::<VariableName>()
             .to::<VariableNameWrapper>()

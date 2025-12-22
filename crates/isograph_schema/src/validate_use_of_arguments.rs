@@ -7,7 +7,7 @@ use common_lang_types::{
 
 use isograph_lang_types::{
     DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, VariableDefinition, VariableNameWrapper,
+    SelectionType, VariableDeclaration, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
@@ -210,8 +210,8 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     errors: &mut Vec<Diagnostic>,
     reachable_variables: &mut UsedVariables,
-    field_argument_definitions: Vec<VariableDefinition>,
-    client_type_variable_definitions: &[VariableDefinition],
+    field_argument_definitions: Vec<VariableDeclaration>,
+    client_type_variable_definitions: &[VariableDeclaration],
     can_have_missing_args: bool,
     selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
     name_location: EmbeddedLocation,
@@ -259,7 +259,7 @@ fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn validate_all_variables_are_used(
-    variable_definitions: &[VariableDefinition],
+    variable_definitions: &[VariableDeclaration],
     used_variables: UsedVariables,
     top_level_type_and_field_name: EntityNameAndSelectableName,
     location: Location,
@@ -296,7 +296,7 @@ fn validate_all_variables_are_used(
 }
 
 fn assert_no_missing_arguments(
-    missing_arguments: Vec<VariableDefinition>,
+    missing_arguments: Vec<VariableDeclaration>,
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     if !missing_arguments.is_empty() {
@@ -317,15 +317,15 @@ fn assert_no_missing_arguments(
 }
 
 enum ArgumentType<'a> {
-    Missing(&'a VariableDefinition),
+    Missing(&'a VariableDeclaration),
     Provided(
-        &'a VariableDefinition,
+        &'a VariableDeclaration,
         &'a WithEmbeddedLocation<SelectionFieldArgument>,
     ),
 }
 
 fn get_missing_and_provided_arguments<'a>(
-    field_argument_definitions: &'a [VariableDefinition],
+    field_argument_definitions: &'a [VariableDeclaration],
     selection_supplied_arguments: &'a [WithEmbeddedLocation<SelectionFieldArgument>],
 ) -> impl Iterator<Item = ArgumentType<'a>> {
     field_argument_definitions
@@ -349,7 +349,7 @@ fn get_missing_and_provided_arguments<'a>(
 }
 
 fn validate_no_extraneous_arguments(
-    field_argument_definitions: &[VariableDefinition],
+    field_argument_definitions: &[VariableDeclaration],
     selection_supplied_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {

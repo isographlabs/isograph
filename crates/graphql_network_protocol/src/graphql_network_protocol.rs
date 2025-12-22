@@ -12,7 +12,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
     SelectionSet, SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant,
-    VariableDefinition,
+    VariableDeclaration,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
@@ -208,7 +208,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 let arg = with_location.item;
-                                VariableDefinition {
+                                VariableDeclaration {
                                     name: arg.name.map(|input_value_name| {
                                         input_value_name
                                             .unchecked_conversion::<VariableName>()
@@ -249,7 +249,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .into_iter()
                             .map(|with_location| {
                                 let arg = with_location.item;
-                                VariableDefinition {
+                                VariableDeclaration {
                                     name: arg.name.map(|input_value_name| {
                                         input_value_name
                                             .unchecked_conversion::<VariableName>()
@@ -566,7 +566,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         _db: &IsographDatabase<Self>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
-        query_variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
+        query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
         root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText {

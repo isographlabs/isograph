@@ -3,7 +3,7 @@ use std::collections::BTreeSet;
 use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName};
 use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
-use isograph_lang_types::{VariableDefinition, VariableNameWrapper};
+use isograph_lang_types::{VariableDeclaration, VariableNameWrapper};
 use isograph_schema::{
     ClientScalarSelectable, Format, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
     IsographDatabase, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
@@ -66,7 +66,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         get_used_variable_definitions(reachable_variables, entrypoint);
 
     for variable_definition in top_level_schema_field_arguments.iter() {
-        definitions_of_used_variables.insert(VariableDefinition {
+        definitions_of_used_variables.insert(VariableDeclaration {
             name: variable_definition.name,
             type_: variable_definition.type_.clone(),
             default_value: variable_definition.default_value.clone(),
@@ -186,7 +186,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
     reachable_variables: &BTreeSet<VariableNameWrapper>,
     entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
-) -> BTreeSet<VariableDefinition> {
+) -> BTreeSet<VariableDeclaration> {
     reachable_variables
         .iter()
         .flat_map(|variable_name| {

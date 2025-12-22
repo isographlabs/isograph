@@ -13,7 +13,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
     NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypePostfix, TypeAnnotation, VariableDefinition, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotation, VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
@@ -390,7 +390,7 @@ fn get_refetch_selectable(
                 from: (*ID_FIELD_NAME).unchecked_conversion(),
                 to: (*ID_FIELD_NAME).unchecked_conversion(),
             }],
-            top_level_schema_field_arguments: vec![VariableDefinition {
+            top_level_schema_field_arguments: vec![VariableDeclaration {
                 name: (*ID_FIELD_NAME)
                     .unchecked_conversion::<VariableName>()
                     .to::<VariableNameWrapper>()

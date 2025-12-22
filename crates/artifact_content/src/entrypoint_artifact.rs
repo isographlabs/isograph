@@ -18,7 +18,7 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
     EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
-    VariableDefinition, VariableNameWrapper,
+    VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
@@ -126,7 +126,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
-    variable_definitions: Vec<&VariableDefinition>,
+    variable_definitions: Vec<&VariableDeclaration>,
     // TODO this implements copy, don't take reference
     default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
@@ -390,8 +390,8 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
 
 fn get_used_variable_definitions<'a>(
     merged_selection_map: &MergedSelectionMap,
-    variable_definitions: Vec<&'a VariableDefinition>,
-) -> BTreeSet<&'a VariableDefinition> {
+    variable_definitions: Vec<&'a VariableDeclaration>,
+) -> BTreeSet<&'a VariableDeclaration> {
     get_reachable_variables(merged_selection_map)
         .map(|variable_name| {
             *variable_definitions

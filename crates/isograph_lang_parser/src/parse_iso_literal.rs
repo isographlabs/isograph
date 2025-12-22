@@ -13,7 +13,7 @@ use isograph_lang_types::{
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
     ScalarSelection, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDefinition, VariableNameWrapper, from_isograph_field_directives,
+    TypeAnnotation, VariableDeclaration, VariableNameWrapper, from_isograph_field_directives,
     semantic_token_legend,
 };
 use prelude::Postfix;
@@ -708,7 +708,7 @@ fn parse_object_entry(
 
 fn parse_variable_definitions(
     tokens: &mut PeekableLexer,
-) -> DiagnosticResult<Vec<WithEmbeddedLocation<VariableDefinition>>> {
+) -> DiagnosticResult<Vec<WithEmbeddedLocation<VariableDeclaration>>> {
     if tokens
         .parse_token_of_kind(
             IsographLangTokenKind::OpenParen,
@@ -732,7 +732,7 @@ fn parse_variable_definitions(
 
 fn parse_variable_definition(
     tokens: &mut PeekableLexer<'_>,
-) -> DiagnosticResult<WithEmbeddedLocation<VariableDefinition>> {
+) -> DiagnosticResult<WithEmbeddedLocation<VariableDeclaration>> {
     tokens
         .with_embedded_location_result(|tokens| {
             let _dollar = tokens.parse_token_of_kind(
@@ -755,7 +755,7 @@ fn parse_variable_definition(
 
             let default_value = parse_optional_default_value(tokens)?;
 
-            VariableDefinition {
+            VariableDeclaration {
                 name,
                 type_,
                 default_value,

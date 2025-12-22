@@ -3,7 +3,7 @@ use std::{collections::HashMap, fmt::Debug};
 use common_lang_types::{SelectableName, WithEmbeddedLocation};
 use isograph_lang_types::{
     ArgumentKeyAndValue, ConstantValue, NonConstantValue, ScalarSelectionDirectiveSet,
-    SelectionFieldArgument, SelectionType, VariableDefinition, VariableNameWrapper,
+    SelectionFieldArgument, SelectionType, VariableDeclaration, VariableNameWrapper,
 };
 use prelude::Postfix;
 
@@ -19,7 +19,7 @@ impl VariableContext {
     pub fn child_variable_context(
         &self,
         selection_arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
-        child_variable_definitions: &[VariableDefinition],
+        child_variable_definitions: &[VariableDeclaration],
         selection_variant: &ScalarSelectionDirectiveSet,
     ) -> Self {
         // We need to take a parent context ({$id: NonConstantValue1 }), the argument parameters ({blah: $id}),

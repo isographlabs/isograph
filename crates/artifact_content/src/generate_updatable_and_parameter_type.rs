@@ -8,7 +8,7 @@ use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDefinition,
+    TypeAnnotation, VariableDeclaration,
 };
 use isograph_schema::{
     ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
@@ -491,7 +491,7 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
 
 fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    arguments: Vec<VariableDefinition>,
+    arguments: Vec<VariableDeclaration>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();
     let mut is_first = true;
@@ -513,9 +513,9 @@ fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
 }
 
 fn get_provided_arguments<'a>(
-    argument_definitions: impl Iterator<Item = &'a VariableDefinition> + 'a,
+    argument_definitions: impl Iterator<Item = &'a VariableDeclaration> + 'a,
     arguments: &[WithEmbeddedLocation<SelectionFieldArgument>],
-) -> Vec<VariableDefinition> {
+) -> Vec<VariableDeclaration> {
     argument_definitions
         .filter_map(|definition| {
             let user_has_supplied_argument = arguments

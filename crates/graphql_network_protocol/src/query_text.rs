@@ -1,6 +1,6 @@
 use common_lang_types::{QueryOperationName, QueryText};
 use isograph_lang_types::{
-    ArgumentKeyAndValue, NonConstantValue, VariableDefinition,
+    ArgumentKeyAndValue, NonConstantValue, VariableDeclaration,
     graphql_type_annotation_from_type_annotation,
 };
 use isograph_schema::{Format, MergedSelectionMap, MergedServerSelection, RootOperationName};
@@ -9,7 +9,7 @@ use prelude::Postfix;
 pub(crate) fn generate_query_text<'a>(
     query_name: QueryOperationName,
     selection_map: &MergedSelectionMap,
-    query_variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
+    query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
     root_operation_name: &RootOperationName,
     format: Format,
 ) -> QueryText {
@@ -30,7 +30,7 @@ pub(crate) fn generate_query_text<'a>(
 }
 
 fn write_variables_to_string<'a>(
-    variables: impl Iterator<Item = &'a VariableDefinition> + 'a,
+    variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
 ) -> String {
     let mut empty = true;
     let mut first = true;

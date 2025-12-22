@@ -10,7 +10,7 @@ use prelude::{ErrClone, Postfix};
 
 use isograph_lang_types::{
     EntityNameWrapper, NonConstantValue, SelectionType, TypeAnnotation, UnionTypeAnnotation,
-    UnionVariant, VariableDefinition, VariableNameWrapper,
+    UnionVariant, VariableDeclaration, VariableNameWrapper,
 };
 
 use crate::{
@@ -141,7 +141,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
     field_argument_definition_type: &TypeAnnotation,
-    variable_definitions: &[VariableDefinition],
+    variable_definitions: &[VariableDeclaration],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
         NonConstantValue::Variable(supplied_variable_name) => {
@@ -296,7 +296,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
-    variable_definitions: &[VariableDefinition],
+    variable_definitions: &[VariableDeclaration],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     object_entity_name: EntityName,
 ) -> DiagnosticResult<()> {
@@ -451,7 +451,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     supplied_list: &[WithEmbeddedLocation<NonConstantValue>],
     target_type: &TypeAnnotation,
-    variable_definitions: &[VariableDefinition],
+    variable_definitions: &[VariableDeclaration],
 ) -> DiagnosticResult<()> {
     supplied_list.iter().try_for_each(|element| {
         value_satisfies_type(db, element, target_type.reference(), variable_definitions)
@@ -460,7 +460,7 @@ fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
 fn get_variable_type<'a>(
     variable_name: &'a VariableNameWrapper,
-    variable_definitions: &'a [VariableDefinition],
+    variable_definitions: &'a [VariableDeclaration],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<&'a TypeAnnotation> {
     match variable_definitions
