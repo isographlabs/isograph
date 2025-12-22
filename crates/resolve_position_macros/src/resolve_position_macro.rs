@@ -220,6 +220,15 @@ fn parse_resolve_field_type(
                     ResolveFieldInfoType::WithLocation,
                 );
             }
+            "WithGenericLocation" => {
+                // NOTE: It has to be a WithGenericLocation<T, EmbeddedLocation> for
+                // this to work.
+                return handle_case(
+                    last_segment,
+                    generics_map,
+                    ResolveFieldInfoType::WithEmbeddedLocation,
+                );
+            }
             "WithEmbeddedLocation" => {
                 return handle_case(
                     last_segment,
@@ -254,7 +263,8 @@ fn parse_resolve_field_type(
 
     Err(Error::new_spanned(
         path,
-        "Expected WithLocation<T>, WithSpan<T>, GraphQLTypeAnnotation, Vec<T>, or Option<T> where T is a valid resolve field type",
+        "Expected WithLocation<T>, WithGenericLocation<T>, GraphQLTypeAnnotation, \
+        Vec<T>, or Option<T> where T is a valid resolve field type",
     )
     .to_compile_error())
 }
