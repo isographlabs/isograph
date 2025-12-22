@@ -6,7 +6,7 @@ use resolve_position_macros::ResolvePosition;
 
 use crate::{
     ClientFieldDeclarationPath, ClientPointerDeclarationPath, ConstantValue, IsographResolvedNode,
-    TypeAnnotation, VariableNameWrapper,
+    TypeAnnotationDeclaration, VariableNameWrapper,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
@@ -15,7 +15,7 @@ pub struct VariableDeclaration {
     #[resolve_field]
     pub name: WithEmbeddedLocation<VariableNameWrapper>,
     #[resolve_field]
-    pub type_: WithEmbeddedLocation<TypeAnnotation>,
+    pub type_: WithEmbeddedLocation<TypeAnnotationDeclaration>,
     pub default_value: Option<WithEmbeddedLocation<ConstantValue>>,
 }
 

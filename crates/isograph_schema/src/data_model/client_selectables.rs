@@ -1,7 +1,9 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName};
-use isograph_lang_types::{Description, SelectionType, TypeAnnotation, VariableDeclaration};
+use isograph_lang_types::{
+    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
+};
 use pico::MemoRef;
 
 use crate::{ClientFieldVariant, NetworkProtocol, UserWrittenClientPointerInfo};
@@ -48,7 +50,7 @@ impl<TNetworkProtocol: NetworkProtocol> ClientScalarSelectable<TNetworkProtocol>
 pub struct ClientObjectSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: SelectableName,
-    pub target_entity_name: TypeAnnotation,
+    pub target_entity_name: TypeAnnotationDeclaration,
 
     pub variable_definitions: Vec<VariableDeclaration>,
 

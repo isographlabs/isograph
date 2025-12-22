@@ -13,8 +13,8 @@ use isograph_lang_types::{
     ConstantValue, EntityNameWrapper, EntrypointDeclaration, IsographFieldDirective,
     IsographResolvedNode, IsographSemanticToken, NonConstantValue, ObjectSelection,
     ScalarSelection, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDeclaration, VariableNameWrapper, from_isograph_field_directives,
-    semantic_token_legend,
+    TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
+    from_isograph_field_directives, semantic_token_legend,
 };
 use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
@@ -284,7 +284,7 @@ fn parse_client_pointer_declaration_inner(
         let variable_definitions = parse_variable_definitions(tokens)?;
 
         let target_type = parse_client_pointer_target_type(tokens)?
-            .map(TypeAnnotation::from_graphql_type_annotation);
+            .map(TypeAnnotationDeclaration::from_graphql_type_annotation);
 
         let directives = parse_directives(tokens)?;
 
@@ -750,8 +750,8 @@ fn parse_variable_definition(
                 IsographLangTokenKind::Colon,
                 semantic_token_legend::ST_COLON,
             )?;
-            let type_ =
-                parse_type_annotation(tokens)?.map(TypeAnnotation::from_graphql_type_annotation);
+            let type_ = parse_type_annotation(tokens)?
+                .map(TypeAnnotationDeclaration::from_graphql_type_annotation);
 
             let default_value = parse_optional_default_value(tokens)?;
 

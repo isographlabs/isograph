@@ -11,8 +11,8 @@ use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
-    SelectionSet, SelectionTypePostfix, TypeAnnotation, UnionTypeAnnotation, UnionVariant,
-    VariableDeclaration,
+    SelectionSet, SelectionTypePostfix, TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration,
+    UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
@@ -199,7 +199,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .type_
                             .item
                             .clone()
-                            .wrap(TypeAnnotation::from_graphql_type_annotation),
+                            .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
                         object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
                         parent_entity_name,
@@ -215,9 +215,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             .unchecked_conversion::<VariableName>()
                                             .into()
                                     }),
-                                    type_: arg
-                                        .type_
-                                        .map(TypeAnnotation::from_graphql_type_annotation),
+                                    type_: arg.type_.map(
+                                        TypeAnnotationDeclaration::from_graphql_type_annotation,
+                                    ),
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),
@@ -256,9 +256,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                             .unchecked_conversion::<VariableName>()
                                             .into()
                                     }),
-                                    type_: arg
-                                        .type_
-                                        .map(TypeAnnotation::from_graphql_type_annotation),
+                                    type_: arg.type_.map(
+                                        TypeAnnotationDeclaration::from_graphql_type_annotation,
+                                    ),
                                     default_value: arg.default_value.map(|with_location| {
                                         with_location.map(to_isograph_constant_value)
                                     }),
@@ -271,7 +271,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .type_
                             .item
                             .clone()
-                            .wrap(TypeAnnotation::from_graphql_type_annotation),
+                            .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
                         javascript_type_override: None,
                     }
@@ -306,16 +306,18 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         name: format!("as{}", concrete_child_entity_name)
                             .intern()
                             .to::<SelectableName>(),
-                        target_entity_name: TypeAnnotation::Union(UnionTypeAnnotation {
-                            variants: {
-                                let mut variants = BTreeSet::new();
-                                variants.insert(UnionVariant::Scalar(
-                                    concrete_child_entity_name.dereference().into(),
-                                ));
-                                variants
+                        target_entity_name: TypeAnnotationDeclaration::Union(
+                            UnionTypeAnnotationDeclaration {
+                                variants: {
+                                    let mut variants = BTreeSet::new();
+                                    variants.insert(UnionVariant::Scalar(
+                                        concrete_child_entity_name.dereference().into(),
+                                    ));
+                                    variants
+                                },
+                                nullable: true,
                             },
-                            nullable: true,
-                        }),
+                        ),
                         object_selectable_variant: ServerObjectSelectableVariant::InlineFragment,
                         parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                         arguments: vec![],

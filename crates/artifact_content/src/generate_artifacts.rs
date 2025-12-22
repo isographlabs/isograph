@@ -7,7 +7,8 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
     DefinitionLocationPostfix, EmptyDirectiveSet, NonConstantValue, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, UnionVariant, VariableDeclaration, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
+    VariableNameWrapper,
 };
 use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
@@ -321,7 +322,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                     .to::<VariableNameWrapper>()
                                     .with_embedded_location(EmbeddedLocation::todo_generated()),
 
-                                type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+                                type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
                                     .with_embedded_location(EmbeddedLocation::todo_generated()),
                                 default_value: None,
                             };
@@ -741,7 +742,7 @@ pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
 
 // TODO accept an inner param... this is broken right now
 pub(crate) fn print_javascript_type_declaration<T: std::fmt::Display>(
-    type_annotation: &TypeAnnotation,
+    type_annotation: &TypeAnnotationDeclaration,
     inner_text: T,
 ) -> String {
     let mut s = String::new();
@@ -753,15 +754,15 @@ pub(crate) fn print_javascript_type_declaration<T: std::fmt::Display>(
 // print the inner EntityName! That's wrong. The entity's name is a concept in the
 // type system (i.e. in the schema), and is not a valid Javascript type.
 fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
-    type_annotation: &TypeAnnotation,
+    type_annotation: &TypeAnnotationDeclaration,
     s: &mut String,
     inner_text: &T,
 ) {
     match &type_annotation {
-        TypeAnnotation::Scalar(_) => {
+        TypeAnnotationDeclaration::Scalar(_) => {
             s.push_str(&inner_text.to_string());
         }
-        TypeAnnotation::Union(union_type_annotation) => {
+        TypeAnnotationDeclaration::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
                 panic!("Unexpected union with not enough variants.");
             }
@@ -813,7 +814,7 @@ fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
                 }
             }
         }
-        TypeAnnotation::Plural(type_annotation) => {
+        TypeAnnotationDeclaration::Plural(type_annotation) => {
             s.push_str("ReadonlyArray<");
             print_javascript_type_declaration_impl(type_annotation.item.reference(), s, inner_text);
             s.push('>');

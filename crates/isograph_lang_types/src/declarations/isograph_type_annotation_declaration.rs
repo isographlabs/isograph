@@ -23,24 +23,28 @@ use crate::{
 /// This is annoying! We should find a better way to model lists.
 /// This gets us closer to a good solution, so it's fine.
 #[derive(PartialEq, PartialOrd, Ord, Eq, Clone, Debug, Hash)]
-pub enum TypeAnnotation {
+pub enum TypeAnnotationDeclaration {
     Scalar(EntityNameWrapper),
-    Union(UnionTypeAnnotation),
-    Plural(Box<WithEmbeddedLocation<TypeAnnotation>>),
+    Union(UnionTypeAnnotationDeclaration),
+    Plural(Box<WithEmbeddedLocation<TypeAnnotationDeclaration>>),
 }
 
-impl std::fmt::Display for TypeAnnotation {
+impl std::fmt::Display for TypeAnnotationDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            TypeAnnotation::Scalar(entity_name_wrapper) => write!(f, "{}", entity_name_wrapper),
-            TypeAnnotation::Union(union_type_annotation) => write!(f, "{}", union_type_annotation),
-            TypeAnnotation::Plural(plural) => write!(f, "[{}]", &plural.item),
+            TypeAnnotationDeclaration::Scalar(entity_name_wrapper) => {
+                write!(f, "{}", entity_name_wrapper)
+            }
+            TypeAnnotationDeclaration::Union(union_type_annotation) => {
+                write!(f, "{}", union_type_annotation)
+            }
+            TypeAnnotationDeclaration::Plural(plural) => write!(f, "[{}]", &plural.item),
         }
     }
 }
 
-impl ResolvePosition for TypeAnnotation {
-    type Parent<'a> = TypeAnnotationParentType<'a>;
+impl ResolvePosition for TypeAnnotationDeclaration {
+    type Parent<'a> = TypeAnnotationDeclarationParentType<'a>;
 
     type ResolvedNode<'a> = IsographResolvedNode<'a>;
 
@@ -55,33 +59,33 @@ impl ResolvePosition for TypeAnnotation {
 }
 
 #[derive(Debug)]
-pub enum TypeAnnotationParentType<'a> {
+pub enum TypeAnnotationDeclarationParentType<'a> {
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
     VariableDeclaration(VariableDeclarationPath<'a>),
 }
 
-pub type TypeAnnotationPath<'a> =
-    PositionResolutionPath<&'a TypeAnnotation, TypeAnnotationParentType<'a>>;
+pub type TypeAnnotationDeclarationPath<'a> =
+    PositionResolutionPath<&'a TypeAnnotationDeclaration, TypeAnnotationDeclarationParentType<'a>>;
 
-impl TypeAnnotation {
+impl TypeAnnotationDeclaration {
     pub fn from_graphql_type_annotation(other: GraphQLTypeAnnotation) -> Self {
         match other {
             GraphQLTypeAnnotation::Named(named_type_annotation) => {
-                TypeAnnotation::Union(UnionTypeAnnotation::new_nullable(UnionVariant::Scalar(
-                    named_type_annotation.0.into(),
-                )))
+                TypeAnnotationDeclaration::Union(UnionTypeAnnotationDeclaration::new_nullable(
+                    UnionVariant::Scalar(named_type_annotation.0.into()),
+                ))
             }
             GraphQLTypeAnnotation::List(list_type_annotation) => {
                 let inner = (*list_type_annotation)
                     .0
-                    .map(TypeAnnotation::from_graphql_type_annotation);
+                    .map(TypeAnnotationDeclaration::from_graphql_type_annotation);
 
-                TypeAnnotation::Union(UnionTypeAnnotation::new_nullable(UnionVariant::Plural(
-                    inner,
-                )))
+                TypeAnnotationDeclaration::Union(UnionTypeAnnotationDeclaration::new_nullable(
+                    UnionVariant::Plural(inner),
+                ))
             }
             GraphQLTypeAnnotation::NonNull(non_null_type_annotation) => {
-                TypeAnnotation::from_non_null_type_annotation(*non_null_type_annotation)
+                TypeAnnotationDeclaration::from_non_null_type_annotation(*non_null_type_annotation)
             }
         }
     }
@@ -89,24 +93,26 @@ impl TypeAnnotation {
     pub fn from_non_null_type_annotation(other: GraphQLNonNullTypeAnnotation) -> Self {
         match other {
             GraphQLNonNullTypeAnnotation::Named(named_type_annotation) => {
-                TypeAnnotation::Scalar(named_type_annotation.0.into())
+                TypeAnnotationDeclaration::Scalar(named_type_annotation.0.into())
             }
             GraphQLNonNullTypeAnnotation::List(list_type_annotation) => {
                 let inner = list_type_annotation
                     .0
-                    .map(TypeAnnotation::from_graphql_type_annotation);
-                TypeAnnotation::Plural(inner.boxed())
+                    .map(TypeAnnotationDeclaration::from_graphql_type_annotation);
+                TypeAnnotationDeclaration::Plural(inner.boxed())
             }
         }
     }
 }
 
-impl TypeAnnotation {
+impl TypeAnnotationDeclaration {
     pub fn inner(&self) -> EntityNameWrapper {
         match self {
-            TypeAnnotation::Scalar(s) => s.dereference(),
-            TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
-            TypeAnnotation::Plural(type_annotation) => type_annotation.item.inner(),
+            TypeAnnotationDeclaration::Scalar(s) => s.dereference(),
+            TypeAnnotationDeclaration::Union(union_type_annotation) => {
+                union_type_annotation.inner()
+            }
+            TypeAnnotationDeclaration::Plural(type_annotation) => type_annotation.item.inner(),
         }
     }
 
@@ -114,9 +120,13 @@ impl TypeAnnotation {
     // ideally
     pub fn inner_non_null(&self) -> EntityNameWrapper {
         match self {
-            TypeAnnotation::Scalar(s) => s.dereference(),
-            TypeAnnotation::Union(union_type_annotation) => union_type_annotation.inner(),
-            TypeAnnotation::Plural(type_annotation) => type_annotation.item.inner_non_null(),
+            TypeAnnotationDeclaration::Scalar(s) => s.dereference(),
+            TypeAnnotationDeclaration::Union(union_type_annotation) => {
+                union_type_annotation.inner()
+            }
+            TypeAnnotationDeclaration::Plural(type_annotation) => {
+                type_annotation.item.inner_non_null()
+            }
         }
     }
 
@@ -124,22 +134,24 @@ impl TypeAnnotation {
         // TODO this will have to change at some point, but for now, a Union is only used
         // to represent nullability.
         match self {
-            TypeAnnotation::Scalar(entity_name_wrapper) => false,
-            TypeAnnotation::Union(union_type_annotation) => union_type_annotation.nullable,
-            TypeAnnotation::Plural(_) => false,
+            TypeAnnotationDeclaration::Scalar(entity_name_wrapper) => false,
+            TypeAnnotationDeclaration::Union(union_type_annotation) => {
+                union_type_annotation.nullable
+            }
+            TypeAnnotationDeclaration::Plural(_) => false,
         }
     }
 }
 
 #[derive(Default, Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
-pub struct UnionTypeAnnotation {
+pub struct UnionTypeAnnotationDeclaration {
     pub variants: BTreeSet<UnionVariant>,
     // TODO this is incredibly hacky. null should be in the variants set, but
     // that doesn't work for a variety of reasons, namely mapping, etc.
     pub nullable: bool,
 }
 
-impl std::fmt::Display for UnionTypeAnnotation {
+impl std::fmt::Display for UnionTypeAnnotationDeclaration {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "(")?;
         let count = self.variants.len();
@@ -157,11 +169,11 @@ impl std::fmt::Display for UnionTypeAnnotation {
     }
 }
 
-impl UnionTypeAnnotation {
+impl UnionTypeAnnotationDeclaration {
     pub fn new_nullable(variant: UnionVariant) -> Self {
         let mut variants = BTreeSet::new();
         variants.insert(variant);
-        UnionTypeAnnotation {
+        UnionTypeAnnotationDeclaration {
             variants,
             nullable: true,
         }
@@ -182,7 +194,7 @@ impl UnionTypeAnnotation {
 #[derive(Ord, PartialEq, PartialOrd, Eq, Clone, Debug, Hash)]
 pub enum UnionVariant {
     Scalar(EntityNameWrapper),
-    Plural(WithEmbeddedLocation<TypeAnnotation>),
+    Plural(WithEmbeddedLocation<TypeAnnotationDeclaration>),
 }
 
 impl std::fmt::Display for UnionVariant {
@@ -195,7 +207,7 @@ impl std::fmt::Display for UnionVariant {
 }
 
 fn graphql_type_annotation_from_union_variant(
-    union_type_annotation: &UnionTypeAnnotation,
+    union_type_annotation: &UnionTypeAnnotationDeclaration,
 ) -> GraphQLTypeAnnotation {
     if union_type_annotation.nullable {
         return match union_type_annotation.variants.iter().next().unwrap() {
@@ -232,14 +244,14 @@ fn graphql_type_annotation_from_union_variant(
 }
 
 pub fn graphql_type_annotation_from_type_annotation(
-    other: &TypeAnnotation,
+    other: &TypeAnnotationDeclaration,
 ) -> GraphQLTypeAnnotation {
     match other {
-        TypeAnnotation::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::NonNull(
+        TypeAnnotationDeclaration::Scalar(scalar_entity_name) => GraphQLTypeAnnotation::NonNull(
             GraphQLNonNullTypeAnnotation::Named(GraphQLNamedTypeAnnotation(scalar_entity_name.0))
                 .boxed(),
         ),
-        TypeAnnotation::Plural(type_annotation) => GraphQLTypeAnnotation::List(
+        TypeAnnotationDeclaration::Plural(type_annotation) => GraphQLTypeAnnotation::List(
             GraphQLListTypeAnnotation(
                 type_annotation
                     .as_ref()
@@ -248,7 +260,7 @@ pub fn graphql_type_annotation_from_type_annotation(
             )
             .boxed(),
         ),
-        TypeAnnotation::Union(union_type_annotation) => {
+        TypeAnnotationDeclaration::Union(union_type_annotation) => {
             graphql_type_annotation_from_union_variant(union_type_annotation)
         }
     }

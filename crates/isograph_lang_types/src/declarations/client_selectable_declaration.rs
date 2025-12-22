@@ -8,8 +8,9 @@ use std::fmt::Debug;
 use crate::{
     ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
     ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotation, VariableDeclaration,
-    isograph_resolved_node::IsographResolvedNode, string_key_wrappers::Description,
+    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotationDeclaration,
+    VariableDeclaration, isograph_resolved_node::IsographResolvedNode,
+    string_key_wrappers::Description,
 };
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash, ResolvePosition)]
@@ -44,7 +45,7 @@ pub struct ClientPointerDeclaration {
     #[resolve_field]
     pub client_pointer_name: WithEmbeddedLocation<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
-    pub target_type: WithEmbeddedLocation<TypeAnnotation>,
+    pub target_type: WithEmbeddedLocation<TypeAnnotationDeclaration>,
     pub directives: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
     pub description: Option<WithEmbeddedLocation<Description>>,

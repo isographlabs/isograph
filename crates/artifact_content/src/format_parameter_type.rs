@@ -1,6 +1,6 @@
 use common_lang_types::{EntityName, SelectableName};
 
-use isograph_lang_types::{SelectionType, TypeAnnotation, UnionVariant};
+use isograph_lang_types::{SelectionType, TypeAnnotationDeclaration, UnionVariant};
 use isograph_schema::{
     IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named_2,
     server_object_selectable_named, server_scalar_entity_javascript_name,
@@ -10,14 +10,14 @@ use prelude::Postfix;
 
 pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    type_: &TypeAnnotation,
+    type_: &TypeAnnotationDeclaration,
     indentation_level: u8,
 ) -> String {
     match type_ {
-        TypeAnnotation::Scalar(entity_name_wrapper) => {
+        TypeAnnotationDeclaration::Scalar(entity_name_wrapper) => {
             format_server_field_type(db, entity_name_wrapper.0, indentation_level)
         }
-        TypeAnnotation::Union(union_type_annotation) => {
+        TypeAnnotationDeclaration::Union(union_type_annotation) => {
             let mut s = String::new();
             let count = union_type_annotation.variants.len();
             for (index, variant) in union_type_annotation.variants.iter().enumerate() {
@@ -51,7 +51,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
 
             s
         }
-        TypeAnnotation::Plural(plural) => {
+        TypeAnnotationDeclaration::Plural(plural) => {
             let mut s = String::new();
             s.push_str("ReadonlyArray<");
             s.push_str(&format_parameter_type(
@@ -190,24 +190,24 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     )
 }
 
-fn is_nullable(type_annotation: &TypeAnnotation) -> bool {
+fn is_nullable(type_annotation: &TypeAnnotationDeclaration) -> bool {
     match type_annotation {
-        TypeAnnotation::Union(union) => union.nullable,
-        TypeAnnotation::Plural(_) => false,
-        TypeAnnotation::Scalar(_) => false,
+        TypeAnnotationDeclaration::Union(union) => union.nullable,
+        TypeAnnotationDeclaration::Plural(_) => false,
+        TypeAnnotationDeclaration::Scalar(_) => false,
     }
 }
 
 fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    type_annotation: &TypeAnnotation,
+    type_annotation: &TypeAnnotationDeclaration,
     indentation_level: u8,
 ) -> String {
     match &type_annotation {
-        TypeAnnotation::Scalar(scalar) => {
+        TypeAnnotationDeclaration::Scalar(scalar) => {
             format_server_field_type(db, scalar.0, indentation_level + 1)
         }
-        TypeAnnotation::Union(union_type_annotation) => {
+        TypeAnnotationDeclaration::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
                 panic!("Unexpected union with not enough variants.");
             }
@@ -266,7 +266,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                 }
             }
         }
-        TypeAnnotation::Plural(type_annotation) => {
+        TypeAnnotationDeclaration::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
                 format_server_field_type(db, type_annotation.item.inner().0, indentation_level + 1)

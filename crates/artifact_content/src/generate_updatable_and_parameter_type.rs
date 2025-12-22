@@ -8,7 +8,7 @@ use intern::Lookup;
 use isograph_lang_types::{
     DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotation, VariableDeclaration,
+    TypeAnnotationDeclaration, VariableDeclaration,
 };
 use isograph_schema::{
     ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
@@ -364,8 +364,8 @@ fn write_getter_and_setter(
     query_type_declaration: &mut String,
     indentation_level: u8,
     name_or_alias: SelectableNameOrAlias,
-    output_type_annotation: &TypeAnnotation,
-    type_annotation: &TypeAnnotation,
+    output_type_annotation: &TypeAnnotationDeclaration,
+    type_annotation: &TypeAnnotationDeclaration,
     getter_inner_text: impl Display,
 ) {
     query_type_declaration.push_str(&format!(

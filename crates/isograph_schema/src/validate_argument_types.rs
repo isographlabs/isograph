@@ -9,8 +9,8 @@ use intern::{Lookup, string_key::StringKey};
 use prelude::{ErrClone, Postfix};
 
 use isograph_lang_types::{
-    EntityNameWrapper, NonConstantValue, SelectionType, TypeAnnotation, UnionTypeAnnotation,
-    UnionVariant, VariableDeclaration, VariableNameWrapper,
+    EntityNameWrapper, NonConstantValue, SelectionType, TypeAnnotationDeclaration,
+    UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration, VariableNameWrapper,
 };
 
 use crate::{
@@ -21,21 +21,21 @@ use crate::{
 fn scalar_literal_satisfies_type(
     // We supplied an int literal
     supplied_scalar_literal_entity_name: EntityName,
-    target_type: &TypeAnnotation,
+    target_type: &TypeAnnotationDeclaration,
     location: EmbeddedLocation,
     type_description: &'static str,
 ) -> DiagnosticResult<()> {
     let matches = match target_type {
-        TypeAnnotation::Scalar(target_entity_name_wrapper) => {
+        TypeAnnotationDeclaration::Scalar(target_entity_name_wrapper) => {
             target_entity_name_wrapper.0 == supplied_scalar_literal_entity_name
         }
-        TypeAnnotation::Union(target_union) => {
+        TypeAnnotationDeclaration::Union(target_union) => {
             // The union must contain an int
             target_union.variants.contains(&UnionVariant::Scalar(
                 supplied_scalar_literal_entity_name.into(),
             ))
         }
-        TypeAnnotation::Plural(_) => false,
+        TypeAnnotationDeclaration::Plural(_) => false,
     };
 
     if !matches {
@@ -51,13 +51,13 @@ fn scalar_literal_satisfies_type(
 }
 
 fn variable_type_satisfies_argument_type(
-    supplied_type: &TypeAnnotation,
-    target_type: &TypeAnnotation,
+    supplied_type: &TypeAnnotationDeclaration,
+    target_type: &TypeAnnotationDeclaration,
 ) -> bool {
     match target_type {
-        TypeAnnotation::Scalar(target_scalar) => match supplied_type {
-            TypeAnnotation::Scalar(supplied_scalar) => target_scalar == supplied_scalar,
-            TypeAnnotation::Union(supplied_union) => {
+        TypeAnnotationDeclaration::Scalar(target_scalar) => match supplied_type {
+            TypeAnnotationDeclaration::Scalar(supplied_scalar) => target_scalar == supplied_scalar,
+            TypeAnnotationDeclaration::Union(supplied_union) => {
                 // Each variant of the union must match the scalar_arg, and it must not be
                 // nullable
                 //
@@ -68,15 +68,15 @@ fn variable_type_satisfies_argument_type(
                         union_variant_matches_scalar_arg(union_variant, target_scalar.dereference())
                     })
             }
-            TypeAnnotation::Plural(_supplied_plural) => false,
+            TypeAnnotationDeclaration::Plural(_supplied_plural) => false,
         },
-        TypeAnnotation::Union(target_union) => {
+        TypeAnnotationDeclaration::Union(target_union) => {
             match supplied_type {
-                TypeAnnotation::Scalar(supplied_scalar) => {
+                TypeAnnotationDeclaration::Scalar(supplied_scalar) => {
                     // This scalar must be a member of the union
                     union_contains(target_union, &UnionVariant::Scalar(*supplied_scalar))
                 }
-                TypeAnnotation::Union(supplied_union) => {
+                TypeAnnotationDeclaration::Union(supplied_union) => {
                     // If the variable is a union and the source is a union, then each variant
                     // in the variable must be a valid union member, and
                     // the union_arg must be nullable or the union_var must be not nullable
@@ -85,7 +85,7 @@ fn variable_type_satisfies_argument_type(
                             union_contains(target_union, union_variant_var)
                         })
                 }
-                TypeAnnotation::Plural(supplied_plural) => {
+                TypeAnnotationDeclaration::Plural(supplied_plural) => {
                     // This plural must be a member of the union
                     union_contains(
                         target_union,
@@ -94,9 +94,9 @@ fn variable_type_satisfies_argument_type(
                 }
             }
         }
-        TypeAnnotation::Plural(target_plural) => match supplied_type {
-            TypeAnnotation::Scalar(_supplied_scalar) => false,
-            TypeAnnotation::Union(supplied_union) => {
+        TypeAnnotationDeclaration::Plural(target_plural) => match supplied_type {
+            TypeAnnotationDeclaration::Scalar(_supplied_scalar) => false,
+            TypeAnnotationDeclaration::Union(supplied_union) => {
                 // each variant of the union must match the plural_arg_type, and
                 // it must not be nullable. Again, assuming that the types are well-formed
                 !supplied_union.nullable
@@ -113,10 +113,12 @@ fn variable_type_satisfies_argument_type(
                             }
                         })
             }
-            TypeAnnotation::Plural(supplied_plural) => variable_type_satisfies_argument_type(
-                supplied_plural.item.reference(),
-                target_plural.item.reference(),
-            ),
+            TypeAnnotationDeclaration::Plural(supplied_plural) => {
+                variable_type_satisfies_argument_type(
+                    supplied_plural.item.reference(),
+                    target_plural.item.reference(),
+                )
+            }
         },
     }
 }
@@ -133,14 +135,14 @@ fn union_variant_matches_scalar_arg(
     }
 }
 
-fn union_contains(union: &UnionTypeAnnotation, potential_member: &UnionVariant) -> bool {
+fn union_contains(union: &UnionTypeAnnotationDeclaration, potential_member: &UnionVariant) -> bool {
     union.variants.contains(potential_member)
 }
 
 pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
-    field_argument_definition_type: &TypeAnnotation,
+    field_argument_definition_type: &TypeAnnotationDeclaration,
     variable_definitions: &[VariableDeclaration],
 ) -> DiagnosticResult<()> {
     match &selection_supplied_argument_value.item {
@@ -243,14 +245,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         ),
         NonConstantValue::Object(object_literal) => {
             match field_argument_definition_type {
-                TypeAnnotation::Scalar(target_scalar) => object_satisfies_type(
+                TypeAnnotationDeclaration::Scalar(target_scalar) => object_satisfies_type(
                     db,
                     selection_supplied_argument_value,
                     variable_definitions,
                     object_literal,
                     target_scalar.0,
                 ),
-                TypeAnnotation::Union(target_union) => {
+                TypeAnnotationDeclaration::Union(target_union) => {
                     let matches = target_union.variants.iter().any(|target_union_variant| {
                         match target_union_variant {
                             UnionVariant::Scalar(target_union_name) => object_satisfies_type(
@@ -280,7 +282,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 
                     // Object must satisfy at least one union variant
                 }
-                TypeAnnotation::Plural(_) => Diagnostic::new(
+                TypeAnnotationDeclaration::Plural(_) => Diagnostic::new(
                     "Mismatched type.".to_string(),
                     selection_supplied_argument_value
                         .embedded_location
@@ -353,7 +355,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
 #[derive(Debug, PartialEq, PartialOrd, Ord, Eq)]
 enum ObjectLiteralFieldType {
     Provided(
-        TypeAnnotation,
+        TypeAnnotationDeclaration,
         NameValuePair<ValueKeyName, NonConstantValue>,
     ),
     Missing(SelectableName),
@@ -394,11 +396,11 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
                 )
                 .wrap_some(),
                 None => match iso_type_annotation {
-                    TypeAnnotation::Scalar(_) => {
+                    TypeAnnotationDeclaration::Scalar(_) => {
                         ObjectLiteralFieldType::Missing(*field_name).wrap_some()
                     }
-                    TypeAnnotation::Union(_union_type_annotation) => None,
-                    TypeAnnotation::Plural(_) => None,
+                    TypeAnnotationDeclaration::Union(_union_type_annotation) => None,
+                    TypeAnnotationDeclaration::Plural(_) => None,
                 },
             }
         })
@@ -450,7 +452,7 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
 fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     supplied_list: &[WithEmbeddedLocation<NonConstantValue>],
-    target_type: &TypeAnnotation,
+    target_type: &TypeAnnotationDeclaration,
     variable_definitions: &[VariableDeclaration],
 ) -> DiagnosticResult<()> {
     supplied_list.iter().try_for_each(|element| {
@@ -462,7 +464,7 @@ fn get_variable_type<'a>(
     variable_name: &'a VariableNameWrapper,
     variable_definitions: &'a [VariableDeclaration],
     location: EmbeddedLocation,
-) -> DiagnosticResult<&'a TypeAnnotation> {
+) -> DiagnosticResult<&'a TypeAnnotationDeclaration> {
     match variable_definitions
         .iter()
         .find(|definition| definition.name.item == *variable_name)
@@ -477,7 +479,7 @@ fn get_variable_type<'a>(
 }
 
 fn expected_type_found_something_else_named_diagnostic(
-    expected: &TypeAnnotation,
+    expected: &TypeAnnotationDeclaration,
     actual: StringKey,
     type_description: &str,
     location: EmbeddedLocation,

@@ -9,7 +9,7 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
     NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
     ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
-    SelectionTypePostfix, TypeAnnotation, VariableDeclaration, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -1547,7 +1547,7 @@ pub fn id_arguments() -> Vec<VariableDeclaration> {
             .unchecked_conversion::<VariableName>()
             .to::<VariableNameWrapper>()
             .with_embedded_location(EmbeddedLocation::todo_generated()),
-        type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+        type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
             .with_embedded_location(EmbeddedLocation::todo_generated()),
         default_value: None,
     }]

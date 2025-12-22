@@ -13,7 +13,7 @@ use intern::string_key::Intern;
 use isograph_lang_types::{
     ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
     NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypePostfix, TypeAnnotation, VariableDeclaration, VariableNameWrapper,
+    SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
@@ -395,7 +395,7 @@ fn get_refetch_selectable(
                     .unchecked_conversion::<VariableName>()
                     .to::<VariableNameWrapper>()
                     .with_embedded_location(EmbeddedLocation::todo_generated()),
-                type_: TypeAnnotation::Scalar((*ID_ENTITY_NAME).into())
+                type_: TypeAnnotationDeclaration::Scalar((*ID_ENTITY_NAME).into())
                     .with_embedded_location(EmbeddedLocation::todo_generated()),
                 default_value: None,
             }],
@@ -419,7 +419,7 @@ pub(crate) fn get_typename_selectable(
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
-        target_entity_name: TypeAnnotation::Scalar((*STRING_TYPE_NAME).into()),
+        target_entity_name: TypeAnnotationDeclaration::Scalar((*STRING_TYPE_NAME).into()),
         javascript_type_override,
         parent_entity_name: server_object_entity_name,
         arguments: vec![],
