@@ -93,6 +93,13 @@ where
     fn with_no_location(self) -> WithNoLocation<Self> {
         WithGenericLocation::new(self, ())
     }
+
+    fn with_generic_location<TLocation>(
+        self,
+        item: TLocation,
+    ) -> WithGenericLocation<Self, TLocation> {
+        WithGenericLocation::new(self, item)
+    }
 }
 
 impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {

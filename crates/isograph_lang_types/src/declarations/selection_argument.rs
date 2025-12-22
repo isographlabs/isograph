@@ -1,6 +1,6 @@
 use common_lang_types::{
-    EnumLiteralValue, FieldArgumentName, StringLiteralValue, ValueKeyName, WithEmbeddedLocation,
-    WithLocationPostfix,
+    EmbeddedLocation, EnumLiteralValue, FieldArgumentName, StringLiteralValue, ValueKeyName,
+    WithEmbeddedLocation, WithGenericLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{FloatValue, NameValuePair};
 use intern::string_key::Lookup;
@@ -46,7 +46,7 @@ impl ArgumentKeyAndValue {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum NonConstantValue {
+pub enum NonConstantValueInner<TLocation> {
     Variable(VariableNameWrapper),
     Integer(i64),
     Boolean(bool),
@@ -54,19 +54,20 @@ pub enum NonConstantValue {
     Float(FloatValue),
     Null,
     Enum(EnumLiteralValue),
-    // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithEmbeddedLocation<NonConstantValue>>),
-    Object(Vec<NameValuePair<ValueKeyName, NonConstantValue>>),
+    List(Vec<WithGenericLocation<NonConstantValueInner<TLocation>, TLocation>>),
+    Object(Vec<NameValuePair<ValueKeyName, NonConstantValueInner<TLocation>>>),
 }
 
-impl NonConstantValue {
+pub type NonConstantValue = NonConstantValueInner<EmbeddedLocation>;
+
+impl<TLocation> NonConstantValueInner<TLocation> {
     pub fn to_alias_str_chunk(&self) -> String {
         match self {
-            NonConstantValue::Variable(name) => format!("v_{name}"),
+            NonConstantValueInner::Variable(name) => format!("v_{name}"),
             // l for literal, i.e. this is shared with others
-            NonConstantValue::Integer(int_value) => format!("l_{int_value}"),
-            NonConstantValue::Boolean(bool) => format!("l_{bool}"),
-            NonConstantValue::String(string) => format!(
+            NonConstantValueInner::Integer(int_value) => format!("l_{int_value}"),
+            NonConstantValueInner::Boolean(bool) => format!("l_{bool}"),
+            NonConstantValueInner::String(string) => format!(
                 "s_{}",
                 string
                     .lookup()
@@ -81,11 +82,11 @@ impl NonConstantValue {
                     .collect::<String>(),
             ),
             // Also not correct
-            NonConstantValue::Float(f) => format!("l_{}", f.as_float()),
-            NonConstantValue::Null => "l_null".to_string(),
-            NonConstantValue::Enum(e) => format!("e_{e}"),
-            NonConstantValue::List(_) => panic!("Lists are not supported here"),
-            NonConstantValue::Object(object) => {
+            NonConstantValueInner::Float(f) => format!("l_{}", f.as_float()),
+            NonConstantValueInner::Null => "l_null".to_string(),
+            NonConstantValueInner::Enum(e) => format!("e_{e}"),
+            NonConstantValueInner::List(_) => panic!("Lists are not supported here"),
+            NonConstantValueInner::Object(object) => {
                 format!(
                     "o_{}_c",
                     object
@@ -105,15 +106,15 @@ impl NonConstantValue {
     pub fn variables(&self) -> Vec<VariableNameWrapper> {
         // TODO return impl Iterator
         match self {
-            NonConstantValue::Variable(variable_name) => vec![*variable_name],
-            NonConstantValue::List(items) => {
+            NonConstantValueInner::Variable(variable_name) => vec![*variable_name],
+            NonConstantValueInner::List(items) => {
                 let mut variables = vec![];
                 for item in items {
                     variables.extend(item.item.variables());
                 }
                 variables
             }
-            NonConstantValue::Object(name_value_pairs) => {
+            NonConstantValueInner::Object(name_value_pairs) => {
                 let mut variables = vec![];
                 for item in name_value_pairs {
                     variables.extend(item.value.item.variables());
@@ -125,27 +126,27 @@ impl NonConstantValue {
     }
 }
 
-impl From<ConstantValue> for NonConstantValue {
-    fn from(value: ConstantValue) -> Self {
+impl<TLocation: Copy> From<ConstantValueInner<TLocation>> for NonConstantValueInner<TLocation> {
+    fn from(value: ConstantValueInner<TLocation>) -> Self {
         match value {
-            ConstantValue::Integer(i) => NonConstantValue::Integer(i),
-            ConstantValue::Boolean(value) => NonConstantValue::Boolean(value),
-            ConstantValue::String(value) => NonConstantValue::String(value),
-            ConstantValue::Float(value) => NonConstantValue::Float(value),
-            ConstantValue::Null => NonConstantValue::Null,
-            ConstantValue::Enum(value) => NonConstantValue::Enum(value),
-            ConstantValue::List(value) => NonConstantValue::List(
+            ConstantValueInner::Integer(i) => NonConstantValueInner::Integer(i),
+            ConstantValueInner::Boolean(value) => NonConstantValueInner::Boolean(value),
+            ConstantValueInner::String(value) => NonConstantValueInner::String(value),
+            ConstantValueInner::Float(value) => NonConstantValueInner::Float(value),
+            ConstantValueInner::Null => NonConstantValueInner::Null,
+            ConstantValueInner::Enum(value) => NonConstantValueInner::Enum(value),
+            ConstantValueInner::List(value) => NonConstantValueInner::List(
                 value
                     .into_iter()
-                    .map(|with_location| with_location.map(NonConstantValue::from))
+                    .map(|with_location| with_location.map(NonConstantValueInner::from))
                     .collect(),
             ),
-            ConstantValue::Object(value) => NonConstantValue::Object(
+            ConstantValueInner::Object(value) => NonConstantValueInner::Object(
                 value
                     .into_iter()
                     .map(|name_value_pair| NameValuePair {
                         name: name_value_pair.name,
-                        value: name_value_pair.value.map(NonConstantValue::from),
+                        value: name_value_pair.value.map(NonConstantValueInner::from),
                     })
                     .collect(),
             ),
@@ -154,50 +155,51 @@ impl From<ConstantValue> for NonConstantValue {
 }
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug, Hash)]
-pub enum ConstantValue {
+pub enum ConstantValueInner<TLocation> {
     Integer(i64),
     Boolean(bool),
     String(StringLiteralValue),
     Float(FloatValue),
     Null,
     Enum(EnumLiteralValue),
-    // This is weird! We can be more consistent vis-a-vis where the WithSpan appears.
-    List(Vec<WithEmbeddedLocation<ConstantValue>>),
-    Object(Vec<NameValuePair<ValueKeyName, ConstantValue>>),
+    List(Vec<WithGenericLocation<ConstantValueInner<TLocation>, TLocation>>),
+    Object(Vec<NameValuePair<ValueKeyName, ConstantValueInner<TLocation>>>),
 }
 
-impl TryFrom<NonConstantValue> for ConstantValue {
+pub type ConstantValue = ConstantValueInner<EmbeddedLocation>;
+
+impl<TLocation> TryFrom<NonConstantValueInner<TLocation>> for ConstantValueInner<TLocation> {
     type Error = VariableNameWrapper;
 
-    fn try_from(value: NonConstantValue) -> Result<Self, Self::Error> {
+    fn try_from(value: NonConstantValueInner<TLocation>) -> Result<Self, Self::Error> {
         match value {
-            NonConstantValue::Variable(variable_name) => variable_name.wrap_err(),
-            NonConstantValue::Integer(i) => ConstantValue::Integer(i).wrap_ok(),
-            NonConstantValue::Boolean(b) => ConstantValue::Boolean(b).wrap_ok(),
-            NonConstantValue::String(s) => ConstantValue::String(s).wrap_ok(),
-            NonConstantValue::Float(f) => ConstantValue::Float(f).wrap_ok(),
-            NonConstantValue::Null => ConstantValue::Null.wrap_ok(),
-            NonConstantValue::Enum(e) => ConstantValue::Enum(e).wrap_ok(),
-            NonConstantValue::List(l) => {
+            NonConstantValueInner::Variable(variable_name) => variable_name.wrap_err(),
+            NonConstantValueInner::Integer(i) => ConstantValueInner::Integer(i).wrap_ok(),
+            NonConstantValueInner::Boolean(b) => ConstantValueInner::Boolean(b).wrap_ok(),
+            NonConstantValueInner::String(s) => ConstantValueInner::String(s).wrap_ok(),
+            NonConstantValueInner::Float(f) => ConstantValueInner::Float(f).wrap_ok(),
+            NonConstantValueInner::Null => ConstantValueInner::Null.wrap_ok(),
+            NonConstantValueInner::Enum(e) => ConstantValueInner::Enum(e).wrap_ok(),
+            NonConstantValueInner::List(l) => {
                 let converted_list = l
                     .into_iter()
                     .map(|x| {
-                        let constant: ConstantValue = x.item.try_into()?;
+                        let constant: ConstantValueInner<TLocation> = x.item.try_into()?;
                         constant
-                            .with_embedded_location(x.location)
+                            .with_generic_location(x.location)
                             .wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                ConstantValue::List(converted_list).wrap_ok()
+                ConstantValueInner::List(converted_list).wrap_ok()
             }
-            NonConstantValue::Object(o) => {
+            NonConstantValueInner::Object(o) => {
                 let converted_object = o
                     .into_iter()
                     .map(|name_value_pair| {
                         NameValuePair {
                             name: name_value_pair.name,
                             value: {
-                                let constant: ConstantValue =
+                                let constant: ConstantValueInner<TLocation> =
                                     name_value_pair.value.item.try_into()?;
                                 constant.with_embedded_location(name_value_pair.value.location)
                             },
@@ -205,22 +207,22 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                         .wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                ConstantValue::Object(converted_object).wrap_ok()
+                ConstantValueInner::Object(converted_object).wrap_ok()
             }
         }
     }
 }
 
-impl ConstantValue {
+impl<TLocation> ConstantValueInner<TLocation> {
     pub fn print_to_string(&self) -> String {
         match self {
-            ConstantValue::Integer(i) => i.to_string(),
-            ConstantValue::Boolean(b) => b.to_string(),
-            ConstantValue::String(s) => format!("\"{s}\""),
-            ConstantValue::Float(f) => f.as_float().to_string(),
-            ConstantValue::Null => "null".to_string(),
-            ConstantValue::Enum(e) => e.to_string(),
-            ConstantValue::List(l) => {
+            ConstantValueInner::Integer(i) => i.to_string(),
+            ConstantValueInner::Boolean(b) => b.to_string(),
+            ConstantValueInner::String(s) => format!("\"{s}\""),
+            ConstantValueInner::Float(f) => f.as_float().to_string(),
+            ConstantValueInner::Null => "null".to_string(),
+            ConstantValueInner::Enum(e) => e.to_string(),
+            ConstantValueInner::List(l) => {
                 let inner = l
                     .iter()
                     .map(|value| value.item.print_to_string())
@@ -228,7 +230,7 @@ impl ConstantValue {
                     .join(", ");
                 format!("[{inner}]")
             }
-            ConstantValue::Object(o) => {
+            ConstantValueInner::Object(o) => {
                 let inner = o
                     .iter()
                     .map(|key_value| {
