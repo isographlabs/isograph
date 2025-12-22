@@ -159,7 +159,6 @@ struct ResolvePositionArgs {
 enum ResolveFieldInfoType {
     WithLocation(syn::Type),
     WithEmbeddedLocation(syn::Type),
-    WithSpan(syn::Type),
     GraphQLTypeAnnotation(syn::Type),
 }
 
@@ -212,7 +211,7 @@ fn parse_resolve_field_type(
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(last_segment) = path.segments.last() {
-        // Base cases: WithLocation<T>, WithEmbeddedLocation<T>, GraphQLTypeAnnotation or WithSpan<T>
+        // Base cases: WithLocation<T>, WithEmbeddedLocation<T>, GraphQLTypeAnnotation
         match last_segment.ident.to_string().as_str() {
             "WithLocation" => {
                 return handle_case(
@@ -234,9 +233,6 @@ fn parse_resolve_field_type(
                     generics_map,
                     ResolveFieldInfoType::GraphQLTypeAnnotation,
                 );
-            }
-            "WithSpan" => {
-                return handle_case(last_segment, generics_map, ResolveFieldInfoType::WithSpan);
             }
             _ => {}
         }
@@ -323,12 +319,6 @@ fn generate_resolve_code_recursive(
             },
             ResolveFieldInfoType::WithEmbeddedLocation(inner_type) => quote! {
                 if #field_expr.location.span.contains(position) {
-                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                    return #field_expr.item.resolve(new_parent, position);
-                }
-            },
-            ResolveFieldInfoType::WithSpan(inner_type) => quote! {
-                if #field_expr.span.contains(position) {
                     let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
                     return #field_expr.item.resolve(new_parent, position);
                 }
