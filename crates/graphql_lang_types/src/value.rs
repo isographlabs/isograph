@@ -1,8 +1,8 @@
 use std::fmt;
 
 use common_lang_types::{
-    EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName, WithEmbeddedLocation,
-    WithSpan,
+    EmbeddedLocation, EnumLiteralValue, StringLiteralValue, ValueKeyName, VariableName,
+    WithEmbeddedLocation, WithGenericLocation, WithSpan,
 };
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -114,21 +114,28 @@ impl std::convert::From<i64> for FloatValue {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct NameValuePair<TName, TValue> {
-    pub name: WithEmbeddedLocation<TName>,
-    pub value: WithEmbeddedLocation<TValue>,
+pub struct NameValuePairInner<TName, TValue, TLocation> {
+    pub name: WithGenericLocation<TName, TLocation>,
+    pub value: WithGenericLocation<TValue, TLocation>,
 }
 
-impl<TName, TValue> NameValuePair<TName, TValue> {
-    pub fn map_name<U>(self, map: impl FnOnce(TName) -> U) -> NameValuePair<U, TValue> {
-        NameValuePair {
+pub type NameValuePair<TName, TValue> = NameValuePairInner<TName, TValue, EmbeddedLocation>;
+
+impl<TName, TValue, TLocation: Copy> NameValuePairInner<TName, TValue, TLocation> {
+    pub fn map_name<U>(
+        self,
+        map: impl FnOnce(TName) -> U,
+    ) -> NameValuePairInner<U, TValue, TLocation> {
+        NameValuePairInner {
             name: self.name.map(map),
             value: self.value,
         }
     }
 }
 
-impl<TName: fmt::Display, TValue: fmt::Display> fmt::Display for NameValuePair<TName, TValue> {
+impl<TName: fmt::Display, TValue: fmt::Display, TLocation> fmt::Display
+    for NameValuePairInner<TName, TValue, TLocation>
+{
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_fmt(format_args!("{}: {}", self.name.item, self.value.item))
     }
