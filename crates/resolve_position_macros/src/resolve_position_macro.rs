@@ -322,7 +322,7 @@ fn generate_resolve_code_recursive(
                 }
             },
             ResolveFieldInfoType::WithEmbeddedLocation(inner_type) => quote! {
-                if #field_expr.embedded_location.span.contains(position) {
+                if #field_expr.location.span.contains(position) {
                     let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
                     return #field_expr.item.resolve(new_parent, position);
                 }

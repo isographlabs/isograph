@@ -50,7 +50,7 @@ pub fn parse_iso_literal(
 ) -> DiagnosticResult<IsoLiteralExtractionResult> {
     let mut tokens = PeekableLexer::new(&iso_literal_text, text_source);
     let discriminator = tokens.peek();
-    let text = tokens.source(discriminator.embedded_location.span);
+    let text = tokens.source(discriminator.location.span);
     // TODO this is awkward. Entrypoint has a different isograph semantic token type than
     // field and pointer, hence we have to peek, then re-parse.
 
@@ -62,7 +62,7 @@ pub fn parse_iso_literal(
             )?;
             IsoLiteralExtractionResult::EntrypointDeclaration(parse_iso_entrypoint_declaration(
                 &mut tokens,
-                entrypoint_keyword.embedded_location,
+                entrypoint_keyword.location,
                 (&iso_literal_text).intern().into(),
             )?)
             .wrap_ok()
@@ -96,7 +96,7 @@ pub fn parse_iso_literal(
         _ => Diagnostic::new(
             "Isograph literals must start with on the keywords `field`, `pointer` or `entrypoint`"
                 .to_string(),
-            discriminator.embedded_location.to::<Location>().wrap_some(),
+            discriminator.location.to::<Location>().wrap_some(),
         )
         .wrap_err(),
     }
@@ -205,7 +205,7 @@ fn parse_client_field_declaration_inner(
                 "field",
                 client_field_name.item,
                 // TODO use a better location
-                client_field_name.embedded_location.into(),
+                client_field_name.location.into(),
             )
         })?;
 
@@ -251,7 +251,7 @@ fn parse_client_pointer_target_type(
     if keyword.item != "to" {
         Diagnostic::new(
             "Expected the keyword `to`".to_string(),
-            keyword.embedded_location.to::<Location>().wrap_some(),
+            keyword.location.to::<Location>().wrap_some(),
         )
         .wrap_err()
     } else {
@@ -302,7 +302,7 @@ fn parse_client_pointer_declaration_inner(
             expected_literal_to_be_exported_diagnostic(
                 "pointer",
                 client_pointer_name.item,
-                client_pointer_name.embedded_location.into(),
+                client_pointer_name.location.into(),
             )
         })?;
 
@@ -404,7 +404,7 @@ fn parse_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult<()> {
     } else {
         Diagnostic::new(
             "Expected a line break.".to_string(),
-            tokens.peek().embedded_location.to::<Location>().wrap_some(),
+            tokens.peek().location.to::<Location>().wrap_some(),
         )
         .wrap_err()
     }
@@ -429,7 +429,7 @@ fn parse_comma_or_line_break(tokens: &mut PeekableLexer<'_>) -> DiagnosticResult
     } else {
         Diagnostic::new(
             "Expected comma or line break".to_string(),
-            tokens.peek().embedded_location.to::<Location>().wrap_some(),
+            tokens.peek().location.to::<Location>().wrap_some(),
         )
         .wrap_err()
     }
@@ -520,8 +520,7 @@ fn parse_directives(
                     IsographLangTokenKind::Identifier,
                     semantic_token_legend::ST_DIRECTIVE,
                 )?;
-                let directive_span =
-                    Span::join(token.embedded_location.span, name.embedded_location.span);
+                let directive_span = Span::join(token.location.span, name.location.span);
 
                 let arguments = parse_optional_arguments(tokens)?;
 
@@ -651,10 +650,7 @@ fn parse_non_constant_value(
             )?;
 
             NonConstantValue::Object(entries.item)
-                .with_span(Span::join(
-                    open.embedded_location.span,
-                    entries.embedded_location.span,
-                ))
+                .with_span(Span::join(open.location.span, entries.location.span))
                 .to_with_embedded_location(tokens.text_source)
                 .wrap_ok()
         })?;
@@ -665,7 +661,7 @@ fn parse_non_constant_value(
                 semantic_token_legend::ST_BOOL_OR_NULL,
             )?;
 
-            let embedded_location = bool_or_null.embedded_location;
+            let embedded_location = bool_or_null.location;
 
             bool_or_null.and_then(|bool_or_null| match bool_or_null {
                 "null" => NonConstantValue::Null.wrap_ok(),
@@ -780,14 +776,11 @@ fn parse_optional_default_value(
             Diagnostic::new(
                 "Found a variable, like $foo, in a context where variables are not allowed"
                     .to_string(),
-                non_constant_value
-                    .embedded_location
-                    .to::<Location>()
-                    .wrap_some(),
+                non_constant_value.location.to::<Location>().wrap_some(),
             )
         })?;
         constant_value
-            .with_embedded_location(non_constant_value.embedded_location)
+            .with_embedded_location(non_constant_value.location)
             .wrap_some()
             .wrap_ok()
     } else {
@@ -871,7 +864,7 @@ fn parse_type_annotation(
 
             ControlFlow::Continue(Diagnostic::new(
                 "Expected a type (e.g. String, [String], or String!)".to_string(),
-                tokens.peek().embedded_location.to::<Location>().wrap_some(),
+                tokens.peek().location.to::<Location>().wrap_some(),
             ))
         })
     })

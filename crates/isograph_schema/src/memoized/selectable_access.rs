@@ -113,8 +113,8 @@ pub fn selectable_definition_location<TNetworkProtocol: NetworkProtocol>(
 
     selectable
         .map(|x| match x {
-            SelectionType::Scalar(s) => s.lookup(db).client_field_name.embedded_location.into(),
-            SelectionType::Object(o) => o.lookup(db).client_pointer_name.embedded_location.into(),
+            SelectionType::Scalar(s) => s.lookup(db).client_field_name.location.into(),
+            SelectionType::Object(o) => o.lookup(db).client_pointer_name.location.into(),
         })
         .wrap_ok()
 }

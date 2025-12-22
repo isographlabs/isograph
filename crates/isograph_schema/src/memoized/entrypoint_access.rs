@@ -77,7 +77,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                         actual_type,
                         entrypoint_declaration_info
                             .client_field_name
-                            .embedded_location
+                            .location
                             .into(),
                     );
                 }
@@ -88,7 +88,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                     entrypoint_declaration_info.client_field_name.item.0,
                     entrypoint_declaration_info
                         .client_field_name
-                        .embedded_location
+                        .location
                         .into(),
                 )
             })?;
@@ -125,7 +125,7 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
                             .to_string(),
                         entrypoint_declaration_info
                             .client_field_name
-                            .embedded_location
+                            .location
                             .to::<Location>()
                             .wrap_some(),
                     )

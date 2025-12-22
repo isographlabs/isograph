@@ -25,7 +25,7 @@ pub fn from_isograph_field_directives<'a, T: Deserialize<'a>>(
     .map_err(|e| {
         Diagnostic::new(
             e.to_string(),
-            directives.embedded_location.to::<Location>().wrap_some(),
+            directives.location.to::<Location>().wrap_some(),
         )
     })
 }

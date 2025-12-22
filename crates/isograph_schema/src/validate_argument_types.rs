@@ -150,7 +150,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             let variable_type = get_variable_type(
                 supplied_variable_name,
                 variable_definitions,
-                selection_supplied_argument_value.embedded_location,
+                selection_supplied_argument_value.location,
             )?;
             if variable_type_satisfies_argument_type(variable_type, field_argument_definition_type)
             {
@@ -162,7 +162,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         expected {field_argument_definition_type}."
                     ),
                     selection_supplied_argument_value
-                        .embedded_location
+                        .location
                         .to::<Location>()
                         .wrap_some(),
                 )
@@ -172,14 +172,14 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         NonConstantValue::Integer(_) => scalar_literal_satisfies_type(
             *INT_ENTITY_NAME,
             field_argument_definition_type,
-            selection_supplied_argument_value.embedded_location,
+            selection_supplied_argument_value.location,
             "an integer literal",
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
                 *FLOAT_ENTITY_NAME,
                 field_argument_definition_type,
-                selection_supplied_argument_value.embedded_location,
+                selection_supplied_argument_value.location,
                 "an integer literal",
             )
             .map_err(|_| error)
@@ -188,7 +188,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
             scalar_literal_satisfies_type(
                 *ID_ENTITY_NAME,
                 field_argument_definition_type,
-                selection_supplied_argument_value.embedded_location,
+                selection_supplied_argument_value.location,
                 "an integer literal",
             )
             .map_err(|_| error)
@@ -196,20 +196,20 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         NonConstantValue::Boolean(_) => scalar_literal_satisfies_type(
             *BOOLEAN_ENTITY_NAME,
             field_argument_definition_type,
-            selection_supplied_argument_value.embedded_location,
+            selection_supplied_argument_value.location,
             "a boolean literal",
         ),
         NonConstantValue::String(_) => scalar_literal_satisfies_type(
             *STRING_ENTITY_NAME,
             field_argument_definition_type,
-            selection_supplied_argument_value.embedded_location,
+            selection_supplied_argument_value.location,
             "a string literal",
         )
         .or_else(|error| {
             scalar_literal_satisfies_type(
                 *ID_ENTITY_NAME,
                 field_argument_definition_type,
-                selection_supplied_argument_value.embedded_location,
+                selection_supplied_argument_value.location,
                 "a string literal",
             )
             .map_err(|_| error)
@@ -217,7 +217,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         NonConstantValue::Float(_) => scalar_literal_satisfies_type(
             *FLOAT_ENTITY_NAME,
             field_argument_definition_type,
-            selection_supplied_argument_value.embedded_location,
+            selection_supplied_argument_value.location,
             "a float literal",
         ),
         NonConstantValue::Enum(_enum_literal_value) => {
@@ -230,7 +230,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 Diagnostic::new(
                     format!("Expected non null input of type {field_argument_definition_type}, found null"),
                     selection_supplied_argument_value
-                        .embedded_location
+                        .location
                         .to::<Location>()
                         .wrap_some(),
                 )
@@ -271,7 +271,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                         return Diagnostic::new(
                             "Item did not match any union variants".to_string(),
                             selection_supplied_argument_value
-                                .embedded_location
+                                .location
                                 .to::<Location>()
                                 .wrap_some(),
                         )
@@ -285,7 +285,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                 TypeAnnotationDeclaration::Plural(_) => Diagnostic::new(
                     "Mismatched type.".to_string(),
                     selection_supplied_argument_value
-                        .embedded_location
+                        .location
                         .to::<Location>()
                         .wrap_some(),
                 )
@@ -306,7 +306,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
         db,
         object_entity_name,
         object_literal,
-        selection_supplied_argument_value.embedded_location,
+        selection_supplied_argument_value.location,
     )?;
 
     let missing_fields =
@@ -344,7 +344,7 @@ fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
                     .join(", ")
             ),
             selection_supplied_argument_value
-                .embedded_location
+                .location
                 .to::<Location>()
                 .wrap_some(),
         )

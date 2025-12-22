@@ -65,37 +65,37 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::EntityNameWrapper(entity) => match entity.parent {
                 EntityNameWrapperParent::EntrypointDeclaration(entrypoint) => {
-                    entrypoint.inner.parent_type.embedded_location
+                    entrypoint.inner.parent_type.location
                 }
                 EntityNameWrapperParent::ClientFieldDeclaration(field) => {
-                    field.inner.parent_type.embedded_location
+                    field.inner.parent_type.location
                 }
                 EntityNameWrapperParent::ClientPointerDeclaration(pointer) => {
-                    pointer.inner.parent_type.embedded_location
+                    pointer.inner.parent_type.location
                 }
             }
             .wrap_some(),
             IsographResolvedNode::Description(s) => match s.parent {
                 DescriptionParent::ClientFieldDeclaration(field) => {
-                    field.inner.description.map(|x| x.embedded_location)
+                    field.inner.description.map(|x| x.location)
                 }
                 DescriptionParent::ClientPointerDeclaration(pointer) => {
-                    pointer.inner.description.map(|x| x.embedded_location)
+                    pointer.inner.description.map(|x| x.location)
                 }
             },
             IsographResolvedNode::ScalarSelection(scalar_path) => {
-                scalar_path.inner.name.embedded_location.wrap_some()
+                scalar_path.inner.name.location.wrap_some()
             }
             IsographResolvedNode::ObjectSelection(object_path) => {
-                object_path.inner.name.embedded_location.wrap_some()
+                object_path.inner.name.location.wrap_some()
             }
             IsographResolvedNode::ClientScalarSelectableNameWrapper(scalar) => {
                 match scalar.parent {
                     ClientScalarSelectableNameWrapperParent::EntrypointDeclaration(entrypoint) => {
-                        entrypoint.inner.client_field_name.embedded_location
+                        entrypoint.inner.client_field_name.location
                     }
                     ClientScalarSelectableNameWrapperParent::ClientFieldDeclaration(field) => {
-                        field.inner.client_field_name.embedded_location
+                        field.inner.client_field_name.location
                     }
                 }
                 .wrap_some()
@@ -103,7 +103,7 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientObjectSelectableNameWrapper(object) => {
                 match object.parent {
                     ClientObjectSelectableNameWrapperParent::ClientPointerDeclaration(pointer) => {
-                        pointer.inner.client_pointer_name.embedded_location
+                        pointer.inner.client_pointer_name.location
                     }
                 }
                 .wrap_some()

@@ -109,7 +109,7 @@ fn format_extraction<TNetworkProtocol: NetworkProtocol>(
     let mut indent: i8 = 1;
 
     for token in semantic_tokens {
-        let content = &extraction.iso_literal_text[token.embedded_location.span.as_usize_range()];
+        let content = &extraction.iso_literal_text[token.location.span.as_usize_range()];
         let new_line_behavior = token.item.line_behavior;
         let indent_change = token.item.indent_change;
 

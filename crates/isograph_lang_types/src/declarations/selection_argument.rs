@@ -184,7 +184,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                     .map(|x| {
                         let constant: ConstantValue = x.item.try_into()?;
                         constant
-                            .with_embedded_location(x.embedded_location)
+                            .with_embedded_location(x.location)
                             .wrap_ok::<Self::Error>()
                     })
                     .collect::<Result<Vec<_>, _>>()?;
@@ -199,8 +199,7 @@ impl TryFrom<NonConstantValue> for ConstantValue {
                             value: {
                                 let constant: ConstantValue =
                                     name_value_pair.value.item.try_into()?;
-                                constant
-                                    .with_embedded_location(name_value_pair.value.embedded_location)
+                                constant.with_embedded_location(name_value_pair.value.location)
                             },
                         }
                         .wrap_ok::<Self::Error>()

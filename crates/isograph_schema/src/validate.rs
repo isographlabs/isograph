@@ -241,7 +241,7 @@ fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
                         }
                         None => errors.push(entity_not_defined_diagnostic(
                             target,
-                            argument.name.embedded_location.to::<Location>().note_todo(
+                            argument.name.location.to::<Location>().note_todo(
                                 "Variable definition will not have location at some point",
                             ),
                         )),

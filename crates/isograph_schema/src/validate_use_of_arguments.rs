@@ -152,7 +152,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         variable_definitions,
                         can_have_missing_args,
                         &scalar_selection.arguments,
-                        scalar_selection.name.embedded_location,
+                        scalar_selection.name.location,
                     );
                 }
                 SelectionType::Object(object_selection) => {
@@ -183,7 +183,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                         variable_definitions,
                         true,
                         &object_selection.arguments,
-                        object_selection.name.embedded_location,
+                        object_selection.name.location,
                     );
                 }
             }

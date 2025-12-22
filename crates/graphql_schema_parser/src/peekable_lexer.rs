@@ -89,7 +89,7 @@ impl<'source> PeekableLexer<'source> {
         } else {
             Diagnostic::new(
                 format!("Expected {expected_kind}, found {}.", found.item),
-                found.embedded_location.to::<Location>().wrap_some(),
+                found.location.to::<Location>().wrap_some(),
             )
             .wrap_err()
         }
@@ -103,8 +103,8 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<&'source str>> {
         let token = self.parse_token_of_kind(expected_kind)?;
 
-        self.source(token.embedded_location.span)
-            .with_embedded_location(token.embedded_location)
+        self.source(token.location.span)
+            .with_embedded_location(token.location)
             .wrap_ok()
     }
 
@@ -113,10 +113,10 @@ impl<'source> PeekableLexer<'source> {
         expected_kind: TokenKind,
     ) -> DiagnosticResult<WithEmbeddedLocation<T>> {
         let kind = self.parse_token_of_kind(expected_kind)?;
-        let source = self.source(kind.embedded_location.span).intern();
+        let source = self.source(kind.location.span).intern();
         source
             .to::<T>()
-            .with_embedded_location(kind.embedded_location)
+            .with_embedded_location(kind.location)
             .wrap_ok()
     }
 
@@ -126,20 +126,20 @@ impl<'source> PeekableLexer<'source> {
     ) -> DiagnosticResult<WithEmbeddedLocation<TokenKind>> {
         let peeked = self.peek();
         if peeked.item == TokenKind::Identifier {
-            let source = self.source(peeked.embedded_location.span);
+            let source = self.source(peeked.location.span);
             if source == identifier {
                 self.parse_token().wrap_ok()
             } else {
                 Diagnostic::new(
                     format!("Expected {identifier}, found {source}"),
-                    peeked.embedded_location.to::<Location>().wrap_some(),
+                    peeked.location.to::<Location>().wrap_some(),
                 )
                 .wrap_err()
             }
         } else {
             Diagnostic::new(
                 format!("Expected identifier, found {}", peeked.item),
-                peeked.embedded_location.to::<Location>().wrap_some(),
+                peeked.location.to::<Location>().wrap_some(),
             )
             .wrap_err()
         }

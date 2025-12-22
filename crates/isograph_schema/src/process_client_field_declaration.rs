@@ -54,7 +54,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
                 client_field_declaration_item
                     .parent_type
-                    .embedded_location
+                    .location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -77,7 +77,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                 ),
                 client_field_declaration_item
                     .parent_type
-                    .embedded_location
+                    .location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -100,7 +100,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{parent_object_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item
                     .parent_type
-                    .embedded_location
+                    .location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -117,7 +117,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
             format!("`{target_type}` is not a type that has been defined."),
             client_pointer_declaration_item
                 .target_type
-                .embedded_location
+                .location
                 .to::<Location>()
                 .wrap_some(),
         )
@@ -139,7 +139,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                     ),
                     client_pointer_declaration_item
                         .target_type
-                        .embedded_location
+                        .location
                         .to::<Location>()
                         .wrap_some(),
                 )
@@ -151,7 +151,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 format!("`{scalar_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item
                     .target_type
-                    .embedded_location
+                    .location
                     .to::<Location>()
                     .wrap_some(),
             )
@@ -278,7 +278,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             format!("Directive `@{directive_name}` is not supported on client pointers."),
             client_pointer_declaration
                 .client_pointer_name
-                .embedded_location
+                .location
                 .to::<Location>()
                 .wrap_some(),
         )
