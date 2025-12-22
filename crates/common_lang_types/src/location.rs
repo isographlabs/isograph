@@ -86,10 +86,6 @@ where
         WithLocation::new(self, Location::Generated)
     }
 
-    fn with_embedded_location(self, location: EmbeddedLocation) -> WithEmbeddedLocation<Self> {
-        WithEmbeddedLocation::new(self, location)
-    }
-
     fn with_no_location(self) -> WithNoLocation<Self> {
         WithGenericLocation::new(self, ())
     }

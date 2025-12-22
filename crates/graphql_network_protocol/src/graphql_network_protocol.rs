@@ -147,7 +147,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 }
                 .interned_value(db)
                 .object_selected()
-                .with_embedded_location(with_location.location)
+                .with_generic_location(with_location.location)
                 .into(),
                 &mut non_fatal_diagnostics,
             );
@@ -167,7 +167,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 get_typename_selectable(db, server_object_entity_name, None)
                     .scalar_selected()
                     .server_defined()
-                    .with_embedded_location(with_location.location)
+                    .with_generic_location(with_location.location)
                     .into(),
                 &mut non_fatal_diagnostics,
             );
@@ -231,7 +231,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .object_selected()
                     .server_defined()
-                    .with_embedded_location(field.location)
+                    .with_generic_location(field.location)
                     .into(),
                     &mut non_fatal_diagnostics,
                 );
@@ -280,7 +280,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                     .interned_value(db)
                     .scalar_selected()
                     .server_defined()
-                    .with_embedded_location(field.location)
+                    .with_generic_location(field.location)
                     .into(),
                     &mut non_fatal_diagnostics,
                 );
@@ -420,7 +420,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             name: field_map_item
                                 .from
                                 .unchecked_conversion::<SelectableName>()
-                                .with_embedded_location(EmbeddedLocation::todo_generated()),
+                                .with_generic_location(EmbeddedLocation::todo_generated()),
                             reader_alias: None,
                             arguments: vec![],
                             scalar_selection_directive_set:
@@ -429,7 +429,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 ),
                         }
                         .scalar_selected::<ObjectSelection>()
-                        .with_embedded_location(EmbeddedLocation::todo_generated())
+                        .with_generic_location(EmbeddedLocation::todo_generated())
                     })
                     .collect::<Vec<_>>();
 
@@ -518,7 +518,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             SelectionSet {
                                 selections: fields.to_vec(),
                             }
-                            .with_embedded_location(EmbeddedLocation::todo_generated()),
+                            .with_generic_location(EmbeddedLocation::todo_generated()),
                             parent_object_entity_name,
                             subfields_or_inline_fragments,
                         )),

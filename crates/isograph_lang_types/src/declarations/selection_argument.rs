@@ -201,7 +201,7 @@ impl<TLocation> TryFrom<NonConstantValueInner<TLocation>> for ConstantValueInner
                             value: {
                                 let constant: ConstantValueInner<TLocation> =
                                     name_value_pair.value.item.try_into()?;
-                                constant.with_embedded_location(name_value_pair.value.location)
+                                constant.with_generic_location(name_value_pair.value.location)
                             },
                         }
                         .wrap_ok::<Self::Error>()

@@ -83,10 +83,10 @@ pub fn id_selection() -> WithEmbeddedLocation<Selection> {
     SelectionType::Scalar(ScalarSelection {
         name: ID_FIELD_NAME
             .unchecked_conversion::<SelectableName>()
-            .with_embedded_location(EmbeddedLocation::todo_generated()),
+            .with_generic_location(EmbeddedLocation::todo_generated()),
         reader_alias: None,
         scalar_selection_directive_set: ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
         arguments: vec![],
     })
-    .with_embedded_location(EmbeddedLocation::todo_generated())
+    .with_generic_location(EmbeddedLocation::todo_generated())
 }

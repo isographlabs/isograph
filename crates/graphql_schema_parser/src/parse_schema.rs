@@ -305,7 +305,7 @@ fn parse_directive_location(
                     text.location.to::<Location>().wrap_some(),
                 )
             })
-            .map(|x| x.with_embedded_location(text.location)),
+            .map(|x| x.with_generic_location(text.location)),
         Err(diagnostic) => {
             let text = tokens.source(peek.location.span);
             Diagnostic::new(
@@ -496,9 +496,9 @@ fn parse_root_operation_type(
     let name = tokens.parse_source_of_kind(TokenKind::Identifier)?;
 
     let root_operation_type = match name.item {
-        "query" => RootOperationKind::Query.with_embedded_location(name.location),
-        "subscription" => RootOperationKind::Subscription.with_embedded_location(name.location),
-        "mutation" => RootOperationKind::Mutation.with_embedded_location(name.location),
+        "query" => RootOperationKind::Query.with_generic_location(name.location),
+        "subscription" => RootOperationKind::Subscription.with_generic_location(name.location),
+        "mutation" => RootOperationKind::Mutation.with_generic_location(name.location),
         _ => {
             return Diagnostic::new(
                 "Expected schema, mutation or subscription".to_string(),

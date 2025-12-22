@@ -33,7 +33,7 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     let function_import_statement = generate_function_import_statement(read_out_data);
 
     let empty_selection_set = SelectionSet { selections: vec![] }
-        .with_embedded_location(EmbeddedLocation::todo_generated());
+        .with_generic_location(EmbeddedLocation::todo_generated());
 
     let refetch_strategy = refetch_strategy_for_client_scalar_selectable_named(
         db,

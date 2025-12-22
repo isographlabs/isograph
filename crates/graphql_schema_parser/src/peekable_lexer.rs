@@ -104,7 +104,7 @@ impl<'source> PeekableLexer<'source> {
         let token = self.parse_token_of_kind(expected_kind)?;
 
         self.source(token.location.span)
-            .with_embedded_location(token.location)
+            .with_generic_location(token.location)
             .wrap_ok()
     }
 
@@ -116,7 +116,7 @@ impl<'source> PeekableLexer<'source> {
         let source = self.source(kind.location.span).intern();
         source
             .to::<T>()
-            .with_embedded_location(kind.location)
+            .with_generic_location(kind.location)
             .wrap_ok()
     }
 

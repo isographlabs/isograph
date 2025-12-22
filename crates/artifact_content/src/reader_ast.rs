@@ -550,7 +550,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     );
 
     let empty_selection_set = SelectionSet { selections: vec![] }
-        .with_embedded_location(EmbeddedLocation::todo_generated());
+        .with_generic_location(EmbeddedLocation::todo_generated());
     let (reader_ast, additional_reader_imports) = generate_reader_ast(
         db,
         client_scalar_selectable.parent_entity_name,

@@ -235,7 +235,7 @@ pub fn get_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
                 SelectionSet {
                     selections: vec![id_selection()],
                 }
-                .with_embedded_location(EmbeddedLocation::todo_generated()),
+                .with_generic_location(EmbeddedLocation::todo_generated()),
                 *query_id,
                 vec![
                     WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
@@ -322,7 +322,7 @@ pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtoco
             refetch_selection_set: SelectionSet {
                 selections: vec![id_selection()],
             }
-            .with_embedded_location(EmbeddedLocation::todo_generated()),
+            .with_generic_location(EmbeddedLocation::todo_generated()),
         },
         client_object_selectable.interned_value(db),
     ))

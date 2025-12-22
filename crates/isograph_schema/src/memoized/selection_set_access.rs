@@ -64,7 +64,7 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
                 map.insert(
                     (scalar_selectable.parent_entity_name, scalar_selectable.name),
                     SelectionSet { selections: vec![] }
-                        .with_embedded_location(EmbeddedLocation::todo_generated())
+                        .with_generic_location(EmbeddedLocation::todo_generated())
                         .interned_value(db)
                         .scalar_selected()
                         .wrap_ok(),
