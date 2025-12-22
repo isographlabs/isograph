@@ -12,8 +12,6 @@ use crate::{CurrentWorkingDirectory, RelativePathToSourceFile, Span};
 /// TODO consider whether to replace the span with an index,
 /// as this will probably mean that sources are more reusable
 /// during watch mode.
-///
-/// TODO do not include the cwd
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct TextSource {
     pub relative_path_to_source_file: RelativePathToSourceFile,
