@@ -48,7 +48,7 @@
 //
 //! *FB-internal: use buck run //relay/oss/crates/fixture-tests:fixture-tests-bin -- \<path to tests dir\>
 
-mod print_diff;
+mod relay_print_diff;
 
 use std::env;
 use std::fs::File;
@@ -158,7 +158,7 @@ pub async fn test_fixture<T, U, V>(
     if actual != expected {
         {
             let _guard = LOCK.lock();
-            print_diff::print_diff(expected, &actual);
+            relay_print_diff::print_diff(expected, &actual);
         }
 
         if env::var_os("UPDATE_SNAPSHOTS").is_some() {

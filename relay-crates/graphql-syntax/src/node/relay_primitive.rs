@@ -13,7 +13,7 @@ use common::Span;
 use common::WithLocation;
 use intern::string_key::StringKey;
 
-use crate::lexer::TokenKind;
+use crate::relay_lexer::TokenKind;
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct Token {

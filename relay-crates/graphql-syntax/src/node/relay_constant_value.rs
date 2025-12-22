@@ -11,7 +11,7 @@ use common::Named;
 use common::Span;
 use intern::string_key::StringKey;
 
-use super::primitive::*;
+use super::relay_primitive::*;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum ConstantValue {

@@ -10,24 +10,24 @@
 #![allow(clippy::all)]
 #![allow(clippy::large_enum_variant)]
 
-mod lexer;
 mod node;
-mod parser;
-mod source;
-mod syntax_error;
-mod utils;
+mod relay_lexer;
+mod relay_parser;
+mod relay_source;
+mod relay_syntax_error;
+mod relay_utils;
 
 use common::DiagnosticsResult;
 use common::SourceLocationKey;
 use common::WithDiagnostics;
-pub use lexer::TokenKind;
 pub use node::*;
-pub use parser::FragmentArgumentSyntaxKind;
-pub use parser::ParserFeatures;
-pub use source::GraphQLSource;
-pub use syntax_error::SyntaxError;
+pub use relay_lexer::TokenKind;
+pub use relay_parser::FragmentArgumentSyntaxKind;
+pub use relay_parser::ParserFeatures;
+pub use relay_source::GraphQLSource;
+pub use relay_syntax_error::SyntaxError;
 
-use crate::parser::Parser;
+use crate::relay_parser::Parser;
 
 /// Parses a GraphQL document that might contain type system and executable
 /// definitions.

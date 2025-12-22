@@ -11,10 +11,10 @@ use common::Location;
 use common::Span;
 use intern::string_key::StringKey;
 
-use super::constant_value::*;
-use super::directive::Directive;
-use super::primitive::*;
-use super::type_annotation::*;
+use super::relay_constant_value::*;
+use super::relay_directive::Directive;
+use super::relay_primitive::*;
+use super::relay_type_annotation::*;
 use super::value::*;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]

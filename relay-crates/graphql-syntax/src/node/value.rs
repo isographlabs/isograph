@@ -13,8 +13,8 @@ use common::Span;
 use common::WithLocation;
 use intern::string_key::StringKey;
 
-use super::constant_value::*;
-use super::primitive::*;
+use super::relay_constant_value::*;
+use super::relay_primitive::*;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct VariableIdentifier {

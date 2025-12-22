@@ -16,9 +16,9 @@ use common::WithDiagnostics;
 use intern::string_key::Intern;
 use logos::Logos;
 
-use crate::lexer::TokenKind;
 use crate::node::*;
-use crate::syntax_error::SyntaxError;
+use crate::relay_lexer::TokenKind;
+use crate::relay_syntax_error::SyntaxError;
 
 type ParseResult<T> = Result<T, ()>;
 

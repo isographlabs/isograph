@@ -13,7 +13,7 @@ use intern::string_key::Intern;
 use intern::string_key::StringKey;
 use intern::Lookup;
 
-use crate::span::Span;
+use crate::relay_span::Span;
 
 /// The location of a source. Could be a standalone file (e.g. test.graphql),
 /// an embedded source (GraphQL tag in a JS file) or generated code without a

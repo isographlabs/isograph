@@ -10,8 +10,8 @@ use std::time::Instant;
 use colored::*;
 use log::debug;
 
-use super::perf_logger::PerfLogEvent;
-use super::perf_logger::PerfLogger;
+use super::relay_perf_logger::PerfLogEvent;
+use super::relay_perf_logger::PerfLogger;
 
 pub struct ConsoleLogEvent;
 

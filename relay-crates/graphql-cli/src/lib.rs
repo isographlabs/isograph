@@ -6,12 +6,12 @@
  */
 #![allow(clippy::all)]
 
-mod diagnostic_printer;
-mod source_printer;
-mod text_style;
+mod relay_diagnostic_printer;
+mod relay_source_printer;
+mod relay_text_style;
 
-pub use diagnostic_printer::DiagnosticPrinter;
-pub use diagnostic_printer::Sources;
-pub use source_printer::SourcePrinter;
-pub use text_style::Style;
-pub use text_style::Styles;
+pub use relay_diagnostic_printer::DiagnosticPrinter;
+pub use relay_diagnostic_printer::Sources;
+pub use relay_source_printer::SourcePrinter;
+pub use relay_text_style::Style;
+pub use relay_text_style::Styles;

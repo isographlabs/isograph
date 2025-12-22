@@ -9,18 +9,18 @@ use common::Named;
 use common::Span;
 use intern::string_key::StringKey;
 
-use super::constant_value::ConstantArgument;
-use super::primitive::*;
+use super::relay_primitive::*;
+use super::value::Argument;
 
 #[derive(Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct ConstantDirective {
+pub struct Directive {
     pub span: Span,
     pub at: Token,
     pub name: Identifier,
-    pub arguments: Option<List<ConstantArgument>>,
+    pub arguments: Option<List<Argument>>,
 }
 
-impl Named for ConstantDirective {
+impl Named for Directive {
     type Name = StringKey;
     fn name(&self) -> StringKey {
         self.name.value

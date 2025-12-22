@@ -5,22 +5,22 @@
  * LICENSE file in the root directory of this source tree.
  */
 
-mod constant_directive;
-mod constant_value;
-mod directive;
-mod document;
-mod executable;
-mod primitive;
-mod type_annotation;
+mod relay_constant_directive;
+mod relay_constant_value;
+mod relay_directive;
+mod relay_document;
+mod relay_executable;
+mod relay_primitive;
+mod relay_type_annotation;
 mod type_system;
 mod value;
 
-pub use constant_directive::*;
-pub use constant_value::*;
-pub use directive::*;
-pub use document::*;
-pub use executable::*;
-pub use primitive::*;
-pub use type_annotation::*;
+pub use relay_constant_directive::*;
+pub use relay_constant_value::*;
+pub use relay_directive::*;
+pub use relay_document::*;
+pub use relay_executable::*;
+pub use relay_primitive::*;
+pub use relay_type_annotation::*;
 pub use type_system::*;
 pub use value::*;

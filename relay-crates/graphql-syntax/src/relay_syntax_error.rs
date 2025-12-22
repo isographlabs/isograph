@@ -7,7 +7,7 @@
 
 use thiserror::Error;
 
-use crate::lexer::TokenKind;
+use crate::relay_lexer::TokenKind;
 
 #[derive(Clone, Copy, Debug, Error, Eq, PartialEq, Ord, PartialOrd, Hash, serde::Serialize)]
 #[serde(tag = "type")]

@@ -10,12 +10,12 @@ use std::fmt;
 use common::Span;
 use intern::string_key::StringKey;
 
-use super::constant_directive::ConstantDirective;
-use super::constant_value::ConstantValue;
-use super::constant_value::StringNode;
-use super::executable::OperationKind;
-use super::primitive::*;
-use super::type_annotation::TypeAnnotation;
+use super::relay_constant_directive::ConstantDirective;
+use super::relay_constant_value::ConstantValue;
+use super::relay_constant_value::StringNode;
+use super::relay_executable::OperationKind;
+use super::relay_primitive::*;
+use super::relay_type_annotation::TypeAnnotation;
 use crate::TokenKind;
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Debug)]
