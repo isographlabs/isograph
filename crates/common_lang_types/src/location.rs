@@ -156,6 +156,13 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
             item: &self.item,
         }
     }
+
+    pub fn drop_location(self) -> WithNoLocation<T> {
+        WithGenericLocation {
+            item: self.item,
+            location: (),
+        }
+    }
 }
 
 impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
@@ -170,3 +177,5 @@ impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
         self.location.partial_cmp(&other.location)
     }
 }
+
+pub type WithNoLocation<TItem> = WithGenericLocation<TItem, ()>;
