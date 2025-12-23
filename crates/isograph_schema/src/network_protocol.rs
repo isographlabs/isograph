@@ -5,6 +5,7 @@ use common_lang_types::{
     WithLocation,
 };
 use isograph_lang_types::VariableDeclaration;
+use pico::MemoRef;
 
 use crate::{
     CompilationProfile, MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap,
