@@ -4,7 +4,7 @@ use pico::MemoRef;
 
 use crate::{CompilationProfile, NetworkProtocol, TargetPlatform};
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy, Ord, PartialOrd)]
 pub struct IsConcrete(pub bool);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]

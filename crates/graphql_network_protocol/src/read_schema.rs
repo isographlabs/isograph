@@ -9,7 +9,8 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 #[memo]
-// TODO add error recovery and the non_fatal_diagnostics vec
+// TODO add error recovery and the non_fatal_diagnostics vec, i.e. do not return
+// a Result
 pub fn parse_graphql_schema<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<(

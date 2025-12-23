@@ -6,7 +6,7 @@ use pico::MemoRef;
 
 use crate::{CompilationProfile, NetworkProtocol, TargetPlatform};
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, PartialOrd, Ord)]
 pub struct IsInlineFragment(pub bool);
 
 impl From<bool> for IsInlineFragment {
