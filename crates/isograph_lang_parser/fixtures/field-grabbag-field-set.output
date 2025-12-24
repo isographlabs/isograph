@@ -1,30 +1,18 @@
 Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 31,
-                                end: 261,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 229,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "BasicField",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -41,14 +29,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -65,55 +53,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 31,
-                                        end: 261,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 21,
-                                end: 229,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 31,
-                                                    end: 261,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 27,
-                                            end: 33,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "scalar",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -130,9 +82,6 @@ Ok(
                                                         end: 33,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "scalar",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -141,9 +90,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -156,14 +103,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 38,
-                                            end: 75,
+                                            start: 27,
+                                            end: 33,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Object(
                                         ObjectSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "linked",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -180,53 +132,19 @@ Ok(
                                                         end: 44,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "linked",
-                                                ),
                                             },
                                             reader_alias: None,
-                                            selection_set: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
-                                                    text_source: TextSource {
-                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                        ),
-                                                        span: Some(
-                                                            Span {
-                                                                start: 31,
-                                                                end: 261,
-                                                            },
-                                                        ),
-                                                    },
-                                                    span: Span {
-                                                        start: 45,
-                                                        end: 75,
-                                                    },
-                                                },
+                                            selection_set: WithGenericLocation {
                                                 item: SelectionSet {
                                                     selections: [
-                                                        WithEmbeddedLocation {
-                                                            embedded_location: EmbeddedLocation {
-                                                                text_source: TextSource {
-                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                    ),
-                                                                    span: Some(
-                                                                        Span {
-                                                                            start: 31,
-                                                                            end: 261,
-                                                                        },
-                                                                    ),
-                                                                },
-                                                                span: Span {
-                                                                    start: 53,
-                                                                    end: 69,
-                                                                },
-                                                            },
+                                                        WithGenericLocation {
                                                             item: Scalar(
                                                                 ScalarSelection {
-                                                                    name: WithEmbeddedLocation {
-                                                                        embedded_location: EmbeddedLocation {
+                                                                    name: WithGenericLocation {
+                                                                        item: SelectableName(
+                                                                            "scalarWithComma",
+                                                                        ),
+                                                                        location: EmbeddedLocation {
                                                                             text_source: TextSource {
                                                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                                                     "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -243,9 +161,6 @@ Ok(
                                                                                 end: 68,
                                                                             },
                                                                         },
-                                                                        item: SelectableName(
-                                                                            "scalarWithComma",
-                                                                        ),
                                                                     },
                                                                     reader_alias: None,
                                                                     arguments: [],
@@ -254,8 +169,42 @@ Ok(
                                                                     ),
                                                                 },
                                                             ),
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 31,
+                                                                            end: 261,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 53,
+                                                                    end: 69,
+                                                                },
+                                                            },
                                                         },
                                                     ],
+                                                },
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 45,
+                                                        end: 75,
+                                                    },
                                                 },
                                             },
                                             arguments: [],
@@ -264,9 +213,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -279,14 +226,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 80,
-                                            end: 115,
+                                            start: 38,
+                                            end: 75,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Object(
                                         ObjectSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "linkedWithComma",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -303,53 +255,19 @@ Ok(
                                                         end: 95,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "linkedWithComma",
-                                                ),
                                             },
                                             reader_alias: None,
-                                            selection_set: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
-                                                    text_source: TextSource {
-                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                        ),
-                                                        span: Some(
-                                                            Span {
-                                                                start: 31,
-                                                                end: 261,
-                                                            },
-                                                        ),
-                                                    },
-                                                    span: Span {
-                                                        start: 96,
-                                                        end: 114,
-                                                    },
-                                                },
+                                            selection_set: WithGenericLocation {
                                                 item: SelectionSet {
                                                     selections: [
-                                                        WithEmbeddedLocation {
-                                                            embedded_location: EmbeddedLocation {
-                                                                text_source: TextSource {
-                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                    ),
-                                                                    span: Some(
-                                                                        Span {
-                                                                            start: 31,
-                                                                            end: 261,
-                                                                        },
-                                                                    ),
-                                                                },
-                                                                span: Span {
-                                                                    start: 104,
-                                                                    end: 108,
-                                                                },
-                                                            },
+                                                        WithGenericLocation {
                                                             item: Scalar(
                                                                 ScalarSelection {
-                                                                    name: WithEmbeddedLocation {
-                                                                        embedded_location: EmbeddedLocation {
+                                                                    name: WithGenericLocation {
+                                                                        item: SelectableName(
+                                                                            "blah",
+                                                                        ),
+                                                                        location: EmbeddedLocation {
                                                                             text_source: TextSource {
                                                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                                                     "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -366,9 +284,6 @@ Ok(
                                                                                 end: 108,
                                                                             },
                                                                         },
-                                                                        item: SelectableName(
-                                                                            "blah",
-                                                                        ),
                                                                     },
                                                                     reader_alias: None,
                                                                     arguments: [],
@@ -377,8 +292,42 @@ Ok(
                                                                     ),
                                                                 },
                                                             ),
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 31,
+                                                                            end: 261,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 104,
+                                                                    end: 108,
+                                                                },
+                                                            },
                                                         },
                                                     ],
+                                                },
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 96,
+                                                        end: 114,
+                                                    },
                                                 },
                                             },
                                             arguments: [],
@@ -387,9 +336,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -402,14 +349,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 120,
-                                            end: 129,
+                                            start: 80,
+                                            end: 115,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "multiple",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -426,9 +378,6 @@ Ok(
                                                         end: 128,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "multiple",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -437,9 +386,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -452,14 +399,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 130,
-                                            end: 133,
+                                            start: 120,
+                                            end: 129,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "on",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -476,9 +428,6 @@ Ok(
                                                         end: 132,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "on",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -487,9 +436,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -502,14 +449,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 134,
-                                            end: 138,
+                                            start: 130,
+                                            end: 133,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "the",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -526,9 +478,6 @@ Ok(
                                                         end: 137,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "the",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -537,9 +486,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -552,14 +499,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 139,
-                                            end: 144,
+                                            start: 134,
+                                            end: 138,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "same",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -576,9 +528,6 @@ Ok(
                                                         end: 143,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "same",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -587,9 +536,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -602,14 +549,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 145,
-                                            end: 149,
+                                            start: 139,
+                                            end: 144,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "line",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -626,9 +578,6 @@ Ok(
                                                         end: 149,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "line",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -637,9 +586,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -652,14 +599,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 154,
-                                            end: 164,
+                                            start: 145,
+                                            end: 149,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "including",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -676,9 +628,6 @@ Ok(
                                                         end: 163,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "including",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -687,9 +636,7 @@ Ok(
                                             ),
                                         },
                                     ),
-                                },
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
+                                    location: EmbeddedLocation {
                                         text_source: TextSource {
                                             relative_path_to_source_file: RelativePathToSourceFile(
                                                 "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -702,14 +649,19 @@ Ok(
                                             ),
                                         },
                                         span: Span {
-                                            start: 165,
-                                            end: 225,
+                                            start: 154,
+                                            end: 164,
                                         },
                                     },
+                                },
+                                WithGenericLocation {
                                     item: Object(
                                         ObjectSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "youCanEndWithALinkedField",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -726,53 +678,19 @@ Ok(
                                                         end: 190,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "youCanEndWithALinkedField",
-                                                ),
                                             },
                                             reader_alias: None,
-                                            selection_set: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
-                                                    text_source: TextSource {
-                                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                        ),
-                                                        span: Some(
-                                                            Span {
-                                                                start: 31,
-                                                                end: 261,
-                                                            },
-                                                        ),
-                                                    },
-                                                    span: Span {
-                                                        start: 191,
-                                                        end: 225,
-                                                    },
-                                                },
+                                            selection_set: WithGenericLocation {
                                                 item: SelectionSet {
                                                     selections: [
-                                                        WithEmbeddedLocation {
-                                                            embedded_location: EmbeddedLocation {
-                                                                text_source: TextSource {
-                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                                                    ),
-                                                                    span: Some(
-                                                                        Span {
-                                                                            start: 31,
-                                                                            end: 261,
-                                                                        },
-                                                                    ),
-                                                                },
-                                                                span: Span {
-                                                                    start: 199,
-                                                                    end: 219,
-                                                                },
-                                                            },
+                                                        WithGenericLocation {
                                                             item: Scalar(
                                                                 ScalarSelection {
-                                                                    name: WithEmbeddedLocation {
-                                                                        embedded_location: EmbeddedLocation {
+                                                                    name: WithGenericLocation {
+                                                                        item: SelectableName(
+                                                                            "butWhyWouldYouDoThat",
+                                                                        ),
+                                                                        location: EmbeddedLocation {
                                                                             text_source: TextSource {
                                                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                                                     "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -789,9 +707,6 @@ Ok(
                                                                                 end: 219,
                                                                             },
                                                                         },
-                                                                        item: SelectableName(
-                                                                            "butWhyWouldYouDoThat",
-                                                                        ),
                                                                     },
                                                                     reader_alias: None,
                                                                     arguments: [],
@@ -800,8 +715,42 @@ Ok(
                                                                     ),
                                                                 },
                                                             ),
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 31,
+                                                                            end: 261,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 199,
+                                                                    end: 219,
+                                                                },
+                                                            },
                                                         },
                                                     ],
+                                                },
+                                                location: EmbeddedLocation {
+                                                    text_source: TextSource {
+                                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                                        ),
+                                                        span: Some(
+                                                            Span {
+                                                                start: 31,
+                                                                end: 261,
+                                                            },
+                                                        ),
+                                                    },
+                                                    span: Span {
+                                                        start: 191,
+                                                        end: 225,
+                                                    },
                                                 },
                                             },
                                             arguments: [],
@@ -810,8 +759,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 31,
+                                                    end: 261,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 165,
+                                            end: 225,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 261,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 21,
+                                end: 229,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -824,8 +807,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -842,38 +838,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 31,
-                                            end: 261,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -890,9 +856,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 261,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -909,41 +908,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 31,
-                                            end: 261,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -960,9 +926,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 261,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -979,22 +975,22 @@ Ok(
                                     end: 22,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1011,6 +1007,8 @@ Ok(
                                     end: 33,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -1024,9 +1022,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1043,22 +1039,22 @@ Ok(
                                     end: 44,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1075,22 +1071,22 @@ Ok(
                                     end: 46,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1107,22 +1103,16 @@ Ok(
                                     end: 68,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1139,16 +1129,16 @@ Ok(
                                     end: 69,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: Remove,
-                                indent_change: Same,
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1165,16 +1155,22 @@ Ok(
                                     end: 75,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1191,22 +1187,22 @@ Ok(
                                     end: 95,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1223,22 +1219,22 @@ Ok(
                                     end: 97,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1255,22 +1251,16 @@ Ok(
                                     end: 108,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1287,16 +1277,16 @@ Ok(
                                     end: 114,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
+                                line_behavior: Remove,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1313,16 +1303,22 @@ Ok(
                                     end: 115,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1339,22 +1335,16 @@ Ok(
                                     end: 128,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1371,16 +1361,22 @@ Ok(
                                     end: 129,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1397,22 +1393,16 @@ Ok(
                                     end: 132,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1429,16 +1419,22 @@ Ok(
                                     end: 133,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1455,22 +1451,16 @@ Ok(
                                     end: 137,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1487,16 +1477,22 @@ Ok(
                                     end: 138,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1513,22 +1509,16 @@ Ok(
                                     end: 143,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1545,16 +1535,22 @@ Ok(
                                     end: 144,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1571,6 +1567,8 @@ Ok(
                                     end: 149,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     9,
@@ -1584,9 +1582,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1603,22 +1599,16 @@ Ok(
                                     end: 163,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: Remove,
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1635,16 +1625,22 @@ Ok(
                                     end: 164,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: Remove,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1661,22 +1657,22 @@ Ok(
                                     end: 190,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1693,22 +1689,22 @@ Ok(
                                     end: 192,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1725,22 +1721,16 @@ Ok(
                                     end: 219,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1757,6 +1747,8 @@ Ok(
                                     end: 225,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -1764,9 +1756,7 @@ Ok(
                                 line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
@@ -1783,15 +1773,25 @@ Ok(
                                     end: 229,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-grabbag-field-set.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 31,
+                                end: 261,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 229,
+                    },
                 },
             },
         ),

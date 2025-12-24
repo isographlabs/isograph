@@ -1,30 +1,18 @@
 Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 31,
-                                end: 77,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 45,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "BasicField",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -41,14 +29,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -65,55 +53,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 31,
-                                        end: 77,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 19,
-                                end: 45,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 31,
-                                                    end: 77,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 25,
-                                            end: 41,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "scalar",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -130,9 +82,6 @@ Ok(
                                                         end: 31,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "scalar",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -145,8 +94,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 31,
+                                                    end: 77,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 25,
+                                            end: 41,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 77,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 45,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -159,8 +142,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -177,38 +173,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 31,
-                                            end: 77,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -225,9 +191,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 77,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -244,41 +243,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 31,
-                                            end: 77,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -295,9 +261,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 31,
+                                            end: 77,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -314,22 +310,22 @@ Ok(
                                     end: 20,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -346,22 +342,25 @@ Ok(
                                     end: 31,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    22,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -378,6 +377,8 @@ Ok(
                                     end: 33,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -385,18 +386,16 @@ Ok(
                                 line_behavior: Inline(
                                     InlineBehavior {
                                         space_before: SpaceBefore(
-                                            true,
+                                            false,
                                         ),
                                         space_after: SpaceAfter(
-                                            false,
+                                            true,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -413,25 +412,16 @@ Ok(
                                     end: 41,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    22,
+                                    21,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -448,15 +438,25 @@ Ok(
                                     end: 45,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 31,
+                                end: 77,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 45,
+                    },
                 },
             },
         ),
@@ -475,30 +475,18 @@ Ok(
 )Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 116,
-                                end: 187,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 70,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "BasicField2",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -515,14 +503,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -539,55 +527,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 116,
-                                        end: 187,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 19,
-                                end: 70,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 116,
-                                                    end: 187,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 25,
-                                            end: 66,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "scalar",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -604,9 +556,6 @@ Ok(
                                                         end: 31,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "scalar",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -619,8 +568,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 116,
+                                                    end: 187,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 25,
+                                            end: 66,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 116,
+                                        end: 187,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 70,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -633,8 +616,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -651,38 +647,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 116,
-                                            end: 187,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -699,9 +665,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 116,
+                                            end: 187,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -718,41 +717,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 116,
-                                            end: 187,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -769,9 +735,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 116,
+                                            end: 187,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -788,22 +784,22 @@ Ok(
                                     end: 20,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -820,22 +816,25 @@ Ok(
                                     end: 31,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    22,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -852,6 +851,8 @@ Ok(
                                     end: 33,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -859,18 +860,16 @@ Ok(
                                 line_behavior: Inline(
                                     InlineBehavior {
                                         space_before: SpaceBefore(
-                                            true,
+                                            false,
                                         ),
                                         space_after: SpaceAfter(
-                                            false,
+                                            true,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -887,25 +886,22 @@ Ok(
                                     end: 41,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    22,
+                                    21,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
                                         space_before: SpaceBefore(
                                             false,
                                         ),
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -922,22 +918,22 @@ Ok(
                                     end: 42,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    7,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -954,38 +950,8 @@ Ok(
                                     end: 58,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    7,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 116,
-                                            end: 187,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 58,
-                                    end: 59,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -1002,9 +968,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1017,10 +981,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 60,
-                                    end: 65,
+                                    start: 58,
+                                    end: 59,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -1037,9 +1003,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 116,
+                                            end: 187,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 60,
+                                    end: 65,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Dedent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1056,22 +1052,16 @@ Ok(
                                     end: 66,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1088,15 +1078,25 @@ Ok(
                                     end: 70,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 116,
+                                end: 187,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 70,
+                    },
                 },
             },
         ),
@@ -1115,30 +1115,18 @@ Ok(
 )Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 226,
-                                end: 296,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 69,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "BasicField3",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1155,14 +1143,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1179,55 +1167,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 226,
-                                        end: 296,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 19,
-                                end: 69,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 226,
-                                                    end: 296,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 25,
-                                            end: 65,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "scalar",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1244,9 +1196,6 @@ Ok(
                                                         end: 31,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "scalar",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -1259,8 +1208,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 226,
+                                                    end: 296,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 25,
+                                            end: 65,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 226,
+                                        end: 296,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 69,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -1273,8 +1256,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1291,38 +1287,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 226,
-                                            end: 296,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -1339,9 +1305,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 226,
+                                            end: 296,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1358,41 +1357,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 226,
-                                            end: 296,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -1409,9 +1375,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 226,
+                                            end: 296,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1428,22 +1424,22 @@ Ok(
                                     end: 20,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1460,22 +1456,25 @@ Ok(
                                     end: 31,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    22,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1492,6 +1491,8 @@ Ok(
                                     end: 33,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -1499,18 +1500,16 @@ Ok(
                                 line_behavior: Inline(
                                     InlineBehavior {
                                         space_before: SpaceBefore(
-                                            true,
+                                            false,
                                         ),
                                         space_after: SpaceAfter(
-                                            false,
+                                            true,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1527,25 +1526,22 @@ Ok(
                                     end: 41,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    22,
+                                    21,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
                                         space_before: SpaceBefore(
                                             false,
                                         ),
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1562,22 +1558,22 @@ Ok(
                                     end: 42,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    7,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1594,38 +1590,8 @@ Ok(
                                     end: 58,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    7,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 226,
-                                            end: 296,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 58,
-                                    end: 59,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -1642,9 +1608,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1657,10 +1621,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 60,
-                                    end: 64,
+                                    start: 58,
+                                    end: 59,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
@@ -1677,9 +1643,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 226,
+                                            end: 296,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 60,
+                                    end: 64,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Dedent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1696,22 +1692,16 @@ Ok(
                                     end: 65,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1728,15 +1718,25 @@ Ok(
                                     end: 69,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 226,
+                                end: 296,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 69,
+                    },
                 },
             },
         ),
@@ -1755,30 +1755,18 @@ Ok(
 )Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 333,
-                                end: 380,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 46,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "updatable",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1795,14 +1783,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1819,55 +1807,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 333,
-                                        end: 380,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 19,
-                                end: 46,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 333,
-                                                    end: 380,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 25,
-                                            end: 42,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "scalar",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1884,9 +1836,6 @@ Ok(
                                                         end: 31,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "scalar",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [],
@@ -1897,8 +1846,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 333,
+                                                    end: 380,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 25,
+                                            end: 42,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 333,
+                                        end: 380,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 46,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -1911,8 +1894,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1929,38 +1925,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 333,
-                                            end: 380,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -1977,9 +1943,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 333,
+                                            end: 380,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1996,41 +1995,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 333,
-                                            end: 380,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -2047,9 +2013,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 333,
+                                            end: 380,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -2066,22 +2062,22 @@ Ok(
                                     end: 20,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -2098,22 +2094,25 @@ Ok(
                                     end: 31,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    22,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
                                             true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -2130,6 +2129,8 @@ Ok(
                                     end: 33,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -2137,18 +2138,16 @@ Ok(
                                 line_behavior: Inline(
                                     InlineBehavior {
                                         space_before: SpaceBefore(
-                                            true,
+                                            false,
                                         ),
                                         space_after: SpaceAfter(
-                                            false,
+                                            true,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -2165,25 +2164,16 @@ Ok(
                                     end: 42,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    22,
+                                    21,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -2200,15 +2190,25 @@ Ok(
                                     end: 46,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 333,
+                                end: 380,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 46,
+                    },
                 },
             },
         ),

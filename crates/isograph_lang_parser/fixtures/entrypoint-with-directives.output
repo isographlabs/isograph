@@ -1,27 +1,15 @@
 Ok(
     (
         EntrypointDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 5,
-                                end: 30,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 11,
-                        end: 25,
-                    },
-                },
+            WithGenericLocation {
                 item: EntrypointDeclaration {
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -38,14 +26,14 @@ Ok(
                                 end: 15,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -62,14 +50,10 @@ Ok(
                                 end: 20,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
-                    entrypoint_keyword: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    entrypoint_keyword: WithGenericLocation {
+                        item: (),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -86,10 +70,10 @@ Ok(
                                 end: 10,
                             },
                         },
-                        item: (),
                     },
-                    dot: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    dot: WithGenericLocation {
+                        item: (),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -106,51 +90,19 @@ Ok(
                                 end: 16,
                             },
                         },
-                        item: (),
                     },
                     iso_literal_text: IsoLiteralText(
                         "entrypoint Type.Name @foo",
                     ),
-                    directive_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 5,
-                                        end: 30,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 21,
-                                end: 25,
-                            },
-                        },
+                    directive_set: WithGenericLocation {
                         item: [
-                            WithEmbeddedLocation {
-                                embedded_location: EmbeddedLocation {
-                                    text_source: TextSource {
-                                        relative_path_to_source_file: RelativePathToSourceFile(
-                                            "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
-                                        ),
-                                        span: Some(
-                                            Span {
-                                                start: 5,
-                                                end: 30,
-                                            },
-                                        ),
-                                    },
-                                    span: Span {
-                                        start: 21,
-                                        end: 25,
-                                    },
-                                },
+                            WithGenericLocation {
                                 item: IsographFieldDirective {
-                                    name: WithEmbeddedLocation {
-                                        embedded_location: EmbeddedLocation {
+                                    name: WithGenericLocation {
+                                        item: IsographDirectiveName(
+                                            "foo",
+                                        ),
+                                        location: EmbeddedLocation {
                                             text_source: TextSource {
                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                     "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -167,34 +119,48 @@ Ok(
                                                 end: 25,
                                             },
                                         },
-                                        item: IsographDirectiveName(
-                                            "foo",
-                                        ),
                                     },
                                     arguments: [],
                                 },
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 5,
+                                                end: 30,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 21,
+                                        end: 25,
+                                    },
+                                },
                             },
                         ],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 5,
+                                        end: 30,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 21,
+                                end: 25,
+                            },
+                        },
                     },
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 5,
-                                            end: 30,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 0,
-                                    end: 10,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     15,
@@ -211,9 +177,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -226,10 +190,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 11,
-                                    end: 15,
+                                    start: 0,
+                                    end: 10,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -246,9 +212,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -261,10 +225,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 15,
-                                    end: 16,
+                                    start: 11,
+                                    end: 15,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -281,9 +247,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -296,10 +260,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 16,
-                                    end: 20,
+                                    start: 15,
+                                    end: 16,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -316,9 +282,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 5,
+                                            end: 30,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 16,
+                                    end: 20,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    22,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -335,6 +334,8 @@ Ok(
                                     end: 22,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     22,
@@ -342,18 +343,16 @@ Ok(
                                 line_behavior: Inline(
                                     InlineBehavior {
                                         space_before: SpaceBefore(
-                                            true,
+                                            false,
                                         ),
                                         space_after: SpaceAfter(
-                                            false,
+                                            true,
                                         ),
                                     },
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
@@ -370,24 +369,25 @@ Ok(
                                     end: 25,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    22,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/entrypoint-with-directives.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 5,
+                                end: 30,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 11,
+                        end: 25,
+                    },
                 },
             },
         ),

@@ -1,30 +1,18 @@
 Ok(
     (
         ClientFieldDeclaration(
-            WithEmbeddedLocation {
-                embedded_location: EmbeddedLocation {
-                    text_source: TextSource {
-                        relative_path_to_source_file: RelativePathToSourceFile(
-                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                        ),
-                        span: Some(
-                            Span {
-                                start: 30,
-                                end: 86,
-                            },
-                        ),
-                    },
-                    span: Span {
-                        start: 9,
-                        end: 55,
-                    },
-                },
+            WithGenericLocation {
                 item: ClientFieldDeclaration {
                     const_export_name: ConstExportName(
                         "ValidArgs",
                     ),
-                    parent_type: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                    parent_type: WithGenericLocation {
+                        item: EntityNameWrapper(
+                            EntityName(
+                                "Type",
+                            ),
+                        ),
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -41,14 +29,14 @@ Ok(
                                 end: 13,
                             },
                         },
-                        item: EntityNameWrapper(
-                            EntityName(
-                                "Type",
+                    },
+                    client_field_name: WithGenericLocation {
+                        item: ClientScalarSelectableNameWrapper(
+                            SelectableName(
+                                "Name",
                             ),
                         ),
-                    },
-                    client_field_name: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
+                        location: EmbeddedLocation {
                             text_source: TextSource {
                                 relative_path_to_source_file: RelativePathToSourceFile(
                                     "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -65,55 +53,19 @@ Ok(
                                 end: 18,
                             },
                         },
-                        item: ClientScalarSelectableNameWrapper(
-                            SelectableName(
-                                "Name",
-                            ),
-                        ),
                     },
                     description: None,
-                    selection_set: WithEmbeddedLocation {
-                        embedded_location: EmbeddedLocation {
-                            text_source: TextSource {
-                                relative_path_to_source_file: RelativePathToSourceFile(
-                                    "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                ),
-                                span: Some(
-                                    Span {
-                                        start: 30,
-                                        end: 86,
-                                    },
-                                ),
-                            },
-                            span: Span {
-                                start: 19,
-                                end: 55,
-                            },
-                        },
+                    selection_set: WithGenericLocation {
                         item: SelectionSet {
                             selections: [
-                                WithEmbeddedLocation {
-                                    embedded_location: EmbeddedLocation {
-                                        text_source: TextSource {
-                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                            ),
-                                            span: Some(
-                                                Span {
-                                                    start: 30,
-                                                    end: 86,
-                                                },
-                                            ),
-                                        },
-                                        span: Span {
-                                            start: 25,
-                                            end: 51,
-                                        },
-                                    },
+                                WithGenericLocation {
                                     item: Scalar(
                                         ScalarSelection {
-                                            name: WithEmbeddedLocation {
-                                                embedded_location: EmbeddedLocation {
+                                            name: WithGenericLocation {
+                                                item: SelectableName(
+                                                    "args",
+                                                ),
+                                                location: EmbeddedLocation {
                                                     text_source: TextSource {
                                                         relative_path_to_source_file: RelativePathToSourceFile(
                                                             "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -130,33 +82,16 @@ Ok(
                                                         end: 29,
                                                     },
                                                 },
-                                                item: SelectableName(
-                                                    "args",
-                                                ),
                                             },
                                             reader_alias: None,
                                             arguments: [
-                                                WithEmbeddedLocation {
-                                                    embedded_location: EmbeddedLocation {
-                                                        text_source: TextSource {
-                                                            relative_path_to_source_file: RelativePathToSourceFile(
-                                                                "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                            ),
-                                                            span: Some(
-                                                                Span {
-                                                                    start: 30,
-                                                                    end: 86,
-                                                                },
-                                                            ),
-                                                        },
-                                                        span: Span {
-                                                            start: 30,
-                                                            end: 50,
-                                                        },
-                                                    },
+                                                WithGenericLocation {
                                                     item: SelectionFieldArgument {
-                                                        name: WithEmbeddedLocation {
-                                                            embedded_location: EmbeddedLocation {
+                                                        name: WithGenericLocation {
+                                                            item: FieldArgumentName(
+                                                                "arg1",
+                                                            ),
+                                                            location: EmbeddedLocation {
                                                                 text_source: TextSource {
                                                                     relative_path_to_source_file: RelativePathToSourceFile(
                                                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -173,33 +108,16 @@ Ok(
                                                                     end: 34,
                                                                 },
                                                             },
-                                                            item: FieldArgumentName(
-                                                                "arg1",
-                                                            ),
                                                         },
-                                                        value: WithEmbeddedLocation {
-                                                            embedded_location: EmbeddedLocation {
-                                                                text_source: TextSource {
-                                                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                                                    ),
-                                                                    span: Some(
-                                                                        Span {
-                                                                            start: 30,
-                                                                            end: 86,
-                                                                        },
-                                                                    ),
-                                                                },
-                                                                span: Span {
-                                                                    start: 36,
-                                                                    end: 50,
-                                                                },
-                                                            },
+                                                        value: WithGenericLocation {
                                                             item: Object(
                                                                 [
-                                                                    NameValuePair {
-                                                                        name: WithEmbeddedLocation {
-                                                                            embedded_location: EmbeddedLocation {
+                                                                    NameValuePairInner {
+                                                                        name: WithGenericLocation {
+                                                                            item: ValueKeyName(
+                                                                                "foo",
+                                                                            ),
+                                                                            location: EmbeddedLocation {
                                                                                 text_source: TextSource {
                                                                                     relative_path_to_source_file: RelativePathToSourceFile(
                                                                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -216,12 +134,14 @@ Ok(
                                                                                     end: 41,
                                                                                 },
                                                                             },
-                                                                            item: ValueKeyName(
-                                                                                "foo",
-                                                                            ),
                                                                         },
-                                                                        value: WithEmbeddedLocation {
-                                                                            embedded_location: EmbeddedLocation {
+                                                                        value: WithGenericLocation {
+                                                                            item: String(
+                                                                                StringLiteralValue(
+                                                                                    "bar",
+                                                                                ),
+                                                                            ),
+                                                                            location: EmbeddedLocation {
                                                                                 text_source: TextSource {
                                                                                     relative_path_to_source_file: RelativePathToSourceFile(
                                                                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -238,15 +158,44 @@ Ok(
                                                                                     end: 48,
                                                                                 },
                                                                             },
-                                                                            item: String(
-                                                                                StringLiteralValue(
-                                                                                    "bar",
-                                                                                ),
-                                                                            ),
                                                                         },
                                                                     },
                                                                 ],
                                                             ),
+                                                            location: EmbeddedLocation {
+                                                                text_source: TextSource {
+                                                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                                    ),
+                                                                    span: Some(
+                                                                        Span {
+                                                                            start: 30,
+                                                                            end: 86,
+                                                                        },
+                                                                    ),
+                                                                },
+                                                                span: Span {
+                                                                    start: 36,
+                                                                    end: 50,
+                                                                },
+                                                            },
+                                                        },
+                                                    },
+                                                    location: EmbeddedLocation {
+                                                        text_source: TextSource {
+                                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                                "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                                            ),
+                                                            span: Some(
+                                                                Span {
+                                                                    start: 30,
+                                                                    end: 86,
+                                                                },
+                                                            ),
+                                                        },
+                                                        span: Span {
+                                                            start: 30,
+                                                            end: 50,
                                                         },
                                                     },
                                                 },
@@ -256,8 +205,42 @@ Ok(
                                             ),
                                         },
                                     ),
+                                    location: EmbeddedLocation {
+                                        text_source: TextSource {
+                                            relative_path_to_source_file: RelativePathToSourceFile(
+                                                "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                            ),
+                                            span: Some(
+                                                Span {
+                                                    start: 30,
+                                                    end: 86,
+                                                },
+                                            ),
+                                        },
+                                        span: Span {
+                                            start: 25,
+                                            end: 51,
+                                        },
+                                    },
                                 },
                             ],
+                        },
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 30,
+                                        end: 86,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 55,
+                            },
                         },
                     },
                     client_scalar_selectable_directive_set: Ok(
@@ -270,8 +253,21 @@ Ok(
                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
                     ),
                     semantic_tokens: [
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    15,
+                                ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -288,38 +284,8 @@ Ok(
                                     end: 8,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    15,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 30,
-                                            end: 86,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 9,
-                                    end: 13,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     2,
@@ -336,9 +302,42 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 30,
+                                            end: 86,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 9,
+                                    end: 13,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
+                                        space_after: SpaceAfter(
+                                            false,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Same,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -355,41 +354,8 @@ Ok(
                                     end: 14,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
-                                            false,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 30,
-                                            end: 86,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 14,
-                                    end: 18,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     13,
@@ -406,9 +372,39 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 30,
+                                            end: 86,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 14,
+                                    end: 18,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            true,
+                                        ),
+                                    },
+                                ),
+                                indent_change: Indent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -425,22 +421,22 @@ Ok(
                                     end: 20,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -457,22 +453,22 @@ Ok(
                                     end: 29,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    9,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
                                         ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -489,22 +485,22 @@ Ok(
                                     end: 30,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    7,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
-                                            false,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -521,12 +517,17 @@ Ok(
                                     end: 34,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    7,
+                                    21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
+                                line_behavior: Inline(
+                                    InlineBehavior {
+                                        space_before: SpaceBefore(
+                                            false,
+                                        ),
                                         space_after: SpaceAfter(
                                             true,
                                         ),
@@ -534,9 +535,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -553,25 +552,22 @@ Ok(
                                     end: 35,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
+                                line_behavior: EndsLine(
+                                    EndsLineBehavior {
                                         space_before: SpaceBefore(
-                                            false,
-                                        ),
-                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Same,
+                                indent_change: Indent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -588,22 +584,22 @@ Ok(
                                     end: 37,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
-                                    21,
+                                    9,
                                 ),
-                                line_behavior: EndsLine(
-                                    EndsLineBehavior {
-                                        space_before: SpaceBefore(
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
                                             true,
                                         ),
                                     },
                                 ),
-                                indent_change: Indent,
+                                indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -620,38 +616,8 @@ Ok(
                                     end: 41,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    9,
-                                ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
-                                indent_change: Same,
-                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
-                                text_source: TextSource {
-                                    relative_path_to_source_file: RelativePathToSourceFile(
-                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
-                                    ),
-                                    span: Some(
-                                        Span {
-                                            start: 30,
-                                            end: 86,
-                                        },
-                                    ),
-                                },
-                                span: Span {
-                                    start: 41,
-                                    end: 42,
-                                },
-                            },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
@@ -668,9 +634,7 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -683,10 +647,12 @@ Ok(
                                     ),
                                 },
                                 span: Span {
-                                    start: 43,
-                                    end: 48,
+                                    start: 41,
+                                    end: 42,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     18,
@@ -703,9 +669,33 @@ Ok(
                                 ),
                                 indent_change: Same,
                             },
+                            location: EmbeddedLocation {
+                                text_source: TextSource {
+                                    relative_path_to_source_file: RelativePathToSourceFile(
+                                        "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                                    ),
+                                    span: Some(
+                                        Span {
+                                            start: 30,
+                                            end: 86,
+                                        },
+                                    ),
+                                },
+                                span: Span {
+                                    start: 43,
+                                    end: 48,
+                                },
+                            },
                         },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                        WithGenericLocation {
+                            item: IsographSemanticToken {
+                                lsp_semantic_token: LspSemanticToken(
+                                    21,
+                                ),
+                                line_behavior: IsOwnLine,
+                                indent_change: Dedent,
+                            },
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -722,16 +712,22 @@ Ok(
                                     end: 50,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: IsOwnLine,
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
+                                        space_after: SpaceAfter(
+                                            true,
+                                        ),
+                                    },
+                                ),
                                 indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -748,22 +744,16 @@ Ok(
                                     end: 51,
                                 },
                             },
+                        },
+                        WithGenericLocation {
                             item: IsographSemanticToken {
                                 lsp_semantic_token: LspSemanticToken(
                                     21,
                                 ),
-                                line_behavior: StartsNewLine(
-                                    StartsNewLineBehavior {
-                                        space_after: SpaceAfter(
-                                            true,
-                                        ),
-                                    },
-                                ),
+                                line_behavior: IsOwnLine,
                                 indent_change: Dedent,
                             },
-                        },
-                        WithEmbeddedLocation {
-                            embedded_location: EmbeddedLocation {
+                            location: EmbeddedLocation {
                                 text_source: TextSource {
                                     relative_path_to_source_file: RelativePathToSourceFile(
                                         "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
@@ -780,15 +770,25 @@ Ok(
                                     end: 55,
                                 },
                             },
-                            item: IsographSemanticToken {
-                                lsp_semantic_token: LspSemanticToken(
-                                    21,
-                                ),
-                                line_behavior: IsOwnLine,
-                                indent_change: Dedent,
-                            },
                         },
                     ],
+                },
+                location: EmbeddedLocation {
+                    text_source: TextSource {
+                        relative_path_to_source_file: RelativePathToSourceFile(
+                            "crates/isograph_lang_parser/fixtures/field-args-obj.input.js",
+                        ),
+                        span: Some(
+                            Span {
+                                start: 30,
+                                end: 86,
+                            },
+                        ),
+                    },
+                    span: Span {
+                        start: 9,
+                        end: 55,
+                    },
                 },
             },
         ),
