@@ -15,8 +15,8 @@ use pico_macros::memo;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, ServerEntityName, WrappedSelectionMapSelection,
-    defined_entity, fetchable_types,
+    NODE_FIELD_NAME, NetworkProtocol, WrappedSelectionMapSelection, defined_entity,
+    fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_selectable_named,
 };
@@ -61,13 +61,13 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
         })?;
 
     match parent_type_id {
-        ServerEntityName::Object(_) => {
+        SelectionType::Object(_) => {
             add_client_scalar_selectable_to_entity(db, client_field_declaration)
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")
                 .map(|x| x.0)?
         }
-        ServerEntityName::Scalar(scalar_entity_name) => {
+        SelectionType::Scalar(scalar_entity_name) => {
             return Diagnostic::new(
                 format!(
                     "Invalid parent type. `{scalar_entity_name}` is a scalar. \
@@ -124,11 +124,11 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     })?;
 
     match parent_type_id {
-        ServerEntityName::Object(_) => match target_type_id {
-            ServerEntityName::Object(_to_object_entity_name) => {
+        SelectionType::Object(_) => match target_type_id {
+            SelectionType::Object(_to_object_entity_name) => {
                 add_client_pointer_to_object(db, client_pointer_declaration)?
             }
-            ServerEntityName::Scalar(scalar_entity_name) => {
+            SelectionType::Scalar(scalar_entity_name) => {
                 return Diagnostic::new(
                     format!(
                         "Invalid client pointer target type. \
@@ -146,7 +146,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 .wrap_err();
             }
         },
-        ServerEntityName::Scalar(scalar_entity_name) => {
+        SelectionType::Scalar(scalar_entity_name) => {
             return Diagnostic::new(
                 format!("`{scalar_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item

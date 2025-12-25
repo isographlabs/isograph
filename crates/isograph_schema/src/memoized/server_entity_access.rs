@@ -7,8 +7,7 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, MemoRefServerEntity, NetworkProtocol, ServerEntityName, ServerObjectEntity,
-    ServerScalarEntity,
+    IsographDatabase, MemoRefServerEntity, NetworkProtocol, ServerObjectEntity, ServerScalarEntity,
 };
 
 /// This function just drops the locations
@@ -127,7 +126,7 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: EntityName,
-) -> DiagnosticResult<Option<ServerEntityName>> {
+) -> DiagnosticResult<Option<SelectionType<EntityName, EntityName>>> {
     match server_entities_map_without_locations(db)
         .clone_err()?
         .lookup(db)

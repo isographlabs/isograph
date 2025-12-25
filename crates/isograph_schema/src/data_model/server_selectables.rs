@@ -4,11 +4,11 @@ use common_lang_types::{
     EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, WithNoLocation,
 };
 use isograph_lang_types::{
-    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration, impl_with_target_id,
+    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 use pico::MemoRef;
 
-use crate::{NetworkProtocol, ServerEntityName, ServerObjectSelectableVariant};
+use crate::{NetworkProtocol, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
@@ -31,8 +31,6 @@ impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol>
         EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
     }
 }
-
-impl_with_target_id!(ServerScalarSelectable<TNetworkProtocol: NetworkProtocol>, ServerEntityName);
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {

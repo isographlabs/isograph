@@ -31,5 +31,3 @@ pub type MemoRefServerEntity<TNetworkProtocol> = SelectionType<
     MemoRef<ServerScalarEntity<TNetworkProtocol>>,
     MemoRef<ServerObjectEntity<TNetworkProtocol>>,
 >;
-
-pub type ServerEntityName = SelectionType<EntityName, EntityName>;
