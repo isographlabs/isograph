@@ -10,7 +10,7 @@ use prelude::{ErrClone, Postfix};
 use std::collections::HashSet;
 
 use crate::{
-    ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerObjectEntity,
+    ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerEntity,
     entity_not_defined_diagnostic, reader_selection_set_map, selectable_named,
     server_object_entity_named,
 };
@@ -74,7 +74,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     errors: &mut Vec<Diagnostic>,
     selection_set: &SelectionSet,
-    parent_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_entity: &ServerEntity<TNetworkProtocol>,
     selectable_declaration_info: EntityNameAndSelectableName,
 ) {
     let mut encountered_names_or_aliases = HashSet::new();

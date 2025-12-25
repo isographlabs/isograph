@@ -6,9 +6,7 @@ use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::{
-    IsographDatabase, MemoRefServerEntity, NetworkProtocol, ServerObjectEntity, ServerScalarEntity,
-};
+use crate::{IsographDatabase, MemoRefServerEntity, NetworkProtocol, ServerEntity};
 
 /// This function just drops the locations
 #[memo]
@@ -31,14 +29,20 @@ pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
 #[memo]
 pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
     let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
         .entities
         .iter()
-        .filter_map(|(_, x)| x.item.as_object())
+        .filter_map(|(_, x)| {
+            if x.item.lookup(db).selection_info.as_object().is_some() {
+                x.item.wrap_some()
+            } else {
+                None
+            }
+        })
         .collect::<Vec<_>>()
         .wrap_ok()
 }
@@ -47,13 +51,13 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerObjectEntity<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ServerEntity<TNetworkProtocol>>>> {
     let map = server_entities_map_without_locations(db)
         .clone_err()?
         .lookup(db);
 
     match map.get(&server_object_entity_name) {
-        Some(entity) => match entity {
+        Some(entity) => match entity.lookup(db).selection_info {
             SelectionType::Scalar(_) => {
                 let location = entity_definition_location(db, server_object_entity_name)
                     .as_ref()
@@ -68,7 +72,7 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
                 )
                 .wrap_err()
             }
-            SelectionType::Object(o) => (*o).wrap_some().wrap_ok(),
+            SelectionType::Object(_) => entity.dereference().wrap_some().wrap_ok(),
         },
         None => None.wrap_ok(),
     }
@@ -78,13 +82,13 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     server_scalar_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerScalarEntity<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ServerEntity<TNetworkProtocol>>>> {
     let map = server_entities_map_without_locations(db)
         .clone_err()?
         .lookup(db);
 
     match map.get(&server_scalar_entity_name) {
-        Some(entity) => match entity {
+        Some(entity) => match entity.lookup(db).selection_info {
             SelectionType::Object(_) => {
                 let location = entity_definition_location(db, server_scalar_entity_name)
                     .as_ref()
@@ -99,7 +103,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
                 )
                 .wrap_err()
             }
-            SelectionType::Scalar(s) => (*s).wrap_some().wrap_ok(),
+            SelectionType::Scalar(_) => entity.dereference().wrap_some().wrap_ok(),
         },
         None => None.wrap_ok(),
     }
@@ -110,15 +114,11 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerEntity<TNetworkProtocol>>> {
-    if let Ok(Some(server_object_entity)) = server_object_entity_named(db, name).to_owned() {
-        return server_object_entity.object_selected().wrap_some().wrap_ok();
-    };
+    let map = server_entities_map_without_locations(db)
+        .clone_err()?
+        .lookup(db);
 
-    let server_scalar_entity = server_scalar_entity_named(db, name).to_owned()?;
-    if let Some(server_scalar_entity) = server_scalar_entity {
-        return server_scalar_entity.scalar_selected().wrap_some().wrap_ok();
-    }
-    Ok(None)
+    map.get(&name).copied().wrap_ok()
 }
 
 // TODO what is this for?? We should get rid of this.
@@ -132,10 +132,13 @@ pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
         .lookup(db)
         .get(&entity_name)
     {
-        Some(entity) => match entity {
-            SelectionType::Scalar(s) => s.lookup(db).name.scalar_selected().wrap_some().wrap_ok(),
-            SelectionType::Object(o) => o.lookup(db).name.object_selected().wrap_some().wrap_ok(),
-        },
+        Some(entity) => {
+            let entity = entity.lookup(db);
+            match entity.selection_info {
+                SelectionType::Scalar(_) => entity.name.scalar_selected().wrap_some().wrap_ok(),
+                SelectionType::Object(_) => entity.name.object_selected().wrap_some().wrap_ok(),
+            }
+        }
         None => None.wrap_ok(),
     }
 }

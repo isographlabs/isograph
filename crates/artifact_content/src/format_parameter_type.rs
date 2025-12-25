@@ -81,8 +81,8 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             This is indicative of a bug in Isograph.",
         );
 
-    match entity {
-        SelectionType::Object(_o) => {
+    match entity.lookup(db).selection_info {
+        SelectionType::Object(_is_concrete) => {
             // TODO this is bad; we should never create a type containing all of the fields
             // on a given object. This is currently used for input objects, and we should
             // consider how to do this is a not obviously broken manner.
@@ -107,7 +107,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        SelectionType::Scalar(s) => s.lookup(db).javascript_name.to_string(),
+        SelectionType::Scalar(s) => s.to_string(),
     }
 }
 

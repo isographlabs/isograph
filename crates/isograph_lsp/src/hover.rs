@@ -10,9 +10,8 @@ use isograph_schema::{
     read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, ServerObjectEntity,
-    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    server_object_entity_named,
+    IsographDatabase, NetworkProtocol, ServerEntity, get_parent_and_selectable_for_object_path,
+    get_parent_and_selectable_for_scalar_path, server_object_entity_named,
 };
 use lsp_types::{
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
@@ -353,7 +352,7 @@ fn hover_text_for_selectable(
 }
 
 fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
-    entity: &ServerObjectEntity<TNetworkProtocol>,
+    entity: &ServerEntity<TNetworkProtocol>,
 ) -> String {
     let object_entity_name = entity.name;
     let description = match entity.description {

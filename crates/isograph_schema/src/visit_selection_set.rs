@@ -5,8 +5,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ServerObjectEntity, selectable_named,
-    server_object_entity_named,
+    IsographDatabase, NetworkProtocol, ServerEntity, selectable_named, server_object_entity_named,
 };
 
 /// This is visiting an unvalidated selection set, and should not panic.
@@ -16,10 +15,10 @@ use crate::{
 pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set: &[WithEmbeddedLocation<Selection>],
-    parent_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_entity: &ServerEntity<TNetworkProtocol>,
     visit_selection: &mut impl FnMut(
         SelectionType<&ScalarSelection, &ObjectSelection>,
-        &ServerObjectEntity<TNetworkProtocol>,
+        &ServerEntity<TNetworkProtocol>,
     ),
 ) {
     for selection in selection_set.iter() {

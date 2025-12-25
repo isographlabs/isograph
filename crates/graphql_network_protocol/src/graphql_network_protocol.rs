@@ -11,22 +11,21 @@ use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
-    SelectionSet, SelectionTypePostfix, TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration,
-    UnionVariant, VariableDeclaration,
+    SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
+    UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
+use isograph_schema::IsographDatabase;
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
     FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
     MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
-    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE,
-    ServerObjectEntity, ServerObjectEntityDirectives, ServerObjectSelectable,
-    ServerObjectSelectableVariant, ServerScalarSelectable, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
+    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE, ServerEntity,
+    ServerEntityDirectives, ServerObjectSelectable, ServerObjectSelectableVariant,
+    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, server_object_entity_named,
     to_isograph_constant_value,
 };
-use isograph_schema::{IsographDatabase, ServerScalarEntity};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -66,7 +65,7 @@ impl From<GraphQLRootTypes> for BTreeMap<EntityName, RootOperationName> {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type EntityAssociatedData = GraphQLSchemaObjectAssociatedData;
+    type EntityAssociatedData = SelectionType<(), GraphQLSchemaObjectAssociatedData>;
 
     #[expect(clippy::type_complexity)]
     #[memo]
@@ -119,7 +118,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         }
 
         // We process interfaces later, because we need to know all of the subtypes that an interface
-        // implements. In an ideal world, this info would not be part of the ServerObjectEntity struct,
+        // implements. In an ideal world, this info would not be part of the ServerEntity struct,
         // and we should make that refactor.
         for with_location in interfaces_to_process {
             let interface_definition = with_location.item;
@@ -128,7 +127,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             insert_entity_or_multiple_definition_diagnostic(
                 &mut outcome.entities,
                 server_object_entity_name,
-                ServerObjectEntity {
+                ServerEntity {
                     description: interface_definition.description.map(|description_value| {
                         description_value
                             .item
@@ -136,17 +135,17 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .wrap(Description)
                     }),
                     name: server_object_entity_name,
-                    is_concrete: false,
                     network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                         original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
                         subtypes: supertype_to_subtype_map
                             .get(&server_object_entity_name)
                             .cloned()
                             .unwrap_or_default(),
-                    },
+                    }
+                    .object_selected(),
+                    selection_info: SelectionType::Object(false),
                 }
                 .interned_value(db)
-                .object_selected()
                 .with_location(with_location.location)
                 .into(),
                 &mut non_fatal_diagnostics,
@@ -184,7 +183,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         for (parent_entity_name, field) in fields_to_process {
             let target: EntityName = field.item.type_.item.inner().unchecked_conversion();
 
-            if is_object_entity(&outcome.entities, target) {
+            if is_object_entity(db, &outcome.entities, target) {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (parent_entity_name, field.item.name.item),
@@ -337,7 +336,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
         // exposeField directives -> fields
         'exposeField: for (parent_object_entity_name, directives) in directives {
-            let result = from_graphql_directives::<ServerObjectEntityDirectives>(&directives)?;
+            let result = from_graphql_directives::<ServerEntityDirectives>(&directives)?;
             for expose_field_directive in result.expose_field {
                 // HACK: we're essentially splitting the field arg by . and keeping the same
                 // implementation as before. But really, there isn't much a distinction
@@ -390,10 +389,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let top_level_schema_field_is_concrete = outcome
                     .entities
                     .get(&payload_object_entity_name)
-                    .and_then(|entity| entity.item.as_object())
-                    .expect("Expected entity to exist and to be an object.")
-                    .lookup(db)
-                    .is_concrete;
+                    .and_then(|entity| entity.item.lookup(db).selection_info.as_object())
+                    .expect("Expected entity to exist and to be an object.");
 
                 let (mut parts_reversed, target_parent_object_entity) =
                     match traverse_selections_and_return_path(
@@ -553,13 +550,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             )
             .lookup(db);
 
-        if server_object_entity.is_concrete {
+        if server_object_entity
+            .selection_info
+            .as_object()
+            .expect("Expected server object entity to be object")
+        {
             let name = server_object_entity.name;
             return format!("Link<\"{name}\">");
         }
 
         let subtypes = server_object_entity
             .network_protocol_associated_data
+            .as_ref()
+            .as_object()
+            .expect("Expected server object entity to have object associated data")
             .subtypes
             .iter()
             .map(|name| format!("\n  | Link<\"{name}\">"))
@@ -635,90 +639,83 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *ID_ENTITY_NAME,
-        ServerScalarEntity {
+        ServerEntity {
             description: None,
             name: *ID_ENTITY_NAME,
-            javascript_name: "string".intern().into(),
-            network_protocol: std::marker::PhantomData,
+            selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            network_protocol_associated_data: ().scalar_selected(),
         }
         .interned_value(db)
-        .scalar_selected()
         .with_generated_location(),
         non_fatal_diagnostics,
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *STRING_ENTITY_NAME,
-        ServerScalarEntity {
+        ServerEntity {
             description: None,
             name: *STRING_ENTITY_NAME,
-            javascript_name: *STRING_JAVASCRIPT_TYPE,
-            network_protocol: std::marker::PhantomData,
+            selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            network_protocol_associated_data: ().scalar_selected(),
         }
         .interned_value(db)
-        .scalar_selected()
         .with_generated_location(),
         non_fatal_diagnostics,
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *BOOLEAN_ENTITY_NAME,
-        ServerScalarEntity {
+        ServerEntity {
             description: None,
             name: *BOOLEAN_ENTITY_NAME,
-            javascript_name: *BOOLEAN_JAVASCRIPT_TYPE,
-            network_protocol: std::marker::PhantomData,
+            selection_info: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
+            network_protocol_associated_data: ().scalar_selected(),
         }
         .interned_value(db)
-        .scalar_selected()
         .with_generated_location(),
         non_fatal_diagnostics,
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *FLOAT_ENTITY_NAME,
-        ServerScalarEntity {
+        ServerEntity {
             description: None,
             name: *FLOAT_ENTITY_NAME,
-            javascript_name: *NUMBER_JAVASCRIPT_TYPE,
-            network_protocol: std::marker::PhantomData,
+            selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            network_protocol_associated_data: ().scalar_selected(),
         }
         .interned_value(db)
-        .scalar_selected()
         .with_generated_location(),
         non_fatal_diagnostics,
     );
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *INT_ENTITY_NAME,
-        ServerScalarEntity {
+        ServerEntity {
             description: None,
             name: *INT_ENTITY_NAME,
-            javascript_name: *NUMBER_JAVASCRIPT_TYPE,
-            network_protocol: std::marker::PhantomData,
+            selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            network_protocol_associated_data: ().scalar_selected(),
         }
         .interned_value(db)
-        .scalar_selected()
         .with_generated_location(),
         non_fatal_diagnostics,
     );
 }
 
-type EntitiesDefinedBySchema = BTreeMap<
-    EntityName,
-    WithLocation<
-        isograph_lang_types::SelectionType<
-            pico::MemoRef<ServerScalarEntity<GraphQLNetworkProtocol>>,
-            pico::MemoRef<ServerObjectEntity<GraphQLNetworkProtocol>>,
-        >,
-    >,
->;
+type EntitiesDefinedBySchema =
+    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLNetworkProtocol>>>>;
 
-fn is_object_entity(entities: &EntitiesDefinedBySchema, target: EntityName) -> bool {
+// Defaults to false if item is missing... should this panic?
+fn is_object_entity(
+    db: &IsographDatabase<GraphQLNetworkProtocol>,
+    entities: &EntitiesDefinedBySchema,
+    target: EntityName,
+) -> bool {
     entities
         .get(&target)
-        .and_then(|entity| entity.item.as_object())
-        .is_some()
+        .map(|entity| entity.item.lookup(db).selection_info.as_object().is_some())
+        .unwrap_or(false)
 }
 
 fn traverse_selections_and_return_path<'a>(
@@ -728,24 +725,33 @@ fn traverse_selections_and_return_path<'a>(
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
     Vec<&'a ServerObjectSelectable<GraphQLNetworkProtocol>>,
-    &'a ServerObjectEntity<GraphQLNetworkProtocol>,
+    &'a ServerEntity<GraphQLNetworkProtocol>,
 )> {
-    // TODO do not do a linear scan
     let mut current_entity = outcome
         .entities
         .get(&payload_object_entity_name)
-        .and_then(|entity| entity.item.as_object())
         .ok_or_else(|| {
             Diagnostic::new(
                 format!(
-                    "Invalid @exposeField directive. Entity {} \
-                    not found or is not an object.",
+                    "Invalid @exposeField directive. Entity {} was not found.",
                     payload_object_entity_name
                 ),
                 None,
             )
         })?
+        .item
         .lookup(db);
+
+    if current_entity.selection_info.as_object().is_none() {
+        return Diagnostic::new(
+            format!(
+                "Invalid @exposeField directive. Entity {} is not an object.",
+                payload_object_entity_name
+            ),
+            None,
+        )
+        .wrap_err();
+    }
 
     let mut output = vec![];
 
@@ -772,18 +778,28 @@ fn traverse_selections_and_return_path<'a>(
         current_entity = outcome
             .entities
             .get(&next_entity_name)
-            .and_then(|entity| entity.item.as_object())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
-                        "Invalid @exposeField directive. Entity {} \
-                        not found or is a not an object.",
+                        "Invalid @exposeField directive. Entity {} not found.",
                         next_entity_name
                     ),
                     None,
                 )
             })?
+            .item
             .lookup(db);
+
+        if current_entity.selection_info.as_object().is_none() {
+            return Diagnostic::new(
+                format!(
+                    "Invalid @exposeField directive. Entity {} is not an object.",
+                    next_entity_name
+                ),
+                None,
+            )
+            .wrap_err();
+        }
 
         output.push(selectable);
     }

@@ -4,7 +4,7 @@ use common_lang_types::{
 use graphql_lang_types::{GraphQLConstantValue, GraphQLDirective, from_graphql_directives};
 use graphql_lang_types::{GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition};
 use intern::string_key::Intern;
-use isograph_schema::ServerObjectEntityDirectives;
+use isograph_schema::ServerEntityDirectives;
 use isograph_schema::{ExposeFieldDirective, FieldMapItem, ID_FIELD_NAME};
 use prelude::Postfix;
 use std::error::Error;
@@ -33,7 +33,7 @@ fn parse_mutation(source: &str) -> Result<Vec<ExposeFieldDirective>, Diagnostic>
     let directives: Vec<GraphQLDirective<GraphQLConstantValue>> =
         directives.into_iter().flatten().collect();
 
-    let server_object_entity_directives: ServerObjectEntityDirectives =
+    let server_object_entity_directives: ServerEntityDirectives =
         from_graphql_directives(&directives)?;
 
     Ok(server_object_entity_directives.expose_field)

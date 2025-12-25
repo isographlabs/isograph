@@ -90,23 +90,23 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_text = match server_scalar_selectable.javascript_type_override {
                         Some(javascript_name) => javascript_name,
-                        None => {
-                            server_scalar_entity_named(
-                                db,
-                                server_scalar_selectable.target_entity_name.inner().0,
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected parsing to not have failed. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .expect(
-                                "Expected entity to exist. \
-                               This is indicative of a bug in Isograph.",
-                            )
-                            .lookup(db)
-                            .javascript_name
-                        }
+                        None => server_scalar_entity_named(
+                            db,
+                            server_scalar_selectable.target_entity_name.inner().0,
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected parsing to not have failed. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .lookup(db)
+                        .selection_info
+                        .as_scalar()
+                        .expect("Expected scalar entity to be scalar"),
                     };
 
                     query_type_declaration.push_str(&format!(
@@ -280,7 +280,9 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                             This is indicative of a bug in Isograph.",
                         )
                         .lookup(db)
-                        .javascript_name;
+                        .selection_info
+                        .as_scalar()
+                        .expect("Expected scalar entity to be scalar");
 
                     if selection.item.is_updatable() {
                         *updatable_fields = true;

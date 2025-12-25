@@ -17,7 +17,7 @@ use prelude::Postfix;
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
     ClientSelectableId, ID_ENTITY_NAME, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
-    IsographDatabase, NameAndArguments, NetworkProtocol, PathToRefetchField, ServerObjectEntity,
+    IsographDatabase, NameAndArguments, NetworkProtocol, PathToRefetchField, ServerEntity,
     ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_transformed_name_and_arguments, fetchable_types,
@@ -446,7 +446,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TNetworkProtocol: NetworkProtocol,
 >(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
@@ -477,7 +477,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 fn create_field_traversal_result<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -533,7 +533,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -656,7 +656,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     variable_context: &VariableContext,
     object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
-    object_selection_parent_object: &ServerObjectEntity<TNetworkProtocol>,
+    object_selection_parent_object: &ServerEntity<TNetworkProtocol>,
     field_parent_object_entity_name: EntityName,
     field_server_object_selectable_name: SelectableName,
 ) {
@@ -794,7 +794,9 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                         This is indicative of a bug in Isograph.",
                     )
                     .lookup(db)
-                    .is_concrete;
+                    .selection_info
+                    .as_object()
+                    .expect("Expected entity to be object");
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                     parent_object_entity_name,
@@ -843,7 +845,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
 fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -914,7 +916,7 @@ fn merge_client_object_field<TNetworkProtocol: NetworkProtocol>(
 fn merge_client_scalar_field<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -1033,7 +1035,7 @@ fn insert_imperative_field_into_refetch_paths<TNetworkProtocol: NetworkProtocol>
     newly_encountered_scalar_client_selectable_name: SelectableName,
     newly_encountered_client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
     parent_object_entity_name: EntityName,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
@@ -1164,7 +1166,11 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     };
 
     let mut subfields_or_inline_fragments = vec![];
-    if target_server_object_entity.is_concrete {
+    if target_server_object_entity
+        .selection_info
+        .as_object()
+        .expect("Expected target object entity to be an object")
+    {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
             target_server_object_entity.name,
         ));
@@ -1182,7 +1188,11 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     });
 
     let info = PathToRefetchFieldInfo {
-        wrap_refetch_field_with_inline_fragment: if target_server_object_entity.is_concrete {
+        wrap_refetch_field_with_inline_fragment: if target_server_object_entity
+            .selection_info
+            .as_object()
+            .expect("Expected target server object entity to be an object")
+        {
             None
         } else {
             (newly_encountered_client_object_selectable
@@ -1241,7 +1251,11 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
     let client_object_selectable = parent_map.entry(normalization_key).or_insert_with(|| {
         MergedServerSelection::ClientObjectSelectable(MergedLinkedFieldSelection {
             parent_object_entity_name,
-            concrete_target_entity_name: if target_server_object_entity.is_concrete {
+            concrete_target_entity_name: if target_server_object_entity
+                .selection_info
+                .as_object()
+                .expect("Expected target server object entity to be an object")
+            {
                 target_server_object_entity.name.wrap_some()
             } else {
                 None
@@ -1284,7 +1298,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
 #[expect(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_type_id: ClientSelectableId,
@@ -1408,9 +1422,13 @@ fn merge_server_scalar_field(
 fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_object_entity: &ServerObjectEntity<TNetworkProtocol>,
+    parent_object_entity: &ServerEntity<TNetworkProtocol>,
 ) {
-    if !parent_object_entity.is_concrete {
+    if !parent_object_entity
+        .selection_info
+        .as_object()
+        .expect("Expected parent object entity to be an object")
+    {
         maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
     };
 

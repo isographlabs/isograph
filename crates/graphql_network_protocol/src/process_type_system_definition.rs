@@ -18,8 +18,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
     ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
-    ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerObjectEntity,
-    ServerScalarEntity, ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerEntity,
+    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
@@ -62,7 +62,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerObjectEntity {
+                    ServerEntity {
                         description: object_type_definition.description.map(|description_value| {
                             description_value
                                 .item
@@ -70,14 +70,14 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        is_concrete: true,
+                        selection_info: true.object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                             subtypes: vec![],
-                        },
+                        }
+                        .object_selected(),
                     }
                     .interned_value(db)
-                    .object_selected()
                     .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
@@ -168,17 +168,16 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     scalar_type_definition.name.item,
-                    ServerScalarEntity {
+                    ServerEntity {
                         description: scalar_type_definition
                             .description
                             .map(|with_span| with_span.item.into()),
                         name: scalar_type_definition.name.item,
                         // TODO allow customization here
-                        javascript_name: *STRING_JAVASCRIPT_TYPE,
-                        network_protocol: std::marker::PhantomData,
+                        selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+                        network_protocol_associated_data: ().scalar_selected(),
                     }
                     .interned_value(db)
-                    .scalar_selected()
                     .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
@@ -194,7 +193,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerObjectEntity {
+                    ServerEntity {
                         description: input_object_definition
                             .description
                             .map(|description_value| {
@@ -204,15 +203,15 @@ pub fn process_graphql_type_system_document(
                                     .wrap(Description)
                             }),
                         name: server_object_entity_name,
-                        is_concrete: true,
+                        selection_info: true.object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
                             subtypes: vec![],
-                        },
+                        }
+                        .object_selected(),
                     }
                     .interned_value(db)
-                    .object_selected()
                     .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
@@ -238,17 +237,16 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     enum_definition.name.item,
-                    ServerScalarEntity {
+                    ServerEntity {
                         description: enum_definition
                             .description
                             .map(|with_span| with_span.item.into()),
                         name: enum_definition.name.item,
                         // TODO allow customization here
-                        javascript_name: *STRING_JAVASCRIPT_TYPE,
-                        network_protocol: std::marker::PhantomData,
+                        selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+                        network_protocol_associated_data: ().scalar_selected(),
                     }
                     .interned_value(db)
-                    .scalar_selected()
                     .with_location(location)
                     .into(),
                     non_fatal_diagnostics,
@@ -260,7 +258,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerObjectEntity {
+                    ServerEntity {
                         description: union_definition.description.map(|description_value| {
                             description_value
                                 .item
@@ -268,7 +266,7 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        is_concrete: false,
+                        selection_info: false.object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: union_definition
@@ -276,10 +274,10 @@ pub fn process_graphql_type_system_document(
                                 .iter()
                                 .map(|entity_name| entity_name.item.unchecked_conversion())
                                 .collect(),
-                        },
+                        }
+                        .object_selected(),
                     }
                     .interned_value(db)
-                    .object_selected()
                     .with_location(location)
                     .into(),
                     non_fatal_diagnostics,

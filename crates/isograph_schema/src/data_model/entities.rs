@@ -1,5 +1,3 @@
-use std::marker::PhantomData;
-
 use common_lang_types::{EntityName, JavascriptName};
 use isograph_lang_types::{Description, SelectionType};
 use pico::MemoRef;
@@ -11,23 +9,11 @@ use crate::NetworkProtocol;
 // is independent of the network protocol, but actually relates to the RuntimeLanguage, but
 // we do not (yet) have that as a generic.)
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ServerScalarEntity<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerEntity<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<Description>,
     pub name: EntityName,
-    pub javascript_name: JavascriptName,
-    pub network_protocol: PhantomData<TNetworkProtocol>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub struct ServerObjectEntity<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<Description>,
-    pub name: EntityName,
-    pub is_concrete: bool,
-
+    pub selection_info: SelectionType<JavascriptName, bool>,
     pub network_protocol_associated_data: TNetworkProtocol::EntityAssociatedData,
 }
 
-pub type MemoRefServerEntity<TNetworkProtocol> = SelectionType<
-    MemoRef<ServerScalarEntity<TNetworkProtocol>>,
-    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
->;
+pub type MemoRefServerEntity<TNetworkProtocol> = MemoRef<ServerEntity<TNetworkProtocol>>;

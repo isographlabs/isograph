@@ -9,7 +9,7 @@ use prelude::Postfix;
 
 use crate::{
     ClientScalarSelectable, IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable,
-    NetworkProtocol, ServerObjectEntity, ServerScalarSelectable, entity_not_defined_diagnostic,
+    NetworkProtocol, ServerEntity, ServerScalarSelectable, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_object_entity_named,
 };
@@ -24,7 +24,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     db: &IsographDatabase<TNetworkProtocol>,
     scalar_path: &ScalarSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
+    MemoRef<ServerEntity<TNetworkProtocol>>,
     ScalarSelectable<TNetworkProtocol>,
 )> {
     let ScalarSelectionPath { parent, inner } = scalar_path;
@@ -66,7 +66,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
     db: &IsographDatabase<TNetworkProtocol>,
     object_path: &ObjectSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
+    MemoRef<ServerEntity<TNetworkProtocol>>,
     MemoRefObjectSelectable<TNetworkProtocol>,
 )> {
     let ObjectSelectionPath { parent, inner } = object_path;
@@ -99,7 +99,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
-) -> DiagnosticResult<MemoRef<ServerObjectEntity<TNetworkProtocol>>> {
+) -> DiagnosticResult<MemoRef<ServerEntity<TNetworkProtocol>>> {
     let parent_object_entity_name = match &selection_set_path.parent {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
@@ -137,7 +137,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     selection_set_path: &SelectionSetPath<'a>,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
+    MemoRef<ServerEntity<TNetworkProtocol>>,
     MemoRefSelectable<TNetworkProtocol>,
 )> {
     match &selection_set_path.parent {
@@ -170,7 +170,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     parent_server_object_entity_name: EntityNameWrapper,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    MemoRef<ServerObjectEntity<TNetworkProtocol>>,
+    MemoRef<ServerEntity<TNetworkProtocol>>,
     MemoRefSelectable<TNetworkProtocol>,
 )> {
     let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
