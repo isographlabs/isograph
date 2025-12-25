@@ -107,33 +107,6 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    name: ServerEntityName,
-) -> DiagnosticResult<Option<MemoRefServerEntity<TNetworkProtocol>>> {
-    match name {
-        SelectionType::Object(server_object_entity_name) => {
-            let server_object_entity =
-                server_object_entity_named(db, server_object_entity_name).to_owned()?;
-            if let Some(server_object_entity) = server_object_entity {
-                server_object_entity.object_selected().wrap_some().wrap_ok()
-            } else {
-                Ok(None)
-            }
-        }
-        SelectionType::Scalar(server_scalar_entity_name) => {
-            let server_scalar_entity =
-                server_scalar_entity_named(db, server_scalar_entity_name).to_owned()?;
-            if let Some(server_scalar_entity) = server_scalar_entity {
-                server_scalar_entity.scalar_selected().wrap_some().wrap_ok()
-            } else {
-                Ok(None)
-            }
-        }
-    }
-}
-
-#[memo]
 pub fn server_entity_named_2<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: EntityName,
