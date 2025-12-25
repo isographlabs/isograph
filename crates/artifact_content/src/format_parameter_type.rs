@@ -15,7 +15,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match type_ {
         TypeAnnotationDeclaration::Scalar(entity_name_wrapper) => {
-            format_server_field_type(db, entity_name_wrapper.0, indentation_level)
+            format_server_field_scalar_type(db, entity_name_wrapper.0, indentation_level)
         }
         TypeAnnotationDeclaration::Union(union_type_annotation) => {
             let mut s = String::new();
@@ -24,7 +24,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
                 let add_pipe = union_type_annotation.nullable || (index != count - 1);
                 match variant {
                     UnionVariant::Scalar(entity_name_wrapper) => {
-                        s.push_str(&format_server_field_type(
+                        s.push_str(&format_server_field_scalar_type(
                             db,
                             entity_name_wrapper.0,
                             indentation_level,
@@ -65,7 +65,7 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
+fn format_server_field_scalar_type<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     entity_name: EntityName,
     indentation_level: u8,
@@ -195,7 +195,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
 ) -> String {
     match &type_annotation {
         TypeAnnotationDeclaration::Scalar(scalar) => {
-            format_server_field_type(db, scalar.0, indentation_level + 1)
+            format_server_field_scalar_type(db, scalar.0, indentation_level + 1)
         }
         TypeAnnotationDeclaration::Union(union_type_annotation) => {
             if union_type_annotation.variants.is_empty() {
@@ -212,7 +212,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
 
                     match variant {
                         UnionVariant::Scalar(scalar) => {
-                            s.push_str(&format_server_field_type(
+                            s.push_str(&format_server_field_scalar_type(
                                 db,
                                 scalar.0,
                                 indentation_level + 1,
@@ -241,12 +241,12 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
                     .expect("Expected variant to exist");
                 match variant {
                     UnionVariant::Scalar(scalar) => {
-                        format_server_field_type(db, scalar.0, indentation_level + 1)
+                        format_server_field_scalar_type(db, scalar.0, indentation_level + 1)
                     }
                     UnionVariant::Plural(type_annotation) => {
                         format!(
                             "ReadonlyArray<{}>",
-                            format_server_field_type(
+                            format_server_field_scalar_type(
                                 db,
                                 type_annotation.item.inner().0,
                                 indentation_level + 1
@@ -259,7 +259,11 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
         TypeAnnotationDeclaration::Plural(type_annotation) => {
             format!(
                 "ReadonlyArray<{}>",
-                format_server_field_type(db, type_annotation.item.inner().0, indentation_level + 1)
+                format_server_field_scalar_type(
+                    db,
+                    type_annotation.item.inner().0,
+                    indentation_level + 1
+                )
             )
         }
     }

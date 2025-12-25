@@ -9,7 +9,7 @@ use prelude::{ErrClone as _, Postfix};
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable, NetworkProtocol,
     ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
-    server_scalar_entity_named,
+    server_entity_named,
 };
 
 #[memo]
@@ -99,7 +99,7 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     let selectable = memo_ref.lookup(db);
 
     let target_scalar_entity_name = selectable.target_entity_name.inner().0;
-    let target_scalar_entity = server_scalar_entity_named(db, target_scalar_entity_name)
+    let target_scalar_entity = server_entity_named(db, target_scalar_entity_name)
         .clone_err()?
         .as_ref()
         // It must exist

@@ -79,37 +79,6 @@ pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerEntity<TNetworkProtocol>>>> {
-    let map = server_entities_map_without_locations(db)
-        .clone_err()?
-        .lookup(db);
-
-    match map.get(&server_scalar_entity_name) {
-        Some(entity) => match entity.lookup(db).selection_info {
-            SelectionType::Object(_) => {
-                let location = entity_definition_location(db, server_scalar_entity_name)
-                    .as_ref()
-                    .ok()
-                    .cloned()
-                    .flatten();
-                entity_wrong_type_diagnostic(
-                    server_scalar_entity_name,
-                    "an object",
-                    "a scalar",
-                    location,
-                )
-                .wrap_err()
-            }
-            SelectionType::Scalar(_) => entity.dereference().wrap_some().wrap_ok(),
-        },
-        None => None.wrap_ok(),
-    }
-}
-
-#[memo]
 pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: EntityName,

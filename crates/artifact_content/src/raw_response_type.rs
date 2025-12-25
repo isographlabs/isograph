@@ -1,7 +1,7 @@
 use intern::Lookup;
 use isograph_schema::{
     IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
-    server_object_selectable_named, server_scalar_entity_named, server_scalar_selectable_named,
+    server_entity_named, server_object_selectable_named, server_scalar_selectable_named,
 };
 use prelude::Postfix;
 use std::collections::BTreeMap;
@@ -66,7 +66,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let inner_text = match server_scalar_selectable.javascript_type_override {
                     Some(javascript_name) => javascript_name,
-                    None => server_scalar_entity_named(db, raw_type.inner().0)
+                    None => server_entity_named(db, raw_type.inner().0)
                         .as_ref()
                         .expect(
                             "Expected parsing to not have failed. \
