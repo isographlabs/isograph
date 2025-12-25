@@ -7,11 +7,11 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
+    read_iso_literals_source_from_relative_path, server_entity_named,
 };
 use isograph_schema::{
     IsographDatabase, NetworkProtocol, ServerEntity, get_parent_and_selectable_for_object_path,
-    get_parent_and_selectable_for_scalar_path, server_object_entity_named,
+    get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
     Hover, HoverContents, MarkupContent, MarkupKind, Position, Uri,
@@ -69,7 +69,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::EntityNameWrapper(entity) => {
-                let server_object_entity = server_object_entity_named(db, entity.inner.0)
+                let server_object_entity = server_entity_named(db, entity.inner.0)
                     .as_ref()
                     .map_err(|_| LSPRuntimeError::ExpectedError)?
                     .as_ref()

@@ -6,7 +6,7 @@ use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::{IsographDatabase, MemoRefServerEntity, NetworkProtocol, ServerEntity};
+use crate::{IsographDatabase, MemoRefServerEntity, NetworkProtocol};
 
 /// This function just drops the locations
 #[memo]
@@ -45,37 +45,6 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
         })
         .collect::<Vec<_>>()
         .wrap_ok()
-}
-
-#[memo]
-pub fn server_object_entity_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerEntity<TNetworkProtocol>>>> {
-    let map = server_entities_map_without_locations(db)
-        .clone_err()?
-        .lookup(db);
-
-    match map.get(&server_object_entity_name) {
-        Some(entity) => match entity.lookup(db).selection_info {
-            SelectionType::Scalar(_) => {
-                let location = entity_definition_location(db, server_object_entity_name)
-                    .as_ref()
-                    .ok()
-                    .cloned()
-                    .flatten();
-                entity_wrong_type_diagnostic(
-                    server_object_entity_name,
-                    "a scalar",
-                    "an object",
-                    location,
-                )
-                .wrap_err()
-            }
-            SelectionType::Object(_) => entity.dereference().wrap_some().wrap_ok(),
-        },
-        None => None.wrap_ok(),
-    }
 }
 
 #[memo]
@@ -125,18 +94,6 @@ pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
         .get(&entity_name)
         .map(|x| x.location)
         .wrap_ok()
-}
-
-pub fn entity_wrong_type_diagnostic(
-    entity_name: EntityName,
-    actual_type: &'static str,
-    intended_type: &'static str,
-    location: Option<Location>,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!("{entity_name} is {actual_type}, but it should be {intended_type}"),
-        location,
-    )
 }
 
 pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {

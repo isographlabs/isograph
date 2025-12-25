@@ -5,7 +5,7 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ServerEntity, selectable_named, server_object_entity_named,
+    IsographDatabase, NetworkProtocol, ServerEntity, selectable_named, server_entity_named,
 };
 
 /// This is visiting an unvalidated selection set, and should not panic.
@@ -51,7 +51,7 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
                 }
                 .0;
 
-                let target_entity = server_object_entity_named(db, target_entity_name)
+                let target_entity = server_entity_named(db, target_entity_name)
                     .as_ref()
                     .expect(
                         "Expected parsing to have succeeded. \

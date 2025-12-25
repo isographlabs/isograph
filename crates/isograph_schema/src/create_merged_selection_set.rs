@@ -23,9 +23,8 @@ use crate::{
     create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
-    selectable_named, selectable_reader_selection_set, server_id_selectable,
-    server_object_entity_named, server_object_selectable_named,
-    transform_arguments_with_child_context,
+    selectable_named, selectable_reader_selection_set, server_entity_named, server_id_selectable,
+    server_object_selectable_named, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
 };
 
@@ -587,7 +586,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                             server_object_entity.target_entity_name.inner().0;
 
                         let object_selection_parent_object_entity =
-                            &server_object_entity_named(db, target_object_entity_name)
+                            &server_entity_named(db, target_object_entity_name)
                                 .as_ref()
                                 .expect(
                                     "Expected validation to have worked. \
@@ -710,7 +709,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 }
                 MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                     let object_selection_parent_object_entity =
-                        &server_object_entity_named(db, parent_object_entity_name)
+                        &server_entity_named(db, parent_object_entity_name)
                             .as_ref()
                             .expect(
                                 "Expected validation to have worked. \
@@ -782,7 +781,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                 let concrete_object_entity_name =
                     server_object_selectable.target_entity_name.inner().0;
 
-                let concrete_type = server_object_entity_named(db, concrete_object_entity_name)
+                let concrete_type = server_entity_named(db, concrete_object_entity_name)
                     .as_ref()
                     .expect(
                         "Expected validation to have worked. \
@@ -1124,19 +1123,18 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         .target_entity_name
         .inner()
         .0;
-    let target_server_object_entity =
-        &server_object_entity_named(db, target_server_object_entity_name)
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
+    let target_server_object_entity = &server_entity_named(db, target_server_object_entity_name)
+        .as_ref()
+        .expect(
+            "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
+        )
+        .as_ref()
+        .expect(
+            "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
+        )
+        .lookup(db);
 
     let parent_object_entity_name = newly_encountered_client_object_selectable.parent_entity_name;
 

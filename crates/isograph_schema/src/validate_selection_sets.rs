@@ -11,8 +11,7 @@ use std::collections::HashSet;
 
 use crate::{
     ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerEntity,
-    entity_not_defined_diagnostic, reader_selection_set_map, selectable_named,
-    server_object_entity_named,
+    entity_not_defined_diagnostic, reader_selection_set_map, selectable_named, server_entity_named,
 };
 
 pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
@@ -34,7 +33,7 @@ pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
             SelectionType::Object(o) => o.lookup(db).item.reference(),
         };
 
-        let parent_entity = match server_object_entity_named(db, key.0).clone_err() {
+        let parent_entity = match server_entity_named(db, key.0).clone_err() {
             Ok(entity) => {
                 match entity {
                     Some(s) => s,
@@ -264,7 +263,7 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                 .0;
 
                 let new_parent_entity =
-                    match server_object_entity_named(db, target_entity_name).clone_err() {
+                    match server_entity_named(db, target_entity_name).clone_err() {
                         Ok(entity) => match entity {
                             Some(s) => s,
                             None => {

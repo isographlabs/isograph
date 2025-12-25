@@ -11,7 +11,7 @@ use crate::{
     ClientScalarSelectable, IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable,
     NetworkProtocol, ServerEntity, ServerScalarSelectable, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
-    server_object_entity_named,
+    server_entity_named,
 };
 
 type ScalarSelectable<TNetworkProtocol> = DefinitionLocation<
@@ -121,7 +121,7 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
     }
     .0;
 
-    server_object_entity_named(db, parent_object_entity_name)
+    server_entity_named(db, parent_object_entity_name)
         .clone()?
         .ok_or_else(|| {
             entity_not_defined_diagnostic(
@@ -173,7 +173,7 @@ pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
     MemoRef<ServerEntity<TNetworkProtocol>>,
     MemoRefSelectable<TNetworkProtocol>,
 )> {
-    let parent_entity = server_object_entity_named(db, parent_server_object_entity_name.0)
+    let parent_entity = server_entity_named(db, parent_server_object_entity_name.0)
         .clone()?
         .ok_or(entity_not_defined_diagnostic(
             parent_server_object_entity_name.0,

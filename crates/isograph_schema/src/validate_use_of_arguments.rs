@@ -14,9 +14,8 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
-    client_selectable_map, selectable_named, selectable_reader_selection_set,
-    server_object_entity_named, validate_argument_types::value_satisfies_type,
-    visit_selection_set::visit_selection_set,
+    client_selectable_map, selectable_named, selectable_reader_selection_set, server_entity_named,
+    validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
 };
 
 type UsedVariables = BTreeSet<VariableNameWrapper>;
@@ -81,7 +80,7 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             }
         };
 
-    let parent_entity = server_object_entity_named(db, parent_entity_name)
+    let parent_entity = server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
         .expect("Expected entity to exist. This is indicative of a bug in Isograph.")
