@@ -28,7 +28,7 @@ use isograph_schema::{
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, get_reachable_variables,
-    initial_variable_context, server_object_entity_named,
+    initial_variable_context, server_entity_named,
 };
 use prelude::Postfix;
 use std::collections::BTreeSet;
@@ -59,7 +59,7 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
     )
     .lookup(db);
 
-    let parent_object_entity = &server_object_entity_named(db, entrypoint.parent_entity_name)
+    let parent_object_entity = &server_entity_named(db, entrypoint.parent_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -158,7 +158,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                 })
         });
 
-    let parent_object_entity = &server_object_entity_named(db, entrypoint.parent_entity_name)
+    let parent_object_entity = &server_entity_named(db, entrypoint.parent_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -248,7 +248,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                         .expect("Expected at least one fetchable type to exist")
                 })
         };
-    let concrete_object_entity = &server_object_entity_named(db, concrete_type_entity_name)
+    let concrete_object_entity = &server_entity_named(db, concrete_type_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \

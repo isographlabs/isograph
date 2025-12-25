@@ -11,7 +11,7 @@ use isograph_schema::{
     ClientScalarSelectable, ClientSelectable, IsographDatabase, LINK_FIELD_NAME,
     MemoRefClientSelectable, NetworkProtocol, ServerObjectSelectable,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
-    selectable_reader_selection_set, server_object_entity_named,
+    selectable_reader_selection_set, server_entity_named,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
@@ -52,7 +52,7 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
         SelectionType::Object(o) => o.parent_entity_name,
     };
 
-    let parent_object_entity = &server_object_entity_named(db, parent_entity_name)
+    let parent_object_entity = &server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \
@@ -211,7 +211,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     let server_object_selectable_name = server_object_selectable.name;
 
     let parent_object_entity =
-        &server_object_entity_named(db, server_object_selectable.parent_entity_name)
+        &server_entity_named(db, server_object_selectable.parent_entity_name)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -225,7 +225,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
             .lookup(db);
 
     let concrete_type =
-        &server_object_entity_named(db, server_object_selectable.target_entity_name.inner().0)
+        &server_entity_named(db, server_object_selectable.target_entity_name.inner().0)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -304,16 +304,16 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
         SelectionType::Object(o) => o.parent_entity_name,
         SelectionType::Scalar(s) => s.parent_entity_name,
     };
-    let parent_object_entity = &server_object_entity_named(db, parent_entity_name)
+    let parent_object_entity = &server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \
-        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .as_ref()
         .expect(
             "Expected entity to exist. \
-        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 
@@ -457,16 +457,16 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
         SelectionType::Scalar(s) => s.parent_entity_name,
         SelectionType::Object(o) => o.parent_entity_name,
     };
-    let parent_object_entity = &server_object_entity_named(db, parent_entity_name)
+    let parent_object_entity = &server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .as_ref()
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 
@@ -526,7 +526,7 @@ pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtoc
     client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
-        &server_object_entity_named(db, client_scalar_selectable.parent_entity_name)
+        &server_entity_named(db, client_scalar_selectable.parent_entity_name)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

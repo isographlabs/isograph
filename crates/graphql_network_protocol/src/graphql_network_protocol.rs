@@ -22,7 +22,7 @@ use isograph_schema::{
     ServerEntityDirectives, ServerObjectSelectable, ServerObjectSelectableVariant,
     ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
-    insert_selectable_or_multiple_definition_diagnostic, server_object_entity_named,
+    insert_selectable_or_multiple_definition_diagnostic, server_entity_named,
     to_isograph_constant_value,
 };
 use isograph_schema::{IsConcrete, IsographDatabase};
@@ -537,7 +537,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         db: &IsographDatabase<Self>,
         server_object_entity_name: &EntityName,
     ) -> String {
-        let server_object_entity = &server_object_entity_named(db, *server_object_entity_name)
+        let server_object_entity = &server_entity_named(db, *server_object_entity_name)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \

@@ -19,7 +19,7 @@ use isograph_schema::{
     client_scalar_selectable_named, client_selectable_map, client_selectable_named,
     fetchable_types, inline_fragment_reader_selection_set,
     refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    server_object_entity_named, server_object_selectable_named, validate_entire_schema,
+    server_entity_named, server_object_selectable_named, validate_entire_schema,
     validated_entrypoints,
 };
 use lazy_static::lazy_static;
@@ -297,7 +297,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                                 ),
                             };
 
-                            let type_to_refine_to = &server_object_entity_named(
+                            let type_to_refine_to = &server_entity_named(
                                 db,
                                 client_scalar_selectable.parent_entity_name,
                             )
