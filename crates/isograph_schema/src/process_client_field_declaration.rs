@@ -15,10 +15,9 @@ use pico_macros::memo;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, WrappedSelectionMapSelection, defined_entity,
-    fetchable_types,
+    NODE_FIELD_NAME, NetworkProtocol, WrappedSelectionMapSelection, fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
-    server_selectable_named,
+    server_entity_named, server_selectable_named,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,7 +45,7 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     client_field_declaration: MemoRef<ClientFieldDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
-    let parent_type_id = defined_entity(db, client_field_declaration_item.parent_type.item.0)
+    let parent_entity = server_entity_named(db, client_field_declaration_item.parent_type.item.0)
         .to_owned()?
         .ok_or_else(|| {
             let parent_object_entity_name = client_field_declaration_item.parent_type.item;
@@ -58,16 +57,18 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
                     .to::<Location>()
                     .wrap_some(),
             )
-        })?;
+        })?
+        .lookup(db);
 
-    match parent_type_id {
+    match parent_entity.selection_info {
         SelectionType::Object(_) => {
             add_client_scalar_selectable_to_entity(db, client_field_declaration)
                 .clone()
                 .note_todo("Do not clone. Use a MemoRef.")
                 .map(|x| x.0)?
         }
-        SelectionType::Scalar(scalar_entity_name) => {
+        SelectionType::Scalar(_) => {
+            let scalar_entity_name = client_field_declaration_item.parent_type.item.0;
             return Diagnostic::new(
                 format!(
                     "Invalid parent type. `{scalar_entity_name}` is a scalar. \
@@ -92,7 +93,7 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
     client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
-    let parent_type_id = defined_entity(db, client_pointer_declaration_item.parent_type.item.0)
+    let parent_entity = server_entity_named(db, client_pointer_declaration_item.parent_type.item.0)
         .to_owned()?
         .ok_or_else(|| {
             let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
@@ -104,9 +105,10 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                     .to::<Location>()
                     .wrap_some(),
             )
-        })?;
+        })?
+        .lookup(db);
 
-    let target_type_id = defined_entity(
+    let target_entity = server_entity_named(
         db,
         client_pointer_declaration_item.target_type.item.inner().0,
     )
@@ -121,14 +123,16 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
                 .to::<Location>()
                 .wrap_some(),
         )
-    })?;
+    })?
+    .lookup(db);
 
-    match parent_type_id {
-        SelectionType::Object(_) => match target_type_id {
+    match parent_entity.selection_info {
+        SelectionType::Object(_) => match target_entity.selection_info {
             SelectionType::Object(_to_object_entity_name) => {
                 add_client_pointer_to_object(db, client_pointer_declaration)?
             }
-            SelectionType::Scalar(scalar_entity_name) => {
+            SelectionType::Scalar(_) => {
+                let scalar_entity_name = target_entity.name;
                 return Diagnostic::new(
                     format!(
                         "Invalid client pointer target type. \

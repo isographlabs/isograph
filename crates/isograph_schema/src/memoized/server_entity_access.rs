@@ -1,7 +1,6 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location};
-use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
@@ -57,28 +56,6 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
         .lookup(db);
 
     map.get(&name).copied().wrap_ok()
-}
-
-// TODO what is this for?? We should get rid of this.
-#[memo]
-pub fn defined_entity<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    entity_name: EntityName,
-) -> DiagnosticResult<Option<SelectionType<EntityName, EntityName>>> {
-    match server_entities_map_without_locations(db)
-        .clone_err()?
-        .lookup(db)
-        .get(&entity_name)
-    {
-        Some(entity) => {
-            let entity = entity.lookup(db);
-            match entity.selection_info {
-                SelectionType::Scalar(_) => entity.name.scalar_selected().wrap_some().wrap_ok(),
-                SelectionType::Object(_) => entity.name.object_selected().wrap_some().wrap_ok(),
-            }
-        }
-        None => None.wrap_ok(),
-    }
 }
 
 #[memo]
