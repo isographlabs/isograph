@@ -13,7 +13,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
-    server_scalar_entity_javascript_name,
+    server_scalar_entity_named,
 };
 use prelude::Postfix;
 
@@ -90,19 +90,23 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
                     let inner_text = match server_scalar_selectable.javascript_type_override {
                         Some(javascript_name) => javascript_name,
-                        None => server_scalar_entity_javascript_name(
-                            db,
-                            server_scalar_selectable.target_entity_name.inner().0,
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected parsing to not have failed. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        ),
+                        None => {
+                            server_scalar_entity_named(
+                                db,
+                                server_scalar_selectable.target_entity_name.inner().0,
+                            )
+                            .as_ref()
+                            .expect(
+                                "Expected parsing to not have failed. \
+                                This is indicative of a bug in Isograph.",
+                            )
+                            .expect(
+                                "Expected entity to exist. \
+                               This is indicative of a bug in Isograph.",
+                            )
+                            .lookup(db)
+                            .javascript_name
+                        }
                     };
 
                     query_type_declaration.push_str(&format!(
@@ -265,17 +269,18 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let name_or_alias = selection.item.name_or_alias().item;
 
                     let output_type = server_scalar_selectable.target_entity_name.clone();
-                    let inner_text =
-                        server_scalar_entity_javascript_name(db, output_type.inner().0)
-                            .as_ref()
-                            .expect(
-                                "Expected parsing to not have failed. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            );
+                    let inner_text = server_scalar_entity_named(db, output_type.inner().0)
+                        .as_ref()
+                        .expect(
+                            "Expected parsing to not have failed. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .expect(
+                            "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                        )
+                        .lookup(db)
+                        .javascript_name;
 
                     if selection.item.is_updatable() {
                         *updatable_fields = true;

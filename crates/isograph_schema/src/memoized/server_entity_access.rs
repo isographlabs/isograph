@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, JavascriptName, Location};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location};
 use isograph_lang_types::{SelectionType, SelectionTypePostfix};
 use pico::MemoRef;
 use pico_macros::memo;
@@ -104,22 +104,6 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
         },
         None => None.wrap_ok(),
     }
-}
-
-/// TODO remove once we return references
-#[memo]
-pub fn server_scalar_entity_javascript_name<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_scalar_entity_name: EntityName,
-) -> DiagnosticResult<Option<JavascriptName>> {
-    let value = server_scalar_entity_named(db, server_scalar_entity_name).clone()?;
-
-    let entity = match value {
-        Some(entity) => entity,
-        None => return Ok(None),
-    };
-
-    entity.lookup(db).javascript_name.wrap_some().wrap_ok()
 }
 
 #[memo]

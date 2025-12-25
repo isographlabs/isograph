@@ -3,8 +3,8 @@ use common_lang_types::{EntityName, SelectableName};
 use isograph_lang_types::{SelectionType, TypeAnnotationDeclaration, UnionVariant};
 use isograph_schema::{
     IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named_2,
-    server_object_selectable_named, server_scalar_entity_javascript_name,
-    server_scalar_selectable_named, server_selectables_map_for_entity,
+    server_object_selectable_named, server_scalar_selectable_named,
+    server_selectables_map_for_entity,
 };
 use prelude::Postfix;
 
@@ -107,17 +107,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
             s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
             s
         }
-        SelectionType::Scalar(_s) => server_scalar_entity_javascript_name(db, entity_name)
-            .as_ref()
-            .expect(
-                "Expected parsing to not have failed. \
-                This is indicative of a bug in Isograph.",
-            )
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .to_string(),
+        SelectionType::Scalar(s) => s.lookup(db).javascript_name.to_string(),
     }
 }
 
