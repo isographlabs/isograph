@@ -809,7 +809,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
                             .map(|arg| arg.item.into_key_and_value()),
                         variable_context,
                     ),
-                    concrete_target_entity_name: if concrete_type {
+                    concrete_target_entity_name: if concrete_type.0 {
                         concrete_object_entity_name.wrap_some()
                     } else {
                         None
@@ -1170,6 +1170,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
         .selection_info
         .as_object()
         .expect("Expected target object entity to be an object")
+        .0
     {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
             target_server_object_entity.name,
@@ -1192,6 +1193,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
             .selection_info
             .as_object()
             .expect("Expected target server object entity to be an object")
+            .0
         {
             None
         } else {
@@ -1255,6 +1257,7 @@ fn insert_client_object_selectable_into_refetch_paths<TNetworkProtocol: NetworkP
                 .selection_info
                 .as_object()
                 .expect("Expected target server object entity to be an object")
+                .0
             {
                 target_server_object_entity.name.wrap_some()
             } else {
@@ -1428,6 +1431,7 @@ fn select_typename_and_id_fields_in_merged_selection<TNetworkProtocol: NetworkPr
         .selection_info
         .as_object()
         .expect("Expected parent object entity to be an object")
+        .0
     {
         maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
     };

@@ -17,8 +17,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
-    ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerEntity,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerEntity,
     ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
@@ -70,7 +70,7 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        selection_info: true.object_selected(),
+                        selection_info: true.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                             subtypes: vec![],
@@ -203,7 +203,7 @@ pub fn process_graphql_type_system_document(
                                     .wrap(Description)
                             }),
                         name: server_object_entity_name,
-                        selection_info: true.object_selected(),
+                        selection_info: true.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type:
                                 GraphQLSchemaOriginalDefinitionType::InputObject,
@@ -266,7 +266,7 @@ pub fn process_graphql_type_system_document(
                                 .wrap(Description)
                         }),
                         name: server_object_entity_name,
-                        selection_info: false.object_selected(),
+                        selection_info: false.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
                             original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: union_definition

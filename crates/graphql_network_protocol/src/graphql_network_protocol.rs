@@ -14,7 +14,6 @@ use isograph_lang_types::{
     SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
-use isograph_schema::IsographDatabase;
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
     FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
@@ -26,6 +25,7 @@ use isograph_schema::{
     insert_selectable_or_multiple_definition_diagnostic, server_object_entity_named,
     to_isograph_constant_value,
 };
+use isograph_schema::{IsConcrete, IsographDatabase};
 use pico_macros::memo;
 use prelude::Postfix;
 
@@ -143,7 +143,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .unwrap_or_default(),
                     }
                     .object_selected(),
-                    selection_info: SelectionType::Object(false),
+                    selection_info: false.wrap(IsConcrete).object_selected(),
                 }
                 .interned_value(db)
                 .with_location(with_location.location)
@@ -464,7 +464,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
                     mutation_subfield_name,
                     &top_level_schema_field_arguments,
-                    if top_level_schema_field_is_concrete {
+                    if top_level_schema_field_is_concrete.0 {
                         payload_object_entity_name.wrap_some()
                     } else {
                         None
@@ -554,6 +554,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             .selection_info
             .as_object()
             .expect("Expected server object entity to be object")
+            .0
         {
             let name = server_object_entity.name;
             return format!("Link<\"{name}\">");
