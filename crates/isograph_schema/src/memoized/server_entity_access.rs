@@ -107,7 +107,7 @@ pub fn server_scalar_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_entity_named_2<TNetworkProtocol: NetworkProtocol>(
+pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerEntity<TNetworkProtocol>>> {

@@ -2,7 +2,7 @@ use common_lang_types::{EntityName, SelectableName};
 
 use isograph_lang_types::{SelectionType, TypeAnnotationDeclaration, UnionVariant};
 use isograph_schema::{
-    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named_2,
+    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named,
     server_object_selectable_named, server_scalar_selectable_named,
     server_selectables_map_for_entity,
 };
@@ -70,7 +70,7 @@ fn format_server_field_type<TNetworkProtocol: NetworkProtocol>(
     entity_name: EntityName,
     indentation_level: u8,
 ) -> String {
-    let entity = server_entity_named_2(db, entity_name)
+    let entity = server_entity_named(db, entity_name)
         .as_ref()
         .expect(
             "Expected parsing to not have failed. \

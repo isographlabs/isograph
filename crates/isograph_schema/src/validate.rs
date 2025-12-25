@@ -9,7 +9,7 @@ use crate::{
     ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map,
     entity_not_defined_diagnostic, parse_iso_literals, process_iso_literals, selectables,
-    server_entities_map_without_locations, server_entity_named_2, server_id_selectable,
+    server_entities_map_without_locations, server_entity_named, server_id_selectable,
     server_object_entities, server_selectables_map,
     validate_selection_sets::validate_selection_sets, validate_use_of_arguments,
     validated_entrypoints,
@@ -230,7 +230,7 @@ fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
         for argument in arguments {
             let target = argument.type_.item.inner().0;
 
-            match server_entity_named_2(db, target).clone_err() {
+            match server_entity_named(db, target).clone_err() {
                 Ok(entity) => {
                     match entity {
                         Some(_) => {
