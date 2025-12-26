@@ -134,7 +134,7 @@ checksum = "7c02d123df017efcdfbd739ef81735b36c5ba83ec3c59c80a9d7ecc718f92e50"
 
 [[package]]
 name = "artifact_content"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -578,7 +578,7 @@ dependencies = [
 
 [[package]]
 name = "common_lang_types"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "intern",
  "lazy_static",
@@ -1122,7 +1122,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_lang_types"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -1134,7 +1134,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_network_protocol"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1154,7 +1154,7 @@ dependencies = [
 
 [[package]]
 name = "graphql_schema_parser"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql-syntax",
@@ -1485,7 +1485,7 @@ checksum = "cb56e1aa765b4b4f3aadfab769793b7087bb03a4ea4920644a6d238e2df5b9ed"
 
 [[package]]
 name = "impl_base_types_macro"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1603,7 +1603,7 @@ checksum = "7943c866cc5cd64cbc25b2e01621d07fa8eb2a1a23160ee81ce38704e97b8ecf"
 
 [[package]]
 name = "isograph_cli"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "clap 4.5.31",
  "colored",
@@ -1629,7 +1629,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_compiler"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "artifact_content",
  "colored",
@@ -1655,7 +1655,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_config"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "intern",
@@ -1669,7 +1669,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_fixture_tests"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "clap 4.5.31",
  "common_lang_types",
@@ -1685,7 +1685,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_parser"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1700,7 +1700,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lang_types"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -1715,7 +1715,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_lsp"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "colored",
  "common_lang_types",
@@ -1743,7 +1743,7 @@ dependencies = [
 
 [[package]]
 name = "isograph_schema"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -2345,7 +2345,7 @@ dependencies = [
 
 [[package]]
 name = "pico"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "bincode 2.0.1",
  "boxcar",
@@ -2363,7 +2363,7 @@ dependencies = [
 
 [[package]]
 name = "pico_macros"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "convert_case",
  "deluxe",
@@ -2415,7 +2415,7 @@ dependencies = [
 
 [[package]]
 name = "prelude"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "pico",
 ]
@@ -2666,14 +2666,14 @@ dependencies = [
 
 [[package]]
 name = "resolve_position"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
 ]
 
 [[package]]
 name = "resolve_position_macros"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "deluxe",
  "prelude",
@@ -3062,7 +3062,7 @@ dependencies = [
 
 [[package]]
 name = "string_key_newtype"
-version = "0.5.1"
+version = "0.5.2"
 
 [[package]]
 name = "strsim"
@@ -3450,7 +3450,7 @@ dependencies = [
 
 [[package]]
 name = "swc_isograph_plugin"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "anyhow",
  "isograph_config",
@@ -3654,7 +3654,7 @@ dependencies = [
 
 [[package]]
 name = "tests"
-version = "0.5.1"
+version = "0.5.2"
 dependencies = [
  "common_lang_types",
  "graphql_lang_types",
@@ -4045,7 +4045,7 @@ dependencies = [
 
 [[package]]
 name = "u64_newtypes"
-version = "0.5.1"
+version = "0.5.2"
 
 [[package]]
 name = "unicase"

@@ -2,7 +2,7 @@
   "name": "@isograph/babel-plugin",
   "description": "A Babel plugin for use with Isograph applications.",
   "homepage": "https://isograph.dev",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "keywords": [
     "graphql",
     "isograph",
