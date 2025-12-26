@@ -51,17 +51,14 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
                 }
                 .0;
 
-                let target_entity = server_entity_named(db, target_entity_name)
-                    .as_ref()
-                    .expect(
+                let target_entity =
+                    match server_entity_named(db, target_entity_name).as_ref().expect(
                         "Expected parsing to have succeeded. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db);
+                    ) {
+                        Some(s) => s.lookup(db),
+                        None => continue,
+                    };
 
                 visit_selection_set(
                     db,
