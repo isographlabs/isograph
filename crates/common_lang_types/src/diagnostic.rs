@@ -67,7 +67,7 @@ pub struct PrintableDiagnostic<'a> {
 
 impl std::fmt::Display for PrintableDiagnostic<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "\n{}", self.diagnostic.0.message)?;
+        write!(f, "{}", self.diagnostic.0.message)?;
         if let Some(location) = self.diagnostic.location() {
             writeln!(f)?;
             (self.print_location)(location, f)?;

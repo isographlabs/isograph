@@ -56,7 +56,7 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol>(
                 err.iter()
                     .map(|e| e.printable(db.print_location_fn()).to_string())
                     .collect::<Vec<_>>()
-                    .join("\n"),
+                    .join("\n\n"),
                 format!(
                     "Compilation took {}.",
                     pretty_duration(&result.elapsed_time, None)
