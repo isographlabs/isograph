@@ -439,6 +439,11 @@ fn parse_selection(
     tokens: &mut PeekableLexer<'_>,
 ) -> DiagnosticResult<WithEmbeddedLocation<Selection>> {
     tokens.with_embedded_location_result(|tokens| {
+        // Special case periods here, in order to emit a good error
+        if let Some(location) = parse_up_to_three_dots(tokens) {
+            return fragment_spread_diagnostic(location).wrap_err();
+        }
+
         let (field_name, alias) = parse_optional_alias_and_field_name(tokens)?;
 
         let arguments = parse_optional_arguments(tokens)?;
@@ -912,4 +917,46 @@ fn expected_literal_to_be_exported_diagnostic(
         ),
         location.wrap_some(),
     )
+}
+
+fn fragment_spread_diagnostic(location: EmbeddedLocation) -> Diagnostic {
+    Diagnostic::new(
+        "Unexpectedly found a period where a field should be selected.\n\
+        - If you are attempting to spread a fragment, note that each client field and pointer \
+        defines a field, which you can select directly. Instead of `...UserAvatar`, select `UserAvatar`.\n\
+        - If you are attempting to refine to another type with the use of an inline fragment, \
+        you can instead select an `asConcreteType` field. So, instead of `... on User {`, select \
+        `asUser {`. These fields are optional, and will be non-null if the typename matches."
+            .to_string(),
+        location.to::<Location>().wrap_some(),
+    )
+}
+
+// We can do better. We can attempt to parse `... on Foo` or `...Foo`
+fn parse_up_to_three_dots(tokens: &mut PeekableLexer) -> Option<EmbeddedLocation> {
+    tokens
+        .with_embedded_location_result(|tokens| {
+            tokens.parse_source_of_kind(
+                IsographLangTokenKind::Period,
+                semantic_token_legend::ST_DOT,
+            )?;
+
+            if tokens.peek().item == IsographLangTokenKind::Period {
+                tokens.parse_source_of_kind(
+                    IsographLangTokenKind::Period,
+                    semantic_token_legend::ST_DOT,
+                )?;
+
+                if tokens.peek().item == IsographLangTokenKind::Period {
+                    tokens.parse_source_of_kind(
+                        IsographLangTokenKind::Period,
+                        semantic_token_legend::ST_DOT,
+                    )?;
+                }
+            }
+
+            ().wrap_ok::<Diagnostic>()
+        })
+        .ok()
+        .map(|x| x.location)
 }
