@@ -60,6 +60,17 @@ impl Diagnostic {
 pub type PrintLocationFn<'a> =
     Box<dyn Fn(Location, &mut std::fmt::Formatter<'_>) -> std::fmt::Result + 'a>;
 
+pub fn noop_print_location_fn<'a>() -> PrintLocationFn<'a> {
+    noop_print_location_fn_inner.boxed()
+}
+
+fn noop_print_location_fn_inner(
+    _loc: Location,
+    _formatter: &mut std::fmt::Formatter<'_>,
+) -> std::fmt::Result {
+    Ok(())
+}
+
 pub struct PrintableDiagnostic<'a> {
     diagnostic: &'a Diagnostic,
     print_location: PrintLocationFn<'a>,

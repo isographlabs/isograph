@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use common_lang_types::Diagnostic;
+use common_lang_types::{Diagnostic, noop_print_location_fn};
 use isograph_schema::{IsographDatabase, NetworkProtocol, read_iso_literals_source};
 use lsp_types::{
     PublishDiagnosticsParams, Uri,
@@ -70,7 +70,7 @@ fn iso_diagnostics_to_params<TNetworkProtocol: NetworkProtocol>(
             .or_default()
             .push(lsp_types::Diagnostic {
                 range: location.range,
-                message: diagnostic.printable(db.print_location_fn()).to_string(),
+                message: diagnostic.printable(noop_print_location_fn()).to_string(),
                 data: serde_json::to_value(diagnostic.0.code_actions.clone())
                     .expect(
                         "Expected serialization to work. \
