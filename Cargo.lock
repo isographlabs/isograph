@@ -580,6 +580,7 @@ dependencies = [
 name = "common_lang_types"
 version = "0.5.2"
 dependencies = [
+ "colored",
  "intern",
  "lazy_static",
  "pathdiff",
@@ -1745,6 +1746,7 @@ dependencies = [
 name = "isograph_schema"
 version = "0.5.2"
 dependencies = [
+ "colored",
  "common_lang_types",
  "graphql_lang_types",
  "impl_base_types_macro",

@@ -32,7 +32,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
 
     let config = state.db.get_isograph_config().clone();
 
-    info!("{}", "Starting to compile.".cyan());
+    info!("{}", "Starting to compile.".green());
     let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
     let _ = print_result(&state.db, result);
 

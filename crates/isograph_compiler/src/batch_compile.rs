@@ -26,7 +26,7 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), ()> {
-    info!("{}", "Starting to compile.".cyan());
+    info!("{}", "Starting to compile.".green());
     let mut state = match CompilerState::new(config, current_working_directory) {
         Ok(s) => s,
         Err(e) => {
@@ -54,11 +54,11 @@ pub fn print_result<TNetworkProtocol: NetworkProtocol>(
                 "Error when compiling.\n".bright_red(),
                 // TODO don't materialize a vec here
                 err.iter()
-                    .map(|e| e.printable(db.print_location_fn()).to_string())
+                    .map(|e| e.printable(db.print_location_fn(true)).to_string())
                     .collect::<Vec<_>>()
                     .join("\n\n"),
                 format!(
-                    "Compilation took {}.",
+                    "\nCompilation took {}.",
                     pretty_duration(&result.elapsed_time, None)
                 )
                 .bright_red()

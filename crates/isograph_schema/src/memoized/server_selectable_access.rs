@@ -147,7 +147,8 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                         .cloned()
                         .flatten(),
                 ),
-                db.print_location_fn(),
+                db.print_location_fn(true)
+                    .note_todo("It's a bad sign we're calling this fn here"),
             )
         })?;
     }

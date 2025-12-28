@@ -143,7 +143,7 @@ fn generate_content_for_output_file(
                 out_str.push_str(&format!("{item:#?}"))
             }
             Err(err) => {
-                let err_printed = err.printable(db.print_location_fn()).to_string();
+                let err_printed = err.printable(db.print_location_fn(false)).to_string();
                 let wrapped_err: Result<(), _> = Err(err);
                 out_str.push_str(&format!("{wrapped_err:#?}\n\n{err_printed}\n---\n"));
             }

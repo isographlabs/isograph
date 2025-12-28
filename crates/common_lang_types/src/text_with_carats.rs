@@ -1,3 +1,5 @@
+use colored::Colorize;
+
 use crate::Span;
 
 enum SpanState {
@@ -11,8 +13,8 @@ enum SpanState {
 
 static LINE_COUNT_BUFFER: usize = 2;
 
-pub fn text_with_carats(text: &str, span: Span) -> String {
-    text_with_carats_and_line_count_buffer(text, span, LINE_COUNT_BUFFER)
+pub fn text_with_carats(text: &str, span: Span, color: bool) -> String {
+    text_with_carats_and_line_count_buffer(text, span, LINE_COUNT_BUFFER, color)
 }
 
 /// For a given string and span, return a string with
@@ -22,6 +24,7 @@ fn text_with_carats_and_line_count_buffer(
     text: &str,
     span: Span,
     line_count_buffer: usize,
+    colorize_carats: bool,
 ) -> String {
     // Major hack alert
     if span.is_empty() {
@@ -87,7 +90,14 @@ fn text_with_carats_and_line_count_buffer(
                     carats.push(' ');
                 }
                 for _ in start_of_carats..end_of_carats {
-                    carats.push('^');
+                    carats.push_str(&format!(
+                        "{}",
+                        if colorize_carats {
+                            "^".bright_red()
+                        } else {
+                            "^".normal()
+                        }
+                    ));
                 }
                 for _ in end_of_carats..line_len {
                     carats.push(' ');
@@ -147,23 +157,35 @@ mod test {
 
     #[test]
     fn empty_span() {
-        let output =
-            text_with_carats_and_line_count_buffer(&input_with_lines(10), Span::new(0, 0), 3);
+        let output = text_with_carats_and_line_count_buffer(
+            &input_with_lines(10),
+            Span::new(0, 0),
+            3,
+            false,
+        );
         assert_eq!(output, "");
     }
 
     #[test]
     fn empty_span_but_not_zero() {
         // This is weird behavior, and maybe we should print no output here.
-        let output =
-            text_with_carats_and_line_count_buffer(&input_with_lines(10), Span::new(1, 1), 3);
+        let output = text_with_carats_and_line_count_buffer(
+            &input_with_lines(10),
+            Span::new(1, 1),
+            3,
+            false,
+        );
         assert_eq!(output, "");
     }
 
     #[test]
     fn bug_span_on_line_break() {
-        let output =
-            text_with_carats_and_line_count_buffer(&input_with_lines(10), Span::new(9, 10), 3);
+        let output = text_with_carats_and_line_count_buffer(
+            &input_with_lines(10),
+            Span::new(9, 10),
+            3,
+            false,
+        );
         assert_eq!(output, "");
     }
 
@@ -173,6 +195,7 @@ mod test {
             &input_with_lines(10),
             Span::new(0, 1),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -191,6 +214,7 @@ mod test {
             &input_with_lines(10),
             Span::new(0, 3),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -215,6 +239,7 @@ mod test {
             &input_with_lines(10),
             Span::new(0, 9),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -233,6 +258,7 @@ mod test {
             &input_with_lines(10),
             Span::new(0, 10),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -251,6 +277,7 @@ mod test {
             &input_with_lines(10),
             Span::new(31, 33),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -272,6 +299,7 @@ mod test {
             &input_with_lines(10),
             Span::new(31, 43),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -295,6 +323,7 @@ mod test {
             &input_with_lines(10),
             Span::new(31, 53),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -320,6 +349,7 @@ mod test {
             &input_with_lines(10),
             Span::new(30, 42),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -344,6 +374,7 @@ mod test {
             &input_with_lines(10),
             Span::new(29, 42),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -367,6 +398,7 @@ mod test {
             &input_with_lines(10),
             Span::new(90, 100),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -388,6 +420,7 @@ mod test {
             &input_with_lines(10),
             Span::new(90, 105),
             3,
+            false,
         ));
         assert_eq!(
             output,
@@ -405,8 +438,12 @@ mod test {
     fn span_outside_text() {
         // Maybe this should panic! But it doesn't.
 
-        let output =
-            text_with_carats_and_line_count_buffer(&input_with_lines(10), Span::new(105, 110), 3);
+        let output = text_with_carats_and_line_count_buffer(
+            &input_with_lines(10),
+            Span::new(105, 110),
+            3,
+            false,
+        );
         assert_eq!(output, "");
     }
 
@@ -416,6 +453,7 @@ mod test {
             &input_with_lines(10),
             Span::new(31, 33),
             0,
+            false,
         ));
         assert_eq!(
             output,
@@ -431,6 +469,7 @@ mod test {
             &input_with_lines(10),
             Span::new(31, 33),
             1,
+            false,
         ));
         assert_eq!(
             output,

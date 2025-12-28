@@ -3,10 +3,12 @@ use std::{
     marker::PhantomData,
 };
 
+use colored::Colorize;
 use common_lang_types::{
     CurrentWorkingDirectory, Location, PrintLocationFn, RelativePathToSourceFile, Span, TextSource,
     text_with_carats,
 };
+use intern::Lookup;
 use isograph_config::CompilerConfig;
 use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
@@ -172,7 +174,7 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
             .is_some()
     }
 
-    pub fn print_location_fn<'a>(&'a self) -> PrintLocationFn<'a> {
+    pub fn print_location_fn<'a>(&'a self, color: bool) -> PrintLocationFn<'a> {
         (move |location: Location, f: &mut std::fmt::Formatter<'_>| match location {
             Location::Embedded(embedded_location) => {
                 let read_out_text = match file_text_at_span_at_location(
@@ -183,17 +185,33 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
                 ) {
                     Some(text) => text,
                     None => {
+                        let error_text =
+                            "\nERROR: File not found. This is indicative of a bug in Isograph.";
                         return write!(
                             f,
-                            "\nERROR: File not found. This is indicative of a bug in Isograph."
+                            "{}",
+                            if color {
+                                error_text.bright_red()
+                            } else {
+                                error_text.normal()
+                            }
                         );
                     }
                 };
 
                 // The inner span
-                let text_with_carats = text_with_carats(read_out_text, embedded_location.span);
+                let text_with_carats =
+                    text_with_carats(read_out_text, embedded_location.span, color);
 
-                let file_path = embedded_location.text_source.relative_path_to_source_file;
+                let file_path = embedded_location
+                    .text_source
+                    .relative_path_to_source_file
+                    .lookup();
+                let file_path = if color {
+                    file_path.bright_blue()
+                } else {
+                    file_path.normal()
+                };
                 write!(f, "{file_path}\n{text_with_carats}")
             }
             Location::Generated => write!(f, "\n<generated>"),
