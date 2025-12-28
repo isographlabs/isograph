@@ -2,13 +2,12 @@ use std::collections::BTreeMap;
 
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
 use isograph_lang_types::SelectionType;
-use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable, NetworkProtocol,
-    ServerSelectable, entity_definition_location, server_entity_named,
+    entity_definition_location, server_entity_named,
 };
 
 #[memo]
@@ -66,7 +65,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRefServerSelectable<TNetworkProtocol>>> {
     let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
         .clone_err()?;
 
