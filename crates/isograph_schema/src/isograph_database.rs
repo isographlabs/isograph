@@ -177,13 +177,11 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
     pub fn print_location_fn<'a>(&'a self, color: bool) -> PrintLocationFn<'a> {
         (move |location: Location, f: &mut std::fmt::Formatter<'_>| match location {
             Location::Embedded(embedded_location) => {
-                let read_out_text = match file_text_at_span_at_location(
+                let file_text = match file_text_at_location(
                     self,
                     embedded_location.text_source.relative_path_to_source_file,
-                    // The TextSource span
-                    embedded_location.text_source.span,
                 ) {
-                    Some(text) => text,
+                    Some(s) => s,
                     None => {
                         let error_text =
                             "\nERROR: File not found. This is indicative of a bug in Isograph.";
@@ -199,20 +197,32 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
                     }
                 };
 
-                // The inner span
-                let text_with_carats =
-                    text_with_carats(read_out_text, embedded_location.span, color);
+                let (text_with_carats, line_number) = text_with_carats(
+                    file_text,
+                    // outer span
+                    embedded_location.text_source.span,
+                    // The inner span
+                    embedded_location.span,
+                    color,
+                );
+
+                let formatted_line_number = match line_number {
+                    Some(s) => format!(":{}:{}", s.0.0, s.1.0),
+                    None => "".to_string(),
+                };
 
                 let file_path = embedded_location
                     .text_source
                     .relative_path_to_source_file
                     .lookup();
-                let file_path = if color {
-                    file_path.bright_blue()
+
+                let file_path_and_line_number = format!("{}{}", file_path, formatted_line_number);
+                let file_path_and_line_number = if color {
+                    file_path_and_line_number.bright_blue()
                 } else {
-                    file_path.normal()
+                    file_path_and_line_number.normal()
                 };
-                write!(f, "{file_path}\n{text_with_carats}")
+                write!(f, "{file_path_and_line_number}\n{text_with_carats}")
             }
             Location::Generated => write!(f, "\n<generated>"),
         })
@@ -220,7 +230,7 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
     }
 }
 
-// TODO can we return &'db str?
+// TODO use this in hover, etc
 #[memo]
 pub fn file_text_at_span_at_location<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
