@@ -67,7 +67,7 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         .as_ref()
         .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
         .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
-    match &selection.item {
+    match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = selectable.as_scalar().expect(
                 "Expected selectable to be a scalar. \
@@ -250,7 +250,7 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             This is indicative of a bug in Isograph.",
         );
 
-    match &selection.item {
+    match selection.item.reference() {
         SelectionType::Scalar(scalar_selection) => {
             match selectable.as_scalar().expect(
                 "Expected selectable to be a scalar. \

@@ -83,7 +83,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_scalar_path(db, &scalar_path)
                 {
-                    let (name, description, arguments) = match &selectable {
+                    let (name, description, arguments) = match selectable.reference() {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
                             (
@@ -120,7 +120,7 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
                 if let Ok((parent_object, selectable)) =
                     get_parent_and_selectable_for_object_path(db, &object_path)
                 {
-                    let (name, description, arguments) = match &selectable {
+                    let (name, description, arguments) = match selectable.reference() {
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
                             (

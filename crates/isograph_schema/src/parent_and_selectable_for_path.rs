@@ -32,7 +32,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
 
     let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
         db,
-        match &parent {
+        match parent.reference() {
             SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
         },
         scalar_selectable_name,
@@ -74,7 +74,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 
     let (parent, selectable) = get_parent_and_selectable_for_selection_parent(
         db,
-        match &parent {
+        match parent.reference() {
             SelectionParentType::SelectionSet(position_resolution_path) => position_resolution_path,
         },
         object_selectable_name,
@@ -100,7 +100,7 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     selection_set_path: &SelectionSetPath<'a>,
 ) -> DiagnosticResult<MemoRef<ServerEntity<TNetworkProtocol>>> {
-    let parent_object_entity_name = match &selection_set_path.parent {
+    let parent_object_entity_name = match selection_set_path.parent.reference() {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
                 get_parent_and_selectable_for_object_path(db, object_selection_path)?;
@@ -140,7 +140,7 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     MemoRef<ServerEntity<TNetworkProtocol>>,
     MemoRefSelectable<TNetworkProtocol>,
 )> {
-    match &selection_set_path.parent {
+    match selection_set_path.parent.reference() {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_, object_selectable) =
                 get_parent_and_selectable_for_object_path(db, object_selection_path)?;

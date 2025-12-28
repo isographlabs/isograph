@@ -186,7 +186,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .refetch_paths
         .iter()
         .map(|((path, selection_variant), root_refetch_path)| {
-            let current_target_merged_selections = match &path.field_name {
+            let current_target_merged_selections = match path.field_name.reference() {
                 SelectionType::Object(name_and_arguments) => {
                     let mut linked_fields = path.linked_fields.clone();
                     linked_fields.push(NormalizationKey::ClientPointer(name_and_arguments.clone()));
@@ -288,7 +288,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         entrypoint.name,
         concrete_object_entity.name,
         &directive_set,
-        match &entrypoint.variant {
+        match entrypoint.variant.reference() {
             ClientFieldVariant::UserWritten(info) => {
                 info.client_scalar_selectable_directive_set.clone().expect(
                     "Expected directive set to have been validated by now. \

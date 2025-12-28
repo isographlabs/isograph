@@ -1,6 +1,7 @@
 //! TODO this is deprecated and should be removed
 
 use isograph_lang_types::{LoadableDirectiveParameters, ScalarSelectionDirectiveSet};
+use prelude::Postfix;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, ImperativelyLoadedFieldVariant, NetworkProtocol,
@@ -25,7 +26,7 @@ pub fn categorize_field_loadability<'a, TNetworkProtocol: NetworkProtocol>(
     client_scalar_selectable: &'a ClientScalarSelectable<TNetworkProtocol>,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
-    match &client_scalar_selectable.variant {
+    match client_scalar_selectable.variant.reference() {
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ScalarSelectionDirectiveSet::None(_) => None,

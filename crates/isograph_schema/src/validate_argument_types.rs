@@ -145,7 +145,7 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     field_argument_definition_type: &TypeAnnotationDeclaration,
     variable_definitions: &[VariableDeclaration],
 ) -> DiagnosticResult<()> {
-    match &selection_supplied_argument_value.item {
+    match selection_supplied_argument_value.item.reference() {
         NonConstantValue::Variable(supplied_variable_name) => {
             let variable_type = get_variable_type(
                 supplied_variable_name,

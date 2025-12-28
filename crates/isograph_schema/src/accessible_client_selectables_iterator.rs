@@ -96,7 +96,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                             "Expected selectable to exist. \
                             This is indicative of a bug in Isograph.",
                         );
-                match &selection.item {
+                match selection.item.reference() {
                     SelectionType::Scalar(scalar_selection) => {
                         match selectable.as_scalar().expect(
                             "Expected selectable to be a scalar. \

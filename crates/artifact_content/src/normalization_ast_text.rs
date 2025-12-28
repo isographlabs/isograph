@@ -2,6 +2,7 @@ use isograph_schema::{
     MergedInlineFragmentSelection, MergedLinkedFieldSelection, MergedScalarFieldSelection,
     MergedServerSelection,
 };
+use prelude::Postfix;
 
 use crate::generate_artifacts::{NormalizationAstText, get_serialized_field_arguments};
 
@@ -19,7 +20,7 @@ pub(crate) fn generate_normalization_ast_text<'schema, 'a>(
 }
 
 fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_level: u8) -> String {
-    match &item {
+    match item.reference() {
         MergedServerSelection::ScalarField(scalar_field) => {
             let MergedScalarFieldSelection {
                 name, arguments, ..

@@ -19,6 +19,7 @@ use isograph_schema::{
     selectable_reader_selection_set, transform_arguments_with_child_context,
 };
 use pico::MemoRef;
+use prelude::Postfix;
 
 use crate::{
     generate_artifacts::{ReaderAst, get_serialized_field_arguments},
@@ -43,7 +44,7 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
         .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
         .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
-    match &selection.item {
+    match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = selectable.as_scalar().expect(
                 "Expected selectable to be a scalar. \
@@ -206,7 +207,10 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
 
     let condition = match object_selectable {
         DefinitionLocation::Server(server_object_selectable) => {
-            match &server_object_selectable.object_selectable_variant {
+            match server_object_selectable
+                .object_selectable_variant
+                .reference()
+            {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = EntityNameAndSelectableName {
                         selectable_name: object_selection.name.item,
@@ -492,7 +496,7 @@ fn loadably_selected_field_ast_node<TNetworkProtocol: NetworkProtocol>(
         let field_parent_type = client_scalar_selectable
             .entity_name_and_selectable_name()
             .parent_entity_name;
-        let field_directive_set = match &client_scalar_selectable.variant {
+        let field_directive_set = match client_scalar_selectable.variant.reference() {
             ClientFieldVariant::UserWritten(info) => {
                 info.client_scalar_selectable_directive_set.clone().expect(
                     "Expected directive set to have been validated. \
@@ -773,7 +777,7 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
             .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
             .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
-        match &selection.item {
+        match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
                 let scalar_selectable = selectable.as_scalar().expect(
                     "Expected selectable to be a scalar. \

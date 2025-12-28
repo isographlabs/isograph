@@ -38,7 +38,7 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
     let mut fragments = BTreeMap::new();
 
     for item in selection_map.values() {
-        match &item {
+        match item.reference() {
             MergedServerSelection::ScalarField(scalar_field) => {
                 let normalization_alias = scalar_field.normalization_alias();
                 let name = normalization_alias

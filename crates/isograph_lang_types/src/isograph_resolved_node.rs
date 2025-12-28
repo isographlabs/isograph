@@ -1,3 +1,5 @@
+use prelude::Postfix;
+
 use crate::{
     ClientFieldDeclarationPath, ClientObjectSelectableNameWrapperPath,
     ClientPointerDeclarationPath, ClientScalarSelectableNameWrapperPath, DescriptionPath,
@@ -43,9 +45,9 @@ fn get_path_using_selection_parent<'a>(
     selection_parent: &SelectionParentType<'a>,
     string_vec: &mut Vec<String>,
 ) {
-    match &selection_parent {
+    match selection_parent.reference() {
         SelectionParentType::SelectionSet(position_resolution_path) => {
-            match &position_resolution_path.parent {
+            match position_resolution_path.parent.reference() {
                 SelectionSetParentType::ObjectSelection(object_path) => {
                     string_vec.push(object_path.inner.name.item.to_string());
                     get_path_using_selection_parent(&object_path.parent, string_vec);

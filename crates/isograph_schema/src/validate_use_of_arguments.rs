@@ -397,7 +397,7 @@ pub fn extend_reachable_variables_with_arg(
     reachable_variables: &mut UsedVariables,
 ) {
     // TODO implement this more efficiently with accumulator-passing-style
-    match &non_constant_value.item {
+    match non_constant_value.item.reference() {
         NonConstantValue::Variable(name) => {
             reachable_variables.insert(*name);
         }

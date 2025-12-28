@@ -192,7 +192,10 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 )
                 .lookup(db);
 
-                match &server_object_selectable.object_selectable_variant {
+                match server_object_selectable
+                    .object_selectable_variant
+                    .reference()
+                {
                     ServerObjectSelectableVariant::LinkedField => {}
                     ServerObjectSelectableVariant::InlineFragment => {
                         path_and_contents.push(generate_eager_reader_condition_artifact(
@@ -263,7 +266,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 )
                 .lookup(db);
 
-                match &client_scalar_selectable.variant {
+                match client_scalar_selectable.variant.reference() {
                     ClientFieldVariant::Link => (),
                     ClientFieldVariant::UserWritten(info) => {
                         path_and_contents.extend(generate_eager_reader_artifacts(
@@ -460,8 +463,8 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 .as_ref()
                 .expect("Expected client selectable to be valid");
 
-            match &value {
-                SelectionType::Scalar(s) => match &s.lookup(db).variant {
+            match value.reference() {
+                SelectionType::Scalar(s) => match s.lookup(db).variant.reference() {
                     isograph_schema::ClientFieldVariant::UserWritten(_) => {}
                     isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
                     isograph_schema::ClientFieldVariant::Link => return None,
@@ -543,7 +546,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
             }
             SelectionType::Scalar(client_scalar_selectable) => {
                 let client_scalar_selectable = client_scalar_selectable.lookup(db);
-                match &client_scalar_selectable.variant {
+                match client_scalar_selectable.variant.reference() {
                     ClientFieldVariant::Link => {
                         generate_link_output_type_artifact(db, client_scalar_selectable).wrap_some()
                     }
@@ -614,7 +617,7 @@ fn get_serialized_field_argument(
 
     let argument_name = argument.key;
 
-    match &argument.value {
+    match argument.value.reference() {
         NonConstantValue::Variable(variable_name) => {
             format!(
                 "\n\
@@ -758,7 +761,7 @@ fn print_javascript_type_declaration_impl<T: std::fmt::Display>(
     s: &mut String,
     inner_text: &T,
 ) {
-    match &type_annotation {
+    match type_annotation.reference() {
         TypeAnnotationDeclaration::Scalar(_) => {
             s.push_str(&inner_text.to_string());
         }

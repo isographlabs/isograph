@@ -162,7 +162,7 @@ impl NormalizationKey {
         parent_variable_context: &VariableContext,
     ) -> Self {
         // from_selection_field_argument_and_context(arg, variable_context)
-        match &self {
+        match self.reference() {
             NormalizationKey::Discriminator => NormalizationKey::Discriminator,
             NormalizationKey::Id => NormalizationKey::Id,
             NormalizationKey::ServerField(s) => NormalizationKey::ServerField(
@@ -544,7 +544,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
             .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
             .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
-        match &selection.item {
+        match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
                 match selectable.as_scalar().expect(
                     "Expected selectable to be a scalar. \
@@ -682,7 +682,10 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     )
     .lookup(db);
 
-    match &server_object_selectable.object_selectable_variant {
+    match server_object_selectable
+        .object_selectable_variant
+        .reference()
+    {
         ServerObjectSelectableVariant::InlineFragment => {
             let type_to_refine_to = object_selection_parent_object.name;
 

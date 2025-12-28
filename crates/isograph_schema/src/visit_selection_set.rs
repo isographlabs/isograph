@@ -3,6 +3,7 @@ use isograph_lang_types::{
     DefinitionLocation, ObjectSelection, ScalarSelection, Selection, SelectionType,
     SelectionTypePostfix,
 };
+use prelude::Postfix;
 
 use crate::{
     IsographDatabase, NetworkProtocol, ServerEntity, selectable_named, server_entity_named,
@@ -22,7 +23,7 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
     ),
 ) {
     for selection in selection_set.iter() {
-        match &selection.item {
+        match selection.item.reference() {
             SelectionType::Scalar(scalar_selection) => {
                 visit_selection(scalar_selection.scalar_selected(), parent_entity)
             }

@@ -78,7 +78,7 @@ fn write_selections_for_query_text(
         query_text.push_str(new_line);
     } else {
         for item in items.values() {
-            match &item {
+            match item.reference() {
                 MergedServerSelection::ScalarField(scalar_field) => {
                     query_text.push_str(indent);
                     if let Some(alias) = scalar_field.normalization_alias() {

@@ -305,7 +305,7 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
                 .expect("Expected client selectable to be valid");
 
             match value {
-                SelectionType::Scalar(s) => match &s.lookup(db).variant {
+                SelectionType::Scalar(s) => match s.lookup(db).variant.reference() {
                     isograph_schema::ClientFieldVariant::UserWritten(_) => {}
                     isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => return None,
                     isograph_schema::ClientFieldVariant::Link => return None,
@@ -317,8 +317,8 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
         })
         .map(|selection_type| {
             let client_scalar_selection_directive_set = {
-                match &selection_type {
-                    SelectionType::Scalar(scalar) => match &scalar.lookup(db).variant {
+                match selection_type.reference() {
+                    SelectionType::Scalar(scalar) => match scalar.lookup(db).variant.reference() {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
                         ) => user_written_client_type_info

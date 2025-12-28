@@ -1,4 +1,5 @@
 use pico::Index;
+use prelude::Postfix;
 use std::{
     collections::{HashMap, HashSet},
     path::Path,
@@ -180,7 +181,7 @@ impl From<&[ArtifactPathAndContent]> for FileSystemState {
                 )),
             );
 
-            match &artifact.artifact_path.type_and_field {
+            match artifact.artifact_path.type_and_field.reference() {
                 Some(type_and_field) => {
                     nested_files
                         .entry(type_and_field.parent_entity_name)

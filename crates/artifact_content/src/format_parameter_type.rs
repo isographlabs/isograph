@@ -193,7 +193,7 @@ fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
     type_annotation: &TypeAnnotationDeclaration,
     indentation_level: u8,
 ) -> String {
-    match &type_annotation {
+    match type_annotation.reference() {
         TypeAnnotationDeclaration::Scalar(scalar) => {
             format_server_field_scalar_type(db, scalar.0, indentation_level + 1)
         }
