@@ -10,7 +10,6 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
     VariableNameWrapper,
 };
-use isograph_schema::ContainsIsoStats;
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME,
     ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol,
@@ -19,9 +18,9 @@ use isograph_schema::{
     client_scalar_selectable_named, client_selectable_map, client_selectable_named,
     fetchable_types, inline_fragment_reader_selection_set,
     refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    server_entity_named, server_object_selectable_named, validate_entire_schema,
-    validated_entrypoints,
+    server_entity_named, validate_entire_schema, validated_entrypoints,
 };
+use isograph_schema::{ContainsIsoStats, server_selectable_named};
 use lazy_static::lazy_static;
 use prelude::*;
 use std::{
@@ -175,7 +174,7 @@ fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
-                let server_object_selectable = server_object_selectable_named(
+                let server_object_selectable = server_selectable_named(
                     db,
                     *parent_object_entity_name,
                     *server_object_selectable_name,

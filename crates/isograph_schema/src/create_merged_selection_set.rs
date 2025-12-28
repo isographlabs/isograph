@@ -24,7 +24,7 @@ use crate::{
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, selectable_reader_selection_set, server_entity_named, server_id_selectable,
-    server_object_selectable_named, transform_arguments_with_child_context,
+    server_selectable_named, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
 };
 
@@ -666,7 +666,7 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
         merge_traversal_state.has_updatable = true;
     }
 
-    let server_object_selectable = server_object_selectable_named(
+    let server_object_selectable = server_selectable_named(
         db,
         field_parent_object_entity_name,
         field_server_object_selectable_name,
