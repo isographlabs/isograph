@@ -3,7 +3,6 @@ use common_lang_types::{EntityName, SelectableName};
 use isograph_lang_types::{SelectionType, TypeAnnotationDeclaration, UnionVariant};
 use isograph_schema::{
     IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named,
-    server_object_selectable_named, server_scalar_selectable_named,
     server_selectables_map_for_entity,
 };
 use prelude::Postfix;
@@ -117,66 +116,20 @@ fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
     server_selectable: MemoRefServerSelectable<TNetworkProtocol>,
     indentation_level: u8,
 ) -> String {
-    let (is_optional, selection_type) = match server_selectable {
-        SelectionType::Scalar(server_scalar_selectable) => {
-            let server_scalar_selectable = server_scalar_selectable.lookup(db);
-            let parent_object_entity_name = server_scalar_selectable.parent_entity_name;
-            let server_scalar_selectable_name = server_scalar_selectable.name;
-            let server_scalar_selectable = server_scalar_selectable_named(
-                db,
-                parent_object_entity_name,
-                server_scalar_selectable_name,
-            )
-            .as_ref()
-            .expect(
-                "Expected validation to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
-
-            (
-                is_nullable(server_scalar_selectable.target_entity_name.reference()),
-                server_scalar_selectable.target_entity_name.clone(),
-            )
-        }
-        SelectionType::Object(server_object_selectable) => {
-            let server_object_selectable = server_object_selectable.lookup(db);
-            let parent_object_entity_name = server_object_selectable.parent_entity_name;
-            let server_object_selectable_name = server_object_selectable.name;
-            let server_object_selectable = server_object_selectable_named(
-                db,
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )
-            .as_ref()
-            .expect(
-                "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
-                "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
-            (
-                is_nullable(server_object_selectable.target_entity_name.reference()),
-                server_object_selectable.target_entity_name.clone(),
-            )
-        }
-    };
+    let server_selectable = server_selectable.lookup(db);
+    let is_optional = is_nullable(server_selectable.target_entity_name.reference());
+    let target_type_annotation = server_selectable.target_entity_name.clone();
 
     format!(
         "{}readonly {}{}: {},\n",
         "  ".repeat(indentation_level as usize),
         name,
         if is_optional { "?" } else { "" },
-        format_type_annotation(db, selection_type.reference(), indentation_level + 1),
+        format_type_annotation(
+            db,
+            target_type_annotation.reference(),
+            indentation_level + 1
+        ),
     )
 }
 

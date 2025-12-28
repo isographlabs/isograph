@@ -8,8 +8,7 @@ use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable, NetworkProtocol,
-    ServerObjectSelectable, ServerScalarSelectable, entity_definition_location,
-    server_entity_named,
+    ServerSelectable, entity_definition_location, server_entity_named,
 };
 
 #[memo]
@@ -67,7 +66,7 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ServerSelectable<TNetworkProtocol>>>> {
     let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
         .clone_err()?;
 
@@ -77,8 +76,8 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
     };
 
     // TODO check if it is a client field...
-    let memo_ref = match selectable {
-        SelectionType::Scalar(s) => s,
+    let memo_ref = match selectable.lookup(db).selection_info.reference() {
+        SelectionType::Scalar(_) => selectable,
         SelectionType::Object(_) => {
             let selectable_name = *ID_FIELD_NAME;
             return Diagnostic::new(
@@ -163,14 +162,14 @@ pub fn server_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRef<ServerObjectSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ServerSelectable<TNetworkProtocol>>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .clone_err()?;
 
     match item {
-        Some(item) => match item.as_ref().as_object() {
-            Some(obj) => (*obj).wrap_some().wrap_ok(),
+        Some(item) => match item.lookup(db).selection_info.as_ref().as_object() {
+            Some(_) => item.dereference().wrap_some().wrap_ok(),
             None => Diagnostic::new(
                 format!(
                     "Expected `{parent_server_object_entity_name}.{server_selectable_name}`\
@@ -193,14 +192,14 @@ pub fn server_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRef<ServerScalarSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ServerSelectable<TNetworkProtocol>>>> {
     let item =
         server_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
             .clone_err()?;
 
     match item {
-        Some(item) => match item.as_ref().as_scalar() {
-            Some(scalar) => (*scalar).wrap_some().wrap_ok(),
+        Some(item) => match item.lookup(db).selection_info.as_ref().as_scalar() {
+            Some(_) => item.dereference().wrap_some().wrap_ok(),
             None => Diagnostic::new(
                 format!(
                     "Expected `{parent_server_object_entity_name}.{server_selectable_name}` \

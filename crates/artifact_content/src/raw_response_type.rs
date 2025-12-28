@@ -64,17 +64,22 @@ pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
 
                 let raw_type = server_scalar_selectable.target_entity_name.clone();
 
-                let inner_text = match server_scalar_selectable.javascript_type_override {
-                    Some(javascript_name) => javascript_name,
+                let inner_text = match server_scalar_selectable
+                    .selection_info
+                    .as_ref()
+                    .as_scalar()
+                    .expect("Expected selectable to be scalar.")
+                {
+                    Some(javascript_name) => javascript_name.dereference(),
                     None => server_entity_named(db, raw_type.inner().0)
                         .as_ref()
                         .expect(
                             "Expected parsing to not have failed. \
-                                This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .expect(
                             "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .lookup(db)
                         .selection_info

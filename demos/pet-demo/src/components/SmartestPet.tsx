@@ -95,7 +95,7 @@ export const SmartestPetRoute = iso(`
 });
 
 export const checkinsPointer = iso(`
-  pointer Pet.checkinsPointer to [ICheckin!]! {
+  pointer Pet.checkinsPointer to [ ICheckin ! ] ! {
     checkins(
       limit: 2
     ) {

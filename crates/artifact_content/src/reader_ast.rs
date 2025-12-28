@@ -46,10 +46,16 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
 
     match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
-            let scalar_selectable = selectable.as_scalar().expect(
-                "Expected selectable to be a scalar. \
-                This is indicative of a bug in Isograph.",
-            );
+            let scalar_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => s.server_defined(),
+                    SelectionType::Object(_) => panic!("Expected selectable to be scalar."),
+                },
+                DefinitionLocation::Client(c) => c
+                    .as_scalar()
+                    .expect("Expected selectable to be scalar.")
+                    .client_defined(),
+            };
 
             match scalar_selectable {
                 DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
@@ -72,10 +78,19 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionType::Object(object_selection) => {
-            let object_selectable = selectable.as_object().expect(
-                "Expected selectable to be an object. \
-                This is indicative of a bug in Isograph.",
-            );
+            let object_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => {
+                        panic!("Expected selectable to be an object.")
+                    }
+                    SelectionType::Object(_) => s.server_defined(),
+                },
+                DefinitionLocation::Client(c) => c
+                    .as_object()
+                    .expect("Expected selectable to be an object.")
+                    .client_defined(),
+            };
+
             match object_selectable {
                 DefinitionLocation::Client(client_object_selectable) => {
                     let client_object_selectable = client_object_selectable.lookup(db);
@@ -120,7 +135,11 @@ fn generate_reader_ast_node<TNetworkProtocol: NetworkProtocol>(
                 }
                 DefinitionLocation::Server(server_object_selectable) => {
                     let server_object_selectable = server_object_selectable.lookup(db);
-                    let normalization_key = match server_object_selectable.object_selectable_variant
+                    let normalization_key = match server_object_selectable
+                        .selection_info
+                        .as_ref()
+                        .as_object()
+                        .expect("Expected selectable to be object")
                     {
                         ServerObjectSelectableVariant::LinkedField => NameAndArguments {
                             // TODO use alias
@@ -208,8 +227,10 @@ fn linked_field_ast_node<TNetworkProtocol: NetworkProtocol>(
     let condition = match object_selectable {
         DefinitionLocation::Server(server_object_selectable) => {
             match server_object_selectable
-                .object_selectable_variant
-                .reference()
+                .selection_info
+                .as_ref()
+                .as_object()
+                .expect("Expected selectable to be an object.")
             {
                 ServerObjectSelectableVariant::InlineFragment => {
                     let type_and_field = EntityNameAndSelectableName {
@@ -779,10 +800,20 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
 
         match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
-                let scalar_selectable = selectable.as_scalar().expect(
-                    "Expected selectable to be a scalar. \
-                    This is indicative of a bug in Isograph.",
-                );
+                let scalar_selectable = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).selection_info.reference() {
+                            SelectionType::Scalar(_) => s.server_defined(),
+                            SelectionType::Object(_) => {
+                                panic!("Expected selectable to be a scalar.")
+                            }
+                        }
+                    }
+                    DefinitionLocation::Client(c) => c
+                        .as_scalar()
+                        .expect("Expected selectable to be a scalar")
+                        .client_defined(),
+                };
 
                 match scalar_selectable {
                     DefinitionLocation::Server(_) => {
@@ -828,10 +859,20 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                 }
             }
             SelectionType::Object(object_selection) => {
-                let object_selectable = selectable.as_object().expect(
-                    "Expected selectable to be an object. \
-                    This is indicative of a bug in Isograph.",
-                );
+                let object_selectable = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).selection_info.reference() {
+                            SelectionType::Scalar(_) => {
+                                panic!("Expected selectable to be an object.")
+                            }
+                            SelectionType::Object(_) => s.server_defined(),
+                        }
+                    }
+                    DefinitionLocation::Client(c) => c
+                        .as_object()
+                        .expect("Expected selectable to be an object.")
+                        .client_defined(),
+                };
                 match object_selectable {
                     DefinitionLocation::Client(client_object_selectable) => {
                         let client_object_selectable = client_object_selectable.lookup(db);
@@ -895,28 +936,32 @@ fn refetched_paths_with_path<TNetworkProtocol: NetworkProtocol>(
                     DefinitionLocation::Server(server_object_selectable) => {
                         let server_object_selectable = server_object_selectable.lookup(db);
 
-                        let normalization_key =
-                            match server_object_selectable.object_selectable_variant {
-                                ServerObjectSelectableVariant::LinkedField => NameAndArguments {
-                                    // TODO use alias
-                                    name: object_selection.name.item,
-                                    arguments: transform_arguments_with_child_context(
-                                        object_selection
-                                            .arguments
-                                            .iter()
-                                            .map(|x| x.item.into_key_and_value()),
-                                        // TODO this clearly does something, but why are we able to pass
-                                        // the initial variable context here??
-                                        initial_variable_context,
-                                    ),
-                                }
-                                .normalization_key(),
-                                ServerObjectSelectableVariant::InlineFragment => {
-                                    NormalizationKey::InlineFragment(
-                                        server_object_selectable.target_entity_name.inner().0,
-                                    )
-                                }
-                            };
+                        let normalization_key = match server_object_selectable
+                            .selection_info
+                            .as_ref()
+                            .as_object()
+                            .expect("Expected selectable to be an object.")
+                        {
+                            ServerObjectSelectableVariant::LinkedField => NameAndArguments {
+                                // TODO use alias
+                                name: object_selection.name.item,
+                                arguments: transform_arguments_with_child_context(
+                                    object_selection
+                                        .arguments
+                                        .iter()
+                                        .map(|x| x.item.into_key_and_value()),
+                                    // TODO this clearly does something, but why are we able to pass
+                                    // the initial variable context here??
+                                    initial_variable_context,
+                                ),
+                            }
+                            .normalization_key(),
+                            ServerObjectSelectableVariant::InlineFragment => {
+                                NormalizationKey::InlineFragment(
+                                    server_object_selectable.target_entity_name.inner().0,
+                                )
+                            }
+                        };
 
                         path.push(normalization_key);
 

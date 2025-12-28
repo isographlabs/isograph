@@ -58,22 +58,13 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                             .flat_map(|result| result.as_ref().ok())
                             .map(|selectable| {
                                 let (selectable_name, description) = match selectable {
-                                    DefinitionLocation::Server(s) => match s {
-                                        SelectionType::Scalar(s) => {
-                                            let scalar = s.lookup(db);
-                                            (
-                                                scalar.name.to_string(),
-                                                scalar.description.map(|x| x.to_string()),
-                                            )
-                                        }
-                                        SelectionType::Object(o) => {
-                                            let object = o.lookup(db);
-                                            (
-                                                object.name.to_string(),
-                                                object.description.map(|x| x.to_string()),
-                                            )
-                                        }
-                                    },
+                                    DefinitionLocation::Server(s) => {
+                                        let server_selectable = s.lookup(db);
+                                        (
+                                            server_selectable.name.to_string(),
+                                            server_selectable.description.map(|x| x.to_string()),
+                                        )
+                                    }
                                     DefinitionLocation::Client(c) => match c {
                                         SelectionType::Scalar(s) => {
                                             let scalar = s.lookup(db);
@@ -97,9 +88,14 @@ pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
                                         description,
                                     }
                                     .wrap_some(),
-                                    insert_text: match selectable.as_ref() {
+                                    insert_text: match selectable {
                                         DefinitionLocation::Server(s) => {
-                                            s.as_ref().as_object().map(|_| &selectable_name)
+                                            match s.lookup(db).selection_info.as_ref() {
+                                                SelectionType::Scalar(_) => None,
+                                                SelectionType::Object(_) => {
+                                                    (&selectable_name).wrap_some()
+                                                }
+                                            }
                                         }
                                         DefinitionLocation::Client(c) => {
                                             c.as_ref().as_object().map(|_| &selectable_name)

@@ -10,8 +10,8 @@ use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
-    SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
+    DefinitionLocation, DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection,
+    ScalarSelection, SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
@@ -19,9 +19,9 @@ use isograph_schema::{
     FLOAT_ENTITY_NAME, Format, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
     MergedSelectionMap, NUMBER_JAVASCRIPT_TYPE, NetworkProtocol, ParseTypeSystemOutcome,
     RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE, ServerEntity,
-    ServerEntityDirectives, ServerObjectSelectable, ServerObjectSelectableVariant,
-    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ServerEntityDirectives, ServerObjectSelectableVariant, ServerSelectable, TYPENAME_FIELD_NAME,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, server_entity_named,
     to_isograph_constant_value,
 };
@@ -66,6 +66,7 @@ pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type EntityAssociatedData = SelectionType<(), GraphQLSchemaObjectAssociatedData>;
+    type SelectableAssociatedData = ();
 
     #[expect(clippy::type_complexity)]
     #[memo]
@@ -164,7 +165,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 &mut outcome.selectables,
                 (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
                 get_typename_selectable(db, server_object_entity_name, None)
-                    .scalar_selected()
                     .server_defined()
                     .with_location(with_location.location)
                     .into(),
@@ -187,7 +187,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (parent_entity_name, field.item.name.item),
-                    ServerObjectSelectable {
+                    ServerSelectable {
                         description: field
                             .item
                             .description
@@ -202,7 +202,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .clone()
                             .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
-                        object_selectable_variant: ServerObjectSelectableVariant::LinkedField,
+                        selection_info: ServerObjectSelectableVariant::LinkedField
+                            .object_selected(),
                         parent_entity_name,
                         arguments: field
                             .item
@@ -225,10 +226,9 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 }
                             })
                             .collect(),
-                        phantom_data: std::marker::PhantomData,
+                        network_protocol_associated_data: (),
                     }
                     .interned_value(db)
-                    .object_selected()
                     .server_defined()
                     .with_location(field.location)
                     .into(),
@@ -238,7 +238,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (parent_entity_name, field.item.name.item),
-                    ServerScalarSelectable {
+                    ServerSelectable {
                         description: field
                             .item
                             .description
@@ -266,7 +266,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 }
                             })
                             .collect(),
-                        phantom_data: std::marker::PhantomData,
                         target_entity_name: field
                             .item
                             .type_
@@ -274,10 +273,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             .clone()
                             .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
-                        javascript_type_override: None,
+                        network_protocol_associated_data: (),
+                        selection_info: None.scalar_selected(),
                     }
                     .interned_value(db)
-                    .scalar_selected()
                     .server_defined()
                     .with_location(field.location)
                     .into(),
@@ -295,7 +294,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                         abstract_parent_entity_name.unchecked_conversion(),
                         format!("as{concrete_child_entity_name}").intern().into(),
                     ),
-                    ServerObjectSelectable {
+                    ServerSelectable {
                         description: format!(
                             "A client pointer for the {} type.",
                             concrete_child_entity_name
@@ -320,13 +319,13 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                                 nullable: true,
                             },
                         ),
-                        object_selectable_variant: ServerObjectSelectableVariant::InlineFragment,
+                        selection_info: ServerObjectSelectableVariant::InlineFragment
+                            .object_selected(),
                         parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                         arguments: vec![],
-                        phantom_data: std::marker::PhantomData,
+                        network_protocol_associated_data: (),
                     }
                     .interned_value(db)
-                    .object_selected()
                     .server_defined()
                     .with_generated_location(),
                     &mut non_fatal_diagnostics,
@@ -357,8 +356,15 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mutation_field = match outcome
                     .selectables
                     .values()
-                    .filter_map(|x| x.item.as_object())
-                    .filter_map(|x| x.as_server())
+                    .filter_map(|x| match x.item {
+                        DefinitionLocation::Server(s) => {
+                            match s.lookup(db).selection_info.reference() {
+                                SelectionType::Scalar(_) => None,
+                                SelectionType::Object(_) => s.wrap_some(),
+                            }
+                        }
+                        DefinitionLocation::Client(_) => None,
+                    })
                     .find_map(|server_object_selectable| {
                         let object = server_object_selectable.lookup(db);
                         if object.name == mutation_subfield_name {
@@ -436,7 +442,15 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                 let mut subfields_or_inline_fragments = parts_reversed
                     .iter()
                     .map(|server_object_selectable| {
-                        match server_object_selectable.object_selectable_variant {
+                        let object_selectable_variant =
+                            match server_object_selectable.selection_info.reference() {
+                                SelectionType::Scalar(_) => {
+                                    panic!("Expected selectable to be an object")
+                                }
+                                SelectionType::Object(o) => o,
+                            };
+
+                        match object_selectable_variant {
                             ServerObjectSelectableVariant::LinkedField => {
                                 WrappedSelectionMapSelection::LinkedField {
                                     parent_object_entity_name: server_object_selectable
@@ -725,7 +739,7 @@ fn traverse_selections_and_return_path<'a>(
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
-    Vec<&'a ServerObjectSelectable<GraphQLNetworkProtocol>>,
+    Vec<&'a ServerSelectable<GraphQLNetworkProtocol>>,
     &'a ServerEntity<GraphQLNetworkProtocol>,
 )> {
     let mut current_entity = outcome
@@ -760,8 +774,13 @@ fn traverse_selections_and_return_path<'a>(
         let selectable = outcome
             .selectables
             .get(&(current_entity.name, selection_name.dereference()))
-            .and_then(|x| x.item.as_object())
-            .and_then(|x| x.as_server())
+            .and_then(|x| match x.item {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => None,
+                    SelectionType::Object(_) => s.wrap_some(),
+                },
+                DefinitionLocation::Client(_) => None,
+            })
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(

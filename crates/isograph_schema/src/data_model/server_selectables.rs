@@ -1,4 +1,4 @@
-use std::{fmt::Debug, marker::PhantomData};
+use std::fmt::Debug;
 
 use common_lang_types::{
     EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, WithNoLocation,
@@ -11,49 +11,34 @@ use pico::MemoRef;
 use crate::{NetworkProtocol, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ServerScalarSelectable<TNetworkProtocol: NetworkProtocol> {
-    pub description: Option<WithNoLocation<Description>>,
-    pub name: SelectableName,
-
-    pub target_entity_name: TypeAnnotationDeclaration,
-    /// Normally, we look up the JavaScript type to use by going through the
-    /// target scalar entity. However, there are
-    pub javascript_type_override: Option<JavascriptName>,
-
-    pub parent_entity_name: EntityName,
-    // TODO we shouldn't support default values here
-    pub arguments: Vec<VariableDeclaration>,
-    pub phantom_data: PhantomData<TNetworkProtocol>,
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
-    pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
-        EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ServerObjectSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerSelectable<TNetworkProtocol: NetworkProtocol> {
     pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
     pub target_entity_name: TypeAnnotationDeclaration,
 
-    pub object_selectable_variant: ServerObjectSelectableVariant,
+    // Hack alert
+    // TODO remove this field as follows:
+    // - for scalars, the override is because all __typename selectables point
+    // to the same entity. But there should actually be a unique typename entity
+    // per typename (i.e. per server object entity), which has a JavascriptName
+    // that is the string literal of the typename. This should be easy to fix!
+    // - For objects, ServerObjectSelectableVariant belongs in the
+    // network_protocol_associated_data field. Since it is (presumably) only used
+    // by query text generation.
+    pub selection_info: SelectionType<Option<JavascriptName>, ServerObjectSelectableVariant>,
 
     pub parent_entity_name: EntityName,
     // TODO we shouldn't support default values here
     pub arguments: Vec<VariableDeclaration>,
-    pub phantom_data: PhantomData<TNetworkProtocol>,
+
+    pub network_protocol_associated_data: TNetworkProtocol::SelectableAssociatedData,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerSelectable<TNetworkProtocol> {
     pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
         EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
     }
 }
 
-pub type MemoRefServerSelectable<TNetworkProtocol> = SelectionType<
-    MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
-    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
->;
+pub type MemoRefServerSelectable<TNetworkProtocol> = MemoRef<ServerSelectable<TNetworkProtocol>>;

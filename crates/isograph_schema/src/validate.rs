@@ -106,15 +106,9 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
 
     // TODO use iterator methods
     for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
-        let (target, arguments) = match selectable {
-            SelectionType::Scalar(s) => {
-                let scalar = s.lookup(db);
-                (scalar.target_entity_name.inner(), &scalar.arguments)
-            }
-            SelectionType::Object(o) => {
-                let object = o.lookup(db);
-                (object.target_entity_name.inner(), &object.arguments)
-            }
+        let (target, arguments) = {
+            let selectable = selectable.lookup(db);
+            (selectable.target_entity_name.inner(), &selectable.arguments)
         };
 
         if !entities.contains_key(&target) {
@@ -217,10 +211,7 @@ fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
 
     for selectable in selectables {
         let arguments = match selectable {
-            DefinitionLocation::Server(s) => match s {
-                SelectionType::Scalar(s) => s.lookup(db).arguments.reference(),
-                SelectionType::Object(o) => o.lookup(db).arguments.reference(),
-            },
+            DefinitionLocation::Server(s) => s.lookup(db).arguments.reference(),
             DefinitionLocation::Client(c) => match c {
                 SelectionType::Scalar(s) => s.lookup(db).variable_definitions.reference(),
                 SelectionType::Object(o) => o.lookup(db).variable_definitions.reference(),

@@ -98,10 +98,7 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                         );
                 match selection.item.reference() {
                     SelectionType::Scalar(scalar_selection) => {
-                        match selectable.as_scalar().expect(
-                            "Expected selectable to be a scalar. \
-                            This is indicative of a bug in Isograph.",
-                        ) {
+                        match selectable {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
                                 continue 'main_loop;
@@ -116,19 +113,24 @@ impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
                         };
                     }
                     SelectionType::Object(object_selection) => {
-                        let object_selectable = selectable.as_object().expect(
-                            "Expected selectable to be an object. \
-                            This is indicative of a bug in Isograph.",
-                        );
+                        let object_selectable = selectable;
 
                         // TODO don't match on object_selectable twice
                         let target_entity_name = match object_selectable {
                             DefinitionLocation::Server(s) => {
                                 s.lookup(self.db).target_entity_name.inner()
                             }
-                            DefinitionLocation::Client(c) => {
-                                c.lookup(self.db).target_entity_name.inner()
-                            }
+                            DefinitionLocation::Client(c) => match c {
+                                SelectionType::Scalar(_) => {
+                                    panic!(
+                                        "Unexpected client scalar selectable. \
+                                        This is indicative of a bug in Isograph."
+                                    );
+                                }
+                                SelectionType::Object(o) => {
+                                    o.lookup(self.db).target_entity_name.inner()
+                                }
+                            },
                         };
 
                         let mut iterator = AccessibleClientSelectableIterator {

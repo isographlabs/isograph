@@ -546,10 +546,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
 
         match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
-                match selectable.as_scalar().expect(
-                    "Expected selectable to be a scalar. \
-                    This is indicative of a bug in Isograph.",
-                ) {
+                match selectable {
                     DefinitionLocation::Server(_) => {
                         merge_server_scalar_field(
                             scalar_field_selection,
@@ -575,9 +572,7 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                 };
             }
             SelectionType::Object(object_selection) => {
-                let object_selectable = selectable
-                    .as_object()
-                    .expect("Expected selectable to be object.");
+                let object_selectable = selectable;
 
                 match object_selectable {
                     DefinitionLocation::Server(server_object_entity) => {
@@ -631,7 +626,13 @@ fn merge_selection_set_into_selection_map<TNetworkProtocol: NetworkProtocol>(
                             encountered_client_type_map,
                             merge_traversal_state,
                             object_selection.name.item,
-                            client_object_selectable.lookup(db),
+                            match client_object_selectable {
+                                SelectionType::Scalar(_) => panic!(
+                                    "Unexpected client scalar selectable. \
+                                    This is indicative of a bug in Isograph."
+                                ),
+                                SelectionType::Object(o) => o.lookup(db),
+                            },
                             object_selection,
                             variable_context,
                         );
@@ -682,10 +683,15 @@ fn merge_server_object_field<TNetworkProtocol: NetworkProtocol>(
     )
     .lookup(db);
 
-    match server_object_selectable
-        .object_selectable_variant
-        .reference()
-    {
+    let object_selectable_variant = match server_object_selectable.selection_info.reference() {
+        SelectionType::Scalar(_s) => panic!(
+            "Unexpected scalar selection variant. \
+            This is indicative of a bug in Isograph."
+        ),
+        SelectionType::Object(o) => o.reference(),
+    };
+
+    match object_selectable_variant {
         ServerObjectSelectableVariant::InlineFragment => {
             let type_to_refine_to = object_selection_parent_object.name;
 

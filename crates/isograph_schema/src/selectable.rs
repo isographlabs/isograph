@@ -2,8 +2,7 @@ use isograph_lang_types::DefinitionLocation;
 use pico::MemoRef;
 
 use crate::{
-    ClientObjectSelectable, MemoRefClientSelectable, MemoRefServerSelectable,
-    ServerObjectSelectable,
+    ClientObjectSelectable, MemoRefClientSelectable, MemoRefServerSelectable, ServerSelectable,
 };
 
 pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
@@ -12,11 +11,11 @@ pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
 >;
 
 pub type BorrowedObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerObjectSelectable<TNetworkProtocol>,
+    &'a ServerSelectable<TNetworkProtocol>,
     &'a ClientObjectSelectable<TNetworkProtocol>,
 >;
 
 pub type MemoRefObjectSelectable<TNetworkProtocol> = DefinitionLocation<
-    MemoRef<ServerObjectSelectable<TNetworkProtocol>>,
+    MemoRef<ServerSelectable<TNetworkProtocol>>,
     MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
 >;

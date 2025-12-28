@@ -1,7 +1,7 @@
 use common_lang_types::WithEmbeddedLocation;
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelection, ScalarSelection, Selection, SelectionType,
-    SelectionTypePostfix,
+    DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection, Selection,
+    SelectionType, SelectionTypePostfix,
 };
 use prelude::Postfix;
 
@@ -41,9 +41,21 @@ pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
                         None => continue,
                     };
 
-                let target_entity = match selectable.as_object() {
-                    Some(s) => s,
-                    None => continue,
+                let target_entity = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).selection_info.reference() {
+                            SelectionType::Scalar(_) => {
+                                continue;
+                            }
+                            SelectionType::Object(_) => s.server_defined(),
+                        }
+                    }
+                    DefinitionLocation::Client(c) => match c {
+                        SelectionType::Scalar(_) => {
+                            continue;
+                        }
+                        SelectionType::Object(o) => o.client_defined(),
+                    },
                 };
 
                 let target_entity_name = match target_entity {

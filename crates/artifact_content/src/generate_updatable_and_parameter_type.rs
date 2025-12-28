@@ -6,9 +6,9 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_lang_types::{
-    DefinitionLocation, Description, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet, SelectionType,
-    TypeAnnotationDeclaration, VariableDeclaration,
+    DefinitionLocation, DefinitionLocationPostfix, Description, ObjectSelectionDirectiveSet,
+    ScalarSelection, ScalarSelectionDirectiveSet, Selection, SelectionFieldArgument, SelectionSet,
+    SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 use isograph_schema::{
     ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
@@ -69,10 +69,18 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
         .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
     match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
-            let scalar_selectable = selectable.as_scalar().expect(
-                "Expected selectable to be a scalar. \
-                This is indicative of a bug in Isograph.",
-            );
+            let scalar_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => s.server_defined(),
+                    SelectionType::Object(_) => {
+                        panic!("Expected selectable to be a scalar.")
+                    }
+                },
+                DefinitionLocation::Client(c) => match c {
+                    SelectionType::Scalar(s) => s.client_defined(),
+                    SelectionType::Object(_) => panic!("Expected selectable to be a scalar."),
+                },
+            };
 
             match scalar_selectable {
                 DefinitionLocation::Server(server_scalar_selectable) => {
@@ -88,8 +96,14 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
                     let name_or_alias: SelectableNameOrAlias =
                         (*scalar_field_selection).name_or_alias().item;
 
-                    let inner_text = match server_scalar_selectable.javascript_type_override {
-                        Some(javascript_name) => javascript_name,
+                    let javascript_type_override = server_scalar_selectable
+                        .selection_info
+                        .as_ref()
+                        .as_scalar()
+                        .expect("Expected selectable to be scalar");
+
+                    let inner_text = match javascript_type_override {
+                        Some(javascript_name) => javascript_name.dereference(),
                         None => server_entity_named(
                             db,
                             server_scalar_selectable.target_entity_name.inner().0,
@@ -132,10 +146,18 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionType::Object(object_selection) => {
-            let object_selectable = selectable.as_object().expect(
-                "Expected selectable to be an object. \
-                This is indicative of a bug in Isograph.",
-            );
+            let object_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => {
+                        panic!("Expected selectable to be an object.")
+                    }
+                    SelectionType::Object(_) => s.server_defined(),
+                },
+                DefinitionLocation::Client(c) => c
+                    .as_object()
+                    .expect("Expected selectable to be an object.")
+                    .client_defined(),
+            };
 
             write_optional_description(
                 description(db, object_selectable),
@@ -252,10 +274,18 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
 
     match selection.item.reference() {
         SelectionType::Scalar(scalar_selection) => {
-            match selectable.as_scalar().expect(
-                "Expected selectable to be a scalar. \
-                This is indicative of a bug in Isograph.",
-            ) {
+            let scalar_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => s.server_defined(),
+                    SelectionType::Object(_) => panic!("Expected selectable to be a scalar."),
+                },
+                DefinitionLocation::Client(c) => c
+                    .as_scalar()
+                    .expect("Expected selectable to be a scalar")
+                    .client_defined(),
+            };
+
+            match scalar_selectable {
                 DefinitionLocation::Server(server_scalar_selectable) => {
                     let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
@@ -317,10 +347,18 @@ fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
             }
         }
         SelectionType::Object(object_selection) => {
-            let object_selectable = selectable.as_object().expect(
-                "Expected selectable to be object. \
-                This is indicative of a bug in Isograph.",
-            );
+            let object_selectable = match selectable {
+                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                    SelectionType::Scalar(_) => {
+                        panic!("Expected selectable to be object selectable")
+                    }
+                    SelectionType::Object(_) => s.server_defined(),
+                },
+                DefinitionLocation::Client(c) => c
+                    .as_object()
+                    .expect("Expected selectable to be object")
+                    .client_defined(),
+            };
 
             write_optional_description(
                 description(db, object_selectable),

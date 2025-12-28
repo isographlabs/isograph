@@ -3,8 +3,8 @@ use common_lang_types::{
     Location, SelectableName,
 };
 use isograph_lang_types::{
-    DefinitionLocation, ObjectSelectionDirectiveSet, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionType,
+    DefinitionLocation, DefinitionLocationPostfix, ObjectSelectionDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionSet, SelectionType,
 };
 use prelude::{ErrClone, Postfix};
 use std::collections::HashSet;
@@ -114,19 +114,37 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                         }
                     };
 
-                let scalar_selectable = match selectable.as_scalar() {
-                    Some(s) => s,
-                    None => {
-                        errors.push(selection_wrong_selection_type_diagnostic(
-                            parent_entity.name,
-                            selectable_name,
-                            "an object",
-                            "a scalar",
-                            scalar_selection.name.location,
-                            selectable_declaration_info,
-                        ));
-                        continue;
+                let scalar_selectable = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).selection_info.reference() {
+                            SelectionType::Scalar(_) => s.server_defined(),
+                            SelectionType::Object(_) => {
+                                errors.push(selection_wrong_selection_type_diagnostic(
+                                    parent_entity.name,
+                                    selectable_name,
+                                    "a scalar",
+                                    "an object",
+                                    scalar_selection.name.location,
+                                    selectable_declaration_info,
+                                ));
+                                continue;
+                            }
+                        }
                     }
+                    DefinitionLocation::Client(c) => match c {
+                        SelectionType::Scalar(s) => s.client_defined(),
+                        SelectionType::Object(_) => {
+                            errors.push(selection_wrong_selection_type_diagnostic(
+                                parent_entity.name,
+                                selectable_name,
+                                "a scalar",
+                                "an object",
+                                scalar_selection.name.location,
+                                selectable_declaration_info,
+                            ));
+                            continue;
+                        }
+                    },
                 };
 
                 // @loadable is not supported on server scalar selections
@@ -224,19 +242,37 @@ fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
                         }
                     };
 
-                let selectable = match selectable.as_object() {
-                    Some(s) => s,
-                    None => {
-                        errors.push(selection_wrong_selection_type_diagnostic(
-                            parent_entity.name,
-                            selectable_name,
-                            "an object",
-                            "a scalar",
-                            object_selection.name.location,
-                            selectable_declaration_info,
-                        ));
-                        continue;
+                let selectable = match selectable {
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).selection_info.reference() {
+                            SelectionType::Scalar(_) => {
+                                errors.push(selection_wrong_selection_type_diagnostic(
+                                    parent_entity.name,
+                                    selectable_name,
+                                    "an object",
+                                    "a scalar",
+                                    object_selection.name.location,
+                                    selectable_declaration_info,
+                                ));
+                                continue;
+                            }
+                            SelectionType::Object(_) => s.server_defined(),
+                        }
                     }
+                    DefinitionLocation::Client(c) => match c {
+                        SelectionType::Scalar(_) => {
+                            errors.push(selection_wrong_selection_type_diagnostic(
+                                parent_entity.name,
+                                selectable_name,
+                                "an object",
+                                "a scalar",
+                                object_selection.name.location,
+                                selectable_declaration_info,
+                            ));
+                            continue;
+                        }
+                        SelectionType::Object(o) => o.client_defined(),
+                    },
                 };
 
                 // @updatable is not supported on client fields

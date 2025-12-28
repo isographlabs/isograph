@@ -9,8 +9,7 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, NormalizationKey, ServerObjectSelectable,
-    server_selectable_named,
+    IsographDatabase, NetworkProtocol, NormalizationKey, ServerSelectable, server_selectable_named,
 };
 
 lazy_static! {
@@ -33,7 +32,7 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
     db: &IsographDatabase<TNetworkProtocol>,
     root_object_name: EntityName,
     selections: impl Iterator<Item = SelectableName>,
-) -> DiagnosticResult<Vec<ServerObjectSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Vec<ServerSelectable<TNetworkProtocol>>> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
 
@@ -43,7 +42,8 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
 
         match current_selectable {
             Some(entity) => {
-                match entity {
+                let server_selectable = entity.lookup(db);
+                match server_selectable.selection_info.reference() {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
                         return Diagnostic::new(
@@ -53,10 +53,13 @@ pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
                         )
                         .wrap_err();
                     }
-                    SelectionType::Object(object) => {
-                        let object = object.lookup(db);
-                        path.push(object.clone().note_todo("We should not clone here!!!"));
-                        current_entity_name = object.target_entity_name.inner().0;
+                    SelectionType::Object(_object) => {
+                        path.push(
+                            server_selectable
+                                .clone()
+                                .note_todo("We should not clone here!!!"),
+                        );
+                        current_entity_name = server_selectable.target_entity_name.inner().0;
                     }
                 }
             }

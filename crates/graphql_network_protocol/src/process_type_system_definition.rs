@@ -19,7 +19,7 @@ use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
     ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
     NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerEntity,
-    ServerScalarSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
@@ -94,7 +94,6 @@ pub fn process_graphql_type_system_document(
                             .to::<JavascriptName>()
                             .wrap_some(),
                     )
-                    .scalar_selected()
                     .server_defined()
                     .with_location(location)
                     .into(),
@@ -303,7 +302,6 @@ pub fn process_graphql_type_system_document(
                     &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
                     get_typename_selectable(db, server_object_entity_name, None)
-                        .scalar_selected()
                         .server_defined()
                         .with_location(location)
                         .into(),
@@ -409,8 +407,8 @@ pub(crate) fn get_typename_selectable(
     db: &IsographDatabase<GraphQLNetworkProtocol>,
     server_object_entity_name: EntityName,
     javascript_type_override: Option<JavascriptName>,
-) -> MemoRef<ServerScalarSelectable<GraphQLNetworkProtocol>> {
-    ServerScalarSelectable {
+) -> MemoRef<ServerSelectable<GraphQLNetworkProtocol>> {
+    ServerSelectable {
         description: format!("A discriminant for the {} type", server_object_entity_name)
             .intern()
             .to::<DescriptionValue>()
@@ -420,10 +418,10 @@ pub(crate) fn get_typename_selectable(
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
         target_entity_name: TypeAnnotationDeclaration::Scalar((*STRING_TYPE_NAME).into()),
-        javascript_type_override,
+        selection_info: javascript_type_override.scalar_selected(),
         parent_entity_name: server_object_entity_name,
         arguments: vec![],
-        phantom_data: std::marker::PhantomData,
+        network_protocol_associated_data: (),
     }
     .interned_value(db)
 }

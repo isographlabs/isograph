@@ -26,6 +26,7 @@ pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
     type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
+    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
     #[expect(clippy::type_complexity)]

@@ -29,10 +29,10 @@ Err(
 )
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), but found open brace ('{')
-crates/isograph_lang_parser/fixtures/field-no-field-name.input.js
-
+crates/isograph_lang_parser/fixtures/field-no-field-name.input.js:2:15
+export const BasicField = iso(`
   field Type. {
               ^
   }
-
+`)();
 ---

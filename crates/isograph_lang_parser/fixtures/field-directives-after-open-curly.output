@@ -29,7 +29,7 @@ Err(
 )
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), but found at symbol ('@')
-crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
+crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js:4:7
   field Type.Name {
     linked {
       @wat
@@ -68,11 +68,11 @@ Err(
 )
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), but found at symbol ('@')
-crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
-
+crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js:11:5
+export const BasicField2 = iso(`
   field Type.Name {
     @wat
     ^   
   }
-
+`)();
 ---

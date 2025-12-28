@@ -62,8 +62,12 @@ pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
 
                 if let Ok(Some(selectable)) = selectable {
                     let actual_type = match selectable {
-                        DefinitionLocation::Server(SelectionType::Scalar(_)) => "a server scalar",
-                        DefinitionLocation::Server(SelectionType::Object(_)) => "a server object",
+                        DefinitionLocation::Server(s) => {
+                            match s.lookup(db).selection_info.reference() {
+                                SelectionType::Scalar(_) => "a server scalar",
+                                SelectionType::Object(_) => "a server object",
+                            }
+                        }
                         DefinitionLocation::Client(SelectionType::Scalar(_)) => {
                             panic!("Unexpected client scalar")
                         }

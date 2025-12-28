@@ -9,13 +9,13 @@ use prelude::Postfix;
 
 use crate::{
     ClientScalarSelectable, IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable,
-    NetworkProtocol, ServerEntity, ServerScalarSelectable, entity_not_defined_diagnostic,
+    NetworkProtocol, ServerEntity, ServerSelectable, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_entity_named,
 };
 
 type ScalarSelectable<TNetworkProtocol> = DefinitionLocation<
-    MemoRef<ServerScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ServerSelectable<TNetworkProtocol>>,
     MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
 >;
 
@@ -39,8 +39,8 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
     )?;
 
     let selectable = match selectable {
-        DefinitionLocation::Server(server) => match server {
-            SelectionType::Scalar(scalar) => scalar.server_defined().wrap_ok(),
+        DefinitionLocation::Server(server) => match server.lookup(db).selection_info.reference() {
+            SelectionType::Scalar(_) => server.server_defined().wrap_ok(),
             SelectionType::Object(_) => ().wrap_err(),
         },
         DefinitionLocation::Client(client) => match client {
@@ -80,16 +80,36 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
         object_selectable_name,
     )?;
 
-    let selectable = selectable.as_object().ok_or_else(|| {
-        let location = object_path.inner.name.location.to::<Location>();
-        selectable_is_wrong_type_diagnostic(
-            parent.lookup(db).name,
-            object_selectable_name,
-            "an object",
-            "a scalar",
-            location,
-        )
-    })?;
+    let selectable = match selectable {
+        DefinitionLocation::Server(s) => {
+            if s.lookup(db).selection_info.as_ref().as_scalar().is_some() {
+                let location = object_path.inner.name.location.to::<Location>();
+                return selectable_is_wrong_type_diagnostic(
+                    parent.lookup(db).name,
+                    object_selectable_name,
+                    "an object",
+                    "a scalar",
+                    location,
+                )
+                .wrap_err();
+            }
+            s.server_defined()
+        }
+        DefinitionLocation::Client(c) => match c {
+            SelectionType::Scalar(_) => {
+                let location = object_path.inner.name.location.to::<Location>();
+                return selectable_is_wrong_type_diagnostic(
+                    parent.lookup(db).name,
+                    object_selectable_name,
+                    "an object",
+                    "a scalar",
+                    location,
+                )
+                .wrap_err();
+            }
+            SelectionType::Object(o) => o.client_defined(),
+        },
+    };
 
     Ok((parent, selectable))
 }

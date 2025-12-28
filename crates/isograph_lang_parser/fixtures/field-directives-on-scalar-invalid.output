@@ -31,13 +31,13 @@ Err(
 Error when deserializing.
 
 data did not match any variant of untagged enum ScalarSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js:3:12
+export const BasicField = iso(`
   field Type.Name {
     scalar @hello @there
            ^^^^^^^^^^^^^
   }
-
+`)();
 ---
 Err(
     Diagnostic(
@@ -72,8 +72,8 @@ Err(
 Error when deserializing.
 
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js:9:12
+export const BasicField2 = iso(`
   field Type.Name {
     linked @loadable(asdf: true) {
            ^^^^^^^^^^^^^^^^^^^^^  
@@ -113,8 +113,8 @@ Err(
 Error when deserializing.
 
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js:16:12
+export const BasicField3 = iso(`
   field Type.Name {
     linked @loadable @updatable {
            ^^^^^^^^^^^^^^^^^^^^  
@@ -154,8 +154,8 @@ Err(
 Error when deserializing.
 
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
-crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js
-
+crates/isograph_lang_parser/fixtures/field-directives-on-scalar-invalid.input.js:23:12
+export const BasicField4 = iso(`
   field Type.Name {
     linked @loadable(lazyLoadArtifact: 123) {
            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^  

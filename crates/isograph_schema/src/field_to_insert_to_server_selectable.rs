@@ -2,10 +2,10 @@ use common_lang_types::WithLocationPostfix;
 use graphql_lang_types::{GraphQLConstantValue, GraphQLNamedTypeAnnotation, NameValuePair};
 use isograph_lang_types::ConstantValue;
 
-use crate::ServerScalarSelectable;
+use crate::ServerSelectable;
 
 pub type ScalarSelectionAndNonNullType<TNetworkProtocol> = (
-    ServerScalarSelectable<TNetworkProtocol>,
+    ServerSelectable<TNetworkProtocol>,
     Option<GraphQLNamedTypeAnnotation>,
 );
 

@@ -9,7 +9,7 @@ use prelude::Postfix;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, NameAndArguments, NetworkProtocol,
-    ServerObjectSelectable, ServerScalarSelectable,
+    ServerSelectable,
 };
 
 #[derive(Debug)]
@@ -123,24 +123,7 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     VariableContext(variable_context)
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerScalarSelectable<TNetworkProtocol> {
-    pub fn initial_variable_context(&self) -> VariableContext {
-        let variable_context = self
-            .arguments
-            .iter()
-            .map(|variable_definition| {
-                (
-                    variable_definition.name.item,
-                    NonConstantValue::Variable(variable_definition.name.item),
-                )
-            })
-            .collect();
-
-        VariableContext(variable_context)
-    }
-}
-
-impl<TNetworkProtocol: NetworkProtocol> ServerObjectSelectable<TNetworkProtocol> {
+impl<TNetworkProtocol: NetworkProtocol> ServerSelectable<TNetworkProtocol> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

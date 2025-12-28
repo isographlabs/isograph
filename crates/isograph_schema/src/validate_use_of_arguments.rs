@@ -6,8 +6,8 @@ use common_lang_types::{
 };
 
 use isograph_lang_types::{
-    DefinitionLocation, NonConstantValue, ScalarSelectionDirectiveSet, SelectionFieldArgument,
-    SelectionType, VariableDeclaration, VariableNameWrapper,
+    DefinitionLocation, DefinitionLocationPostfix, NonConstantValue, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionType, VariableDeclaration, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
@@ -116,13 +116,23 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 
             match selection {
                 SelectionType::Scalar(scalar_selection) => {
-                    let scalar_selectable = match selectable.as_scalar() {
-                        Some(s) => s,
-                        None => {
-                            // This is validated in validate_selection_sets
-                            return;
+                    let scalar_selectable = match selectable {
+                        DefinitionLocation::Server(s) => {
+                            match s.lookup(db).selection_info.reference() {
+                                SelectionType::Scalar(_) => s.server_defined(),
+                                SelectionType::Object(_) => {
+                                    return;
+                                }
+                            }
                         }
+                        DefinitionLocation::Client(c) => match c {
+                            SelectionType::Scalar(s) => s.client_defined(),
+                            SelectionType::Object(_) => {
+                                return;
+                            }
+                        },
                     };
+
                     let field_argument_definitions = match scalar_selectable {
                         DefinitionLocation::Server(server_scalar_selectable) => {
                             let server_scalar_selectable = server_scalar_selectable.lookup(db);
@@ -155,13 +165,23 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
                     );
                 }
                 SelectionType::Object(object_selection) => {
-                    let object_selectable = match selectable.as_object() {
-                        Some(s) => s,
-                        None => {
-                            // This is validated in validate_selection_sets
-                            return;
+                    let object_selectable = match selectable {
+                        DefinitionLocation::Server(s) => {
+                            match s.lookup(db).selection_info.reference() {
+                                SelectionType::Scalar(_) => {
+                                    return;
+                                }
+                                SelectionType::Object(_) => s.server_defined(),
+                            }
                         }
+                        DefinitionLocation::Client(c) => match c {
+                            SelectionType::Scalar(_) => {
+                                return;
+                            }
+                            SelectionType::Object(o) => o.client_defined(),
+                        },
                     };
+
                     let field_argument_definitions = match object_selectable {
                         DefinitionLocation::Server(server_object_selectable) => {
                             server_object_selectable.lookup(db).arguments.to_vec()
