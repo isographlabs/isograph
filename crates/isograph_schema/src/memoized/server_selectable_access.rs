@@ -135,9 +135,9 @@ pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
                 Diagnostic::new(
                     format!(
                         "The `{strong_field_name}` field on \
-                    `{parent_server_object_entity_name}` must have type `ID!`.\n\
-                    This error can be suppressed using the \
-                    \"on_invalid_id_type\" config parameter."
+                        `{parent_server_object_entity_name}` must have type `ID!`.\n\
+                        This error can be suppressed using the \
+                        \"on_invalid_id_type\" config parameter."
                     ),
                     entity_definition_location(db, parent_server_object_entity_name)
                         .as_ref()
