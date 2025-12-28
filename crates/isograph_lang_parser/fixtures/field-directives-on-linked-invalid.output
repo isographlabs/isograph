@@ -28,7 +28,6 @@ Err(
     ),
 )
 
-
 Error when deserializing.
 
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
@@ -70,7 +69,6 @@ Err(
     ),
 )
 
-
 Error when deserializing.
 
 data did not match any variant of untagged enum ObjectSelectionDirectiveSet
@@ -111,7 +109,6 @@ Err(
         },
     ),
 )
-
 
 Error when deserializing.
 

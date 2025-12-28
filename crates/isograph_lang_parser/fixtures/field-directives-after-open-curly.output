@@ -28,7 +28,6 @@ Err(
     ),
 )
 
-
 Expected non-variable identifier (e.g. 'x' or 'Foo'), but found at symbol ('@')
 crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
   field Type.Name {
@@ -67,7 +66,6 @@ Err(
         },
     ),
 )
-
 
 Expected non-variable identifier (e.g. 'x' or 'Foo'), but found at symbol ('@')
 crates/isograph_lang_parser/fixtures/field-directives-after-open-curly.input.js
