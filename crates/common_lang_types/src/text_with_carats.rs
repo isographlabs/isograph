@@ -605,4 +605,21 @@ mod test {
 012345678"
         );
     }
+    #[test]
+    fn text_with_carats_colored() {
+        colored::control::set_override(true);
+
+        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
+            &input_with_lines(10),
+            None,
+            Span::new(31, 33),
+            3,
+            true,
+        )
+        .0;
+
+        colored::control::unset_override();
+
+        assert!(output.contains("\u{1b}[91m"));
+    }
 }
