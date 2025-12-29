@@ -6,7 +6,8 @@ import Repository__RepositoryLink__resolver_reader from '../../Repository/Reposi
 const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   {
     kind: "Resolver",
-    alias: "RepositoryLink",
+    fieldName: "RepositoryLink",
+    alias: "null",
     arguments: null,
     readerArtifact: Repository__RepositoryLink__resolver_reader,
     usedRefetchQueries: [],

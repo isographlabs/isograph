@@ -57,7 +57,8 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     selections: [
       {
         kind: "Resolver",
-        alias: "ImageDisplayWrapper",
+        fieldName: "ImageDisplayWrapper",
+        alias: "null",
         arguments: null,
         readerArtifact: Image__ImageDisplayWrapper__resolver_reader,
         usedRefetchQueries: [],

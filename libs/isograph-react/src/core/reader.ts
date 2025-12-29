@@ -122,7 +122,8 @@ export interface ReaderClientPointer extends ReaderLinkedField {
 
 export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';
-  readonly alias: string;
+  readonly fieldName: string;
+  readonly alias: string | null;
   // TODO don't type this as any
   readonly readerArtifact: TopLevelReaderArtifact<any, any, any>;
   readonly arguments: Arguments | null;

@@ -53,7 +53,8 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
           },
           {
             kind: "Resolver",
-            alias: "CommentList",
+            fieldName: "CommentList",
+            alias: "null",
             arguments: [
               [
                 "last",

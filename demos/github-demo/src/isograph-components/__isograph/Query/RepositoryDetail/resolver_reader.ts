@@ -27,7 +27,8 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
     selections: [
       {
         kind: "Resolver",
-        alias: "IsStarred",
+        fieldName: "IsStarred",
+        alias: "null",
         arguments: null,
         readerArtifact: Repository__IsStarred__resolver_reader,
         usedRefetchQueries: [],
@@ -50,7 +51,8 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         selections: [
           {
             kind: "Resolver",
-            alias: "RepositoryLink",
+            fieldName: "RepositoryLink",
+            alias: "null",
             arguments: null,
             readerArtifact: Repository__RepositoryLink__resolver_reader,
             usedRefetchQueries: [],
@@ -80,7 +82,8 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
         selections: [
           {
             kind: "Resolver",
-            alias: "PullRequestTable",
+            fieldName: "PullRequestTable",
+            alias: "null",
             arguments: null,
             readerArtifact: PullRequestConnection__PullRequestTable__resolver_reader,
             usedRefetchQueries: [],

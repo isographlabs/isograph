@@ -7,14 +7,16 @@ import Query__UserDetail__resolver_reader from '../../Query/UserDetail/resolver_
 const readerAst: ReaderAst<Query__UserPage__param> = [
   {
     kind: "Resolver",
-    alias: "Header",
+    fieldName: "Header",
+    alias: "null",
     arguments: null,
     readerArtifact: Query__Header__resolver_reader,
     usedRefetchQueries: [],
   },
   {
     kind: "Resolver",
-    alias: "UserDetail",
+    fieldName: "UserDetail",
+    alias: "null",
     arguments: [
       [
         "userLogin",

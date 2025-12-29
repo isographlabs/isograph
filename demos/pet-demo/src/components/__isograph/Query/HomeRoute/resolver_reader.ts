@@ -22,7 +22,8 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
       },
       {
         kind: "Resolver",
-        alias: "PetSummaryCard",
+        fieldName: "PetSummaryCard",
+        alias: "null",
         arguments: null,
         readerArtifact: Pet__PetSummaryCard__resolver_reader,
         usedRefetchQueries: [],

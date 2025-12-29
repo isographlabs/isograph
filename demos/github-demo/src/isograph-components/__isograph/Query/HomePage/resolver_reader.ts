@@ -7,14 +7,16 @@ import Query__HomePageList__resolver_reader from '../../Query/HomePageList/resol
 const readerAst: ReaderAst<Query__HomePage__param> = [
   {
     kind: "Resolver",
-    alias: "Header",
+    fieldName: "Header",
+    alias: "null",
     arguments: null,
     readerArtifact: Query__Header__resolver_reader,
     usedRefetchQueries: [],
   },
   {
     kind: "Resolver",
-    alias: "HomePageList",
+    fieldName: "HomePageList",
+    alias: "null",
     arguments: null,
     readerArtifact: Query__HomePageList__resolver_reader,
     usedRefetchQueries: [0, ],

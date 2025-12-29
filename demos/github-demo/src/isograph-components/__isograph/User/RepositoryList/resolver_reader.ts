@@ -7,7 +7,8 @@ import User__RepositoryConnection__entrypoint from '../../User/RepositoryConnect
 const readerAst: ReaderAst<User__RepositoryList__param> = [
   {
     kind: "Resolver",
-    alias: "firstPage",
+    fieldName: "RepositoryConnection",
+    alias: ""firstPage"",
     arguments: [
       [
         "first",

@@ -30,7 +30,8 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
       },
       {
         kind: "Resolver",
-        alias: "RepositoryList",
+        fieldName: "RepositoryList",
+        alias: "null",
         arguments: null,
         readerArtifact: User__RepositoryList__resolver_reader,
         usedRefetchQueries: [],

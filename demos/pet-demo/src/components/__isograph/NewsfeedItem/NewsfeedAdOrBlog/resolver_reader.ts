@@ -49,7 +49,8 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
     selections: [
       {
         kind: "Resolver",
-        alias: "BlogItemDisplay",
+        fieldName: "BlogItemDisplay",
+        alias: "null",
         arguments: null,
         readerArtifact: BlogItem__BlogItemDisplay__resolver_reader,
         usedRefetchQueries: [],

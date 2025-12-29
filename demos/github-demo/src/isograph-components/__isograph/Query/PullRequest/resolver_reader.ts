@@ -7,14 +7,16 @@ import Query__PullRequestDetail__resolver_reader from '../../Query/PullRequestDe
 const readerAst: ReaderAst<Query__PullRequest__param> = [
   {
     kind: "Resolver",
-    alias: "Header",
+    fieldName: "Header",
+    alias: "null",
     arguments: null,
     readerArtifact: Query__Header__resolver_reader,
     usedRefetchQueries: [],
   },
   {
     kind: "Resolver",
-    alias: "PullRequestDetail",
+    fieldName: "PullRequestDetail",
+    alias: "null",
     arguments: [
       [
         "repositoryOwner",

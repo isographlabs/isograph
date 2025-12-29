@@ -32,7 +32,8 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
       },
       {
         kind: "Resolver",
-        alias: "fullName",
+        fieldName: "fullName",
+        alias: "null",
         arguments: null,
         readerArtifact: Pet__fullName__resolver_reader,
         usedRefetchQueries: [],

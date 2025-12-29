@@ -7,7 +7,8 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
   {
     kind: "Resolver",
-    alias: "fullName",
+    fieldName: "fullName",
+    alias: "null",
     arguments: null,
     readerArtifact: Pet__fullName__resolver_reader,
     usedRefetchQueries: [],

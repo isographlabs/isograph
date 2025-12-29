@@ -247,7 +247,7 @@ function readData<TReadFromStore>(
         if (data.kind === 'MissingData') {
           return data;
         }
-        target[field.alias] = data.data;
+        target[field.alias ?? field.fieldName] = data.data;
         break;
       }
       case 'LoadablySelectedField': {

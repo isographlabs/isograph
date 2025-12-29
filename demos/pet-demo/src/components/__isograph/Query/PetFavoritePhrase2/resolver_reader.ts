@@ -20,7 +20,8 @@ const readerAst: ReaderAst<Query__PetFavoritePhrase2__param> = [
     selections: [
       {
         kind: "Resolver",
-        alias: "fullName",
+        fieldName: "fullName",
+        alias: "null",
         arguments: null,
         readerArtifact: Pet__fullName__resolver_reader,
         usedRefetchQueries: [],

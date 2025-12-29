@@ -82,7 +82,7 @@ export function mergeObjectsUsingReaderAst(
         }
         break;
       case 'Resolver': {
-        const key = field.alias;
+        const key = field.alias ?? field.fieldName;
         // @ts-expect-error
         const oldValue = oldItemObject[key];
         // @ts-expect-error

@@ -295,22 +295,27 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
         break;
       }
       case 'Resolver': {
-        defineCachedProperty(target, field.alias, mutableState, () => {
-          const data = readResolverFieldData(
-            environment,
-            field,
-            root,
-            variables,
-            nestedRefetchQueries,
-            networkRequest,
-            networkRequestOptions,
-            new Map(),
-          );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
-          }
-          return data.data;
-        });
+        defineCachedProperty(
+          target,
+          field.alias ?? field.fieldName,
+          mutableState,
+          () => {
+            const data = readResolverFieldData(
+              environment,
+              field,
+              root,
+              variables,
+              nestedRefetchQueries,
+              networkRequest,
+              networkRequestOptions,
+              new Map(),
+            );
+            if (data.kind === 'MissingData') {
+              throw new Error(data.reason);
+            }
+            return data.data;
+          },
+        );
         break;
       }
       case 'LoadablySelectedField': {

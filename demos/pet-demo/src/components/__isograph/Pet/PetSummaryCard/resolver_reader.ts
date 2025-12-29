@@ -15,14 +15,16 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   },
   {
     kind: "Resolver",
-    alias: "fullName",
+    fieldName: "fullName",
+    alias: "null",
     arguments: null,
     readerArtifact: Pet__fullName__resolver_reader,
     usedRefetchQueries: [],
   },
   {
     kind: "Resolver",
-    alias: "Avatar",
+    fieldName: "Avatar",
+    alias: "null",
     arguments: null,
     readerArtifact: Pet__Avatar__resolver_reader,
     usedRefetchQueries: [],
@@ -36,7 +38,8 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   },
   {
     kind: "Resolver",
-    alias: "FavoritePhraseLoader",
+    fieldName: "FavoritePhraseLoader",
+    alias: "null",
     arguments: null,
     readerArtifact: Pet__FavoritePhraseLoader__resolver_reader,
     usedRefetchQueries: [],

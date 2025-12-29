@@ -20,7 +20,8 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
     selections: [
       {
         kind: "Resolver",
-        alias: "PetDetailDeferredRouteInnerComponent",
+        fieldName: "PetDetailDeferredRouteInnerComponent",
+        alias: "null",
         arguments: null,
         readerArtifact: Pet__PetDetailDeferredRouteInnerComponent__resolver_reader,
         usedRefetchQueries: [],

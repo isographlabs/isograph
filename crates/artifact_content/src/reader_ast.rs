@@ -387,7 +387,11 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     client_scalar_selectable_variable_context: &VariableContext,
     initial_variable_context: &VariableContext,
 ) -> String {
-    let alias = scalar_field_selection.name_or_alias().item;
+    let name = scalar_field_selection.name.item;
+    let alias = scalar_field_selection
+        .reader_alias
+        .map(|x| format!("\"{}\"", x.item))
+        .unwrap_or("null".to_string());
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
     // Note: this is confusing. We're using the parent context to determine the
@@ -435,6 +439,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Resolver\",\n\
+        {indent_2}fieldName: \"{name}\",\n\
         {indent_2}alias: \"{alias}\",\n\
         {indent_2}arguments: {arguments},\n\
         {indent_2}readerArtifact: {reader_artifact_import_name},\n\
