@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use common_lang_types::{
-    Diagnostic, DiagnosticResult, EntityName, JavascriptName, SelectableName, VariableName,
-};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName, VariableName};
 use intern::string_key::Intern;
 use isograph_lang_types::{ArgumentKeyAndValue, SelectionType};
 use lazy_static::lazy_static;
@@ -20,9 +18,6 @@ lazy_static! {
     pub static ref BOOLEAN_ENTITY_NAME: EntityName = "Boolean".intern().into();
     pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
     pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
-    pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
-    pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
-    pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

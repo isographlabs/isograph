@@ -13,10 +13,9 @@ use isograph_lang_types::{
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, BOOLEAN_JAVASCRIPT_TYPE, ClientFieldVariant, ClientScalarSelectable,
-    FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete,
-    IsographDatabase, NUMBER_JAVASCRIPT_TYPE, ParseTypeSystemOutcome, RefetchStrategy,
-    RootOperationName, STRING_ENTITY_NAME, STRING_JAVASCRIPT_TYPE, ServerEntity,
+    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
+    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
     ServerEntityDirectives, ServerObjectSelectableVariant, ServerSelectable, TYPENAME_FIELD_NAME,
     WrappedSelectionMapSelection, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments,
@@ -25,7 +24,8 @@ use isograph_schema::{
 use prelude::Postfix;
 
 use crate::{
-    GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData,
+    BOOLEAN_JAVASCRIPT_TYPE, GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData,
+    NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
     insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
     process_type_system_definition::{
         get_typename_selectable, process_graphql_type_system_document,

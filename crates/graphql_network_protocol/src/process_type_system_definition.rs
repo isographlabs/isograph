@@ -18,9 +18,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
     ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, STRING_JAVASCRIPT_TYPE, ServerEntity,
-    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
+    NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, ServerEntity, ServerSelectable,
+    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
 use pico::MemoRef;
@@ -28,7 +28,7 @@ use prelude::Postfix;
 
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    insert_entity_or_multiple_definition_diagnostic,
+    STRING_JAVASCRIPT_TYPE, insert_entity_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {

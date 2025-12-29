@@ -2,8 +2,8 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EntityName, QueryExtraInfo, QueryOperationName, QueryText,
-    WithLocation, WithNonFatalDiagnostics,
+    Diagnostic, DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName,
+    QueryText, WithLocation, WithNonFatalDiagnostics,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{SelectionType, VariableDeclaration};
@@ -12,12 +12,19 @@ use isograph_schema::{
     Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
     server_entity_named,
 };
+use lazy_static::lazy_static;
 use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::parse_type_system_document::parse_type_system_document;
 use crate::process_type_system_definition::multiple_entity_definitions_found_diagnostic;
 use crate::query_text::generate_query_text;
+
+lazy_static! {
+    pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
+    pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
+    pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
+}
 
 pub(crate) struct GraphQLRootTypes {
     pub query: EntityName,
