@@ -3,7 +3,7 @@ use std::num::NonZeroU32;
 use colored::Colorize;
 
 use crate::Span;
-  
+
 enum SpanState {
     /// We have not yet reached the start of the span
     Before,
@@ -69,103 +69,106 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
 
     let mut span_state = SpanState::Before;
     for (line_index, line_content) in file_text.split('\n').enumerate() {
-    let start_of_line = cur_index;
+        let start_of_line = cur_index;
 
-     // +1 is accounting for \n, though presumably we should handle other line endings
-    cur_index += line_content.len() + 1;
+        // +1 is accounting for \n, though presumably we should handle other line endings
+        cur_index += line_content.len() + 1;
 
-    let end_of_line = cur_index;
+        let end_of_line = cur_index;
 
-     
-    let should_print_carats = match span_state {
-        SpanState::Before => {
-            if end_of_line > actual_span.end as usize {
-                line_row = Some((
-                    OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
-                    OneIndexedColNumber(
-                        (actual_span.start - (start_of_line as u32) + 1)
-                            .try_into()
-                            .expect("Expected col index to be positive"),
-                    ),
-                ));
-                span_state = SpanState::After;
-                true
-            } else if end_of_line > actual_span.start as usize {
-                line_row = Some((
-                    OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
-                    OneIndexedColNumber(
-                        (actual_span.start - (start_of_line as u32) + 1)
-                            .try_into()
-                            .expect("Expected col index to be positive"),
-                    ),
-                ));
-                span_state = SpanState::Inside;
-                true
-            } else {
-                false
+        let should_print_carats = match span_state {
+            SpanState::Before => {
+                if end_of_line > actual_span.end as usize {
+                    line_row = Some((
+                        OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
+                        OneIndexedColNumber(
+                            (actual_span.start - (start_of_line as u32) + 1)
+                                .try_into()
+                                .expect("Expected col index to be positive"),
+                        ),
+                    ));
+                    span_state = SpanState::After;
+                    true
+                } else if end_of_line > actual_span.start as usize {
+                    line_row = Some((
+                        OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
+                        OneIndexedColNumber(
+                            (actual_span.start - (start_of_line as u32) + 1)
+                                .try_into()
+                                .expect("Expected col index to be positive"),
+                        ),
+                    ));
+                    span_state = SpanState::Inside;
+                    true
+                } else {
+                    false
+                }
             }
-        }
-        SpanState::Inside => {
-            if end_of_line > actual_span.end as usize {
-                span_state = SpanState::After;
+            SpanState::Inside => {
+                if end_of_line > actual_span.end as usize {
+                    span_state = SpanState::After;
+                }
+                true
             }
-            true
-        }
-        SpanState::After => false,
-    };
+            SpanState::After => false,
+        };
 
-    if should_print_carats {
-        let line_len = line_content.len() as u32;
-        let start_of_carats = actual_span.start.saturating_sub(start_of_line as u32);
-        let start_idx = start_of_carats as usize;
-        let end_idx = std::cmp::min(
-            actual_span.end.saturating_sub(start_of_line as u32),
-            line_len,
-        ) as usize;
+        if should_print_carats {
+            let line_len = line_content.len() as u32;
+            let start_of_carats = actual_span.start.saturating_sub(start_of_line as u32);
+            let start_idx = start_of_carats as usize;
+            let end_idx = std::cmp::min(
+                actual_span.end.saturating_sub(start_of_line as u32),
+                line_len,
+            ) as usize;
 
-        let prefix = &line_content[0..start_idx];
-        let highlighted = &line_content[start_idx..end_idx];
-        let suffix = &line_content[end_idx..];
+            let prefix = &line_content[0..start_idx];
+            let highlighted = &line_content[start_idx..end_idx];
+            let suffix = &line_content[end_idx..];
 
-        let colored_source = format!(
-            "{}{}{}",
-            prefix,
-            if colorize_carats { highlighted.bright_red().to_string() } else { highlighted.to_string() },
-            suffix
-        );
-        output_lines.push(colored_source);
-          // a line may be entirely empty, due to containing only a \n. We probably want to avoid
+            let colored_source = format!(
+                "{}{}{}",
+                prefix,
+                if colorize_carats {
+                    highlighted.bright_red().to_string()
+                } else {
+                    highlighted.to_string()
+                },
+                suffix
+            );
+            output_lines.push(colored_source);
+            // a line may be entirely empty, due to containing only a \n. We probably want to avoid
             // printing an empty line underneath. This is weird and probably buggy!
-        let end_of_carats = end_idx as u32;
+            let end_of_carats = end_idx as u32;
 
-        if start_of_carats != line_len && end_of_carats != 0 {
-            first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
-            last_line_with_span = output_lines.len() + 1;
+            if start_of_carats != line_len && end_of_carats != 0 {
+                first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
+                last_line_with_span = output_lines.len() + 1;
 
-            let mut carats = String::new();
-            for _ in 0..start_of_carats {
-                carats.push(' ');
-            }
-            for _ in start_of_carats..end_of_carats {
-                carats.push_str(&format!(
-                    "{}",
-                    if colorize_carats {
-                        "^".bright_red()
-                    } else {
-                        "^".normal()
-                    }
-                ));
-            }
-            for _ in end_of_carats..line_len {
-                carats.push(' ');
-            }
+                let mut carats = String::new();
+                for _ in 0..start_of_carats {
+                    carats.push(' ');
+                }
+                for _ in start_of_carats..end_of_carats {
+                    carats.push_str(&format!(
+                        "{}",
+                        if colorize_carats {
+                            "^".bright_red()
+                        } else {
+                            "^".normal()
+                        }
+                    ));
+                }
+                for _ in end_of_carats..line_len {
+                    carats.push(' ');
+                }
 
-            output_lines.push(carats);
+                output_lines.push(carats);
+            }
+        } else {
+            output_lines.push(line_content.to_string());
         }
-    } else {
-        output_lines.push(line_content.to_string());
     }
-}
 
     // This is indicative of a bug. If we are passed a span that encompasses
     // only a line break, we never set first_line_with_span, so the range would
