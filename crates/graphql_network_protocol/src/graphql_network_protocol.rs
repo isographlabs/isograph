@@ -139,28 +139,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct GraphQLSchemaObjectAssociatedData {
-    pub original_definition_type: GraphQLSchemaOriginalDefinitionType,
-    // TODO expose this as a separate memoized method
     pub subtypes: Vec<EntityName>,
-}
-
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
-pub enum GraphQLSchemaOriginalDefinitionType {
-    InputObject,
-    Object,
-    Interface,
-    Union,
-}
-
-impl GraphQLSchemaOriginalDefinitionType {
-    pub fn sdl_keyword(&self) -> &'static str {
-        match self {
-            GraphQLSchemaOriginalDefinitionType::InputObject => "input",
-            GraphQLSchemaOriginalDefinitionType::Object => "object",
-            GraphQLSchemaOriginalDefinitionType::Interface => "interface",
-            GraphQLSchemaOriginalDefinitionType::Union => "union",
-        }
-    }
 }
 
 // TODO make this generic over value, too

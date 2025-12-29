@@ -25,7 +25,7 @@ use isograph_schema::{
 use prelude::Postfix;
 
 use crate::{
-    GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData, GraphQLSchemaOriginalDefinitionType,
+    GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData,
     insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
     process_type_system_definition::{
         get_typename_selectable, process_graphql_type_system_document,
@@ -100,7 +100,6 @@ pub(crate) fn parse_type_system_document(
                 }),
                 name: server_object_entity_name,
                 network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                    original_definition_type: GraphQLSchemaOriginalDefinitionType::Interface,
                     subtypes: supertype_to_subtype_map
                         .get(&server_object_entity_name)
                         .cloned()

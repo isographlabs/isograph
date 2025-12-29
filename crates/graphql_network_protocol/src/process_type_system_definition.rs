@@ -28,7 +28,7 @@ use prelude::Postfix;
 
 use crate::{
     GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    GraphQLSchemaOriginalDefinitionType, insert_entity_or_multiple_definition_diagnostic,
+    insert_entity_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {
@@ -72,7 +72,6 @@ pub fn process_graphql_type_system_document(
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Object,
                             subtypes: vec![],
                         }
                         .object_selected(),
@@ -204,8 +203,6 @@ pub fn process_graphql_type_system_document(
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                            original_definition_type:
-                                GraphQLSchemaOriginalDefinitionType::InputObject,
                             subtypes: vec![],
                         }
                         .object_selected(),
@@ -267,7 +264,6 @@ pub fn process_graphql_type_system_document(
                         name: server_object_entity_name,
                         selection_info: false.wrap(IsConcrete).object_selected(),
                         network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
-                            original_definition_type: GraphQLSchemaOriginalDefinitionType::Union,
                             subtypes: union_definition
                                 .union_member_types
                                 .iter()
