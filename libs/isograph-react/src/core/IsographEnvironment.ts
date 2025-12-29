@@ -1,6 +1,10 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
 import type {
+  NetworkResponseErrorExtensions,
+  NetworkResponseKey,
+} from './cache';
+import type {
   IsographEntrypoint,
   IsographOperation,
   IsographPersistedOperation,
@@ -16,6 +20,7 @@ import type {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import type { LogFunction, WrappedLogFunction } from './logging';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { type StoreLayer } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -97,7 +102,10 @@ export type MissingFieldHandler = (
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<{
+  data?: any;
+  errors?: any;
+}>;
 
 export type IsographComponentFunction = <
   TReadFromStore extends UnknownTReadFromStore = any,
@@ -132,11 +140,31 @@ export type DataTypeValue =
   // Plural scalar and linked fields:
   | readonly DataTypeValue[];
 
+export type WithErrorsData<T> = {
+  readonly kind: 'Data';
+  readonly value: T;
+};
+
+export type WithErrors<T, Err> =
+  | WithErrorsData<T>
+  | {
+      readonly kind: 'Errors';
+      readonly errors: NonEmptyArray<Err>;
+    };
+
+export interface StoreError {
+  readonly locations:
+    | { readonly line: number; readonly column: number }[]
+    | undefined;
+  readonly extensions: NetworkResponseErrorExtensions | undefined;
+}
+
 export type StoreRecord = {
-  [index: DataId | string]: DataTypeValue;
+  [index: NetworkResponseKey]: WithErrors<DataTypeValue, StoreError>;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
-  readonly id?: DataId;
+  readonly __typename?: WithErrorsData<TypeName>;
+  readonly id?: WithErrorsData<DataId>;
 };
 
 export type TypeName = string;

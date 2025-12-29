@@ -1,13 +1,13 @@
 import { getParentRecordKey, TYPENAME_FIELD_NAME } from './cache';
-import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
+import type { NormalizationAst, NormalizationAstNodes } from './entrypoint';
 import type { Variables } from './FragmentReference';
 import {
   assertLink,
   type DataId,
   type IsographEnvironment,
-  type StoreRecord,
   type StoreLayerData,
   type StoreLink,
+  type StoreRecord,
   type TypeName,
 } from './IsographEnvironment';
 import type { BaseStoreLayer } from './optimisticProxy';
@@ -16,6 +16,7 @@ import {
   type PromiseWrapper,
   type PromiseWrapperOk,
 } from './PromiseWrapper';
+import { isArray } from './util';
 
 export type RetainedQuery = {
   readonly normalizationAst: PromiseWrapper<NormalizationAst>;
@@ -156,7 +157,7 @@ function recordReachableIdsFromRecord(
   for (const selection of selections) {
     switch (selection.kind) {
       case 'InlineFragment':
-        if (currentRecord[TYPENAME_FIELD_NAME] === selection.type) {
+        if (currentRecord[TYPENAME_FIELD_NAME]?.value === selection.type) {
           recordReachableIdsFromRecord(
             dataLayer,
             currentRecord,
@@ -170,16 +171,20 @@ function recordReachableIdsFromRecord(
         const linkKey = getParentRecordKey(selection, variables ?? {});
         const linkedFieldOrFields = currentRecord[linkKey];
 
+        if (linkedFieldOrFields?.kind !== 'Data') {
+          continue;
+        }
+
         const links: StoreLink[] = [];
-        if (Array.isArray(linkedFieldOrFields)) {
-          for (const maybeLink of linkedFieldOrFields) {
+        if (isArray(linkedFieldOrFields.value)) {
+          for (const maybeLink of linkedFieldOrFields.value) {
             const link = assertLink(maybeLink);
             if (link != null) {
               links.push(link);
             }
           }
         } else {
-          const link = assertLink(linkedFieldOrFields);
+          const link = assertLink(linkedFieldOrFields.value);
           if (link != null) {
             links.push(link);
           }
