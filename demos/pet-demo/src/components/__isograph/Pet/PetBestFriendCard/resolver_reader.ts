@@ -16,7 +16,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   {
     kind: "Resolver",
     fieldName: "PetUpdater",
-    alias: "null",
+    alias: null,
     arguments: null,
     readerArtifact: Pet__PetUpdater__resolver_reader,
     usedRefetchQueries: [0, 1, 2, ],
@@ -56,7 +56,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
           {
             kind: "Resolver",
             fieldName: "fullName",
-            alias: "null",
+            alias: null,
             arguments: null,
             readerArtifact: Pet__fullName__resolver_reader,
             usedRefetchQueries: [],
@@ -64,7 +64,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
           {
             kind: "Resolver",
             fieldName: "Avatar",
-            alias: "null",
+            alias: null,
             arguments: null,
             readerArtifact: Pet__Avatar__resolver_reader,
             usedRefetchQueries: [],

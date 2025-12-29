@@ -22,7 +22,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "FirstCheckinMakeSuperButton",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__FirstCheckinMakeSuperButton__resolver_reader,
         usedRefetchQueries: [0, ],
@@ -30,7 +30,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "fullName",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__fullName__resolver_reader,
         usedRefetchQueries: [],

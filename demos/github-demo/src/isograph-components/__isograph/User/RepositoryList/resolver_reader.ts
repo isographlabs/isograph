@@ -8,7 +8,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
   {
     kind: "Resolver",
     fieldName: "RepositoryConnection",
-    alias: ""firstPage"",
+    alias: "firstPage",
     arguments: [
       [
         "first",

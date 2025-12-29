@@ -440,7 +440,7 @@ fn user_written_variant_ast_node<TNetworkProtocol: NetworkProtocol>(
         "{indent_1}{{\n\
         {indent_2}kind: \"Resolver\",\n\
         {indent_2}fieldName: \"{name}\",\n\
-        {indent_2}alias: \"{alias}\",\n\
+        {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
         {indent_2}readerArtifact: {reader_artifact_import_name},\n\
         {indent_2}usedRefetchQueries: {nested_refetch_queries},\n\

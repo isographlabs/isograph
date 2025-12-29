@@ -70,7 +70,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
               {
                 kind: "Resolver",
                 fieldName: "RepositoryRow",
-                alias: "null",
+                alias: null,
                 arguments: null,
                 readerArtifact: Repository__RepositoryRow__resolver_reader,
                 usedRefetchQueries: [],

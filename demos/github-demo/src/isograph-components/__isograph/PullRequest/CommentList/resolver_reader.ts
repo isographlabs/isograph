@@ -53,7 +53,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
               {
                 kind: "Resolver",
                 fieldName: "formattedCommentCreationDate",
-                alias: "null",
+                alias: null,
                 arguments: null,
                 readerArtifact: IssueComment__formattedCommentCreationDate__resolver_reader,
                 usedRefetchQueries: [],

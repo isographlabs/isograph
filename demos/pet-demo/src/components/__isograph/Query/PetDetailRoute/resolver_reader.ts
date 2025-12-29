@@ -35,7 +35,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "fullName",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__fullName__resolver_reader,
         usedRefetchQueries: [],
@@ -43,7 +43,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetCheckinsCard",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__PetCheckinsCard__resolver_reader,
         usedRefetchQueries: [4, ],
@@ -51,7 +51,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetBestFriendCard",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__PetBestFriendCard__resolver_reader,
         usedRefetchQueries: [0, 2, 3, ],
@@ -59,7 +59,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetPhraseCard",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__PetPhraseCard__resolver_reader,
         usedRefetchQueries: [],
@@ -67,7 +67,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetTaglineCard",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__PetTaglineCard__resolver_reader,
         usedRefetchQueries: [],
@@ -75,7 +75,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "MutualBestFriendSetter",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__MutualBestFriendSetter__resolver_reader,
         usedRefetchQueries: [],
@@ -83,7 +83,7 @@ const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetStatsCard",
-        alias: "null",
+        alias: null,
         arguments: [
           [
             "id",

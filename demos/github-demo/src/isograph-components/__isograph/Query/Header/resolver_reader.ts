@@ -23,7 +23,7 @@ const readerAst: ReaderAst<Query__Header__param> = [
       {
         kind: "Resolver",
         fieldName: "Avatar",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: User__Avatar__resolver_reader,
         usedRefetchQueries: [],

@@ -40,7 +40,7 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
       {
         kind: "Resolver",
         fieldName: "Pokemon",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pokemon__Pokemon__resolver_reader,
         usedRefetchQueries: [],

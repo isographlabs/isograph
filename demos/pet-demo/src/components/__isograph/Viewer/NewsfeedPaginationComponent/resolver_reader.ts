@@ -65,7 +65,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
       {
         kind: "Resolver",
         fieldName: "NewsfeedAdOrBlog",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: NewsfeedItem__NewsfeedAdOrBlog__resolver_reader,
         usedRefetchQueries: [],

@@ -8,7 +8,7 @@ const readerAst: ReaderAst<Query__RepositoryPage__param> = [
   {
     kind: "Resolver",
     fieldName: "Header",
-    alias: "null",
+    alias: null,
     arguments: null,
     readerArtifact: Query__Header__resolver_reader,
     usedRefetchQueries: [],
@@ -16,7 +16,7 @@ const readerAst: ReaderAst<Query__RepositoryPage__param> = [
   {
     kind: "Resolver",
     fieldName: "RepositoryDetail",
-    alias: "null",
+    alias: null,
     arguments: [
       [
         "repositoryName",

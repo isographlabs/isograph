@@ -33,7 +33,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
       {
         kind: "Resolver",
         fieldName: "CheckinDisplay",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Checkin__CheckinDisplay__resolver_reader,
         usedRefetchQueries: [0, ],

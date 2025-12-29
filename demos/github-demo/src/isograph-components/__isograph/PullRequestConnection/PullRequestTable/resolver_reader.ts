@@ -34,7 +34,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           {
             kind: "Resolver",
             fieldName: "PullRequestLink",
-            alias: "null",
+            alias: null,
             arguments: null,
             readerArtifact: PullRequest__PullRequestLink__resolver_reader,
             usedRefetchQueries: [],
@@ -65,7 +65,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
               {
                 kind: "Resolver",
                 fieldName: "UserLink",
-                alias: "null",
+                alias: null,
                 arguments: null,
                 readerArtifact: Actor__UserLink__resolver_reader,
                 usedRefetchQueries: [],
@@ -96,7 +96,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           {
             kind: "Resolver",
             fieldName: "createdAtFormatted",
-            alias: "null",
+            alias: null,
             arguments: null,
             readerArtifact: PullRequest__createdAtFormatted__resolver_reader,
             usedRefetchQueries: [],

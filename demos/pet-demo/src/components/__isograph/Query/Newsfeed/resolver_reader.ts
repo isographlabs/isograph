@@ -17,7 +17,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
       {
         kind: "Resolver",
         fieldName: "NewsfeedPaginationComponent",
-        alias: ""initial"",
+        alias: "initial",
         arguments: [
           [
             "skip",

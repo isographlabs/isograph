@@ -8,7 +8,7 @@ const readerAst: ReaderAst<Query__PullRequest__param> = [
   {
     kind: "Resolver",
     fieldName: "Header",
-    alias: "null",
+    alias: null,
     arguments: null,
     readerArtifact: Query__Header__resolver_reader,
     usedRefetchQueries: [],
@@ -16,7 +16,7 @@ const readerAst: ReaderAst<Query__PullRequest__param> = [
   {
     kind: "Resolver",
     fieldName: "PullRequestDetail",
-    alias: "null",
+    alias: null,
     arguments: [
       [
         "repositoryOwner",

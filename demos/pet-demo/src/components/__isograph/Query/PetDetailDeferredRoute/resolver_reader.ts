@@ -21,7 +21,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
       {
         kind: "Resolver",
         fieldName: "PetDetailDeferredRouteInnerComponent",
-        alias: "null",
+        alias: null,
         arguments: null,
         readerArtifact: Pet__PetDetailDeferredRouteInnerComponent__resolver_reader,
         usedRefetchQueries: [],
