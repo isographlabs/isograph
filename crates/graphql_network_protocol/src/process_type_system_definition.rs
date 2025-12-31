@@ -399,7 +399,7 @@ fn get_refetch_selectable<
         }),
         variable_definitions: vec![],
         parent_entity_name: server_object_entity_name,
-        network_protocol: std::marker::PhantomData,
+        phantom_data: std::marker::PhantomData,
     }
 }
 

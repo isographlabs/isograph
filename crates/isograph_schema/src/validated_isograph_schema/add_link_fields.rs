@@ -34,7 +34,7 @@ pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
                 parent_entity_name,
                 variable_definitions: vec![],
                 variant: ClientFieldVariant::Link,
-                network_protocol: std::marker::PhantomData,
+                phantom_data: std::marker::PhantomData,
             }
             .interned_value(db)
         })

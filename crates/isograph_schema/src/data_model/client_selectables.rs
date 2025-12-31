@@ -35,8 +35,7 @@ pub struct ClientScalarSelectable<TCompilationProfile: CompilationProfile> {
     pub variable_definitions: Vec<VariableDeclaration>,
 
     pub parent_entity_name: EntityName,
-    // TODO rename
-    pub network_protocol: PhantomData<TCompilationProfile>,
+    pub phantom_data: PhantomData<TCompilationProfile>,
 }
 
 impl<TCompilationProfile: CompilationProfile> ClientScalarSelectable<TCompilationProfile> {
@@ -57,8 +56,7 @@ pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
 
     pub parent_entity_name: EntityName,
 
-    // TODO rename
-    pub network_protocol: PhantomData<TCompilationProfile>,
+    pub phantom_data: PhantomData<TCompilationProfile>,
     pub info: UserWrittenClientPointerInfo,
 }
 

@@ -465,7 +465,7 @@ pub(crate) fn parse_type_system_document<
                 ),
                 variable_definitions: vec![],
                 parent_entity_name: target_parent_object_entity_name,
-                network_protocol: std::marker::PhantomData,
+                phantom_data: std::marker::PhantomData,
             };
 
             insert_selectable_or_multiple_definition_diagnostic(

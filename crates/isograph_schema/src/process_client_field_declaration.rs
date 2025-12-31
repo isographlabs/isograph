@@ -194,7 +194,7 @@ pub fn add_client_scalar_selectable_to_entity<TCompilationProfile: CompilationPr
             .map(|x| x.item.clone())
             .collect(),
         parent_entity_name: client_field_declaration.parent_type.item.0,
-        network_protocol: std::marker::PhantomData,
+        phantom_data: std::marker::PhantomData,
     };
 
     let selections = client_field_declaration.selection_set.clone();
@@ -311,7 +311,7 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
 
         parent_entity_name,
         target_entity_name: client_pointer_declaration.target_type.item.clone(),
-        network_protocol: std::marker::PhantomData,
+        phantom_data: std::marker::PhantomData,
 
         info: UserWrittenClientPointerInfo {
             const_export_name: client_pointer_declaration.const_export_name,
