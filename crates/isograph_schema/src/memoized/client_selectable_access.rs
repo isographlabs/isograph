@@ -1,9 +1,9 @@
 use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, IsographDatabase, MemoRefClientSelectable,
-    NetworkProtocol, add_client_scalar_selectable_to_entity, get_link_fields_map,
-    process_client_pointer_declaration_inner,
+    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, IsographDatabase,
+    MemoRefClientSelectable, NetworkProtocol, add_client_scalar_selectable_to_entity,
+    get_link_fields_map, process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EntityName, Location, SelectableName, WithEmbeddedLocation,
@@ -25,8 +25,10 @@ type MemoRefDeclaration =
 /// client selectables defined by iso literals.
 /// Note: this is just the declarations, not the fields!
 #[memo]
-pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_selectable_declaration_map_from_iso_literals<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> WithNonFatalDiagnostics<
     BTreeMap<(EntityName, SelectableName), WithEmbeddedLocation<MemoRefDeclaration>>,
 > {
@@ -89,8 +91,8 @@ pub fn client_selectable_declaration_map_from_iso_literals<TNetworkProtocol: Net
 }
 
 #[memo]
-pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_selectable_declaration<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
 ) -> Option<MemoRefDeclaration> {
@@ -101,8 +103,8 @@ pub fn client_selectable_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_field_declaration<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientFieldDeclaration>>> {
@@ -129,8 +131,8 @@ pub fn client_field_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_pointer_declaration<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRef<ClientPointerDeclaration>>> {
@@ -158,11 +160,11 @@ pub fn client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRef<ClientScalarSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ClientScalarSelectable<TCompilationProfile>>>> {
     let declaration =
         client_field_declaration(db, parent_object_entity_name, client_scalar_selectable_name)
             .clone_err()?;
@@ -206,11 +208,11 @@ pub fn client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_object_selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRef<ClientObjectSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Option<MemoRef<ClientObjectSelectable<TCompilationProfile>>>> {
     let declaration =
         client_pointer_declaration(db, parent_object_entity_name, client_object_selectable_name)
             .clone_err()?;
@@ -227,11 +229,11 @@ pub fn client_object_selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRefClientSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRefClientSelectable<TCompilationProfile>>> {
     // we can do this better by reordering functions in this file
     // just in general, we can do better! This is awkward!
     // TODO don't call to_owned, since that clones an error unnecessarily
@@ -280,12 +282,13 @@ pub fn client_selectable_named<TNetworkProtocol: NetworkProtocol>(
 
 #[memo]
 // TODO this function seems quite useless!
-pub fn client_selectables_defined_by_network_protocol<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
-    HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TNetworkProtocol>>,
+    HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
 > {
-    let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let outcome =
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
 
     expose_as_field_queue
@@ -299,12 +302,12 @@ pub fn client_selectables_defined_by_network_protocol<TNetworkProtocol: NetworkP
 // client_scalar_selectable_named
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn client_selectable_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn client_selectable_map<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
     HashMap<
         (EntityName, SelectableName),
-        DiagnosticResult<MemoRefClientSelectable<TNetworkProtocol>>,
+        DiagnosticResult<MemoRefClientSelectable<TCompilationProfile>>,
     >,
 > {
     let iso_literal_map = client_selectable_declaration_map_from_iso_literals(db);

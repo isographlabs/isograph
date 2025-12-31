@@ -10,11 +10,10 @@ use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
 };
-use isograph_schema::process_iso_literal_extraction;
+use isograph_schema::{CompilationProfile, process_iso_literal_extraction};
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, entity_definition_location,
-    get_parent_and_selectable_for_object_path, get_parent_and_selectable_for_scalar_path,
-    selectable_definition_location,
+    IsographDatabase, entity_definition_location, get_parent_and_selectable_for_object_path,
+    get_parent_and_selectable_for_scalar_path, selectable_definition_location,
 };
 use lsp_types::{
     GotoDefinitionResponse, Position, Uri,
@@ -24,8 +23,8 @@ use pico_macros::memo;
 use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
-pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_goto_definition<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <GotoDefinition as Request>::Params,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
     let db = &lsp_state.compiler_state.db;
@@ -38,8 +37,8 @@ pub fn on_goto_definition<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn on_goto_definition_impl<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     url: Uri,
     position: Position,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
@@ -243,8 +242,8 @@ fn lsp_location_to_scalar_response(location: lsp_types::Location) -> GotoDefinit
     GotoDefinitionResponse::Scalar(location)
 }
 
-fn goto_entity_definition<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn goto_entity_definition<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
     let location = entity_definition_location(db, entity_name)

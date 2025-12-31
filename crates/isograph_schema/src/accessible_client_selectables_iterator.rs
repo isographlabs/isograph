@@ -3,7 +3,7 @@ use isograph_lang_types::{DefinitionLocation, SelectionSet, SelectionTypePostfix
 use prelude::Postfix;
 
 use crate::{
-    ClientSelectableId, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
+    ClientSelectableId, CompilationProfile, IsographDatabase, MemoRefClientSelectable,
     client_scalar_selectable_selection_set_for_parent_query, selectable_named,
     selectable_reader_selection_set,
 };
@@ -11,9 +11,9 @@ use crate::{
 use isograph_lang_types::SelectionType;
 
 // This should really be replaced with a proper visitor, or something
-pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    selection_type: MemoRefClientSelectable<TNetworkProtocol>,
+pub fn accessible_client_selectables<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    selection_type: MemoRefClientSelectable<TCompilationProfile>,
 ) -> impl Iterator<Item = WithEmbeddedLocation<ClientSelectableId>> {
     let (selection_set, parent_entity_name) = match selection_type {
         SelectionType::Scalar(scalar) => {
@@ -57,17 +57,17 @@ pub fn accessible_client_selectables<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-struct AccessibleClientSelectableIterator<'db, TNetworkProtocol: NetworkProtocol> {
+struct AccessibleClientSelectableIterator<'db, TCompilationProfile: CompilationProfile> {
     // TODO have a reference
-    db: &'db IsographDatabase<TNetworkProtocol>,
+    db: &'db IsographDatabase<TCompilationProfile>,
     selection_set: WithEmbeddedLocation<SelectionSet>,
     index: usize,
-    sub_iterator: Option<Box<AccessibleClientSelectableIterator<'db, TNetworkProtocol>>>,
+    sub_iterator: Option<Box<AccessibleClientSelectableIterator<'db, TCompilationProfile>>>,
     parent_entity_name: EntityName,
 }
 
-impl<'db, TNetworkProtocol: NetworkProtocol> Iterator
-    for AccessibleClientSelectableIterator<'db, TNetworkProtocol>
+impl<'db, TCompilationProfile: CompilationProfile> Iterator
+    for AccessibleClientSelectableIterator<'db, TCompilationProfile>
 {
     type Item = WithEmbeddedLocation<ClientSelectableId>;
 

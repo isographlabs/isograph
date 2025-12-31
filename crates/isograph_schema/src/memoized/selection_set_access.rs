@@ -10,14 +10,14 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, RefetchStrategy,
+    CompilationProfile, IsographDatabase, NetworkProtocol, RefetchStrategy,
     client_selectable_declaration_map_from_iso_literals, get_link_fields,
 };
 
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn reader_selection_set_map<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> HashMap<
     (EntityName, SelectableName),
     DiagnosticResult<
@@ -77,7 +77,7 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    if let Ok(outcome) = TNetworkProtocol::parse_type_system_documents(db) {
+    if let Ok(outcome) = TCompilationProfile::NetworkProtocol::parse_type_system_documents(db) {
         let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
         // And we must also do it for expose fields. Ay ay ay
@@ -103,8 +103,8 @@ pub fn reader_selection_set_map<TNetworkProtocol: NetworkProtocol>(
     map
 }
 
-pub fn selectable_reader_selection_set<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn selectable_reader_selection_set<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<MemoRef<WithEmbeddedLocation<SelectionSet>>> {

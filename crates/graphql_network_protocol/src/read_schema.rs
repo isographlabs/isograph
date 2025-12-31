@@ -3,15 +3,15 @@ use std::collections::BTreeMap;
 use common_lang_types::{DiagnosticResult, RelativePathToSourceFile};
 use graphql_lang_types::{GraphQLTypeSystemDocument, GraphQLTypeSystemExtensionDocument};
 use graphql_schema_parser::{parse_schema, parse_schema_extensions};
-use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource};
+use isograph_schema::{CompilationProfile, IsographDatabase, SchemaSource};
 use pico::{MemoRef, SourceId};
 use pico_macros::memo;
 use prelude::Postfix;
 
 #[memo]
 // TODO add error recovery and the non_fatal_diagnostics vec
-pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_graphql_schema<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<(
     GraphQLTypeSystemDocument,
     BTreeMap<RelativePathToSourceFile, MemoRef<GraphQLTypeSystemExtensionDocument>>,
@@ -42,8 +42,8 @@ pub fn parse_graphql_schema<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn parse_schema_extensions_file<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_schema_extensions_file<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     schema_extension_source_id: SourceId<SchemaSource>,
 ) -> DiagnosticResult<MemoRef<GraphQLTypeSystemExtensionDocument>> {
     let SchemaSource {

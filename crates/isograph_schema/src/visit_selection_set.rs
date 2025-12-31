@@ -6,20 +6,20 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    IsographDatabase, NetworkProtocol, ServerEntity, selectable_named, server_entity_named,
+    CompilationProfile, IsographDatabase, ServerEntity, selectable_named, server_entity_named,
 };
 
 /// This is visiting an unvalidated selection set, and should not panic.
 /// Instead, we simply avoid visiting selections where parents aren't found.
 ///
 /// This function should probably be renamed, as it's not what you expect, otherwise!
-pub(crate) fn visit_selection_set<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_set: &[WithEmbeddedLocation<Selection>],
-    parent_entity: &ServerEntity<TNetworkProtocol>,
+    parent_entity: &ServerEntity<TCompilationProfile>,
     visit_selection: &mut impl FnMut(
         SelectionType<&ScalarSelection, &ObjectSelection>,
-        &ServerEntity<TNetworkProtocol>,
+        &ServerEntity<TCompilationProfile>,
     ),
 ) {
     for selection in selection_set.iter() {

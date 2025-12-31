@@ -3,7 +3,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use common_lang_types::{Diagnostic, noop_print_location_fn};
-use isograph_schema::{IsographDatabase, NetworkProtocol, read_iso_literals_source};
+use isograph_schema::{CompilationProfile, IsographDatabase, read_iso_literals_source};
 use lsp_types::{
     PublishDiagnosticsParams, Uri,
     notification::{Notification, PublishDiagnostics},
@@ -13,9 +13,9 @@ use prelude::Postfix;
 use crate::location_utils::isograph_location_to_lsp_location;
 
 pub(crate) fn publish_new_diagnostics_and_clear_old_diagnostics<
-    TNetworkProtocol: NetworkProtocol,
+    TCompilationProfile: CompilationProfile,
 >(
-    db: &IsographDatabase<TNetworkProtocol>,
+    db: &IsographDatabase<TCompilationProfile>,
     new_diagnostics: &[Diagnostic],
     sender: &crossbeam::channel::Sender<lsp_server::Message>,
     old_uris_with_diagnostics: BTreeSet<Uri>,
@@ -33,8 +33,8 @@ pub(crate) fn publish_new_diagnostics_and_clear_old_diagnostics<
 }
 
 // TODO clean this up
-fn iso_diagnostics_to_params<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn iso_diagnostics_to_params<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     diagnostics: &[Diagnostic],
     old_uris_with_diagnostics: BTreeSet<Uri>,
 ) -> (

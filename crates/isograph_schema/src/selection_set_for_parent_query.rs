@@ -3,14 +3,14 @@ use isograph_lang_types::SelectionSet;
 use prelude::ErrClone;
 
 use crate::{
-    ClientFieldVariant, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
+    ClientFieldVariant, CompilationProfile, IsographDatabase, client_scalar_selectable_named,
     refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
 };
 
 pub fn client_scalar_selectable_selection_set_for_parent_query<
-    TNetworkProtocol: NetworkProtocol,
+    TCompilationProfile: CompilationProfile,
 >(
-    db: &IsographDatabase<TNetworkProtocol>,
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<WithEmbeddedLocation<SelectionSet>> {

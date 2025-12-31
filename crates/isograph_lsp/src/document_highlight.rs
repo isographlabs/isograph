@@ -5,7 +5,7 @@ use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DescriptionParent, EntityNameWrapperParent, IsographResolvedNode,
 };
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use isograph_schema::{process_iso_literal_extraction, read_iso_literals_source};
 use lsp_types::DocumentHighlight;
 use lsp_types::request::DocumentHighlightRequest;
@@ -22,8 +22,8 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 
-pub fn on_document_highlight<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_document_highlight<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <DocumentHighlightRequest as Request>::Params,
 ) -> LSPRuntimeResult<<DocumentHighlightRequest as Request>::Result> {
     let db = &lsp_state.compiler_state.db;
@@ -36,8 +36,8 @@ pub fn on_document_highlight<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn on_document_highlight_impl<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     url: Uri,
     position: Position,
 ) -> LSPRuntimeResult<<DocumentHighlightRequest as Request>::Result> {
@@ -123,8 +123,8 @@ fn on_document_highlight_impl<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn location_to_document_highlight<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn location_to_document_highlight<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     location: EmbeddedLocation,
 ) -> Option<DocumentHighlight> {
     let iso_literal_map = db.get_iso_literal_map();

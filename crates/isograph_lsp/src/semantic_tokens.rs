@@ -9,7 +9,7 @@ use common_lang_types::{
 };
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use isograph_lang_types::IsographSemanticToken;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use isograph_schema::{
     parse_iso_literals_in_file_content_and_return_all, read_iso_literals_source_from_relative_path,
 };
@@ -21,8 +21,8 @@ use lsp_types::{
 use pico_macros::memo;
 use prelude::Postfix;
 
-pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_semantic_token_full_request<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <SemanticTokensFullRequest as Request>::Params,
 ) -> LSPRuntimeResult<<SemanticTokensFullRequest as Request>::Result> {
     let uri = params.text_document.uri;
@@ -50,8 +50,8 @@ pub fn on_semantic_token_full_request<TNetworkProtocol: NetworkProtocol>(
 /// we cannot reuse that cached value (as the output changes.) (We already can't reuse the
 /// cached value, but that is a bug.) See https://github.com/isographlabs/isograph/issues/548
 #[memo]
-fn get_semantic_tokens<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn get_semantic_tokens<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     uri: Uri,
 ) -> Result<Option<LspSemanticTokensResult>, LSPRuntimeError> {
     // TODO we should embed this check elsewhere, and not here. For example, we should just

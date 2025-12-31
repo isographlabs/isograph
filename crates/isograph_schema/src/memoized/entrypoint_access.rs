@@ -9,14 +9,14 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    EntrypointDeclarationInfo, IsographDatabase, NetworkProtocol, client_scalar_selectable_named,
-    parse_iso_literal_in_source, selectable_is_not_defined_diagnostic,
-    selectable_is_wrong_type_diagnostic, selectable_named,
+    CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
+    client_scalar_selectable_named, parse_iso_literal_in_source,
+    selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 #[memo]
-pub fn entrypoint_declarations<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn entrypoint_declarations<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<EntrypointDeclaration> {
     let mut out = vec![];
     for (_relative_path, iso_literals_source_id) in db.get_iso_literal_map().tracked().0.iter() {
@@ -32,8 +32,8 @@ pub fn entrypoint_declarations<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn validated_entrypoints<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> HashMap<(EntityName, SelectableName), DiagnosticResult<EntrypointDeclarationInfo>> {
     let entrypoints = entrypoint_declarations(db);
 

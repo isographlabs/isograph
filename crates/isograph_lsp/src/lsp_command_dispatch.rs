@@ -1,6 +1,6 @@
 use std::ops::ControlFlow;
 
-use isograph_schema::NetworkProtocol;
+use isograph_schema::CompilationProfile;
 use lsp_types::request::{ExecuteCommand, Request};
 use serde_json::Value;
 
@@ -10,18 +10,18 @@ use crate::{
     lsp_state::LspState,
 };
 
-pub(crate) struct LspIsographCommandDispatch<'state, TNetworkProtocol: NetworkProtocol> {
+pub(crate) struct LspIsographCommandDispatch<'state, TCompilationProfile: CompilationProfile> {
     params: <ExecuteCommand as Request>::Params,
     // TODO make this generic over TState like the other dispatch structs
-    state: &'state LspState<'state, TNetworkProtocol>,
+    state: &'state LspState<'state, TCompilationProfile>,
 }
 
-impl<'state, TNetworkProtocol: NetworkProtocol>
-    LspIsographCommandDispatch<'state, TNetworkProtocol>
+impl<'state, TCompilationProfile: CompilationProfile>
+    LspIsographCommandDispatch<'state, TCompilationProfile>
 {
     pub fn new(
         params: <ExecuteCommand as Request>::Params,
-        state: &'state LspState<TNetworkProtocol>,
+        state: &'state LspState<TCompilationProfile>,
     ) -> Self {
         LspIsographCommandDispatch { params, state }
     }

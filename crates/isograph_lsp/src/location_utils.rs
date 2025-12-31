@@ -2,15 +2,15 @@ use std::{borrow::Cow, path::PathBuf, str::FromStr};
 
 use common_lang_types::EmbeddedLocation;
 use intern::string_key::Lookup;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use lsp_types::{Range, Uri};
 
 use crate::{format::char_index_to_position, uri_file_path_ext::UriFilePathExt};
 
 // TODO we should have a function that goes from Uri to Option<ProjectFile>
 // and use ProfileFile everywhere in the LSP, instead of this one-off check
-pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn uri_is_project_file<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     uri: &Uri,
 ) -> bool {
     let config = db.get_isograph_config();
@@ -23,8 +23,8 @@ pub(crate) fn uri_is_project_file<TNetworkProtocol: NetworkProtocol>(
         && !uri_path.starts_with(&config.artifact_directory.absolute_path)
 }
 
-pub fn isograph_location_to_lsp_location<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn isograph_location_to_lsp_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     location: EmbeddedLocation,
     content: &str,
 ) -> Option<lsp_types::Location> {

@@ -2,11 +2,11 @@ use common_lang_types::WithGenericLocation;
 use isograph_lang_types::{DefinitionLocation, Description, TypeAnnotationDeclaration};
 use prelude::Postfix;
 
-use crate::{IsographDatabase, MemoRefObjectSelectable, NetworkProtocol};
+use crate::{CompilationProfile, IsographDatabase, MemoRefObjectSelectable};
 
-pub fn description<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
+pub fn description<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    definition_location: MemoRefObjectSelectable<TCompilationProfile>,
 ) -> Option<Description> {
     match definition_location {
         DefinitionLocation::Server(server_field) => server_field
@@ -20,9 +20,9 @@ pub fn description<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub fn output_type_annotation<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    definition_location: MemoRefObjectSelectable<TNetworkProtocol>,
+pub fn output_type_annotation<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    definition_location: MemoRefObjectSelectable<TCompilationProfile>,
 ) -> &TypeAnnotationDeclaration {
     match definition_location {
         DefinitionLocation::Client(client_pointer) => {

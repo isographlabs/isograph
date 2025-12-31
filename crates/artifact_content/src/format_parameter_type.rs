@@ -2,13 +2,13 @@ use common_lang_types::{EntityName, SelectableName};
 
 use isograph_lang_types::{SelectionType, TypeAnnotationDeclaration, UnionVariant};
 use isograph_schema::{
-    IsographDatabase, MemoRefServerSelectable, NetworkProtocol, server_entity_named,
+    CompilationProfile, IsographDatabase, MemoRefServerSelectable, server_entity_named,
     server_selectables_map_for_entity,
 };
 use prelude::Postfix;
 
-pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn format_parameter_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     type_: &TypeAnnotationDeclaration,
     indentation_level: u8,
 ) -> String {
@@ -64,8 +64,8 @@ pub(crate) fn format_parameter_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn format_server_field_scalar_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn format_server_field_scalar_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
     indentation_level: u8,
 ) -> String {
@@ -110,10 +110,10 @@ fn format_server_field_scalar_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn format_field_definition<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn format_field_definition<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     name: &SelectableName,
-    server_selectable: MemoRefServerSelectable<TNetworkProtocol>,
+    server_selectable: MemoRefServerSelectable<TCompilationProfile>,
     indentation_level: u8,
 ) -> String {
     let server_selectable = server_selectable.lookup(db);
@@ -141,8 +141,8 @@ fn is_nullable(type_annotation: &TypeAnnotationDeclaration) -> bool {
     }
 }
 
-fn format_type_annotation<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn format_type_annotation<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     type_annotation: &TypeAnnotationDeclaration,
     indentation_level: u8,
 ) -> String {

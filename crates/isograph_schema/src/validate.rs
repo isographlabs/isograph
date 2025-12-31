@@ -6,7 +6,7 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientFieldVariant, ContainsIsoStats, IsographDatabase, NetworkProtocol,
+    ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase, NetworkProtocol,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map,
     entity_not_defined_diagnostic, parse_iso_literals, process_iso_literals, selectables,
     server_entities_map_without_locations, server_entity_named, server_id_selectable,
@@ -26,8 +26,8 @@ use crate::{
 /// artifacts. However, whether we do these strictly-unnecessary
 /// validations should be controllable by the user.
 #[memo]
-pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn validate_entire_schema<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
     let mut errors = BTreeSet::new();
 
@@ -52,7 +52,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
 
     errors.extend(validate_scalar_selectable_directive_sets(db));
 
-    if let Ok((outcome, _)) = TNetworkProtocol::parse_type_system_documents(db) {
+    if let Ok((outcome, _)) = TCompilationProfile::NetworkProtocol::parse_type_system_documents(db)
+    {
         errors.extend(outcome.non_fatal_diagnostics.clone());
     }
 
@@ -77,8 +78,8 @@ pub fn validate_entire_schema<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_all_iso_literals<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_all_iso_literals<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<ContainsIsoStats> {
     let contains_iso = parse_iso_literals(db).to_owned()?;
     let contains_iso_stats = contains_iso.stats();
@@ -94,8 +95,10 @@ fn maybe_extend<T, E>(errors_acc: &mut impl Extend<E>, result: Result<T, Vec<E>>
     }
 }
 
-fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_all_server_selectables_point_to_defined_types<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<()> {
     let server_selectables = server_selectables_map(db).clone_err()?;
     let entities = server_entities_map_without_locations(db)
@@ -144,8 +147,8 @@ fn validate_all_server_selectables_point_to_defined_types<TNetworkProtocol: Netw
     }
 }
 
-fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_all_id_fields<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
     let entities = match server_object_entities(db).as_ref() {
         Ok(entities) => entities,
@@ -162,8 +165,8 @@ fn validate_all_id_fields<TNetworkProtocol: NetworkProtocol>(
         .collect()
 }
 
-fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_scalar_selectable_directive_sets<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
     let selectables = match client_selectable_map(db) {
         Ok(s) => s,
@@ -199,8 +202,8 @@ fn validate_scalar_selectable_directive_sets<TNetworkProtocol: NetworkProtocol>(
 /// Validate selectables:
 /// - that each variable definition points to an actual type
 /// - TODO move the rest of the valuations that relate to entities into this
-fn validate_selectables<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_selectables<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
     let selectables = match selectables(db).clone_err() {
         Ok(selectables) => selectables,

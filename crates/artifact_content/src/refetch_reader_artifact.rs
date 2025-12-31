@@ -6,7 +6,7 @@ use common_lang_types::{
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{SelectionSet, SelectionTypePostfix};
 use isograph_schema::{
-    ClientScalarSelectable, FieldMapItem, IsographDatabase, NetworkProtocol, RefetchedPathsMap,
+    ClientScalarSelectable, CompilationProfile, FieldMapItem, IsographDatabase, RefetchedPathsMap,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     refetch_strategy_for_client_scalar_selectable_named,
 };
@@ -21,9 +21,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+pub(crate) fn generate_refetch_reader_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
     refetched_paths: &RefetchedPathsMap,
     was_selected_loadably: bool,
     file_extensions: GenerateFileExtensionsOption,
@@ -104,9 +104,9 @@ pub(crate) fn generate_refetch_reader_artifact<TNetworkProtocol: NetworkProtocol
     }
 }
 
-pub(crate) fn generate_refetch_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+pub(crate) fn generate_refetch_output_type_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
 ) -> ArtifactPathAndContent {
     let client_scalar_selectable_output_type = generate_output_type(db, client_scalar_selectable);
 

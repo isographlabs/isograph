@@ -6,11 +6,12 @@ use isograph_lang_types::{
     DefinitionLocation, Description, IsographResolvedNode, VariableDeclaration,
 };
 use isograph_schema::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path, server_entity_named,
+    CompilationProfile, IsoLiteralExtraction, extract_iso_literals_from_file_content,
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+    server_entity_named,
 };
 use isograph_schema::{
-    IsographDatabase, NetworkProtocol, ServerEntity, get_parent_and_selectable_for_object_path,
+    IsographDatabase, ServerEntity, get_parent_and_selectable_for_object_path,
     get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
@@ -28,8 +29,8 @@ use crate::{
     uri_file_path_ext::UriFilePathExt,
 };
 
-pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_hover<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <HoverRequest as Request>::Params,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
     let db = &lsp_state.compiler_state.db;
@@ -42,8 +43,8 @@ pub fn on_hover<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn on_hover_impl<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     url: Uri,
     position: Position,
 ) -> LSPRuntimeResult<<HoverRequest as Request>::Result> {
@@ -176,8 +177,10 @@ fn on_hover_impl<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn get_iso_literal_extraction_from_text_position_params<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_iso_literal_extraction_from_text_position_params<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
     url: Uri,
     line_char: LineChar,
 ) -> Option<(IsoLiteralExtraction, u32)> {
@@ -351,8 +354,8 @@ fn hover_text_for_selectable(
     )
 }
 
-fn format_hover_for_entity<TNetworkProtocol: NetworkProtocol>(
-    entity: &ServerEntity<TNetworkProtocol>,
+fn format_hover_for_entity<TCompilationProfile: CompilationProfile>(
+    entity: &ServerEntity<TCompilationProfile>,
 ) -> String {
     let object_entity_name = entity.name;
     let description = match entity.description {

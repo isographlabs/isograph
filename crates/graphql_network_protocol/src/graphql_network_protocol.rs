@@ -7,7 +7,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{SelectionType, VariableDeclaration};
-use isograph_schema::IsographDatabase;
+use isograph_schema::{CompilationProfile, IsographDatabase, TargetPlatform};
 use isograph_schema::{
     Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
     server_entity_named,
@@ -53,6 +53,19 @@ impl From<GraphQLRootTypes> for BTreeMap<EntityName, RootOperationName> {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
+pub struct GraphQLAndJavascriptProfile {}
+
+impl CompilationProfile for GraphQLAndJavascriptProfile {
+    type NetworkProtocol = GraphQLNetworkProtocol;
+    type TargetPlatform = JavascriptTargetPlatform;
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
+pub struct JavascriptTargetPlatform {}
+
+impl TargetPlatform for JavascriptTargetPlatform {}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
@@ -61,18 +74,20 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
     #[expect(clippy::type_complexity)]
     #[memo]
-    fn parse_type_system_documents(
-        db: &IsographDatabase<Self>,
+    fn parse_type_system_documents<
+        TCompilationProfile: CompilationProfile<NetworkProtocol = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
     ) -> DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
         // fetchable types
         BTreeMap<EntityName, RootOperationName>,
     )> {
         parse_type_system_document(db)
     }
 
-    fn generate_link_type<'a>(
-        db: &IsographDatabase<Self>,
+    fn generate_link_type<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDatabase<TCompilationProfile>,
         server_object_entity_name: &EntityName,
     ) -> String {
         let server_object_entity = &server_entity_named(db, *server_object_entity_name)
@@ -111,8 +126,8 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         subtypes.join("")
     }
 
-    fn generate_query_text<'a>(
-        _db: &IsographDatabase<Self>,
+    fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+        _db: &IsographDatabase<TCompilationProfile>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,

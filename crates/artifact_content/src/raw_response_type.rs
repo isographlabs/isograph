@@ -1,6 +1,6 @@
 use intern::Lookup;
 use isograph_schema::{
-    IsographDatabase, MergedSelectionMap, MergedServerSelection, NetworkProtocol,
+    CompilationProfile, IsographDatabase, MergedSelectionMap, MergedServerSelection,
     server_entity_named, server_selectable_named,
 };
 use prelude::Postfix;
@@ -8,8 +8,8 @@ use std::collections::BTreeMap;
 
 use crate::generate_artifacts::print_javascript_type_declaration;
 
-pub fn generate_raw_response_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn generate_raw_response_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_map: &MergedSelectionMap,
     indentation_level: u8,
 ) -> String {
@@ -27,8 +27,8 @@ pub fn generate_raw_response_type<TNetworkProtocol: NetworkProtocol>(
     raw_response_type
 }
 
-pub fn generate_raw_response_type_inner<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     raw_response_type: &mut String,
     selection_map: &MergedSelectionMap,
     indentation_level: u8,

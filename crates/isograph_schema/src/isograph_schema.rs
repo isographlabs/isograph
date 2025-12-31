@@ -7,7 +7,8 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, NormalizationKey, ServerSelectable, server_selectable_named,
+    CompilationProfile, IsographDatabase, NormalizationKey, ServerSelectable,
+    server_selectable_named,
 };
 
 lazy_static! {
@@ -23,11 +24,11 @@ lazy_static! {
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct RootOperationName(pub &'static str);
 
-pub fn get_object_selections_path<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_object_selections_path<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     root_object_name: EntityName,
     selections: impl Iterator<Item = SelectableName>,
-) -> DiagnosticResult<Vec<ServerSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Vec<ServerSelectable<TCompilationProfile>>> {
     let mut path = vec![];
     let mut current_entity_name = root_object_name;
 

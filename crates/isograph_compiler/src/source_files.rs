@@ -10,7 +10,7 @@ use common_lang_types::{
 };
 use intern::Lookup;
 use isograph_config::absolute_and_relative_paths;
-use isograph_schema::{IsographDatabase, NetworkProtocol, SchemaSource, StandardSources};
+use isograph_schema::{CompilationProfile, IsographDatabase, SchemaSource, StandardSources};
 use pico::{Database, SourceId};
 use prelude::Postfix;
 
@@ -20,8 +20,8 @@ use crate::{
     write_artifacts::unable_to_do_something_at_path_diagnostic,
 };
 
-pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+pub fn initialize_sources<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
 ) -> LocationFreeDiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
     let schema_source_id = read_schema(db, &schema)?;
@@ -33,8 +33,8 @@ pub fn initialize_sources<TNetworkProtocol: NetworkProtocol>(
     read_iso_literals_from_project_root(db)
 }
 
-pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+pub fn update_sources<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     changes: &[SourceFileEvent],
 ) -> LocationFreeDiagnosticVecResult<()> {
     let errors = changes
@@ -56,8 +56,8 @@ pub fn update_sources<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn handle_update_schema<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     event_kind: &SourceEventKind,
 ) -> LocationFreeDiagnosticResult<()> {
     let schema = db.get_isograph_config().schema.clone();
@@ -83,8 +83,8 @@ fn handle_update_schema<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn handle_update_schema_extensions<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     event_kind: &SourceEventKind,
 ) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
@@ -118,8 +118,8 @@ fn handle_update_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn create_or_update_schema_extension<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     path: &Path,
 ) -> LocationFreeDiagnosticResult<()> {
     let absolute_and_relative =
@@ -132,8 +132,8 @@ fn create_or_update_schema_extension<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn handle_update_source_file<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     event_kind: &SourceEventKind,
 ) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
@@ -160,8 +160,8 @@ fn handle_update_source_file<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn create_or_update_iso_literals<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     path: &Path,
 ) -> LocationFreeDiagnosticResult<()> {
     let (relative_path, content) =
@@ -171,8 +171,8 @@ fn create_or_update_iso_literals<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn handle_update_source_folder<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     event_kind: &SourceEventKind,
 ) -> LocationFreeDiagnosticResult<()> {
     match event_kind {
@@ -190,8 +190,8 @@ fn handle_update_source_folder<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn remove_iso_literals_from_folder<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     folder: &PathBuf,
 ) {
     let current_working_directory = db.get_current_working_directory();
@@ -203,8 +203,8 @@ fn remove_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
     db.remove_iso_literals_from_path(&relative_path);
 }
 
-fn read_schema<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn read_schema<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     schema_path: &AbsolutePathAndRelativePath,
 ) -> LocationFreeDiagnosticResult<SourceId<SchemaSource>> {
     let content = read_schema_file(&schema_path.absolute_path)?;
@@ -256,8 +256,8 @@ fn read_schema_file(path: &PathBuf) -> LocationFreeDiagnosticResult<String> {
         .wrap_ok()
 }
 
-fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn read_schema_extensions<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
 ) -> LocationFreeDiagnosticResult<BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>> {
     let config_schema_extensions = db.get_isograph_config().schema_extensions.clone();
     let mut schema_extensions = BTreeMap::new();
@@ -268,15 +268,15 @@ fn read_schema_extensions<TNetworkProtocol: NetworkProtocol>(
     schema_extensions.wrap_ok()
 }
 
-fn read_iso_literals_from_project_root<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn read_iso_literals_from_project_root<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
 ) -> LocationFreeDiagnosticResult<()> {
     let project_root = db.get_isograph_config().project_root.clone();
     read_iso_literals_from_folder(db, &project_root)
 }
 
-fn read_iso_literals_from_folder<TNetworkProtocol: NetworkProtocol>(
-    db: &mut IsographDatabase<TNetworkProtocol>,
+fn read_iso_literals_from_folder<TCompilationProfile: CompilationProfile>(
+    db: &mut IsographDatabase<TCompilationProfile>,
     folder: &Path,
 ) -> LocationFreeDiagnosticResult<()> {
     for (relative_path, content) in

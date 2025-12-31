@@ -6,19 +6,19 @@ use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
 
 use crate::{
-    ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable, NetworkProtocol,
-    entity_definition_location, server_entity_named,
+    CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
+    NetworkProtocol, entity_definition_location, server_entity_named,
 };
 
 #[memo]
 /// This just drops the location (but not internal locations...) and filters out client fields
-pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn server_selectables_map<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
-    BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TNetworkProtocol>>,
+    BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>>,
 > {
     let (outcome, _fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
@@ -30,10 +30,10 @@ pub fn server_selectables_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>>> {
     let map = server_selectables_map(db).clone_err()?;
 
     map.iter()
@@ -49,11 +49,11 @@ pub fn server_selectables_map_for_entity<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn server_selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRefServerSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRefServerSelectable<TCompilationProfile>>> {
     server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .clone_err()?
         .get(&server_selectable_name)
@@ -62,10 +62,10 @@ pub fn server_selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_id_selectable<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<Option<MemoRefServerSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRefServerSelectable<TCompilationProfile>>> {
     let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
         .clone_err()?;
 

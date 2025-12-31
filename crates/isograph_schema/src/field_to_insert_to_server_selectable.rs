@@ -4,8 +4,8 @@ use isograph_lang_types::ConstantValue;
 
 use crate::ServerSelectable;
 
-pub type ScalarSelectionAndNonNullType<TNetworkProtocol> = (
-    ServerSelectable<TNetworkProtocol>,
+pub type ScalarSelectionAndNonNullType<TCompilationProfile> = (
+    ServerSelectable<TCompilationProfile>,
     Option<GraphQLNamedTypeAnnotation>,
 );
 

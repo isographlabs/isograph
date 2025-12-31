@@ -9,16 +9,16 @@ use std::{cmp::Ordering, collections::BTreeSet};
 
 use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
 use isograph_schema::{
-    ClientScalarSelectable, EntrypointDeclarationInfo, IsographDatabase, LINK_FIELD_NAME,
-    MemoRefClientSelectable, NetworkProtocol, client_scalar_selectable_named,
+    ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
+    LINK_FIELD_NAME, MemoRefClientSelectable, client_scalar_selectable_named,
     client_selectable_map, validated_entrypoints,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
 
-fn build_iso_overload_for_entrypoint<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_scalar_selectable: MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+fn build_iso_overload_for_entrypoint<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_scalar_selectable: MemoRef<ClientScalarSelectable<TCompilationProfile>>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> (String, String) {
     let type_and_field = client_scalar_selectable
@@ -48,10 +48,10 @@ export function iso<T>(
     (import, s)
 }
 
-fn build_iso_overload_for_client_defined_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn build_iso_overload_for_client_defined_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_type_and_variant: (
-        MemoRefClientSelectable<TNetworkProtocol>,
+        MemoRefClientSelectable<TCompilationProfile>,
         ClientScalarSelectableDirectiveSet,
     ),
     file_extensions: GenerateFileExtensionsOption,
@@ -134,8 +134,8 @@ export function iso<T>(
     (import, s)
 }
 
-pub(crate) fn build_iso_overload_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn build_iso_overload_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     file_extensions: GenerateFileExtensionsOption,
     no_babel_transform: bool,
 ) -> ArtifactPathAndContent {
@@ -289,10 +289,10 @@ export function iso(isographLiteralText: string):
     }
 }
 
-fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn sorted_user_written_types<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<(
-    MemoRefClientSelectable<TNetworkProtocol>,
+    MemoRefClientSelectable<TCompilationProfile>,
     ClientScalarSelectableDirectiveSet,
 )> {
     let mut client_types = client_selectable_map(db)
@@ -375,10 +375,10 @@ fn sorted_user_written_types<TNetworkProtocol: NetworkProtocol>(
     client_types
 }
 
-fn sorted_entrypoints<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn sorted_entrypoints<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<(
-    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ClientScalarSelectable<TCompilationProfile>>,
     &EntrypointDeclarationInfo,
 )> {
     let mut entrypoints = validated_entrypoints(db)

@@ -8,7 +8,7 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, NetworkProtocol, RefetchStrategy,
+    CompilationProfile, IsographDatabase, NetworkProtocol, RefetchStrategy,
     client_selectable_declaration_map_from_iso_literals, get_refetch_stategy,
     multiple_selectable_definitions_found_diagnostic, selectable_is_not_defined_diagnostic,
     selectable_is_wrong_type_diagnostic,
@@ -16,8 +16,8 @@ use crate::{
 
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn refetch_strategy_map<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<
     HashMap<
         (EntityName, SelectableName),
@@ -56,7 +56,8 @@ pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
         }
     }
 
-    let outcome = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let outcome =
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
     let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
     for with_location in expose_fields.iter().flatten() {
@@ -86,8 +87,10 @@ pub fn refetch_strategy_map<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn refetch_strategy_for_client_scalar_selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn refetch_strategy_for_client_scalar_selectable_named<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticVecResult<Option<RefetchStrategy>> {

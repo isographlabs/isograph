@@ -13,7 +13,7 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable, NetworkProtocol,
+    CompilationProfile, ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable,
     client_selectable_map, selectable_named, selectable_reader_selection_set, server_entity_named,
     validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
 };
@@ -34,8 +34,8 @@ lazy_static! {
 /// This should not be validated here, and can be fixed with better modeling (i.e.
 /// have different associated data for fields that points to server objects and
 /// fields that point to client objects.)
-pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn validate_use_of_arguments<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<()> {
     let mut errors = vec![];
 
@@ -54,9 +54,9 @@ pub fn validate_use_of_arguments<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_type: MemoRefClientSelectable<TNetworkProtocol>,
+fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_type: MemoRefClientSelectable<TCompilationProfile>,
     errors: &mut Vec<Diagnostic>,
 ) {
     let mut reachable_variables = BTreeSet::new();
@@ -231,8 +231,8 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn validate_use_of_arguments_impl<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_use_of_arguments_impl<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     errors: &mut Vec<Diagnostic>,
     reachable_variables: &mut UsedVariables,
     field_argument_definitions: Vec<VariableDeclaration>,

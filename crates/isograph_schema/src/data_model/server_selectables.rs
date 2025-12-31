@@ -8,10 +8,10 @@ use isograph_lang_types::{
 };
 use pico::MemoRef;
 
-use crate::{NetworkProtocol, ServerObjectSelectableVariant};
+use crate::{CompilationProfile, NetworkProtocol, ServerObjectSelectableVariant};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ServerSelectable<TNetworkProtocol: NetworkProtocol> {
+pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
     pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
@@ -32,13 +32,15 @@ pub struct ServerSelectable<TNetworkProtocol: NetworkProtocol> {
     // TODO we shouldn't support default values here
     pub arguments: Vec<VariableDeclaration>,
 
-    pub network_protocol_associated_data: TNetworkProtocol::SelectableAssociatedData,
+    pub network_protocol_associated_data:
+        <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerSelectable<TNetworkProtocol> {
+impl<TCompilationProfile: CompilationProfile> ServerSelectable<TCompilationProfile> {
     pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
         EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
     }
 }
 
-pub type MemoRefServerSelectable<TNetworkProtocol> = MemoRef<ServerSelectable<TNetworkProtocol>>;
+pub type MemoRefServerSelectable<TCompilationProfile> =
+    MemoRef<ServerSelectable<TCompilationProfile>>;

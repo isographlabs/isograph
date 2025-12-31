@@ -7,16 +7,18 @@ use common_lang_types::{
 use isograph_lang_types::VariableDeclaration;
 
 use crate::{
-    MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap, RefetchStrategy, RootOperationName,
-    isograph_database::IsographDatabase,
+    CompilationProfile, MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap,
+    RefetchStrategy, RootOperationName, isograph_database::IsographDatabase,
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
-pub struct ParseTypeSystemOutcome<TNetworkProtocol: NetworkProtocol> {
-    pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TNetworkProtocol>>>,
+pub struct ParseTypeSystemOutcome<TCompilationProfile: CompilationProfile> {
+    pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TCompilationProfile>>>,
 
-    pub selectables:
-        BTreeMap<(EntityName, SelectableName), WithLocation<MemoRefSelectable<TNetworkProtocol>>>,
+    pub selectables: BTreeMap<
+        (EntityName, SelectableName),
+        WithLocation<MemoRefSelectable<TCompilationProfile>>,
+    >,
 
     pub client_scalar_refetch_strategies:
         Vec<DiagnosticResult<WithLocation<(EntityName, SelectableName, RefetchStrategy)>>>,
@@ -30,16 +32,18 @@ pub trait NetworkProtocol:
 
     // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
     #[expect(clippy::type_complexity)]
-    fn parse_type_system_documents(
-        db: &IsographDatabase<Self>,
+    fn parse_type_system_documents<
+        TCompilationProfile: CompilationProfile<NetworkProtocol = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
     ) -> &DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
         // TODO just seems awkward that we return fetchable types
         BTreeMap<EntityName, RootOperationName>,
     )>;
 
-    fn generate_query_text<'a>(
-        db: &IsographDatabase<Self>,
+    fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDatabase<TCompilationProfile>,
         query_name: QueryOperationName,
         selection_map: &MergedSelectionMap,
         query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
@@ -47,8 +51,8 @@ pub trait NetworkProtocol:
         format: Format,
     ) -> QueryText;
 
-    fn generate_link_type(
-        db: &IsographDatabase<Self>,
+    fn generate_link_type<TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDatabase<TCompilationProfile>,
         server_object_entity_name: &EntityName,
     ) -> String;
 

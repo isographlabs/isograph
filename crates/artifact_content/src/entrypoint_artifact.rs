@@ -21,7 +21,7 @@ use isograph_lang_types::{
     VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, EntrypointDeclarationInfo,
+    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
     MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
     ScalarClientFieldTraversalState, ServerEntity, WrappedSelectionMapSelection,
@@ -33,8 +33,8 @@ use isograph_schema::{
 use prelude::Postfix;
 use std::collections::BTreeSet;
 
-pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     entrypoint_scalar_selectable_name: SelectableName,
     info: &EntrypointDeclarationInfo,
@@ -118,10 +118,10 @@ pub(crate) fn generate_entrypoint_artifacts<TNetworkProtocol: NetworkProtocol>(
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result<
-    TNetworkProtocol: NetworkProtocol,
+    TCompilationProfile: CompilationProfile,
 >(
-    db: &IsographDatabase<TNetworkProtocol>,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    db: &IsographDatabase<TCompilationProfile>,
+    entrypoint: &ClientScalarSelectable<TCompilationProfile>,
     info: Option<&EntrypointDeclarationInfo>,
     merged_selection_map: &MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
@@ -174,7 +174,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     let reachable_variables =
         get_used_variable_definitions(merged_selection_map, variable_definitions);
 
-    let query_text = TNetworkProtocol::generate_query_text(
+    let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
         query_name,
         merged_selection_map,
@@ -454,11 +454,11 @@ fn generate_refetch_query_artifact_import(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn entrypoint_file_content<TNetworkProtocol: NetworkProtocol>(
+fn entrypoint_file_content<TCompilationProfile: CompilationProfile>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,
-    parent_type: &ServerEntity<TNetworkProtocol>,
+    parent_type: &ServerEntity<TCompilationProfile>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
     field_name: SelectableName,
     concrete_type: EntityName,

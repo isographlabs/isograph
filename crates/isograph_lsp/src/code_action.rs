@@ -3,7 +3,7 @@ use std::str::FromStr;
 use common_lang_types::{EntityName, IsographCodeAction, SelectableName};
 use intern::Lookup;
 use isograph_lang_types::SelectionType;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use lsp_types::{
     CodeAction, CodeActionOrCommand, CreateFile, DocumentChangeOperation, DocumentChanges, OneOf,
     OptionalVersionedTextDocumentIdentifier, Position, Range, ResourceOp, TextDocumentEdit,
@@ -18,8 +18,8 @@ use crate::{
     lsp_runtime_error::LSPRuntimeResult,
 };
 
-pub fn on_code_action<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_code_action<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <CodeActionRequest as Request>::Params,
 ) -> LSPRuntimeResult<<CodeActionRequest as Request>::Result> {
     for diagnostic in params.context.diagnostics {
@@ -48,8 +48,8 @@ pub fn on_code_action<TNetworkProtocol: NetworkProtocol>(
     Ok(None)
 }
 
-fn isograph_code_action_to_lsp_code_actions<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn isograph_code_action_to_lsp_code_actions<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     action: IsographCodeAction,
 ) -> Vec<CodeActionOrCommand> {
     let config = db.get_isograph_config();

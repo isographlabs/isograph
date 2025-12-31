@@ -8,7 +8,7 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, NameAndArguments, NetworkProtocol,
+    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, NameAndArguments,
     ServerSelectable,
 };
 
@@ -85,10 +85,10 @@ impl VariableContext {
     }
 }
 
-pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
+pub fn initial_variable_context<TCompilationProfile: CompilationProfile>(
     selection_type: &SelectionType<
-        &ClientScalarSelectable<TNetworkProtocol>,
-        &ClientObjectSelectable<TNetworkProtocol>,
+        &ClientScalarSelectable<TCompilationProfile>,
+        &ClientObjectSelectable<TCompilationProfile>,
     >,
 ) -> VariableContext {
     // This is used in two places: before we generate a merged selection set for an
@@ -123,7 +123,7 @@ pub fn initial_variable_context<TNetworkProtocol: NetworkProtocol>(
     VariableContext(variable_context)
 }
 
-impl<TNetworkProtocol: NetworkProtocol> ServerSelectable<TNetworkProtocol> {
+impl<TCompilationProfile: CompilationProfile> ServerSelectable<TCompilationProfile> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

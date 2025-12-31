@@ -4,18 +4,18 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    IsographDatabase, MemoRefSelectable, NetworkProtocol, client_selectable_declaration,
-    client_selectable_map, client_selectable_named,
+    CompilationProfile, IsographDatabase, MemoRefSelectable, NetworkProtocol,
+    client_selectable_declaration, client_selectable_map, client_selectable_named,
     multiple_selectable_definitions_found_diagnostic, server_selectable_named,
     server_selectables_map, server_selectables_map_for_entity,
 };
 
 #[memo]
-pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRefSelectable<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRefSelectable<TCompilationProfile>>> {
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
@@ -66,10 +66,10 @@ pub fn selectable_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TNetworkProtocol>>>> {
+) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TCompilationProfile>>>> {
     let mut selectables = server_selectables_map_for_entity(db, parent_server_object_entity_name)
         .to_owned()?
         .into_values()
@@ -93,12 +93,13 @@ pub fn selectables_for_entity<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn selectable_definition_location<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) =
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     if let Some(x) = outcome
         .item
@@ -120,9 +121,9 @@ pub fn selectable_definition_location<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn selectables<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<MemoRefSelectable<TNetworkProtocol>>> {
+pub fn selectables<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> DiagnosticResult<Vec<MemoRefSelectable<TCompilationProfile>>> {
     let mut selectables = server_selectables_map(db)
         .to_owned()?
         .into_values()

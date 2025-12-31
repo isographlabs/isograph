@@ -11,7 +11,7 @@ use isograph_lang_types::{
     SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 use isograph_schema::{
-    ClientFieldVariant, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
+    ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
     server_entity_named,
 };
@@ -26,8 +26,8 @@ use crate::{
     import_statements::{ParamTypeImports, UpdatableImports},
 };
 
-pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn generate_client_selectable_parameter_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     selection_map: &WithEmbeddedLocation<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -54,8 +54,8 @@ pub(crate) fn generate_client_selectable_parameter_type<TNetworkProtocol: Networ
     ClientScalarSelectableParameterType(client_scalar_selectable_parameter_type)
 }
 
-fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
     selection: &WithEmbeddedLocation<Selection>,
@@ -218,8 +218,10 @@ fn write_param_type_from_selection<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn generate_client_selectable_updatable_data_type<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     selection_map: &WithEmbeddedLocation<SelectionSet>,
     nested_client_scalar_selectable_imports: &mut ParamTypeImports,
@@ -251,8 +253,8 @@ pub(crate) fn generate_client_selectable_updatable_data_type<TNetworkProtocol: N
 }
 
 #[expect(clippy::too_many_arguments)]
-fn write_updatable_data_type_from_selection<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     query_type_declaration: &mut String,
     selection: &WithEmbeddedLocation<Selection>,
@@ -439,8 +441,8 @@ fn write_getter_and_setter(
 }
 
 #[expect(clippy::too_many_arguments)]
-fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn write_param_type_from_client_scalar_selectable<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     query_type_declaration: &mut String,
     nested_client_scalar_selectable_imports: &mut BTreeSet<EntityNameAndSelectableName>,
     loadable_fields: &mut BTreeSet<EntityNameAndSelectableName>,
@@ -534,8 +536,8 @@ fn write_param_type_from_client_scalar_selectable<TNetworkProtocol: NetworkProto
     }
 }
 
-fn get_loadable_field_type_from_arguments<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn get_loadable_field_type_from_arguments<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     arguments: Vec<VariableDeclaration>,
 ) -> String {
     let mut loadable_field_type = "{".to_string();

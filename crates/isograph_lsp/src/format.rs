@@ -4,11 +4,11 @@ use common_lang_types::{
 use isograph_lang_types::{
     InlineBehavior, LineBehavior, SpaceAfter, SpaceBefore, semantic_token_legend::IndentChange,
 };
+use isograph_schema::IsographDatabase;
 use isograph_schema::{
-    IsoLiteralExtraction, extract_iso_literals_from_file_content, process_iso_literal_extraction,
-    read_iso_literals_source_from_relative_path,
+    CompilationProfile, IsoLiteralExtraction, extract_iso_literals_from_file_content,
+    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
 };
-use isograph_schema::{IsographDatabase, NetworkProtocol};
 use lsp_types::{
     Position, Range, TextEdit,
     request::{Formatting, Request},
@@ -19,8 +19,8 @@ use prelude::Postfix;
 use crate::lsp_state::LspState;
 use crate::{lsp_runtime_error::LSPRuntimeResult, uri_file_path_ext::UriFilePathExt};
 
-pub fn on_format<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_format<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <Formatting as Request>::Params,
 ) -> LSPRuntimeResult<<Formatting as Request>::Result> {
     let db = &lsp_state.compiler_state.db;
@@ -91,8 +91,8 @@ pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 
 #[memo]
-fn format_extraction<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn format_extraction<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<String> {

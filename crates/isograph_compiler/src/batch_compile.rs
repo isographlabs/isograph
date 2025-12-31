@@ -9,7 +9,7 @@ use artifact_content::get_artifact_path_and_content;
 use colored::Colorize;
 use common_lang_types::{CurrentWorkingDirectory, Diagnostic, DiagnosticVecResult};
 use isograph_config::CompilerConfig;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use prelude::Postfix;
 use pretty_duration::pretty_duration;
 use tracing::{error, info};
@@ -22,7 +22,7 @@ pub struct CompilationStats {
 }
 
 #[expect(clippy::result_unit_err)]
-pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
+pub fn compile_and_print<TCompilationProfile: CompilationProfile>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
 ) -> Result<(), ()> {
@@ -34,13 +34,13 @@ pub fn compile_and_print<TNetworkProtocol: NetworkProtocol>(
             return ().wrap_err();
         }
     };
-    let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
+    let result = WithDuration::new(|| compile::<TCompilationProfile>(&mut state));
     print_result(&state.db, result)
 }
 
 #[expect(clippy::result_unit_err)]
-pub fn print_result<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn print_result<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     result: WithDuration<DiagnosticVecResult<CompilationStats>>,
 ) -> Result<(), ()> {
     match result.item {
@@ -90,8 +90,8 @@ fn print_stats(elapsed_time: Duration, stats: CompilationStats) {
 
 /// This the "workhorse" command of batch compilation.
 #[tracing::instrument(skip_all)]
-pub fn compile<TNetworkProtocol: NetworkProtocol>(
-    state: &mut CompilerState<TNetworkProtocol>,
+pub fn compile<TCompilationProfile: CompilationProfile>(
+    state: &mut CompilerState<TCompilationProfile>,
 ) -> DiagnosticVecResult<CompilationStats> {
     // Note: we calculate all of the artifact paths and contents first, so that writing to
     // disk can be as fast as possible and we minimize the chance that changes to the file

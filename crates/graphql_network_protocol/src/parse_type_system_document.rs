@@ -13,12 +13,12 @@ use isograph_lang_types::{
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
-    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
-    ServerEntityDirectives, ServerObjectSelectableVariant, ServerSelectable, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
+    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, CompilationProfile,
+    FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete,
+    IsographDatabase, ParseTypeSystemOutcome, RefetchStrategy, RootOperationName,
+    STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives, ServerObjectSelectableVariant,
+    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::Postfix;
@@ -33,10 +33,12 @@ use crate::{
     },
 };
 
-pub(crate) fn parse_type_system_document(
-    db: &IsographDatabase<GraphQLNetworkProtocol>,
+pub(crate) fn parse_type_system_document<
+    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<(
-    WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLNetworkProtocol>>,
+    WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
     // fetchable types
     BTreeMap<EntityName, RootOperationName>,
 )> {
@@ -463,7 +465,7 @@ pub(crate) fn parse_type_system_document(
                 ),
                 variable_definitions: vec![],
                 parent_entity_name: target_parent_object_entity_name,
-                network_protocol: std::marker::PhantomData::<GraphQLNetworkProtocol>,
+                network_protocol: std::marker::PhantomData,
             };
 
             insert_selectable_or_multiple_definition_diagnostic(
@@ -506,9 +508,11 @@ pub(crate) fn parse_type_system_document(
         .wrap_ok()
 }
 
-fn define_default_graphql_types(
-    db: &IsographDatabase<GraphQLNetworkProtocol>,
-    outcome: &mut ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+fn define_default_graphql_types<
+    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
+    outcome: &mut ParseTypeSystemOutcome<TCompilationProfile>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
     insert_entity_or_multiple_definition_diagnostic(
@@ -579,9 +583,11 @@ fn define_default_graphql_types(
 }
 
 // Defaults to false if item is missing... should this panic?
-fn is_object_entity(
-    db: &IsographDatabase<GraphQLNetworkProtocol>,
-    entities: &EntitiesDefinedBySchema,
+fn is_object_entity<
+    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
+    entities: &EntitiesDefinedBySchema<TCompilationProfile>,
     target: EntityName,
 ) -> bool {
     entities
@@ -590,14 +596,17 @@ fn is_object_entity(
         .unwrap_or(false)
 }
 
-fn traverse_selections_and_return_path<'a>(
-    db: &'a IsographDatabase<GraphQLNetworkProtocol>,
-    outcome: &'a ParseTypeSystemOutcome<GraphQLNetworkProtocol>,
+fn traverse_selections_and_return_path<
+    'a,
+    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
+>(
+    db: &'a IsographDatabase<TCompilationProfile>,
+    outcome: &'a ParseTypeSystemOutcome<TCompilationProfile>,
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
-    Vec<&'a ServerSelectable<GraphQLNetworkProtocol>>,
-    &'a ServerEntity<GraphQLNetworkProtocol>,
+    Vec<&'a ServerSelectable<TCompilationProfile>>,
+    &'a ServerEntity<TCompilationProfile>,
 )> {
     let mut current_entity = outcome
         .entities
@@ -684,5 +693,5 @@ fn traverse_selections_and_return_path<'a>(
     (output, current_entity).wrap_ok()
 }
 
-type EntitiesDefinedBySchema =
-    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLNetworkProtocol>>>>;
+type EntitiesDefinedBySchema<TCompilationProfile> =
+    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<TCompilationProfile>>>>;

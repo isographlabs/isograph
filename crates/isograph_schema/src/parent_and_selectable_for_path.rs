@@ -8,24 +8,24 @@ use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
-    ClientScalarSelectable, IsographDatabase, MemoRefObjectSelectable, MemoRefSelectable,
-    NetworkProtocol, ServerEntity, ServerSelectable, entity_not_defined_diagnostic,
+    ClientScalarSelectable, CompilationProfile, IsographDatabase, MemoRefObjectSelectable,
+    MemoRefSelectable, ServerEntity, ServerSelectable, entity_not_defined_diagnostic,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
     server_entity_named,
 };
 
-type ScalarSelectable<TNetworkProtocol> = DefinitionLocation<
-    MemoRef<ServerSelectable<TNetworkProtocol>>,
-    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+type ScalarSelectable<TCompilationProfile> = DefinitionLocation<
+    MemoRef<ServerSelectable<TCompilationProfile>>,
+    MemoRef<ClientScalarSelectable<TCompilationProfile>>,
 >;
 
 // TODO return only selectable. The caller can look up the entity.
-pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     scalar_path: &ScalarSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    MemoRef<ServerEntity<TNetworkProtocol>>,
-    ScalarSelectable<TNetworkProtocol>,
+    MemoRef<ServerEntity<TCompilationProfile>>,
+    ScalarSelectable<TCompilationProfile>,
 )> {
     let ScalarSelectionPath { parent, inner } = scalar_path;
     let scalar_selectable_name = inner.name.item;
@@ -62,12 +62,12 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TNetworkProtocol: NetworkPr
 }
 
 // TODO return only selectable. The caller can look up the entity.
-pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     object_path: &ObjectSelectionPath<'a>,
 ) -> DiagnosticResult<(
-    MemoRef<ServerEntity<TNetworkProtocol>>,
-    MemoRefObjectSelectable<TNetworkProtocol>,
+    MemoRef<ServerEntity<TCompilationProfile>>,
+    MemoRefObjectSelectable<TCompilationProfile>,
 )> {
     let ObjectSelectionPath { parent, inner } = object_path;
     let object_selectable_name = inner.name.item;
@@ -116,10 +116,10 @@ pub fn get_parent_and_selectable_for_object_path<'a, TNetworkProtocol: NetworkPr
 
 // For a selection set, you are not hovering on an individual selection, so it doesn't make sense to
 // get a selectable! Just the enclosing object entity.
-pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_parent_for_selection_set_path<'a, TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_set_path: &SelectionSetPath<'a>,
-) -> DiagnosticResult<MemoRef<ServerEntity<TNetworkProtocol>>> {
+) -> DiagnosticResult<MemoRef<ServerEntity<TCompilationProfile>>> {
     let parent_object_entity_name = match selection_set_path.parent.reference() {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
             let (_parent, selectable) =
@@ -152,13 +152,16 @@ pub fn get_parent_for_selection_set_path<'a, TNetworkProtocol: NetworkProtocol>(
         })
 }
 
-pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_parent_and_selectable_for_selection_parent<
+    'a,
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_set_path: &SelectionSetPath<'a>,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    MemoRef<ServerEntity<TNetworkProtocol>>,
-    MemoRefSelectable<TNetworkProtocol>,
+    MemoRef<ServerEntity<TCompilationProfile>>,
+    MemoRefSelectable<TCompilationProfile>,
 )> {
     match selection_set_path.parent.reference() {
         SelectionSetParentType::ObjectSelection(object_selection_path) => {
@@ -185,13 +188,13 @@ pub fn get_parent_and_selectable_for_selection_parent<'a, TNetworkProtocol: Netw
     }
 }
 
-pub fn parent_object_entity_and_selectable<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parent_object_entity_and_selectable<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityNameWrapper,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<(
-    MemoRef<ServerEntity<TNetworkProtocol>>,
-    MemoRefSelectable<TNetworkProtocol>,
+    MemoRef<ServerEntity<TCompilationProfile>>,
+    MemoRefSelectable<TCompilationProfile>,
 )> {
     let parent_entity = server_entity_named(db, parent_server_object_entity_name.0)
         .clone()?

@@ -8,8 +8,8 @@ use isograph_lang_types::{
     VariableDeclaration,
 };
 use isograph_schema::{
-    ClientScalarSelectable, ClientSelectable, IsographDatabase, LINK_FIELD_NAME,
-    MemoRefClientSelectable, NetworkProtocol, ServerSelectable,
+    ClientScalarSelectable, ClientSelectable, CompilationProfile, IsographDatabase,
+    LINK_FIELD_NAME, MemoRefClientSelectable, ServerSelectable,
     client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
     selectable_reader_selection_set, server_entity_named,
 };
@@ -35,9 +35,9 @@ use crate::{
     reader_ast::generate_reader_ast,
 };
 
-pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_selectable: &ClientSelectable<TNetworkProtocol>,
+pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_selectable: &ClientSelectable<TCompilationProfile>,
     config: &CompilerConfig,
     info: &UserWrittenClientTypeInfo,
     refetched_paths: &RefetchedPathsMap,
@@ -201,9 +201,9 @@ pub(crate) fn generate_eager_reader_artifacts<TNetworkProtocol: NetworkProtocol>
     path_and_contents
 }
 
-pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    server_object_selectable: &ServerSelectable<TNetworkProtocol>,
+pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    server_object_selectable: &ServerSelectable<TCompilationProfile>,
     inline_fragment_reader_selections: &WithEmbeddedLocation<SelectionSet>,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
@@ -289,9 +289,9 @@ pub(crate) fn generate_eager_reader_condition_artifact<TNetworkProtocol: Network
     }
 }
 
-pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_selectable: MemoRefClientSelectable<TNetworkProtocol>,
+pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_selectable: MemoRefClientSelectable<TCompilationProfile>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
     let client_selectable = match client_selectable {
@@ -446,9 +446,11 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TNetworkProtocol: Networ
     }
 }
 
-pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_selectable: &ClientSelectable<TNetworkProtocol>,
+pub(crate) fn generate_eager_reader_output_type_artifact<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_selectable: &ClientSelectable<TCompilationProfile>,
     config: &CompilerConfig,
     info: &UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
@@ -521,9 +523,9 @@ pub(crate) fn generate_eager_reader_output_type_artifact<TNetworkProtocol: Netwo
     }
 }
 
-pub(crate) fn generate_link_output_type_artifact<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+pub(crate) fn generate_link_output_type_artifact<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
         &server_entity_named(db, client_scalar_selectable.parent_entity_name)
@@ -614,8 +616,8 @@ fn generate_function_import_statement(
     ))
 }
 
-fn generate_parameters<'a, TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn generate_parameters<'a, TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     argument_definitions: impl Iterator<Item = &'a VariableDeclaration>,
 ) -> String {
     let mut s = "{\n".to_string();

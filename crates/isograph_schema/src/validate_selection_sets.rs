@@ -10,12 +10,12 @@ use prelude::{ErrClone, Postfix};
 use std::collections::HashSet;
 
 use crate::{
-    ClientFieldVariant, IsographDatabase, NetworkProtocol, ServerEntity,
+    ClientFieldVariant, CompilationProfile, IsographDatabase, ServerEntity,
     entity_not_defined_diagnostic, reader_selection_set_map, selectable_named, server_entity_named,
 };
 
-pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
     let selection_sets = reader_selection_set_map(db);
 
@@ -69,11 +69,11 @@ pub(crate) fn validate_selection_sets<TNetworkProtocol: NetworkProtocol>(
 
 /// for each selection, validate that it corresponds to a selectable of the correct SelectionType,
 /// as well as ensure that @loadable is only selected on client fields that aren't exposed fields
-fn validate_selection_set<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_selection_set<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     errors: &mut Vec<Diagnostic>,
     selection_set: &SelectionSet,
-    parent_entity: &ServerEntity<TNetworkProtocol>,
+    parent_entity: &ServerEntity<TCompilationProfile>,
     selectable_declaration_info: EntityNameAndSelectableName,
 ) {
     let mut encountered_names_or_aliases = HashSet::new();

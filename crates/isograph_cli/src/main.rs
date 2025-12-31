@@ -2,7 +2,7 @@ mod opt;
 
 use clap::Parser;
 use common_lang_types::CurrentWorkingDirectory;
-use graphql_network_protocol::GraphQLNetworkProtocol;
+use graphql_network_protocol::GraphQLAndJavascriptProfile;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
 use isograph_config::{CompilerConfig, create_config};
@@ -40,7 +40,7 @@ async fn start_compiler(
 
     configure_logger(compile_command.log_level, &config);
     if compile_command.watch {
-        match handle_watch_command::<GraphQLNetworkProtocol>(config, current_working_directory)
+        match handle_watch_command::<GraphQLAndJavascriptProfile>(config, current_working_directory)
             .await
         {
             Ok(_) => {
@@ -54,7 +54,7 @@ async fn start_compiler(
                 std::process::exit(1);
             }
         };
-    } else if compile_and_print::<GraphQLNetworkProtocol>(config, current_working_directory)
+    } else if compile_and_print::<GraphQLAndJavascriptProfile>(config, current_working_directory)
         .is_err()
     {
         std::process::exit(1);
@@ -72,7 +72,7 @@ async fn start_language_server(
     let config = create_config(&config_location, current_working_directory);
 
     configure_logger(lsp_command.log_level, &config);
-    if let Err(e) = isograph_lsp::start_language_server::<GraphQLNetworkProtocol>(
+    if let Err(e) = isograph_lsp::start_language_server::<GraphQLAndJavascriptProfile>(
         config,
         current_working_directory,
     )

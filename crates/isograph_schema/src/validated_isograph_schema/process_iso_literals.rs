@@ -3,7 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use crate::{IsographDatabase, NetworkProtocol};
+use crate::{CompilationProfile, IsographDatabase};
 use common_lang_types::{DiagnosticVecResult, RelativePathToSourceFile, TextSource};
 use isograph_lang_parser::IsoLiteralExtractionResult;
 use pico_macros::memo;
@@ -13,8 +13,8 @@ use crate::parse_iso_literal_in_source;
 
 // This should not be used. It returns an Err variant if there is a single parse error.
 #[memo]
-pub fn parse_iso_literals<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_iso_literals<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<ParsedIsoLiteralsMap> {
     // TODO we are not checking the open file map here. This will probably be fixed when we
     // fully rewrite everything to be incremental.

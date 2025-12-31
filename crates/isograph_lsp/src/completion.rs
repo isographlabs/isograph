@@ -8,9 +8,9 @@ use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
 use isograph_lang_types::SelectionType;
-use isograph_schema::get_parent_for_selection_set_path;
+use isograph_schema::process_iso_literal_extraction;
 use isograph_schema::selectables_for_entity;
-use isograph_schema::{NetworkProtocol, process_iso_literal_extraction};
+use isograph_schema::{CompilationProfile, get_parent_for_selection_set_path};
 use lsp_types::CompletionItemLabelDetails;
 use lsp_types::{
     CompletionItem, CompletionResponse,
@@ -19,8 +19,8 @@ use lsp_types::{
 use prelude::Postfix;
 use resolve_position::ResolvePosition;
 
-pub fn on_completion<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_completion<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <Completion as Request>::Params,
 ) -> LSPRuntimeResult<Option<CompletionResponse>> {
     let url = params.text_document_position.text_document.uri;

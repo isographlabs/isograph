@@ -11,14 +11,14 @@ use isograph_lang_types::{
     VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, FieldMapItem, FieldTraversalResult, ID_ENTITY_NAME,
-    ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, NameAndArguments, NetworkProtocol,
-    NormalizationKey, RefetchStrategy, ServerObjectSelectableVariant, UserWrittenClientTypeInfo,
-    WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
-    client_scalar_selectable_named, client_selectable_map, client_selectable_named,
-    fetchable_types, inline_fragment_reader_selection_set,
-    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    server_entity_named, validate_entire_schema, validated_entrypoints,
+    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
+    FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
+    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
+    ServerObjectSelectableVariant, UserWrittenClientTypeInfo, WrappedSelectionMapSelection,
+    accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
+    client_selectable_map, client_selectable_named, fetchable_types,
+    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
+    selection_map_wrapped, server_entity_named, validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, server_selectable_named};
 use lazy_static::lazy_static;
@@ -101,8 +101,8 @@ lazy_static! {
 ///
 /// TODO this should go through OutputFormat
 #[tracing::instrument(skip_all)]
-pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_artifact_path_and_content<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<(Vec<ArtifactPathAndContent>, ContainsIsoStats)> {
     let config = db.get_isograph_config();
 
@@ -118,8 +118,8 @@ pub fn get_artifact_path_and_content<TNetworkProtocol: NetworkProtocol>(
     (artifact_path_and_content, stats).wrap_ok()
 }
 
-fn get_artifact_path_and_content_impl<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<ArtifactPathAndContent> {
     let config = db.get_isograph_config();
     let mut encountered_client_type_map = BTreeMap::new();
@@ -715,14 +715,17 @@ fn get_serialized_field_argument(
     }
 }
 
-pub(crate) fn generate_output_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-    client_scalar_selectable: &ClientScalarSelectable<TNetworkProtocol>,
+pub(crate) fn generate_output_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
 ) -> ClientScalarSelectableOutputType {
     let variant = &client_scalar_selectable.variant;
     match variant {
         ClientFieldVariant::Link => ClientScalarSelectableOutputType(
-            TNetworkProtocol::generate_link_type(db, &client_scalar_selectable.parent_entity_name),
+            TCompilationProfile::NetworkProtocol::generate_link_type(
+                db,
+                &client_scalar_selectable.parent_entity_name,
+            ),
         ),
         ClientFieldVariant::UserWritten(info) => match info
             .client_scalar_selectable_directive_set

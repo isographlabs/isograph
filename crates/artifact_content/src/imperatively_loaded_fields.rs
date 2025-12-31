@@ -5,10 +5,10 @@ use intern::string_key::Intern;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{VariableDeclaration, VariableNameWrapper};
 use isograph_schema::{
-    ClientScalarSelectable, Format, ID_FIELD_NAME, ImperativelyLoadedFieldVariant,
-    IsographDatabase, MergedSelectionMap, NetworkProtocol, PathToRefetchFieldInfo,
-    REFETCH_FIELD_NAME, RootRefetchedPath, WrappedSelectionMapSelection, fetchable_types,
-    selection_map_wrapped,
+    ClientScalarSelectable, CompilationProfile, Format, ID_FIELD_NAME,
+    ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
+    PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, WrappedSelectionMapSelection,
+    fetchable_types, selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -19,12 +19,12 @@ use crate::{
 
 #[expect(clippy::too_many_arguments)]
 pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
-    TNetworkProtocol: NetworkProtocol,
+    TCompilationProfile: CompilationProfile,
 >(
-    db: &IsographDatabase<TNetworkProtocol>,
+    db: &IsographDatabase<TCompilationProfile>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TCompilationProfile>,
     root_refetch_path: RootRefetchedPath,
     nested_selection_map: &MergedSelectionMap,
     reachable_variables: &BTreeSet<VariableNameWrapper>,
@@ -97,7 +97,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
     let root_fetchable_field = entrypoint.name;
 
-    let query_text = TNetworkProtocol::generate_query_text(
+    let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
         query_name,
         &query_text_selection_map_wrapped,
@@ -183,9 +183,9 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     ]
 }
 
-fn get_used_variable_definitions<TNetworkProtocol: NetworkProtocol>(
+fn get_used_variable_definitions<TCompilationProfile: CompilationProfile>(
     reachable_variables: &BTreeSet<VariableNameWrapper>,
-    entrypoint: &ClientScalarSelectable<TNetworkProtocol>,
+    entrypoint: &ClientScalarSelectable<TCompilationProfile>,
 ) -> BTreeSet<VariableDeclaration> {
     reachable_variables
         .iter()

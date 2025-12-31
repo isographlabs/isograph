@@ -14,10 +14,10 @@ use pico::{Database, SourceId, Storage};
 use pico_macros::{Db, Source, memo};
 use prelude::Postfix;
 
-use crate::NetworkProtocol;
+use crate::CompilationProfile;
 
 #[derive(Default, Debug, Db)]
-pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
+pub struct IsographDatabase<TCompilationProfile: CompilationProfile> {
     storage: Storage<Self>,
     #[tracked]
     iso_literal_map: IsoLiteralMap,
@@ -25,7 +25,7 @@ pub struct IsographDatabase<TNetworkProtocol: NetworkProtocol> {
     standard_sources: StandardSources,
     #[tracked]
     open_file_map: OpenFileMap,
-    phantom_data: PhantomData<TNetworkProtocol>,
+    phantom_data: PhantomData<TCompilationProfile>,
 }
 
 #[derive(Debug, Default)]
@@ -70,7 +70,7 @@ pub struct StandardSources {
     pub schema_extension_sources: BTreeMap<RelativePathToSourceFile, SourceId<SchemaSource>>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
+impl<TCompilationProfile: CompilationProfile> IsographDatabase<TCompilationProfile> {
     pub fn get_current_working_directory(&self) -> CurrentWorkingDirectory {
         *self
             .get_singleton::<CurrentWorkingDirectory>()
@@ -232,8 +232,8 @@ impl<TNetworkProtocol: NetworkProtocol> IsographDatabase<TNetworkProtocol> {
 
 // TODO use this in hover, etc
 #[memo]
-pub fn file_text_at_span_at_location<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn file_text_at_span_at_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path: RelativePathToSourceFile,
     // Note: we pass the span as well, so that if unrelated text changes (e.g. surrounding JavaScript,
     // or the iso literal is moved around), then we can recalculate this fn but short circuit the surrounding
@@ -252,8 +252,8 @@ pub fn file_text_at_span_at_location<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-fn file_text_at_location<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn file_text_at_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path: RelativePathToSourceFile,
 ) -> Option<String> {
     // TODO do something smarter

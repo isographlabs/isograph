@@ -248,7 +248,7 @@ pub struct GraphQLFieldDefinition {
     // TODO we can probably restructure things to make this less awkward.
     // As in, we should not return GraphQLFieldDefinitions to the isograph side,
     // which is GraphQL-agnostic, and instead pass field definitions. These field
-    // definitions should have an associated_data: TNetworkProtocol::FieldAssociatedData
+    // definitions should have an associated_data: TCompilationProfile::NetworkProtocol::FieldAssociatedData
     // or the like, which should carry this info.
     //
     // Then, that should be consumed by NetworkProtocol::generate_query_text, and also

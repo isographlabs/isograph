@@ -1,6 +1,6 @@
 use std::{ops::ControlFlow, str::FromStr};
 
-use isograph_schema::NetworkProtocol;
+use isograph_schema::CompilationProfile;
 use lsp_server::{Message, RequestId};
 use lsp_types::{
     Command, Range, ShowDocumentParams, Uri,
@@ -34,8 +34,8 @@ pub(crate) trait IsographLspCommand {
                 .wrap_some(),
         }
     }
-    fn handler<TNetworkProtocol: NetworkProtocol>(
-        state: &LspState<TNetworkProtocol>,
+    fn handler<TCompilationProfile: CompilationProfile>(
+        state: &LspState<TCompilationProfile>,
         params: Self::Params,
     ) -> LSPRuntimeResult<Option<Value>>;
 }
@@ -53,8 +53,8 @@ impl IsographLspCommand for OpenFileIsographLspCommand {
     const TITLE: &'static str = "Isograph: Open file";
     type Params = OpenFileIsographLspCommandParams;
 
-    fn handler<TNetworkProtocol: NetworkProtocol>(
-        state: &LspState<TNetworkProtocol>,
+    fn handler<TCompilationProfile: CompilationProfile>(
+        state: &LspState<TCompilationProfile>,
         lsp_command_params: <OpenFileIsographLspCommand as IsographLspCommand>::Params,
     ) -> LSPRuntimeResult<Option<Value>> {
         let uri = lsp_command_params.uri_string;
@@ -88,8 +88,8 @@ impl IsographLspCommand for OpenFileIsographLspCommand {
     }
 }
 
-pub fn on_command<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &LspState<TNetworkProtocol>,
+pub fn on_command<TCompilationProfile: CompilationProfile>(
+    lsp_state: &LspState<TCompilationProfile>,
     params: <ExecuteCommand as Request>::Params,
 ) -> LSPRuntimeResult<<ExecuteCommand as Request>::Result> {
     let get_response = || {

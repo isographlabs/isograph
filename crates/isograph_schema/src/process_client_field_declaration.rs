@@ -14,8 +14,9 @@ use prelude::{ErrClone, Postfix};
 use pico_macros::memo;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, FieldMapItem, ID_FIELD_NAME, IsographDatabase,
-    NODE_FIELD_NAME, NetworkProtocol, WrappedSelectionMapSelection, fetchable_types,
+    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, FieldMapItem,
+    ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, WrappedSelectionMapSelection,
+    fetchable_types,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
     server_entity_named, server_selectable_named,
 };
@@ -40,8 +41,8 @@ pub type UnprocessedSelectionSet = SelectionType<
     UnprocessedClientObjectSelectableSelectionSet,
 >;
 
-pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn process_client_field_declaration<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_field_declaration: MemoRef<ClientFieldDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
@@ -88,8 +89,8 @@ pub fn process_client_field_declaration<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn process_client_pointer_declaration<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
@@ -166,12 +167,12 @@ pub fn process_client_pointer_declaration<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn add_client_scalar_selectable_to_entity<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_field_declaration: MemoRef<ClientFieldDeclaration>,
 ) -> DiagnosticResult<(
     UnprocessedClientScalarSelectableSelectionSet,
-    MemoRef<ClientScalarSelectable<TNetworkProtocol>>,
+    MemoRef<ClientScalarSelectable<TCompilationProfile>>,
 )> {
     let client_field_declaration = client_field_declaration.lookup(db);
     let client_scalar_selectable_name = client_field_declaration.client_field_name.item;
@@ -213,8 +214,8 @@ pub fn add_client_scalar_selectable_to_entity<TNetworkProtocol: NetworkProtocol>
         .wrap_ok()
 }
 
-pub fn get_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_refetch_stategy<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy>> {
     let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
@@ -256,8 +257,8 @@ pub fn get_refetch_stategy<TNetworkProtocol: NetworkProtocol>(
     .wrap_ok()
 }
 
-fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn add_client_pointer_to_object<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let (unprocessed_fields, _) =
@@ -267,12 +268,12 @@ fn add_client_pointer_to_object<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn process_client_pointer_declaration_inner<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn process_client_pointer_declaration_inner<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<(
     UnprocessedClientObjectSelectableSelectionSet,
-    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
+    MemoRef<ClientObjectSelectable<TCompilationProfile>>,
 )> {
     let client_pointer_declaration = client_pointer_declaration.lookup(db);
     let parent_entity_name = client_pointer_declaration.parent_type.item.0;

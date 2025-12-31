@@ -1,5 +1,5 @@
 use crate::{
-    IsoLiteralsSource, IsographDatabase, NetworkProtocol, ParsedIsoLiteralsMap,
+    CompilationProfile, IsoLiteralsSource, IsographDatabase, ParsedIsoLiteralsMap,
     UnprocessedSelectionSet, process_client_field_declaration, process_client_pointer_declaration,
 };
 use common_lang_types::{
@@ -16,8 +16,8 @@ use regex::Regex;
 
 // TODO this should return a Vec of Results, since a file can contain
 // both valid and invalid iso literals.
-pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_iso_literals_in_file_content<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path_to_source_file: RelativePathToSourceFile,
     // Normally, this would not be a parameter, but instead read from the db. But,
     // we are using it in crates/isograph_fixture_tests/src/main.rs.
@@ -39,8 +39,10 @@ pub fn parse_iso_literals_in_file_content<TNetworkProtocol: NetworkProtocol>(
 }
 
 // TODO this (and the previous function) smell
-pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_iso_literals_in_file_content_and_return_all<
+    TCompilationProfile: CompilationProfile,
+>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     extract_iso_literals_from_file_content(db, relative_path_to_source_file)
@@ -52,8 +54,8 @@ pub fn parse_iso_literals_in_file_content_and_return_all<TNetworkProtocol: Netwo
 }
 
 #[memo]
-pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn parse_iso_literal_in_source<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> Vec<DiagnosticResult<(IsoLiteralExtractionResult, TextSource)>> {
     let IsoLiteralsSource {
@@ -65,8 +67,8 @@ pub fn parse_iso_literal_in_source<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn read_iso_literals_source_from_relative_path<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Option<IsoLiteralsSource> {
     let iso_literals_source_id = db.get_iso_literal(relative_path_to_source_file)?;
@@ -80,8 +82,8 @@ pub fn read_iso_literals_source_from_relative_path<TNetworkProtocol: NetworkProt
 /// We should (probably) never directly read SourceId<IsoLiteralsSource>, since if we do so,
 /// we will ignore open files.
 #[memo]
-pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn read_iso_literals_source<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     iso_literals_source_id: SourceId<IsoLiteralsSource>,
 ) -> IsoLiteralsSource {
     let IsoLiteralsSource {
@@ -101,8 +103,8 @@ pub fn read_iso_literals_source<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[expect(clippy::type_complexity)]
-pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub(crate) fn process_iso_literals<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     contains_iso: ParsedIsoLiteralsMap,
 ) -> DiagnosticVecResult<(
     Vec<UnprocessedSelectionSet>,
@@ -156,8 +158,8 @@ pub(crate) fn process_iso_literals<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-pub fn process_iso_literal_extraction<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn process_iso_literal_extraction<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     iso_literal_extraction: &IsoLiteralExtraction,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> DiagnosticResult<(IsoLiteralExtractionResult, TextSource)> {
@@ -234,8 +236,8 @@ pub struct IsoLiteralExtraction {
 }
 
 #[memo]
-pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn extract_iso_literals_from_file_content<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     relative_path_to_source_file: RelativePathToSourceFile,
 ) -> Vec<IsoLiteralExtraction> {
     let IsoLiteralsSource {
@@ -270,8 +272,8 @@ pub fn extract_iso_literals_from_file_content<TNetworkProtocol: NetworkProtocol>
 }
 
 #[memo]
-pub fn memoized_parse_iso_literal<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn memoized_parse_iso_literal<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     iso_literal_text: String,
     definition_file_path: RelativePathToSourceFile,
     const_export_name: Option<String>,

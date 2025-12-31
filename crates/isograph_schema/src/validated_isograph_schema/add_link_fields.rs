@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
 use crate::{
-    ClientFieldVariant, ClientScalarSelectable, IsographDatabase, LINK_FIELD_NAME, NetworkProtocol,
-    server_object_entities,
+    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, IsographDatabase,
+    LINK_FIELD_NAME, server_object_entities,
 };
 use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
@@ -12,9 +12,9 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 #[memo]
-pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<MemoRef<ClientScalarSelectable<TNetworkProtocol>>>> {
+pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> DiagnosticResult<Vec<MemoRef<ClientScalarSelectable<TCompilationProfile>>>> {
     server_object_entities(db)
         .as_ref()
         .map_err(|e| e.clone())?
@@ -44,10 +44,10 @@ pub fn get_link_fields<TNetworkProtocol: NetworkProtocol>(
 
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn get_link_fields_map<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn get_link_fields_map<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
-    HashMap<(EntityName, SelectableName), MemoRef<ClientScalarSelectable<TNetworkProtocol>>>,
+    HashMap<(EntityName, SelectableName), MemoRef<ClientScalarSelectable<TCompilationProfile>>>,
 > {
     get_link_fields(db)
         .to_owned()

@@ -5,17 +5,17 @@ use crate::{
     ClientObjectSelectable, MemoRefClientSelectable, MemoRefServerSelectable, ServerSelectable,
 };
 
-pub type MemoRefSelectable<TNetworkProtocol> = DefinitionLocation<
-    MemoRefServerSelectable<TNetworkProtocol>,
-    MemoRefClientSelectable<TNetworkProtocol>,
+pub type MemoRefSelectable<TCompilationProfile> = DefinitionLocation<
+    MemoRefServerSelectable<TCompilationProfile>,
+    MemoRefClientSelectable<TCompilationProfile>,
 >;
 
-pub type BorrowedObjectSelectable<'a, TNetworkProtocol> = DefinitionLocation<
-    &'a ServerSelectable<TNetworkProtocol>,
-    &'a ClientObjectSelectable<TNetworkProtocol>,
+pub type BorrowedObjectSelectable<'a, TCompilationProfile> = DefinitionLocation<
+    &'a ServerSelectable<TCompilationProfile>,
+    &'a ClientObjectSelectable<TCompilationProfile>,
 >;
 
-pub type MemoRefObjectSelectable<TNetworkProtocol> = DefinitionLocation<
-    MemoRef<ServerSelectable<TNetworkProtocol>>,
-    MemoRef<ClientObjectSelectable<TNetworkProtocol>>,
+pub type MemoRefObjectSelectable<TCompilationProfile> = DefinitionLocation<
+    MemoRef<ServerSelectable<TCompilationProfile>>,
+    MemoRef<ClientObjectSelectable<TCompilationProfile>>,
 >;

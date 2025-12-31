@@ -5,15 +5,15 @@ use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::{IsographDatabase, MemoRefServerEntity, NetworkProtocol};
+use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity, NetworkProtocol};
 
 /// This function just drops the locations
 #[memo]
-pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TNetworkProtocol>>>, Diagnostic> {
+pub fn server_entities_map_without_locations<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TCompilationProfile>>>, Diagnostic> {
     let (outcome, _fetchable_types) =
-        TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
@@ -26,10 +26,11 @@ pub fn server_entities_map_without_locations<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
-) -> DiagnosticResult<Vec<MemoRefServerEntity<TNetworkProtocol>>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+pub fn server_object_entities<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> DiagnosticResult<Vec<MemoRefServerEntity<TCompilationProfile>>> {
+    let (outcome, _) =
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
@@ -47,10 +48,10 @@ pub fn server_object_entities<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     name: EntityName,
-) -> DiagnosticResult<Option<MemoRefServerEntity<TNetworkProtocol>>> {
+) -> DiagnosticResult<Option<MemoRefServerEntity<TCompilationProfile>>> {
     let map = server_entities_map_without_locations(db)
         .clone_err()?
         .lookup(db);
@@ -59,11 +60,12 @@ pub fn server_entity_named<TNetworkProtocol: NetworkProtocol>(
 }
 
 #[memo]
-pub fn entity_definition_location<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) = TNetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) =
+        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item

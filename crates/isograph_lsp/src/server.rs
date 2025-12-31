@@ -28,7 +28,7 @@ use isograph_compiler::{
 };
 use isograph_config::{CompilerConfig, create_config};
 use isograph_lang_types::semantic_token_legend::semantic_token_legend;
-use isograph_schema::{NetworkProtocol, validate_entire_schema};
+use isograph_schema::{CompilationProfile, validate_entire_schema};
 use lsp_server::{Connection, ErrorCode, Response, ResponseError};
 use lsp_types::{
     CodeActionProviderCapability, CompletionOptions, ExecuteCommandOptions,
@@ -97,7 +97,7 @@ const SHORT_DEBOUNCE_TIME: Duration = Duration::from_millis(100);
 const LONG_DEBOUNCE_TIME: Duration = Duration::from_hours(24 * 365);
 
 /// Run the main server loop
-pub async fn run<TNetworkProtocol: NetworkProtocol>(
+pub async fn run<TCompilationProfile: CompilationProfile>(
     connection: Connection,
     config: CompilerConfig,
     _params: InitializeParams,
@@ -108,7 +108,7 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     let (mut file_system_receiver, mut file_system_watcher) =
         create_debounced_file_watcher(&config);
 
-    let compiler_state: CompilerState<TNetworkProtocol> =
+    let compiler_state: CompilerState<TCompilationProfile> =
         CompilerState::new(config, current_working_directory).map_err(|e| e.wrap_vec())?;
     let mut lsp_state = LspState::new(compiler_state, &connection.sender);
 
@@ -219,9 +219,9 @@ pub async fn run<TNetworkProtocol: NetworkProtocol>(
     ().wrap_ok()
 }
 
-fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
+fn dispatch_notification<TCompilationProfile: CompilationProfile>(
     notification: lsp_server::Notification,
-    lsp_state: &mut LspState<TNetworkProtocol>,
+    lsp_state: &mut LspState<TCompilationProfile>,
 ) -> ControlFlow<Option<LSPRuntimeError>, ()> {
     LSPNotificationDispatch::new(notification, lsp_state)
         .on_notification_sync::<DidOpenTextDocument>(on_did_open_text_document)?
@@ -231,9 +231,9 @@ fn dispatch_notification<TNetworkProtocol: NetworkProtocol>(
 
     ControlFlow::Continue(())
 }
-fn dispatch_request<TNetworkProtocol: NetworkProtocol>(
+fn dispatch_request<TCompilationProfile: CompilationProfile>(
     request: lsp_server::Request,
-    lsp_state: &LspState<TNetworkProtocol>,
+    lsp_state: &LspState<TCompilationProfile>,
 ) -> Response {
     // Returns ControlFlow::Break(ServerResponse) if the request
     // was handled, ControlFlow::Continue(Request) otherwise.

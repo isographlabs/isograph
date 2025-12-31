@@ -1,5 +1,5 @@
 use common_lang_types::relative_path_from_absolute_and_working_directory;
-use isograph_schema::NetworkProtocol;
+use isograph_schema::CompilationProfile;
 use lsp_types::{
     DidChangeTextDocumentParams, DidOpenTextDocumentParams, TextDocumentItem,
     notification::{
@@ -11,8 +11,8 @@ use crate::{
     lsp_runtime_error::LSPRuntimeResult, lsp_state::LspState, uri_file_path_ext::UriFilePathExt,
 };
 
-pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &mut LspState<TNetworkProtocol>,
+pub fn on_did_open_text_document<TCompilationProfile: CompilationProfile>(
+    lsp_state: &mut LspState<TCompilationProfile>,
     params: <DidOpenTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidOpenTextDocumentParams { text_document } = params;
@@ -30,8 +30,8 @@ pub fn on_did_open_text_document<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &mut LspState<TNetworkProtocol>,
+pub fn on_did_close_text_document<TCompilationProfile: CompilationProfile>(
+    lsp_state: &mut LspState<TCompilationProfile>,
     params: <DidCloseTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let uri = params.text_document.uri;
@@ -49,8 +49,8 @@ pub fn on_did_close_text_document<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-pub fn on_did_change_text_document<TNetworkProtocol: NetworkProtocol>(
-    lsp_state: &mut LspState<TNetworkProtocol>,
+pub fn on_did_change_text_document<TCompilationProfile: CompilationProfile>(
+    lsp_state: &mut LspState<TCompilationProfile>,
     params: <DidChangeTextDocument as Notification>::Params,
 ) -> LSPRuntimeResult<()> {
     let DidChangeTextDocumentParams {

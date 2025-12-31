@@ -3,7 +3,7 @@ use common_lang_types::{
     CurrentWorkingDirectory, LocationFreeDiagnostic, LocationFreeDiagnosticVecResult,
 };
 use isograph_config::{CompilerConfig, create_config};
-use isograph_schema::NetworkProtocol;
+use isograph_schema::CompilationProfile;
 use notify::{
     Error, EventKind, RecommendedWatcher, RecursiveMode,
     event::{CreateKind, ModifyKind, RemoveKind, RenameMode},
@@ -23,7 +23,7 @@ use crate::{
     with_duration::WithDuration,
 };
 
-pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
+pub async fn handle_watch_command<TCompilationProfile: CompilationProfile>(
     config: CompilerConfig,
     current_working_directory: CurrentWorkingDirectory,
 ) -> LocationFreeDiagnosticVecResult<()> {
@@ -33,7 +33,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
     let config = state.db.get_isograph_config().clone();
 
     info!("{}", "Starting to compile.".green());
-    let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
+    let result = WithDuration::new(|| compile::<TCompilationProfile>(&mut state));
     let _ = print_result(&state.db, result);
 
     let (mut file_system_receiver, mut file_system_watcher) =
@@ -57,7 +57,7 @@ pub async fn handle_watch_command<TNetworkProtocol: NetworkProtocol>(
                     info!("{}", "File changes detected. Starting to compile.".cyan());
                     update_sources(&mut state.db, &changes)?;
                 };
-                let result = WithDuration::new(|| compile::<TNetworkProtocol>(&mut state));
+                let result = WithDuration::new(|| compile::<TCompilationProfile>(&mut state));
                 let _ = print_result(&state.db, result);
                 state.run_garbage_collection();
             }

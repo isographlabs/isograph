@@ -14,8 +14,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    BOOLEAN_ENTITY_NAME, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsographDatabase,
-    NetworkProtocol, STRING_ENTITY_NAME, server_selectables_map_for_entity,
+    BOOLEAN_ENTITY_NAME, CompilationProfile, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME,
+    IsographDatabase, STRING_ENTITY_NAME, server_selectables_map_for_entity,
 };
 
 fn scalar_literal_satisfies_type(
@@ -139,8 +139,8 @@ fn union_contains(union: &UnionTypeAnnotationDeclaration, potential_member: &Uni
     union.variants.contains(potential_member)
 }
 
-pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+pub fn value_satisfies_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
     field_argument_definition_type: &TypeAnnotationDeclaration,
     variable_definitions: &[VariableDeclaration],
@@ -295,8 +295,8 @@ pub fn value_satisfies_type<TNetworkProtocol: NetworkProtocol>(
     }
 }
 
-fn object_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn object_satisfies_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     selection_supplied_argument_value: &WithEmbeddedLocation<NonConstantValue>,
     variable_definitions: &[VariableDeclaration],
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
@@ -361,8 +361,8 @@ enum ObjectLiteralFieldType {
     Missing(SelectableName),
 }
 
-fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeSet<ObjectLiteralFieldType>> {
@@ -397,8 +397,8 @@ fn get_non_nullable_missing_and_provided_fields<TNetworkProtocol: NetworkProtoco
         .wrap_ok()
 }
 
-fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn validate_no_extraneous_fields<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: EmbeddedLocation,
@@ -438,8 +438,8 @@ fn validate_no_extraneous_fields<TNetworkProtocol: NetworkProtocol>(
     Ok(())
 }
 
-fn list_satisfies_type<TNetworkProtocol: NetworkProtocol>(
-    db: &IsographDatabase<TNetworkProtocol>,
+fn list_satisfies_type<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
     supplied_list: &[WithEmbeddedLocation<NonConstantValue>],
     target_type: &TypeAnnotationDeclaration,
     variable_definitions: &[VariableDeclaration],

@@ -2,7 +2,7 @@ use std::time::{Duration, Instant};
 
 use common_lang_types::{CurrentWorkingDirectory, LocationFreeDiagnosticResult};
 use isograph_config::CompilerConfig;
-use isograph_schema::{IsographDatabase, NetworkProtocol};
+use isograph_schema::{CompilationProfile, IsographDatabase};
 use pico::Database;
 use prelude::Postfix;
 
@@ -12,14 +12,14 @@ use artifact_content::FileSystemState;
 const GC_DURATION_SECONDS: u64 = 60;
 
 #[derive(Debug)]
-pub struct CompilerState<TNetworkProtocol: NetworkProtocol> {
-    pub db: IsographDatabase<TNetworkProtocol>,
+pub struct CompilerState<TCompilationProfile: CompilationProfile> {
+    pub db: IsographDatabase<TCompilationProfile>,
     pub last_gc_run: Instant,
     // TODO this doesn't belong here... it's watch-mode-specific
     pub file_system_state: Option<FileSystemState>,
 }
 
-impl<TNetworkProtocol: NetworkProtocol> CompilerState<TNetworkProtocol> {
+impl<TCompilationProfile: CompilationProfile> CompilerState<TCompilationProfile> {
     pub fn new(
         config: CompilerConfig,
         current_working_directory: CurrentWorkingDirectory,
