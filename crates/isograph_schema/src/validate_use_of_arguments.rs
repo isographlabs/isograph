@@ -80,11 +80,17 @@ fn validate_use_of_arguments_for_client_type<TNetworkProtocol: NetworkProtocol>(
             }
         };
 
-    let parent_entity = server_entity_named(db, parent_entity_name)
+    let parent_entity = match server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-        .expect("Expected entity to exist. This is indicative of a bug in Isograph.")
-        .lookup(db);
+    {
+        Some(entity) => entity.lookup(db),
+        None => {
+            // We could emit an error, but this is validated already.
+            // Anyway, this is clearly a smell.
+            return;
+        }
+    };
 
     visit_selection_set(
         db,
