@@ -16,8 +16,8 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem, ID_ENTITY_NAME,
-    ID_FIELD_NAME, ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
     NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, ServerEntity, ServerSelectable,
     TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, generate_refetch_field_strategy,
     insert_selectable_or_multiple_definition_diagnostic,
@@ -27,7 +27,7 @@ use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
-    GraphQLNetworkProtocol, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
+    GraphQLAndJavascriptProfile, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
     STRING_JAVASCRIPT_TYPE, insert_entity_or_multiple_definition_diagnostic,
 };
 
@@ -40,13 +40,11 @@ lazy_static! {
 }
 
 #[expect(clippy::too_many_arguments)]
-pub fn process_graphql_type_system_document<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
+pub fn process_graphql_type_system_document(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-    outcome: &mut ParseTypeSystemOutcome<TCompilationProfile>,
+    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
@@ -77,6 +75,7 @@ pub fn process_graphql_type_system_document<
                             subtypes: vec![],
                         }
                         .object_selected(),
+                        target_platform_associated_data: (),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -176,6 +175,7 @@ pub fn process_graphql_type_system_document<
                         // TODO allow customization here
                         selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
                         network_protocol_associated_data: ().scalar_selected(),
+                        target_platform_associated_data: (),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -208,6 +208,7 @@ pub fn process_graphql_type_system_document<
                             subtypes: vec![],
                         }
                         .object_selected(),
+                        target_platform_associated_data: (),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -243,6 +244,7 @@ pub fn process_graphql_type_system_document<
                         // TODO allow customization here
                         selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
                         network_protocol_associated_data: ().scalar_selected(),
+                        target_platform_associated_data: (),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -273,6 +275,7 @@ pub fn process_graphql_type_system_document<
                                 .collect(),
                         }
                         .object_selected(),
+                        target_platform_associated_data: (),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -361,12 +364,10 @@ fn refetch_selectable_refetch_strategy(
     ))
 }
 
-fn get_refetch_selectable<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
+fn get_refetch_selectable(
     server_object_entity_name: EntityName,
     subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
-) -> ClientScalarSelectable<TCompilationProfile> {
+) -> ClientScalarSelectable<GraphQLAndJavascriptProfile> {
     ClientScalarSelectable {
         description: format!(
             "A refetch field for the {} type.",
@@ -403,13 +404,11 @@ fn get_refetch_selectable<
     }
 }
 
-pub(crate) fn get_typename_selectable<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
+pub(crate) fn get_typename_selectable(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     server_object_entity_name: EntityName,
     javascript_type_override: Option<JavascriptName>,
-) -> MemoRef<ServerSelectable<TCompilationProfile>> {
+) -> MemoRef<ServerSelectable<GraphQLAndJavascriptProfile>> {
     ServerSelectable {
         description: format!("A discriminant for the {} type", server_object_entity_name)
             .intern()
@@ -429,13 +428,11 @@ pub(crate) fn get_typename_selectable<
 }
 
 #[expect(clippy::too_many_arguments)]
-pub fn process_graphql_type_system_extension_document<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
+pub fn process_graphql_type_system_extension_document(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-    outcome: &mut ParseTypeSystemOutcome<TCompilationProfile>,
+    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,

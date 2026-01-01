@@ -7,7 +7,7 @@ use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
-    NetworkProtocol, entity_definition_location, server_entity_named,
+    entity_definition_location, server_entity_named,
 };
 
 #[memo]
@@ -18,7 +18,7 @@ pub fn server_selectables_map<TCompilationProfile: CompilationProfile>(
     BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>>,
 > {
     let (outcome, _fetchable_types) =
-        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item

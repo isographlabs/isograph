@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{
     DiagnosticResult, EntityName, QueryExtraInfo, QueryOperationName, QueryText, SelectableName,
-    WithLocation, WithNonFatalDiagnostics,
+    WithLocation,
 };
 use isograph_lang_types::VariableDeclaration;
 
@@ -29,18 +29,6 @@ pub trait NetworkProtocol:
 {
     type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
     type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
-
-    // TODO this should return a Vec<Result<...>>, not a Result<Vec<...>>, probably
-    #[expect(clippy::type_complexity)]
-    fn parse_type_system_documents<
-        TCompilationProfile: CompilationProfile<NetworkProtocol = Self>,
-    >(
-        db: &IsographDatabase<TCompilationProfile>,
-    ) -> &DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
-        // TODO just seems awkward that we return fetchable types
-        BTreeMap<EntityName, RootOperationName>,
-    )>;
 
     fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
         db: &IsographDatabase<TCompilationProfile>,

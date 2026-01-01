@@ -58,12 +58,26 @@ pub struct GraphQLAndJavascriptProfile {}
 impl CompilationProfile for GraphQLAndJavascriptProfile {
     type NetworkProtocol = GraphQLNetworkProtocol;
     type TargetPlatform = JavascriptTargetPlatform;
+
+    #[expect(clippy::type_complexity)]
+    #[memo]
+    fn parse_type_system_documents(
+        db: &IsographDatabase<GraphQLAndJavascriptProfile>,
+    ) -> DiagnosticResult<(
+        WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
+        // fetchable types
+        BTreeMap<EntityName, RootOperationName>,
+    )> {
+        parse_type_system_document(db)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
 pub struct JavascriptTargetPlatform {}
 
-impl TargetPlatform for JavascriptTargetPlatform {}
+impl TargetPlatform for JavascriptTargetPlatform {
+    type EntityAssociatedData = ();
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
 pub struct GraphQLNetworkProtocol {}
@@ -71,20 +85,6 @@ pub struct GraphQLNetworkProtocol {}
 impl NetworkProtocol for GraphQLNetworkProtocol {
     type EntityAssociatedData = SelectionType<(), GraphQLSchemaObjectAssociatedData>;
     type SelectableAssociatedData = ();
-
-    #[expect(clippy::type_complexity)]
-    #[memo]
-    fn parse_type_system_documents<
-        TCompilationProfile: CompilationProfile<NetworkProtocol = Self>,
-    >(
-        db: &IsographDatabase<TCompilationProfile>,
-    ) -> DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
-        // fetchable types
-        BTreeMap<EntityName, RootOperationName>,
-    )> {
-        parse_type_system_document(db)
-    }
 
     fn generate_link_type<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
         db: &IsographDatabase<TCompilationProfile>,

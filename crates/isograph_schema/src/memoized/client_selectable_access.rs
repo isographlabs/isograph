@@ -2,8 +2,8 @@ use std::collections::{BTreeMap, HashMap, btree_map::Entry};
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, IsographDatabase,
-    MemoRefClientSelectable, NetworkProtocol, add_client_scalar_selectable_to_entity,
-    get_link_fields_map, process_client_pointer_declaration_inner,
+    MemoRefClientSelectable, add_client_scalar_selectable_to_entity, get_link_fields_map,
+    process_client_pointer_declaration_inner,
 };
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EntityName, Location, SelectableName, WithEmbeddedLocation,
@@ -287,8 +287,7 @@ pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: Compi
 ) -> DiagnosticResult<
     HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
 > {
-    let outcome =
-        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let outcome = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
 
     expose_as_field_queue

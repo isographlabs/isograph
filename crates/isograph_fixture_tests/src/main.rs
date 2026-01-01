@@ -6,8 +6,7 @@ use common_lang_types::{
 };
 use graphql_network_protocol::GraphQLAndJavascriptProfile;
 use intern::{Lookup, string_key::Intern};
-use isograph_schema::IsographDatabase;
-use isograph_schema::parse_iso_literals_in_file_content;
+use isograph_schema::{IsographDatabase, parse_iso_literals_in_file_content};
 use lazy_static::lazy_static;
 use regex::Regex;
 

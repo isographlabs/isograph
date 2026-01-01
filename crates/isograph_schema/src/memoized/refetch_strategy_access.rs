@@ -8,7 +8,7 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    CompilationProfile, IsographDatabase, NetworkProtocol, RefetchStrategy,
+    CompilationProfile, IsographDatabase, RefetchStrategy,
     client_selectable_declaration_map_from_iso_literals, get_refetch_stategy,
     multiple_selectable_definitions_found_diagnostic, selectable_is_not_defined_diagnostic,
     selectable_is_wrong_type_diagnostic,
@@ -56,8 +56,7 @@ pub fn refetch_strategy_map<TCompilationProfile: CompilationProfile>(
         }
     }
 
-    let outcome =
-        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let outcome = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
     let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
     for with_location in expose_fields.iter().flatten() {

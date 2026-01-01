@@ -13,18 +13,18 @@ use isograph_lang_types::{
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, CompilationProfile,
-    FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete,
-    IsographDatabase, ParseTypeSystemOutcome, RefetchStrategy, RootOperationName,
-    STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives, ServerObjectSelectableVariant,
-    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
+    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
+    ServerEntityDirectives, ServerObjectSelectableVariant, ServerSelectable, TYPENAME_FIELD_NAME,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::Postfix;
 
 use crate::{
-    BOOLEAN_JAVASCRIPT_TYPE, GraphQLNetworkProtocol, GraphQLSchemaObjectAssociatedData,
+    BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
     NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
     insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
     process_type_system_definition::{
@@ -33,12 +33,10 @@ use crate::{
     },
 };
 
-pub(crate) fn parse_type_system_document<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
+pub(crate) fn parse_type_system_document(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
 ) -> DiagnosticResult<(
-    WithNonFatalDiagnostics<ParseTypeSystemOutcome<TCompilationProfile>>,
+    WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
     // fetchable types
     BTreeMap<EntityName, RootOperationName>,
 )> {
@@ -109,6 +107,7 @@ pub(crate) fn parse_type_system_document<
                 }
                 .object_selected(),
                 selection_info: false.wrap(IsConcrete).object_selected(),
+                target_platform_associated_data: (),
             }
             .interned_value(db)
             .with_location(with_location.location)
@@ -508,11 +507,9 @@ pub(crate) fn parse_type_system_document<
         .wrap_ok()
 }
 
-fn define_default_graphql_types<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
-    outcome: &mut ParseTypeSystemOutcome<TCompilationProfile>,
+fn define_default_graphql_types(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
+    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
     insert_entity_or_multiple_definition_diagnostic(
@@ -523,6 +520,7 @@ fn define_default_graphql_types<
             name: *ID_ENTITY_NAME,
             selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
+            target_platform_associated_data: (),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -536,6 +534,7 @@ fn define_default_graphql_types<
             name: *STRING_ENTITY_NAME,
             selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
+            target_platform_associated_data: (),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -549,6 +548,7 @@ fn define_default_graphql_types<
             name: *BOOLEAN_ENTITY_NAME,
             selection_info: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
+            target_platform_associated_data: (),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -562,6 +562,7 @@ fn define_default_graphql_types<
             name: *FLOAT_ENTITY_NAME,
             selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
+            target_platform_associated_data: (),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -575,6 +576,7 @@ fn define_default_graphql_types<
             name: *INT_ENTITY_NAME,
             selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
+            target_platform_associated_data: (),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -583,11 +585,9 @@ fn define_default_graphql_types<
 }
 
 // Defaults to false if item is missing... should this panic?
-fn is_object_entity<
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &IsographDatabase<TCompilationProfile>,
-    entities: &EntitiesDefinedBySchema<TCompilationProfile>,
+fn is_object_entity(
+    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
+    entities: &EntitiesDefinedBySchema,
     target: EntityName,
 ) -> bool {
     entities
@@ -596,17 +596,14 @@ fn is_object_entity<
         .unwrap_or(false)
 }
 
-fn traverse_selections_and_return_path<
-    'a,
-    TCompilationProfile: CompilationProfile<NetworkProtocol = GraphQLNetworkProtocol>,
->(
-    db: &'a IsographDatabase<TCompilationProfile>,
-    outcome: &'a ParseTypeSystemOutcome<TCompilationProfile>,
+fn traverse_selections_and_return_path<'a>(
+    db: &'a IsographDatabase<GraphQLAndJavascriptProfile>,
+    outcome: &'a ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
-    Vec<&'a ServerSelectable<TCompilationProfile>>,
-    &'a ServerEntity<TCompilationProfile>,
+    Vec<&'a ServerSelectable<GraphQLAndJavascriptProfile>>,
+    &'a ServerEntity<GraphQLAndJavascriptProfile>,
 )> {
     let mut current_entity = outcome
         .entities
@@ -693,5 +690,5 @@ fn traverse_selections_and_return_path<
     (output, current_entity).wrap_ok()
 }
 
-type EntitiesDefinedBySchema<TCompilationProfile> =
-    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<TCompilationProfile>>>>;
+type EntitiesDefinedBySchema =
+    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLAndJavascriptProfile>>>>;

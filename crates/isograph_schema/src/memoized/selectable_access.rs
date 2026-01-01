@@ -4,8 +4,8 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    CompilationProfile, IsographDatabase, MemoRefSelectable, NetworkProtocol,
-    client_selectable_declaration, client_selectable_map, client_selectable_named,
+    CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_declaration,
+    client_selectable_map, client_selectable_named,
     multiple_selectable_definitions_found_diagnostic, server_selectable_named,
     server_selectables_map, server_selectables_map_for_entity,
 };
@@ -98,8 +98,7 @@ pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) =
-        TCompilationProfile::NetworkProtocol::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
 
     if let Some(x) = outcome
         .item

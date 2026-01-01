@@ -10,7 +10,7 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, IsographDatabase, NetworkProtocol, RefetchStrategy,
+    CompilationProfile, IsographDatabase, RefetchStrategy,
     client_selectable_declaration_map_from_iso_literals, get_link_fields,
 };
 
@@ -77,7 +77,7 @@ pub fn reader_selection_set_map<TCompilationProfile: CompilationProfile>(
         }
     }
 
-    if let Ok(outcome) = TCompilationProfile::NetworkProtocol::parse_type_system_documents(db) {
+    if let Ok(outcome) = TCompilationProfile::parse_type_system_documents(db) {
         let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
         // And we must also do it for expose fields. Ay ay ay

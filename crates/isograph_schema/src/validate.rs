@@ -6,7 +6,7 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase, NetworkProtocol,
+    ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map,
     entity_not_defined_diagnostic, parse_iso_literals, process_iso_literals, selectables,
     server_entities_map_without_locations, server_entity_named, server_id_selectable,
@@ -52,8 +52,7 @@ pub fn validate_entire_schema<TCompilationProfile: CompilationProfile>(
 
     errors.extend(validate_scalar_selectable_directive_sets(db));
 
-    if let Ok((outcome, _)) = TCompilationProfile::NetworkProtocol::parse_type_system_documents(db)
-    {
+    if let Ok((outcome, _)) = TCompilationProfile::parse_type_system_documents(db) {
         errors.extend(outcome.non_fatal_diagnostics.clone());
     }
 
