@@ -8,7 +8,7 @@ use isograph_lang_types::{
 };
 use pico::MemoRef;
 
-use crate::{CompilationProfile, NetworkProtocol, ServerObjectSelectableVariant};
+use crate::{CompilationProfile, NetworkProtocol, ServerObjectSelectableVariant, TargetPlatform};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
@@ -35,6 +35,8 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
 
     pub network_protocol_associated_data:
         <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,
+    pub target_platform_associated_data:
+        <<TCompilationProfile as CompilationProfile>::TargetPlatform as TargetPlatform>::SelectableAssociatedData,
 }
 
 impl<TCompilationProfile: CompilationProfile> ServerSelectable<TCompilationProfile> {

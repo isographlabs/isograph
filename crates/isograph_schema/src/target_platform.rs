@@ -8,6 +8,7 @@ pub trait TargetPlatform:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
     type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
+    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,

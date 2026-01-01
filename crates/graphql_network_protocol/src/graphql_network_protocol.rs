@@ -82,6 +82,7 @@ pub struct JavascriptTargetPlatform {}
 
 impl TargetPlatform for JavascriptTargetPlatform {
     type EntityAssociatedData = SelectionType<JavascriptName, ()>;
+    type SelectableAssociatedData = ();
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,

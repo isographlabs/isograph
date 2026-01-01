@@ -190,6 +190,7 @@ pub(crate) fn parse_type_system_document(
                         })
                         .collect(),
                     network_protocol_associated_data: (),
+                    target_platform_associated_data: (),
                 }
                 .interned_value(db)
                 .server_defined()
@@ -238,6 +239,7 @@ pub(crate) fn parse_type_system_document(
 
                     network_protocol_associated_data: (),
                     selection_info: None.scalar_selected(),
+                    target_platform_associated_data: (),
                 }
                 .interned_value(db)
                 .server_defined()
@@ -286,6 +288,7 @@ pub(crate) fn parse_type_system_document(
                     parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                     arguments: vec![],
                     network_protocol_associated_data: (),
+                    target_platform_associated_data: (),
                 }
                 .interned_value(db)
                 .server_defined()
