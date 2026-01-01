@@ -153,7 +153,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
             .as_scalar()
             .expect("Expected selectable to be scalar");
 
-        let inner_text = match javascript_type_override {
+        match javascript_type_override {
             Some(javascript_name) => javascript_name.dereference(),
             None => server_entity_named(db, server_scalar_selectable.target_entity_name.inner().0)
                 .as_ref()
@@ -169,9 +169,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .selection_info
                 .as_scalar()
                 .expect("Expected scalar entity to be scalar"),
-        };
-
-        inner_text
+        }
     }
 }
 

@@ -13,7 +13,6 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
-    server_entity_named,
 };
 use prelude::Postfix;
 
@@ -281,20 +280,13 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                     let name_or_alias = selection.item.name_or_alias().item;
 
                     let output_type = server_scalar_selectable.target_entity_name.clone();
-                    let inner_text = server_entity_named(db, output_type.inner().0)
-                        .as_ref()
-                        .expect(
-                            "Expected parsing to not have failed. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db)
-                        .selection_info
-                        .as_scalar()
-                        .expect("Expected scalar entity to be scalar");
+
+                    let inner_text =
+                        TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
+                            db,
+                            server_scalar_selectable.parent_entity_name,
+                            server_scalar_selectable.name,
+                        );
 
                     if selection.item.is_updatable() {
                         *updatable_fields = true;
