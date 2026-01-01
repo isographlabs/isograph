@@ -151,7 +151,9 @@ pub fn process_client_pointer_declaration<TCompilationProfile: CompilationProfil
                 .wrap_err();
             }
         },
-        SelectionType::Scalar(scalar_entity_name) => {
+        SelectionType::Scalar(_) => {
+            // What?? This just seems wrong.
+            let scalar_entity_name = parent_entity.name;
             return Diagnostic::new(
                 format!("`{scalar_entity_name}` is not a type that has been defined."),
                 client_pointer_declaration_item
