@@ -26,6 +26,7 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
     // - For objects, ServerObjectSelectableVariant belongs in the
     // network_protocol_associated_data field. Since it is (presumably) only used
     // by query text generation.
+    // TODO move this onto target_platform_associated_data
     pub selection_info: SelectionType<Option<JavascriptName>, ServerObjectSelectableVariant>,
 
     pub parent_entity_name: EntityName,

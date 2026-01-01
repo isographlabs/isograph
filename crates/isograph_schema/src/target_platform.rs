@@ -1,6 +1,6 @@
 use std::{fmt::Debug, hash::Hash};
 
-use common_lang_types::EntityName;
+use common_lang_types::{EntityName, JavascriptName, SelectableName};
 
 use crate::{CompilationProfile, IsographDatabase};
 
@@ -16,4 +16,12 @@ pub trait TargetPlatform:
         entity_name: EntityName,
         indentation_level: u8,
     ) -> String;
+
+    fn get_inner_text_for_selectable<
+        TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
+        parent_object_entity_name: EntityName,
+        selectable_name: SelectableName,
+    ) -> JavascriptName;
 }

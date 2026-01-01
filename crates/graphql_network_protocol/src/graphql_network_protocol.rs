@@ -11,7 +11,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
-    server_selectables_map_for_entity,
+    selectable_named, server_selectables_map_for_entity,
 };
 use isograph_schema::{
     Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
@@ -19,7 +19,7 @@ use isograph_schema::{
 };
 use lazy_static::lazy_static;
 use pico_macros::memo;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::parse_type_system_document::parse_type_system_document;
 use crate::process_type_system_definition::multiple_entity_definitions_found_diagnostic;
@@ -129,6 +129,49 @@ impl TargetPlatform for JavascriptTargetPlatform {
             }
             SelectionType::Scalar(s) => s.to_string(),
         }
+    }
+
+    fn get_inner_text_for_selectable<
+        TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
+        parent_object_entity_name: EntityName,
+        selectable_name: SelectableName,
+    ) -> JavascriptName {
+        let server_scalar_selectable =
+            selectable_named(db, parent_object_entity_name, selectable_name)
+                .clone_err()
+                .expect("Expected parsing to have worked")
+                .expect("Expected selectable to exist")
+                .as_server()
+                .expect("Expected selectable to be server selectable")
+                .lookup(db);
+
+        let javascript_type_override = server_scalar_selectable
+            .selection_info
+            .as_ref()
+            .as_scalar()
+            .expect("Expected selectable to be scalar");
+
+        let inner_text = match javascript_type_override {
+            Some(javascript_name) => javascript_name.dereference(),
+            None => server_entity_named(db, server_scalar_selectable.target_entity_name.inner().0)
+                .as_ref()
+                .expect(
+                    "Expected parsing to not have failed. \
+                            This is indicative of a bug in Isograph.",
+                )
+                .expect(
+                    "Expected entity to exist. \
+                            This is indicative of a bug in Isograph.",
+                )
+                .lookup(db)
+                .selection_info
+                .as_scalar()
+                .expect("Expected scalar entity to be scalar"),
+        };
+
+        inner_text
     }
 }
 

@@ -11,7 +11,7 @@ use isograph_lang_types::{
     SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 use isograph_schema::{
-    ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME,
+    ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
     server_entity_named,
 };
@@ -96,32 +96,12 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                     let name_or_alias: SelectableNameOrAlias =
                         (*scalar_field_selection).name_or_alias().item;
 
-                    let javascript_type_override = server_scalar_selectable
-                        .selection_info
-                        .as_ref()
-                        .as_scalar()
-                        .expect("Expected selectable to be scalar");
-
-                    let inner_text = match javascript_type_override {
-                        Some(javascript_name) => javascript_name.dereference(),
-                        None => server_entity_named(
+                    let inner_text =
+                        TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
                             db,
-                            server_scalar_selectable.target_entity_name.inner().0,
-                        )
-                        .as_ref()
-                        .expect(
-                            "Expected parsing to not have failed. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db)
-                        .selection_info
-                        .as_scalar()
-                        .expect("Expected scalar entity to be scalar"),
-                    };
+                            server_scalar_selectable.parent_entity_name,
+                            server_scalar_selectable.name,
+                        );
 
                     query_type_declaration.push_str(&format!(
                         "{}readonly {}: {},\n",
