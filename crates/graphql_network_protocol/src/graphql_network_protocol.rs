@@ -82,7 +82,17 @@ pub struct JavascriptTargetPlatform {}
 
 impl TargetPlatform for JavascriptTargetPlatform {
     type EntityAssociatedData = SelectionType<JavascriptName, ()>;
-    type SelectableAssociatedData = ();
+
+    // Hack alert
+    // TODO remove this field as follows:
+    // - for scalars, the override is because all __typename selectables point
+    // to the same entity. But there should actually be a unique typename entity
+    // per typename (i.e. per server object entity), which has a JavascriptName
+    // that is the string literal of the typename. This should be easy to fix!
+    // - For objects, ServerObjectSelectableVariant belongs in the
+    // network_protocol_associated_data field. Since it is (presumably) only used
+    // by query text generation.
+    type SelectableAssociatedData = SelectionType<Option<JavascriptName>, ()>;
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
@@ -149,7 +159,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .lookup(db);
 
         let javascript_type_override = server_scalar_selectable
-            .selection_info
+            .target_platform_associated_data
             .as_ref()
             .as_scalar()
             .expect("Expected selectable to be scalar");
@@ -160,11 +170,11 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .as_ref()
                 .expect(
                     "Expected parsing to not have failed. \
-                            This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .expect(
                     "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .lookup(db)
                 .target_platform_associated_data

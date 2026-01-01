@@ -1,8 +1,6 @@
 use std::fmt::Debug;
 
-use common_lang_types::{
-    EntityName, EntityNameAndSelectableName, JavascriptName, SelectableName, WithNoLocation,
-};
+use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName, WithNoLocation};
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
@@ -17,17 +15,7 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
 
     pub target_entity_name: TypeAnnotationDeclaration,
 
-    // Hack alert
-    // TODO remove this field as follows:
-    // - for scalars, the override is because all __typename selectables point
-    // to the same entity. But there should actually be a unique typename entity
-    // per typename (i.e. per server object entity), which has a JavascriptName
-    // that is the string literal of the typename. This should be easy to fix!
-    // - For objects, ServerObjectSelectableVariant belongs in the
-    // network_protocol_associated_data field. Since it is (presumably) only used
-    // by query text generation.
-    // TODO move this onto target_platform_associated_data
-    pub selection_info: SelectionType<Option<JavascriptName>, ServerObjectSelectableVariant>,
+    pub selection_info: SelectionType<(), ServerObjectSelectableVariant>,
 
     pub parent_entity_name: EntityName,
     // TODO we shouldn't support default values here
