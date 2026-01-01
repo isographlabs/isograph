@@ -3,11 +3,16 @@ use std::collections::btree_map::Entry;
 
 use common_lang_types::{
     Diagnostic, DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName,
-    QueryText, WithLocation, WithNonFatalDiagnostics,
+    QueryText, SelectableName, WithLocation, WithNonFatalDiagnostics,
 };
 use intern::string_key::Intern;
-use isograph_lang_types::{SelectionType, VariableDeclaration};
-use isograph_schema::{CompilationProfile, IsographDatabase, TargetPlatform};
+use isograph_lang_types::{
+    SelectionType, TypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
+};
+use isograph_schema::{
+    CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
+    server_selectables_map_for_entity,
+};
 use isograph_schema::{
     Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
     server_entity_named,
@@ -77,6 +82,54 @@ pub struct JavascriptTargetPlatform {}
 
 impl TargetPlatform for JavascriptTargetPlatform {
     type EntityAssociatedData = ();
+
+    fn format_server_field_scalar_type<
+        TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
+        entity_name: EntityName,
+        indentation_level: u8,
+    ) -> String {
+        let entity = server_entity_named(db, entity_name)
+            .as_ref()
+            .expect(
+                "Expected parsing to not have failed. \
+            This is indicative of a bug in Isograph.",
+            )
+            .expect(
+                "Expected entity to exist. \
+            This is indicative of a bug in Isograph.",
+            );
+
+        match entity.lookup(db).selection_info {
+            SelectionType::Object(_is_concrete) => {
+                // TODO this is bad; we should never create a type containing all of the fields
+                // on a given object. This is currently used for input objects, and we should
+                // consider how to do this is a not obviously broken manner.
+                let mut s = "{\n".to_string();
+
+                for (name, server_selectable) in server_selectables_map_for_entity(db, entity_name)
+                    .as_ref()
+                    .expect(
+                        "Expected type system document to be valid. \
+                    This is indicative of a bug in Isograph.",
+                    )
+                {
+                    let field_type = format_field_definition(
+                        db,
+                        name,
+                        server_selectable.dereference(),
+                        indentation_level + 1,
+                    );
+                    s.push_str(&field_type)
+                }
+
+                s.push_str(&format!("{}}}", "  ".repeat(indentation_level as usize)));
+                s
+            }
+            SelectionType::Scalar(s) => s.to_string(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
@@ -178,5 +231,125 @@ pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
         Entry::Occupied(_) => non_fatal_diagnostics.push(
             multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()),
         ),
+    }
+}
+
+fn format_field_definition<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    name: &SelectableName,
+    server_selectable: MemoRefServerSelectable<TCompilationProfile>,
+    indentation_level: u8,
+) -> String {
+    let server_selectable = server_selectable.lookup(db);
+    let is_optional = is_nullable(server_selectable.target_entity_name.reference());
+    let target_type_annotation = server_selectable.target_entity_name.clone();
+
+    format!(
+        "{}readonly {}{}: {},\n",
+        "  ".repeat(indentation_level as usize),
+        name,
+        if is_optional { "?" } else { "" },
+        format_type_annotation(
+            db,
+            target_type_annotation.reference(),
+            indentation_level + 1
+        ),
+    )
+}
+
+fn is_nullable(type_annotation: &TypeAnnotationDeclaration) -> bool {
+    match type_annotation {
+        TypeAnnotationDeclaration::Union(union) => union.nullable,
+        TypeAnnotationDeclaration::Plural(_) => false,
+        TypeAnnotationDeclaration::Scalar(_) => false,
+    }
+}
+
+fn format_type_annotation<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    type_annotation: &TypeAnnotationDeclaration,
+    indentation_level: u8,
+) -> String {
+    match type_annotation.reference() {
+        TypeAnnotationDeclaration::Scalar(scalar) => {
+            TCompilationProfile::TargetPlatform::format_server_field_scalar_type(
+                db,
+                scalar.0,
+                indentation_level + 1,
+            )
+        }
+        TypeAnnotationDeclaration::Union(union_type_annotation) => {
+            if union_type_annotation.variants.is_empty() {
+                panic!("Unexpected union with not enough variants.");
+            }
+
+            let mut s = String::new();
+            if union_type_annotation.variants.len() > 1 || union_type_annotation.nullable {
+                s.push('(');
+                for (index, variant) in union_type_annotation.variants.iter().enumerate() {
+                    if index != 0 {
+                        s.push_str(" | ");
+                    }
+
+                    match variant {
+                        UnionVariant::Scalar(scalar) => {
+                            s.push_str(&TCompilationProfile::TargetPlatform::format_server_field_scalar_type(
+                                db,
+                                scalar.0,
+                                indentation_level + 1,
+                            ));
+                        }
+                        UnionVariant::Plural(type_annotation) => {
+                            s.push_str("ReadonlyArray<");
+                            s.push_str(&format_type_annotation(
+                                db,
+                                type_annotation.item.reference(),
+                                indentation_level + 1,
+                            ));
+                            s.push('>');
+                        }
+                    }
+                }
+                if union_type_annotation.nullable {
+                    s.push_str(" | null");
+                }
+                s.push(')');
+                s
+            } else {
+                let variant = union_type_annotation
+                    .variants
+                    .first()
+                    .expect("Expected variant to exist");
+                match variant {
+                    UnionVariant::Scalar(scalar) => {
+                        TCompilationProfile::TargetPlatform::format_server_field_scalar_type(
+                            db,
+                            scalar.0,
+                            indentation_level + 1,
+                        )
+                    }
+                    UnionVariant::Plural(type_annotation) => {
+                        format!(
+                            "ReadonlyArray<{}>",
+                            TCompilationProfile::TargetPlatform::format_server_field_scalar_type(
+                                db,
+                                type_annotation.item.inner().0,
+                                indentation_level + 1
+                            )
+                        )
+                    }
+                }
+            }
+        }
+        TypeAnnotationDeclaration::Plural(type_annotation) => {
+            format!(
+                "ReadonlyArray<{}>",
+                TCompilationProfile::TargetPlatform::format_server_field_scalar_type(
+                    db,
+                    type_annotation.item.inner().0,
+                    indentation_level + 1
+                )
+            )
+        }
     }
 }
