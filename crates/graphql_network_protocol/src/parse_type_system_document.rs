@@ -33,6 +33,7 @@ use crate::{
     },
 };
 
+#[expect(clippy::type_complexity)]
 pub(crate) fn parse_type_system_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
 ) -> DiagnosticResult<(
