@@ -75,7 +75,7 @@ pub fn process_graphql_type_system_document(
                             subtypes: vec![],
                         }
                         .object_selected(),
-                        target_platform_associated_data: (),
+                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -173,9 +173,10 @@ pub fn process_graphql_type_system_document(
                             .map(|with_span| with_span.item.into()),
                         name: scalar_type_definition.name.item,
                         // TODO allow customization here
-                        selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+                        selection_info: ().scalar_selected(),
                         network_protocol_associated_data: ().scalar_selected(),
-                        target_platform_associated_data: (),
+                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
+                            .scalar_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -208,7 +209,7 @@ pub fn process_graphql_type_system_document(
                             subtypes: vec![],
                         }
                         .object_selected(),
-                        target_platform_associated_data: (),
+                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -242,9 +243,10 @@ pub fn process_graphql_type_system_document(
                             .map(|with_span| with_span.item.into()),
                         name: enum_definition.name.item,
                         // TODO allow customization here
-                        selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+                        selection_info: ().scalar_selected(),
                         network_protocol_associated_data: ().scalar_selected(),
-                        target_platform_associated_data: (),
+                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
+                            .scalar_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -275,7 +277,7 @@ pub fn process_graphql_type_system_document(
                                 .collect(),
                         }
                         .object_selected(),
-                        target_platform_associated_data: (),
+                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)

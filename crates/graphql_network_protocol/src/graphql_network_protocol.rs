@@ -81,7 +81,7 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
 pub struct JavascriptTargetPlatform {}
 
 impl TargetPlatform for JavascriptTargetPlatform {
-    type EntityAssociatedData = ();
+    type EntityAssociatedData = SelectionType<JavascriptName, ()>;
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
@@ -101,7 +101,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
             This is indicative of a bug in Isograph.",
             );
 
-        match entity.lookup(db).selection_info {
+        match entity.lookup(db).target_platform_associated_data {
             SelectionType::Object(_is_concrete) => {
                 // TODO this is bad; we should never create a type containing all of the fields
                 // on a given object. This is currently used for input objects, and we should
@@ -166,7 +166,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                             This is indicative of a bug in Isograph.",
                 )
                 .lookup(db)
-                .selection_info
+                .target_platform_associated_data
                 .as_scalar()
                 .expect("Expected scalar entity to be scalar"),
         }

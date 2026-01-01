@@ -108,7 +108,7 @@ pub(crate) fn parse_type_system_document(
                 }
                 .object_selected(),
                 selection_info: false.wrap(IsConcrete).object_selected(),
-                target_platform_associated_data: (),
+                target_platform_associated_data: ().object_selected(),
             }
             .interned_value(db)
             .with_location(with_location.location)
@@ -519,9 +519,9 @@ fn define_default_graphql_types(
         ServerEntity {
             description: None,
             name: *ID_ENTITY_NAME,
-            selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            selection_info: ().scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
-            target_platform_associated_data: (),
+            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -533,9 +533,9 @@ fn define_default_graphql_types(
         ServerEntity {
             description: None,
             name: *STRING_ENTITY_NAME,
-            selection_info: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            selection_info: ().scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
-            target_platform_associated_data: (),
+            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -547,9 +547,9 @@ fn define_default_graphql_types(
         ServerEntity {
             description: None,
             name: *BOOLEAN_ENTITY_NAME,
-            selection_info: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
+            selection_info: ().scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
-            target_platform_associated_data: (),
+            target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -561,9 +561,9 @@ fn define_default_graphql_types(
         ServerEntity {
             description: None,
             name: *FLOAT_ENTITY_NAME,
-            selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            selection_info: ().scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
-            target_platform_associated_data: (),
+            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -575,9 +575,9 @@ fn define_default_graphql_types(
         ServerEntity {
             description: None,
             name: *INT_ENTITY_NAME,
-            selection_info: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            selection_info: ().scalar_selected(),
             network_protocol_associated_data: ().scalar_selected(),
-            target_platform_associated_data: (),
+            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
         .with_generated_location(),
