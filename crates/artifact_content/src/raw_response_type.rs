@@ -1,7 +1,7 @@
 use intern::Lookup;
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MergedSelectionMap, MergedServerSelection,
-    server_entity_named, server_selectable_named,
+    TargetPlatform, server_selectable_named,
 };
 use prelude::Postfix;
 use std::collections::BTreeMap;
@@ -64,28 +64,11 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 let raw_type = server_scalar_selectable.target_entity_name.clone();
 
-                let inner_text = match server_scalar_selectable
-                    .selection_info
-                    .as_ref()
-                    .as_scalar()
-                    .expect("Expected selectable to be scalar.")
-                {
-                    Some(javascript_name) => javascript_name.dereference(),
-                    None => server_entity_named(db, raw_type.inner().0)
-                        .as_ref()
-                        .expect(
-                            "Expected parsing to not have failed. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect(
-                            "Expected entity to exist. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db)
-                        .selection_info
-                        .as_scalar()
-                        .expect("Expected server scalar entity to be scalar"),
-                };
+                let inner_text = TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
+                    db,
+                    server_scalar_selectable.parent_entity_name,
+                    server_scalar_selectable.name,
+                );
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
