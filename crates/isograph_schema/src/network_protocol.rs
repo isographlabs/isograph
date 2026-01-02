@@ -27,8 +27,8 @@ pub struct ParseTypeSystemOutcome<TCompilationProfile: CompilationProfile> {
 pub trait NetworkProtocol:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
-    type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
-    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
+    type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash + Ord + PartialOrd;
+    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash + Ord + PartialOrd;
 
     fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
         db: &IsographDatabase<TCompilationProfile>,

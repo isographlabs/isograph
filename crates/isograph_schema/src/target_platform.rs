@@ -7,8 +7,8 @@ use crate::{CompilationProfile, IsographDatabase};
 pub trait TargetPlatform:
     Debug + Clone + Copy + Eq + PartialEq + Ord + PartialOrd + Hash + Default + Sized + 'static
 {
-    type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
-    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash;
+    type EntityAssociatedData: Debug + PartialEq + Eq + Clone + Hash + Ord + PartialOrd;
+    type SelectableAssociatedData: Debug + PartialEq + Eq + Clone + Hash + Ord + PartialOrd;
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,

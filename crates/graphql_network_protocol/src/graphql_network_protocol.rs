@@ -264,7 +264,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub subtypes: Vec<EntityName>,
 }
