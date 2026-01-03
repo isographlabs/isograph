@@ -71,11 +71,11 @@ pub fn process_graphql_type_system_document(
                         }),
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                        network_protocol_associated_data: ().object_selected(),
+                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: vec![],
                         }
                         .object_selected(),
-                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -205,11 +205,11 @@ pub fn process_graphql_type_system_document(
                             }),
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                        network_protocol_associated_data: ().object_selected(),
+                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: vec![],
                         }
                         .object_selected(),
-                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -269,7 +269,8 @@ pub fn process_graphql_type_system_document(
                         }),
                         name: server_object_entity_name,
                         selection_info: false.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                        network_protocol_associated_data: ().object_selected(),
+                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: union_definition
                                 .union_member_types
                                 .iter()
@@ -277,7 +278,6 @@ pub fn process_graphql_type_system_document(
                                 .collect(),
                         }
                         .object_selected(),
-                        target_platform_associated_data: ().object_selected(),
                     }
                     .interned_value(db)
                     .with_location(location)

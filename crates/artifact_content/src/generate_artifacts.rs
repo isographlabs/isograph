@@ -13,8 +13,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy,
-    ServerObjectSelectableVariant, UserWrittenClientTypeInfo, WrappedSelectionMapSelection,
+    NameAndArguments, NormalizationKey, RefetchStrategy, ServerObjectSelectableVariant,
+    TargetPlatform, UserWrittenClientTypeInfo, WrappedSelectionMapSelection,
     accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
     client_selectable_map, client_selectable_named, fetchable_types,
     inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
@@ -722,7 +722,7 @@ pub(crate) fn generate_output_type<TCompilationProfile: CompilationProfile>(
     let variant = &client_scalar_selectable.variant;
     match variant {
         ClientFieldVariant::Link => ClientScalarSelectableOutputType(
-            TCompilationProfile::NetworkProtocol::generate_link_type(
+            TCompilationProfile::TargetPlatform::generate_link_type(
                 db,
                 &client_scalar_selectable.parent_entity_name,
             ),

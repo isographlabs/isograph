@@ -81,7 +81,7 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
 pub struct JavascriptTargetPlatform {}
 
 impl TargetPlatform for JavascriptTargetPlatform {
-    type EntityAssociatedData = SelectionType<JavascriptName, ()>;
+    type EntityAssociatedData = SelectionType<JavascriptName, GraphQLSchemaObjectAssociatedData>;
 
     // Hack alert
     // TODO remove this field as follows:
@@ -112,8 +112,8 @@ impl TargetPlatform for JavascriptTargetPlatform {
             This is indicative of a bug in Isograph.",
             );
 
-        match entity.lookup(db).target_platform_associated_data {
-            SelectionType::Object(_is_concrete) => {
+        match entity.lookup(db).target_platform_associated_data.as_ref() {
+            SelectionType::Object(_) => {
                 // TODO this is bad; we should never create a type containing all of the fields
                 // on a given object. This is currently used for input objects, and we should
                 // consider how to do this is a not obviously broken manner.
@@ -178,20 +178,14 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 )
                 .lookup(db)
                 .target_platform_associated_data
+                .as_ref()
                 .as_scalar()
-                .expect("Expected scalar entity to be scalar"),
+                .expect("Expected scalar entity to be scalar")
+                .dereference(),
         }
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
-pub struct GraphQLNetworkProtocol {}
-
-impl NetworkProtocol for GraphQLNetworkProtocol {
-    type EntityAssociatedData = SelectionType<(), GraphQLSchemaObjectAssociatedData>;
-    type SelectableAssociatedData = ();
-
-    fn generate_link_type<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+    fn generate_link_type<'a, TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(
         db: &IsographDatabase<TCompilationProfile>,
         server_object_entity_name: &EntityName,
     ) -> String {
@@ -219,7 +213,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         }
 
         let subtypes = server_object_entity
-            .network_protocol_associated_data
+            .target_platform_associated_data
             .as_ref()
             .as_object()
             .expect("Expected server object entity to have object associated data")
@@ -230,6 +224,14 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 
         subtypes.join("")
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
+pub struct GraphQLNetworkProtocol {}
+
+impl NetworkProtocol for GraphQLNetworkProtocol {
+    type EntityAssociatedData = SelectionType<(), ()>;
+    type SelectableAssociatedData = ();
 
     fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
         _db: &IsographDatabase<TCompilationProfile>,

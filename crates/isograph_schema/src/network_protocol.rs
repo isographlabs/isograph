@@ -39,11 +39,6 @@ pub trait NetworkProtocol:
         format: Format,
     ) -> QueryText;
 
-    fn generate_link_type<TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
-        db: &IsographDatabase<TCompilationProfile>,
-        server_object_entity_name: &EntityName,
-    ) -> String;
-
     // TODO: include `QueryText` to incrementally adopt persisted documents
     fn generate_query_extra_info(
         query_name: QueryOperationName,

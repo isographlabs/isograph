@@ -100,15 +100,15 @@ pub(crate) fn parse_type_system_document(
                         .wrap(Description)
                 }),
                 name: server_object_entity_name,
-                network_protocol_associated_data: GraphQLSchemaObjectAssociatedData {
+                network_protocol_associated_data: ().object_selected(),
+                selection_info: false.wrap(IsConcrete).object_selected(),
+                target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                     subtypes: supertype_to_subtype_map
                         .get(&server_object_entity_name)
                         .cloned()
                         .unwrap_or_default(),
                 }
                 .object_selected(),
-                selection_info: false.wrap(IsConcrete).object_selected(),
-                target_platform_associated_data: ().object_selected(),
             }
             .interned_value(db)
             .with_location(with_location.location)

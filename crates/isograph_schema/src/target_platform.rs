@@ -25,4 +25,9 @@ pub trait TargetPlatform:
         parent_object_entity_name: EntityName,
         selectable_name: SelectableName,
     ) -> JavascriptName;
+
+    fn generate_link_type<TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(
+        db: &IsographDatabase<TCompilationProfile>,
+        server_object_entity_name: &EntityName,
+    ) -> String;
 }
