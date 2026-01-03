@@ -12,6 +12,12 @@ pub struct ServerEntity<TCompilationProfile: CompilationProfile> {
     pub description: Option<Description>,
     pub name: EntityName,
     // TODO this is obviously a hack
+    // IsConcrete is used in (at least) two situations: first, it is used to add a __typename
+    // selection if the entity is not concrete (i.e. needed by the network protocol when
+    // generating query text), and to add the concrete type into the normalization AST (thus
+    // needed by the target platform, when that trait is responsible for creating the
+    // normalization AST.)
+    // That's awkward!
     pub selection_info: SelectionType<(), IsConcrete>,
     pub network_protocol_associated_data:
         <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityAssociatedData,
