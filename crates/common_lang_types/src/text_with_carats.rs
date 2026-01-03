@@ -114,32 +114,30 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
         };
 
         if should_print_carats {
-            let line_len = line_content.len() as u32;
-            let start_of_carats = actual_span.start.saturating_sub(start_of_line as u32);
-            let start_idx = start_of_carats as usize;
-            let end_idx = std::cmp::min(
-                actual_span.end.saturating_sub(start_of_line as u32),
+            let line_len = line_content.len();
+            let start_of_carats = (actual_span.start as usize).saturating_sub(start_of_line);
+
+            let end_of_carats = std::cmp::min(
+                (actual_span.end as usize).saturating_sub(start_of_line),
                 line_len,
-            ) as usize;
+            );
 
-            let prefix = &line_content[0..start_idx];
-            let highlighted = &line_content[start_idx..end_idx];
-            let suffix = &line_content[end_idx..];
-
+            let prefix = &line_content[0..start_of_carats];
+            let highlighted = &line_content[start_of_carats..end_of_carats];
+            let suffix = &line_content[end_of_carats..];
             let colored_source = format!(
                 "{}{}{}",
                 prefix,
                 if colorize_carats {
-                    highlighted.bright_red().to_string()
+                    highlighted.bright_red()
                 } else {
-                    highlighted.to_string()
+                    highlighted.normal()
                 },
                 suffix
             );
             output_lines.push(colored_source);
             // a line may be entirely empty, due to containing only a \n. We probably want to avoid
             // printing an empty line underneath. This is weird and probably buggy!
-            let end_of_carats = end_idx as u32;
 
             if start_of_carats != line_len && end_of_carats != 0 {
                 first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
@@ -618,8 +616,23 @@ mod test {
         )
         .0;
 
-        colored::control::unset_override();
+        let expected = "012345678\n012345678\n012345678\n0\u{1b}[91m12\u{1b}[0m345678\n \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \n012345678\n012345678\n012345678";
+        assert_eq!(output, expected);
+    }
+    #[test]
+    fn text_with_carats_multiline() {
+        colored::control::set_override(true);
 
-        assert!(output.contains("\u{1b}[91m"));
+        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
+            &input_with_lines(10),
+            None,
+            Span::new(8, 12),
+            3,
+            true,
+        )
+        .0;
+        let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m       \n012345678\n012345678\n012345678";
+
+        assert_eq!(output, expected);
     }
 }
