@@ -599,7 +599,7 @@ fn parse_non_constant_value(
         to_control_flow::<_, Diagnostic>(|| {
             let _dollar_sign = tokens.parse_token_of_kind(
                 IsographLangTokenKind::Dollar,
-                semantic_token_legend::ST_VARIABLE_DOLLAR,
+                semantic_token_legend::ST_VARIABLE_DOLLAR_USAGE,
             )?;
 
             let name: WithEmbeddedLocation<VariableName> = tokens.parse_string_key_type(
@@ -738,7 +738,7 @@ fn parse_variable_definition(
         .with_embedded_location_result(|tokens| {
             let _dollar = tokens.parse_token_of_kind(
                 IsographLangTokenKind::Dollar,
-                semantic_token_legend::ST_VARIABLE_DOLLAR,
+                semantic_token_legend::ST_VARIABLE_DOLLAR_DECLARATION,
             )?;
 
             let name: WithEmbeddedLocation<VariableName> = tokens.parse_string_key_type(

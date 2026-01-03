@@ -243,7 +243,14 @@ pub const ST_ARGUMENT_NAME: IsographSemanticToken = IsographSemanticToken {
     indent_change: IndentChange::Same,
 };
 
-pub const ST_VARIABLE_DOLLAR: IsographSemanticToken = IsographSemanticToken {
+pub const ST_VARIABLE_DOLLAR_DECLARATION: IsographSemanticToken = IsographSemanticToken {
+    lsp_semantic_token: LSP_ST_VARIABLE,
+    line_behavior: LineBehavior::StartsNewLine(StartsNewLineBehavior {
+        space_after: SpaceAfter(false),
+    }),
+    indent_change: IndentChange::Same,
+};
+pub const ST_VARIABLE_DOLLAR_USAGE: IsographSemanticToken = IsographSemanticToken {
     lsp_semantic_token: LSP_ST_VARIABLE,
     line_behavior: LineBehavior::Inline(InlineBehavior {
         space_before: SpaceBefore(true),
