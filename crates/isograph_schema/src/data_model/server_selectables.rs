@@ -15,6 +15,9 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
 
     pub target_entity_name: TypeAnnotationDeclaration,
 
+    // TODO move ServerObjectSelectableVariant into target_platform_associated_data.
+    // Note that this is hard, because it is used inside of merge_server_object_field (etc) in
+    // a way that isn't obviously easily extracted.
     pub selection_info: SelectionType<(), ServerObjectSelectableVariant>,
 
     pub parent_entity_name: EntityName,
