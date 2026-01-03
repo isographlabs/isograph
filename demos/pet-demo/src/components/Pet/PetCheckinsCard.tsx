@@ -5,12 +5,12 @@ import React from 'react';
 
 export const PetCheckinsCard = iso(`
   field Pet.PetCheckinsCard(
-    $skip: Int,
+    $skip: Int
     $limit: Int
   ) @component {
     id
     checkins(
-      skip: $skip,
+      skip: $skip
       limit: $limit
     ) {
       CheckinDisplay
@@ -59,11 +59,11 @@ export const CheckinDisplay = iso(`
 
 export const PetCheckinsCardList = iso(`
   field Pet.PetCheckinsCardList(
-    $skip: Int !,
+    $skip: Int !
     $limit: Int !
   ) {
     checkins(
-      skip: $skip,
+      skip: $skip
       limit: $limit
     ) {
       CheckinDisplay

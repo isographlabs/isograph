@@ -16,11 +16,11 @@ import { Button, Card, CardContent } from '@mui/material';
 
 export const setMututalBestFriend = iso(`
   field Mutation.MututalBestFriendSetterMutation(
-    $id: ID !,
+    $id: ID !
     $new_best_friend_id: ID !
   ) @component {
     set_pet_best_friend(
-      id: $id,
+      id: $id
       new_best_friend_id: $new_best_friend_id
     ) {
       pet {
@@ -56,11 +56,11 @@ export const setMututalBestFriend = iso(`
 
 export const SomeThing = iso(`
   field Mutation.MutualBestFriendSetterOtherSide(
-    $pet_id: ID !,
+    $pet_id: ID !
     $new_best_friend_id: ID !
   ) @component {
     set_pet_best_friend(
-      id: $pet_id,
+      id: $pet_id
       new_best_friend_id: $new_best_friend_id
     ) {
       pet {
