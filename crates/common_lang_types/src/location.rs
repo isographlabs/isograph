@@ -137,6 +137,10 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
         WithGenericLocation::new(map(self.item), self.location)
     }
 
+    pub fn map_location<U>(self, map: impl FnOnce(TLocation) -> U) -> WithGenericLocation<T, U> {
+        WithGenericLocation::new(self.item, map(self.location))
+    }
+
     pub fn and_then<U, E>(
         self,
         map: impl FnOnce(T) -> Result<U, E>,
@@ -158,10 +162,7 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
     }
 
     pub fn drop_location(self) -> WithNoLocation<T> {
-        WithGenericLocation {
-            item: self.item,
-            location: (),
-        }
+        self.map_location(|_| ())
     }
 
     pub fn item(self) -> T {
