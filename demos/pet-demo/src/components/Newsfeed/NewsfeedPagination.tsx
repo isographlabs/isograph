@@ -2,11 +2,11 @@ import { iso } from '@iso';
 
 export const NewsfeedPaginationComponent = iso(`
   field Viewer.NewsfeedPaginationComponent(
-    $skip: Int !,
+    $skip: Int !
     $limit: Int !
   ) {
     newsfeed(
-      skip: $skip,
+      skip: $skip
       limit: $limit
     ) {
       asAdItem {
