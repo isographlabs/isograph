@@ -182,6 +182,8 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
     // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
     // - everything in between
 
+    colored::control::unset_override();
+
     (
         output_lines[(first_line_with_span.saturating_sub(line_count_buffer + 1))
             ..(std::cmp::min(last_line_with_span + line_count_buffer, output_lines.len()))]
@@ -631,6 +633,7 @@ mod test {
             true,
         )
         .0;
+
         let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m       \n012345678\n012345678\n012345678";
 
         assert_eq!(output, expected);
