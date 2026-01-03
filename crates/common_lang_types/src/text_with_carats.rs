@@ -69,8 +69,6 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
 
     let mut span_state = SpanState::Before;
     for (line_index, line_content) in file_text.split('\n').enumerate() {
-        output_lines.push(line_content.to_string());
-
         let start_of_line = cur_index;
 
         // +1 is accounting for \n, though presumably we should handle other line endings
@@ -116,19 +114,33 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
         };
 
         if should_print_carats {
-            let start_of_carats = actual_span.start.saturating_sub(start_of_line as u32);
-            let line_len = line_content.len() as u32;
+            let line_len = line_content.len();
+            let start_of_carats = (actual_span.start as usize).saturating_sub(start_of_line);
+
             let end_of_carats = std::cmp::min(
-                actual_span.end.saturating_sub(start_of_line as u32),
+                (actual_span.end as usize).saturating_sub(start_of_line),
                 line_len,
             );
 
+            let prefix = &line_content[0..start_of_carats];
+            let highlighted = &line_content[start_of_carats..end_of_carats];
+            let suffix = &line_content[end_of_carats..];
+            let colored_source = format!(
+                "{}{}{}",
+                prefix,
+                if colorize_carats {
+                    highlighted.bright_red()
+                } else {
+                    highlighted.normal()
+                },
+                suffix
+            );
+            output_lines.push(colored_source);
             // a line may be entirely empty, due to containing only a \n. We probably want to avoid
             // printing an empty line underneath. This is weird and probably buggy!
+
             if start_of_carats != line_len && end_of_carats != 0 {
                 first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
-                // add +1 because we want the index of the line containing the carats, not the
-                // source text, and because ranges are exclusive on the end
                 last_line_with_span = output_lines.len() + 1;
 
                 let mut carats = String::new();
@@ -151,6 +163,8 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
 
                 output_lines.push(carats);
             }
+        } else {
+            output_lines.push(line_content.to_string());
         }
     }
 
@@ -167,6 +181,8 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
     // - the source line containing the start of the span and LINE_COUNT_BUFFER earlier lines
     // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
     // - everything in between
+
+    colored::control::unset_override();
 
     (
         output_lines[(first_line_with_span.saturating_sub(line_count_buffer + 1))
@@ -588,5 +604,38 @@ mod test {
  ^^      
 012345678"
         );
+    }
+    #[test]
+    fn text_with_carats_colored() {
+        colored::control::set_override(true);
+
+        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
+            &input_with_lines(10),
+            None,
+            Span::new(31, 33),
+            3,
+            true,
+        )
+        .0;
+
+        let expected = "012345678\n012345678\n012345678\n0\u{1b}[91m12\u{1b}[0m345678\n \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \n012345678\n012345678\n012345678";
+        assert_eq!(output, expected);
+    }
+    #[test]
+    fn text_with_carats_multiline() {
+        colored::control::set_override(true);
+
+        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
+            &input_with_lines(10),
+            None,
+            Span::new(8, 12),
+            3,
+            true,
+        )
+        .0;
+
+        let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m       \n012345678\n012345678\n012345678";
+
+        assert_eq!(output, expected);
     }
 }
