@@ -230,7 +230,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type EntityAssociatedData = SelectionType<(), ()>;
+    type EntityAssociatedData = ();
     type SelectableAssociatedData = ();
 
     fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(

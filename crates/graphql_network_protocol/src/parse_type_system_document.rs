@@ -100,7 +100,7 @@ pub(crate) fn parse_type_system_document(
                         .wrap(Description)
                 }),
                 name: server_object_entity_name,
-                network_protocol_associated_data: ().object_selected(),
+                network_protocol_associated_data: (),
                 selection_info: false.wrap(IsConcrete).object_selected(),
                 target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                     subtypes: supertype_to_subtype_map
@@ -523,7 +523,7 @@ fn define_default_graphql_types(
             description: None,
             name: *ID_ENTITY_NAME,
             selection_info: ().scalar_selected(),
-            network_protocol_associated_data: ().scalar_selected(),
+            network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
@@ -537,7 +537,7 @@ fn define_default_graphql_types(
             description: None,
             name: *STRING_ENTITY_NAME,
             selection_info: ().scalar_selected(),
-            network_protocol_associated_data: ().scalar_selected(),
+            network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
@@ -551,7 +551,7 @@ fn define_default_graphql_types(
             description: None,
             name: *BOOLEAN_ENTITY_NAME,
             selection_info: ().scalar_selected(),
-            network_protocol_associated_data: ().scalar_selected(),
+            network_protocol_associated_data: (),
             target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
@@ -565,7 +565,7 @@ fn define_default_graphql_types(
             description: None,
             name: *FLOAT_ENTITY_NAME,
             selection_info: ().scalar_selected(),
-            network_protocol_associated_data: ().scalar_selected(),
+            network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)
@@ -579,7 +579,7 @@ fn define_default_graphql_types(
             description: None,
             name: *INT_ENTITY_NAME,
             selection_info: ().scalar_selected(),
-            network_protocol_associated_data: ().scalar_selected(),
+            network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
         }
         .interned_value(db)

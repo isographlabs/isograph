@@ -71,7 +71,7 @@ pub fn process_graphql_type_system_document(
                         }),
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: ().object_selected(),
+                        network_protocol_associated_data: (),
                         target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: vec![],
                         }
@@ -174,7 +174,7 @@ pub fn process_graphql_type_system_document(
                         name: scalar_type_definition.name.item,
                         // TODO allow customization here
                         selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: ().scalar_selected(),
+                        network_protocol_associated_data: (),
                         target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
                             .scalar_selected(),
                     }
@@ -205,7 +205,7 @@ pub fn process_graphql_type_system_document(
                             }),
                         name: server_object_entity_name,
                         selection_info: true.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: ().object_selected(),
+                        network_protocol_associated_data: (),
                         target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: vec![],
                         }
@@ -244,7 +244,7 @@ pub fn process_graphql_type_system_document(
                         name: enum_definition.name.item,
                         // TODO allow customization here
                         selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: ().scalar_selected(),
+                        network_protocol_associated_data: (),
                         target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
                             .scalar_selected(),
                     }
@@ -269,7 +269,7 @@ pub fn process_graphql_type_system_document(
                         }),
                         name: server_object_entity_name,
                         selection_info: false.wrap(IsConcrete).object_selected(),
-                        network_protocol_associated_data: ().object_selected(),
+                        network_protocol_associated_data: (),
                         target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                             subtypes: union_definition
                                 .union_member_types
