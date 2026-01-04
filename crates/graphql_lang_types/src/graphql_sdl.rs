@@ -231,7 +231,6 @@ impl From<GraphQLInputValueDefinition> for GraphQLFieldDefinition {
             // Input object fields do not take arguments
             arguments: vec![],
             directives: value.directives,
-            is_inline_fragment: false,
         }
     }
 }
@@ -244,18 +243,6 @@ pub struct GraphQLFieldDefinition {
     pub type_: WithEmbeddedLocation<GraphQLTypeAnnotation>,
     pub arguments: Vec<WithEmbeddedLocation<GraphQLInputValueDefinition>>,
     pub directives: Vec<GraphQLDirective<GraphQLConstantValue>>,
-
-    // TODO we can probably restructure things to make this less awkward.
-    // As in, we should not return GraphQLFieldDefinitions to the isograph side,
-    // which is GraphQL-agnostic, and instead pass field definitions. These field
-    // definitions should have an associated_data: TCompilationProfile::NetworkProtocol::FieldAssociatedData
-    // or the like, which should carry this info.
-    //
-    // Then, that should be consumed by NetworkProtocol::generate_query_text, and also
-    // somehow by generate_merged_selection_set. (Is a merged selection set something
-    // that the network protocol should care about?? I don't think so, but how else
-    // do we add the __typename and link selections?)
-    pub is_inline_fragment: bool,
 }
 
 /// This is an argument definition, but we're using the GraphQL spec lingo here.
