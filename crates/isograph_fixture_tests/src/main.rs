@@ -63,6 +63,7 @@ fn generate_fixtures_for_files_in_folder(
     current_working_directory: CurrentWorkingDirectory,
 ) {
     for read_dir in folder.read_dir().expect("read_dir call failed") {
+        #[expect(clippy::match_wild_err_arm)]
         match read_dir {
             Ok(entry) => {
                 let path = entry.path();
