@@ -8,9 +8,9 @@ use common_lang_types::relative_path_from_absolute_and_working_directory;
 use isograph_lang_types::DefinitionLocation;
 use isograph_lang_types::IsographResolvedNode;
 use isograph_lang_types::SelectionType;
-use isograph_schema::process_iso_literal_extraction;
 use isograph_schema::selectables_for_entity;
 use isograph_schema::{CompilationProfile, get_parent_for_selection_set_path};
+use isograph_schema::{process_iso_literal_extraction, server_entity_named};
 use lsp_types::CompletionItemLabelDetails;
 use lsp_types::{
     CompletionItem, CompletionResponse,
@@ -88,9 +88,19 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                         description,
                                     }
                                     .wrap_some(),
-                                    insert_text: match selectable {
+                                    insert_text: (|| match selectable {
                                         DefinitionLocation::Server(s) => {
-                                            match s.lookup(db).is_inline_fragment.as_ref() {
+                                            let selectable = s.lookup(db);
+                                            let entity = server_entity_named(
+                                                db,
+                                                selectable.target_entity_name.inner().0,
+                                            )
+                                            .as_ref()
+                                            .ok()?
+                                            .dereference()?
+                                            .lookup(db);
+
+                                            match entity.selection_info {
                                                 SelectionType::Scalar(_) => None,
                                                 SelectionType::Object(_) => {
                                                     (&selectable_name).wrap_some()
@@ -100,7 +110,7 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                         DefinitionLocation::Client(c) => {
                                             c.as_ref().as_object().map(|_| &selectable_name)
                                         }
-                                    }
+                                    })()
                                     .map(|name| format!("{} {{\n}}", name)),
                                     label: selectable_name,
                                     ..Default::default()

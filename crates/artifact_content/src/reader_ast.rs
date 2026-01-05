@@ -92,12 +92,20 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => {
-                            panic!("Expected selectable to be an object.")
-                        }
-                        SelectionType::Object(_) => s.server_defined(),
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_object()
+                        .expect("Expected selectable to be an object");
+
+                    selectable.server_defined()
                 }
                 DefinitionLocation::Client(c) => c
                     .as_object()
@@ -148,7 +156,6 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                     )
                 }
                 DefinitionLocation::Server(server_object_selectable) => {
-                    let server_object_selectable = server_object_selectable.lookup(db);
                     let normalization_key = match server_object_selectable
                         .is_inline_fragment
                         .as_ref()
@@ -816,12 +823,21 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
             SelectionType::Scalar(scalar_field_selection) => {
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => s.server_defined(),
-                            SelectionType::Object(_) => {
-                                panic!("Expected selectable to be a scalar.")
-                            }
-                        }
+                        let selectable = s.lookup(db);
+                        let entity =
+                            server_entity_named(db, selectable.target_entity_name.inner().0)
+                                .as_ref()
+                                .expect("Expected parsing to have succeeded")
+                                .expect("Expected target entity to be defined")
+                                .lookup(db);
+
+                        // TODO is this already validated?
+                        entity
+                            .selection_info
+                            .as_scalar()
+                            .expect("Expected selectable to be a scalar");
+
+                        selectable.server_defined()
                     }
                     DefinitionLocation::Client(c) => c
                         .as_scalar()
@@ -875,12 +891,21 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
             SelectionType::Object(object_selection) => {
                 let object_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => {
-                                panic!("Expected selectable to be an object.")
-                            }
-                            SelectionType::Object(_) => s.server_defined(),
-                        }
+                        let selectable = s.lookup(db);
+                        let entity =
+                            server_entity_named(db, selectable.target_entity_name.inner().0)
+                                .as_ref()
+                                .expect("Expected parsing to have succeeded")
+                                .expect("Expected target entity to be defined")
+                                .lookup(db);
+
+                        // TODO is this already validated?
+                        entity
+                            .selection_info
+                            .as_object()
+                            .expect("Expected selectable to be an object");
+
+                        selectable.server_defined()
                     }
                     DefinitionLocation::Client(c) => c
                         .as_object()
@@ -948,8 +973,6 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                         path.pop();
                     }
                     DefinitionLocation::Server(server_object_selectable) => {
-                        let server_object_selectable = server_object_selectable.lookup(db);
-
                         let normalization_key = match server_object_selectable
                             .is_inline_fragment
                             .as_ref()

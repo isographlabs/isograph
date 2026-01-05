@@ -7,7 +7,7 @@ use lazy_static::lazy_static;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    CompilationProfile, IsographDatabase, NormalizationKey, ServerSelectable,
+    CompilationProfile, IsographDatabase, NormalizationKey, ServerSelectable, server_entity_named,
     server_selectable_named,
 };
 
@@ -37,27 +37,31 @@ pub fn get_object_selections_path<TCompilationProfile: CompilationProfile>(
             server_selectable_named(db, current_entity_name, selection_name).clone_err()?;
 
         match current_selectable {
-            Some(entity) => {
-                let server_selectable = entity.lookup(db);
-                match server_selectable.is_inline_fragment.reference() {
-                    SelectionType::Scalar(_) => {
-                        // TODO show a better error message
-                        return Diagnostic::new(
+            Some(s) => {
+                let selectable = s.lookup(db);
+                let target_entity_name = selectable.target_entity_name.inner().0;
+                let entity = server_entity_named(db, target_entity_name)
+                    .clone_err()?
+                    .ok_or_else(|| {
+                        Diagnostic::new(
                             format!("Invalid field `{selection_name}` in @exposeField directive"),
                             // TODO have a location
                             None,
                         )
-                        .wrap_err();
-                    }
-                    SelectionType::Object(_object) => {
-                        path.push(
-                            server_selectable
-                                .clone()
-                                .note_todo("We should not clone here!!!"),
-                        );
-                        current_entity_name = server_selectable.target_entity_name.inner().0;
-                    }
-                }
+                    })?
+                    .lookup(db);
+
+                // TODO is this already validated?
+                entity.selection_info.as_object().ok_or_else(|| {
+                    Diagnostic::new(
+                        format!("Expected selectable to be an object"),
+                        // TODO have a location
+                        None,
+                    )
+                })?;
+
+                path.push(selectable.clone().note_todo("We should not clone here!!!"));
+                current_entity_name = target_entity_name;
             }
             None => {
                 return Diagnostic::new(
