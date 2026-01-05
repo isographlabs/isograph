@@ -63,34 +63,29 @@ fn generate_fixtures_for_files_in_folder(
     current_working_directory: CurrentWorkingDirectory,
 ) {
     for read_dir in folder.read_dir().expect("read_dir call failed") {
-        #[expect(clippy::match_wild_err_arm)]
-        match read_dir {
-            Ok(entry) => {
-                let path = entry.path();
+        let entry = read_dir.unwrap_or_else(|_| panic!("Failed to read an item in {folder:?}"));
+        let path = entry.path();
 
-                if !path.is_file() {
-                    panic!("Expected {path:?} to be a file");
-                }
-                let path_as_str = path
-                    .to_str()
-                    .expect("Expected path to be able to be converted to string")
-                    .to_string();
+        if !path.is_file() {
+            panic!("Expected {path:?} to be a file");
+        }
+        let path_as_str = path
+            .to_str()
+            .expect("Expected path to be able to be converted to string")
+            .to_string();
 
-                if let Some(capture) = INPUT_SUFFIX.captures(&path_as_str) {
-                    let mut output_file = PathBuf::from(capture.get(1).unwrap().as_str());
-                    output_file.set_extension(OUTPUT_SUFFIX);
-                    process_input_file(db, path, output_file, current_working_directory);
-                } else if path.extension() == Some(OsStr::new(OUTPUT_SUFFIX)) {
-                    // Great, ignore it.
-                } else {
-                    panic!(
-                        "Invalid file {:?}. Files in this folder should either \
+        if let Some(capture) = INPUT_SUFFIX.captures(&path_as_str) {
+            let mut output_file = PathBuf::from(capture.get(1).unwrap().as_str());
+            output_file.set_extension(OUTPUT_SUFFIX);
+            process_input_file(db, path, output_file, current_working_directory);
+        } else if path.extension() == Some(OsStr::new(OUTPUT_SUFFIX)) {
+            // Great, ignore it.
+        } else {
+            panic!(
+                "Invalid file {:?}. Files in this folder should either \
                         end in .{} or .{}",
-                        path, *INPUT_SUFFIX, OUTPUT_SUFFIX
-                    );
-                }
-            }
-            Err(_) => panic!("Failed to read an item in {folder:?}"),
+                path, *INPUT_SUFFIX, OUTPUT_SUFFIX
+            );
         }
     }
 }
