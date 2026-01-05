@@ -15,7 +15,7 @@ use isograph_schema::{
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
     server_entity_named,
 };
-use prelude::{ErrClone, Postfix};
+use prelude::Postfix;
 
 use crate::{
     format_parameter_type::format_parameter_type,
@@ -73,7 +73,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
                     let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
-                        .clone_err()
+                        .as_ref()
                         .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
                         .lookup(db);
@@ -137,12 +137,21 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => {
-                            panic!("Expected selectable to be an object.")
-                        }
-                        SelectionType::Object(_) => s.server_defined(),
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_object()
+                        .expect("Expected selectable to be an object");
+
+                    s.server_defined()
+                        .note_todo("avoid looking up twice with selectable.server_defined()")
                 }
                 DefinitionLocation::Client(c) => c
                     .as_object()
@@ -269,10 +278,20 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
         SelectionType::Scalar(scalar_selection) => {
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => s.server_defined(),
-                        SelectionType::Object(_) => panic!("Expected selectable to be a scalar."),
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_scalar()
+                        .expect("Expected selectable to be a scalar");
+
+                    selectable.server_defined()
                 }
                 DefinitionLocation::Client(c) => c
                     .as_scalar()
@@ -282,7 +301,6 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
 
             match scalar_selectable {
                 DefinitionLocation::Server(server_scalar_selectable) => {
-                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
                         server_scalar_selectable
                             .description
@@ -337,12 +355,21 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => {
-                            panic!("Expected selectable to be object selectable")
-                        }
-                        SelectionType::Object(_) => s.server_defined(),
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_object()
+                        .expect("Expected selectable to be an object");
+
+                    s.server_defined()
+                        .note_todo("selectable.server_defined() to avoid looking up twice")
                 }
                 DefinitionLocation::Client(c) => c
                     .as_object()

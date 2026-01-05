@@ -16,7 +16,7 @@ use isograph_schema::{
     RefetchedPathsMap, ServerObjectSelectableVariant, VariableContext,
     categorize_field_loadability, client_scalar_selectable_selection_set_for_parent_query,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
-    selectable_reader_selection_set, transform_arguments_with_child_context,
+    selectable_reader_selection_set, server_entity_named, transform_arguments_with_child_context,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -48,10 +48,20 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => s.server_defined(),
-                        SelectionType::Object(_) => panic!("Expected selectable to be scalar."),
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_scalar()
+                        .expect("Expected selectable to be a scalar");
+
+                    selectable.server_defined()
                 }
                 DefinitionLocation::Client(c) => c
                     .as_scalar()
