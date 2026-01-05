@@ -169,7 +169,8 @@ pub(crate) fn parse_type_system_document(
                         .clone()
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
-                    is_inline_fragment: ServerObjectSelectableVariant::LinkedField.object_selected(),
+                    is_inline_fragment: ServerObjectSelectableVariant::LinkedField
+                        .object_selected(),
                     parent_entity_name,
                     arguments: field
                         .item
@@ -287,7 +288,8 @@ pub(crate) fn parse_type_system_document(
                             nullable: true,
                         },
                     ),
-                    is_inline_fragment: ServerObjectSelectableVariant::InlineFragment.object_selected(),
+                    is_inline_fragment: ServerObjectSelectableVariant::InlineFragment
+                        .object_selected(),
                     parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                     arguments: vec![],
                     network_protocol_associated_data: (),
@@ -645,10 +647,12 @@ fn traverse_selections_and_return_path<'a>(
             .selectables
             .get(&(current_entity.name, selection_name.dereference()))
             .and_then(|x| match x.item {
-                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
-                    SelectionType::Scalar(_) => None,
-                    SelectionType::Object(_) => s.wrap_some(),
-                },
+                DefinitionLocation::Server(s) => {
+                    match s.lookup(db).is_inline_fragment.reference() {
+                        SelectionType::Scalar(_) => None,
+                        SelectionType::Object(_) => s.wrap_some(),
+                    }
+                }
                 DefinitionLocation::Client(_) => None,
             })
             .ok_or_else(|| {

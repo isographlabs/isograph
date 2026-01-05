@@ -47,10 +47,12 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
     match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
-                    SelectionType::Scalar(_) => s.server_defined(),
-                    SelectionType::Object(_) => panic!("Expected selectable to be scalar."),
-                },
+                DefinitionLocation::Server(s) => {
+                    match s.lookup(db).is_inline_fragment.reference() {
+                        SelectionType::Scalar(_) => s.server_defined(),
+                        SelectionType::Object(_) => panic!("Expected selectable to be scalar."),
+                    }
+                }
                 DefinitionLocation::Client(c) => c
                     .as_scalar()
                     .expect("Expected selectable to be scalar.")
@@ -79,12 +81,14 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
         }
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
-                    SelectionType::Scalar(_) => {
-                        panic!("Expected selectable to be an object.")
+                DefinitionLocation::Server(s) => {
+                    match s.lookup(db).is_inline_fragment.reference() {
+                        SelectionType::Scalar(_) => {
+                            panic!("Expected selectable to be an object.")
+                        }
+                        SelectionType::Object(_) => s.server_defined(),
                     }
-                    SelectionType::Object(_) => s.server_defined(),
-                },
+                }
                 DefinitionLocation::Client(c) => c
                     .as_object()
                     .expect("Expected selectable to be an object.")
