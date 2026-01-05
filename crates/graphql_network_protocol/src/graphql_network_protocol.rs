@@ -105,11 +105,11 @@ impl TargetPlatform for JavascriptTargetPlatform {
             .as_ref()
             .expect(
                 "Expected parsing to not have failed. \
-            This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .expect(
                 "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             );
 
         match entity.lookup(db).target_platform_associated_data.as_ref() {
@@ -123,7 +123,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                     .as_ref()
                     .expect(
                         "Expected type system document to be valid. \
-                    This is indicative of a bug in Isograph.",
+                        This is indicative of a bug in Isograph.",
                     )
                 {
                     let field_type = format_field_definition(
