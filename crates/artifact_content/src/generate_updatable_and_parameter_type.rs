@@ -13,8 +13,9 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
     client_scalar_selectable_named, description, output_type_annotation, selectable_named,
+    server_entity_named,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     format_parameter_type::format_parameter_type,
@@ -70,12 +71,20 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => s.server_defined(),
-                        SelectionType::Object(_) => {
-                            panic!("Expected selectable to be a scalar.")
-                        }
-                    }
+                    let selectable = s.lookup(db);
+                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                        .clone_err()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
+
+                    // TODO is this already validated?
+                    entity
+                        .selection_info
+                        .as_scalar()
+                        .expect("Expected selectable to be a scalar");
+
+                    selectable.server_defined()
                 }
                 DefinitionLocation::Client(c) => match c {
                     SelectionType::Scalar(s) => s.client_defined(),
@@ -85,7 +94,6 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
 
             match scalar_selectable {
                 DefinitionLocation::Server(server_scalar_selectable) => {
-                    let server_scalar_selectable = server_scalar_selectable.lookup(db);
                     write_optional_description(
                         server_scalar_selectable
                             .description
