@@ -54,7 +54,7 @@ pub fn get_object_selections_path<TCompilationProfile: CompilationProfile>(
                 // TODO is this already validated?
                 entity.selection_info.as_object().ok_or_else(|| {
                     Diagnostic::new(
-                        format!("Expected selectable to be an object"),
+                        "Expected selectable to be an object".to_string(),
                         // TODO have a location
                         None,
                     )

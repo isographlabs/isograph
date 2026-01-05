@@ -12,6 +12,7 @@ use crate::{
     CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
     client_scalar_selectable_named, parse_iso_literal_in_source,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
+    server_entity_named,
 };
 
 #[memo]
@@ -63,7 +64,16 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                 if let Ok(Some(selectable)) = selectable {
                     let actual_type = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).is_inline_fragment.reference() {
+                            let selectable = s.lookup(db);
+                            let entity =
+                                server_entity_named(db, selectable.target_entity_name.inner().0)
+                                    .as_ref()
+                                    .expect("Expected parsing to have succeeded")
+                                    .expect("Expected target entity to be defined")
+                                    .lookup(db);
+
+                            // TODO is this already validated?
+                            match entity.selection_info {
                                 SelectionType::Scalar(_) => "a server scalar",
                                 SelectionType::Object(_) => "a server object",
                             }

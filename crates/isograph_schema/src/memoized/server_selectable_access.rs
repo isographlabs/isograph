@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, SelectableName};
-use isograph_lang_types::SelectionType;
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
-    entity_definition_location, server_entity_named,
+    entity_definition_location, entity_not_defined_diagnostic, server_entity_named,
 };
 
 #[memo]
@@ -69,62 +68,28 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
     let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
         .clone_err()?;
 
-    let selectable = match selectable {
+    let memo_ref = match selectable {
         Some(s) => s,
         None => return Ok(None),
     };
 
-    // TODO check if it is a client field...
-    let memo_ref = match selectable.lookup(db).is_inline_fragment.reference() {
-        SelectionType::Scalar(_) => selectable,
-        SelectionType::Object(_) => {
-            let selectable_name = *ID_FIELD_NAME;
-            return Diagnostic::new(
-                format!(
-                    "Expected `{parent_server_object_entity_name}.{selectable_name}` \
-                    to be a scalar, but it was an object."
-                ),
-                entity_definition_location(db, parent_server_object_entity_name)
-                    .as_ref()
-                    .ok()
-                    .cloned()
-                    .flatten(),
-            )
-            .wrap_err();
-        }
-    };
-
     let selectable = memo_ref.lookup(db);
 
-    let target_scalar_entity_name = selectable.target_entity_name.inner().0;
-    let target_scalar_entity = server_entity_named(db, target_scalar_entity_name)
+    let target_entity_name = selectable.target_entity_name.inner().0;
+    let target_scalar_entity = server_entity_named(db, target_entity_name)
         .clone_err()?
-        .as_ref()
-        // It must exist
         .ok_or_else(|| {
-            let id_field_name = *ID_FIELD_NAME;
-            Diagnostic::new(
-                // TODO: it doesn't seem like this error is actually suppresable (here).
-                format!(
-                    "The `{id_field_name}` field on \
-                    `{target_scalar_entity_name}` must have type `ID!`.\n\
-                    This error can be suppressed using the \
-                    \"on_invalid_id_type\" config parameter."
-                ),
-                // TODO use the location of the selectable
-                entity_definition_location(db, target_scalar_entity_name)
-                    .as_ref()
-                    .ok()
-                    .cloned()
-                    .flatten(),
+            entity_not_defined_diagnostic(
+                target_entity_name,
+                Location::Generated.note_todo("Don't be lazy, get a location"),
             )
-        })?;
+        })?
+        .lookup(db);
 
     let options = &db.get_isograph_config().options;
 
     // And must have the right inner type
     if target_scalar_entity
-        .lookup(db)
         .name
         .note_todo("Compare with *target_scalar_entity_name here")
         != *ID_ENTITY_NAME
