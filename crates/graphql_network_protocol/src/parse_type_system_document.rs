@@ -16,9 +16,9 @@ use isograph_schema::{
     BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
     ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
     ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
-    ServerEntityDirectives, ServerObjectSelectableVariant, ServerSelectable, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
+    ServerEntityDirectives, ServerObjectSelectableVariant, ServerObjectSelectionInfo,
+    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::Postfix;
@@ -101,7 +101,10 @@ pub(crate) fn parse_type_system_document(
                 }),
                 name: server_object_entity_name,
                 network_protocol_associated_data: (),
-                selection_info: false.wrap(IsConcrete).object_selected(),
+                selection_info: ServerObjectSelectionInfo {
+                    is_concrete: IsConcrete(false),
+                }
+                .object_selected(),
                 target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                     subtypes: supertype_to_subtype_map
                         .get(&server_object_entity_name)
@@ -357,7 +360,7 @@ pub(crate) fn parse_type_system_document(
                 mutation_field.parent_entity_name;
             let mutation_field_arguments = mutation_field.arguments.clone();
 
-            let top_level_schema_field_is_concrete = outcome
+            let top_level_schema_field_selection_info = outcome
                 .entities
                 .get(&payload_object_entity_name)
                 .and_then(|entity| entity.item.lookup(db).selection_info.as_object())
@@ -443,7 +446,7 @@ pub(crate) fn parse_type_system_document(
             subfields_or_inline_fragments.push(imperative_field_subfields_or_inline_fragments(
                 mutation_subfield_name,
                 &top_level_schema_field_arguments,
-                if top_level_schema_field_is_concrete.0 {
+                if top_level_schema_field_selection_info.is_concrete.0 {
                     payload_object_entity_name.wrap_some()
                 } else {
                     None

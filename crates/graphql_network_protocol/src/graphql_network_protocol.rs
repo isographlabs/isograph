@@ -206,6 +206,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
             .selection_info
             .as_object()
             .expect("Expected server object entity to be object")
+            .is_concrete
             .0
         {
             let name = server_object_entity.name;

@@ -790,21 +790,22 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                 let concrete_object_entity_name =
                     server_object_selectable.target_entity_name.inner().0;
 
-                let concrete_type = server_entity_named(db, concrete_object_entity_name)
-                    .as_ref()
-                    .expect(
-                        "Expected validation to have worked. \
+                let server_object_selection_info =
+                    server_entity_named(db, concrete_object_entity_name)
+                        .as_ref()
+                        .expect(
+                            "Expected validation to have worked. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .as_ref()
-                    .expect(
-                        "Expected entity to exist. \
+                        )
+                        .as_ref()
+                        .expect(
+                            "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
-                    )
-                    .lookup(db)
-                    .selection_info
-                    .as_object()
-                    .expect("Expected entity to be object");
+                        )
+                        .lookup(db)
+                        .selection_info
+                        .as_object()
+                        .expect("Expected entity to be object");
 
                 MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                     parent_object_entity_name,
@@ -817,7 +818,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                             .map(|arg| arg.item.into_key_and_value()),
                         variable_context,
                     ),
-                    concrete_target_entity_name: if concrete_type.0 {
+                    concrete_target_entity_name: if server_object_selection_info.is_concrete.0 {
                         concrete_object_entity_name.wrap_some()
                     } else {
                         None
@@ -1177,6 +1178,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         .selection_info
         .as_object()
         .expect("Expected target object entity to be an object")
+        .is_concrete
         .0
     {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
@@ -1200,6 +1202,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
             .selection_info
             .as_object()
             .expect("Expected target server object entity to be an object")
+            .is_concrete
             .0
         {
             None
@@ -1264,6 +1267,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
                 .selection_info
                 .as_object()
                 .expect("Expected target server object entity to be an object")
+                .is_concrete
                 .0
             {
                 target_server_object_entity.name.wrap_some()
@@ -1438,6 +1442,7 @@ fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: Compil
         .selection_info
         .as_object()
         .expect("Expected parent object entity to be an object")
+        .is_concrete
         .0
     {
         maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)

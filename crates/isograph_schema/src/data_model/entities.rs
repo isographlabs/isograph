@@ -18,7 +18,7 @@ pub struct ServerEntity<TCompilationProfile: CompilationProfile> {
     // needed by the target platform, when that trait is responsible for creating the
     // normalization AST.)
     // That's awkward!
-    pub selection_info: SelectionType<(), IsConcrete>,
+    pub selection_info: SelectionType<(), ServerObjectSelectionInfo>,
     pub network_protocol_associated_data:
         <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityAssociatedData,
     pub target_platform_associated_data:
@@ -26,3 +26,8 @@ pub struct ServerEntity<TCompilationProfile: CompilationProfile> {
 }
 
 pub type MemoRefServerEntity<TCompilationProfile> = MemoRef<ServerEntity<TCompilationProfile>>;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy)]
+pub struct ServerObjectSelectionInfo {
+    pub is_concrete: IsConcrete,
+}
