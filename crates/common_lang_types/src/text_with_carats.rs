@@ -182,8 +182,6 @@ fn text_with_carats_and_line_count_buffer_and_line_numbers(
     // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
     // - everything in between
 
-    colored::control::unset_override();
-
     (
         output_lines[(first_line_with_span.saturating_sub(line_count_buffer + 1))
             ..(std::cmp::min(last_line_with_span + line_count_buffer, output_lines.len()))]
@@ -198,6 +196,25 @@ mod test {
     // spaces on lines with carats matter!
 
     use crate::{Span, text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers};
+
+    fn text_with_carats_for_test(
+        file_text: &str,
+        outer_span: Option<Span>,
+        inner_span: Span,
+        line_count_buffer: usize,
+        colorize_carats: bool,
+    ) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
+        colored::control::set_override(true);
+        let text_with_carats = text_with_carats_and_line_count_buffer_and_line_numbers(
+            file_text,
+            outer_span,
+            inner_span,
+            line_count_buffer,
+            colorize_carats,
+        );
+        colored::control::unset_override();
+        text_with_carats
+    }
 
     fn input_with_lines(line_count: usize) -> String {
         // 9 is not present — this is so that every line has 10
@@ -222,55 +239,30 @@ mod test {
 
     #[test]
     fn empty_span() {
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(0, 0),
-            3,
-            false,
-        )
-        .0;
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 0), 3, false).0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn empty_span_but_not_zero() {
         // This is weird behavior, and maybe we should print no output here.
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(1, 1),
-            3,
-            false,
-        )
-        .0;
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(1, 1), 3, false).0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn bug_span_on_line_break() {
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(9, 10),
-            3,
-            false,
-        )
-        .0;
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(9, 10), 3, false).0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn one_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(0, 1),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 1), 3, false).0,
         );
         assert_eq!(
             output,
@@ -286,14 +278,7 @@ mod test {
     #[test]
     fn multi_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(0, 3),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 3), 3, false).0,
         );
         assert_eq!(
             output,
@@ -315,14 +300,7 @@ mod test {
         // Note that spans do not include the final character (i.e. it is a range
         // of the form [start, end).)
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(0, 9),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 9), 3, false).0,
         );
         assert_eq!(
             output,
@@ -338,14 +316,7 @@ mod test {
     #[test]
     fn multi_leading_char_full_first_line_span_2() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(0, 10),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 10), 3, false).0,
         );
         assert_eq!(
             output,
@@ -361,14 +332,7 @@ mod test {
     #[test]
     fn multi_char_mid_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(31, 33),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false).0,
         );
         assert_eq!(
             output,
@@ -387,14 +351,7 @@ mod test {
     #[test]
     fn multi_char_multi_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(31, 43),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 43), 3, false).0,
         );
         assert_eq!(
             output,
@@ -415,14 +372,7 @@ mod test {
     #[test]
     fn multi_char_multi_line_span_2() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(31, 53),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 53), 3, false).0,
         );
         assert_eq!(
             output,
@@ -445,14 +395,7 @@ mod test {
     #[test]
     fn multi_line_start_on_beginning_of_line() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(30, 42),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(30, 42), 3, false).0,
         );
         assert_eq!(
             output,
@@ -474,14 +417,7 @@ mod test {
     fn multi_line_start_on_line_break() {
         // char 29 is the line break character...
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(29, 42),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(29, 42), 3, false).0,
         );
         assert_eq!(
             output,
@@ -502,14 +438,7 @@ mod test {
     #[test]
     fn span_ends_on_final_line() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(90, 100),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(90, 100), 3, false).0,
         );
         assert_eq!(
             output,
@@ -528,14 +457,7 @@ mod test {
         // Maybe this should panic! But it doesn't.
 
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(90, 105),
-                3,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(90, 105), 3, false).0,
         );
         assert_eq!(
             output,
@@ -553,28 +475,15 @@ mod test {
     fn span_outside_text() {
         // Maybe this should panic! But it doesn't.
 
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(105, 110),
-            3,
-            false,
-        )
-        .0;
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(105, 110), 3, false).0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn line_count_buffer_0() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(31, 33),
-                0,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 0, false).0,
         );
         assert_eq!(
             output,
@@ -587,14 +496,7 @@ mod test {
     #[test]
     fn line_count_buffer_1() {
         let output = with_leading_line_break(
-            text_with_carats_and_line_count_buffer_and_line_numbers(
-                &input_with_lines(10),
-                None,
-                Span::new(31, 33),
-                1,
-                false,
-            )
-            .0,
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 1, false).0,
         );
         assert_eq!(
             output,
@@ -606,33 +508,17 @@ mod test {
         );
     }
     #[test]
-    fn text_with_carats_colored() {
-        colored::control::set_override(true);
-
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(31, 33),
-            3,
-            true,
-        )
-        .0;
+    fn text_with_carats() {
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, true).0;
 
         let expected = "012345678\n012345678\n012345678\n0\u{1b}[91m12\u{1b}[0m345678\n \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \n012345678\n012345678\n012345678";
         assert_eq!(output, expected);
     }
     #[test]
     fn text_with_carats_multiline() {
-        colored::control::set_override(true);
-
-        let output = text_with_carats_and_line_count_buffer_and_line_numbers(
-            &input_with_lines(10),
-            None,
-            Span::new(8, 12),
-            3,
-            true,
-        )
-        .0;
+        let output =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(8, 12), 3, true).0;
 
         let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m       \n012345678\n012345678\n012345678";
 
