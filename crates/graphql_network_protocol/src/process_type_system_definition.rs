@@ -430,7 +430,7 @@ pub(crate) fn get_typename_selectable(
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
         target_entity_name: TypeAnnotationDeclaration::Scalar((*STRING_TYPE_NAME).into()),
-        selection_info: ().scalar_selected(),
+        is_inline_fragment: ().scalar_selected(),
         parent_entity_name: server_object_entity_name,
         arguments: vec![],
         network_protocol_associated_data: (),

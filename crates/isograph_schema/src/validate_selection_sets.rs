@@ -116,7 +116,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => s.server_defined(),
                             SelectionType::Object(_) => {
                                 errors.push(selection_wrong_selection_type_diagnostic(
@@ -244,7 +244,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => {
                                 errors.push(selection_wrong_selection_type_diagnostic(
                                     parent_entity.name,

@@ -43,7 +43,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let target_entity = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => {
                                 continue;
                             }

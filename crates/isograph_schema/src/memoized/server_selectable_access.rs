@@ -75,7 +75,7 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
     };
 
     // TODO check if it is a client field...
-    let memo_ref = match selectable.lookup(db).selection_info.reference() {
+    let memo_ref = match selectable.lookup(db).is_inline_fragment.reference() {
         SelectionType::Scalar(_) => selectable,
         SelectionType::Object(_) => {
             let selectable_name = *ID_FIELD_NAME;

@@ -192,7 +192,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 .lookup(db);
 
                 let object_selectable_variant =
-                    match server_object_selectable.selection_info.reference() {
+                    match server_object_selectable.is_inline_fragment.reference() {
                         SelectionType::Scalar(_) => {
                             panic!("Expected selectable to be an object")
                         }

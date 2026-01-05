@@ -39,7 +39,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
     )?;
 
     let selectable = match selectable {
-        DefinitionLocation::Server(server) => match server.lookup(db).selection_info.reference() {
+        DefinitionLocation::Server(server) => match server.lookup(db).is_inline_fragment.reference() {
             SelectionType::Scalar(_) => server.server_defined().wrap_ok(),
             SelectionType::Object(_) => ().wrap_err(),
         },
@@ -82,7 +82,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
 
     let selectable = match selectable {
         DefinitionLocation::Server(s) => {
-            if s.lookup(db).selection_info.as_ref().as_scalar().is_some() {
+            if s.lookup(db).is_inline_fragment.as_ref().as_scalar().is_some() {
                 let location = object_path.inner.name.location.to::<Location>();
                 return selectable_is_wrong_type_diagnostic(
                     parent.lookup(db).name,

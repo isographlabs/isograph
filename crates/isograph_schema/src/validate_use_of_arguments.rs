@@ -124,7 +124,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                 SelectionType::Scalar(scalar_selection) => {
                     let scalar_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).selection_info.reference() {
+                            match s.lookup(db).is_inline_fragment.reference() {
                                 SelectionType::Scalar(_) => s.server_defined(),
                                 SelectionType::Object(_) => {
                                     return;
@@ -173,7 +173,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                 SelectionType::Object(object_selection) => {
                     let object_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).selection_info.reference() {
+                            match s.lookup(db).is_inline_fragment.reference() {
                                 SelectionType::Scalar(_) => {
                                     return;
                                 }

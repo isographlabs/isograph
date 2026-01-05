@@ -47,7 +47,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
     match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => s.server_defined(),
                     SelectionType::Object(_) => panic!("Expected selectable to be scalar."),
                 },
@@ -79,7 +79,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
         }
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => {
                         panic!("Expected selectable to be an object.")
                     }
@@ -136,7 +136,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Server(server_object_selectable) => {
                     let server_object_selectable = server_object_selectable.lookup(db);
                     let normalization_key = match server_object_selectable
-                        .selection_info
+                        .is_inline_fragment
                         .as_ref()
                         .as_object()
                         .expect("Expected selectable to be object")
@@ -227,7 +227,7 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
     let condition = match object_selectable {
         DefinitionLocation::Server(server_object_selectable) => {
             match server_object_selectable
-                .selection_info
+                .is_inline_fragment
                 .as_ref()
                 .as_object()
                 .expect("Expected selectable to be an object.")
@@ -802,7 +802,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
             SelectionType::Scalar(scalar_field_selection) => {
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => s.server_defined(),
                             SelectionType::Object(_) => {
                                 panic!("Expected selectable to be a scalar.")
@@ -861,7 +861,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
             SelectionType::Object(object_selection) => {
                 let object_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => {
                                 panic!("Expected selectable to be an object.")
                             }
@@ -937,7 +937,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                         let server_object_selectable = server_object_selectable.lookup(db);
 
                         let normalization_key = match server_object_selectable
-                            .selection_info
+                            .is_inline_fragment
                             .as_ref()
                             .as_object()
                             .expect("Expected selectable to be an object.")

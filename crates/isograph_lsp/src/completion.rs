@@ -90,7 +90,7 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                     .wrap_some(),
                                     insert_text: match selectable {
                                         DefinitionLocation::Server(s) => {
-                                            match s.lookup(db).selection_info.as_ref() {
+                                            match s.lookup(db).is_inline_fragment.as_ref() {
                                                 SelectionType::Scalar(_) => None,
                                                 SelectionType::Object(_) => {
                                                     (&selectable_name).wrap_some()

@@ -683,7 +683,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
     )
     .lookup(db);
 
-    let object_selectable_variant = match server_object_selectable.selection_info.reference() {
+    let object_selectable_variant = match server_object_selectable.is_inline_fragment.reference() {
         SelectionType::Scalar(_s) => panic!(
             "Unexpected scalar selection variant. \
             This is indicative of a bug in Isograph."

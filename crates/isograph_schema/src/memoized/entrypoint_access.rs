@@ -63,7 +63,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                 if let Ok(Some(selectable)) = selectable {
                     let actual_type = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).selection_info.reference() {
+                            match s.lookup(db).is_inline_fragment.reference() {
                                 SelectionType::Scalar(_) => "a server scalar",
                                 SelectionType::Object(_) => "a server object",
                             }

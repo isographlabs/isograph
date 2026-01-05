@@ -39,7 +39,7 @@ pub fn get_object_selections_path<TCompilationProfile: CompilationProfile>(
         match current_selectable {
             Some(entity) => {
                 let server_selectable = entity.lookup(db);
-                match server_selectable.selection_info.reference() {
+                match server_selectable.is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => {
                         // TODO show a better error message
                         return Diagnostic::new(

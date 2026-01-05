@@ -169,7 +169,7 @@ pub(crate) fn parse_type_system_document(
                         .clone()
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
-                    selection_info: ServerObjectSelectableVariant::LinkedField.object_selected(),
+                    is_inline_fragment: ServerObjectSelectableVariant::LinkedField.object_selected(),
                     parent_entity_name,
                     arguments: field
                         .item
@@ -241,7 +241,7 @@ pub(crate) fn parse_type_system_document(
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
                     network_protocol_associated_data: (),
-                    selection_info: ().scalar_selected(),
+                    is_inline_fragment: ().scalar_selected(),
                     target_platform_associated_data: None.scalar_selected(),
                 }
                 .interned_value(db)
@@ -287,7 +287,7 @@ pub(crate) fn parse_type_system_document(
                             nullable: true,
                         },
                     ),
-                    selection_info: ServerObjectSelectableVariant::InlineFragment.object_selected(),
+                    is_inline_fragment: ServerObjectSelectableVariant::InlineFragment.object_selected(),
                     parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                     arguments: vec![],
                     network_protocol_associated_data: (),
@@ -326,7 +326,7 @@ pub(crate) fn parse_type_system_document(
                 .values()
                 .filter_map(|x| match x.item {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).selection_info.reference() {
+                        match s.lookup(db).is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => None,
                             SelectionType::Object(_) => s.wrap_some(),
                         }
@@ -411,7 +411,7 @@ pub(crate) fn parse_type_system_document(
                 .iter()
                 .map(|server_object_selectable| {
                     let object_selectable_variant =
-                        match server_object_selectable.selection_info.reference() {
+                        match server_object_selectable.is_inline_fragment.reference() {
                             SelectionType::Scalar(_) => {
                                 panic!("Expected selectable to be an object")
                             }
@@ -645,7 +645,7 @@ fn traverse_selections_and_return_path<'a>(
             .selectables
             .get(&(current_entity.name, selection_name.dereference()))
             .and_then(|x| match x.item {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => None,
                     SelectionType::Object(_) => s.wrap_some(),
                 },

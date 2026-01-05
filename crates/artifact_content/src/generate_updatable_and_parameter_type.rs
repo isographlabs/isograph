@@ -69,7 +69,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
     match selection.item.reference() {
         SelectionType::Scalar(scalar_field_selection) => {
             let scalar_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => s.server_defined(),
                     SelectionType::Object(_) => {
                         panic!("Expected selectable to be a scalar.")
@@ -126,7 +126,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
         }
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => {
                         panic!("Expected selectable to be an object.")
                     }
@@ -256,7 +256,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
     match selection.item.reference() {
         SelectionType::Scalar(scalar_selection) => {
             let scalar_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => s.server_defined(),
                     SelectionType::Object(_) => panic!("Expected selectable to be a scalar."),
                 },
@@ -322,7 +322,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
         }
         SelectionType::Object(object_selection) => {
             let object_selectable = match selectable {
-                DefinitionLocation::Server(s) => match s.lookup(db).selection_info.reference() {
+                DefinitionLocation::Server(s) => match s.lookup(db).is_inline_fragment.reference() {
                     SelectionType::Scalar(_) => {
                         panic!("Expected selectable to be object selectable")
                     }
