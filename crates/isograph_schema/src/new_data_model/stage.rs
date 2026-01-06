@@ -3,8 +3,7 @@ use std::{fmt::Debug, hash::Hash};
 use common_lang_types::{Diagnostic, EmbeddedLocation, SelectableName, WithGenericLocation};
 
 use crate::{
-    CompilationProfile, CreateError, LazyValidation, MapWithNonfatalDiagnostics,
-    NestedDataModelSelectable,
+    CompilationProfile, CreateError, MapWithNonfatalDiagnostics, NestedDataModelSelectable,
 };
 
 /// A trait that identifies how far along in the "transformation pipeline"
@@ -50,7 +49,10 @@ impl DataModelStage for NestedStage {
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct FlattenedStage {}
 impl DataModelStage for FlattenedStage {
-    type Resolution<T, E: CreateError> = LazyValidation<T, E>;
+    // TODO this Resolution type isn't what we want, probably!
+    type Resolution<T, E: CreateError> = WithGenericLocation<Result<T, Diagnostic>, Self::Location>;
+    // Instead, I believe we want this:
+    // type Resolution<T, E: CreateError> = LazyValidation<T, E>;
     type Location = ();
     type Selectables<TCompilationProfile: CompilationProfile> = ();
 }
