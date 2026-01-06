@@ -12,8 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
-    client_scalar_selectable_named, description, output_type_annotation, selectable_named,
-    server_entity_named,
+    client_scalar_selectable_named, description, selectable_named, server_entity_named,
 };
 use prelude::Postfix;
 
@@ -173,7 +172,14 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             }
             .0;
 
-            let type_annotation = output_type_annotation(db, object_selectable);
+            let type_annotation = match object_selectable {
+                DefinitionLocation::Client(client_pointer) => {
+                    client_pointer.lookup(db).target_entity_name.reference()
+                }
+                DefinitionLocation::Server(server_field) => {
+                    server_field.lookup(db).target_entity.reference()
+                }
+            };
 
             query_type_declaration.push_str(&format!(
                 "readonly {}: {},\n",
@@ -385,7 +391,14 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             query_type_declaration.push_str(&"  ".repeat(indentation_level as usize).to_string());
             let name_or_alias = (*object_selection).name_or_alias().item;
 
-            let type_annotation = output_type_annotation(db, object_selectable).clone();
+            let type_annotation = match object_selectable {
+                DefinitionLocation::Client(client_pointer) => {
+                    client_pointer.lookup(db).target_entity_name.reference()
+                }
+                DefinitionLocation::Server(server_field) => {
+                    server_field.lookup(db).target_entity.reference()
+                }
+            };
 
             let new_parent_object_entity_name = match object_selectable {
                 DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
@@ -409,8 +422,15 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                         query_type_declaration,
                         indentation_level,
                         name_or_alias,
-                        output_type_annotation(db, object_selectable),
-                        &type_annotation,
+                        match object_selectable {
+                            DefinitionLocation::Client(client_pointer) => {
+                                client_pointer.lookup(db).target_entity_name.reference()
+                            }
+                            DefinitionLocation::Server(server_field) => {
+                                server_field.lookup(db).target_entity.reference()
+                            }
+                        },
+                        type_annotation,
                         inner_text,
                     );
                 }
@@ -418,7 +438,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                     query_type_declaration.push_str(&format!(
                         "readonly {}: {},\n",
                         name_or_alias,
-                        print_javascript_type_declaration(&type_annotation, inner_text),
+                        print_javascript_type_declaration(type_annotation, inner_text),
                     ));
                 }
             }
