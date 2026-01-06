@@ -77,6 +77,28 @@ pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
+pub fn flattened_selectables<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> Vec<(
+    EntityName,
+    SelectableName,
+    MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>,
+)> {
+    flattened_schema(db)
+        .iter()
+        .flat_map(|(entity_name, value)| {
+            value.item.1.item.iter().map(|(selectable_name, value)| {
+                (
+                    entity_name.dereference(),
+                    selectable_name.dereference(),
+                    value.0.interned_ref(db),
+                )
+            })
+        })
+        .collect()
+}
+
+#[memo]
 pub fn flattened_selectables_for_entity<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
