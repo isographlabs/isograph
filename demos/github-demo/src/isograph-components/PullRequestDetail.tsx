@@ -34,7 +34,9 @@ export const PullRequestDetail = iso(`
 
       <Card variant="outlined">
         <CardContent>
-          <div dangerouslySetInnerHTML={{ __html: pullRequest.bodyHTML }} />
+          <div
+            dangerouslySetInnerHTML={{ __html: pullRequest.bodyHTML as string }}
+          />
         </CardContent>
       </Card>
 
