@@ -321,7 +321,7 @@ fn process_graphql_documents(
                                     GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
                                         .object_selected(),
                                 selection_info: ServerObjectSelectionInfo {
-                                    is_concrete: IsConcrete(true),
+                                    is_concrete: IsConcrete(false),
                                 }
                                 .object_selected(),
                             },
@@ -456,7 +456,7 @@ fn process_graphql_documents(
                                     GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
                                         .object_selected(),
                                 selection_info: ServerObjectSelectionInfo {
-                                    is_concrete: IsConcrete(true),
+                                    is_concrete: IsConcrete(false),
                                 }
                                 .object_selected(),
                             },
