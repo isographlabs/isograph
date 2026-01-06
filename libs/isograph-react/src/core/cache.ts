@@ -46,7 +46,7 @@ export function getOrCreateItemInSuspenseCache<
   return environment.fragmentCache[index];
 }
 
-export type NetworkResponseScalarValue = string | number | boolean;
+export type NetworkResponseScalarValue = string | number | boolean | unknown;
 export type NetworkResponseValue =
   | NetworkResponseScalarValue
   | null
