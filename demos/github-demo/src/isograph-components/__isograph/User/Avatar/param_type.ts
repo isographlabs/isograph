@@ -8,7 +8,7 @@ The user's public profile name.
     /**
 A URL pointing to the user's public avatar.
     */
-    readonly avatarUrl: string,
+    readonly avatarUrl: unknown,
   },
   readonly parameters: Record<PropertyKey, never>,
 };

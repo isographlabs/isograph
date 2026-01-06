@@ -17,7 +17,7 @@ The pet's ID
 Pets have a very complex social life. Find out more!
         */
         readonly best_friend_relationship: ({
-          readonly picture_together: (string | null),
+          readonly picture_together: (unknown | null),
           readonly best_friend: {
             /**
 The pet's ID

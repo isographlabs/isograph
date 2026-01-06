@@ -1,7 +1,7 @@
 export type Query__HomePage__raw_response_type = {
   viewer: {
     id: string,
-    avatarUrl: string,
+    avatarUrl: unknown,
     login: string,
     name?: (string | null),
     repositories____first___l_10____after___l_null: {

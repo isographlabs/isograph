@@ -7,9 +7,9 @@ export type Query__PetDetailRoute__raw_response_type = {
         id: string,
         firstName: string,
         lastName: string,
-        picture: string,
+        picture: unknown,
       },
-      picture_together?: (string | null),
+      picture_together?: (unknown | null),
     } | null),
     checkins____skip___l_null____limit___l_null: ReadonlyArray<{
       id: string,

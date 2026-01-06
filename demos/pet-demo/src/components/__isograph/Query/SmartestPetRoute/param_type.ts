@@ -22,7 +22,7 @@ Charisma? 100%
       readonly stats: ({
         readonly intelligence: (number | null),
       } | null),
-      readonly picture: string,
+      readonly picture: unknown,
       readonly checkinsPointer: ReadonlyArray<LoadableField<Pet__checkinsPointer__param, {
         readonly location: string,
       }>>,

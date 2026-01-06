@@ -23,7 +23,7 @@ export type Query__RepositoryPage__raw_response_type = {
             twitterUsername?: (string | null),
           } | null),
           closed: boolean,
-          createdAt: string,
+          createdAt: unknown,
           number: number,
           repository: {
             id: string,
@@ -44,7 +44,7 @@ export type Query__RepositoryPage__raw_response_type = {
   } | null),
   viewer: {
     id: string,
-    avatarUrl: string,
+    avatarUrl: unknown,
     name?: (string | null),
   },
 }

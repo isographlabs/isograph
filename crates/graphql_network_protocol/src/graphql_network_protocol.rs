@@ -26,6 +26,7 @@ use crate::process_type_system_definition::multiple_entity_definitions_found_dia
 use crate::query_text::generate_query_text;
 
 lazy_static! {
+    pub static ref UNKNOWN_JAVASCRIPT_TYPE: JavascriptName = "unknown".intern().into();
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
     pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
     pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();

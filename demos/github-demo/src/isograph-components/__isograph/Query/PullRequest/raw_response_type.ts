@@ -3,7 +3,7 @@ export type Query__PullRequest__raw_response_type = {
     id: string,
     pullRequest____number___v_pullRequestNumber?: ({
       id: string,
-      bodyHTML: string,
+      bodyHTML: unknown,
       comments____last___l_10: {
         edges?: (ReadonlyArray<({
           node?: ({
@@ -13,7 +13,7 @@ export type Query__PullRequest__raw_response_type = {
               login: string,
             } | null),
             bodyText: string,
-            createdAt: string,
+            createdAt: unknown,
           } | null),
         } | null)> | null),
       },
@@ -22,7 +22,7 @@ export type Query__PullRequest__raw_response_type = {
   } | null),
   viewer: {
     id: string,
-    avatarUrl: string,
+    avatarUrl: unknown,
     name?: (string | null),
   },
 }

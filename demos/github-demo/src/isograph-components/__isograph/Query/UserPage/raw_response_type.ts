@@ -32,7 +32,7 @@ export type Query__UserPage__raw_response_type = {
   } | null),
   viewer: {
     id: string,
-    avatarUrl: string,
+    avatarUrl: unknown,
     name?: (string | null),
   },
 }

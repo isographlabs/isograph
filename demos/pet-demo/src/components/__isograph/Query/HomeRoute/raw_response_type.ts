@@ -3,7 +3,7 @@ export type Query__HomeRoute__raw_response_type = {
     id: string,
     firstName: string,
     lastName: string,
-    picture: string,
+    picture: unknown,
     tagline: string,
   }>,
 }

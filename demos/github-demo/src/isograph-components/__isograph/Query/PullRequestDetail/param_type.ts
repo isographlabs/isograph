@@ -18,7 +18,7 @@ Identifies the pull request title.
         /**
 The body rendered to HTML.
         */
-        readonly bodyHTML: string,
+        readonly bodyHTML: unknown,
         readonly CommentList: PullRequest__CommentList__output_type,
       } | null),
     } | null),

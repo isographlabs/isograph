@@ -28,7 +28,8 @@ use prelude::Postfix;
 
 use crate::{
     GraphQLAndJavascriptProfile, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    STRING_JAVASCRIPT_TYPE, insert_entity_or_multiple_definition_diagnostic,
+    STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE,
+    insert_entity_or_multiple_definition_diagnostic,
 };
 
 lazy_static! {
@@ -202,7 +203,7 @@ pub fn process_graphql_type_system_document(
                         // TODO allow customization here
                         selection_info: ().scalar_selected(),
                         network_protocol_associated_data: (),
-                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
+                        target_platform_associated_data: (*UNKNOWN_JAVASCRIPT_TYPE)
                             .scalar_selected(),
                     }
                     .interned_value(db)
