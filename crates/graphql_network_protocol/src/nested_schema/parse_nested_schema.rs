@@ -50,7 +50,7 @@ fn define_default_graphql_data_model_entities(
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
         schema,
         DataModelEntity {
-            name: (*STRING_ENTITY_NAME).with_location(None),
+            name: (*STRING_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
             network_protocol_associated_data: (),
@@ -62,12 +62,12 @@ fn define_default_graphql_data_model_entities(
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
         schema,
         DataModelEntity {
-            name: (*ID_ENTITY_NAME).with_location(None),
+            name: (*ID_ENTITY_NAME).with_missing_location(),
             description: "ID fields uniquely identify each item, within their type"
                 .intern()
                 .to::<DescriptionValue>()
                 .wrap(Description)
-                .with_location(None)
+                .with_missing_location()
                 .wrap_some(),
             selectables: Default::default(),
             network_protocol_associated_data: (),
@@ -79,7 +79,7 @@ fn define_default_graphql_data_model_entities(
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
         schema,
         DataModelEntity {
-            name: (*FLOAT_ENTITY_NAME).with_location(None),
+            name: (*FLOAT_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
             network_protocol_associated_data: (),
@@ -91,7 +91,7 @@ fn define_default_graphql_data_model_entities(
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
         schema,
         DataModelEntity {
-            name: (*INT_ENTITY_NAME).with_location(None),
+            name: (*INT_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
             network_protocol_associated_data: (),
@@ -103,7 +103,7 @@ fn define_default_graphql_data_model_entities(
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
         schema,
         DataModelEntity {
-            name: (*BOOLEAN_ENTITY_NAME).with_location(None),
+            name: (*BOOLEAN_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
             network_protocol_associated_data: (),
@@ -161,7 +161,10 @@ fn process_graphql_documents(
                     GraphQLTypeSystemDefinition::ObjectTypeDefinition(
                         graphql_object_type_definition,
                     ) => {
-                        let mut selectables = process_fields(graphql_object_type_definition.fields);
+                        let mut selectables = process_fields(
+                            graphql_object_type_definition.name.item,
+                            graphql_object_type_definition.fields,
+                        );
                         let entity_name = graphql_object_type_definition.name.item;
 
                         let typename_entity_name = format!("{}__discriminator", entity_name)
@@ -176,12 +179,12 @@ fn process_graphql_documents(
                         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
                             schema,
                             DataModelEntity {
-                                name: typename_entity_name.with_location(None),
+                                name: typename_entity_name.with_missing_location(),
                                 description: format!("The typename of {}", entity_name)
                                     .intern()
                                     .to::<DescriptionValue>()
                                     .wrap(Description)
-                                    .with_location(None)
+                                    .with_missing_location()
                                     .wrap_some(),
                                 selectables: Default::default(),
                                 network_protocol_associated_data: (),
@@ -196,7 +199,13 @@ fn process_graphql_documents(
                         selectables.item.insert(
                             *TYPENAME_FIELD_NAME,
                             DataModelSelectable {
-                                name: (*TYPENAME_FIELD_NAME).with_location(None),
+                                name: (*TYPENAME_FIELD_NAME).with_missing_location(),
+                                // Missing location because we didn't parse the parent type name as part of the
+                                // selectable
+                                parent_entity_name: graphql_object_type_definition
+                                    .name
+                                    .item
+                                    .with_missing_location(),
                                 description: format!(
                                     "A typename field identifying the type {}",
                                     entity_name
@@ -204,14 +213,14 @@ fn process_graphql_documents(
                                 .intern()
                                 .to::<DescriptionValue>()
                                 .wrap(Description)
-                                .with_location(None)
+                                .with_missing_location()
                                 .wrap_some(),
                                 arguments: vec![],
                                 target_entity: TypeAnnotationDeclaration::Scalar(
                                     typename_entity_name.into(),
                                 )
                                 .wrap_ok()
-                                .with_location(None),
+                                .with_missing_location(),
                                 network_protocol_associated_data: (),
                                 target_platform_associated_data: (),
                                 is_inline_fragment: false.into(),
@@ -267,7 +276,10 @@ fn process_graphql_documents(
                     GraphQLTypeSystemDefinition::InterfaceTypeDefinition(
                         graphql_interface_type_definition,
                     ) => {
-                        let selectables = process_fields(graphql_interface_type_definition.fields);
+                        let selectables = process_fields(
+                            graphql_interface_type_definition.name.item,
+                            graphql_interface_type_definition.fields,
+                        );
                         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
                             schema,
                             DataModelEntity {
@@ -293,6 +305,7 @@ fn process_graphql_documents(
                         graphql_input_object_type_definition,
                     ) => {
                         let selectables = process_fields(
+                            graphql_input_object_type_definition.name.item,
                             graphql_input_object_type_definition
                                 .fields
                                 .into_iter()
@@ -354,12 +367,12 @@ fn process_graphql_documents(
                         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
                             schema,
                             DataModelEntity {
-                                name: typename_entity_name.with_location(None),
+                                name: typename_entity_name.with_missing_location(),
                                 description: format!("The typename of {}", entity_name)
                                     .intern()
                                     .to::<DescriptionValue>()
                                     .wrap(Description)
-                                    .with_location(None)
+                                    .with_missing_location()
                                     .wrap_some(),
                                 selectables: Default::default(),
                                 network_protocol_associated_data: (),
@@ -375,7 +388,8 @@ fn process_graphql_documents(
                         selectables.insert(
                             *TYPENAME_FIELD_NAME,
                             DataModelSelectable {
-                                name: (*TYPENAME_FIELD_NAME).with_location(None),
+                                name: (*TYPENAME_FIELD_NAME).with_missing_location(),
+                                parent_entity_name: typename_entity_name.with_missing_location(),
                                 description: format!(
                                     "A typename field identifying the type {}",
                                     entity_name
@@ -464,6 +478,7 @@ fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
 }
 
 fn process_fields(
+    parent_entity_name: EntityName,
     // TODO accept iterator and don't materialize when processing input items
     fields: Vec<WithEmbeddedLocation<GraphQLFieldDefinition>>,
 ) -> WithNonFatalDiagnostics<
@@ -480,6 +495,7 @@ fn process_fields(
             field.name.item,
             DataModelSelectable {
                 name: field.name.map_location(Some),
+                parent_entity_name: parent_entity_name.with_missing_location(),
                 description: field
                     .description
                     .map(|x| x.map_location(Some).map(Description)),

@@ -57,6 +57,7 @@ pub type ValidatedDataModelEntity<TCompilationProfile> =
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: DataModelStage> {
     pub name: WithGenericLocation<SelectableName, TStage::Location>,
+    pub parent_entity_name: WithGenericLocation<EntityName, TStage::Location>,
     pub description: Option<WithGenericLocation<Description, TStage::Location>>,
 
     pub arguments: Vec<VariableDeclaration>,

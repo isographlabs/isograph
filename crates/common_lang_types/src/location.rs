@@ -89,6 +89,10 @@ where
     fn with_location<TLocation>(self, item: TLocation) -> WithGenericLocation<Self, TLocation> {
         WithGenericLocation::new(self, item)
     }
+
+    fn with_missing_location<TLocation>(self) -> WithGenericLocation<Self, Option<TLocation>> {
+        WithGenericLocation::new(self, None)
+    }
 }
 
 impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
