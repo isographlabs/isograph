@@ -195,7 +195,10 @@ mod test {
     // Note: we use raw strings in this module, and the extra
     // spaces on lines with carats matter!
 
-    use crate::{Span, text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers};
+    use crate::{
+        OneIndexedColNumber, OneIndexedRowNumber, Span,
+        text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers,
+    };
 
     fn text_with_carats_for_test(
         file_text: &str,
