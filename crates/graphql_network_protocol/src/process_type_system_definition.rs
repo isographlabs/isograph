@@ -120,17 +120,10 @@ pub fn process_graphql_type_system_document(
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-                    get_typename_selectable(
-                        db,
-                        server_object_entity_name,
-                        format!("\"{}\"", server_object_entity_name)
-                            .intern()
-                            .to::<JavascriptName>()
-                            .wrap_some(),
-                    )
-                    .server_defined()
-                    .with_location(location)
-                    .into(),
+                    get_typename_selectable(db, server_object_entity_name, typename_entity_name)
+                        .server_defined()
+                        .with_location(location)
+                        .into(),
                     non_fatal_diagnostics,
                 );
 
@@ -399,7 +392,7 @@ pub fn process_graphql_type_system_document(
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-                    get_typename_selectable(db, server_object_entity_name, None)
+                    get_typename_selectable(db, server_object_entity_name, typename_entity_name)
                         .server_defined()
                         .with_location(location)
                         .into(),
@@ -504,7 +497,7 @@ fn get_refetch_selectable(
 pub(crate) fn get_typename_selectable(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     server_object_entity_name: EntityName,
-    javascript_type_override: Option<JavascriptName>,
+    target_entity_name: EntityName,
 ) -> MemoRef<ServerSelectable<GraphQLAndJavascriptProfile>> {
     ServerSelectable {
         description: format!("A discriminant for the {} type", server_object_entity_name)
@@ -515,12 +508,12 @@ pub(crate) fn get_typename_selectable(
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
         // Should this be the typename entity?
-        target_entity_name: TypeAnnotationDeclaration::Scalar((*STRING_TYPE_NAME).into()),
+        target_entity_name: TypeAnnotationDeclaration::Scalar(target_entity_name.into()),
         is_inline_fragment: false.into(),
         parent_entity_name: server_object_entity_name,
         arguments: vec![],
         network_protocol_associated_data: (),
-        target_platform_associated_data: javascript_type_override.scalar_selected(),
+        target_platform_associated_data: None.scalar_selected(),
     }
     .interned_value(db)
 }

@@ -7,7 +7,7 @@ export type Viewer__NewsfeedPaginationComponent__param = {
       /**
 A discriminant for the NewsfeedItem type
       */
-      readonly __typename: string,
+      readonly __typename: "BlogItem" | "AdItem",
       /**
 A client pointer for the AdItem type.
       */

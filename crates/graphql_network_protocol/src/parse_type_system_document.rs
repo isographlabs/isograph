@@ -131,7 +131,7 @@ pub(crate) fn parse_type_system_document(
         insert_selectable_or_multiple_definition_diagnostic(
             &mut outcome.selectables,
             (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-            get_typename_selectable(db, server_object_entity_name, None)
+            get_typename_selectable(db, server_object_entity_name, *STRING_ENTITY_NAME)
                 .server_defined()
                 .with_location(with_location.location)
                 .into(),
