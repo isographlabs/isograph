@@ -13,7 +13,7 @@ export const createdAtFormatted = iso(`
     createdAt
   }
 `)(({ data }) => {
-  const date = new Date(data.createdAt);
+  const date = new Date(data.createdAt as string);
   return date.toLocaleDateString('en-us', {
     year: 'numeric',
     month: 'numeric',
