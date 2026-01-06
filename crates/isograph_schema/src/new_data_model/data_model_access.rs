@@ -1,12 +1,13 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{EntityName, WithNoLocation};
+use common_lang_types::{EntityName, SelectableName, WithNoLocation};
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, FlattenedDataModelEntity, IsographDatabase, NestedDataModelEntity,
+    CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSelectable, IsographDatabase,
+    NestedDataModelEntity,
     flatten::{BothFlattenedResults, Flatten},
 };
 
@@ -34,4 +35,15 @@ pub fn flattened_entity_named<TCompilationProfile: CompilationProfile>(
     let entity = flattened_schema(db).get(&entity_name)?;
 
     entity.item.0.interned_ref(db).wrap_some()
+}
+
+#[memo]
+pub fn flattened_selectable_named<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> Option<MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>> {
+    let entity = flattened_schema(db).get(&entity_name)?;
+    let (selectable, _) = entity.item.1.item.get(selectable_name.reference())?;
+    selectable.interned_ref(db).wrap_some()
 }
