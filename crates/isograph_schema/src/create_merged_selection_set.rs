@@ -18,9 +18,9 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
     ClientSelectableId, CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME,
     ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments, PathToRefetchField,
-    ServerEntity, ServerObjectSelectableVariant, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    ServerEntity, VariableContext, client_object_selectable_named, client_scalar_selectable_named,
+    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
+    fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, selectable_reader_selection_set, server_entity_named, server_id_selectable,
@@ -683,168 +683,155 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
     )
     .lookup(db);
 
-    let object_selectable_variant = match server_object_selectable.is_inline_fragment.reference() {
-        SelectionType::Scalar(_s) => panic!(
-            "Unexpected scalar selection variant. \
-            This is indicative of a bug in Isograph."
-        ),
-        SelectionType::Object(o) => o.reference(),
-    };
+    if server_object_selectable.is_inline_fragment.0 {
+        let type_to_refine_to = object_selection_parent_object.name;
 
-    match object_selectable_variant {
-        ServerObjectSelectableVariant::InlineFragment => {
-            let type_to_refine_to = object_selection_parent_object.name;
+        let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to);
+        merge_traversal_state
+            .traversal_path
+            .push(normalization_key.clone());
 
-            let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to);
-            merge_traversal_state
-                .traversal_path
-                .push(normalization_key.clone());
+        let inline_fragment = parent_map.entry(normalization_key).or_insert_with(|| {
+            MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
+                type_to_refine_to,
+                selection_map: BTreeMap::new(),
+            })
+        });
 
-            let inline_fragment = parent_map.entry(normalization_key).or_insert_with(|| {
-                MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
-                    type_to_refine_to,
-                    selection_map: BTreeMap::new(),
-                })
-            });
-
-            match inline_fragment {
-                MergedServerSelection::ScalarField(_)
-                | MergedServerSelection::ClientObjectSelectable(_)
-                | MergedServerSelection::LinkedField(_) => {
-                    panic!(
-                        "Expected inline fragment. \
+        match inline_fragment {
+            MergedServerSelection::ScalarField(_)
+            | MergedServerSelection::ClientObjectSelectable(_)
+            | MergedServerSelection::LinkedField(_) => {
+                panic!(
+                    "Expected inline fragment. \
                         This is indicative of a bug in Isograph."
-                    )
-                }
-                MergedServerSelection::InlineFragment(existing_inline_fragment) => {
-                    let object_selection_parent_object_entity =
-                        &server_entity_named(db, parent_object_entity_name)
-                            .as_ref()
-                            .expect(
-                                "Expected validation to have worked. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            )
-                            .lookup(db);
-
-                    let reader_selection_set = inline_fragment_reader_selection_set();
-                    merge_selection_set_into_selection_map(
-                        db,
-                        &mut existing_inline_fragment.selection_map,
-                        object_selection_parent_object_entity,
-                        &reader_selection_set,
-                        merge_traversal_state,
-                        encountered_client_type_map,
-                        variable_context,
-                    );
-                    merge_selection_set_into_selection_map(
-                        db,
-                        &mut existing_inline_fragment.selection_map,
-                        object_selection_parent_object_entity,
-                        &object_selection.selection_set,
-                        merge_traversal_state,
-                        encountered_client_type_map,
-                        variable_context,
-                    );
-
-                    create_merged_selection_map_for_field_and_insert_into_global_map(
-                        db,
-                        object_selection_parent_object_entity,
-                        &object_selection.selection_set,
-                        encountered_client_type_map,
-                        (
-                            field_parent_object_entity_name,
-                            field_server_object_selectable_name,
-                        )
-                            .server_defined(),
-                        &server_object_selectable.initial_variable_context(),
-                    );
-                }
+                )
             }
-        }
-        ServerObjectSelectableVariant::LinkedField => {
-            let normalization_key = create_transformed_name_and_arguments(
-                object_selection.name.item,
-                &object_selection.arguments,
-                variable_context,
-            )
-            .normalization_key();
-
-            merge_traversal_state
-                .traversal_path
-                .push(normalization_key.clone());
-
-            // We are creating the linked field, and inserting it into the parent object
-            // first, because otherwise, when we try to merge the results into the parent
-            // selection_map, we find that the linked field we are about to insert is
-            // missing, and panic.
-            //
-            // This might be indicative of poor modeling.
-            let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
-                let parent_object_entity_name = server_object_selectable.parent_entity_name;
-
-                let concrete_object_entity_name =
-                    server_object_selectable.target_entity_name.inner().0;
-
-                let server_object_selection_info =
-                    server_entity_named(db, concrete_object_entity_name)
+            MergedServerSelection::InlineFragment(existing_inline_fragment) => {
+                let object_selection_parent_object_entity =
+                    &server_entity_named(db, parent_object_entity_name)
                         .as_ref()
                         .expect(
                             "Expected validation to have worked. \
-                        This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                         )
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                         )
-                        .lookup(db)
-                        .selection_info
-                        .as_object()
-                        .expect("Expected entity to be object");
+                        .lookup(db);
 
-                MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                    parent_object_entity_name,
-                    name: object_selection.name.item,
-                    selection_map: BTreeMap::new(),
-                    arguments: transform_arguments_with_child_context(
-                        object_selection
-                            .arguments
-                            .iter()
-                            .map(|arg| arg.item.into_key_and_value()),
-                        variable_context,
-                    ),
-                    concrete_target_entity_name: if server_object_selection_info.is_concrete.0 {
-                        concrete_object_entity_name.wrap_some()
-                    } else {
-                        None
-                    },
-                })
-            });
-            match linked_field {
-                MergedServerSelection::LinkedField(existing_linked_field) => {
-                    merge_selection_set_into_selection_map(
-                        db,
-                        &mut existing_linked_field.selection_map,
-                        object_selection_parent_object,
-                        &object_selection.selection_set,
-                        merge_traversal_state,
-                        encountered_client_type_map,
-                        variable_context,
-                    );
-                }
-                MergedServerSelection::ClientObjectSelectable(_)
-                | MergedServerSelection::ScalarField(_)
-                | MergedServerSelection::InlineFragment(_) => {
-                    panic!(
-                        "Expected linked field. \
-                                            This is indicative of a bug in Isograph."
+                let reader_selection_set = inline_fragment_reader_selection_set();
+                merge_selection_set_into_selection_map(
+                    db,
+                    &mut existing_inline_fragment.selection_map,
+                    object_selection_parent_object_entity,
+                    &reader_selection_set,
+                    merge_traversal_state,
+                    encountered_client_type_map,
+                    variable_context,
+                );
+                merge_selection_set_into_selection_map(
+                    db,
+                    &mut existing_inline_fragment.selection_map,
+                    object_selection_parent_object_entity,
+                    &object_selection.selection_set,
+                    merge_traversal_state,
+                    encountered_client_type_map,
+                    variable_context,
+                );
+
+                create_merged_selection_map_for_field_and_insert_into_global_map(
+                    db,
+                    object_selection_parent_object_entity,
+                    &object_selection.selection_set,
+                    encountered_client_type_map,
+                    (
+                        field_parent_object_entity_name,
+                        field_server_object_selectable_name,
                     )
-                }
+                        .server_defined(),
+                    &server_object_selectable.initial_variable_context(),
+                );
+            }
+        }
+    } else {
+        let normalization_key = create_transformed_name_and_arguments(
+            object_selection.name.item,
+            &object_selection.arguments,
+            variable_context,
+        )
+        .normalization_key();
+
+        merge_traversal_state
+            .traversal_path
+            .push(normalization_key.clone());
+
+        // We are creating the linked field, and inserting it into the parent object
+        // first, because otherwise, when we try to merge the results into the parent
+        // selection_map, we find that the linked field we are about to insert is
+        // missing, and panic.
+        //
+        // This might be indicative of poor modeling.
+        let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
+            let parent_object_entity_name = server_object_selectable.parent_entity_name;
+
+            let concrete_object_entity_name = server_object_selectable.target_entity_name.inner().0;
+
+            let server_object_selection_info = server_entity_named(db, concrete_object_entity_name)
+                .as_ref()
+                .expect(
+                    "Expected validation to have worked. \
+                        This is indicative of a bug in Isograph.",
+                )
+                .as_ref()
+                .expect(
+                    "Expected entity to exist. \
+                        This is indicative of a bug in Isograph.",
+                )
+                .lookup(db)
+                .selection_info
+                .as_object()
+                .expect("Expected entity to be object");
+
+            MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
+                parent_object_entity_name,
+                name: object_selection.name.item,
+                selection_map: BTreeMap::new(),
+                arguments: transform_arguments_with_child_context(
+                    object_selection
+                        .arguments
+                        .iter()
+                        .map(|arg| arg.item.into_key_and_value()),
+                    variable_context,
+                ),
+                concrete_target_entity_name: if server_object_selection_info.is_concrete.0 {
+                    concrete_object_entity_name.wrap_some()
+                } else {
+                    None
+                },
+            })
+        });
+        match linked_field {
+            MergedServerSelection::LinkedField(existing_linked_field) => {
+                merge_selection_set_into_selection_map(
+                    db,
+                    &mut existing_linked_field.selection_map,
+                    object_selection_parent_object,
+                    &object_selection.selection_set,
+                    merge_traversal_state,
+                    encountered_client_type_map,
+                    variable_context,
+                );
+            }
+            MergedServerSelection::ClientObjectSelectable(_)
+            | MergedServerSelection::ScalarField(_)
+            | MergedServerSelection::InlineFragment(_) => {
+                panic!(
+                    "Expected linked field. \
+                    This is indicative of a bug in Isograph."
+                )
             }
         }
     }

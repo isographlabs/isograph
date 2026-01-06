@@ -13,8 +13,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     BorrowedObjectSelectable, ClientFieldVariant, ClientScalarSelectable, CompilationProfile,
     IsographDatabase, Loadability, NameAndArguments, NormalizationKey, PathToRefetchField,
-    RefetchedPathsMap, ServerObjectSelectableVariant, VariableContext,
-    categorize_field_loadability, client_scalar_selectable_selection_set_for_parent_query,
+    RefetchedPathsMap, VariableContext, categorize_field_loadability,
+    client_scalar_selectable_selection_set_for_parent_query,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
     selectable_reader_selection_set, server_entity_named, transform_arguments_with_child_context,
 };
@@ -156,13 +156,12 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                     )
                 }
                 DefinitionLocation::Server(server_object_selectable) => {
-                    let normalization_key = match server_object_selectable
-                        .is_inline_fragment
-                        .as_ref()
-                        .as_object()
-                        .expect("Expected selectable to be object")
-                    {
-                        ServerObjectSelectableVariant::LinkedField => NameAndArguments {
+                    let normalization_key = if server_object_selectable.is_inline_fragment.0 {
+                        NormalizationKey::InlineFragment(
+                            server_object_selectable.target_entity_name.inner().0,
+                        )
+                    } else {
+                        NameAndArguments {
                             // TODO use alias
                             name: object_selection.name.item,
                             // TODO this clearly does something, but why are we able to pass
@@ -176,12 +175,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                                 initial_variable_context,
                             ),
                         }
-                        .normalization_key(),
-                        ServerObjectSelectableVariant::InlineFragment => {
-                            NormalizationKey::InlineFragment(
-                                server_object_selectable.target_entity_name.inner().0,
-                            )
-                        }
+                        .normalization_key()
                     };
 
                     path.push(normalization_key);
@@ -247,26 +241,20 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
 
     let condition = match object_selectable {
         DefinitionLocation::Server(server_object_selectable) => {
-            match server_object_selectable
-                .is_inline_fragment
-                .as_ref()
-                .as_object()
-                .expect("Expected selectable to be an object.")
-            {
-                ServerObjectSelectableVariant::InlineFragment => {
-                    let type_and_field = EntityNameAndSelectableName {
-                        selectable_name: object_selection.name.item,
-                        parent_entity_name: server_object_selectable.parent_entity_name,
-                    };
+            if server_object_selectable.is_inline_fragment.0 {
+                let type_and_field = EntityNameAndSelectableName {
+                    selectable_name: object_selection.name.item,
+                    parent_entity_name: server_object_selectable.parent_entity_name,
+                };
 
-                    let reader_artifact_import_name =
-                        format!("{}__resolver_reader", type_and_field.underscore_separated());
+                let reader_artifact_import_name =
+                    format!("{}__resolver_reader", type_and_field.underscore_separated());
 
-                    reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
+                reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-                    reader_artifact_import_name
-                }
-                ServerObjectSelectableVariant::LinkedField => "null".to_string(),
+                reader_artifact_import_name
+            } else {
+                "null".to_string()
             }
         }
         DefinitionLocation::Client(client_object_selectable) => {
@@ -973,13 +961,12 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                         path.pop();
                     }
                     DefinitionLocation::Server(server_object_selectable) => {
-                        let normalization_key = match server_object_selectable
-                            .is_inline_fragment
-                            .as_ref()
-                            .as_object()
-                            .expect("Expected selectable to be an object.")
-                        {
-                            ServerObjectSelectableVariant::LinkedField => NameAndArguments {
+                        let normalization_key = if server_object_selectable.is_inline_fragment.0 {
+                            NormalizationKey::InlineFragment(
+                                server_object_selectable.target_entity_name.inner().0,
+                            )
+                        } else {
+                            NameAndArguments {
                                 // TODO use alias
                                 name: object_selection.name.item,
                                 arguments: transform_arguments_with_child_context(
@@ -992,12 +979,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                                     initial_variable_context,
                                 ),
                             }
-                            .normalization_key(),
-                            ServerObjectSelectableVariant::InlineFragment => {
-                                NormalizationKey::InlineFragment(
-                                    server_object_selectable.target_entity_name.inner().0,
-                                )
-                            }
+                            .normalization_key()
                         };
 
                         path.push(normalization_key);

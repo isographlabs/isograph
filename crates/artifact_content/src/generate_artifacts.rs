@@ -13,12 +13,12 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NameAndArguments, NormalizationKey, RefetchStrategy, ServerObjectSelectableVariant,
-    TargetPlatform, UserWrittenClientTypeInfo, WrappedSelectionMapSelection,
-    accessible_client_selectables, client_object_selectable_named, client_scalar_selectable_named,
-    client_selectable_map, client_selectable_named, fetchable_types,
-    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
-    selection_map_wrapped, server_entity_named, validate_entire_schema, validated_entrypoints,
+    NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
+    WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
+    client_scalar_selectable_named, client_selectable_map, client_selectable_named,
+    fetchable_types, inline_fragment_reader_selection_set,
+    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
+    server_entity_named, validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, server_selectable_named};
 use lazy_static::lazy_static;
@@ -191,25 +191,14 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 )
                 .lookup(db);
 
-                let object_selectable_variant =
-                    match server_object_selectable.is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => {
-                            panic!("Expected selectable to be an object")
-                        }
-                        SelectionType::Object(o) => o,
-                    };
-
-                match object_selectable_variant {
-                    ServerObjectSelectableVariant::LinkedField => {}
-                    ServerObjectSelectableVariant::InlineFragment => {
-                        path_and_contents.push(generate_eager_reader_condition_artifact(
-                            db,
-                            server_object_selectable,
-                            &inline_fragment_reader_selection_set(),
-                            &traversal_state.refetch_paths,
-                            config.options.include_file_extensions_in_import_statements,
-                        ));
-                    }
+                if server_object_selectable.is_inline_fragment.0 {
+                    path_and_contents.push(generate_eager_reader_condition_artifact(
+                        db,
+                        server_object_selectable,
+                        &inline_fragment_reader_selection_set(),
+                        &traversal_state.refetch_paths,
+                        config.options.include_file_extensions_in_import_statements,
+                    ));
                 }
             }
 

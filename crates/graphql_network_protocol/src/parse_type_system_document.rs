@@ -9,16 +9,16 @@ use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
     DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
-    SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
-    UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
+    SelectionSet, SelectionTypePostfix, TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration,
+    UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
     ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
     ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
-    ServerEntityDirectives, ServerObjectSelectableVariant, ServerObjectSelectionInfo,
-    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ServerEntityDirectives, ServerObjectSelectionInfo, ServerSelectable, TYPENAME_FIELD_NAME,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::Postfix;
@@ -169,8 +169,7 @@ pub(crate) fn parse_type_system_document(
                         .clone()
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
-                    is_inline_fragment: ServerObjectSelectableVariant::LinkedField
-                        .object_selected(),
+                    is_inline_fragment: false.into(),
                     parent_entity_name,
                     arguments: field
                         .item
@@ -242,7 +241,7 @@ pub(crate) fn parse_type_system_document(
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
 
                     network_protocol_associated_data: (),
-                    is_inline_fragment: ().scalar_selected(),
+                    is_inline_fragment: false.into(),
                     target_platform_associated_data: None.scalar_selected(),
                 }
                 .interned_value(db)
@@ -288,8 +287,7 @@ pub(crate) fn parse_type_system_document(
                             nullable: true,
                         },
                     ),
-                    is_inline_fragment: ServerObjectSelectableVariant::InlineFragment
-                        .object_selected(),
+                    is_inline_fragment: true.into(),
                     parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                     arguments: vec![],
                     network_protocol_associated_data: (),
@@ -404,34 +402,22 @@ pub(crate) fn parse_type_system_document(
             let mut subfields_or_inline_fragments = parts_reversed
                 .iter()
                 .map(|server_object_selectable| {
-                    let object_selectable_variant =
-                        match server_object_selectable.is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => {
-                                panic!("Expected selectable to be an object")
-                            }
-                            SelectionType::Object(o) => o,
-                        };
-
-                    match object_selectable_variant {
-                        ServerObjectSelectableVariant::LinkedField => {
-                            WrappedSelectionMapSelection::LinkedField {
-                                parent_object_entity_name: server_object_selectable
-                                    .parent_entity_name,
-                                server_object_selectable_name: server_object_selectable.name,
-                                arguments: vec![],
-                                concrete_target_entity_name: target_parent_object_entity_name
-                                    .wrap_some()
-                                    .note_todo(
-                                        "This is 100% a bug when there are \
-                                            multiple items in parts_reversed, or this \
-                                            field is ignored.",
-                                    ),
-                            }
-                        }
-                        ServerObjectSelectableVariant::InlineFragment => {
-                            WrappedSelectionMapSelection::InlineFragment(
-                                server_object_selectable.target_entity_name.inner().0,
-                            )
+                    if server_object_selectable.is_inline_fragment.0 {
+                        WrappedSelectionMapSelection::InlineFragment(
+                            server_object_selectable.target_entity_name.inner().0,
+                        )
+                    } else {
+                        WrappedSelectionMapSelection::LinkedField {
+                            parent_object_entity_name: server_object_selectable.parent_entity_name,
+                            server_object_selectable_name: server_object_selectable.name,
+                            arguments: vec![],
+                            concrete_target_entity_name: target_parent_object_entity_name
+                                .wrap_some()
+                                .note_todo(
+                                    "This is 100% a bug when there are \
+                                    multiple items in parts_reversed, or this \
+                                    field is ignored.",
+                                ),
                         }
                     }
                 })

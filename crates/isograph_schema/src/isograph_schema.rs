@@ -102,10 +102,3 @@ impl NameAndArguments {
         }
     }
 }
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
-// This struct is indicative of poor data modeling.
-pub enum ServerObjectSelectableVariant {
-    LinkedField,
-    InlineFragment,
-}

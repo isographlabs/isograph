@@ -1,12 +1,19 @@
 use std::fmt::Debug;
 
 use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName, WithNoLocation};
-use isograph_lang_types::{
-    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
-};
+use isograph_lang_types::{Description, TypeAnnotationDeclaration, VariableDeclaration};
 use pico::MemoRef;
 
-use crate::{CompilationProfile, NetworkProtocol, ServerObjectSelectableVariant, TargetPlatform};
+use crate::{CompilationProfile, NetworkProtocol, TargetPlatform};
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy)]
+pub struct IsInlineFragment(pub bool);
+
+impl From<bool> for IsInlineFragment {
+    fn from(value: bool) -> Self {
+        IsInlineFragment(value)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
@@ -16,8 +23,9 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
     pub target_entity_name: TypeAnnotationDeclaration,
 
     // TODO this is obviously a GraphQL-ism! But it's used in a bunch of places, so it's
-    // not really easy to move it to TargetPlatform
-    pub is_inline_fragment: SelectionType<(), ServerObjectSelectableVariant>,
+    // not really easy to move it to TargetPlatform. However, we know it at parse time,
+    // because only asConcreteType fields are inline fragments.
+    pub is_inline_fragment: IsInlineFragment,
 
     pub parent_entity_name: EntityName,
     // TODO we shouldn't support default values here
