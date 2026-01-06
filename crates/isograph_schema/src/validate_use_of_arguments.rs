@@ -124,12 +124,26 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                 SelectionType::Scalar(scalar_selection) => {
                     let scalar_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).is_inline_fragment.reference() {
-                                SelectionType::Scalar(_) => s.server_defined(),
-                                SelectionType::Object(_) => {
-                                    return;
-                                }
+                            let selectable = s.lookup(db);
+                            let target_entity_name = selectable.target_entity_name.inner().0;
+                            let entity =
+                                match server_entity_named(db, target_entity_name).clone_err() {
+                                    Ok(o) => match o {
+                                        Some(entity) => entity.lookup(db),
+                                        None => {
+                                            return;
+                                        }
+                                    },
+                                    Err(_) => {
+                                        return;
+                                    }
+                                };
+
+                            if entity.selection_info.as_object().is_some() {
+                                return;
                             }
+
+                            selectable.server_defined()
                         }
                         DefinitionLocation::Client(c) => match c {
                             SelectionType::Scalar(s) => s.client_defined(),
@@ -141,8 +155,6 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
 
                     let field_argument_definitions = match scalar_selectable {
                         DefinitionLocation::Server(server_scalar_selectable) => {
-                            let server_scalar_selectable = server_scalar_selectable.lookup(db);
-
                             server_scalar_selectable.arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_scalar_selectable) => {
@@ -173,12 +185,26 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                 SelectionType::Object(object_selection) => {
                     let object_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
-                            match s.lookup(db).is_inline_fragment.reference() {
-                                SelectionType::Scalar(_) => {
-                                    return;
-                                }
-                                SelectionType::Object(_) => s.server_defined(),
+                            let selectable = s.lookup(db);
+                            let target_entity_name = selectable.target_entity_name.inner().0;
+                            let entity =
+                                match server_entity_named(db, target_entity_name).clone_err() {
+                                    Ok(o) => match o {
+                                        Some(entity) => entity.lookup(db),
+                                        None => {
+                                            return;
+                                        }
+                                    },
+                                    Err(_) => {
+                                        return;
+                                    }
+                                };
+
+                            if entity.selection_info.as_scalar().is_some() {
+                                return;
                             }
+
+                            selectable.server_defined()
                         }
                         DefinitionLocation::Client(c) => match c {
                             SelectionType::Scalar(_) => {
@@ -190,7 +216,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
 
                     let field_argument_definitions = match object_selectable {
                         DefinitionLocation::Server(server_object_selectable) => {
-                            server_object_selectable.lookup(db).arguments.to_vec()
+                            server_object_selectable.arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_object_selectable) => {
                             client_object_selectable
