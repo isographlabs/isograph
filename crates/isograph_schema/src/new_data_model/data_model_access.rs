@@ -1,6 +1,6 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{EntityName, SelectableName, WithNoLocation};
+use common_lang_types::{EmbeddedLocation, EntityName, SelectableName, WithNoLocation};
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::Postfix;
@@ -46,6 +46,17 @@ pub fn flattened_entity_named<TCompilationProfile: CompilationProfile>(
     flattened_entities(db)
         .get(&entity_name)
         .map(|x| x.dereference())
+}
+
+#[memo]
+pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    entity_name: EntityName,
+) -> Option<Option<EmbeddedLocation>> {
+    TCompilationProfile::parse_nested_data_model_schema(db)
+        .item
+        .get(entity_name.reference())
+        .map(|x| x.location)
 }
 
 #[memo]

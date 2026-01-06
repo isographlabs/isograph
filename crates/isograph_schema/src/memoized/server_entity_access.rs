@@ -1,6 +1,6 @@
-use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location};
+use common_lang_types::{Diagnostic, EntityName, Location};
 use pico_macros::memo;
-use prelude::{ErrClone, Postfix};
+use prelude::Postfix;
 
 use crate::{
     CompilationProfile, IsographDatabase, MemoRefServerEntity, flattened_entities,
@@ -31,22 +31,6 @@ pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
     name: EntityName,
 ) -> Option<MemoRefServerEntity<TCompilationProfile>> {
     flattened_entity_named(db, name).dereference()
-}
-
-#[memo]
-pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
-    db: &IsographDatabase<TCompilationProfile>,
-    entity_name: EntityName,
-) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) =
-        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
-
-    outcome
-        .item
-        .entities
-        .get(&entity_name)
-        .map(|x| x.location)
-        .wrap_ok()
 }
 
 pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {

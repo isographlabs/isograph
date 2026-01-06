@@ -102,10 +102,8 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
                         \"on_invalid_id_type\" config parameter."
                     ),
                     entity_definition_location(db, parent_server_object_entity_name)
-                        .as_ref()
-                        .ok()
-                        .cloned()
-                        .flatten(),
+                        .flatten()
+                        .map(|x| x.to::<Location>()),
                 ),
                 db.print_location_fn(true)
                     .note_todo("It's a bad sign we're calling this fn here"),

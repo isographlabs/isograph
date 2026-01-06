@@ -247,20 +247,12 @@ fn goto_entity_definition<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
 ) -> LSPRuntimeResult<Option<GotoDefinitionResponse>> {
     let location = entity_definition_location(db, entity_name)
-        .to_owned()
-        .ok()
         .ok_or(LSPRuntimeError::ExpectedError)?
         .ok_or(LSPRuntimeError::ExpectedError)?;
 
     GotoDefinitionResponse::Scalar(
-        isograph_location_to_lsp_location(
-            db,
-            location
-                .as_embedded_location()
-                .ok_or(LSPRuntimeError::ExpectedError)?,
-            &db.get_schema_source().content,
-        )
-        .ok_or(LSPRuntimeError::ExpectedError)?,
+        isograph_location_to_lsp_location(db, location, &db.get_schema_source().content)
+            .ok_or(LSPRuntimeError::ExpectedError)?,
     )
     .wrap_some()
     .wrap_ok()
