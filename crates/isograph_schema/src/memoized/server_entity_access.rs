@@ -5,7 +5,7 @@ use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity};
+use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity, flattened_entity_named};
 
 /// This function just drops the locations
 #[memo]
@@ -52,11 +52,7 @@ pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerEntity<TCompilationProfile>>> {
-    let map = deprecated_server_entities_map_without_locations(db)
-        .clone_err()?
-        .lookup(db);
-
-    map.get(&name).copied().wrap_ok()
+    flattened_entity_named(db, name).clone().wrap_ok()
 }
 
 #[memo]
