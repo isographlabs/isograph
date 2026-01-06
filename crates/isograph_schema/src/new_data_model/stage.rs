@@ -1,10 +1,8 @@
-use std::{fmt::Debug, hash::Hash};
+use std::{convert::Infallible, fmt::Debug, hash::Hash};
 
-use common_lang_types::{Diagnostic, EmbeddedLocation, SelectableName, WithGenericLocation};
+use common_lang_types::{Diagnostic, EmbeddedLocation, SelectableName};
 
-use crate::{
-    CompilationProfile, CreateError, MapWithNonfatalDiagnostics, NestedDataModelSelectable,
-};
+use crate::{CompilationProfile, MapWithNonfatalDiagnostics, NestedDataModelSelectable};
 
 /// A trait that identifies how far along in the "transformation pipeline"
 /// a data model item is. It is simply a bag of associated types.
@@ -29,7 +27,7 @@ use crate::{
 pub trait DataModelStage:
     Copy + Clone + Debug + PartialEq + PartialOrd + Eq + Ord + Hash + Default
 {
-    type Resolution<T, E: CreateError>;
+    type Error;
     type Location;
 
     type Selectables<TCompilationProfile: CompilationProfile>;
@@ -39,29 +37,34 @@ pub trait DataModelStage:
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct NestedStage {}
 
+/// Initially, we have errors and locations.
 impl DataModelStage for NestedStage {
-    type Resolution<T, E: CreateError> = WithGenericLocation<Result<T, Diagnostic>, Self::Location>;
+    type Error = Diagnostic;
     type Location = Option<EmbeddedLocation>;
     // TODO WithGenericLocation<NestedDataModelSelectables>
-    type Selectables<TCompilationProfile: CompilationProfile> =
-        MapWithNonfatalDiagnostics<SelectableName, NestedDataModelSelectable<TCompilationProfile>>;
+    type Selectables<TCompilationProfile: CompilationProfile> = MapWithNonfatalDiagnostics<
+        SelectableName,
+        NestedDataModelSelectable<TCompilationProfile>,
+        Self::Error,
+    >;
 }
 
+/// Next, those locations are dropped and errors ignored.
+/// In order to print those errors, we must go back to the original nested object and access
+/// the error.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct FlattenedStage {}
 impl DataModelStage for FlattenedStage {
-    // TODO this Resolution type isn't what we want, probably!
-    type Resolution<T, E: CreateError> = WithGenericLocation<Result<T, Diagnostic>, Self::Location>;
-    // Instead, I believe we want this:
-    // type Resolution<T, E: CreateError> = LazyValidation<T, E>;
+    type Error = ();
     type Location = ();
     type Selectables<TCompilationProfile: CompilationProfile> = ();
 }
 
+/// Finally, those errors are proven to not exist.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct ValidatedStage {}
 impl DataModelStage for ValidatedStage {
-    type Resolution<T, E: CreateError> = T;
+    type Error = Infallible;
     type Location = ();
     type Selectables<TCompilationProfile: CompilationProfile> = ();
 }

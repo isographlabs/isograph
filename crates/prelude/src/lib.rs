@@ -114,3 +114,16 @@ impl<T, E: Clone> ErrClone for Result<T, E> {
         self.as_ref().map_err(Clone::clone)
     }
 }
+
+pub trait DropErr {
+    type Target;
+    fn drop_err(self) -> Self::Target;
+}
+
+impl<T, E> DropErr for Result<T, E> {
+    type Target = Result<T, ()>;
+
+    fn drop_err<'a>(self) -> Self::Target {
+        self.map_err(|_| ())
+    }
+}

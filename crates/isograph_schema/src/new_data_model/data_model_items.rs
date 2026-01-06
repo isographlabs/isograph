@@ -1,22 +1,22 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    Diagnostic, EntityName, SelectableName, WithGenericLocation, WithNonFatalDiagnostics,
+    EntityName, SelectableName, WithGenericLocation, WithGenericNonFatalDiagnostics,
 };
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 
 use crate::{
-    CompilationProfile, CreateError, DataModelStage, FlattenedStage, IsInlineFragment,
-    IsographDatabase, NestedStage, NetworkProtocol, ServerObjectSelectionInfo, TargetPlatform,
-    ValidatedStage,
+    CompilationProfile, DataModelStage, FlattenedStage, IsInlineFragment, NestedStage,
+    NetworkProtocol, ServerObjectSelectionInfo, TargetPlatform, ValidatedStage,
 };
 
 // TODO use a type parameter here to ensure that there are no non-fatal diagnostics,
 // though realistically that's impossible - we can always drop them!
 // Perhaps we can have non-droppable diagnostics.
-pub type MapWithNonfatalDiagnostics<TKey, TValue> = WithNonFatalDiagnostics<BTreeMap<TKey, TValue>>;
+pub type MapWithNonfatalDiagnostics<TKey, TValue, TError> =
+    WithGenericNonFatalDiagnostics<BTreeMap<TKey, TValue>, TError>;
 
 pub type DataModelSchema<TCompilationProfile, TStage> = MapWithNonfatalDiagnostics<
     EntityName,
@@ -24,6 +24,7 @@ pub type DataModelSchema<TCompilationProfile, TStage> = MapWithNonfatalDiagnosti
         DataModelEntity<TCompilationProfile, TStage>,
         <TStage as DataModelStage>::Location,
     >,
+    <TStage as DataModelStage>::Error,
 >;
 pub type NestedDataModelSchema<TCompilationProfile> =
     DataModelSchema<TCompilationProfile, NestedStage>;
@@ -62,7 +63,7 @@ pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: 
     pub description: Option<WithGenericLocation<Description, TStage::Location>>,
 
     pub arguments: Vec<VariableDeclaration>,
-    pub target_entity: TStage::Resolution<TypeAnnotationDeclaration, TargetEntityParseError>,
+    pub target_entity: WithGenericLocation<Result<TypeAnnotationDeclaration, TStage::Error>, TStage::Location>,
     pub network_protocol_associated_data:
         <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,
     pub target_platform_associated_data:
@@ -79,21 +80,3 @@ pub type FlattenedDataModelSelectable<TCompilationProfile> =
     DataModelSelectable<TCompilationProfile, FlattenedStage>;
 pub type ValidatedDataModelSelectable<TCompilationProfile> =
     DataModelSelectable<TCompilationProfile, ValidatedStage>;
-
-#[derive(Copy, Clone)]
-pub struct TargetEntityParseError;
-
-impl CreateError for TargetEntityParseError {
-    fn create_error<TCompilationProfile: CompilationProfile>(
-        self,
-        _db: &IsographDatabase<TCompilationProfile>,
-    ) -> Diagnostic {
-        // // 1. Look up the Nested Node in the DB
-        // let nested_node = db.get_nested_selectable(key);
-        // // 2. Grab the location from the Nested Node
-        // let location = nested_node.target_entity.location;
-        // // 3. Return the diagnostic
-        // Diagnostic::new("Target entity not found", location)
-        Diagnostic::new("Target entity parse error".to_string(), None)
-    }
-}

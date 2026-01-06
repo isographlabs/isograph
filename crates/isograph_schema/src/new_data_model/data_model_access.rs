@@ -17,14 +17,12 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
     EntityName,
     WithNoLocation<BothFlattenedResults<NestedDataModelEntity<TCompilationProfile>>>,
 > {
-    let items = TCompilationProfile::parse_nested_data_model_schema(db)
+    TCompilationProfile::parse_nested_data_model_schema(db)
         .item
         .to_owned()
         .into_iter()
         .map(|(key, value)| (key, value.drop_location().map(|x| x.flatten())))
-        .collect();
-
-    items
+        .collect()
 }
 
 #[memo]

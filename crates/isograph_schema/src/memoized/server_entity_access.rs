@@ -52,7 +52,7 @@ pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerEntity<TCompilationProfile>>> {
-    flattened_entity_named(db, name).clone().wrap_ok()
+    (*flattened_entity_named(db, name)).wrap_ok()
 }
 
 #[memo]

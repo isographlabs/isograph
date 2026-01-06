@@ -1,9 +1,10 @@
 use common_lang_types::SelectableName;
+use prelude::DropErr;
 
 use crate::{
-    CompilationProfile, DataModelEntity, DataModelSelectable, FlattenedDataModelEntity,
-    FlattenedDataModelSelectable, MapWithNonfatalDiagnostics, NestedDataModelEntity,
-    NestedDataModelSelectable,
+    CompilationProfile, DataModelEntity, DataModelSelectable, DataModelStage,
+    FlattenedDataModelEntity, FlattenedDataModelSelectable, MapWithNonfatalDiagnostics,
+    NestedDataModelEntity, NestedDataModelSelectable, NestedStage,
 };
 
 pub type BothFlattenedResults<TFlatten> = (
@@ -25,6 +26,7 @@ impl<TCompilationProfile: CompilationProfile> Flatten
     type NestedOutput = MapWithNonfatalDiagnostics<
         SelectableName,
         BothFlattenedResults<NestedDataModelSelectable<TCompilationProfile>>,
+        <NestedStage as DataModelStage>::Error,
     >;
     fn flatten(self) -> (Self::Output, Self::NestedOutput) {
         let selectables = self
@@ -61,7 +63,7 @@ impl<TCompilationProfile: CompilationProfile> Flatten
                 parent_entity_name: self.parent_entity_name.drop_location(),
                 description: self.description.map(|x| x.drop_location()),
                 arguments: self.arguments,
-                target_entity: self.target_entity.drop_location(),
+                target_entity: self.target_entity.drop_location().map(|x| x.drop_err()),
                 network_protocol_associated_data: self.network_protocol_associated_data,
                 target_platform_associated_data: self.target_platform_associated_data,
                 is_inline_fragment: self.is_inline_fragment,

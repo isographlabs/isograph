@@ -99,9 +99,11 @@ impl From<Diagnostic> for Vec<Diagnostic> {
     }
 }
 
-#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Default)]
-pub struct WithNonFatalDiagnostics<T> {
-    pub non_fatal_diagnostics: Vec<Diagnostic>,
+pub type WithNonFatalDiagnostics<T> = WithGenericNonFatalDiagnostics<T, Diagnostic>;
+
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord)]
+pub struct WithGenericNonFatalDiagnostics<T, TError> {
+    pub non_fatal_diagnostics: Vec<TError>,
     pub item: T,
 }
 
@@ -110,6 +112,15 @@ impl<T> WithNonFatalDiagnostics<T> {
         WithNonFatalDiagnostics {
             non_fatal_diagnostics,
             item,
+        }
+    }
+}
+
+impl<T: Default, TError> Default for WithGenericNonFatalDiagnostics<T, TError> {
+    fn default() -> Self {
+        Self {
+            non_fatal_diagnostics: Default::default(),
+            item: Default::default(),
         }
     }
 }
