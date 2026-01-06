@@ -2,7 +2,7 @@ use std::collections::{BTreeMap, btree_map::Entry};
 
 use common_lang_types::{
     DescriptionValue, EntityName, JavascriptName, Location, SelectableName, VariableName,
-    WithEmbeddedLocation, WithGenericLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemExtension,
@@ -464,7 +464,8 @@ fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
     let key = item.name.item;
     match schema.item.entry(key) {
         Entry::Vacant(vacant_entry) => {
-            vacant_entry.insert(WithGenericLocation::new(item, None));
+            // TODO parse graphql schema should wrap the items with locations
+            vacant_entry.insert(item.with_missing_location());
         }
         Entry::Occupied(occupied_entry) => {
             schema
