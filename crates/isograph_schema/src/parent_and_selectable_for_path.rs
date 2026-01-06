@@ -5,7 +5,7 @@ use isograph_lang_types::{
     SelectionType,
 };
 use pico::MemoRef;
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientScalarSelectable, CompilationProfile, IsographDatabase, MemoRefObjectSelectable,
@@ -40,8 +40,26 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
 
     let selectable = match selectable {
         DefinitionLocation::Server(server) => {
-            match server.lookup(db).is_inline_fragment.reference() {
-                SelectionType::Scalar(_) => server.server_defined().wrap_ok(),
+            let selectable = server.lookup(db);
+            let target_entity_name = selectable.target_entity_name.inner().0;
+            let entity = server_entity_named(db, target_entity_name)
+                .clone_err()?
+                .ok_or_else(|| {
+                    entity_not_defined_diagnostic(
+                        target_entity_name,
+                        Location::Generated.note_todo("Use a real location"),
+                    )
+                })?
+                .lookup(db);
+
+            match entity.selection_info {
+                SelectionType::Scalar(_) => server
+                    .note_todo(
+                        "Do not call server.server_defined as \
+                        that means we look up twice",
+                    )
+                    .server_defined()
+                    .wrap_ok(),
                 SelectionType::Object(_) => ().wrap_err(),
             }
         }
