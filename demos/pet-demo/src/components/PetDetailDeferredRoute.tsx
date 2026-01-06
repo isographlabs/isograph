@@ -31,6 +31,7 @@ export const PetDetailDeferredRouteComponent = iso(`
     }
     notImplemented {
       __typename
+      __link
     }
   }
 `)(function PetDetailRouteComponent({ data }) {

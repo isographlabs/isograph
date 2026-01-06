@@ -93,6 +93,10 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
         arguments: null,
         isUpdatable: false,
       },
+      {
+        kind: "Link",
+        alias: "__link",
+      },
     ],
   },
 ];

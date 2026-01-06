@@ -1,3 +1,4 @@
+import { type NotImplemented____link__output_type } from '../../NotImplemented/__link/output_type';
 import { type Pet__PetDetailDeferredRouteInnerComponent__output_type } from '../../Pet/PetDetailDeferredRouteInnerComponent/output_type';
 import type { Query__PetDetailDeferredRoute__parameters } from './parameters_type';
 
@@ -29,6 +30,10 @@ A discriminant for the Namable type
 A discriminant for the NotImplemented type
       */
       readonly __typename: never,
+      /**
+A store Link for the NotImplemented type.
+      */
+      readonly __link: NotImplemented____link__output_type,
     } | null),
   },
   readonly parameters: Query__PetDetailDeferredRoute__parameters,
