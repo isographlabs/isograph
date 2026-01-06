@@ -5,8 +5,8 @@ use common_lang_types::{
     WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::{
-    GraphQLFieldDefinition, GraphQLTypeSystemDefinition, GraphQLTypeSystemExtension,
-    GraphQLTypeSystemExtensionOrDefinition,
+    GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition, GraphQLTypeSystemDefinition,
+    GraphQLTypeSystemExtension, GraphQLTypeSystemExtensionOrDefinition,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -147,6 +147,35 @@ fn insert_parsed_items_into_schema(
         &mut interfaces_to_process,
     );
 
+    for graphql_interface_type_definition in interfaces_to_process {
+        let selectables = process_fields(
+            graphql_interface_type_definition.name.item,
+            graphql_interface_type_definition.fields,
+        );
+        insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
+            schema,
+            DataModelEntity {
+                name: graphql_interface_type_definition.name.map_location(Some),
+                description: graphql_interface_type_definition
+                    .description
+                    .map(|x| x.map_location(Some).map(Description)),
+                selectables,
+                network_protocol_associated_data: (),
+                target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
+                    subtypes: supertype_to_subtype_map
+                        .get(graphql_interface_type_definition.name.item.reference())
+                        .expect("Expected interface to exist")
+                        .clone(),
+                }
+                .object_selected(),
+                selection_info: ServerObjectSelectionInfo {
+                    is_concrete: IsConcrete(false),
+                }
+                .object_selected(),
+            },
+        );
+    }
+
     for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
         let typename_entity_name = format!("{}__discriminator", abstract_parent_entity_name)
             .intern()
@@ -180,7 +209,7 @@ fn process_graphql_documents(
     schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
     documents: Vec<GraphQLTypeSystemExtensionOrDefinition>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    interfaces_to_process: &mut Vec<EntityName>,
+    interfaces_to_process: &mut Vec<GraphQLInterfaceTypeDefinition>,
 ) {
     for document in documents {
         match document {
@@ -304,33 +333,10 @@ fn process_graphql_documents(
                     GraphQLTypeSystemDefinition::InterfaceTypeDefinition(
                         graphql_interface_type_definition,
                     ) => {
-                        let selectables = process_fields(
-                            graphql_interface_type_definition.name.item,
-                            graphql_interface_type_definition.fields,
-                        );
-                        insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
-                            schema,
-                            DataModelEntity {
-                                name: graphql_interface_type_definition.name.map_location(Some),
-                                description: graphql_interface_type_definition
-                                    .description
-                                    .map(|x| x.map_location(Some).map(Description)),
-                                selectables,
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data:
-                                    GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
-                                        .object_selected(),
-                                selection_info: ServerObjectSelectionInfo {
-                                    is_concrete: IsConcrete(false),
-                                }
-                                .object_selected(),
-                            },
-                        );
-
                         supertype_to_subtype_map
                             .entry(graphql_interface_type_definition.name.item)
                             .or_default();
-                        interfaces_to_process.push(graphql_interface_type_definition.name.item);
+                        interfaces_to_process.push(graphql_interface_type_definition);
                     }
                     GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
                         graphql_input_object_type_definition,
