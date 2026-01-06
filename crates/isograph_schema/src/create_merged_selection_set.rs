@@ -16,11 +16,11 @@ use prelude::Postfix;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
-    ClientSelectableId, CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments, PathToRefetchField,
-    ServerEntity, VariableContext, client_object_selectable_named, client_scalar_selectable_named,
-    client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
-    fetchable_types,
+    ClientSelectableId, CompilationProfile, FlattenedDataModelEntity, ID_ENTITY_NAME,
+    ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments,
+    PathToRefetchField, VariableContext, client_object_selectable_named,
+    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     flattened_entity_named, flattened_selectable_named, initial_variable_context,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
@@ -445,7 +445,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     TCompilationProfile: CompilationProfile,
 >(
     db: &IsographDatabase<TCompilationProfile>,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
@@ -476,7 +476,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
 
 fn create_field_traversal_result<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -532,7 +532,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_map: &mut MergedSelectionMap,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
@@ -659,7 +659,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
     variable_context: &VariableContext,
     object_selection: &ObjectSelection,
     parent_object_entity_name: EntityName,
-    object_selection_parent_object: &ServerEntity<TCompilationProfile>,
+    object_selection_parent_object: &FlattenedDataModelEntity<TCompilationProfile>,
     field_parent_object_entity_name: EntityName,
     field_server_object_selectable_name: SelectableName,
 ) {
@@ -836,7 +836,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
 fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -907,7 +907,7 @@ fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
 fn merge_client_scalar_field<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_map: &mut BTreeMap<NormalizationKey, MergedServerSelection>,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
     variable_context: &VariableContext,
@@ -1026,7 +1026,7 @@ fn insert_imperative_field_into_refetch_paths<TCompilationProfile: CompilationPr
     newly_encountered_scalar_client_selectable_name: SelectableName,
     newly_encountered_client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
     parent_object_entity_name: EntityName,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     variant: &ImperativelyLoadedFieldVariant,
 ) {
     let path = PathToRefetchField {
@@ -1289,7 +1289,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
 #[expect(clippy::too_many_arguments)]
 fn merge_non_loadable_client_type<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     parent_map: &mut MergedSelectionMap,
     parent_merge_traversal_state: &mut ScalarClientFieldTraversalState,
     newly_encountered_client_type_id: ClientSelectableId,
@@ -1413,7 +1413,7 @@ fn merge_server_scalar_field(
 fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     merged_selection_map: &mut MergedSelectionMap,
-    parent_object_entity: &ServerEntity<TCompilationProfile>,
+    parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
 ) {
     if !parent_object_entity
         .selection_info

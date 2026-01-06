@@ -11,7 +11,7 @@ use isograph_schema::{
     read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
-    IsographDatabase, ServerEntity, get_parent_and_selectable_for_object_path,
+    FlattenedDataModelEntity, IsographDatabase, get_parent_and_selectable_for_object_path,
     get_parent_and_selectable_for_scalar_path,
 };
 use lsp_types::{
@@ -353,7 +353,7 @@ fn hover_text_for_selectable(
 }
 
 fn format_hover_for_entity<TCompilationProfile: CompilationProfile>(
-    entity: &ServerEntity<TCompilationProfile>,
+    entity: &FlattenedDataModelEntity<TCompilationProfile>,
 ) -> String {
     let object_entity_name = entity.name;
     let description = match entity.description {

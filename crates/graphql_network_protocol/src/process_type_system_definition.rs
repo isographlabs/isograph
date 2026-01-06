@@ -17,10 +17,11 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
-    FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME,
-    ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase, NODE_FIELD_NAME, RefetchStrategy,
-    ServerEntity, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
+    FlattenedDataModelEntity, FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    NODE_FIELD_NAME, RefetchStrategy, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
 use pico::MemoRef;
@@ -63,7 +64,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: object_type_definition.description.map(|description_value| {
                             description_value
                                 .item
@@ -97,7 +98,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     typename_entity_name,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: format!("The typename of {}", server_object_entity_name)
                             .intern()
                             .to::<DescriptionValue>()
@@ -199,7 +200,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     scalar_type_definition.name.item,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: scalar_type_definition
                             .description
                             .map(|with_span| with_span.item.wrap(Description).with_no_location()),
@@ -230,7 +231,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: input_object_definition
                             .description
                             .map(|description_value| {
@@ -278,7 +279,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     enum_definition.name.item,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: enum_definition
                             .description
                             .map(|with_span| with_span.item.wrap(Description).with_no_location()),
@@ -302,7 +303,7 @@ pub fn process_graphql_type_system_document(
                 insert_entity_or_multiple_definition_diagnostic(
                     &mut outcome.entities,
                     server_object_entity_name,
-                    ServerEntity {
+                    FlattenedDataModelEntity {
                         description: union_definition.description.map(|description_value| {
                             description_value
                                 .item

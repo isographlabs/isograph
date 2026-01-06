@@ -10,7 +10,7 @@ use prelude::{ErrClone, Postfix};
 use std::collections::HashSet;
 
 use crate::{
-    ClientFieldVariant, CompilationProfile, IsographDatabase, ServerEntity,
+    ClientFieldVariant, CompilationProfile, FlattenedDataModelEntity, IsographDatabase,
     entity_not_defined_diagnostic, flattened_entity_named, reader_selection_set_map,
     selectable_is_wrong_type_diagnostic, selectable_named,
 };
@@ -66,7 +66,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     errors: &mut Vec<Diagnostic>,
     selection_set: &SelectionSet,
-    parent_entity: &ServerEntity<TCompilationProfile>,
+    parent_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     selectable_declaration_info: EntityNameAndSelectableName,
 ) {
     let mut encountered_names_or_aliases = HashSet::new();

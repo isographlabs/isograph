@@ -22,9 +22,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo,
-    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, Format, IsographDatabase,
-    MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName, RootRefetchedPath,
-    ScalarClientFieldTraversalState, ServerEntity, WrappedSelectionMapSelection,
+    FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, FlattenedDataModelEntity, Format,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName,
+    RootRefetchedPath, ScalarClientFieldTraversalState, WrappedSelectionMapSelection,
     client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
     current_target_merged_selections, fetchable_types, flattened_entity_named,
@@ -443,7 +443,7 @@ fn entrypoint_file_content<TCompilationProfile: CompilationProfile>(
     file_extensions: GenerateFileExtensionsOption,
     query_name: QueryOperationName,
     operation_text: &OperationText,
-    parent_type: &ServerEntity<TCompilationProfile>,
+    parent_type: &FlattenedDataModelEntity<TCompilationProfile>,
     refetch_query_artifact_import: &RefetchQueryArtifactImport,
     field_name: SelectableName,
     concrete_type: EntityName,

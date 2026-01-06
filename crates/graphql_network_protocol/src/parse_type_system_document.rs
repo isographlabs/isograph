@@ -15,11 +15,12 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable,
-    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, FlattenedDataModelSelectable,
-    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives,
-    ServerObjectSelectionInfo, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, FlattenedDataModelEntity,
+    FlattenedDataModelSelectable, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
+    IsConcrete, IsographDatabase, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME,
+    ServerEntityDirectives, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
+    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::{ErrClone, Postfix};
@@ -93,7 +94,7 @@ pub(crate) fn parse_type_system_document(
         insert_entity_or_multiple_definition_diagnostic(
             &mut outcome.entities,
             server_object_entity_name,
-            ServerEntity {
+            FlattenedDataModelEntity {
                 description: interface_definition.description.map(|description_value| {
                     description_value
                         .item
@@ -269,7 +270,7 @@ pub(crate) fn parse_type_system_document(
         insert_entity_or_multiple_definition_diagnostic(
             &mut outcome.entities,
             typename_entity_name,
-            ServerEntity {
+            FlattenedDataModelEntity {
                 description: format!("The typename of {}", abstract_parent_entity_name)
                     .intern()
                     .to::<DescriptionValue>()
@@ -566,7 +567,7 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *ID_ENTITY_NAME,
-        ServerEntity {
+        FlattenedDataModelEntity {
             description: None,
             name: (*ID_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
@@ -581,7 +582,7 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *STRING_ENTITY_NAME,
-        ServerEntity {
+        FlattenedDataModelEntity {
             description: None,
             name: (*STRING_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
@@ -596,7 +597,7 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *BOOLEAN_ENTITY_NAME,
-        ServerEntity {
+        FlattenedDataModelEntity {
             description: None,
             name: (*BOOLEAN_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
@@ -611,7 +612,7 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *FLOAT_ENTITY_NAME,
-        ServerEntity {
+        FlattenedDataModelEntity {
             description: None,
             name: (*FLOAT_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
@@ -626,7 +627,7 @@ fn define_default_graphql_types(
     insert_entity_or_multiple_definition_diagnostic(
         &mut outcome.entities,
         *INT_ENTITY_NAME,
-        ServerEntity {
+        FlattenedDataModelEntity {
             description: None,
             name: (*INT_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
@@ -659,7 +660,7 @@ fn traverse_selections_and_return_path<'a>(
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
     Vec<&'a FlattenedDataModelSelectable<GraphQLAndJavascriptProfile>>,
-    &'a ServerEntity<GraphQLAndJavascriptProfile>,
+    &'a FlattenedDataModelEntity<GraphQLAndJavascriptProfile>,
 )> {
     let mut current_entity = outcome
         .entities
@@ -740,8 +741,10 @@ fn traverse_selections_and_return_path<'a>(
     (output, current_entity).wrap_ok()
 }
 
-type EntitiesDefinedBySchema =
-    BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLAndJavascriptProfile>>>>;
+type EntitiesDefinedBySchema = BTreeMap<
+    EntityName,
+    WithLocation<pico::MemoRef<FlattenedDataModelEntity<GraphQLAndJavascriptProfile>>>,
+>;
 
 pub(crate) fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
     if members.is_empty() {

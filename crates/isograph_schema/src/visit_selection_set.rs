@@ -6,7 +6,8 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, IsographDatabase, ServerEntity, flattened_entity_named, selectable_named,
+    CompilationProfile, FlattenedDataModelEntity, IsographDatabase, flattened_entity_named,
+    selectable_named,
 };
 
 /// This is visiting an unvalidated selection set, and should not panic.
@@ -16,10 +17,10 @@ use crate::{
 pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     selection_set: &[WithEmbeddedLocation<Selection>],
-    parent_entity: &ServerEntity<TCompilationProfile>,
+    parent_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     visit_selection: &mut impl FnMut(
         SelectionType<&ScalarSelection, &ObjectSelection>,
-        &ServerEntity<TCompilationProfile>,
+        &FlattenedDataModelEntity<TCompilationProfile>,
     ),
 ) {
     for selection in selection_set.iter() {
