@@ -503,19 +503,19 @@ fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
 }
 
 fn insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
-    selectable: &mut WithNonFatalDiagnostics<
+    selectables: &mut WithNonFatalDiagnostics<
         BTreeMap<SelectableName, NestedDataModelSelectable<GraphQLAndJavascriptProfile>>,
     >,
     item: NestedDataModelSelectable<GraphQLAndJavascriptProfile>,
 ) {
     let key = item.name.item;
-    match selectable.item.entry(key) {
+    match selectables.item.entry(key) {
         Entry::Vacant(vacant_entry) => {
             // TODO parse graphql schema should wrap the items with locations
             vacant_entry.insert(item);
         }
         Entry::Occupied(_) => {
-            selectable.non_fatal_diagnostics.push(
+            selectables.non_fatal_diagnostics.push(
                 multiple_selectable_definitions_found_diagnostic(
                     item.parent_entity_name.item,
                     key,
