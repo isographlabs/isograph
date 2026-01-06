@@ -86,6 +86,37 @@ pub fn process_graphql_type_system_document(
                     non_fatal_diagnostics,
                 );
 
+                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
+                    .intern()
+                    .to::<EntityName>()
+                    // And make it not selectable!
+                    .note_todo("Come up with a way to not have these be in the same namespace");
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    typename_entity_name,
+                    ServerEntity {
+                        description: format!("The typename of {}", server_object_entity_name)
+                            .intern()
+                            .to::<DescriptionValue>()
+                            .wrap(Description)
+                            .wrap_some(),
+                        name: typename_entity_name,
+                        selection_info: ().scalar_selected(),
+                        network_protocol_associated_data: (),
+                        target_platform_associated_data: format!(
+                            "\"{}\"",
+                            server_object_entity_name
+                        )
+                        .intern()
+                        .to::<JavascriptName>()
+                        .scalar_selected(),
+                    }
+                    .interned_value(db)
+                    .with_location(location)
+                    .into(),
+                    non_fatal_diagnostics,
+                );
+
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
                     (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
