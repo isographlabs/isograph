@@ -395,26 +395,6 @@ fn process_graphql_documents(
                                 these be in the same namespace",
                             );
 
-                        insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
-                            schema,
-                            DataModelEntity {
-                                name: typename_entity_name.with_missing_location(),
-                                description: format!("The typename of {}", entity_name)
-                                    .intern()
-                                    .to::<DescriptionValue>()
-                                    .wrap(Description)
-                                    .with_missing_location()
-                                    .wrap_some(),
-                                selectables: Default::default(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: format!("\"{entity_name}\"")
-                                    .intern()
-                                    .to::<JavascriptName>()
-                                    .scalar_selected(),
-                                selection_info: ().scalar_selected(),
-                            },
-                        );
-
                         let mut selectables = BTreeMap::new();
                         selectables.insert(
                             *TYPENAME_FIELD_NAME,
