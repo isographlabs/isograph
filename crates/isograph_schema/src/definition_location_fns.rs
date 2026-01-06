@@ -29,7 +29,7 @@ pub fn output_type_annotation<TCompilationProfile: CompilationProfile>(
             client_pointer.lookup(db).target_entity_name.reference()
         }
         DefinitionLocation::Server(server_field) => {
-            server_field.lookup(db).target_entity_name.reference()
+            server_field.lookup(db).target_entity.reference()
         }
     }
 }

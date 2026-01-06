@@ -581,7 +581,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                     DefinitionLocation::Server(server_object_entity) => {
                         let server_object_entity = server_object_entity.lookup(db);
                         let target_object_entity_name =
-                            server_object_entity.target_entity_name.inner().0;
+                            server_object_entity.target_entity.inner().0;
 
                         let object_selection_parent_object_entity =
                             &server_entity_named(db, target_object_entity_name)
@@ -780,7 +780,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
         let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
             let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
-            let concrete_object_entity_name = server_object_selectable.target_entity_name.inner().0;
+            let concrete_object_entity_name = server_object_selectable.target_entity.inner().0;
 
             let server_object_selection_info = server_entity_named(db, concrete_object_entity_name)
                 .as_ref()

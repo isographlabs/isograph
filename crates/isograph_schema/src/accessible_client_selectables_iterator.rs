@@ -118,7 +118,7 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
                         // TODO don't match on object_selectable twice
                         let target_entity_name = match object_selectable {
                             DefinitionLocation::Server(s) => {
-                                s.lookup(self.db).target_entity_name.inner()
+                                s.lookup(self.db).target_entity.inner()
                             }
                             DefinitionLocation::Client(c) => match c {
                                 SelectionType::Scalar(_) => {

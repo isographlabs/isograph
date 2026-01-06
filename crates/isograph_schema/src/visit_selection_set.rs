@@ -44,7 +44,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 let target_entity = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = selectable.target_entity_name.inner().0;
+                        let target_entity_name = selectable.target_entity.inner().0;
                         let entity = match server_entity_named(db, target_entity_name).clone_err() {
                             Ok(o) => match o {
                                 Some(entity) => entity.lookup(db),
@@ -72,7 +72,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 };
 
                 let target_entity_name = match target_entity {
-                    DefinitionLocation::Server(s) => s.target_entity_name.inner(),
+                    DefinitionLocation::Server(s) => s.target_entity.inner(),
                     DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
                 }
                 .0;

@@ -125,7 +125,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                     let scalar_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let target_entity_name = selectable.target_entity_name.inner().0;
+                            let target_entity_name = selectable.target_entity.inner().0;
                             let entity =
                                 match server_entity_named(db, target_entity_name).clone_err() {
                                     Ok(o) => match o {
@@ -186,7 +186,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                     let object_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let target_entity_name = selectable.target_entity_name.inner().0;
+                            let target_entity_name = selectable.target_entity.inner().0;
                             let entity =
                                 match server_entity_named(db, target_entity_name).clone_err() {
                                     Ok(o) => match o {

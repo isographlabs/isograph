@@ -72,7 +72,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
                         .as_ref()
                         .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
@@ -117,7 +117,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                         "  ".repeat(indentation_level as usize),
                         name_or_alias,
                         print_javascript_type_declaration(
-                            server_scalar_selectable.target_entity_name.reference(),
+                            server_scalar_selectable.target_entity.reference(),
                             inner_text
                         )
                     ));
@@ -138,7 +138,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
                         .as_ref()
                         .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
@@ -168,7 +168,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;
@@ -279,7 +279,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
                         .as_ref()
                         .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
@@ -311,7 +311,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
 
                     let name_or_alias = selection.item.name_or_alias().item;
 
-                    let output_type = server_scalar_selectable.target_entity_name.clone();
+                    let output_type = server_scalar_selectable.target_entity.clone();
 
                     let inner_text =
                         TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
@@ -356,7 +356,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity_name.inner().0)
+                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
                         .as_ref()
                         .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
@@ -388,7 +388,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let type_annotation = output_type_annotation(db, object_selectable).clone();
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;

@@ -94,7 +94,7 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                             let selectable = s.lookup(db);
                                             let entity = server_entity_named(
                                                 db,
-                                                selectable.target_entity_name.inner().0,
+                                                selectable.target_entity.inner().0,
                                             )
                                             .as_ref()
                                             .ok()?

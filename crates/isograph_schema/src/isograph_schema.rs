@@ -39,7 +39,7 @@ pub fn get_object_selections_path<TCompilationProfile: CompilationProfile>(
         match current_selectable {
             Some(s) => {
                 let selectable = s.lookup(db);
-                let target_entity_name = selectable.target_entity_name.inner().0;
+                let target_entity_name = selectable.target_entity.inner().0;
                 let entity = server_entity_named(db, target_entity_name)
                     .clone_err()?
                     .ok_or_else(|| {

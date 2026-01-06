@@ -20,7 +20,7 @@ pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
     pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
 
-    pub target_entity_name: TypeAnnotationDeclaration,
+    pub target_entity: TypeAnnotationDeclaration,
 
     // TODO this is obviously a GraphQL-ism! But it's used in a bunch of places, so it's
     // not really easy to move it to TargetPlatform. However, we know it at parse time,

@@ -158,7 +158,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .expect("Expected selectable to be server selectable")
                 .lookup(db);
 
-        server_entity_named(db, server_scalar_selectable.target_entity_name.inner().0)
+        server_entity_named(db, server_scalar_selectable.target_entity.inner().0)
             .as_ref()
             .expect(
                 "Expected parsing to not have failed. \
@@ -287,8 +287,8 @@ fn format_field_definition<TCompilationProfile: CompilationProfile>(
     indentation_level: u8,
 ) -> String {
     let server_selectable = server_selectable.lookup(db);
-    let is_optional = is_nullable(server_selectable.target_entity_name.reference());
-    let target_type_annotation = server_selectable.target_entity_name.clone();
+    let is_optional = is_nullable(server_selectable.target_entity.reference());
+    let target_type_annotation = server_selectable.target_entity.clone();
 
     format!(
         "{}readonly {}{}: {},\n",

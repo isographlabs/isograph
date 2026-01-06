@@ -62,7 +62,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                 )
                 .lookup(db);
 
-                let raw_type = server_scalar_selectable.target_entity_name.clone();
+                let raw_type = server_scalar_selectable.target_entity.clone();
 
                 let inner_text = TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
                     db,
@@ -72,7 +72,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_scalar_selectable.target_entity_name.is_nullable() {
+                    if server_scalar_selectable.target_entity.is_nullable() {
                         "?"
                     } else {
                         ""
@@ -103,7 +103,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                 )
                 .lookup(db);
 
-                let raw_type = server_object_selectable.target_entity_name.clone();
+                let raw_type = server_object_selectable.target_entity.clone();
 
                 let inner_text = {
                     let mut raw_response_type_declaration = String::new();
@@ -120,7 +120,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_object_selectable.target_entity_name.is_nullable() {
+                    if server_object_selectable.target_entity.is_nullable() {
                         "?"
                     } else {
                         ""

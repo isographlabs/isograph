@@ -110,7 +110,7 @@ fn validate_all_server_selectables_point_to_defined_types<
     for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
         let (target, arguments) = {
             let selectable = selectable.lookup(db);
-            (selectable.target_entity_name.inner(), &selectable.arguments)
+            (selectable.target_entity.inner(), &selectable.arguments)
         };
 
         if !entities.contains_key(&target) {

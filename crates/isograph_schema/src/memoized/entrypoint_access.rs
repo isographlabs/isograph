@@ -66,7 +66,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
                             let entity =
-                                server_entity_named(db, selectable.target_entity_name.inner().0)
+                                server_entity_named(db, selectable.target_entity.inner().0)
                                     .as_ref()
                                     .expect("Expected parsing to have succeeded")
                                     .expect("Expected target entity to be defined")

@@ -155,7 +155,7 @@ pub(crate) fn parse_type_system_document(
                         .map(|x| x.map(Description::from)),
 
                     name: field.item.name.item.unchecked_conversion(),
-                    target_entity_name: field
+                    target_entity: field
                         .item
                         .type_
                         .item
@@ -226,7 +226,7 @@ pub(crate) fn parse_type_system_document(
                             }
                         })
                         .collect(),
-                    target_entity_name: field
+                    target_entity: field
                         .item
                         .type_
                         .item
@@ -307,7 +307,7 @@ pub(crate) fn parse_type_system_document(
                     name: format!("as{}", concrete_child_entity_name)
                         .intern()
                         .to::<SelectableName>(),
-                    target_entity_name: TypeAnnotationDeclaration::Union(
+                    target_entity: TypeAnnotationDeclaration::Union(
                         UnionTypeAnnotationDeclaration {
                             variants: {
                                 let mut variants = BTreeSet::new();
@@ -375,7 +375,7 @@ pub(crate) fn parse_type_system_document(
                 }
             };
 
-            let payload_object_entity_name = mutation_field.target_entity_name.inner().0;
+            let payload_object_entity_name = mutation_field.target_entity.inner().0;
 
             let client_field_scalar_selection_name = expose_field_directive
                 .expose_as
@@ -436,7 +436,7 @@ pub(crate) fn parse_type_system_document(
                 .map(|server_object_selectable| {
                     if server_object_selectable.is_inline_fragment.0 {
                         WrappedSelectionMapSelection::InlineFragment(
-                            server_object_selectable.target_entity_name.inner().0,
+                            server_object_selectable.target_entity.inner().0,
                         )
                     } else {
                         WrappedSelectionMapSelection::LinkedField {
@@ -675,7 +675,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_entity_name.inner();
+        let next_entity_name = selectable.target_entity.inner();
 
         current_entity = outcome
             .entities
