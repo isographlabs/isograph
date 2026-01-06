@@ -69,8 +69,9 @@ pub fn process_graphql_type_system_document(
                                 .item
                                 .unchecked_conversion::<DescriptionValue>()
                                 .wrap(Description)
+                                .with_no_location()
                         }),
-                        name: server_object_entity_name,
+                        name: server_object_entity_name.with_no_location(),
                         selection_info: ServerObjectSelectionInfo {
                             is_concrete: IsConcrete(true),
                         }
@@ -80,6 +81,7 @@ pub fn process_graphql_type_system_document(
                             subtypes: vec![],
                         }
                         .object_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -100,8 +102,9 @@ pub fn process_graphql_type_system_document(
                             .intern()
                             .to::<DescriptionValue>()
                             .wrap(Description)
+                            .with_no_location()
                             .wrap_some(),
-                        name: typename_entity_name,
+                        name: typename_entity_name.with_no_location(),
                         selection_info: ().scalar_selected(),
                         network_protocol_associated_data: (),
                         target_platform_associated_data: format!(
@@ -111,6 +114,7 @@ pub fn process_graphql_type_system_document(
                         .intern()
                         .to::<JavascriptName>()
                         .scalar_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -198,13 +202,14 @@ pub fn process_graphql_type_system_document(
                     ServerEntity {
                         description: scalar_type_definition
                             .description
-                            .map(|with_span| with_span.item.into()),
-                        name: scalar_type_definition.name.item,
+                            .map(|with_span| with_span.item.wrap(Description).with_no_location()),
+                        name: scalar_type_definition.name.item.with_no_location(),
                         // TODO allow customization here
                         selection_info: ().scalar_selected(),
                         network_protocol_associated_data: (),
                         target_platform_associated_data: (*UNKNOWN_JAVASCRIPT_TYPE)
                             .scalar_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -233,8 +238,9 @@ pub fn process_graphql_type_system_document(
                                     .item
                                     .unchecked_conversion::<DescriptionValue>()
                                     .wrap(Description)
+                                    .with_no_location()
                             }),
-                        name: server_object_entity_name,
+                        name: server_object_entity_name.with_no_location(),
                         selection_info: ServerObjectSelectionInfo {
                             is_concrete: IsConcrete(true),
                         }
@@ -244,6 +250,7 @@ pub fn process_graphql_type_system_document(
                             subtypes: vec![],
                         }
                         .object_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -274,13 +281,14 @@ pub fn process_graphql_type_system_document(
                     ServerEntity {
                         description: enum_definition
                             .description
-                            .map(|with_span| with_span.item.into()),
-                        name: enum_definition.name.item,
+                            .map(|with_span| with_span.item.wrap(Description).with_no_location()),
+                        name: enum_definition.name.item.with_no_location(),
                         // TODO allow customization here
                         selection_info: ().scalar_selected(),
                         network_protocol_associated_data: (),
                         target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
                             .scalar_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)
@@ -300,8 +308,9 @@ pub fn process_graphql_type_system_document(
                                 .item
                                 .unchecked_conversion::<DescriptionValue>()
                                 .wrap(Description)
+                                .with_no_location()
                         }),
-                        name: server_object_entity_name,
+                        name: server_object_entity_name.with_no_location(),
                         selection_info: ServerObjectSelectionInfo {
                             is_concrete: IsConcrete(false),
                         }
@@ -315,6 +324,7 @@ pub fn process_graphql_type_system_document(
                                 .collect(),
                         }
                         .object_selected(),
+                        selectables: Default::default(),
                     }
                     .interned_value(db)
                     .with_location(location)

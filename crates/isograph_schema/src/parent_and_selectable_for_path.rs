@@ -70,7 +70,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
     }
     .map_err(|_| {
         selectable_is_wrong_type_diagnostic(
-            parent.lookup(db).name,
+            parent.lookup(db).name.item,
             scalar_selectable_name,
             "a scalar",
             "an object",
@@ -115,7 +115,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
             if entity.selection_info.as_scalar().is_some() {
                 let location = object_path.inner.name.location.to::<Location>();
                 return selectable_is_wrong_type_diagnostic(
-                    parent.lookup(db).name,
+                    parent.lookup(db).name.item,
                     object_selectable_name,
                     "an object",
                     "a scalar",
@@ -129,7 +129,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
             SelectionType::Scalar(_) => {
                 let location = object_path.inner.name.location.to::<Location>();
                 return selectable_is_wrong_type_diagnostic(
-                    parent.lookup(db).name,
+                    parent.lookup(db).name.item,
                     object_selectable_name,
                     "an object",
                     "a scalar",

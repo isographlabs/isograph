@@ -94,26 +94,31 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
         match selection.item.reference() {
             SelectionType::Scalar(scalar_selection) => {
                 let selectable_name = scalar_selection.name.item;
-                let selectable =
-                    match selectable_named(db, parent_entity.name, selectable_name).clone_err() {
-                        Ok(s) => match s {
-                            Some(s) => s,
-                            None => {
-                                errors.push(selection_does_not_exist_diagnostic(
-                                    parent_entity.name,
-                                    selectable_name,
-                                    scalar_selection.name.location,
-                                    SelectionType::Scalar(()),
-                                    selectable_declaration_info,
-                                ));
-                                continue;
-                            }
-                        },
-                        Err(e) => {
-                            errors.push(e);
+                let selectable = match selectable_named(
+                    db,
+                    parent_entity.name.item,
+                    selectable_name,
+                )
+                .clone_err()
+                {
+                    Ok(s) => match s {
+                        Some(s) => s,
+                        None => {
+                            errors.push(selection_does_not_exist_diagnostic(
+                                parent_entity.name.item,
+                                selectable_name,
+                                scalar_selection.name.location,
+                                SelectionType::Scalar(()),
+                                selectable_declaration_info,
+                            ));
                             continue;
                         }
-                    };
+                    },
+                    Err(e) => {
+                        errors.push(e);
+                        continue;
+                    }
+                };
 
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
@@ -154,7 +159,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                         SelectionType::Scalar(s) => s.client_defined(),
                         SelectionType::Object(_) => {
                             errors.push(selection_wrong_selection_type_diagnostic(
-                                parent_entity.name,
+                                parent_entity.name.item,
                                 selectable_name,
                                 "a scalar",
                                 "an object",
@@ -240,26 +245,31 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
             }
             SelectionType::Object(object_selection) => {
                 let selectable_name = object_selection.name.item;
-                let selectable =
-                    match selectable_named(db, parent_entity.name, selectable_name).clone_err() {
-                        Ok(s) => match s {
-                            Some(s) => s,
-                            None => {
-                                errors.push(selection_does_not_exist_diagnostic(
-                                    parent_entity.name,
-                                    selectable_name,
-                                    object_selection.name.location,
-                                    SelectionType::Object(()),
-                                    selectable_declaration_info,
-                                ));
-                                continue;
-                            }
-                        },
-                        Err(e) => {
-                            errors.push(e);
+                let selectable = match selectable_named(
+                    db,
+                    parent_entity.name.item,
+                    selectable_name,
+                )
+                .clone_err()
+                {
+                    Ok(s) => match s {
+                        Some(s) => s,
+                        None => {
+                            errors.push(selection_does_not_exist_diagnostic(
+                                parent_entity.name.item,
+                                selectable_name,
+                                object_selection.name.location,
+                                SelectionType::Object(()),
+                                selectable_declaration_info,
+                            ));
                             continue;
                         }
-                    };
+                    },
+                    Err(e) => {
+                        errors.push(e);
+                        continue;
+                    }
+                };
 
                 let selectable = match selectable {
                     DefinitionLocation::Server(s) => {
@@ -299,7 +309,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                     DefinitionLocation::Client(c) => match c {
                         SelectionType::Scalar(_) => {
                             errors.push(selection_wrong_selection_type_diagnostic(
-                                parent_entity.name,
+                                parent_entity.name.item,
                                 selectable_name,
                                 "an object",
                                 "a scalar",

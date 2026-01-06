@@ -99,7 +99,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
         &mut |selection, parent_object_entity| {
             let selectable = match selectable_named(
                 db,
-                parent_object_entity.name,
+                parent_object_entity.name.item,
                 match selection {
                     SelectionType::Scalar(s) => s.name.item,
                     SelectionType::Object(o) => o.name.item,

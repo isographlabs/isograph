@@ -91,6 +91,7 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
     // And must have the right inner type
     if target_scalar_entity
         .name
+        .item
         .note_todo("Compare with *target_scalar_entity_name here")
         != *ID_ENTITY_NAME
     {

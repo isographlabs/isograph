@@ -77,7 +77,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Server(server_selectable) => {
                             selectable_definition_location(
                                 db,
-                                parent.name,
+                                parent.name.item,
                                 server_selectable.lookup(db).name,
                             )
                             .as_ref()
@@ -97,7 +97,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Client(client_selectable) => {
                             selectable_definition_location(
                                 db,
-                                parent.name,
+                                parent.name.item,
                                 client_selectable.lookup(db).name,
                             )
                             .as_ref()
@@ -128,7 +128,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Server(server_selectable) => {
                             selectable_definition_location(
                                 db,
-                                parent.name,
+                                parent.name.item,
                                 server_selectable.lookup(db).name,
                             )
                             .as_ref()
@@ -148,7 +148,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Client(client_selectable) => {
                             selectable_definition_location(
                                 db,
-                                parent.name,
+                                parent.name.item,
                                 client_selectable.lookup(db).name,
                             )
                             .as_ref()

@@ -88,7 +88,7 @@ pub(crate) fn parse_type_system_document(
     // and we should make that refactor.
     for with_location in interfaces_to_process {
         let interface_definition = with_location.item;
-        let server_object_entity_name = interface_definition.name.item.to::<EntityName>();
+        let server_object_entity_name = interface_definition.name.item;
 
         insert_entity_or_multiple_definition_diagnostic(
             &mut outcome.entities,
@@ -99,8 +99,9 @@ pub(crate) fn parse_type_system_document(
                         .item
                         .unchecked_conversion::<DescriptionValue>()
                         .wrap(Description)
+                        .with_no_location()
                 }),
-                name: server_object_entity_name,
+                name: interface_definition.name.drop_location(),
                 network_protocol_associated_data: (),
                 selection_info: ServerObjectSelectionInfo {
                     is_concrete: IsConcrete(false),
@@ -113,6 +114,7 @@ pub(crate) fn parse_type_system_document(
                         .unwrap_or_default(),
                 }
                 .object_selected(),
+                selectables: Default::default(),
             }
             .interned_value(db)
             .with_location(with_location.location)
@@ -260,12 +262,14 @@ pub(crate) fn parse_type_system_document(
                     .intern()
                     .to::<DescriptionValue>()
                     .wrap(Description)
+                    .with_no_location()
                     .wrap_some(),
-                name: typename_entity_name,
+                name: typename_entity_name.with_no_location(),
                 selection_info: ().scalar_selected(),
                 network_protocol_associated_data: (),
                 target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
                     .scalar_selected(),
+                selectables: Default::default(),
             }
             .interned_value(db)
             .with_generated_location()
@@ -440,6 +444,7 @@ pub(crate) fn parse_type_system_document(
                             server_object_selectable_name: server_object_selectable.name,
                             arguments: vec![],
                             concrete_target_entity_name: target_parent_object_entity_name
+                                .item
                                 .wrap_some()
                                 .note_todo(
                                     "This is 100% a bug when there are \
@@ -478,14 +483,14 @@ pub(crate) fn parse_type_system_document(
                     },
                 ),
                 variable_definitions: vec![],
-                parent_entity_name: target_parent_object_entity_name,
+                parent_entity_name: target_parent_object_entity_name.item,
                 phantom_data: std::marker::PhantomData,
             };
 
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
                 (
-                    target_parent_object_entity_name,
+                    target_parent_object_entity_name.item,
                     client_field_scalar_selection_name.unchecked_conversion(),
                 ),
                 mutation_client_scalar_selectable
@@ -498,7 +503,7 @@ pub(crate) fn parse_type_system_document(
 
             outcome.client_scalar_refetch_strategies.push(
                 (
-                    target_parent_object_entity_name,
+                    target_parent_object_entity_name.item,
                     client_field_scalar_selection_name.unchecked_conversion::<SelectableName>(),
                     RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                         SelectionSet {
@@ -532,10 +537,11 @@ fn define_default_graphql_types(
         *ID_ENTITY_NAME,
         ServerEntity {
             description: None,
-            name: *ID_ENTITY_NAME,
+            name: (*ID_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
             network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            selectables: Default::default(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -546,10 +552,11 @@ fn define_default_graphql_types(
         *STRING_ENTITY_NAME,
         ServerEntity {
             description: None,
-            name: *STRING_ENTITY_NAME,
+            name: (*STRING_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
             network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            selectables: Default::default(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -560,10 +567,11 @@ fn define_default_graphql_types(
         *BOOLEAN_ENTITY_NAME,
         ServerEntity {
             description: None,
-            name: *BOOLEAN_ENTITY_NAME,
+            name: (*BOOLEAN_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
             network_protocol_associated_data: (),
             target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
+            selectables: Default::default(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -574,10 +582,11 @@ fn define_default_graphql_types(
         *FLOAT_ENTITY_NAME,
         ServerEntity {
             description: None,
-            name: *FLOAT_ENTITY_NAME,
+            name: (*FLOAT_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
             network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            selectables: Default::default(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -588,10 +597,11 @@ fn define_default_graphql_types(
         *INT_ENTITY_NAME,
         ServerEntity {
             description: None,
-            name: *INT_ENTITY_NAME,
+            name: (*INT_ENTITY_NAME).with_no_location(),
             selection_info: ().scalar_selected(),
             network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            selectables: Default::default(),
         }
         .interned_value(db)
         .with_generated_location(),
@@ -651,7 +661,7 @@ fn traverse_selections_and_return_path<'a>(
     for selection_name in primary_field_selection_name_parts {
         let selectable = outcome
             .selectables
-            .get(&(current_entity.name, selection_name.dereference()))
+            .get(&(current_entity.name.item, selection_name.dereference()))
             .and_then(|x| x.item.as_server())
             .ok_or_else(|| {
                 Diagnostic::new(

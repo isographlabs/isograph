@@ -109,8 +109,8 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                         name,
                         description.map(WithGenericLocation::item),
                         arguments,
-                        parent_object.name,
-                        parent_object.description,
+                        parent_object.name.item,
+                        parent_object.description.map(|x| x.item),
                     )
                     .wrap_some()
                 } else {
@@ -146,8 +146,8 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                         name,
                         description.map(WithGenericLocation::item),
                         arguments,
-                        parent_object.name,
-                        parent_object.description,
+                        parent_object.name.item,
+                        parent_object.description.map(|x| x.item),
                     )
                     .wrap_some()
                 } else {

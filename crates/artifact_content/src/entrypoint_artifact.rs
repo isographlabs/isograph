@@ -267,7 +267,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         merged_selection_map,
         reachable_variables.iter().copied(),
         root_operation_name,
-        concrete_object_entity.name,
+        concrete_object_entity.name.item,
         persisted_documents,
         1,
     );
@@ -286,7 +286,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         parent_object_entity,
         &refetch_query_artifact_import,
         entrypoint.name,
-        concrete_object_entity.name,
+        concrete_object_entity.name.item,
         &directive_set,
         match entrypoint.variant.reference() {
             ClientFieldVariant::UserWritten(info) => {
@@ -312,7 +312,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         artifact_path: ArtifactPath {
             file_name: *QUERY_TEXT_FILE_NAME,
             type_and_field: EntityNameAndSelectableName {
-                parent_entity_name: type_name,
+                parent_entity_name: type_name.item,
                 selectable_name: field_name,
             }
             .wrap_some(),
@@ -332,7 +332,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         artifact_path: ArtifactPath {
             file_name: *NORMALIZATION_AST_FILE_NAME,
             type_and_field: EntityNameAndSelectableName {
-                parent_entity_name: type_name,
+                parent_entity_name: type_name.item,
                 selectable_name: field_name,
             }
             .wrap_some(),
@@ -347,7 +347,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         artifact_path: ArtifactPath {
             file_name: *RAW_RESPONSE_TYPE_FILE_NAME,
             type_and_field: EntityNameAndSelectableName {
-                parent_entity_name: type_name,
+                parent_entity_name: type_name.item,
                 selectable_name: field_name,
             }
             .wrap_some(),
@@ -358,7 +358,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         artifact_path: ArtifactPath {
             file_name: *ENTRYPOINT_FILE_NAME,
             type_and_field: EntityNameAndSelectableName {
-                parent_entity_name: type_name,
+                parent_entity_name: type_name.item,
                 selectable_name: field_name,
             }
             .wrap_some(),

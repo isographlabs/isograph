@@ -157,7 +157,7 @@ fn validate_all_id_fields<TCompilationProfile: CompilationProfile>(
     entities
         .iter()
         .flat_map(|entity| {
-            server_id_selectable(db, entity.lookup(db).name)
+            server_id_selectable(db, entity.lookup(db).name.item)
                 .clone_err()
                 .err()
         })

@@ -52,7 +52,8 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                     get_parent_for_selection_set_path(db, &selection_set_path)
                 {
                     if let Ok(map) =
-                        selectables_for_entity(db, parent_object_entity.lookup(db).name).as_ref()
+                        selectables_for_entity(db, parent_object_entity.lookup(db).name.item)
+                            .as_ref()
                     {
                         map.iter()
                             .flat_map(|result| result.as_ref().ok())

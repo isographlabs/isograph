@@ -539,10 +539,13 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
     variable_context: &VariableContext,
 ) {
     for selection in selection_set.item.selections.iter() {
-        let selectable = selectable_named(db, parent_object_entity.name, selection.item.name())
-            .as_ref()
-            .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-            .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
+        let selectable =
+            selectable_named(db, parent_object_entity.name.item, selection.item.name())
+                .as_ref()
+                .expect(
+                    "Expected parsing to have succeeded. This is indicative of a bug in Isograph.",
+                )
+                .expect("Expected selectable to exist. This is indicative of a bug in Isograph.");
 
         match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
@@ -553,7 +556,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             parent_map,
                             variable_context,
                             merge_traversal_state,
-                            parent_object_entity.name,
+                            parent_object_entity.name.item,
                         );
                     }
                     DefinitionLocation::Client(_) => {
@@ -565,7 +568,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             encountered_client_type_map,
                             variable_context,
                             scalar_field_selection,
-                            parent_object_entity.name,
+                            parent_object_entity.name.item,
                             scalar_field_selection.name.item,
                         );
                     }
@@ -603,7 +606,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             object_selection,
                             target_object_entity_name,
                             object_selection_parent_object_entity,
-                            parent_object_entity.name,
+                            parent_object_entity.name.item,
                             object_selection.name.item,
                         );
                     }
@@ -616,7 +619,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             encountered_client_type_map,
                             variable_context,
                             object_selection,
-                            parent_object_entity.name,
+                            parent_object_entity.name.item,
                             object_selection.name.item,
                         );
 
@@ -686,14 +689,14 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
     if server_object_selectable.is_inline_fragment.0 {
         let type_to_refine_to = object_selection_parent_object.name;
 
-        let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to);
+        let normalization_key = NormalizationKey::InlineFragment(type_to_refine_to.item);
         merge_traversal_state
             .traversal_path
             .push(normalization_key.clone());
 
         let inline_fragment = parent_map.entry(normalization_key).or_insert_with(|| {
             MergedServerSelection::InlineFragment(MergedInlineFragmentSelection {
-                type_to_refine_to,
+                type_to_refine_to: type_to_refine_to.item,
                 selection_map: BTreeMap::new(),
             })
         });
@@ -1169,7 +1172,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         .0
     {
         subfields_or_inline_fragments.push(WrappedSelectionMapSelection::InlineFragment(
-            target_server_object_entity.name,
+            target_server_object_entity.name.item,
         ));
     }
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
@@ -1257,7 +1260,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
                 .is_concrete
                 .0
             {
-                target_server_object_entity.name.wrap_some()
+                target_server_object_entity.name.item.wrap_some()
             } else {
                 None
             },
@@ -1432,10 +1435,10 @@ fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: Compil
         .is_concrete
         .0
     {
-        maybe_add_typename_selection(merged_selection_map, parent_object_entity.name)
+        maybe_add_typename_selection(merged_selection_map, parent_object_entity.name.item)
     };
 
-    let id_field = server_id_selectable(db, parent_object_entity.name)
+    let id_field = server_id_selectable(db, parent_object_entity.name.item)
         .as_ref()
         .expect("Expected this to be valid.");
 
@@ -1462,7 +1465,7 @@ fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: Compil
             Entry::Vacant(vacant_entry) => {
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
-                        parent_object_entity_name: parent_object_entity.name,
+                        parent_object_entity_name: parent_object_entity.name.item,
                         name: id_field.lookup(db).name,
                         arguments: vec![],
                     },

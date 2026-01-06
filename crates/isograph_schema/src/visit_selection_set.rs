@@ -31,7 +31,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 visit_selection(object_selection.object_selected(), parent_entity);
 
                 let selectable =
-                    match selectable_named(db, parent_entity.name, object_selection.name.item)
+                    match selectable_named(db, parent_entity.name.item, object_selection.name.item)
                         .as_ref()
                         .expect(
                             "Expected parsing to have succeeded. \
