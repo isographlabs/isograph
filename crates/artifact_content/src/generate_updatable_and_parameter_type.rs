@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
-    client_scalar_selectable_named, description, selectable_named, server_entity_named,
+    client_scalar_selectable_named, selectable_named, server_entity_named,
 };
 use prelude::Postfix;
 
@@ -159,7 +159,16 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             };
 
             write_optional_description(
-                description(db, object_selectable),
+                match object_selectable {
+                    DefinitionLocation::Server(server_field) => server_field
+                        .lookup(db)
+                        .description
+                        .map(WithGenericLocation::item),
+                    DefinitionLocation::Client(client_field) => client_field
+                        .lookup(db)
+                        .description
+                        .map(WithGenericLocation::item),
+                },
                 query_type_declaration,
                 indentation_level,
             );
@@ -384,7 +393,16 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             };
 
             write_optional_description(
-                description(db, object_selectable),
+                match object_selectable {
+                    DefinitionLocation::Server(server_field) => server_field
+                        .lookup(db)
+                        .description
+                        .map(WithGenericLocation::item),
+                    DefinitionLocation::Client(client_field) => client_field
+                        .lookup(db)
+                        .description
+                        .map(WithGenericLocation::item),
+                },
                 query_type_declaration,
                 indentation_level,
             );
