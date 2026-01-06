@@ -37,6 +37,8 @@ lazy_static! {
     static ref NODE_INTERFACE_NAME: EntityName= "Node".intern().into();
     pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
 
+    pub static ref NEVER_JAVASCRIPT_TYPE: JavascriptName = "never".intern().into();
+
 }
 
 #[expect(clippy::too_many_arguments)]
@@ -212,33 +214,9 @@ pub fn process_graphql_type_system_document(
                 );
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
-                let server_object_entity_name = interface_definition.name.item;
-                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
-                    .intern()
-                    .to::<EntityName>()
-                    // And make it not selectable!
-                    .note_todo("Come up with a way to not have these be in the same namespace");
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    typename_entity_name,
-                    ServerEntity {
-                        description: format!("The typename of {}", server_object_entity_name)
-                            .intern()
-                            .to::<DescriptionValue>()
-                            .wrap(Description)
-                            .wrap_some(),
-                        name: typename_entity_name,
-                        selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
-                            .scalar_selected(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
-
+                supertype_to_subtype_map
+                    .entry(interface_definition.name.item)
+                    .or_default();
                 interfaces_to_process.push(interface_definition.with_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
@@ -345,34 +323,6 @@ pub fn process_graphql_type_system_document(
                     non_fatal_diagnostics,
                 );
 
-                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
-                    .intern()
-                    .to::<EntityName>()
-                    // And make it not selectable!
-                    .note_todo("Come up with a way to not have these be in the same namespace");
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    typename_entity_name,
-                    ServerEntity {
-                        description: format!("The typename of {}", server_object_entity_name)
-                            .intern()
-                            .to::<DescriptionValue>()
-                            .wrap(Description)
-                            .wrap_some(),
-                        name: typename_entity_name,
-                        selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: get_js_union_name(
-                            &union_definition.union_member_types,
-                        )
-                        .scalar_selected(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
-
                 directives
                     .entry(server_object_entity_name)
                     .or_default()
@@ -389,15 +339,6 @@ pub fn process_graphql_type_system_document(
                     );
 
                 // unions do not implement interfaces
-                insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.selectables,
-                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-                    get_typename_selectable(db, server_object_entity_name, typename_entity_name)
-                        .server_defined()
-                        .with_location(location)
-                        .into(),
-                    non_fatal_diagnostics,
-                );
             }
             GraphQLTypeSystemDefinition::SchemaDefinition(schema_definition) => {
                 if graphql_root_types.is_some() {
@@ -579,14 +520,4 @@ pub fn multiple_entity_definitions_found_diagnostic(
         format!("Multiple definitions of {server_object_entity_name} were found."),
         location,
     )
-}
-
-fn get_js_union_name(members: &[WithEmbeddedLocation<EntityName>]) -> JavascriptName {
-    members
-        .iter()
-        .map(|name| format!("\"{}\"", name.item))
-        .collect::<Vec<String>>()
-        .join(" | ")
-        .intern()
-        .into()
 }

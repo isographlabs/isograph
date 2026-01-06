@@ -1,8 +1,9 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, SelectableName,
-    VariableName, WithGenericLocation, WithLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, JavascriptName,
+    SelectableName, VariableName, WithGenericLocation, WithLocation, WithLocationPostfix,
+    WithNonFatalDiagnostics,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -28,7 +29,7 @@ use crate::{
     NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
     insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
     process_type_system_definition::{
-        get_typename_selectable, process_graphql_type_system_document,
+        NEVER_JAVASCRIPT_TYPE, get_typename_selectable, process_graphql_type_system_document,
         process_graphql_type_system_extension_document,
     },
 };
@@ -127,16 +128,6 @@ pub(crate) fn parse_type_system_document(
         for field in interface_definition.fields {
             fields_to_process.push((server_object_entity_name, field));
         }
-
-        insert_selectable_or_multiple_definition_diagnostic(
-            &mut outcome.selectables,
-            (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-            get_typename_selectable(db, server_object_entity_name, *STRING_ENTITY_NAME)
-                .server_defined()
-                .with_location(with_location.location)
-                .into(),
-            &mut non_fatal_diagnostics,
-        );
 
         // I don't think interface-to-interface refinement is handled correctly, let's just
         // ignore it for now.
@@ -255,6 +246,43 @@ pub(crate) fn parse_type_system_document(
 
     // asConcreteType fields
     for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
+        let typename_entity_name = format!("{}__discriminator", abstract_parent_entity_name)
+            .intern()
+            .to::<EntityName>()
+            // And make it not selectable!
+            .note_todo("Come up with a way to not have these be in the same namespace");
+
+        insert_entity_or_multiple_definition_diagnostic(
+            &mut outcome.entities,
+            typename_entity_name,
+            ServerEntity {
+                description: format!("The typename of {}", abstract_parent_entity_name)
+                    .intern()
+                    .to::<DescriptionValue>()
+                    .wrap(Description)
+                    .wrap_some(),
+                name: typename_entity_name,
+                selection_info: ().scalar_selected(),
+                network_protocol_associated_data: (),
+                target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
+                    .scalar_selected(),
+            }
+            .interned_value(db)
+            .with_generated_location()
+            .note_todo("use a better location"),
+            &mut non_fatal_diagnostics,
+        );
+
+        insert_selectable_or_multiple_definition_diagnostic(
+            &mut outcome.selectables,
+            (abstract_parent_entity_name, (*TYPENAME_FIELD_NAME)),
+            get_typename_selectable(db, abstract_parent_entity_name, typename_entity_name)
+                .server_defined()
+                .with_generated_location()
+                .note_todo("use a better location"),
+            &mut non_fatal_diagnostics,
+        );
+
         for concrete_child_entity_name in concrete_child_entity_names.iter() {
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
@@ -673,3 +701,17 @@ fn traverse_selections_and_return_path<'a>(
 
 type EntitiesDefinedBySchema =
     BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLAndJavascriptProfile>>>>;
+
+fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
+    if members.is_empty() {
+        *NEVER_JAVASCRIPT_TYPE
+    } else {
+        members
+            .iter()
+            .map(|name| format!("\"{name}\""))
+            .collect::<Vec<String>>()
+            .join(" | ")
+            .intern()
+            .into()
+    }
+}
