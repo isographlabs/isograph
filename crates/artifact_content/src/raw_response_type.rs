@@ -52,11 +52,6 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                 )
                 .as_ref()
                 .expect(
-                    "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .as_ref()
-                .expect(
                     "Expected selectable to exist. \
                     This is indicative of a bug in Isograph.",
                 )
@@ -103,11 +98,6 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     db,
                     linked_field.parent_object_entity_name,
                     linked_field.name,
-                )
-                .as_ref()
-                .expect(
-                    "Expected validation to have succeeded. \
-                    This is indicative of a bug in Isograph.",
                 )
                 .as_ref()
                 .expect(

@@ -1,4 +1,4 @@
-use common_lang_types::{DiagnosticResult, EntityName, Location, SelectableName};
+use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
@@ -37,10 +37,11 @@ pub fn selectable_named<TCompilationProfile: CompilationProfile>(
     // case 2: one is error -> assume that is an unrelated error and return the other one
     // case 3: both are ok -> check that there aren't duplicate definitions, and return remaining one or None
 
-    match (server_selectable, client_selectable) {
+    // TODO wrap_ok here is silly! We should figure out how to rewrite this fn.
+    match (server_selectable.wrap_ok::<Diagnostic>(), client_selectable) {
         (Err(e), Err(_)) => e.clone().wrap_err(),
-        (Ok(server), Err(_)) => match *server {
-            Some(server_selectable) => server_selectable.server_defined().wrap_some().wrap_ok(),
+        (Ok(server), Err(_)) => match server {
+            Some(server_selectable) => (*server_selectable).server_defined().wrap_some().wrap_ok(),
             None => Ok(None),
         },
         (Err(_), Ok(client)) => match *client {

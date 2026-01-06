@@ -53,10 +53,9 @@ pub fn server_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
-) -> DiagnosticResult<Option<MemoRefServerSelectable<TCompilationProfile>>> {
+) -> Option<MemoRefServerSelectable<TCompilationProfile>> {
     flattened_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
         .dereference()
-        .wrap_ok()
 }
 
 #[memo]
@@ -64,8 +63,7 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerSelectable<TCompilationProfile>>> {
-    let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME)
-        .clone_err()?;
+    let selectable = server_selectable_named(db, parent_server_object_entity_name, *ID_FIELD_NAME);
 
     let memo_ref = match selectable {
         Some(s) => s,

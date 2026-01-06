@@ -224,8 +224,7 @@ pub fn get_refetch_stategy<TCompilationProfile: CompilationProfile>(
     if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
-        let id_field =
-            server_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME).clone_err()?;
+        let id_field = server_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME);
 
         let query_id = fetchable_types_map
             .iter()
