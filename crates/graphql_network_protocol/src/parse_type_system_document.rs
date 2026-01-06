@@ -8,8 +8,8 @@ use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocation, DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection,
-    ScalarSelection, SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
+    DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
+    SelectionSet, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration,
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
@@ -638,15 +638,7 @@ fn traverse_selections_and_return_path<'a>(
         let selectable = outcome
             .selectables
             .get(&(current_entity.name, selection_name.dereference()))
-            .and_then(|x| match x.item {
-                DefinitionLocation::Server(s) => {
-                    match s.lookup(db).is_inline_fragment.reference() {
-                        SelectionType::Scalar(_) => None,
-                        SelectionType::Object(_) => s.wrap_some(),
-                    }
-                }
-                DefinitionLocation::Client(_) => None,
-            })
+            .and_then(|x| x.item.as_server())
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
