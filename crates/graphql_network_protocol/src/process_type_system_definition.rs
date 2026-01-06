@@ -219,6 +219,33 @@ pub fn process_graphql_type_system_document(
                 );
             }
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
+                let server_object_entity_name = interface_definition.name.item;
+                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
+                    .intern()
+                    .to::<EntityName>()
+                    // And make it not selectable!
+                    .note_todo("Come up with a way to not have these be in the same namespace");
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    typename_entity_name,
+                    ServerEntity {
+                        description: format!("The typename of {}", server_object_entity_name)
+                            .intern()
+                            .to::<DescriptionValue>()
+                            .wrap(Description)
+                            .wrap_some(),
+                        name: typename_entity_name,
+                        selection_info: ().scalar_selected(),
+                        network_protocol_associated_data: (),
+                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
+                            .scalar_selected(),
+                    }
+                    .interned_value(db)
+                    .with_location(location)
+                    .into(),
+                    non_fatal_diagnostics,
+                );
+
                 interfaces_to_process.push(interface_definition.with_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
