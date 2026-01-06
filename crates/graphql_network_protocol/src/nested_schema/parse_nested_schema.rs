@@ -171,6 +171,8 @@ fn insert_parsed_items_into_schema(
                 selectables: Default::default(),
             },
         );
+
+        // TODO insert __typename field
     }
 }
 
