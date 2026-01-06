@@ -28,13 +28,24 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
+pub fn flattened_entities<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> BTreeMap<EntityName, MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
+    let schema = flattened_schema(db);
+    schema
+        .iter()
+        .map(|(key, value)| (*key, value.item.0.interned_ref(db)))
+        .collect()
+}
+
+#[memo]
 pub fn flattened_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> Option<MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
-    let entity = flattened_schema(db).get(&entity_name)?;
-
-    entity.item.0.interned_ref(db).wrap_some()
+    flattened_entities(db)
+        .get(&entity_name)
+        .map(|x| x.dereference())
 }
 
 #[memo]
