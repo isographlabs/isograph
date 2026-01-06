@@ -120,3 +120,22 @@ pub fn flattened_selectable_named<TCompilationProfile: CompilationProfile>(
     let (selectable, _) = entity.item.1.item.get(selectable_name.reference())?;
     selectable.interned_ref(db).wrap_some()
 }
+
+#[memo]
+pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    entity_name: EntityName,
+    selectable_name: SelectableName,
+) -> Option<Option<Option<EmbeddedLocation>>> {
+    TCompilationProfile::parse_nested_data_model_schema(db)
+        .item
+        .get(entity_name.reference())
+        .map(|x| {
+            x.item
+                .selectables
+                .item
+                .get(selectable_name.reference())
+                // TODO the selectable should have a location
+                .map(|x| x.name.location)
+        })
+}

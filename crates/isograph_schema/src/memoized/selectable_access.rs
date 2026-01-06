@@ -1,13 +1,13 @@
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
-use isograph_lang_types::{DefinitionLocationPostfix, SelectionType};
+use isograph_lang_types::DefinitionLocationPostfix;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_declaration,
-    client_selectable_map, client_selectable_named, entity_not_defined_diagnostic,
-    flattened_selectables, flattened_selectables_for_entity,
-    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
+    CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_map,
+    client_selectable_named, entity_not_defined_diagnostic, flattened_selectables,
+    flattened_selectables_for_entity, multiple_selectable_definitions_found_diagnostic,
+    server_selectable_named,
 };
 
 #[memo]
@@ -94,34 +94,6 @@ pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
     );
 
     selectables.wrap_ok()
-}
-
-#[memo]
-pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
-    db: &IsographDatabase<TCompilationProfile>,
-    entity_name: EntityName,
-    selectable_name: SelectableName,
-) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) =
-        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
-
-    if let Some(x) = outcome
-        .item
-        .selectables
-        .get(&(entity_name, selectable_name))
-        .map(|x| x.location)
-    {
-        return x.wrap_some().wrap_ok();
-    }
-
-    let selectable = client_selectable_declaration(db, entity_name, selectable_name);
-
-    selectable
-        .map(|x| match x {
-            SelectionType::Scalar(s) => s.lookup(db).client_field_name.location.into(),
-            SelectionType::Object(o) => o.lookup(db).client_pointer_name.location.into(),
-        })
-        .wrap_ok()
 }
 
 #[memo]

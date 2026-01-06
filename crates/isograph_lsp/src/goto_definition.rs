@@ -80,11 +80,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 parent.name.item,
                                 server_selectable.lookup(db).name.item,
                             )
-                            .as_ref()
-                            .ok()
-                            .copied()
                             .flatten()
-                            .and_then(|x| x.as_embedded_location())
+                            .flatten()
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -100,11 +97,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 parent.name.item,
                                 client_selectable.lookup(db).name,
                             )
-                            .as_ref()
-                            .ok()
-                            .copied()
                             .flatten()
-                            .and_then(|x| x.as_embedded_location())
+                            .flatten()
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -131,11 +125,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 parent.name.item,
                                 server_selectable.lookup(db).name.item,
                             )
-                            .as_ref()
-                            .ok()
-                            .copied()
                             .flatten()
-                            .and_then(|x| x.as_embedded_location())
+                            .flatten()
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -151,11 +142,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 parent.name.item,
                                 client_selectable.lookup(db).name,
                             )
-                            .as_ref()
-                            .ok()
-                            .copied()
                             .flatten()
-                            .and_then(|x| x.as_embedded_location())
+                            .flatten()
                             .and_then(|location| {
                                 isograph_location_to_lsp_location(
                                     db,
@@ -185,11 +173,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                 };
 
                 selectable_definition_location(db, parent_type_name.0, wrapper.inner.0)
-                    .as_ref()
-                    .ok()
-                    .copied()
                     .flatten()
-                    .and_then(|x| x.as_embedded_location())
+                    .flatten()
                     .and_then(|location| {
                         isograph_location_to_lsp_location(
                             db,
@@ -209,11 +194,8 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                 };
 
                 selectable_definition_location(db, parent_type_name.0, object_wrapper_path.inner.0)
-                    .as_ref()
-                    .ok()
-                    .copied()
                     .flatten()
-                    .and_then(|x| x.as_embedded_location())
+                    .flatten()
                     .and_then(|location| {
                         isograph_location_to_lsp_location(
                             db,
