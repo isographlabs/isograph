@@ -453,8 +453,14 @@ fn process_graphql_documents(
                                 selectables,
                                 network_protocol_associated_data: (),
                                 target_platform_associated_data:
-                                    GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
-                                        .object_selected(),
+                                    GraphQLSchemaObjectAssociatedData {
+                                        subtypes: graphql_union_type_definition
+                                            .union_member_types
+                                            .iter()
+                                            .map(|x| x.item)
+                                            .collect(),
+                                    }
+                                    .object_selected(),
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(false),
                                 }
