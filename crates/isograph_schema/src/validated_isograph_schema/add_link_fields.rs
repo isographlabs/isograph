@@ -16,8 +16,6 @@ pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRef<ClientScalarSelectable<TCompilationProfile>>>> {
     deprecated_server_object_entities(db)
-        .as_ref()
-        .map_err(|e| e.clone())?
         .iter()
         .map(|object| {
             let field_name = *LINK_FIELD_NAME;

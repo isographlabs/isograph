@@ -2,28 +2,27 @@ use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity, flattened_entity_named};
+use crate::{
+    CompilationProfile, IsographDatabase, MemoRefServerEntity, flattened_entities,
+    flattened_entity_named,
+};
 
 #[memo]
 pub fn deprecated_server_object_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-) -> DiagnosticResult<Vec<MemoRefServerEntity<TCompilationProfile>>> {
-    let (outcome, _) =
-        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
+) -> Vec<MemoRefServerEntity<TCompilationProfile>> {
+    let entities = flattened_entities(db);
 
-    outcome
-        .item
-        .entities
+    entities
         .iter()
         .filter_map(|(_, x)| {
-            if x.item.lookup(db).selection_info.as_object().is_some() {
-                x.item.wrap_some()
+            if x.lookup(db).selection_info.as_object().is_some() {
+                x.dereference().wrap_some()
             } else {
                 None
             }
         })
         .collect::<Vec<_>>()
-        .wrap_ok()
 }
 
 #[memo]

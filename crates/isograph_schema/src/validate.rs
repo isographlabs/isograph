@@ -150,10 +150,7 @@ fn validate_all_server_selectables_point_to_defined_types<
 fn validate_all_id_fields<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
-    let entities = match deprecated_server_object_entities(db).as_ref() {
-        Ok(entities) => entities,
-        Err(e) => return vec![e.clone()],
-    };
+    let entities = deprecated_server_object_entities(db);
 
     entities
         .iter()
