@@ -29,6 +29,7 @@ lazy_static! {
     pub static ref STRING_JAVASCRIPT_TYPE: JavascriptName = "string".intern().into();
     pub static ref BOOLEAN_JAVASCRIPT_TYPE: JavascriptName = "boolean".intern().into();
     pub static ref NUMBER_JAVASCRIPT_TYPE: JavascriptName = "number".intern().into();
+    pub static ref NEVER_JAVASCRIPT_TYPE: JavascriptName = "never".intern().into();
 }
 
 pub(crate) struct GraphQLRootTypes {

@@ -26,10 +26,10 @@ use prelude::Postfix;
 
 use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
-    NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
+    NEVER_JAVASCRIPT_TYPE, NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
     insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
     process_type_system_definition::{
-        NEVER_JAVASCRIPT_TYPE, get_typename_selectable, process_graphql_type_system_document,
+        get_typename_selectable, process_graphql_type_system_document,
         process_graphql_type_system_extension_document,
     },
 };

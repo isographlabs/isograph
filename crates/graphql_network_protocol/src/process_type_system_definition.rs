@@ -37,8 +37,6 @@ lazy_static! {
     static ref NODE_INTERFACE_NAME: EntityName= "Node".intern().into();
     pub static ref REFETCH_FIELD_NAME: SelectableName = "__refetch".intern().into();
 
-    pub static ref NEVER_JAVASCRIPT_TYPE: JavascriptName = "never".intern().into();
-
 }
 
 #[expect(clippy::too_many_arguments)]
