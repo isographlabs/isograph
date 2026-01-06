@@ -56,7 +56,9 @@ export const PetBestFriendCard = iso(`
           </Stack>
           <data.PetUpdater />
           <img
-            src={bestFriendRelationship.picture_together ?? undefined}
+            src={
+              (bestFriendRelationship.picture_together as string) ?? undefined
+            }
             style={{ maxWidth: 400 }}
           />
         </Stack>

@@ -14,7 +14,7 @@ export const PetAvatar = iso(`
   return (
     <Avatar
       sx={{ height: 100, width: 100, cursor: 'pointer' }}
-      src={data.picture}
+      src={data.picture as string}
       onClick={onClick}
     />
   );
