@@ -626,11 +626,8 @@ Ok(
                                 lsp_semantic_token: LspSemanticToken(
                                     8,
                                 ),
-                                line_behavior: Inline(
-                                    InlineBehavior {
-                                        space_before: SpaceBefore(
-                                            true,
-                                        ),
+                                line_behavior: StartsNewLine(
+                                    StartsNewLineBehavior {
                                         space_after: SpaceAfter(
                                             false,
                                         ),
