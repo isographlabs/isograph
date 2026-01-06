@@ -15,6 +15,7 @@ impl From<bool> for IsInlineFragment {
     }
 }
 
+// TODO replace this with an alias to NestedDataModelSelectable
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ServerSelectable<TCompilationProfile: CompilationProfile> {
     pub description: Option<WithNoLocation<Description>>,
