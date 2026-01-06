@@ -7,34 +7,29 @@ use prelude::{ErrClone as _, Postfix};
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
     entity_definition_location, entity_not_defined_diagnostic, flattened_entity_named,
-    flattened_selectable_named,
+    flattened_selectable_named, flattened_selectables,
 };
 
 #[memo]
 /// This just drops the location (but not internal locations...) and filters out client fields
 pub fn deprecated_server_selectables_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-) -> DiagnosticResult<
-    BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>>,
-> {
-    let (outcome, _fetchable_types) =
-        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
-
-    outcome
-        .item
-        .selectables
+) -> BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>> {
+    flattened_selectables(db)
         .iter()
-        .filter_map(|(key, value)| value.item.as_server().map(|server| (*key, server)))
-        .collect::<BTreeMap<_, _>>()
-        .wrap_ok()
+        .copied()
+        .map(|(entity_name, selectable_name, selectable)| {
+            ((entity_name, selectable_name), selectable)
+        })
+        .collect()
 }
 
 #[memo]
 pub fn deprecated_server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
-) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>>> {
-    let map = deprecated_server_selectables_map(db).clone_err()?;
+) -> BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>> {
+    let map = deprecated_server_selectables_map(db);
 
     map.iter()
         .filter_map(|(key, value)| {
@@ -45,7 +40,6 @@ pub fn deprecated_server_selectables_map_for_entity<TCompilationProfile: Compila
             }
         })
         .collect::<BTreeMap<_, _>>()
-        .wrap_ok()
 }
 
 #[memo]

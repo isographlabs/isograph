@@ -6,7 +6,7 @@ use common_lang_types::{
 };
 use graphql_lang_types::NameValuePair;
 use intern::{Lookup, string_key::StringKey};
-use prelude::{ErrClone, Postfix};
+use prelude::Postfix;
 
 use isograph_lang_types::{
     EntityNameWrapper, NonConstantValue, TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration,
@@ -367,7 +367,7 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
     server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeSet<ObjectLiteralFieldType>> {
     let server_selectables =
-        deprecated_server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
+        deprecated_server_selectables_map_for_entity(db, server_object_entity_name);
 
     server_selectables
         .iter()
@@ -404,8 +404,7 @@ fn validate_no_extraneous_fields<TCompilationProfile: CompilationProfile>(
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     let object_fields =
-        deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name)
-            .clone_err()?;
+        deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name);
 
     let extra_fields: Vec<_> = object_literal
         .iter()

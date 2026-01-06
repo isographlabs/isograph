@@ -99,7 +99,7 @@ fn validate_all_server_selectables_point_to_defined_types<
 >(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<()> {
-    let server_selectables = deprecated_server_selectables_map(db).clone_err()?;
+    let server_selectables = deprecated_server_selectables_map(db);
     let entities = flattened_entities(db).to_owned();
 
     let mut errors = vec![];

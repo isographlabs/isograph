@@ -116,11 +116,6 @@ impl TargetPlatform for JavascriptTargetPlatform {
 
                 for (name, server_selectable) in
                     deprecated_server_selectables_map_for_entity(db, entity_name)
-                        .as_ref()
-                        .expect(
-                            "Expected type system document to be valid. \
-                            This is indicative of a bug in Isograph.",
-                        )
                 {
                     let field_type = format_field_definition(
                         db,

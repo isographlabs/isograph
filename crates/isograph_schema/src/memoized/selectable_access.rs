@@ -73,9 +73,8 @@ pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
 ) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TCompilationProfile>>>> {
     let mut selectables =
         deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name)
-            .to_owned()?
-            .into_values()
-            .map(|value| value.server_defined().wrap_ok())
+            .values()
+            .map(|value| value.dereference().server_defined().wrap_ok())
             .collect::<Vec<_>>();
 
     selectables.extend(
@@ -127,9 +126,8 @@ pub fn selectables<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRefSelectable<TCompilationProfile>>> {
     let mut selectables = deprecated_server_selectables_map(db)
-        .to_owned()?
-        .into_values()
-        .map(|value| value.server_defined())
+        .values()
+        .map(|value| value.dereference().server_defined())
         .collect::<Vec<_>>();
 
     selectables.extend(
