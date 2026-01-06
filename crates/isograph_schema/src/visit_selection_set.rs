@@ -3,7 +3,7 @@ use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection, Selection,
     SelectionType, SelectionTypePostfix,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, IsographDatabase, ServerEntity, selectable_named, server_entity_named,
@@ -43,12 +43,25 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let target_entity = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => {
+                        let selectable = s.lookup(db);
+                        let target_entity_name = selectable.target_entity_name.inner().0;
+                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
+                            Ok(o) => match o {
+                                Some(entity) => entity.lookup(db),
+                                None => {
+                                    continue;
+                                }
+                            },
+                            Err(_) => {
                                 continue;
                             }
-                            SelectionType::Object(_) => s.server_defined(),
+                        };
+
+                        if entity.selection_info.as_scalar().is_some() {
+                            continue;
                         }
+
+                        selectable.server_defined()
                     }
                     DefinitionLocation::Client(c) => match c {
                         SelectionType::Scalar(_) => {
@@ -59,7 +72,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 };
 
                 let target_entity_name = match target_entity {
-                    DefinitionLocation::Server(s) => s.lookup(db).target_entity_name.inner(),
+                    DefinitionLocation::Server(s) => s.target_entity_name.inner(),
                     DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
                 }
                 .0;
