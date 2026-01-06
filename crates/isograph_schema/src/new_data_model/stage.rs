@@ -1,0 +1,64 @@
+use std::{fmt::Debug, hash::Hash};
+
+use common_lang_types::{Diagnostic, EmbeddedLocation, SelectableName, WithGenericLocation};
+
+use crate::{
+    CompilationProfile, CreateError, LazyValidation, MapWithNonfatalDiagnostics,
+    NestedDataModelSelectable,
+};
+
+/// A trait that identifies how far along in the "transformation pipeline"
+/// a data model item is. It is simply a bag of associated types.
+/// We use this trait because we don't want to pass many type params
+/// around, and because we want the type params to change together.
+///
+/// - When we parse the type system documents via [`NetworkProtocol`],
+///   we return a `DataModelSchema<TNetworkProtocol, NestedState>`. At this
+///   point, everything is nested, i.e. entities contain selectables, which
+///   contain arguments, etc.
+/// - The compiler will flatten this, i.e. convert it to
+///   `DataModelSchema<TNetworkProtocol, FlattenedState>`. At this point,
+///   nothing is nested, and nothing is validated, and there is no location
+///   info.
+/// - Before creating artifact text, the compiler will validate everything,
+///   creating a
+///   `Result<DataModelSchema<TNetworkProtocol, ValidatedState>, Vec<Diagnostic>>`.
+///
+/// For now, we will start with everything below the level of selectable
+/// being nested, i.e. selectables will contain arguments. Once we have adopted
+/// this pattern, we will flatten arguments, selection sets, etc.
+pub trait DataModelStage:
+    Copy + Clone + Debug + PartialEq + PartialOrd + Eq + Ord + Hash + Default
+{
+    type Resolution<T, E: CreateError>;
+    type Location;
+
+    type Selectables<TCompilationProfile: CompilationProfile>;
+    // Arguments, SelectionSets, etc.
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+pub struct NestedStage {}
+
+impl DataModelStage for NestedStage {
+    type Resolution<T, E: CreateError> = WithGenericLocation<Result<T, Diagnostic>, Self::Location>;
+    type Location = Option<EmbeddedLocation>;
+    type Selectables<TCompilationProfile: CompilationProfile> =
+        MapWithNonfatalDiagnostics<SelectableName, NestedDataModelSelectable<TCompilationProfile>>;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+pub struct FlattenedStage {}
+impl DataModelStage for FlattenedStage {
+    type Resolution<T, E: CreateError> = LazyValidation<T, E>;
+    type Location = ();
+    type Selectables<TCompilationProfile: CompilationProfile> = ();
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
+pub struct ValidatedStage {}
+impl DataModelStage for ValidatedStage {
+    type Resolution<T, E: CreateError> = T;
+    type Location = ();
+    type Selectables<TCompilationProfile: CompilationProfile> = ();
+}

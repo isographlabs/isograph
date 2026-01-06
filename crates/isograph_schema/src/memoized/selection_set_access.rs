@@ -77,7 +77,7 @@ pub fn reader_selection_set_map<TCompilationProfile: CompilationProfile>(
         }
     }
 
-    if let Ok(outcome) = TCompilationProfile::parse_type_system_documents(db) {
+    if let Ok(outcome) = TCompilationProfile::deprecated_parse_type_system_documents(db) {
         let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
         // And we must also do it for expose fields. Ay ay ay

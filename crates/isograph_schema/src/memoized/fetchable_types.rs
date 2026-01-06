@@ -13,7 +13,7 @@ pub fn fetchable_types<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<MemoRef<BTreeMap<EntityName, RootOperationName>>> {
     let (_items, fetchable_types) =
-        TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     fetchable_types.interned_ref(db).wrap_ok()
 }

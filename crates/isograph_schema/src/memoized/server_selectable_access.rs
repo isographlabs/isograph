@@ -17,7 +17,7 @@ pub fn server_selectables_map<TCompilationProfile: CompilationProfile>(
     BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>>,
 > {
     let (outcome, _fetchable_types) =
-        TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item

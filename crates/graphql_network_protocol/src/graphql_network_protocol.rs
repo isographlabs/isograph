@@ -21,6 +21,7 @@ use lazy_static::lazy_static;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
+use crate::nested_schema::parse_nested_schema;
 use crate::parse_type_system_document::parse_type_system_document;
 use crate::process_type_system_definition::multiple_entity_definitions_found_diagnostic;
 use crate::query_text::generate_query_text;
@@ -68,7 +69,7 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
 
     #[expect(clippy::type_complexity)]
     #[memo]
-    fn parse_type_system_documents(
+    fn deprecated_parse_type_system_documents(
         db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     ) -> DiagnosticResult<(
         WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
@@ -76,6 +77,12 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
         BTreeMap<EntityName, RootOperationName>,
     )> {
         parse_type_system_document(db)
+    }
+
+    fn parse_nested_data_model_schema(
+        db: &IsographDatabase<Self>,
+    ) -> pico::MemoRef<isograph_schema::NestedDataModelSchema<Self>> {
+        parse_nested_schema(db)
     }
 }
 

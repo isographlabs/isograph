@@ -52,7 +52,7 @@ pub fn validate_entire_schema<TCompilationProfile: CompilationProfile>(
 
     errors.extend(validate_scalar_selectable_directive_sets(db));
 
-    if let Ok((outcome, _)) = TCompilationProfile::parse_type_system_documents(db) {
+    if let Ok((outcome, _)) = TCompilationProfile::deprecated_parse_type_system_documents(db) {
         errors.extend(outcome.non_fatal_diagnostics.clone());
     }
 

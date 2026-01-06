@@ -56,7 +56,7 @@ pub fn refetch_strategy_map<TCompilationProfile: CompilationProfile>(
         }
     }
 
-    let outcome = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+    let outcome = TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
     let expose_fields = &outcome.0.item.client_scalar_refetch_strategies;
 
     for with_location in expose_fields.iter().flatten() {

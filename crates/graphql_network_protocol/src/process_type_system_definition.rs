@@ -509,7 +509,7 @@ pub fn process_graphql_type_system_extension_document(
     }
 }
 
-type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
+pub type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
 
 pub fn multiple_entity_definitions_found_diagnostic(
     server_object_entity_name: EntityName,

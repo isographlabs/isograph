@@ -13,7 +13,7 @@ pub fn server_entities_map_without_locations<TCompilationProfile: CompilationPro
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TCompilationProfile>>>, Diagnostic> {
     let (outcome, _fetchable_types) =
-        TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
@@ -29,7 +29,8 @@ pub fn server_entities_map_without_locations<TCompilationProfile: CompilationPro
 pub fn server_object_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRefServerEntity<TCompilationProfile>>> {
-    let (outcome, _) = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) =
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item
@@ -63,7 +64,8 @@ pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) =
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     outcome
         .item

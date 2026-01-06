@@ -98,7 +98,8 @@ pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<Location>> {
-    let (outcome, _) = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+    let (outcome, _) =
+        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
 
     if let Some(x) = outcome
         .item

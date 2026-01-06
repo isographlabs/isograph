@@ -287,7 +287,7 @@ pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: Compi
 ) -> DiagnosticResult<
     HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
 > {
-    let outcome = TCompilationProfile::parse_type_system_documents(db).clone_err()?;
+    let outcome = TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
 
     expose_as_field_queue

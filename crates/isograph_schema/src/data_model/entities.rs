@@ -4,7 +4,7 @@ use pico::MemoRef;
 
 use crate::{CompilationProfile, NetworkProtocol, TargetPlatform};
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy, Ord, PartialOrd)]
 pub struct IsConcrete(pub bool);
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -27,7 +27,7 @@ pub struct ServerEntity<TCompilationProfile: CompilationProfile> {
 
 pub type MemoRefServerEntity<TCompilationProfile> = MemoRef<ServerEntity<TCompilationProfile>>;
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy)]
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy, PartialOrd, Ord)]
 pub struct ServerObjectSelectionInfo {
     pub is_concrete: IsConcrete,
 }
