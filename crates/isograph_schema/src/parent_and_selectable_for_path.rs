@@ -102,12 +102,17 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
 
     let selectable = match selectable {
         DefinitionLocation::Server(s) => {
-            if s.lookup(db)
-                .is_inline_fragment
-                .as_ref()
-                .as_scalar()
-                .is_some()
-            {
+            let selectable = s.lookup(db);
+            let target_entity_name = selectable.target_entity_name.inner().0;
+            let entity = server_entity_named(db, target_entity_name)
+                .clone_err()?
+                .ok_or_else(|| {
+                    let location = object_path.inner.name.location.to::<Location>();
+                    entity_not_defined_diagnostic(target_entity_name, location)
+                })?
+                .lookup(db);
+
+            if entity.selection_info.as_scalar().is_some() {
                 let location = object_path.inner.name.location.to::<Location>();
                 return selectable_is_wrong_type_diagnostic(
                     parent.lookup(db).name,
