@@ -325,6 +325,34 @@ pub fn process_graphql_type_system_document(
                     non_fatal_diagnostics,
                 );
 
+                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
+                    .intern()
+                    .to::<EntityName>()
+                    // And make it not selectable!
+                    .note_todo("Come up with a way to not have these be in the same namespace");
+                insert_entity_or_multiple_definition_diagnostic(
+                    &mut outcome.entities,
+                    typename_entity_name,
+                    ServerEntity {
+                        description: format!("The typename of {}", server_object_entity_name)
+                            .intern()
+                            .to::<DescriptionValue>()
+                            .wrap(Description)
+                            .wrap_some(),
+                        name: typename_entity_name,
+                        selection_info: ().scalar_selected(),
+                        network_protocol_associated_data: (),
+                        target_platform_associated_data: get_js_union_name(
+                            &union_definition.union_member_types,
+                        )
+                        .scalar_selected(),
+                    }
+                    .interned_value(db)
+                    .with_location(location)
+                    .into(),
+                    non_fatal_diagnostics,
+                );
+
                 directives
                     .entry(server_object_entity_name)
                     .or_default()
@@ -531,4 +559,14 @@ pub fn multiple_entity_definitions_found_diagnostic(
         format!("Multiple definitions of {server_object_entity_name} were found."),
         location,
     )
+}
+
+fn get_js_union_name(members: &[WithEmbeddedLocation<EntityName>]) -> JavascriptName {
+    members
+        .iter()
+        .map(|name| format!("\"{}\"", name.item))
+        .collect::<Vec<String>>()
+        .join(" | ")
+        .intern()
+        .into()
 }
