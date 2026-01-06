@@ -326,19 +326,11 @@ pub(crate) fn parse_type_system_document(
             let mutation_field = match outcome
                 .selectables
                 .values()
-                .filter_map(|x| match x.item {
-                    DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => None,
-                            SelectionType::Object(_) => s.wrap_some(),
-                        }
-                    }
-                    DefinitionLocation::Client(_) => None,
-                })
+                .filter_map(|x| x.item.as_server())
                 .find_map(|server_object_selectable| {
-                    let object = server_object_selectable.lookup(db);
-                    if object.name == mutation_subfield_name {
-                        Some(object)
+                    let server_object_selectable = server_object_selectable.lookup(db);
+                    if server_object_selectable.name == mutation_subfield_name {
+                        Some(server_object_selectable)
                     } else {
                         None
                     }
