@@ -105,14 +105,17 @@ fn validate_all_server_selectables_point_to_defined_types<
     let mut errors = vec![];
 
     // TODO use iterator methods
-    for (parent_object_entity_name, selectable_name, selectable) in server_selectables.iter() {
+    for selectable in server_selectables.iter() {
+        let selectable = selectable.lookup(db);
         let (target, arguments) = {
-            let selectable = selectable.lookup(db);
             (
                 selectable.target_entity.item.clone_err()?.inner(),
                 &selectable.arguments,
             )
         };
+
+        let parent_object_entity_name = selectable.parent_entity_name.item;
+        let selectable_name = selectable.name.item;
 
         if !entities.contains_key(&target) {
             errors.push(Diagnostic::new(

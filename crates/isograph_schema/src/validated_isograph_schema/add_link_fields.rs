@@ -39,7 +39,6 @@ pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
         .collect::<Vec<_>>()
 }
 
-#[expect(clippy::type_complexity)]
 #[memo]
 pub fn get_link_fields_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,

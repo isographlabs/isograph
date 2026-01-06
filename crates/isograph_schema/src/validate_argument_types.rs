@@ -15,7 +15,8 @@ use isograph_lang_types::{
 
 use crate::{
     BOOLEAN_ENTITY_NAME, CompilationProfile, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME,
-    IsographDatabase, STRING_ENTITY_NAME, deprecated_server_selectables_map_for_entity,
+    IsographDatabase, STRING_ENTITY_NAME, entity_not_defined_diagnostic,
+    flattened_selectables_for_entity,
 };
 
 fn scalar_literal_satisfies_type(
@@ -366,8 +367,11 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeSet<ObjectLiteralFieldType>> {
-    let server_selectables =
-        deprecated_server_selectables_map_for_entity(db, server_object_entity_name);
+    let server_selectables = flattened_selectables_for_entity(db, server_object_entity_name)
+        .as_ref()
+        .ok_or_else(|| {
+            entity_not_defined_diagnostic(server_object_entity_name, Location::Generated)
+        })?;
 
     server_selectables
         .iter()
@@ -403,8 +407,11 @@ fn validate_no_extraneous_fields<TCompilationProfile: CompilationProfile>(
     object_literal: &[NameValuePair<ValueKeyName, NonConstantValue>],
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
-    let object_fields =
-        deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name);
+    let object_fields = flattened_selectables_for_entity(db, parent_server_object_entity_name)
+        .as_ref()
+        .ok_or_else(|| {
+            entity_not_defined_diagnostic(parent_server_object_entity_name, Location::Generated)
+        })?;
 
     let extra_fields: Vec<_> = object_literal
         .iter()

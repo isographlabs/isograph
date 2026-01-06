@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location, SelectableName};
 use pico_macros::memo;
 use prelude::{ErrClone as _, Postfix};
@@ -7,29 +5,8 @@ use prelude::{ErrClone as _, Postfix};
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
     entity_definition_location, entity_not_defined_diagnostic, flattened_entity_named,
-    flattened_selectable_named, flattened_selectables,
+    flattened_selectable_named,
 };
-
-#[memo]
-pub fn deprecated_server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
-    db: &IsographDatabase<TCompilationProfile>,
-    parent_server_object_entity_name: EntityName,
-) -> BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>> {
-    let map = flattened_selectables(db);
-
-    map.iter()
-        .filter_map(|(entity_name, selectable_name, memo_ref)| {
-            if entity_name.dereference() == parent_server_object_entity_name {
-                Some((
-                    selectable_name.unchecked_conversion(),
-                    memo_ref.dereference(),
-                ))
-            } else {
-                None
-            }
-        })
-        .collect::<BTreeMap<_, _>>()
-}
 
 #[memo]
 pub fn server_selectable_named<TCompilationProfile: CompilationProfile>(

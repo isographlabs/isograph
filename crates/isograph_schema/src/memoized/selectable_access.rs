@@ -5,9 +5,9 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_declaration,
-    client_selectable_map, client_selectable_named, deprecated_server_selectables_map_for_entity,
-    flattened_selectables, multiple_selectable_definitions_found_diagnostic,
-    server_selectable_named,
+    client_selectable_map, client_selectable_named, entity_not_defined_diagnostic,
+    flattened_selectables, flattened_selectables_for_entity,
+    multiple_selectable_definitions_found_diagnostic, server_selectable_named,
 };
 
 #[memo]
@@ -71,11 +71,14 @@ pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<Vec<DiagnosticResult<MemoRefSelectable<TCompilationProfile>>>> {
-    let mut selectables =
-        deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name)
-            .values()
-            .map(|value| value.dereference().server_defined().wrap_ok())
-            .collect::<Vec<_>>();
+    let mut selectables = flattened_selectables_for_entity(db, parent_server_object_entity_name)
+        .as_ref()
+        .ok_or_else(|| {
+            entity_not_defined_diagnostic(parent_server_object_entity_name, Location::Generated)
+        })?
+        .values()
+        .map(|value| value.dereference().server_defined().wrap_ok())
+        .collect::<Vec<_>>();
 
     selectables.extend(
         client_selectable_map(db)
@@ -127,7 +130,7 @@ pub fn selectables<TCompilationProfile: CompilationProfile>(
 ) -> DiagnosticResult<Vec<MemoRefSelectable<TCompilationProfile>>> {
     let mut selectables = flattened_selectables(db)
         .iter()
-        .map(|(_, _, value)| value.dereference().server_defined())
+        .map(|value| value.dereference().server_defined())
         .collect::<Vec<_>>();
 
     selectables.extend(

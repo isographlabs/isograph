@@ -11,7 +11,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
-    deprecated_server_selectables_map_for_entity, selectable_named,
+    flattened_selectables_for_entity, selectable_named,
 };
 use isograph_schema::{
     DeprecatedParseTypeSystemOutcome, Format, MergedSelectionMap, NetworkProtocol,
@@ -114,8 +114,9 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 // consider how to do this is a not obviously broken manner.
                 let mut s = "{\n".to_string();
 
-                for (name, server_selectable) in
-                    deprecated_server_selectables_map_for_entity(db, entity_name)
+                for (name, server_selectable) in flattened_selectables_for_entity(db, entity_name)
+                    .as_ref()
+                    .expect("Expected entity to be defined")
                 {
                     let field_type = format_field_definition(
                         db,
