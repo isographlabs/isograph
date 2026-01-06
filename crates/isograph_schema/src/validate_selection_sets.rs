@@ -123,7 +123,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = match selectable.target_entity.clone_err() {
+                        let target_entity_name = match selectable.target_entity.item.clone_err() {
                             Ok(annotation) => annotation.inner().0,
                             Err(e) => {
                                 errors.push(e);
@@ -150,8 +150,8 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                         if entity.selection_info.as_object().is_some() {
                             let location = scalar_selection.name.location.to::<Location>();
                             errors.push(selectable_is_wrong_type_diagnostic(
-                                selectable.parent_entity_name,
-                                selectable.name,
+                                selectable.parent_entity_name.item,
+                                selectable.name.item,
                                 "a scalar",
                                 "an object",
                                 location,
@@ -280,7 +280,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 let selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = match selectable.target_entity.clone_err() {
+                        let target_entity_name = match selectable.target_entity.item.clone_err() {
                             Ok(annotation) => annotation.inner().0,
                             Err(e) => {
                                 errors.push(e);
@@ -307,8 +307,8 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                         if entity.selection_info.as_scalar().is_some() {
                             let location = object_selection.name.location.to::<Location>();
                             errors.push(selectable_is_wrong_type_diagnostic(
-                                selectable.parent_entity_name,
-                                selectable.name,
+                                selectable.parent_entity_name.item,
+                                selectable.name.item,
                                 "an object",
                                 "a scalar",
                                 location,
@@ -336,13 +336,15 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 // @updatable is not supported on client fields
                 let target_entity_name = match selectable {
-                    DefinitionLocation::Server(s) => match s.lookup(db).target_entity.clone_err() {
-                        Ok(annotation) => annotation.inner(),
-                        Err(e) => {
-                            errors.push(e);
-                            continue;
+                    DefinitionLocation::Server(s) => {
+                        match s.lookup(db).target_entity.item.clone_err() {
+                            Ok(annotation) => annotation.inner(),
+                            Err(e) => {
+                                errors.push(e);
+                                continue;
+                            }
                         }
-                    },
+                    }
                     DefinitionLocation::Client(c) => {
                         match object_selection.object_selection_directive_set {
                             ObjectSelectionDirectiveSet::Updatable(_) => {

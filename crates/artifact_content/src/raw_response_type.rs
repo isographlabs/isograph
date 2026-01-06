@@ -66,14 +66,15 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 let inner_text = TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
                     db,
-                    server_scalar_selectable.parent_entity_name,
-                    server_scalar_selectable.name,
+                    server_scalar_selectable.parent_entity_name.item,
+                    server_scalar_selectable.name.item,
                 );
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
                     if server_scalar_selectable
                         .target_entity
+                        .item
                         .as_ref()
                         .expect("Expected target entity to be valid.")
                         .is_nullable()
@@ -84,6 +85,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     },
                     print_javascript_type_declaration(
                         raw_type
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .reference(),
@@ -133,6 +135,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     "{indent}{name}{}: {},\n",
                     if server_object_selectable
                         .target_entity
+                        .item
                         .as_ref()
                         .expect("Expected target entity to be valid.")
                         .is_nullable()
@@ -143,6 +146,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     },
                     print_javascript_type_declaration(
                         raw_type
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .reference(),

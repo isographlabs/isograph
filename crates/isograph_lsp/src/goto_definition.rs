@@ -78,7 +78,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                             selectable_definition_location(
                                 db,
                                 parent.name.item,
-                                server_selectable.lookup(db).name,
+                                server_selectable.lookup(db).name.item,
                             )
                             .as_ref()
                             .ok()
@@ -129,7 +129,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                             selectable_definition_location(
                                 db,
                                 parent.name.item,
-                                server_selectable.lookup(db).name,
+                                server_selectable.lookup(db).name.item,
                             )
                             .as_ref()
                             .ok()

@@ -211,7 +211,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
     let server_object_selectable_name = server_object_selectable.name;
 
     let parent_object_entity =
-        &server_entity_named(db, server_object_selectable.parent_entity_name)
+        &server_entity_named(db, server_object_selectable.parent_entity_name.item)
             .as_ref()
             .expect(
                 "Expected validation to have worked. \
@@ -228,6 +228,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
         db,
         server_object_selectable
             .target_entity
+            .item
             .as_ref()
             .expect("Expected target entity to be valid.")
             .inner()
@@ -248,7 +249,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
-        server_object_selectable.parent_entity_name,
+        server_object_selectable.parent_entity_name.item,
         inline_fragment_reader_selections,
         0,
         refetch_paths,
@@ -289,7 +290,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
             file_name: *RESOLVER_READER_FILE_NAME,
             type_and_field: EntityNameAndSelectableName {
                 parent_entity_name: parent_object_entity.name.item,
-                selectable_name: server_object_selectable_name,
+                selectable_name: server_object_selectable_name.item,
             }
             .wrap_some(),
         },

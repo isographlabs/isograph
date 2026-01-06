@@ -118,7 +118,7 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
                         // TODO don't match on object_selectable twice
                         let target_entity_name = match object_selectable {
                             DefinitionLocation::Server(s) => {
-                                match s.lookup(self.db).target_entity.as_ref() {
+                                match s.lookup(self.db).target_entity.item.as_ref() {
                                     Ok(annotation) => annotation.inner(),
                                     Err(_) => {
                                         continue 'main_loop;

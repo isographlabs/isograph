@@ -125,7 +125,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                     let scalar_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let target_entity_name = match selectable.target_entity.as_ref() {
+                            let target_entity_name = match selectable.target_entity.item.as_ref() {
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };
@@ -189,7 +189,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                     let object_selectable = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let target_entity_name = match selectable.target_entity.as_ref() {
+                            let target_entity_name = match selectable.target_entity.item.as_ref() {
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };

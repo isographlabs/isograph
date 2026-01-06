@@ -456,10 +456,12 @@ pub(crate) fn get_typename_selectable(
             .wrap(Description)
             .with_no_location()
             .wrap_some(),
-        name: *TYPENAME_FIELD_NAME,
-        target_entity: TypeAnnotationDeclaration::Scalar(target_entity_name.into()).wrap_ok(),
+        name: (*TYPENAME_FIELD_NAME).with_no_location(),
+        target_entity: TypeAnnotationDeclaration::Scalar(target_entity_name.into())
+            .wrap_ok()
+            .with_no_location(),
         is_inline_fragment: false.into(),
-        parent_entity_name: server_object_entity_name,
+        parent_entity_name: server_object_entity_name.with_no_location(),
         arguments: vec![],
         network_protocol_associated_data: (),
         target_platform_associated_data: (),

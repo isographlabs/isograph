@@ -372,7 +372,7 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
     server_selectables
         .iter()
         .filter_map(|(field_name, selectable)| {
-            let iso_type_annotation = selectable.lookup(db).target_entity.clone().ok()?;
+            let iso_type_annotation = selectable.lookup(db).target_entity.item.as_ref().ok()?;
 
             let object_literal_supplied_field = object_literal
                 .iter()
@@ -380,7 +380,7 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
 
             match object_literal_supplied_field {
                 Some(selection_supplied_argument_value) => ObjectLiteralFieldType::Provided(
-                    iso_type_annotation,
+                    iso_type_annotation.clone(),
                     selection_supplied_argument_value.clone(),
                 )
                 .wrap_some(),

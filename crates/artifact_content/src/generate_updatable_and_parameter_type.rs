@@ -75,6 +75,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -115,8 +116,8 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                     let inner_text =
                         TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
                             db,
-                            server_scalar_selectable.parent_entity_name,
-                            server_scalar_selectable.name,
+                            server_scalar_selectable.parent_entity_name.item,
+                            server_scalar_selectable.name.item,
                         );
 
                     query_type_declaration.push_str(&format!(
@@ -126,6 +127,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                         print_javascript_type_declaration(
                             server_scalar_selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .reference(),
@@ -153,6 +155,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -199,6 +202,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Server(s) => s
                     .lookup(db)
                     .target_entity
+                    .item
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .inner(),
@@ -213,6 +217,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Server(server_field) => server_field
                     .lookup(db)
                     .target_entity
+                    .item
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .reference(),
@@ -326,6 +331,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -367,8 +373,8 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                     let inner_text =
                         TCompilationProfile::TargetPlatform::get_inner_text_for_selectable(
                             db,
-                            server_scalar_selectable.parent_entity_name,
-                            server_scalar_selectable.name,
+                            server_scalar_selectable.parent_entity_name.item,
+                            server_scalar_selectable.name.item,
                         );
 
                     if selection.item.is_updatable() {
@@ -380,6 +386,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             name_or_alias,
                             print_javascript_type_declaration(
                                 output_type
+                                    .item
                                     .as_ref()
                                     .expect("Expected target entity to be valid.")
                                     .reference(),
@@ -393,6 +400,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             name_or_alias,
                             print_javascript_type_declaration(
                                 output_type
+                                    .item
                                     .as_ref()
                                     .expect("Expected target entity to be valid.")
                                     .reference(),
@@ -423,6 +431,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -472,6 +481,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                 DefinitionLocation::Server(server_field) => server_field
                     .lookup(db)
                     .target_entity
+                    .item
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .reference(),
@@ -481,6 +491,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                 DefinitionLocation::Server(s) => s
                     .lookup(db)
                     .target_entity
+                    .item
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .inner(),
@@ -511,6 +522,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             DefinitionLocation::Server(server_field) => server_field
                                 .lookup(db)
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .reference(),

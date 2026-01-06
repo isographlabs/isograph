@@ -67,7 +67,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                             let selectable = s.lookup(db);
                             let entity = server_entity_named(
                                 db,
-                                match selectable.target_entity.clone_err() {
+                                match selectable.target_entity.item.clone_err() {
                                     Ok(annotation) => annotation.inner().0,
                                     Err(e) => return e,
                                 },

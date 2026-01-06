@@ -163,6 +163,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
             db,
             server_scalar_selectable
                 .target_entity
+                .item
                 .as_ref()
                 .expect("Expected target entity to be valid.")
                 .inner()
@@ -306,6 +307,7 @@ fn format_field_definition<TCompilationProfile: CompilationProfile>(
     let is_optional = is_nullable(
         server_selectable
             .target_entity
+            .item
             .as_ref()
             .expect("Expected target entity to be valid.")
             .reference(),
@@ -320,6 +322,7 @@ fn format_field_definition<TCompilationProfile: CompilationProfile>(
         format_type_annotation(
             db,
             target_type_annotation
+                .item
                 .as_ref()
                 .expect("Expected target entity to be valid.")
                 .reference(),

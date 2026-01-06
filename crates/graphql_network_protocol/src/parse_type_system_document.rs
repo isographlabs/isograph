@@ -154,17 +154,22 @@ pub(crate) fn parse_type_system_document(
                         .map(WithGenericLocation::drop_location)
                         .map(|x| x.map(Description::from)),
 
-                    name: field.item.name.item.unchecked_conversion(),
+                    name: field
+                        .item
+                        .name
+                        .map(|x| x.unchecked_conversion())
+                        .drop_location(),
                     target_entity: field
                         .item
                         .type_
                         .item
                         .clone()
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
-                        .wrap_ok(),
+                        .wrap_ok()
+                        .with_no_location(),
 
                     is_inline_fragment: false.into(),
-                    parent_entity_name,
+                    parent_entity_name: parent_entity_name.with_no_location(),
                     arguments: field
                         .item
                         .arguments
@@ -204,8 +209,12 @@ pub(crate) fn parse_type_system_document(
                         .item
                         .description
                         .map(|x| x.drop_location().map(Description::from)),
-                    name: field.item.name.item.unchecked_conversion(),
-                    parent_entity_name,
+                    name: field
+                        .item
+                        .name
+                        .map(|x| x.unchecked_conversion())
+                        .drop_location(),
+                    parent_entity_name: parent_entity_name.with_no_location(),
                     arguments: field
                         .item
                         .arguments
@@ -233,7 +242,8 @@ pub(crate) fn parse_type_system_document(
                         .item
                         .clone()
                         .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
-                        .wrap_ok(),
+                        .wrap_ok()
+                        .with_no_location(),
 
                     network_protocol_associated_data: (),
                     is_inline_fragment: false.into(),
@@ -308,7 +318,8 @@ pub(crate) fn parse_type_system_document(
                     .wrap_some(),
                     name: format!("as{}", concrete_child_entity_name)
                         .intern()
-                        .to::<SelectableName>(),
+                        .to::<SelectableName>()
+                        .with_no_location(),
                     target_entity: TypeAnnotationDeclaration::Union(
                         UnionTypeAnnotationDeclaration {
                             variants: {
@@ -321,9 +332,12 @@ pub(crate) fn parse_type_system_document(
                             nullable: true,
                         },
                     )
-                    .wrap_ok(),
+                    .wrap_ok()
+                    .with_no_location(),
                     is_inline_fragment: true.into(),
-                    parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
+                    parent_entity_name: abstract_parent_entity_name
+                        .unchecked_conversion::<EntityName>()
+                        .with_no_location(),
                     arguments: vec![],
                     network_protocol_associated_data: (),
                     target_platform_associated_data: (),
@@ -362,7 +376,7 @@ pub(crate) fn parse_type_system_document(
                 .filter_map(|x| x.item.as_server())
                 .find_map(|server_object_selectable| {
                     let server_object_selectable = server_object_selectable.lookup(db);
-                    if server_object_selectable.name == mutation_subfield_name {
+                    if server_object_selectable.name.item == mutation_subfield_name {
                         Some(server_object_selectable)
                     } else {
                         None
@@ -378,7 +392,7 @@ pub(crate) fn parse_type_system_document(
                 }
             };
 
-            let payload_object_entity_name = match mutation_field.target_entity.clone_err() {
+            let payload_object_entity_name = match mutation_field.target_entity.item.clone_err() {
                 Ok(annotation) => annotation.inner().0,
                 Err(e) => {
                     non_fatal_diagnostics.push(e);
@@ -388,7 +402,7 @@ pub(crate) fn parse_type_system_document(
 
             let client_field_scalar_selection_name = expose_field_directive
                 .expose_as
-                .unwrap_or(mutation_field.name);
+                .unwrap_or(mutation_field.name.item);
             let top_level_schema_field_parent_object_entity_name =
                 mutation_field.parent_entity_name;
             let mutation_field_arguments = mutation_field.arguments.clone();
@@ -447,6 +461,7 @@ pub(crate) fn parse_type_system_document(
                         WrappedSelectionMapSelection::InlineFragment(
                             server_object_selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid")
                                 .inner()
@@ -454,8 +469,10 @@ pub(crate) fn parse_type_system_document(
                         )
                     } else {
                         WrappedSelectionMapSelection::LinkedField {
-                            parent_object_entity_name: server_object_selectable.parent_entity_name,
-                            server_object_selectable_name: server_object_selectable.name,
+                            parent_object_entity_name: server_object_selectable
+                                .parent_entity_name
+                                .item,
+                            server_object_selectable_name: server_object_selectable.name.item,
                             arguments: vec![],
                             concrete_target_entity_name: target_parent_object_entity_name
                                 .item
@@ -478,7 +495,7 @@ pub(crate) fn parse_type_system_document(
                 } else {
                     None
                 },
-                top_level_schema_field_parent_object_entity_name,
+                top_level_schema_field_parent_object_entity_name.item,
             ));
 
             let mutation_client_scalar_selectable = ClientScalarSelectable {
@@ -689,7 +706,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_entity.clone_err()?.inner();
+        let next_entity_name = selectable.target_entity.item.clone_err()?.inner();
 
         current_entity = outcome
             .entities

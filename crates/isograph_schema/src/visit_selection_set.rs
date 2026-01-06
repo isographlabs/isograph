@@ -44,7 +44,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 let target_entity = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = match selectable.target_entity.as_ref() {
+                        let target_entity_name = match selectable.target_entity.item.as_ref() {
                             Ok(annotation) => annotation.inner().0,
                             Err(_) => continue,
                         };
@@ -75,7 +75,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 };
 
                 let target_entity_name = match target_entity {
-                    DefinitionLocation::Server(s) => match s.target_entity.as_ref() {
+                    DefinitionLocation::Server(s) => match s.target_entity.item.as_ref() {
                         Ok(annotation) => annotation.inner(),
                         Err(_) => continue,
                     },

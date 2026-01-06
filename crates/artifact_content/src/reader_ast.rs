@@ -53,6 +53,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -105,6 +106,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                         db,
                         selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -176,6 +178,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                         NormalizationKey::InlineFragment(
                             server_object_selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .inner()
@@ -205,6 +208,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                         db,
                         server_object_selectable
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -270,7 +274,7 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
             if server_object_selectable.is_inline_fragment.0 {
                 let type_and_field = EntityNameAndSelectableName {
                     selectable_name: object_selection.name.item,
-                    parent_entity_name: server_object_selectable.parent_entity_name,
+                    parent_entity_name: server_object_selectable.parent_entity_name.item,
                 };
 
                 let reader_artifact_import_name =
@@ -842,6 +846,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             db,
                             selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .inner()
@@ -917,6 +922,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             db,
                             selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .inner()
@@ -1005,6 +1011,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             NormalizationKey::InlineFragment(
                                 server_object_selectable
                                     .target_entity
+                                    .item
                                     .as_ref()
                                     .expect("Expected target entity to be valid.")
                                     .inner()
@@ -1033,6 +1040,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             db,
                             server_object_selectable
                                 .target_entity
+                                .item
                                 .as_ref()
                                 .expect("Expected target entity to be valid.")
                                 .inner()

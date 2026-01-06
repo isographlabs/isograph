@@ -582,6 +582,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                         let server_object_entity = server_object_entity.lookup(db);
                         let target_object_entity_name = server_object_entity
                             .target_entity
+                            .item
                             .as_ref()
                             .expect("Expected target entity to be valid.")
                             .inner()
@@ -786,6 +787,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
 
             let concrete_object_entity_name = server_object_selectable
                 .target_entity
+                .item
                 .as_ref()
                 .expect("Expected target entity to be valid")
                 .inner()
@@ -808,7 +810,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                 .expect("Expected entity to be object");
 
             MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
-                parent_object_entity_name,
+                parent_object_entity_name: parent_object_entity_name.item,
                 name: object_selection.name.item,
                 selection_map: BTreeMap::new(),
                 arguments: transform_arguments_with_child_context(
@@ -1475,7 +1477,7 @@ fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: Compil
                 vacant_entry.insert(MergedServerSelection::ScalarField(
                     MergedScalarFieldSelection {
                         parent_object_entity_name: parent_object_entity.name.item,
-                        name: id_field.lookup(db).name,
+                        name: id_field.lookup(db).name.item,
                         arguments: vec![],
                     },
                 ));

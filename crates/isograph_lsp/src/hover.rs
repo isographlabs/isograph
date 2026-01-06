@@ -88,7 +88,7 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
                             (
-                                scalar.name,
+                                scalar.name.item,
                                 scalar.description,
                                 scalar.arguments.reference(),
                             )
@@ -125,7 +125,7 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Server(s) => {
                             let scalar = s.lookup(db);
                             (
-                                scalar.name,
+                                scalar.name.item,
                                 scalar.description,
                                 scalar.arguments.reference(),
                             )

@@ -111,7 +111,7 @@ fn validate_all_server_selectables_point_to_defined_types<
         let (target, arguments) = {
             let selectable = selectable.lookup(db);
             (
-                selectable.target_entity.clone_err()?.inner(),
+                selectable.target_entity.item.clone_err()?.inner(),
                 &selectable.arguments,
             )
         };
