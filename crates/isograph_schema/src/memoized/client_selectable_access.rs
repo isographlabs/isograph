@@ -395,6 +395,13 @@ pub fn selectable_is_not_defined_diagnostic(
     )
 }
 
+pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {
+    Diagnostic::new(
+        format!("`{entity_name}` is not defined."),
+        location.wrap_some(),
+    )
+}
+
 // TODO make this generic over value, too
 pub fn insert_selectable_or_multiple_definition_diagnostic<Value>(
     map: &mut BTreeMap<(EntityName, SelectableName), WithLocation<Value>>,
