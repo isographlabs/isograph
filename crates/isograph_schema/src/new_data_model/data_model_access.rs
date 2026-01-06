@@ -17,6 +17,7 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
     EntityName,
     WithNoLocation<BothFlattenedResults<NestedDataModelEntity<TCompilationProfile>>>,
 > {
+    #[expect(clippy::unnecessary_to_owned)]
     TCompilationProfile::parse_nested_data_model_schema(db)
         .item
         .to_owned()
