@@ -26,6 +26,8 @@ pub trait TargetPlatform:
         selectable_name: SelectableName,
     ) -> JavascriptName;
 
+    // TODO replace this with an entity with a JavascriptName, similar to how __typename
+    // fields work
     fn generate_link_type<TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(
         db: &IsographDatabase<TCompilationProfile>,
         server_object_entity_name: &EntityName,
