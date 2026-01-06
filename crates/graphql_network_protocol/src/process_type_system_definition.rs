@@ -457,8 +457,7 @@ pub(crate) fn get_typename_selectable(
             .with_no_location()
             .wrap_some(),
         name: *TYPENAME_FIELD_NAME,
-        // Should this be the typename entity?
-        target_entity: TypeAnnotationDeclaration::Scalar(target_entity_name.into()),
+        target_entity: TypeAnnotationDeclaration::Scalar(target_entity_name.into()).wrap_ok(),
         is_inline_fragment: false.into(),
         parent_entity_name: server_object_entity_name,
         arguments: vec![],

@@ -71,11 +71,19 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -116,7 +124,11 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                         "  ".repeat(indentation_level as usize),
                         name_or_alias,
                         print_javascript_type_declaration(
-                            server_scalar_selectable.target_entity.reference(),
+                            server_scalar_selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .reference(),
                             inner_text
                         )
                     ));
@@ -137,11 +149,19 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -176,7 +196,12 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let name_or_alias = (*object_selection).name_or_alias().item;
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
+                DefinitionLocation::Server(s) => s
+                    .lookup(db)
+                    .target_entity
+                    .as_ref()
+                    .expect("Expected target entity to be valid.")
+                    .inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;
@@ -185,9 +210,12 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Client(client_pointer) => {
                     client_pointer.lookup(db).target_entity_name.reference()
                 }
-                DefinitionLocation::Server(server_field) => {
-                    server_field.lookup(db).target_entity.reference()
-                }
+                DefinitionLocation::Server(server_field) => server_field
+                    .lookup(db)
+                    .target_entity
+                    .as_ref()
+                    .expect("Expected target entity to be valid.")
+                    .reference(),
             };
 
             query_type_declaration.push_str(&format!(
@@ -294,11 +322,19 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -342,14 +378,26 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                         query_type_declaration.push_str(&format!(
                             "{}: {},\n",
                             name_or_alias,
-                            print_javascript_type_declaration(output_type.reference(), inner_text)
+                            print_javascript_type_declaration(
+                                output_type
+                                    .as_ref()
+                                    .expect("Expected target entity to be valid.")
+                                    .reference(),
+                                inner_text
+                            )
                         ));
                     } else {
                         query_type_declaration.push_str(&format!(
                             "{}readonly {}: {},\n",
                             "  ".repeat(indentation_level as usize),
                             name_or_alias,
-                            print_javascript_type_declaration(output_type.reference(), inner_text)
+                            print_javascript_type_declaration(
+                                output_type
+                                    .as_ref()
+                                    .expect("Expected target entity to be valid.")
+                                    .reference(),
+                                inner_text
+                            )
                         ));
                     }
                 }
@@ -371,11 +419,19 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -413,13 +469,21 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                 DefinitionLocation::Client(client_pointer) => {
                     client_pointer.lookup(db).target_entity_name.reference()
                 }
-                DefinitionLocation::Server(server_field) => {
-                    server_field.lookup(db).target_entity.reference()
-                }
+                DefinitionLocation::Server(server_field) => server_field
+                    .lookup(db)
+                    .target_entity
+                    .as_ref()
+                    .expect("Expected target entity to be valid.")
+                    .reference(),
             };
 
             let new_parent_object_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
+                DefinitionLocation::Server(s) => s
+                    .lookup(db)
+                    .target_entity
+                    .as_ref()
+                    .expect("Expected target entity to be valid.")
+                    .inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
             .0;
@@ -444,9 +508,12 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             DefinitionLocation::Client(client_pointer) => {
                                 client_pointer.lookup(db).target_entity_name.reference()
                             }
-                            DefinitionLocation::Server(server_field) => {
-                                server_field.lookup(db).target_entity.reference()
-                            }
+                            DefinitionLocation::Server(server_field) => server_field
+                                .lookup(db)
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .reference(),
                         },
                         type_annotation,
                         inner_text,

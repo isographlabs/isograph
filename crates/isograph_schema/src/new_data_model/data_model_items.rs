@@ -63,6 +63,9 @@ pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: 
     pub description: Option<WithGenericLocation<Description, TStage::Location>>,
 
     pub arguments: Vec<VariableDeclaration>,
+    // Note: we never actually produce any error results here! Note that that's fine.
+    // This still forces us to learn how to handle results :) and we will have errors here
+    // at some point! (e.g. if the field is something like `fieldName: @asdf`)
     pub target_entity: WithGenericLocation<Result<TypeAnnotationDeclaration, TStage::Error>, TStage::Location>,
     pub network_protocol_associated_data:
         <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,

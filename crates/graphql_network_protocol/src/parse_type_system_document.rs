@@ -22,7 +22,7 @@ use isograph_schema::{
     imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
-use prelude::Postfix;
+use prelude::{ErrClone, Postfix};
 
 use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
@@ -160,7 +160,8 @@ pub(crate) fn parse_type_system_document(
                         .type_
                         .item
                         .clone()
-                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
+                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
+                        .wrap_ok(),
 
                     is_inline_fragment: false.into(),
                     parent_entity_name,
@@ -231,7 +232,8 @@ pub(crate) fn parse_type_system_document(
                         .type_
                         .item
                         .clone()
-                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation),
+                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
+                        .wrap_ok(),
 
                     network_protocol_associated_data: (),
                     is_inline_fragment: false.into(),
@@ -318,7 +320,8 @@ pub(crate) fn parse_type_system_document(
                             },
                             nullable: true,
                         },
-                    ),
+                    )
+                    .wrap_ok(),
                     is_inline_fragment: true.into(),
                     parent_entity_name: abstract_parent_entity_name.unchecked_conversion(),
                     arguments: vec![],
@@ -375,7 +378,13 @@ pub(crate) fn parse_type_system_document(
                 }
             };
 
-            let payload_object_entity_name = mutation_field.target_entity.inner().0;
+            let payload_object_entity_name = match mutation_field.target_entity.clone_err() {
+                Ok(annotation) => annotation.inner().0,
+                Err(e) => {
+                    non_fatal_diagnostics.push(e);
+                    continue 'exposeField;
+                }
+            };
 
             let client_field_scalar_selection_name = expose_field_directive
                 .expose_as
@@ -436,7 +445,12 @@ pub(crate) fn parse_type_system_document(
                 .map(|server_object_selectable| {
                     if server_object_selectable.is_inline_fragment.0 {
                         WrappedSelectionMapSelection::InlineFragment(
-                            server_object_selectable.target_entity.inner().0,
+                            server_object_selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid")
+                                .inner()
+                                .0,
                         )
                     } else {
                         WrappedSelectionMapSelection::LinkedField {
@@ -675,7 +689,7 @@ fn traverse_selections_and_return_path<'a>(
             })?
             .lookup(db);
 
-        let next_entity_name = selectable.target_entity.inner();
+        let next_entity_name = selectable.target_entity.clone_err()?.inner();
 
         current_entity = outcome
             .entities

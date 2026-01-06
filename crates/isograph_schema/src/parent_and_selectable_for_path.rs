@@ -41,7 +41,7 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
     let selectable = match selectable {
         DefinitionLocation::Server(server) => {
             let selectable = server.lookup(db);
-            let target_entity_name = selectable.target_entity.inner().0;
+            let target_entity_name = selectable.target_entity.clone_err()?.inner().0;
             let entity = server_entity_named(db, target_entity_name)
                 .clone_err()?
                 .ok_or_else(|| {
@@ -103,7 +103,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
     let selectable = match selectable {
         DefinitionLocation::Server(s) => {
             let selectable = s.lookup(db);
-            let target_entity_name = selectable.target_entity.inner().0;
+            let target_entity_name = selectable.target_entity.clone_err()?.inner().0;
             let entity = server_entity_named(db, target_entity_name)
                 .clone_err()?
                 .ok_or_else(|| {
@@ -158,7 +158,7 @@ pub fn get_parent_for_selection_set_path<'a, TCompilationProfile: CompilationPro
             // _parent is Query, selectable is pet. So, we need to get the target of the selectable.
 
             match selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity.clone_err()?.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             }
         }
@@ -199,7 +199,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
                 get_parent_and_selectable_for_object_path(db, object_selection_path)?;
 
             let object_parent_entity_name = match object_selectable {
-                DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
+                DefinitionLocation::Server(s) => s.lookup(db).target_entity.clone_err()?.inner(),
                 DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
             };
 

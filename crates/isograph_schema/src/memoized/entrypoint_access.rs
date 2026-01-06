@@ -65,12 +65,17 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                     let actual_type = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let entity =
-                                server_entity_named(db, selectable.target_entity.inner().0)
-                                    .as_ref()
-                                    .expect("Expected parsing to have succeeded")
-                                    .expect("Expected target entity to be defined")
-                                    .lookup(db);
+                            let entity = server_entity_named(
+                                db,
+                                match selectable.target_entity.clone_err() {
+                                    Ok(annotation) => annotation.inner().0,
+                                    Err(e) => return e,
+                                },
+                            )
+                            .as_ref()
+                            .expect("Expected parsing to have succeeded")
+                            .expect("Expected target entity to be defined")
+                            .lookup(db);
 
                             // TODO is this already validated?
                             match entity.selection_info {

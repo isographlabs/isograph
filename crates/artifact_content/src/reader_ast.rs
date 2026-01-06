@@ -49,11 +49,19 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -93,11 +101,19 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
-                        .expect("Expected target entity to be defined")
-                        .lookup(db);
+                    let entity = server_entity_named(
+                        db,
+                        selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
+                    )
+                    .as_ref()
+                    .expect("Expected parsing to have succeeded")
+                    .expect("Expected target entity to be defined")
+                    .lookup(db);
 
                     // TODO is this already validated?
                     entity
@@ -158,7 +174,12 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                 DefinitionLocation::Server(server_object_selectable) => {
                     let normalization_key = if server_object_selectable.is_inline_fragment.0 {
                         NormalizationKey::InlineFragment(
-                            server_object_selectable.target_entity.inner().0,
+                            server_object_selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .inner()
+                                .0,
                         )
                     } else {
                         NameAndArguments {
@@ -182,7 +203,12 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        server_object_selectable.target_entity.inner().0,
+                        server_object_selectable
+                            .target_entity
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .inner()
+                            .0,
                         &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -812,11 +838,19 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                            .as_ref()
-                            .expect("Expected parsing to have succeeded")
-                            .expect("Expected target entity to be defined")
-                            .lookup(db);
+                        let entity = server_entity_named(
+                            db,
+                            selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .inner()
+                                .0,
+                        )
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
 
                         // TODO is this already validated?
                         entity
@@ -879,11 +913,19 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                 let object_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let entity = server_entity_named(db, selectable.target_entity.inner().0)
-                            .as_ref()
-                            .expect("Expected parsing to have succeeded")
-                            .expect("Expected target entity to be defined")
-                            .lookup(db);
+                        let entity = server_entity_named(
+                            db,
+                            selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .inner()
+                                .0,
+                        )
+                        .as_ref()
+                        .expect("Expected parsing to have succeeded")
+                        .expect("Expected target entity to be defined")
+                        .lookup(db);
 
                         // TODO is this already validated?
                         entity
@@ -961,7 +1003,12 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                     DefinitionLocation::Server(server_object_selectable) => {
                         let normalization_key = if server_object_selectable.is_inline_fragment.0 {
                             NormalizationKey::InlineFragment(
-                                server_object_selectable.target_entity.inner().0,
+                                server_object_selectable
+                                    .target_entity
+                                    .as_ref()
+                                    .expect("Expected target entity to be valid.")
+                                    .inner()
+                                    .0,
                             )
                         } else {
                             NameAndArguments {
@@ -984,7 +1031,12 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
 
                         let new_paths = refetched_paths_with_path(
                             db,
-                            server_object_selectable.target_entity.inner().0,
+                            server_object_selectable
+                                .target_entity
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .inner()
+                                .0,
                             &object_selection.selection_set,
                             path,
                             initial_variable_context,

@@ -123,7 +123,13 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = selectable.target_entity.inner().0;
+                        let target_entity_name = match selectable.target_entity.clone_err() {
+                            Ok(annotation) => annotation.inner().0,
+                            Err(e) => {
+                                errors.push(e);
+                                continue;
+                            }
+                        };
                         let entity = match server_entity_named(db, target_entity_name).clone_err() {
                             Ok(o) => match o {
                                 Some(entity) => entity.lookup(db),
@@ -274,7 +280,13 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 let selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let target_entity_name = selectable.target_entity.inner().0;
+                        let target_entity_name = match selectable.target_entity.clone_err() {
+                            Ok(annotation) => annotation.inner().0,
+                            Err(e) => {
+                                errors.push(e);
+                                continue;
+                            }
+                        };
                         let entity = match server_entity_named(db, target_entity_name).clone_err() {
                             Ok(o) => match o {
                                 Some(entity) => entity.lookup(db),
@@ -324,7 +336,13 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 // @updatable is not supported on client fields
                 let target_entity_name = match selectable {
-                    DefinitionLocation::Server(s) => s.lookup(db).target_entity.inner(),
+                    DefinitionLocation::Server(s) => match s.lookup(db).target_entity.clone_err() {
+                        Ok(annotation) => annotation.inner(),
+                        Err(e) => {
+                            errors.push(e);
+                            continue;
+                        }
+                    },
                     DefinitionLocation::Client(c) => {
                         match object_selection.object_selection_directive_set {
                             ObjectSelectionDirectiveSet::Updatable(_) => {

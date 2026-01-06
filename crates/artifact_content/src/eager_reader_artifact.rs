@@ -224,19 +224,27 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
             )
             .lookup(db);
 
-    let concrete_type = &server_entity_named(db, server_object_selectable.target_entity.inner().0)
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
+    let concrete_type = &server_entity_named(
+        db,
+        server_object_selectable
+            .target_entity
+            .as_ref()
+            .expect("Expected target entity to be valid.")
+            .inner()
+            .0,
+    )
+    .as_ref()
+    .expect(
+        "Expected validation to have worked. \
                 This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
+    )
+    .as_ref()
+    .expect(
+        "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-        )
-        .lookup(db)
-        .name;
+    )
+    .lookup(db)
+    .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,

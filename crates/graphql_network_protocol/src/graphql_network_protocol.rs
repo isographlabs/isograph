@@ -159,22 +159,30 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .expect("Expected selectable to be server selectable")
                 .lookup(db);
 
-        server_entity_named(db, server_scalar_selectable.target_entity.inner().0)
-            .as_ref()
-            .expect(
-                "Expected parsing to not have failed. \
+        server_entity_named(
+            db,
+            server_scalar_selectable
+                .target_entity
+                .as_ref()
+                .expect("Expected target entity to be valid.")
+                .inner()
+                .0,
+        )
+        .as_ref()
+        .expect(
+            "Expected parsing to not have failed. \
                 This is indicative of a bug in Isograph.",
-            )
-            .expect(
-                "Expected entity to exist. \
+        )
+        .expect(
+            "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .lookup(db)
-            .target_platform_associated_data
-            .as_ref()
-            .as_scalar()
-            .expect("Expected scalar entity to be scalar")
-            .dereference()
+        )
+        .lookup(db)
+        .target_platform_associated_data
+        .as_ref()
+        .as_scalar()
+        .expect("Expected scalar entity to be scalar")
+        .dereference()
     }
 
     fn generate_link_type<'a, TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(
@@ -295,7 +303,13 @@ fn format_field_definition<TCompilationProfile: CompilationProfile>(
     indentation_level: u8,
 ) -> String {
     let server_selectable = server_selectable.lookup(db);
-    let is_optional = is_nullable(server_selectable.target_entity.reference());
+    let is_optional = is_nullable(
+        server_selectable
+            .target_entity
+            .as_ref()
+            .expect("Expected target entity to be valid.")
+            .reference(),
+    );
     let target_type_annotation = server_selectable.target_entity.clone();
 
     format!(
@@ -305,7 +319,10 @@ fn format_field_definition<TCompilationProfile: CompilationProfile>(
         if is_optional { "?" } else { "" },
         format_type_annotation(
             db,
-            target_type_annotation.reference(),
+            target_type_annotation
+                .as_ref()
+                .expect("Expected target entity to be valid.")
+                .reference(),
             indentation_level + 1
         ),
     )

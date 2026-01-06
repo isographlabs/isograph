@@ -72,12 +72,23 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_scalar_selectable.target_entity.is_nullable() {
+                    if server_scalar_selectable
+                        .target_entity
+                        .as_ref()
+                        .expect("Expected target entity to be valid.")
+                        .is_nullable()
+                    {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(raw_type.reference(), inner_text)
+                    print_javascript_type_declaration(
+                        raw_type
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .reference(),
+                        inner_text
+                    )
                 ));
             }
             MergedServerSelection::LinkedField(linked_field) => {
@@ -120,12 +131,23 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
 
                 raw_response_type_inner.push_str(&format!(
                     "{indent}{name}{}: {},\n",
-                    if server_object_selectable.target_entity.is_nullable() {
+                    if server_object_selectable
+                        .target_entity
+                        .as_ref()
+                        .expect("Expected target entity to be valid.")
+                        .is_nullable()
+                    {
                         "?"
                     } else {
                         ""
                     },
-                    print_javascript_type_declaration(raw_type.reference(), inner_text)
+                    print_javascript_type_declaration(
+                        raw_type
+                            .as_ref()
+                            .expect("Expected target entity to be valid.")
+                            .reference(),
+                        inner_text
+                    )
                 ));
             }
             MergedServerSelection::ClientObjectSelectable(_) => {}
