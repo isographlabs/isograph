@@ -202,7 +202,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
             .0
         {
             let name = server_object_entity.name;
-            return format!("Link<\"{name}\">");
+            return format!("\n  | Link<\"{name}\">");
         }
 
         let subtypes = server_object_entity
@@ -211,6 +211,13 @@ impl TargetPlatform for JavascriptTargetPlatform {
             .as_object()
             .expect("Expected server object entity to have object associated data")
             .subtypes
+            .reference();
+
+        if subtypes.is_empty() {
+            return (*NEVER_JAVASCRIPT_TYPE).to_string();
+        }
+
+        let subtypes = subtypes
             .iter()
             .map(|name| format!("\n  | Link<\"{name}\">"))
             .collect::<Vec<_>>();
