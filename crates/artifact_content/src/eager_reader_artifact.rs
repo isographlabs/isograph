@@ -8,8 +8,8 @@ use isograph_lang_types::{
     VariableDeclaration,
 };
 use isograph_schema::{
-    ClientScalarSelectable, ClientSelectable, CompilationProfile, IsographDatabase,
-    LINK_FIELD_NAME, MemoRefClientSelectable, ServerSelectable,
+    ClientScalarSelectable, ClientSelectable, CompilationProfile, FlattenedDataModelSelectable,
+    IsographDatabase, LINK_FIELD_NAME, MemoRefClientSelectable,
     client_scalar_selectable_selection_set_for_parent_query, flattened_entity_named,
     initial_variable_context, selectable_reader_selection_set,
 };
@@ -198,7 +198,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
 
 pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-    server_object_selectable: &ServerSelectable<TCompilationProfile>,
+    server_object_selectable: &FlattenedDataModelSelectable<TCompilationProfile>,
     inline_fragment_reader_selections: &WithEmbeddedLocation<SelectionSet>,
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,

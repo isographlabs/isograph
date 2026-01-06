@@ -17,9 +17,9 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
-    ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete,
-    IsographDatabase, NODE_FIELD_NAME, RefetchStrategy, ServerEntity, ServerObjectSelectionInfo,
-    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME,
+    ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase, NODE_FIELD_NAME, RefetchStrategy,
+    ServerEntity, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
@@ -448,8 +448,8 @@ pub(crate) fn get_typename_selectable(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     server_object_entity_name: EntityName,
     target_entity_name: EntityName,
-) -> MemoRef<ServerSelectable<GraphQLAndJavascriptProfile>> {
-    ServerSelectable {
+) -> MemoRef<FlattenedDataModelSelectable<GraphQLAndJavascriptProfile>> {
+    FlattenedDataModelSelectable {
         description: format!("A discriminant for the {} type", server_object_entity_name)
             .intern()
             .to::<DescriptionValue>()

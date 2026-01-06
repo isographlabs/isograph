@@ -2,10 +2,10 @@ use common_lang_types::WithLocationPostfix;
 use graphql_lang_types::{GraphQLConstantValue, GraphQLNamedTypeAnnotation, NameValuePair};
 use isograph_lang_types::ConstantValue;
 
-use crate::ServerSelectable;
+use crate::FlattenedDataModelSelectable;
 
 pub type ScalarSelectionAndNonNullType<TCompilationProfile> = (
-    ServerSelectable<TCompilationProfile>,
+    FlattenedDataModelSelectable<TCompilationProfile>,
     Option<GraphQLNamedTypeAnnotation>,
 );
 

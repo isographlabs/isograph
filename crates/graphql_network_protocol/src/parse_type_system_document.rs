@@ -15,10 +15,10 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable,
-    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME,
-    ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase, RefetchStrategy,
-    RootOperationName, STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives,
-    ServerObjectSelectionInfo, ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, FlattenedDataModelSelectable,
+    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
+    RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives,
+    ServerObjectSelectionInfo, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
@@ -147,7 +147,7 @@ pub(crate) fn parse_type_system_document(
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
                 (parent_entity_name, field.item.name.item),
-                ServerSelectable {
+                FlattenedDataModelSelectable {
                     description: field
                         .item
                         .description
@@ -204,7 +204,7 @@ pub(crate) fn parse_type_system_document(
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
                 (parent_entity_name, field.item.name.item),
-                ServerSelectable {
+                FlattenedDataModelSelectable {
                     description: field
                         .item
                         .description
@@ -306,7 +306,7 @@ pub(crate) fn parse_type_system_document(
                     abstract_parent_entity_name.unchecked_conversion(),
                     format!("as{concrete_child_entity_name}").intern().into(),
                 ),
-                ServerSelectable {
+                FlattenedDataModelSelectable {
                     description: format!(
                         "A client pointer for the {} type.",
                         concrete_child_entity_name
@@ -658,7 +658,7 @@ fn traverse_selections_and_return_path<'a>(
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
-    Vec<&'a ServerSelectable<GraphQLAndJavascriptProfile>>,
+    Vec<&'a FlattenedDataModelSelectable<GraphQLAndJavascriptProfile>>,
     &'a ServerEntity<GraphQLAndJavascriptProfile>,
 )> {
     let mut current_entity = outcome

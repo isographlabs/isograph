@@ -8,14 +8,14 @@ use pico::MemoRef;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    ClientScalarSelectable, CompilationProfile, IsographDatabase, MemoRefObjectSelectable,
-    MemoRefSelectable, ServerEntity, ServerSelectable, entity_not_defined_diagnostic,
+    ClientScalarSelectable, CompilationProfile, FlattenedDataModelSelectable, IsographDatabase,
+    MemoRefObjectSelectable, MemoRefSelectable, ServerEntity, entity_not_defined_diagnostic,
     flattened_entity_named, selectable_is_not_defined_diagnostic,
     selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 type ScalarSelectable<TCompilationProfile> = DefinitionLocation<
-    MemoRef<ServerSelectable<TCompilationProfile>>,
+    MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>,
     MemoRef<ClientScalarSelectable<TCompilationProfile>>,
 >;
 

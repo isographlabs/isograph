@@ -8,8 +8,8 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, NameAndArguments,
-    ServerSelectable,
+    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile,
+    FlattenedDataModelSelectable, NameAndArguments,
 };
 
 #[derive(Debug)]
@@ -123,7 +123,7 @@ pub fn initial_variable_context<TCompilationProfile: CompilationProfile>(
     VariableContext(variable_context)
 }
 
-impl<TCompilationProfile: CompilationProfile> ServerSelectable<TCompilationProfile> {
+impl<TCompilationProfile: CompilationProfile> FlattenedDataModelSelectable<TCompilationProfile> {
     pub fn initial_variable_context(&self) -> VariableContext {
         let variable_context = self
             .arguments

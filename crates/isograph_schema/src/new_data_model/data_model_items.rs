@@ -6,10 +6,11 @@ use common_lang_types::{
 use isograph_lang_types::{
     Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
+use pico::MemoRef;
 
 use crate::{
-    CompilationProfile, DataModelStage, FlattenedStage, IsInlineFragment, NestedStage,
-    NetworkProtocol, ServerObjectSelectionInfo, TargetPlatform, ValidatedStage,
+    CompilationProfile, DataModelStage, FlattenedStage, NestedStage, NetworkProtocol,
+    ServerObjectSelectionInfo, TargetPlatform, ValidatedStage,
 };
 
 // TODO use a type parameter here to ensure that there are no non-fatal diagnostics,
@@ -83,3 +84,15 @@ pub type FlattenedDataModelSelectable<TCompilationProfile> =
     DataModelSelectable<TCompilationProfile, FlattenedStage>;
 pub type ValidatedDataModelSelectable<TCompilationProfile> =
     DataModelSelectable<TCompilationProfile, ValidatedStage>;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Copy, PartialOrd, Ord)]
+pub struct IsInlineFragment(pub bool);
+
+impl From<bool> for IsInlineFragment {
+    fn from(value: bool) -> Self {
+        IsInlineFragment(value)
+    }
+}
+
+pub type MemoRefServerSelectable<TCompilationProfile> =
+    MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>;

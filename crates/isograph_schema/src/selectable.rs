@@ -2,7 +2,8 @@ use isograph_lang_types::DefinitionLocation;
 use pico::MemoRef;
 
 use crate::{
-    ClientObjectSelectable, MemoRefClientSelectable, MemoRefServerSelectable, ServerSelectable,
+    ClientObjectSelectable, FlattenedDataModelSelectable, MemoRefClientSelectable,
+    MemoRefServerSelectable,
 };
 
 pub type MemoRefSelectable<TCompilationProfile> = DefinitionLocation<
@@ -11,11 +12,11 @@ pub type MemoRefSelectable<TCompilationProfile> = DefinitionLocation<
 >;
 
 pub type BorrowedObjectSelectable<'a, TCompilationProfile> = DefinitionLocation<
-    &'a ServerSelectable<TCompilationProfile>,
+    &'a FlattenedDataModelSelectable<TCompilationProfile>,
     &'a ClientObjectSelectable<TCompilationProfile>,
 >;
 
 pub type MemoRefObjectSelectable<TCompilationProfile> = DefinitionLocation<
-    MemoRef<ServerSelectable<TCompilationProfile>>,
+    MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>,
     MemoRef<ClientObjectSelectable<TCompilationProfile>>,
 >;
