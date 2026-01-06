@@ -101,6 +101,7 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
                         This error can be suppressed using the \
                         \"on_invalid_id_type\" config parameter."
                     ),
+                    // TODO use the id field name location
                     entity_definition_location(db, parent_server_object_entity_name)
                         .flatten()
                         .map(|x| x.to::<Location>()),
