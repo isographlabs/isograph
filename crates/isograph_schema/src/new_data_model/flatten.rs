@@ -1,5 +1,3 @@
-use std::collections::BTreeMap;
-
 use common_lang_types::SelectableName;
 
 use crate::{
@@ -24,7 +22,7 @@ impl<TCompilationProfile: CompilationProfile> NestedDataModelEntity<TCompilation
             .item
             .into_iter()
             .map(|(key, value)| (key, value.flatten()))
-            .collect::<BTreeMap<_, _>>();
+            .collect();
 
         (
             DataModelEntity {
