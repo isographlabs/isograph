@@ -137,13 +137,13 @@ fn insert_parsed_items_into_schema(
         .collect::<Vec<_>>();
 
     let mut supertype_to_subtype_map = BTreeMap::new();
-    let mut entities_to_process = vec![];
+    let mut interfaces_to_process = vec![];
 
     process_graphql_documents(
         schema,
         documents,
         &mut supertype_to_subtype_map,
-        &mut entities_to_process,
+        &mut interfaces_to_process,
     );
 }
 
