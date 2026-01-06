@@ -42,6 +42,7 @@ pub struct NestedStage {}
 impl DataModelStage for NestedStage {
     type Resolution<T, E: CreateError> = WithGenericLocation<Result<T, Diagnostic>, Self::Location>;
     type Location = Option<EmbeddedLocation>;
+    // TODO WithGenericLocation<NestedDataModelSelectables>
     type Selectables<TCompilationProfile: CompilationProfile> =
         MapWithNonfatalDiagnostics<SelectableName, NestedDataModelSelectable<TCompilationProfile>>;
 }

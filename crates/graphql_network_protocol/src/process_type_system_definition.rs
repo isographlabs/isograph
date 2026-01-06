@@ -526,7 +526,7 @@ pub fn multiple_entity_definitions_found_diagnostic(
     location: Option<Location>,
 ) -> Diagnostic {
     Diagnostic::new(
-        format!("Multiple definitions of {server_object_entity_name} were found."),
+        format!("Multiple definitions of `{server_object_entity_name}` were found."),
         location,
     )
 }

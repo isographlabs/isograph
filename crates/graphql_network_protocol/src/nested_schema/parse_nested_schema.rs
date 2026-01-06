@@ -17,7 +17,7 @@ use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, FLOAT_ENTITY_NAME, ID_ENTITY_NAME,
     INT_ENTITY_NAME, IsConcrete, IsographDatabase, NestedDataModelEntity, NestedDataModelSchema,
     NestedDataModelSelectable, STRING_ENTITY_NAME, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
-    to_isograph_constant_value,
+    multiple_selectable_definitions_found_diagnostic, to_isograph_constant_value,
 };
 use prelude::Postfix;
 
@@ -483,6 +483,7 @@ fn process_graphql_documents(
     }
 }
 
+// TODO these should be one method
 fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
     schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
     item: NestedDataModelEntity<GraphQLAndJavascriptProfile>,
@@ -504,6 +505,31 @@ fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
     }
 }
 
+fn insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
+    selectable: &mut WithNonFatalDiagnostics<
+        BTreeMap<SelectableName, NestedDataModelSelectable<GraphQLAndJavascriptProfile>>,
+    >,
+    item: NestedDataModelSelectable<GraphQLAndJavascriptProfile>,
+) {
+    let key = item.name.item;
+    match selectable.item.entry(key) {
+        Entry::Vacant(vacant_entry) => {
+            // TODO parse graphql schema should wrap the items with locations
+            vacant_entry.insert(item);
+        }
+        Entry::Occupied(_) => {
+            selectable.non_fatal_diagnostics.push(
+                multiple_selectable_definitions_found_diagnostic(
+                    item.parent_entity_name.item,
+                    key,
+                    // TODO proper location
+                    None,
+                ),
+            );
+        }
+    }
+}
+
 fn process_fields(
     parent_entity_name: EntityName,
     // TODO accept iterator and don't materialize when processing input items
@@ -518,8 +544,8 @@ fn process_fields(
 
     for field in fields {
         let field = field.item;
-        selectables.item.insert(
-            field.name.item,
+        insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
+            &mut selectables,
             DataModelSelectable {
                 name: field.name.map_location(Some),
                 parent_entity_name: parent_entity_name.with_missing_location(),
