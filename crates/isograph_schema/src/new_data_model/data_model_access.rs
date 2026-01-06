@@ -31,8 +31,7 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
 pub fn flattened_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> BTreeMap<EntityName, MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
-    let schema = flattened_schema(db);
-    schema
+    flattened_schema(db)
         .iter()
         .map(|(key, value)| (*key, value.item.0.interned_ref(db)))
         .collect()
@@ -75,6 +74,23 @@ pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
         .item
         .get(entity_name.reference())
         .map(|x| x.location)
+}
+
+#[memo]
+pub fn flattened_selectables_for_entity<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+    entity_name: EntityName,
+) -> Option<BTreeMap<SelectableName, MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>>> {
+    let entity = flattened_schema(db).get(entity_name.reference())?;
+
+    entity
+        .item
+        .1
+        .item
+        .iter()
+        .map(|(key, value)| (key.dereference(), value.0.interned_ref(db)))
+        .collect::<BTreeMap<_, _>>()
+        .wrap_some()
 }
 
 #[memo]
