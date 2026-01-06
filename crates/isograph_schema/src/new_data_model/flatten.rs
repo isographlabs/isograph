@@ -6,17 +6,28 @@ use crate::{
     NestedDataModelSelectable,
 };
 
-impl<TCompilationProfile: CompilationProfile> NestedDataModelEntity<TCompilationProfile> {
-    pub fn flatten(
-        self,
-    ) -> (
-        FlattenedDataModelEntity<TCompilationProfile>,
-        // TODO use traits and associated types...
-        MapWithNonfatalDiagnostics<
-            SelectableName,
-            (FlattenedDataModelSelectable<TCompilationProfile>, ()),
-        >,
-    ) {
+pub type BothFlattenedResults<TFlatten> = (
+    <TFlatten as Flatten>::Output,
+    <TFlatten as Flatten>::NestedOutput,
+);
+
+#[expect(unused)]
+pub trait Flatten {
+    type Output;
+    type NestedOutput;
+
+    fn flatten(self) -> BothFlattenedResults<Self>;
+}
+
+impl<TCompilationProfile: CompilationProfile> Flatten
+    for NestedDataModelEntity<TCompilationProfile>
+{
+    type Output = FlattenedDataModelEntity<TCompilationProfile>;
+    type NestedOutput = MapWithNonfatalDiagnostics<
+        SelectableName,
+        BothFlattenedResults<NestedDataModelSelectable<TCompilationProfile>>,
+    >;
+    fn flatten(self) -> (Self::Output, Self::NestedOutput) {
         let selectables = self
             .selectables
             .item
@@ -38,8 +49,13 @@ impl<TCompilationProfile: CompilationProfile> NestedDataModelEntity<TCompilation
     }
 }
 
-impl<TCompilationProfile: CompilationProfile> NestedDataModelSelectable<TCompilationProfile> {
-    pub fn flatten(self) -> (FlattenedDataModelSelectable<TCompilationProfile>, ()) {
+impl<TCompilationProfile: CompilationProfile> Flatten
+    for NestedDataModelSelectable<TCompilationProfile>
+{
+    type Output = FlattenedDataModelSelectable<TCompilationProfile>;
+    type NestedOutput = ();
+
+    fn flatten(self) -> BothFlattenedResults<Self> {
         (
             DataModelSelectable {
                 name: self.name.drop_location(),
