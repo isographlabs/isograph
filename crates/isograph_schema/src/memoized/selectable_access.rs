@@ -5,8 +5,8 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_declaration,
-    client_selectable_map, client_selectable_named, deprecated_server_selectables_map,
-    deprecated_server_selectables_map_for_entity, multiple_selectable_definitions_found_diagnostic,
+    client_selectable_map, client_selectable_named, deprecated_server_selectables_map_for_entity,
+    flattened_selectables, multiple_selectable_definitions_found_diagnostic,
     server_selectable_named,
 };
 
@@ -125,9 +125,9 @@ pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
 pub fn selectables<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRefSelectable<TCompilationProfile>>> {
-    let mut selectables = deprecated_server_selectables_map(db)
-        .values()
-        .map(|value| value.dereference().server_defined())
+    let mut selectables = flattened_selectables(db)
+        .iter()
+        .map(|(_, _, value)| value.dereference().server_defined())
         .collect::<Vec<_>>();
 
     selectables.extend(

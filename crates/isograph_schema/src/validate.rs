@@ -8,8 +8,8 @@ use prelude::{ErrClone, Postfix};
 use crate::{
     ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map,
-    deprecated_server_selectables_map, entity_not_defined_diagnostic, flattened_entities,
-    flattened_entity_named, flattened_server_object_entities, parse_iso_literals,
+    entity_not_defined_diagnostic, flattened_entities, flattened_entity_named,
+    flattened_selectables, flattened_server_object_entities, parse_iso_literals,
     process_iso_literals, selectables, server_id_selectable,
     validate_selection_sets::validate_selection_sets, validate_use_of_arguments,
     validated_entrypoints,
@@ -99,13 +99,13 @@ fn validate_all_server_selectables_point_to_defined_types<
 >(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticVecResult<()> {
-    let server_selectables = deprecated_server_selectables_map(db);
+    let server_selectables = flattened_selectables(db);
     let entities = flattened_entities(db).to_owned();
 
     let mut errors = vec![];
 
     // TODO use iterator methods
-    for ((parent_object_entity_name, selectable_name), selectable) in server_selectables.iter() {
+    for (parent_object_entity_name, selectable_name, selectable) in server_selectables.iter() {
         let (target, arguments) = {
             let selectable = selectable.lookup(db);
             (

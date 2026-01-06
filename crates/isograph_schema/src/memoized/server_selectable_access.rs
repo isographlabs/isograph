@@ -11,30 +11,19 @@ use crate::{
 };
 
 #[memo]
-/// This just drops the location (but not internal locations...) and filters out client fields
-pub fn deprecated_server_selectables_map<TCompilationProfile: CompilationProfile>(
-    db: &IsographDatabase<TCompilationProfile>,
-) -> BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>> {
-    flattened_selectables(db)
-        .iter()
-        .copied()
-        .map(|(entity_name, selectable_name, selectable)| {
-            ((entity_name, selectable_name), selectable)
-        })
-        .collect()
-}
-
-#[memo]
 pub fn deprecated_server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
 ) -> BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>> {
-    let map = deprecated_server_selectables_map(db);
+    let map = flattened_selectables(db);
 
     map.iter()
-        .filter_map(|(key, value)| {
-            if key.0 == parent_server_object_entity_name {
-                Some((key.1.unchecked_conversion(), *value))
+        .filter_map(|(entity_name, selectable_name, memo_ref)| {
+            if entity_name.dereference() == parent_server_object_entity_name {
+                Some((
+                    selectable_name.unchecked_conversion(),
+                    memo_ref.dereference(),
+                ))
             } else {
                 None
             }
