@@ -13,7 +13,7 @@ export type Query__HomePage__raw_response_type = {
           name: string,
           nameWithOwner: string,
           owner: {
-            __typename: string,
+            __typename: "Organization" | "User",
             id: string,
             login: string,
           },

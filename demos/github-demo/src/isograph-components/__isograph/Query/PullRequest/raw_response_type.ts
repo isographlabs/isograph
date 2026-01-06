@@ -9,7 +9,7 @@ export type Query__PullRequest__raw_response_type = {
           node?: ({
             id: string,
             author?: ({
-              __typename: string,
+              __typename: "Bot" | "EnterpriseUserAccount" | "Mannequin" | "Organization" | "User",
               login: string,
             } | null),
             bodyText: string,

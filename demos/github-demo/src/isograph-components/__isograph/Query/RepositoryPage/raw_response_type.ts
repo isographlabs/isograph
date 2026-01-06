@@ -7,7 +7,7 @@ export type Query__RepositoryPage__raw_response_type = {
       name: string,
       nameWithOwner: string,
       owner: {
-        __typename: string,
+        __typename: "Organization" | "User",
         id: string,
         login: string,
       },
@@ -29,7 +29,7 @@ export type Query__RepositoryPage__raw_response_type = {
             id: string,
             name: string,
             owner: {
-              __typename: string,
+              __typename: "Organization" | "User",
               id: string,
               login: string,
             },
