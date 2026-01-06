@@ -10,7 +10,7 @@ use pico::MemoRef;
 
 use crate::{
     CompilationProfile, DataModelStage, FlattenedStage, NestedStage, NetworkProtocol,
-    ServerObjectSelectionInfo, TargetPlatform, ValidatedStage,
+    TargetPlatform, ValidatedStage,
 };
 
 // TODO use a type parameter here to ensure that there are no non-fatal diagnostics,
@@ -96,3 +96,14 @@ impl From<bool> for IsInlineFragment {
 
 pub type MemoRefServerSelectable<TCompilationProfile> =
     MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy, Ord, PartialOrd)]
+pub struct IsConcrete(pub bool);
+
+pub type MemoRefServerEntity<TCompilationProfile> =
+    MemoRef<FlattenedDataModelEntity<TCompilationProfile>>;
+
+#[derive(Debug, PartialEq, Eq, Clone, Hash, Copy, PartialOrd, Ord)]
+pub struct ServerObjectSelectionInfo {
+    pub is_concrete: IsConcrete,
+}
