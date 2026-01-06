@@ -4,6 +4,32 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      fieldName: "namable",
+      arguments: null,
+      concreteType: null,
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "__typename",
+          arguments: null,
+        },
+      ],
+    },
+    {
+      kind: "Linked",
+      fieldName: "notImplemented",
+      arguments: null,
+      concreteType: null,
+      selections: [
+        {
+          kind: "Scalar",
+          fieldName: "__typename",
+          arguments: null,
+        },
+      ],
+    },
+    {
+      kind: "Linked",
       fieldName: "pet",
       arguments: [
         [

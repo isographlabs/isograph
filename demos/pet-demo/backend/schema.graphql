@@ -23,6 +23,18 @@ type Query {
   Don't use this field. It's for testing.
   """
   topLevelField(input: TopLevelFieldInput): TopLevelField
+
+  namable: Namable
+  notImplemented: NotImplemented
+}
+
+interface Namable {
+  firstName: String
+  lastName: String
+}
+
+interface NotImplemented {
+  someField: String
 }
 
 input TopLevelFieldInput {
@@ -74,7 +86,7 @@ type SetPetTaglineResponse {
 """
 A pet is the joy in life
 """
-type Pet implements Node {
+type Pet implements Node & Namable {
   """
   The pet's ID
   """

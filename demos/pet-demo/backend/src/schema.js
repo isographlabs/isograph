@@ -181,7 +181,10 @@ export const schema = createSchema({
           id: 'Viewer',
         };
       },
+      // These fields are here just to demonstrate something about artifact/type gen
       topLevelField: () => null,
+      namable: () => null,
+      notImplemented: () => null,
     },
     Viewer: {
       newsfeed: (_obj, args) => {

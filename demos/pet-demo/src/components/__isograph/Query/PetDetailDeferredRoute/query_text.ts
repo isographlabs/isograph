@@ -1,4 +1,10 @@
 export default 'query PetDetailDeferredRoute($id: ID!) {\
+  namable {\
+    __typename,\
+  },\
+  notImplemented {\
+    __typename,\
+  },\
   pet____id___v_id: pet(id: $id) {\
     id,\
     firstName,\

@@ -59,6 +59,42 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
       },
     ],
   },
+  {
+    kind: "Linked",
+    fieldName: "namable",
+    alias: null,
+    arguments: null,
+    condition: null,
+    isUpdatable: false,
+    refetchQueryIndex: null,
+    selections: [
+      {
+        kind: "Scalar",
+        fieldName: "__typename",
+        alias: null,
+        arguments: null,
+        isUpdatable: false,
+      },
+    ],
+  },
+  {
+    kind: "Linked",
+    fieldName: "notImplemented",
+    alias: null,
+    arguments: null,
+    condition: null,
+    isUpdatable: false,
+    refetchQueryIndex: null,
+    selections: [
+      {
+        kind: "Scalar",
+        fieldName: "__typename",
+        alias: null,
+        arguments: null,
+        isUpdatable: false,
+      },
+    ],
+  },
 ];
 
 const artifact: ComponentReaderArtifact<

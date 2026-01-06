@@ -18,6 +18,18 @@ A discriminant for the TopLevelField type
       */
       readonly __typename: "TopLevelField",
     } | null),
+    readonly namable: ({
+      /**
+A discriminant for the Namable type
+      */
+      readonly __typename: "Pet",
+    } | null),
+    readonly notImplemented: ({
+      /**
+A discriminant for the NotImplemented type
+      */
+      readonly __typename: never,
+    } | null),
   },
   readonly parameters: Query__PetDetailDeferredRoute__parameters,
 };
