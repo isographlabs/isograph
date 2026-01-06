@@ -195,10 +195,14 @@ mod test {
     // Note: we use raw strings in this module, and the extra
     // spaces on lines with carats matter!
 
+    use std::sync::{LazyLock, Mutex};
+
     use crate::{
         OneIndexedColNumber, OneIndexedRowNumber, Span,
         text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers,
     };
+
+    static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
 
     fn text_with_carats_for_test(
         file_text: &str,
@@ -207,6 +211,8 @@ mod test {
         line_count_buffer: usize,
         colorize_carats: bool,
     ) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
+        // https://github.com/colored-rs/colored/issues/201
+        let _serial_lock = RUN_SERIALLY.lock();
         colored::control::set_override(true);
         let text_with_carats = text_with_carats_and_line_count_buffer_and_line_numbers(
             file_text,
