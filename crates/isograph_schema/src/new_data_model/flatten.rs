@@ -11,7 +11,6 @@ pub type BothFlattenedResults<TFlatten> = (
     <TFlatten as Flatten>::NestedOutput,
 );
 
-#[expect(unused)]
 pub trait Flatten {
     type Output;
     type NestedOutput;
