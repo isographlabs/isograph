@@ -515,7 +515,10 @@ mod test {
         let output =
             text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, true).0;
 
-        let expected = "012345678\n012345678\n012345678\n0\u{1b}[91m12\u{1b}[0m345678\n \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \n012345678\n012345678\n012345678";
+        let expected = "012345678\n012345678\n012345678\n0\
+        \u{1b}[91m12\u{1b}[0m345678\n \
+        \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \
+        \n012345678\n012345678\n012345678";
         assert_eq!(output, expected);
     }
     #[test]
@@ -523,7 +526,9 @@ mod test {
         let output =
             text_with_carats_for_test(&input_with_lines(10), None, Span::new(8, 12), 3, true).0;
 
-        let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m       \n012345678\n012345678\n012345678";
+        let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\
+        \u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\
+        \u{1b}[0m       \n012345678\n012345678\n012345678";
 
         assert_eq!(output, expected);
     }
