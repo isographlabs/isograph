@@ -31,11 +31,8 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
 pub fn flattened_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
-) -> Option<WithNoLocation<MemoRef<FlattenedDataModelEntity<TCompilationProfile>>>> {
-    let item = flattened_schema(db).get(&entity_name)?;
+) -> Option<MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
+    let entity = flattened_schema(db).get(&entity_name)?;
 
-    item.as_ref()
-        // TODO have trait types include MemoRef, do not intern on the outside...?
-        .map(|(flattened_entity, _)| flattened_entity.interned_ref(db))
-        .wrap_some()
+    entity.item.0.interned_ref(db).wrap_some()
 }
