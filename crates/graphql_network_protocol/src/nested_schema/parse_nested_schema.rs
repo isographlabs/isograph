@@ -327,6 +327,9 @@ fn process_graphql_documents(
                             },
                         );
 
+                        supertype_to_subtype_map
+                            .entry(graphql_interface_type_definition.name.item)
+                            .or_default();
                         interfaces_to_process.push(graphql_interface_type_definition.name.item);
                     }
                     GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
