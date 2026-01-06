@@ -5,9 +5,9 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_map,
-    client_selectable_named, entity_not_defined_diagnostic, flattened_selectables,
-    flattened_selectables_for_entity, multiple_selectable_definitions_found_diagnostic,
-    server_selectable_named,
+    client_selectable_named, entity_not_defined_diagnostic, flattened_selectable_named,
+    flattened_selectables, flattened_selectables_for_entity,
+    multiple_selectable_definitions_found_diagnostic,
 };
 
 #[memo]
@@ -19,7 +19,7 @@ pub fn selectable_named<TCompilationProfile: CompilationProfile>(
     // we don't obviously have a better way to do this besides checking whether this
     // a server selectable and also checking whether it is a client selectable, and
     // error'ing if we have multiple definitions.
-    let server_selectable = server_selectable_named(
+    let server_selectable = flattened_selectable_named(
         db,
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),

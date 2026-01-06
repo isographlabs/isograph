@@ -16,9 +16,8 @@ use pico_macros::memo;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, WrappedSelectionMapSelection,
-    fetchable_types, flattened_entity_named,
+    fetchable_types, flattened_entity_named, flattened_selectable_named,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
-    server_selectable_named,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -226,7 +225,7 @@ pub fn get_refetch_stategy<TCompilationProfile: CompilationProfile>(
     if is_fetchable {
         Some(RefetchStrategy::RefetchFromRoot)
     } else {
-        let id_field = server_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME);
+        let id_field = flattened_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME);
 
         let query_id = fetchable_types_map
             .iter()

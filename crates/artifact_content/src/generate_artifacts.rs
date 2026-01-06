@@ -20,7 +20,7 @@ use isograph_schema::{
     refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
     validate_entire_schema, validated_entrypoints,
 };
-use isograph_schema::{ContainsIsoStats, server_selectable_named};
+use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
 use prelude::*;
 use std::{
@@ -174,7 +174,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
-                let server_object_selectable = server_selectable_named(
+                let server_object_selectable = flattened_selectable_named(
                     db,
                     *parent_object_entity_name,
                     *server_object_selectable_name,

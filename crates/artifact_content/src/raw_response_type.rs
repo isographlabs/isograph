@@ -1,7 +1,7 @@
 use intern::Lookup;
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MergedSelectionMap, MergedServerSelection,
-    TargetPlatform, server_selectable_named,
+    TargetPlatform, flattened_selectable_named,
 };
 use prelude::Postfix;
 use std::collections::BTreeMap;
@@ -45,7 +45,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     .as_deref()
                     .unwrap_or(scalar_field.name.lookup());
 
-                let server_scalar_selectable = server_selectable_named(
+                let server_scalar_selectable = flattened_selectable_named(
                     db,
                     scalar_field.parent_object_entity_name,
                     scalar_field.name,
@@ -94,7 +94,7 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     .as_deref()
                     .unwrap_or(linked_field.name.lookup());
 
-                let server_object_selectable = server_selectable_named(
+                let server_object_selectable = flattened_selectable_named(
                     db,
                     linked_field.parent_object_entity_name,
                     linked_field.name,

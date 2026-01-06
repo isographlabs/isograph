@@ -22,10 +22,9 @@ use crate::{
     client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
     fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    flattened_entity_named, initial_variable_context,
+    flattened_entity_named, flattened_selectable_named, initial_variable_context,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
-    selectable_reader_selection_set, server_id_selectable, server_selectable_named,
-    transform_arguments_with_child_context,
+    selectable_reader_selection_set, server_id_selectable, transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
 };
 
@@ -670,7 +669,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
         merge_traversal_state.has_updatable = true;
     }
 
-    let server_object_selectable = server_selectable_named(
+    let server_object_selectable = flattened_selectable_named(
         db,
         field_parent_object_entity_name,
         field_server_object_selectable_name,
