@@ -83,16 +83,7 @@ pub struct JavascriptTargetPlatform {}
 impl TargetPlatform for JavascriptTargetPlatform {
     type EntityAssociatedData = SelectionType<JavascriptName, GraphQLSchemaObjectAssociatedData>;
 
-    // Hack alert
-    // TODO remove this field as follows:
-    // - for scalars, the override is because all __typename selectables point
-    // to the same entity. But there should actually be a unique typename entity
-    // per typename (i.e. per server object entity), which has a JavascriptName
-    // that is the string literal of the typename. This should be easy to fix!
-    // - For objects, ServerObjectSelectableVariant belongs in the
-    // network_protocol_associated_data field. Since it is (presumably) only used
-    // by query text generation.
-    type SelectableAssociatedData = SelectionType<Option<JavascriptName>, ()>;
+    type SelectableAssociatedData = ();
 
     fn format_server_field_scalar_type<
         TCompilationProfile: CompilationProfile<TargetPlatform = Self>,
@@ -158,31 +149,22 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .expect("Expected selectable to be server selectable")
                 .lookup(db);
 
-        let javascript_type_override = server_scalar_selectable
+        server_entity_named(db, server_scalar_selectable.target_entity_name.inner().0)
+            .as_ref()
+            .expect(
+                "Expected parsing to not have failed. \
+                This is indicative of a bug in Isograph.",
+            )
+            .expect(
+                "Expected entity to exist. \
+                This is indicative of a bug in Isograph.",
+            )
+            .lookup(db)
             .target_platform_associated_data
             .as_ref()
             .as_scalar()
-            .expect("Expected selectable to be scalar");
-
-        match javascript_type_override {
-            Some(javascript_name) => javascript_name.dereference(),
-            None => server_entity_named(db, server_scalar_selectable.target_entity_name.inner().0)
-                .as_ref()
-                .expect(
-                    "Expected parsing to not have failed. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .expect(
-                    "Expected entity to exist. \
-                    This is indicative of a bug in Isograph.",
-                )
-                .lookup(db)
-                .target_platform_associated_data
-                .as_ref()
-                .as_scalar()
-                .expect("Expected scalar entity to be scalar")
-                .dereference(),
-        }
+            .expect("Expected scalar entity to be scalar")
+            .dereference()
     }
 
     fn generate_link_type<'a, TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(

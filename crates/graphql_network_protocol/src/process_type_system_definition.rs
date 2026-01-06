@@ -513,7 +513,7 @@ pub(crate) fn get_typename_selectable(
         parent_entity_name: server_object_entity_name,
         arguments: vec![],
         network_protocol_associated_data: (),
-        target_platform_associated_data: None.scalar_selected(),
+        target_platform_associated_data: (),
     }
     .interned_value(db)
 }
