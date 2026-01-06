@@ -9,7 +9,7 @@ use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity};
 
 /// This function just drops the locations
 #[memo]
-pub fn server_entities_map_without_locations<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_server_entities_map_without_locations<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TCompilationProfile>>>, Diagnostic> {
     let (outcome, _fetchable_types) =
@@ -26,7 +26,7 @@ pub fn server_entities_map_without_locations<TCompilationProfile: CompilationPro
 }
 
 #[memo]
-pub fn server_object_entities<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_server_object_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRefServerEntity<TCompilationProfile>>> {
     let (outcome, _) =
@@ -52,7 +52,7 @@ pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     name: EntityName,
 ) -> DiagnosticResult<Option<MemoRefServerEntity<TCompilationProfile>>> {
-    let map = server_entities_map_without_locations(db)
+    let map = deprecated_server_entities_map_without_locations(db)
         .clone_err()?
         .lookup(db);
 

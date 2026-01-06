@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, IsographDatabase,
-    LINK_FIELD_NAME, server_object_entities,
+    LINK_FIELD_NAME, deprecated_server_object_entities,
 };
 use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
@@ -15,7 +15,7 @@ use prelude::Postfix;
 pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<Vec<MemoRef<ClientScalarSelectable<TCompilationProfile>>>> {
-    server_object_entities(db)
+    deprecated_server_object_entities(db)
         .as_ref()
         .map_err(|e| e.clone())?
         .iter()
