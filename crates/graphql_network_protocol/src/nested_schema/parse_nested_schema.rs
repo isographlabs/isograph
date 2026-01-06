@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, btree_map::Entry};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 use common_lang_types::{
     DescriptionValue, EntityName, JavascriptName, Location, SelectableName, VariableName,
@@ -11,7 +11,7 @@ use graphql_lang_types::{
 use intern::string_key::Intern;
 use isograph_lang_types::{
     Description, EntityNameWrapper, SelectionTypePostfix, TypeAnnotationDeclaration,
-    VariableDeclarationInner, VariableNameWrapper,
+    UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclarationInner, VariableNameWrapper,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, FLOAT_ENTITY_NAME, ID_ENTITY_NAME,
@@ -201,13 +201,14 @@ fn insert_parsed_items_into_schema(
             },
         );
 
+        let selectables = &mut schema
+            .item
+            .get_mut(abstract_parent_entity_name.reference())
+            .expect("Expected entity to exist")
+            .item
+            .selectables;
         insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
-            &mut schema
-                .item
-                .get_mut(abstract_parent_entity_name.reference())
-                .expect("Expected entity to exist")
-                .item
-                .selectables,
+            selectables,
             DataModelSelectable {
                 name: (*TYPENAME_FIELD_NAME).with_missing_location(),
                 parent_entity_name: abstract_parent_entity_name.with_missing_location(),
@@ -231,6 +232,48 @@ fn insert_parsed_items_into_schema(
                 is_inline_fragment: false.into(),
             },
         );
+
+        for concrete_child_entity_name in concrete_child_entity_names {
+            insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
+                selectables,
+                DataModelSelectable {
+                    description: format!(
+                        "A client pointer for the {} type.",
+                        concrete_child_entity_name
+                    )
+                    .intern()
+                    .to::<DescriptionValue>()
+                    .wrap(Description)
+                    .with_missing_location()
+                    .wrap_some(),
+                    name: format!("as{}", concrete_child_entity_name)
+                        .intern()
+                        .to::<SelectableName>()
+                        .with_missing_location(),
+                    target_entity: TypeAnnotationDeclaration::Union(
+                        UnionTypeAnnotationDeclaration {
+                            variants: {
+                                let mut variants = BTreeSet::new();
+                                variants.insert(UnionVariant::Scalar(
+                                    concrete_child_entity_name.into(),
+                                ));
+                                variants
+                            },
+                            nullable: true,
+                        },
+                    )
+                    .wrap_ok()
+                    .with_missing_location(),
+                    is_inline_fragment: true.into(),
+                    parent_entity_name: abstract_parent_entity_name
+                        .unchecked_conversion::<EntityName>()
+                        .with_missing_location(),
+                    arguments: vec![],
+                    network_protocol_associated_data: (),
+                    target_platform_associated_data: (),
+                },
+            );
+        }
     }
 }
 
@@ -292,15 +335,12 @@ fn process_graphql_documents(
                                     .name
                                     .item
                                     .with_missing_location(),
-                                description: format!(
-                                    "A typename field identifying the type {}",
-                                    entity_name
-                                )
-                                .intern()
-                                .to::<DescriptionValue>()
-                                .wrap(Description)
-                                .with_missing_location()
-                                .wrap_some(),
+                                description: format!("A discriminant for the {} type", entity_name)
+                                    .intern()
+                                    .to::<DescriptionValue>()
+                                    .wrap(Description)
+                                    .with_missing_location()
+                                    .wrap_some(),
                                 arguments: vec![],
                                 target_entity: TypeAnnotationDeclaration::Scalar(
                                     typename_entity_name.into(),
@@ -419,45 +459,6 @@ fn process_graphql_documents(
                     GraphQLTypeSystemDefinition::UnionTypeDefinition(
                         graphql_union_type_definition,
                     ) => {
-                        let entity_name = graphql_union_type_definition.name.item;
-
-                        let typename_entity_name = format!("{}__discriminator", entity_name)
-                            .intern()
-                            .to::<EntityName>()
-                            // And make it not selectable!
-                            .note_todo(
-                                "Come up with a way to not have \
-                                these be in the same namespace",
-                            );
-
-                        let mut selectables = BTreeMap::new();
-                        selectables.insert(
-                            *TYPENAME_FIELD_NAME,
-                            DataModelSelectable {
-                                name: (*TYPENAME_FIELD_NAME).with_missing_location(),
-                                parent_entity_name: typename_entity_name.with_missing_location(),
-                                description: format!(
-                                    "A typename field identifying the type {}",
-                                    entity_name
-                                )
-                                .intern()
-                                .to::<DescriptionValue>()
-                                .wrap(Description)
-                                .with_location(None)
-                                .wrap_some(),
-                                arguments: vec![],
-                                target_entity: TypeAnnotationDeclaration::Scalar(
-                                    typename_entity_name.into(),
-                                )
-                                .wrap_ok()
-                                .with_location(None),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: (),
-                                is_inline_fragment: false.into(),
-                            },
-                        );
-                        let selectables = WithNonFatalDiagnostics::new(selectables, vec![]);
-
                         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
                             schema,
                             DataModelEntity {
@@ -465,7 +466,7 @@ fn process_graphql_documents(
                                 description: graphql_union_type_definition
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
-                                selectables,
+                                selectables: Default::default(),
                                 network_protocol_associated_data: (),
                                 target_platform_associated_data:
                                     GraphQLSchemaObjectAssociatedData {

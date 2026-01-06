@@ -11,7 +11,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
-    selectable_named, server_selectables_map_for_entity,
+    deprecated_server_selectables_map_for_entity, selectable_named,
 };
 use isograph_schema::{
     Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
@@ -120,12 +120,13 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 // consider how to do this is a not obviously broken manner.
                 let mut s = "{\n".to_string();
 
-                for (name, server_selectable) in server_selectables_map_for_entity(db, entity_name)
-                    .as_ref()
-                    .expect(
-                        "Expected type system document to be valid. \
+                for (name, server_selectable) in
+                    deprecated_server_selectables_map_for_entity(db, entity_name)
+                        .as_ref()
+                        .expect(
+                            "Expected type system document to be valid. \
                         This is indicative of a bug in Isograph.",
-                    )
+                        )
                 {
                     let field_type = format_field_definition(
                         db,
