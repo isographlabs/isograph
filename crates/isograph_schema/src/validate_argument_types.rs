@@ -15,7 +15,7 @@ use isograph_lang_types::{
 
 use crate::{
     BOOLEAN_ENTITY_NAME, CompilationProfile, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME,
-    IsographDatabase, STRING_ENTITY_NAME, server_selectables_map_for_entity,
+    IsographDatabase, STRING_ENTITY_NAME, deprecated_server_selectables_map_for_entity,
 };
 
 fn scalar_literal_satisfies_type(
@@ -367,7 +367,7 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
     server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeSet<ObjectLiteralFieldType>> {
     let server_selectables =
-        server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
+        deprecated_server_selectables_map_for_entity(db, server_object_entity_name).clone_err()?;
 
     server_selectables
         .iter()
@@ -404,7 +404,8 @@ fn validate_no_extraneous_fields<TCompilationProfile: CompilationProfile>(
     location: EmbeddedLocation,
 ) -> DiagnosticResult<()> {
     let object_fields =
-        server_selectables_map_for_entity(db, parent_server_object_entity_name).clone_err()?;
+        deprecated_server_selectables_map_for_entity(db, parent_server_object_entity_name)
+            .clone_err()?;
 
     let extra_fields: Vec<_> = object_literal
         .iter()

@@ -6,12 +6,13 @@ use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
-    entity_definition_location, entity_not_defined_diagnostic, server_entity_named,
+    entity_definition_location, entity_not_defined_diagnostic, flattened_selectable_named,
+    server_entity_named,
 };
 
 #[memo]
 /// This just drops the location (but not internal locations...) and filters out client fields
-pub fn server_selectables_map<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_server_selectables_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
     BTreeMap<(EntityName, SelectableName), MemoRefServerSelectable<TCompilationProfile>>,
@@ -29,11 +30,11 @@ pub fn server_selectables_map<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
-pub fn server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_server_selectables_map_for_entity<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_server_object_entity_name: EntityName,
 ) -> DiagnosticResult<BTreeMap<SelectableName, MemoRefServerSelectable<TCompilationProfile>>> {
-    let map = server_selectables_map(db).clone_err()?;
+    let map = deprecated_server_selectables_map(db).clone_err()?;
 
     map.iter()
         .filter_map(|(key, value)| {
@@ -53,10 +54,8 @@ pub fn server_selectable_named<TCompilationProfile: CompilationProfile>(
     parent_server_object_entity_name: EntityName,
     server_selectable_name: SelectableName,
 ) -> DiagnosticResult<Option<MemoRefServerSelectable<TCompilationProfile>>> {
-    server_selectables_map_for_entity(db, parent_server_object_entity_name)
-        .clone_err()?
-        .get(&server_selectable_name)
-        .cloned()
+    flattened_selectable_named(db, parent_server_object_entity_name, server_selectable_name)
+        .dereference()
         .wrap_ok()
 }
 
