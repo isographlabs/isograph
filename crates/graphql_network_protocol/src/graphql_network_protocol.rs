@@ -14,8 +14,8 @@ use isograph_schema::{
     deprecated_server_selectables_map_for_entity, selectable_named,
 };
 use isograph_schema::{
-    Format, MergedSelectionMap, NetworkProtocol, ParseTypeSystemOutcome, RootOperationName,
-    server_entity_named,
+    DeprecatedParseTypeSystemOutcome, Format, MergedSelectionMap, NetworkProtocol,
+    RootOperationName, server_entity_named,
 };
 use lazy_static::lazy_static;
 use pico_macros::memo;
@@ -72,7 +72,7 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
     fn deprecated_parse_type_system_documents(
         db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     ) -> DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
+        WithNonFatalDiagnostics<DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
         // fetchable types
         BTreeMap<EntityName, RootOperationName>,
     )> {

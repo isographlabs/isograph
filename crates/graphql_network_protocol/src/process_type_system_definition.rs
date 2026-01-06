@@ -16,10 +16,10 @@ use isograph_lang_types::{
     SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    NODE_FIELD_NAME, ParseTypeSystemOutcome, RefetchStrategy, ServerEntity,
-    ServerObjectSelectionInfo, ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
+    ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete,
+    IsographDatabase, NODE_FIELD_NAME, RefetchStrategy, ServerEntity, ServerObjectSelectionInfo,
+    ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
     generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
@@ -45,7 +45,7 @@ pub fn process_graphql_type_system_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     type_system_document: GraphQLTypeSystemDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
+    outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
@@ -474,7 +474,7 @@ pub fn process_graphql_type_system_extension_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     extension_document: GraphQLTypeSystemExtensionDocument,
     graphql_root_types: &mut Option<GraphQLRootTypes>,
-    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
+    outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
     fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,

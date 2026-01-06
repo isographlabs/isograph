@@ -14,12 +14,12 @@ use isograph_lang_types::{
     UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable, FLOAT_ENTITY_NAME,
-    ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    ParseTypeSystemOutcome, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME, ServerEntity,
-    ServerEntityDirectives, ServerObjectSelectionInfo, ServerSelectable, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
+    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable,
+    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME,
+    ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase, RefetchStrategy,
+    RootOperationName, STRING_ENTITY_NAME, ServerEntity, ServerEntityDirectives,
+    ServerObjectSelectionInfo, ServerSelectable, TYPENAME_FIELD_NAME, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::{ErrClone, Postfix};
@@ -38,11 +38,11 @@ use crate::{
 pub(crate) fn parse_type_system_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
 ) -> DiagnosticResult<(
-    WithNonFatalDiagnostics<ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
+    WithNonFatalDiagnostics<DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>>,
     // fetchable types
     BTreeMap<EntityName, RootOperationName>,
 )> {
-    let mut outcome = ParseTypeSystemOutcome::default();
+    let mut outcome = DeprecatedParseTypeSystemOutcome::default();
     let mut non_fatal_diagnostics = vec![];
     define_default_graphql_types(db, &mut outcome, &mut non_fatal_diagnostics);
 
@@ -560,7 +560,7 @@ pub(crate) fn parse_type_system_document(
 
 fn define_default_graphql_types(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
-    outcome: &mut ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
+    outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
     insert_entity_or_multiple_definition_diagnostic(
@@ -654,7 +654,7 @@ fn is_object_entity(
 
 fn traverse_selections_and_return_path<'a>(
     db: &'a IsographDatabase<GraphQLAndJavascriptProfile>,
-    outcome: &'a ParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
+    outcome: &'a DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(

@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
-pub struct ParseTypeSystemOutcome<TCompilationProfile: CompilationProfile> {
+pub struct DeprecatedParseTypeSystemOutcome<TCompilationProfile: CompilationProfile> {
     pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TCompilationProfile>>>,
 
     pub selectables: BTreeMap<

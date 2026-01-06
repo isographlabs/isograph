@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 use common_lang_types::{DiagnosticResult, EntityName, WithNonFatalDiagnostics};
 
 use crate::{
-    IsographDatabase, NestedDataModelSchema, NetworkProtocol, ParseTypeSystemOutcome,
+    DeprecatedParseTypeSystemOutcome, IsographDatabase, NestedDataModelSchema, NetworkProtocol,
     RootOperationName, TargetPlatform,
 };
 
@@ -18,7 +18,7 @@ pub trait CompilationProfile:
     fn deprecated_parse_type_system_documents(
         db: &IsographDatabase<Self>,
     ) -> &DiagnosticResult<(
-        WithNonFatalDiagnostics<ParseTypeSystemOutcome<Self>>,
+        WithNonFatalDiagnostics<DeprecatedParseTypeSystemOutcome<Self>>,
         // TODO just seems awkward that we return fetchable types
         BTreeMap<EntityName, RootOperationName>,
     )>;
