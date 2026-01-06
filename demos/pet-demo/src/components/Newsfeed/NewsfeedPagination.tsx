@@ -9,6 +9,7 @@ export const NewsfeedPaginationComponent = iso(`
       skip: $skip
       limit: $limit
     ) {
+      __typename
       asAdItem {
         id
       }

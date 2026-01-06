@@ -5,6 +5,10 @@ export type Viewer__NewsfeedPaginationComponent__param = {
   readonly data: {
     readonly newsfeed: ReadonlyArray<{
       /**
+A discriminant for the NewsfeedItem type
+      */
+      readonly __typename: string,
+      /**
 A client pointer for the AdItem type.
       */
       readonly asAdItem: ({

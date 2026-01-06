@@ -27,6 +27,13 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
     refetchQueryIndex: null,
     selections: [
       {
+        kind: "Scalar",
+        fieldName: "__typename",
+        alias: null,
+        arguments: null,
+        isUpdatable: false,
+      },
+      {
         kind: "Linked",
         fieldName: "asAdItem",
         alias: null,
