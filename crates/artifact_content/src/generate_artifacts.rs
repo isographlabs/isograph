@@ -299,11 +299,6 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                             )
                             .as_ref()
                             .expect(
-                                "Expected validation to have worked. \
-                                    This is indicative of a bug in Isograph.",
-                            )
-                            .as_ref()
-                            .expect(
                                 "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
                             )

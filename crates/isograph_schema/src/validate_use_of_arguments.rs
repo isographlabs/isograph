@@ -80,10 +80,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
             }
         };
 
-    let parent_entity = match server_entity_named(db, parent_entity_name)
-        .as_ref()
-        .expect("Expected parsing to have succeeded. This is indicative of a bug in Isograph.")
-    {
+    let parent_entity = match server_entity_named(db, parent_entity_name) {
         Some(entity) => entity.lookup(db),
         None => {
             // We could emit an error, but this is validated already.
@@ -129,18 +126,13 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };
-                            let entity =
-                                match server_entity_named(db, target_entity_name).clone_err() {
-                                    Ok(o) => match o {
-                                        Some(entity) => entity.lookup(db),
-                                        None => {
-                                            return;
-                                        }
-                                    },
-                                    Err(_) => {
-                                        return;
-                                    }
-                                };
+                            let entity = server_entity_named(db, target_entity_name);
+                            let entity = match entity {
+                                Some(entity) => entity.lookup(db),
+                                None => {
+                                    return;
+                                }
+                            };
 
                             if entity.selection_info.as_object().is_some() {
                                 return;
@@ -193,18 +185,13 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };
-                            let entity =
-                                match server_entity_named(db, target_entity_name).clone_err() {
-                                    Ok(o) => match o {
-                                        Some(entity) => entity.lookup(db),
-                                        None => {
-                                            return;
-                                        }
-                                    },
-                                    Err(_) => {
-                                        return;
-                                    }
-                                };
+                            let entity = server_entity_named(db, target_entity_name);
+                            let entity = match entity {
+                                Some(entity) => entity.lookup(db),
+                                None => {
+                                    return;
+                                }
+                            };
 
                             if entity.selection_info.as_scalar().is_some() {
                                 return;

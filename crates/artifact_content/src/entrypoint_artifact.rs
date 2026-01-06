@@ -62,11 +62,6 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
     let parent_object_entity = &server_entity_named(db, entrypoint.parent_entity_name)
         .as_ref()
         .expect(
-            "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
         )
@@ -161,11 +156,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     let parent_object_entity = &server_entity_named(db, entrypoint.parent_entity_name)
         .as_ref()
         .expect(
-            "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
         )
@@ -249,11 +239,6 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                 })
         };
     let concrete_object_entity = &server_entity_named(db, concrete_type_entity_name)
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-        )
         .as_ref()
         .expect(
             "Expected entity to exist. \

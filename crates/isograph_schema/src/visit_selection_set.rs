@@ -3,7 +3,7 @@ use isograph_lang_types::{
     DefinitionLocation, DefinitionLocationPostfix, ObjectSelection, ScalarSelection, Selection,
     SelectionType, SelectionTypePostfix,
 };
-use prelude::{ErrClone, Postfix};
+use prelude::Postfix;
 
 use crate::{
     CompilationProfile, IsographDatabase, ServerEntity, selectable_named, server_entity_named,
@@ -48,14 +48,10 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                             Ok(annotation) => annotation.inner().0,
                             Err(_) => continue,
                         };
-                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
-                            Ok(o) => match o {
-                                Some(entity) => entity.lookup(db),
-                                None => {
-                                    continue;
-                                }
-                            },
-                            Err(_) => {
+                        let entity = server_entity_named(db, target_entity_name);
+                        let entity = match entity {
+                            Some(entity) => entity.lookup(db),
+                            None => {
                                 continue;
                             }
                         };
@@ -83,14 +79,10 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 }
                 .0;
 
-                let target_entity =
-                    match server_entity_named(db, target_entity_name).as_ref().expect(
-                        "Expected parsing to have succeeded. \
-                        This is indicative of a bug in Isograph.",
-                    ) {
-                        Some(s) => s.lookup(db),
-                        None => continue,
-                    };
+                let target_entity = match server_entity_named(db, target_entity_name) {
+                    Some(s) => s.lookup(db),
+                    None => continue,
+                };
 
                 visit_selection_set(
                     db,

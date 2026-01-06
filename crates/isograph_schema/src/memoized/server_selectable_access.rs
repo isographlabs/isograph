@@ -76,7 +76,6 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
 
     let target_entity_name = selectable.target_entity.item.clone_err()?.inner().0;
     let target_scalar_entity = server_entity_named(db, target_entity_name)
-        .clone_err()?
         .ok_or_else(|| {
             entity_not_defined_diagnostic(
                 target_entity_name,

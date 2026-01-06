@@ -592,11 +592,6 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             &server_entity_named(db, target_object_entity_name)
                                 .as_ref()
                                 .expect(
-                                    "Expected validation to have worked. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .as_ref()
-                                .expect(
                                     "Expected entity to exist. \
                                     This is indicative of a bug in Isograph.",
                                 )
@@ -720,11 +715,6 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                     &server_entity_named(db, parent_object_entity_name)
                         .as_ref()
                         .expect(
-                            "Expected validation to have worked. \
-                                This is indicative of a bug in Isograph.",
-                        )
-                        .as_ref()
-                        .expect(
                             "Expected entity to exist. \
                                 This is indicative of a bug in Isograph.",
                         )
@@ -794,11 +784,6 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                 .0;
 
             let server_object_selection_info = server_entity_named(db, concrete_object_entity_name)
-                .as_ref()
-                .expect(
-                    "Expected validation to have worked. \
-                        This is indicative of a bug in Isograph.",
-                )
                 .as_ref()
                 .expect(
                     "Expected entity to exist. \
@@ -1137,13 +1122,8 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
     let target_server_object_entity = &server_entity_named(db, target_server_object_entity_name)
         .as_ref()
         .expect(
-            "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 
@@ -1153,7 +1133,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         .as_ref()
         .expect(
             "Expected parsing to have succeeded. \
-        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 

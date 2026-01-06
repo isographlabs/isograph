@@ -226,24 +226,22 @@ fn validate_selectables<TCompilationProfile: CompilationProfile>(
         for argument in arguments {
             let target = argument.type_.item.inner().0;
 
-            match server_entity_named(db, target).clone_err() {
-                Ok(entity) => {
-                    match entity {
-                        Some(_) => {
-                            // Note: we should also validate that the entity is an input entity (i.e.
-                            // scalar or input type). That's a GraphQL-ism, though, so we have to figure
-                            // out a good mechanism for that (realistically, call out to a method on
-                            // NetworkProtocol).
-                        }
-                        None => errors.push(entity_not_defined_diagnostic(
-                            target,
-                            argument.name.location.to::<Location>().note_todo(
-                                "Variable definition will not have location at some point",
-                            ),
-                        )),
-                    }
+            let entity = server_entity_named(db, target);
+            match entity {
+                Some(_) => {
+                    // Note: we should also validate that the entity is an input entity (i.e.
+                    // scalar or input type). That's a GraphQL-ism, though, so we have to figure
+                    // out a good mechanism for that (realistically, call out to a method on
+                    // NetworkProtocol).
                 }
-                Err(e) => errors.push(e),
+                None => errors.push(entity_not_defined_diagnostic(
+                    target,
+                    argument
+                        .name
+                        .location
+                        .to::<Location>()
+                        .note_todo("Variable definition will not have location at some point"),
+                )),
             }
         }
     }

@@ -102,8 +102,6 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                                     .inner()
                                                     .0,
                                             )
-                                            .as_ref()
-                                            .ok()?
                                             .dereference()?
                                             .lookup(db);
 

@@ -34,24 +34,16 @@ pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
             SelectionType::Object(o) => o.lookup(db).item.reference(),
         };
 
-        let parent_entity = match server_entity_named(db, key.0).clone_err() {
-            Ok(entity) => {
-                match entity {
-                    Some(s) => s,
-                    None => {
-                        // TODO better location... and this is probably already validated elsewhere.
-                        // Maybe we can just continue
-                        errors.push(entity_not_defined_diagnostic(key.0, Location::Generated));
-                        continue;
-                    }
-                }
-            }
-            Err(e) => {
-                errors.push(e);
+        let parent_entity = server_entity_named(db, key.0);
+        let parent_entity = match parent_entity {
+            Some(s) => s.lookup(db),
+            None => {
+                // TODO better location... and this is probably already validated elsewhere.
+                // Maybe we can just continue
+                errors.push(entity_not_defined_diagnostic(key.0, Location::Generated));
                 continue;
             }
-        }
-        .lookup(db);
+        };
 
         validate_selection_set(
             db,
@@ -130,19 +122,14 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                                 continue;
                             }
                         };
-                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
-                            Ok(o) => match o {
-                                Some(entity) => entity.lookup(db),
-                                None => {
-                                    errors.push(entity_not_defined_diagnostic(
-                                        target_entity_name,
-                                        scalar_selection.name.location.to::<Location>(),
-                                    ));
-                                    continue;
-                                }
-                            },
-                            Err(e) => {
-                                errors.push(e);
+                        let entity = server_entity_named(db, target_entity_name);
+                        let entity = match entity {
+                            Some(entity) => entity.lookup(db),
+                            None => {
+                                errors.push(entity_not_defined_diagnostic(
+                                    target_entity_name,
+                                    scalar_selection.name.location.to::<Location>(),
+                                ));
                                 continue;
                             }
                         };
@@ -287,19 +274,15 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                                 continue;
                             }
                         };
-                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
-                            Ok(o) => match o {
-                                Some(entity) => entity.lookup(db),
-                                None => {
-                                    errors.push(entity_not_defined_diagnostic(
-                                        target_entity_name,
-                                        object_selection.name.location.to::<Location>(),
-                                    ));
-                                    continue;
-                                }
-                            },
-                            Err(e) => {
-                                errors.push(e);
+                        let entity = server_entity_named(db, target_entity_name);
+
+                        let entity = match entity {
+                            Some(entity) => entity.lookup(db),
+                            None => {
+                                errors.push(entity_not_defined_diagnostic(
+                                    target_entity_name,
+                                    object_selection.name.location.to::<Location>(),
+                                ));
                                 continue;
                             }
                         };
@@ -365,25 +348,18 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 }
                 .0;
 
-                let new_parent_entity =
-                    match server_entity_named(db, target_entity_name).clone_err() {
-                        Ok(entity) => match entity {
-                            Some(s) => s,
-                            None => {
-                                // This was probably validated elsewhere??
-                                errors.push(entity_not_defined_diagnostic(
-                                    target_entity_name,
-                                    object_selection.name.location.to(),
-                                ));
-                                continue;
-                            }
-                        },
-                        Err(e) => {
-                            errors.push(e);
-                            continue;
-                        }
+                let new_parent_entity = server_entity_named(db, target_entity_name);
+                let new_parent_entity = match new_parent_entity {
+                    Some(s) => s.lookup(db),
+                    None => {
+                        // This was probably validated elsewhere??
+                        errors.push(entity_not_defined_diagnostic(
+                            target_entity_name,
+                            object_selection.name.location.to(),
+                        ));
+                        continue;
                     }
-                    .lookup(db);
+                };
 
                 validate_selection_set(
                     db,

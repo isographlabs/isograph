@@ -55,11 +55,6 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     let parent_object_entity = &server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
-            "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
         )
@@ -214,11 +209,6 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
         &server_entity_named(db, server_object_selectable.parent_entity_name.item)
             .as_ref()
             .expect(
-                "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-            )
-            .as_ref()
-            .expect(
                 "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
             )
@@ -233,11 +223,6 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
             .expect("Expected target entity to be valid.")
             .inner()
             .0,
-    )
-    .as_ref()
-    .expect(
-        "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
     )
     .as_ref()
     .expect(
@@ -313,11 +298,6 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: Com
         SelectionType::Scalar(s) => s.parent_entity_name,
     };
     let parent_object_entity = &server_entity_named(db, parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected validation to have worked. \
-            This is indicative of a bug in Isograph.",
-        )
         .as_ref()
         .expect(
             "Expected entity to exist. \
@@ -470,11 +450,6 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     let parent_object_entity = &server_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
-            "Expected validation to have worked. \
-            This is indicative of a bug in Isograph.",
-        )
-        .as_ref()
-        .expect(
             "Expected entity to exist. \
             This is indicative of a bug in Isograph.",
         )
@@ -537,11 +512,6 @@ pub(crate) fn generate_link_output_type_artifact<TCompilationProfile: Compilatio
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
         &server_entity_named(db, client_scalar_selectable.parent_entity_name)
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-            )
             .as_ref()
             .expect(
                 "Expected entity to exist. \

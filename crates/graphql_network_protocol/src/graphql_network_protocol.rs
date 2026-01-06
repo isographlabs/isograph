@@ -102,16 +102,10 @@ impl TargetPlatform for JavascriptTargetPlatform {
         entity_name: EntityName,
         indentation_level: u8,
     ) -> String {
-        let entity = server_entity_named(db, entity_name)
-            .as_ref()
-            .expect(
-                "Expected parsing to not have failed. \
+        let entity = server_entity_named(db, entity_name).expect(
+            "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
-            )
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            );
+        );
 
         match entity.lookup(db).target_platform_associated_data.as_ref() {
             SelectionType::Object(_) => {
@@ -170,11 +164,6 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .inner()
                 .0,
         )
-        .as_ref()
-        .expect(
-            "Expected parsing to not have failed. \
-                This is indicative of a bug in Isograph.",
-        )
         .expect(
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
@@ -192,11 +181,6 @@ impl TargetPlatform for JavascriptTargetPlatform {
         server_object_entity_name: &EntityName,
     ) -> String {
         let server_object_entity = &server_entity_named(db, *server_object_entity_name)
-            .as_ref()
-            .expect(
-                "Expected validation to have worked. \
-                This is indicative of a bug in Isograph.",
-            )
             .as_ref()
             .expect(
                 "Expected entity to exist. \

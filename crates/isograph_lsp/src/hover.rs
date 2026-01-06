@@ -72,8 +72,6 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
             IsographResolvedNode::EntityNameWrapper(entity) => {
                 let server_object_entity = server_entity_named(db, entity.inner.0)
                     .as_ref()
-                    .map_err(|_| LSPRuntimeError::ExpectedError)?
-                    .as_ref()
                     .ok_or(LSPRuntimeError::ExpectedError)?
                     .lookup(db);
 

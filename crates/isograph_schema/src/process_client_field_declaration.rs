@@ -47,7 +47,6 @@ pub fn process_client_field_declaration<TCompilationProfile: CompilationProfile>
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
     let parent_entity = server_entity_named(db, client_field_declaration_item.parent_type.item.0)
-        .to_owned()?
         .ok_or_else(|| {
             let parent_object_entity_name = client_field_declaration_item.parent_type.item;
             Diagnostic::new(
@@ -95,7 +94,6 @@ pub fn process_client_pointer_declaration<TCompilationProfile: CompilationProfil
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
     let parent_entity = server_entity_named(db, client_pointer_declaration_item.parent_type.item.0)
-        .to_owned()?
         .ok_or_else(|| {
             let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
             Diagnostic::new(
@@ -113,7 +111,6 @@ pub fn process_client_pointer_declaration<TCompilationProfile: CompilationProfil
         db,
         client_pointer_declaration_item.target_type.item.inner().0,
     )
-    .to_owned()?
     .ok_or_else(|| {
         let target_type = client_pointer_declaration_item.target_type.item.inner();
         Diagnostic::new(

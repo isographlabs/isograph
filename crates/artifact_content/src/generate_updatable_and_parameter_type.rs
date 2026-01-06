@@ -81,8 +81,6 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 
@@ -161,8 +159,6 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 
@@ -337,8 +333,6 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 
@@ -437,8 +431,6 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 

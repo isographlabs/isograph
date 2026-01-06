@@ -51,8 +51,8 @@ pub fn deprecated_server_object_entities<TCompilationProfile: CompilationProfile
 pub fn server_entity_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     name: EntityName,
-) -> DiagnosticResult<Option<MemoRefServerEntity<TCompilationProfile>>> {
-    flattened_entity_named(db, name).dereference().wrap_ok()
+) -> Option<MemoRefServerEntity<TCompilationProfile>> {
+    flattened_entity_named(db, name).dereference()
 }
 
 #[memo]

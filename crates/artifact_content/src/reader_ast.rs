@@ -59,8 +59,6 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 
@@ -112,8 +110,6 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
                             .inner()
                             .0,
                     )
-                    .as_ref()
-                    .expect("Expected parsing to have succeeded")
                     .expect("Expected target entity to be defined")
                     .lookup(db);
 
@@ -852,8 +848,6 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                                 .inner()
                                 .0,
                         )
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
                         .lookup(db);
 
@@ -928,8 +922,6 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                                 .inner()
                                 .0,
                         )
-                        .as_ref()
-                        .expect("Expected parsing to have succeeded")
                         .expect("Expected target entity to be defined")
                         .lookup(db);
 

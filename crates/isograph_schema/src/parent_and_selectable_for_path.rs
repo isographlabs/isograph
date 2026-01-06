@@ -43,7 +43,6 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
             let selectable = server.lookup(db);
             let target_entity_name = selectable.target_entity.item.clone_err()?.inner().0;
             let entity = server_entity_named(db, target_entity_name)
-                .clone_err()?
                 .ok_or_else(|| {
                     entity_not_defined_diagnostic(
                         target_entity_name,
@@ -105,7 +104,6 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
             let selectable = s.lookup(db);
             let target_entity_name = selectable.target_entity.item.clone_err()?.inner().0;
             let entity = server_entity_named(db, target_entity_name)
-                .clone_err()?
                 .ok_or_else(|| {
                     let location = object_path.inner.name.location.to::<Location>();
                     entity_not_defined_diagnostic(target_entity_name, location)
@@ -173,15 +171,13 @@ pub fn get_parent_for_selection_set_path<'a, TCompilationProfile: CompilationPro
     }
     .0;
 
-    server_entity_named(db, parent_object_entity_name)
-        .clone()?
-        .ok_or_else(|| {
-            entity_not_defined_diagnostic(
-                parent_object_entity_name,
-                // TODO we can thread a location here?
-                Location::Generated,
-            )
-        })
+    server_entity_named(db, parent_object_entity_name).ok_or_else(|| {
+        entity_not_defined_diagnostic(
+            parent_object_entity_name,
+            // TODO we can thread a location here?
+            Location::Generated,
+        )
+    })
 }
 
 pub fn get_parent_and_selectable_for_selection_parent<
@@ -230,13 +226,13 @@ pub fn parent_object_entity_and_selectable<TCompilationProfile: CompilationProfi
     MemoRef<ServerEntity<TCompilationProfile>>,
     MemoRefSelectable<TCompilationProfile>,
 )> {
-    let parent_entity = server_entity_named(db, parent_server_object_entity_name.0)
-        .clone()?
-        .ok_or(entity_not_defined_diagnostic(
+    let parent_entity = server_entity_named(db, parent_server_object_entity_name.0).ok_or(
+        entity_not_defined_diagnostic(
             parent_server_object_entity_name.0,
             // TODO we can get a location
             Location::Generated,
-        ))?;
+        ),
+    )?;
 
     match selectable_named(db, parent_server_object_entity_name.0, selectable_name).to_owned()? {
         Some(selectable) => Ok((parent_entity, selectable)),
