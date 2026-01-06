@@ -11,7 +11,8 @@ use std::collections::HashSet;
 
 use crate::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, ServerEntity,
-    entity_not_defined_diagnostic, reader_selection_set_map, selectable_named, server_entity_named,
+    entity_not_defined_diagnostic, reader_selection_set_map, selectable_is_wrong_type_diagnostic,
+    selectable_named, server_entity_named,
 };
 
 pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
@@ -116,20 +117,38 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => s.server_defined(),
-                            SelectionType::Object(_) => {
-                                errors.push(selection_wrong_selection_type_diagnostic(
-                                    parent_entity.name,
-                                    selectable_name,
-                                    "a scalar",
-                                    "an object",
-                                    scalar_selection.name.location,
-                                    selectable_declaration_info,
-                                ));
+                        let selectable = s.lookup(db);
+                        let target_entity_name = selectable.target_entity_name.inner().0;
+                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
+                            Ok(o) => match o {
+                                Some(entity) => entity.lookup(db),
+                                None => {
+                                    errors.push(entity_not_defined_diagnostic(
+                                        target_entity_name,
+                                        scalar_selection.name.location.to::<Location>(),
+                                    ));
+                                    continue;
+                                }
+                            },
+                            Err(e) => {
+                                errors.push(e);
                                 continue;
                             }
+                        };
+
+                        if entity.selection_info.as_object().is_some() {
+                            let location = scalar_selection.name.location.to::<Location>();
+                            errors.push(selectable_is_wrong_type_diagnostic(
+                                selectable.parent_entity_name,
+                                selectable.name,
+                                "a scalar",
+                                "an object",
+                                location,
+                            ));
+                            continue;
                         }
+
+                        selectable.server_defined()
                     }
                     DefinitionLocation::Client(c) => match c {
                         SelectionType::Scalar(s) => s.client_defined(),
@@ -244,20 +263,38 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
 
                 let selectable = match selectable {
                     DefinitionLocation::Server(s) => {
-                        match s.lookup(db).is_inline_fragment.reference() {
-                            SelectionType::Scalar(_) => {
-                                errors.push(selection_wrong_selection_type_diagnostic(
-                                    parent_entity.name,
-                                    selectable_name,
-                                    "an object",
-                                    "a scalar",
-                                    object_selection.name.location,
-                                    selectable_declaration_info,
-                                ));
+                        let selectable = s.lookup(db);
+                        let target_entity_name = selectable.target_entity_name.inner().0;
+                        let entity = match server_entity_named(db, target_entity_name).clone_err() {
+                            Ok(o) => match o {
+                                Some(entity) => entity.lookup(db),
+                                None => {
+                                    errors.push(entity_not_defined_diagnostic(
+                                        target_entity_name,
+                                        object_selection.name.location.to::<Location>(),
+                                    ));
+                                    continue;
+                                }
+                            },
+                            Err(e) => {
+                                errors.push(e);
                                 continue;
                             }
-                            SelectionType::Object(_) => s.server_defined(),
+                        };
+
+                        if entity.selection_info.as_scalar().is_some() {
+                            let location = object_selection.name.location.to::<Location>();
+                            errors.push(selectable_is_wrong_type_diagnostic(
+                                selectable.parent_entity_name,
+                                selectable.name,
+                                "an object",
+                                "a scalar",
+                                location,
+                            ));
+                            continue;
                         }
+
+                        s.server_defined()
                     }
                     DefinitionLocation::Client(c) => match c {
                         SelectionType::Scalar(_) => {
