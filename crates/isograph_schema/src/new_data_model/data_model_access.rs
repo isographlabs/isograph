@@ -49,6 +49,24 @@ pub fn flattened_entity_named<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
+pub fn flattened_server_object_entities<TCompilationProfile: CompilationProfile>(
+    db: &IsographDatabase<TCompilationProfile>,
+) -> Vec<MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
+    let entities = flattened_entities(db);
+
+    entities
+        .iter()
+        .filter_map(|(_, x)| {
+            if x.lookup(db).selection_info.as_object().is_some() {
+                x.dereference().wrap_some()
+            } else {
+                None
+            }
+        })
+        .collect::<Vec<_>>()
+}
+
+#[memo]
 pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,

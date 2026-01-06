@@ -10,8 +10,8 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientScalarSelectable, ClientSelectable, CompilationProfile, IsographDatabase,
     LINK_FIELD_NAME, MemoRefClientSelectable, ServerSelectable,
-    client_scalar_selectable_selection_set_for_parent_query, initial_variable_context,
-    selectable_reader_selection_set, server_entity_named,
+    client_scalar_selectable_selection_set_for_parent_query, flattened_entity_named,
+    initial_variable_context, selectable_reader_selection_set,
 };
 use isograph_schema::{RefetchedPathsMap, UserWrittenClientTypeInfo};
 use prelude::Postfix;
@@ -52,7 +52,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
         SelectionType::Object(o) => o.parent_entity_name,
     };
 
-    let parent_object_entity = &server_entity_named(db, parent_entity_name)
+    let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected entity to exist. \
@@ -206,7 +206,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
     let server_object_selectable_name = server_object_selectable.name;
 
     let parent_object_entity =
-        &server_entity_named(db, server_object_selectable.parent_entity_name.item)
+        &flattened_entity_named(db, server_object_selectable.parent_entity_name.item)
             .as_ref()
             .expect(
                 "Expected entity to exist. \
@@ -214,7 +214,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
             )
             .lookup(db);
 
-    let concrete_type = &server_entity_named(
+    let concrete_type = &flattened_entity_named(
         db,
         server_object_selectable
             .target_entity
@@ -297,7 +297,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: Com
         SelectionType::Object(o) => o.parent_entity_name,
         SelectionType::Scalar(s) => s.parent_entity_name,
     };
-    let parent_object_entity = &server_entity_named(db, parent_entity_name)
+    let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected entity to exist. \
@@ -447,7 +447,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
         SelectionType::Scalar(s) => s.parent_entity_name,
         SelectionType::Object(o) => o.parent_entity_name,
     };
-    let parent_object_entity = &server_entity_named(db, parent_entity_name)
+    let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
         .as_ref()
         .expect(
             "Expected entity to exist. \
@@ -511,7 +511,7 @@ pub(crate) fn generate_link_output_type_artifact<TCompilationProfile: Compilatio
     client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
-        &server_entity_named(db, client_scalar_selectable.parent_entity_name)
+        &flattened_entity_named(db, client_scalar_selectable.parent_entity_name)
             .as_ref()
             .expect(
                 "Expected entity to exist. \

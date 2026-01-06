@@ -11,8 +11,8 @@ use std::collections::HashSet;
 
 use crate::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, ServerEntity,
-    entity_not_defined_diagnostic, reader_selection_set_map, selectable_is_wrong_type_diagnostic,
-    selectable_named, server_entity_named,
+    entity_not_defined_diagnostic, flattened_entity_named, reader_selection_set_map,
+    selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
 pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
@@ -34,7 +34,7 @@ pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
             SelectionType::Object(o) => o.lookup(db).item.reference(),
         };
 
-        let parent_entity = server_entity_named(db, key.0);
+        let parent_entity = flattened_entity_named(db, key.0);
         let parent_entity = match parent_entity {
             Some(s) => s.lookup(db),
             None => {
@@ -122,7 +122,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                                 continue;
                             }
                         };
-                        let entity = server_entity_named(db, target_entity_name);
+                        let entity = flattened_entity_named(db, target_entity_name);
                         let entity = match entity {
                             Some(entity) => entity.lookup(db),
                             None => {
@@ -274,7 +274,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                                 continue;
                             }
                         };
-                        let entity = server_entity_named(db, target_entity_name);
+                        let entity = flattened_entity_named(db, target_entity_name);
 
                         let entity = match entity {
                             Some(entity) => entity.lookup(db),
@@ -348,7 +348,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                 }
                 .0;
 
-                let new_parent_entity = server_entity_named(db, target_entity_name);
+                let new_parent_entity = flattened_entity_named(db, target_entity_name);
                 let new_parent_entity = match new_parent_entity {
                     Some(s) => s.lookup(db),
                     None => {

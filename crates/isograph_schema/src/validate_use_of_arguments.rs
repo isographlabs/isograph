@@ -14,8 +14,9 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable,
-    client_selectable_map, selectable_named, selectable_reader_selection_set, server_entity_named,
-    validate_argument_types::value_satisfies_type, visit_selection_set::visit_selection_set,
+    client_selectable_map, flattened_entity_named, selectable_named,
+    selectable_reader_selection_set, validate_argument_types::value_satisfies_type,
+    visit_selection_set::visit_selection_set,
 };
 
 type UsedVariables = BTreeSet<VariableNameWrapper>;
@@ -80,7 +81,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
             }
         };
 
-    let parent_entity = match server_entity_named(db, parent_entity_name) {
+    let parent_entity = match flattened_entity_named(db, parent_entity_name) {
         Some(entity) => entity.lookup(db),
         None => {
             // We could emit an error, but this is validated already.
@@ -126,7 +127,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };
-                            let entity = server_entity_named(db, target_entity_name);
+                            let entity = flattened_entity_named(db, target_entity_name);
                             let entity = match entity {
                                 Some(entity) => entity.lookup(db),
                                 None => {
@@ -185,7 +186,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                                 Ok(annotation) => annotation.inner().0,
                                 Err(_) => return,
                             };
-                            let entity = server_entity_named(db, target_entity_name);
+                            let entity = flattened_entity_named(db, target_entity_name);
                             let entity = match entity {
                                 Some(entity) => entity.lookup(db),
                                 None => {

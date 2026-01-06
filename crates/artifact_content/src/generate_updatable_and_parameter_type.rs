@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
-    client_scalar_selectable_named, selectable_named, server_entity_named,
+    client_scalar_selectable_named, flattened_entity_named, selectable_named,
 };
 use prelude::Postfix;
 
@@ -71,7 +71,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity
@@ -149,7 +149,7 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity
@@ -323,7 +323,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity
@@ -421,7 +421,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity

@@ -8,9 +8,9 @@ use prelude::{ErrClone, Postfix};
 use crate::{
     ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase,
     client_selectable_declaration_map_from_iso_literals, client_selectable_map,
-    deprecated_server_object_entities, deprecated_server_selectables_map,
-    entity_not_defined_diagnostic, flattened_entities, parse_iso_literals, process_iso_literals,
-    selectables, server_entity_named, server_id_selectable,
+    deprecated_server_selectables_map, entity_not_defined_diagnostic, flattened_entities,
+    flattened_entity_named, flattened_server_object_entities, parse_iso_literals,
+    process_iso_literals, selectables, server_id_selectable,
     validate_selection_sets::validate_selection_sets, validate_use_of_arguments,
     validated_entrypoints,
 };
@@ -150,7 +150,7 @@ fn validate_all_server_selectables_point_to_defined_types<
 fn validate_all_id_fields<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
-    let entities = deprecated_server_object_entities(db);
+    let entities = flattened_server_object_entities(db);
 
     entities
         .iter()
@@ -221,7 +221,7 @@ fn validate_selectables<TCompilationProfile: CompilationProfile>(
         for argument in arguments {
             let target = argument.type_.item.inner().0;
 
-            let entity = server_entity_named(db, target);
+            let entity = flattened_entity_named(db, target);
             match entity {
                 Some(_) => {
                     // Note: we should also validate that the entity is an input entity (i.e.

@@ -6,8 +6,8 @@ use prelude::{ErrClone as _, Postfix};
 
 use crate::{
     CompilationProfile, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, MemoRefServerSelectable,
-    entity_definition_location, entity_not_defined_diagnostic, flattened_selectable_named,
-    server_entity_named,
+    entity_definition_location, entity_not_defined_diagnostic, flattened_entity_named,
+    flattened_selectable_named,
 };
 
 #[memo]
@@ -73,7 +73,7 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
     let selectable = memo_ref.lookup(db);
 
     let target_entity_name = selectable.target_entity.item.clone_err()?.inner().0;
-    let target_scalar_entity = server_entity_named(db, target_entity_name)
+    let target_scalar_entity = flattened_entity_named(db, target_entity_name)
         .ok_or_else(|| {
             entity_not_defined_diagnostic(
                 target_entity_name,

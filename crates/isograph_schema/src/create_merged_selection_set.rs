@@ -22,9 +22,10 @@ use crate::{
     client_scalar_selectable_selection_set_for_parent_query, create_transformed_name_and_arguments,
     fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
-    initial_variable_context, refetch_strategy_for_client_scalar_selectable_named,
-    selectable_named, selectable_reader_selection_set, server_entity_named, server_id_selectable,
-    server_selectable_named, transform_arguments_with_child_context,
+    flattened_entity_named, initial_variable_context,
+    refetch_strategy_for_client_scalar_selectable_named, selectable_named,
+    selectable_reader_selection_set, server_id_selectable, server_selectable_named,
+    transform_arguments_with_child_context,
     transform_name_and_arguments_with_child_variable_context,
 };
 
@@ -589,7 +590,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
                             .0;
 
                         let object_selection_parent_object_entity =
-                            &server_entity_named(db, target_object_entity_name)
+                            &flattened_entity_named(db, target_object_entity_name)
                                 .as_ref()
                                 .expect(
                                     "Expected entity to exist. \
@@ -707,7 +708,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
             }
             MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                 let object_selection_parent_object_entity =
-                    &server_entity_named(db, parent_object_entity_name)
+                    &flattened_entity_named(db, parent_object_entity_name)
                         .as_ref()
                         .expect(
                             "Expected entity to exist. \
@@ -778,16 +779,17 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                 .inner()
                 .0;
 
-            let server_object_selection_info = server_entity_named(db, concrete_object_entity_name)
-                .as_ref()
-                .expect(
-                    "Expected entity to exist. \
+            let server_object_selection_info =
+                flattened_entity_named(db, concrete_object_entity_name)
+                    .as_ref()
+                    .expect(
+                        "Expected entity to exist. \
                         This is indicative of a bug in Isograph.",
-                )
-                .lookup(db)
-                .selection_info
-                .as_object()
-                .expect("Expected entity to be object");
+                    )
+                    .lookup(db)
+                    .selection_info
+                    .as_object()
+                    .expect("Expected entity to be object");
 
             MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                 parent_object_entity_name: parent_object_entity_name.item,
@@ -1114,7 +1116,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         .target_entity_name
         .inner()
         .0;
-    let target_server_object_entity = &server_entity_named(db, target_server_object_entity_name)
+    let target_server_object_entity = &flattened_entity_named(db, target_server_object_entity_name)
         .as_ref()
         .expect(
             "Expected entity to exist. \

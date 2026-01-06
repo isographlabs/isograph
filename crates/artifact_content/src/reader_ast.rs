@@ -14,9 +14,9 @@ use isograph_schema::{
     BorrowedObjectSelectable, ClientFieldVariant, ClientScalarSelectable, CompilationProfile,
     IsographDatabase, Loadability, NameAndArguments, NormalizationKey, PathToRefetchField,
     RefetchedPathsMap, VariableContext, categorize_field_loadability,
-    client_scalar_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_selection_set_for_parent_query, flattened_entity_named,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
-    selectable_reader_selection_set, server_entity_named, transform_arguments_with_child_context,
+    selectable_reader_selection_set, transform_arguments_with_child_context,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -49,7 +49,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
             let scalar_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity
@@ -100,7 +100,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
             let object_selectable = match selectable {
                 DefinitionLocation::Server(s) => {
                     let selectable = s.lookup(db);
-                    let entity = server_entity_named(
+                    let entity = flattened_entity_named(
                         db,
                         selectable
                             .target_entity
@@ -838,7 +838,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                 let scalar_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let entity = server_entity_named(
+                        let entity = flattened_entity_named(
                             db,
                             selectable
                                 .target_entity
@@ -912,7 +912,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                 let object_selectable = match selectable {
                     DefinitionLocation::Server(s) => {
                         let selectable = s.lookup(db);
-                        let entity = server_entity_named(
+                        let entity = flattened_entity_named(
                             db,
                             selectable
                                 .target_entity

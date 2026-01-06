@@ -7,8 +7,8 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     CompilationProfile, IsoLiteralExtraction, extract_iso_literals_from_file_content,
-    process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
-    server_entity_named,
+    flattened_entity_named, process_iso_literal_extraction,
+    read_iso_literals_source_from_relative_path,
 };
 use isograph_schema::{
     IsographDatabase, ServerEntity, get_parent_and_selectable_for_object_path,
@@ -70,7 +70,7 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
             IsographResolvedNode::ClientPointerDeclaration(_) => None,
             IsographResolvedNode::EntrypointDeclaration(_) => None,
             IsographResolvedNode::EntityNameWrapper(entity) => {
-                let server_object_entity = server_entity_named(db, entity.inner.0)
+                let server_object_entity = flattened_entity_named(db, entity.inner.0)
                     .as_ref()
                     .ok_or(LSPRuntimeError::ExpectedError)?
                     .lookup(db);

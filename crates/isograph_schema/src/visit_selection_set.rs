@@ -6,7 +6,7 @@ use isograph_lang_types::{
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, IsographDatabase, ServerEntity, selectable_named, server_entity_named,
+    CompilationProfile, IsographDatabase, ServerEntity, flattened_entity_named, selectable_named,
 };
 
 /// This is visiting an unvalidated selection set, and should not panic.
@@ -48,7 +48,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                             Ok(annotation) => annotation.inner().0,
                             Err(_) => continue,
                         };
-                        let entity = server_entity_named(db, target_entity_name);
+                        let entity = flattened_entity_named(db, target_entity_name);
                         let entity = match entity {
                             Some(entity) => entity.lookup(db),
                             None => {
@@ -79,7 +79,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                 }
                 .0;
 
-                let target_entity = match server_entity_named(db, target_entity_name) {
+                let target_entity = match flattened_entity_named(db, target_entity_name) {
                     Some(s) => s.lookup(db),
                     None => continue,
                 };

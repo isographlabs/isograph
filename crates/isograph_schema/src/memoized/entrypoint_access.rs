@@ -10,9 +10,8 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
-    client_scalar_selectable_named, parse_iso_literal_in_source,
+    client_scalar_selectable_named, flattened_entity_named, parse_iso_literal_in_source,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
-    server_entity_named,
 };
 
 #[memo]
@@ -65,7 +64,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                     let actual_type = match selectable {
                         DefinitionLocation::Server(s) => {
                             let selectable = s.lookup(db);
-                            let entity = server_entity_named(
+                            let entity = flattened_entity_named(
                                 db,
                                 match selectable.target_entity.item.clone_err() {
                                     Ok(annotation) => annotation.inner().0,

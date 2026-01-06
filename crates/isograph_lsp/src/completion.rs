@@ -10,7 +10,7 @@ use isograph_lang_types::IsographResolvedNode;
 use isograph_lang_types::SelectionType;
 use isograph_schema::selectables_for_entity;
 use isograph_schema::{CompilationProfile, get_parent_for_selection_set_path};
-use isograph_schema::{process_iso_literal_extraction, server_entity_named};
+use isograph_schema::{flattened_entity_named, process_iso_literal_extraction};
 use lsp_types::CompletionItemLabelDetails;
 use lsp_types::{
     CompletionItem, CompletionResponse,
@@ -92,7 +92,7 @@ pub fn on_completion<TCompilationProfile: CompilationProfile>(
                                     insert_text: (|| match selectable {
                                         DefinitionLocation::Server(s) => {
                                             let selectable = s.lookup(db);
-                                            let entity = server_entity_named(
+                                            let entity = flattened_entity_named(
                                                 db,
                                                 selectable
                                                     .target_entity

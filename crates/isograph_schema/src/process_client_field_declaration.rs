@@ -16,9 +16,9 @@ use pico_macros::memo;
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, WrappedSelectionMapSelection,
-    fetchable_types,
+    fetchable_types, flattened_entity_named,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
-    server_entity_named, server_selectable_named,
+    server_selectable_named,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,19 +46,20 @@ pub fn process_client_field_declaration<TCompilationProfile: CompilationProfile>
     client_field_declaration: MemoRef<ClientFieldDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientScalarSelectableSelectionSet> {
     let client_field_declaration_item = client_field_declaration.lookup(db);
-    let parent_entity = server_entity_named(db, client_field_declaration_item.parent_type.item.0)
-        .ok_or_else(|| {
-            let parent_object_entity_name = client_field_declaration_item.parent_type.item;
-            Diagnostic::new(
-                format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                client_field_declaration_item
-                    .parent_type
-                    .location
-                    .to::<Location>()
-                    .wrap_some(),
-            )
-        })?
-        .lookup(db);
+    let parent_entity =
+        flattened_entity_named(db, client_field_declaration_item.parent_type.item.0)
+            .ok_or_else(|| {
+                let parent_object_entity_name = client_field_declaration_item.parent_type.item;
+                Diagnostic::new(
+                    format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                    client_field_declaration_item
+                        .parent_type
+                        .location
+                        .to::<Location>()
+                        .wrap_some(),
+                )
+            })?
+            .lookup(db);
 
     match parent_entity.selection_info {
         SelectionType::Object(_) => {
@@ -93,21 +94,22 @@ pub fn process_client_pointer_declaration<TCompilationProfile: CompilationProfil
     client_pointer_declaration: MemoRef<ClientPointerDeclaration>,
 ) -> DiagnosticResult<UnprocessedClientObjectSelectableSelectionSet> {
     let client_pointer_declaration_item = client_pointer_declaration.lookup(db);
-    let parent_entity = server_entity_named(db, client_pointer_declaration_item.parent_type.item.0)
-        .ok_or_else(|| {
-            let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
-            Diagnostic::new(
-                format!("`{parent_object_entity_name}` is not a type that has been defined."),
-                client_pointer_declaration_item
-                    .parent_type
-                    .location
-                    .to::<Location>()
-                    .wrap_some(),
-            )
-        })?
-        .lookup(db);
+    let parent_entity =
+        flattened_entity_named(db, client_pointer_declaration_item.parent_type.item.0)
+            .ok_or_else(|| {
+                let parent_object_entity_name = client_pointer_declaration_item.parent_type.item;
+                Diagnostic::new(
+                    format!("`{parent_object_entity_name}` is not a type that has been defined."),
+                    client_pointer_declaration_item
+                        .parent_type
+                        .location
+                        .to::<Location>()
+                        .wrap_some(),
+                )
+            })?
+            .lookup(db);
 
-    let target_entity = server_entity_named(
+    let target_entity = flattened_entity_named(
         db,
         client_pointer_declaration_item.target_type.item.inner().0,
     )

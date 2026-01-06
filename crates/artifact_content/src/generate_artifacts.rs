@@ -16,9 +16,9 @@ use isograph_schema::{
     NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
     WrappedSelectionMapSelection, accessible_client_selectables, client_object_selectable_named,
     client_scalar_selectable_named, client_selectable_map, client_selectable_named,
-    fetchable_types, inline_fragment_reader_selection_set,
+    fetchable_types, flattened_entity_named, inline_fragment_reader_selection_set,
     refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    server_entity_named, validate_entire_schema, validated_entrypoints,
+    validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, server_selectable_named};
 use lazy_static::lazy_static;
@@ -288,7 +288,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                 ),
                             };
 
-                            let type_to_refine_to = &server_entity_named(
+                            let type_to_refine_to = &flattened_entity_named(
                                 db,
                                 client_scalar_selectable.parent_entity_name,
                             )

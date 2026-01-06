@@ -15,7 +15,7 @@ use isograph_schema::{
 };
 use isograph_schema::{
     DeprecatedParseTypeSystemOutcome, Format, MergedSelectionMap, NetworkProtocol,
-    RootOperationName, server_entity_named,
+    RootOperationName, flattened_entity_named,
 };
 use lazy_static::lazy_static;
 use pico_macros::memo;
@@ -102,7 +102,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
         entity_name: EntityName,
         indentation_level: u8,
     ) -> String {
-        let entity = server_entity_named(db, entity_name).expect(
+        let entity = flattened_entity_named(db, entity_name).expect(
             "Expected entity to exist. \
                 This is indicative of a bug in Isograph.",
         );
@@ -154,7 +154,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                 .expect("Expected selectable to be server selectable")
                 .lookup(db);
 
-        server_entity_named(
+        flattened_entity_named(
             db,
             server_scalar_selectable
                 .target_entity
@@ -180,7 +180,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
         db: &IsographDatabase<TCompilationProfile>,
         server_object_entity_name: &EntityName,
     ) -> String {
-        let server_object_entity = &server_entity_named(db, *server_object_entity_name)
+        let server_object_entity = &flattened_entity_named(db, *server_object_entity_name)
             .as_ref()
             .expect(
                 "Expected entity to exist. \
