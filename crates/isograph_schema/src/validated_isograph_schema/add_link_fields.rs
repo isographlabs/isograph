@@ -4,7 +4,7 @@ use crate::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, IsographDatabase,
     LINK_FIELD_NAME, flattened_server_object_entities,
 };
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithLocationPostfix};
+use common_lang_types::{EntityName, SelectableName, WithLocationPostfix};
 use intern::string_key::Intern;
 use isograph_lang_types::Description;
 use pico::MemoRef;
@@ -14,7 +14,7 @@ use prelude::Postfix;
 #[memo]
 pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-) -> DiagnosticResult<Vec<MemoRef<ClientScalarSelectable<TCompilationProfile>>>> {
+) -> Vec<MemoRef<ClientScalarSelectable<TCompilationProfile>>> {
     flattened_server_object_entities(db)
         .iter()
         .map(|object| {
@@ -37,19 +37,15 @@ pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
             .interned_value(db)
         })
         .collect::<Vec<_>>()
-        .wrap_ok()
 }
 
 #[expect(clippy::type_complexity)]
 #[memo]
 pub fn get_link_fields_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-) -> DiagnosticResult<
-    HashMap<(EntityName, SelectableName), MemoRef<ClientScalarSelectable<TCompilationProfile>>>,
-> {
+) -> HashMap<(EntityName, SelectableName), MemoRef<ClientScalarSelectable<TCompilationProfile>>> {
     get_link_fields(db)
-        .to_owned()
-        .note_todo("Do not clone. Use a MemoRef.")?
+        .clone()
         .into_iter()
         .map(|link_selectable| {
             (
@@ -61,5 +57,4 @@ pub fn get_link_fields_map<TCompilationProfile: CompilationProfile>(
             )
         })
         .collect::<HashMap<_, _>>()
-        .wrap_ok()
 }

@@ -183,7 +183,7 @@ pub fn client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
             // This is also problematic, because we really actually want a "all client fields map" fn,
             // but we don't really have one, since we're adding this here. Oh well. See the awkwardness in
             // selection_set_access.
-            let link_fields = get_link_fields_map(db).clone_err()?;
+            let link_fields = get_link_fields_map(db);
 
             if let Some(link_field) = link_fields
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
@@ -341,7 +341,6 @@ pub fn client_selectable_map<TCompilationProfile: CompilationProfile>(
         .chain(
             get_link_fields_map(db)
                 .clone()
-                .note_todo("Do not clone. Use a MemoRef.")?
                 .into_iter()
                 .map(|(key, value)| ((key.0, key.1), value.scalar_selected().wrap_ok())),
         )

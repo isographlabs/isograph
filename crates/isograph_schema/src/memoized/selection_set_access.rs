@@ -57,24 +57,17 @@ pub fn reader_selection_set_map<TCompilationProfile: CompilationProfile>(
 
     // we must add empty selection sets for __link fields, and TODO perhaps others.
     // TODO this should be cleaned up and thought about holistically.
-    match get_link_fields(db) {
-        Ok(fields) => {
-            for field in fields {
-                let scalar_selectable = field.lookup(db);
-                map.insert(
-                    (scalar_selectable.parent_entity_name, scalar_selectable.name),
-                    SelectionSet { selections: vec![] }
-                        .with_location(EmbeddedLocation::todo_generated())
-                        .interned_value(db)
-                        .scalar_selected()
-                        .wrap_ok(),
-                );
-            }
-        }
-        Err(_) => {
-            // TODO do not silently ignore errors in link fields. Instead, return a Result
-            // from this fn
-        }
+    let fields = get_link_fields(db);
+    for field in fields {
+        let scalar_selectable = field.lookup(db);
+        map.insert(
+            (scalar_selectable.parent_entity_name, scalar_selectable.name),
+            SelectionSet { selections: vec![] }
+                .with_location(EmbeddedLocation::todo_generated())
+                .interned_value(db)
+                .scalar_selected()
+                .wrap_ok(),
+        );
     }
 
     if let Ok(outcome) = TCompilationProfile::deprecated_parse_type_system_documents(db) {
