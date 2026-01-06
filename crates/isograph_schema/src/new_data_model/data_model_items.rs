@@ -25,7 +25,8 @@ pub type DataModelSchema<TCompilationProfile, TStage> = MapWithNonfatalDiagnosti
         <TStage as DataModelStage>::Location,
     >,
 >;
-pub type NestedDataModelSchema<TNetworkProtocol> = DataModelSchema<TNetworkProtocol, NestedStage>;
+pub type NestedDataModelSchema<TCompilationProfile> =
+    DataModelSchema<TCompilationProfile, NestedStage>;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DataModelEntity<TCompilationProfile: CompilationProfile, TStage: DataModelStage> {
