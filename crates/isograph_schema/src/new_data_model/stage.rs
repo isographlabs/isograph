@@ -50,12 +50,18 @@ impl DataModelStage for NestedStage {
 }
 
 /// Next, those locations are dropped and errors ignored.
+/// Note that we are *not* dropping those errors, though, for the time being. That's because
+/// lots of things cannot handle missing diagnostics! This should be fixable, though.
+///
 /// In order to print those errors, we must go back to the original nested object and access
-/// the error.
+/// the error. That's a lot of work!
+///
+/// Anyway, in the mean time, keep the errors around. In the long run, we can (and should)
+/// get these same errors out by going to the validated stage.
 #[derive(Copy, Clone, Debug, PartialEq, PartialOrd, Eq, Ord, Hash, Default)]
 pub struct FlattenedStage {}
 impl DataModelStage for FlattenedStage {
-    type Error = ();
+    type Error = Diagnostic;
     type Location = ();
     type Selectables<TCompilationProfile: CompilationProfile> = ();
 }

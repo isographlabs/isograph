@@ -1,5 +1,4 @@
 use common_lang_types::SelectableName;
-use prelude::DropErr;
 
 use crate::{
     CompilationProfile, DataModelEntity, DataModelSelectable, DataModelStage,
@@ -63,7 +62,7 @@ impl<TCompilationProfile: CompilationProfile> Flatten
                 parent_entity_name: self.parent_entity_name.drop_location(),
                 description: self.description.map(|x| x.drop_location()),
                 arguments: self.arguments,
-                target_entity: self.target_entity.drop_location().map(|x| x.drop_err()),
+                target_entity: self.target_entity.drop_location(),
                 network_protocol_associated_data: self.network_protocol_associated_data,
                 target_platform_associated_data: self.target_platform_associated_data,
                 is_inline_fragment: self.is_inline_fragment,
