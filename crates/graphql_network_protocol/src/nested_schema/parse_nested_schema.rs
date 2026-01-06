@@ -19,7 +19,6 @@ use isograph_schema::{
     NestedDataModelSelectable, STRING_ENTITY_NAME, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
     to_isograph_constant_value,
 };
-use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{
@@ -32,7 +31,7 @@ use crate::{
 
 pub fn parse_nested_schema(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
-) -> MemoRef<NestedDataModelSchema<GraphQLAndJavascriptProfile>> {
+) -> NestedDataModelSchema<GraphQLAndJavascriptProfile> {
     let mut schema = WithNonFatalDiagnostics {
         non_fatal_diagnostics: vec![],
         item: BTreeMap::new(),
@@ -41,7 +40,7 @@ pub fn parse_nested_schema(
     define_default_graphql_data_model_entities(&mut schema);
     insert_parsed_items_into_schema(db, &mut schema);
 
-    schema.interned_value(db)
+    schema
 }
 
 fn define_default_graphql_data_model_entities(

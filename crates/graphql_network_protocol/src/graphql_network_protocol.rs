@@ -79,9 +79,10 @@ impl CompilationProfile for GraphQLAndJavascriptProfile {
         parse_type_system_document(db)
     }
 
+    #[memo]
     fn parse_nested_data_model_schema(
         db: &IsographDatabase<Self>,
-    ) -> pico::MemoRef<isograph_schema::NestedDataModelSchema<Self>> {
+    ) -> isograph_schema::NestedDataModelSchema<Self> {
         parse_nested_schema(db)
     }
 }

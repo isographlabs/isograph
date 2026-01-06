@@ -1,7 +1,6 @@
 use std::{collections::BTreeMap, fmt::Debug, hash::Hash};
 
 use common_lang_types::{DiagnosticResult, EntityName, WithNonFatalDiagnostics};
-use pico::MemoRef;
 
 use crate::{
     IsographDatabase, NestedDataModelSchema, NetworkProtocol, ParseTypeSystemOutcome,
@@ -24,7 +23,5 @@ pub trait CompilationProfile:
         BTreeMap<EntityName, RootOperationName>,
     )>;
 
-    fn parse_nested_data_model_schema(
-        db: &IsographDatabase<Self>,
-    ) -> MemoRef<NestedDataModelSchema<Self>>;
+    fn parse_nested_data_model_schema(db: &IsographDatabase<Self>) -> &NestedDataModelSchema<Self>;
 }
