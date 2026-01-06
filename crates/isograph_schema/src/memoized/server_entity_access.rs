@@ -1,29 +1,8 @@
-use std::collections::BTreeMap;
-
 use common_lang_types::{Diagnostic, DiagnosticResult, EntityName, Location};
-use pico::MemoRef;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{CompilationProfile, IsographDatabase, MemoRefServerEntity, flattened_entity_named};
-
-/// This function just drops the locations
-#[memo]
-pub fn deprecated_server_entities_map_without_locations<TCompilationProfile: CompilationProfile>(
-    db: &IsographDatabase<TCompilationProfile>,
-) -> Result<MemoRef<BTreeMap<EntityName, MemoRefServerEntity<TCompilationProfile>>>, Diagnostic> {
-    let (outcome, _fetchable_types) =
-        TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
-
-    outcome
-        .item
-        .entities
-        .iter()
-        .map(|(entity_name, entities)| (*entity_name, entities.item))
-        .collect::<BTreeMap<_, _>>()
-        .interned_value(db)
-        .wrap_ok()
-}
 
 #[memo]
 pub fn deprecated_server_object_entities<TCompilationProfile: CompilationProfile>(
