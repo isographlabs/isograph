@@ -10,8 +10,8 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    Description, SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclarationInner,
-    VariableNameWrapper,
+    Description, EntityNameWrapper, SelectionTypePostfix, TypeAnnotationDeclaration,
+    VariableDeclarationInner, VariableNameWrapper,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, FLOAT_ENTITY_NAME, ID_ENTITY_NAME,
@@ -201,7 +201,36 @@ fn insert_parsed_items_into_schema(
             },
         );
 
-        // TODO insert __typename field
+        insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
+            &mut schema
+                .item
+                .get_mut(abstract_parent_entity_name.reference())
+                .expect("Expected entity to exist")
+                .item
+                .selectables,
+            DataModelSelectable {
+                name: (*TYPENAME_FIELD_NAME).with_missing_location(),
+                parent_entity_name: abstract_parent_entity_name.with_missing_location(),
+                description: format!(
+                    "A discriminant for the {} type",
+                    abstract_parent_entity_name
+                )
+                .intern()
+                .to::<DescriptionValue>()
+                .wrap(Description)
+                .with_missing_location()
+                .wrap_some(),
+                arguments: vec![],
+                target_entity: TypeAnnotationDeclaration::Scalar(
+                    typename_entity_name.wrap(EntityNameWrapper),
+                )
+                .wrap_ok()
+                .with_missing_location(),
+                network_protocol_associated_data: (),
+                target_platform_associated_data: (),
+                is_inline_fragment: false.into(),
+            },
+        );
     }
 }
 
