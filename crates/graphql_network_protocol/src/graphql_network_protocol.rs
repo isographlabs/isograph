@@ -119,7 +119,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
                         .as_ref()
                         .expect(
                             "Expected type system document to be valid. \
-                        This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                 {
                     let field_type = format_field_definition(
