@@ -23,7 +23,8 @@ use prelude::Postfix;
 
 use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
-    NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE, parse_graphql_schema,
+    NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE, get_js_union_name,
+    parse_graphql_schema,
     process_type_system_definition::{
         UnvalidatedTypeRefinementMap, multiple_entity_definitions_found_diagnostic,
     },
@@ -145,6 +146,32 @@ fn insert_parsed_items_into_schema(
         &mut supertype_to_subtype_map,
         &mut interfaces_to_process,
     );
+
+    for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
+        let typename_entity_name = format!("{}__discriminator", abstract_parent_entity_name)
+            .intern()
+            .to::<EntityName>()
+            // And make it not selectable!
+            .note_todo("Come up with a way to not have these be in the same namespace");
+
+        insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
+            schema,
+            DataModelEntity {
+                description: format!("The typename of {}", abstract_parent_entity_name)
+                    .intern()
+                    .to::<DescriptionValue>()
+                    .wrap(Description)
+                    .with_missing_location()
+                    .wrap_some(),
+                name: typename_entity_name.with_missing_location(),
+                selection_info: ().scalar_selected(),
+                network_protocol_associated_data: (),
+                target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
+                    .scalar_selected(),
+                selectables: Default::default(),
+            },
+        );
+    }
 }
 
 fn process_graphql_documents(

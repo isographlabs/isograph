@@ -712,7 +712,7 @@ fn traverse_selections_and_return_path<'a>(
 type EntitiesDefinedBySchema =
     BTreeMap<EntityName, WithLocation<pico::MemoRef<ServerEntity<GraphQLAndJavascriptProfile>>>>;
 
-fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
+pub(crate) fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
     if members.is_empty() {
         *NEVER_JAVASCRIPT_TYPE
     } else {
