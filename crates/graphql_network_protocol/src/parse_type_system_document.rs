@@ -19,7 +19,7 @@ use isograph_schema::{
     FlattenedDataModelSelectable, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
     IsConcrete, IsographDatabase, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME,
     ServerEntityDirectives, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    WrappedSelectionMapSelection, flattened_entity_named, generate_refetch_field_strategy,
     imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
@@ -408,11 +408,10 @@ pub(crate) fn parse_type_system_document(
                 mutation_field.parent_entity_name;
             let mutation_field_arguments = mutation_field.arguments.clone();
 
-            let top_level_schema_field_selection_info = outcome
-                .entities
-                .get(&payload_object_entity_name)
-                .and_then(|entity| entity.item.lookup(db).selection_info.as_object())
-                .expect("Expected entity to exist and to be an object.");
+            let top_level_schema_field_selection_info =
+                flattened_entity_named(db, payload_object_entity_name)
+                    .and_then(|entity| entity.lookup(db).selection_info.as_object())
+                    .expect("Expected entity to exist and to be an object.");
 
             let (mut parts_reversed, target_parent_object_entity) =
                 match traverse_selections_and_return_path(
@@ -662,9 +661,7 @@ fn traverse_selections_and_return_path<'a>(
     Vec<&'a FlattenedDataModelSelectable<GraphQLAndJavascriptProfile>>,
     &'a FlattenedDataModelEntity<GraphQLAndJavascriptProfile>,
 )> {
-    let mut current_entity = outcome
-        .entities
-        .get(&payload_object_entity_name)
+    let mut current_entity = flattened_entity_named(db, payload_object_entity_name)
         .ok_or_else(|| {
             Diagnostic::new(
                 format!(
@@ -674,7 +671,6 @@ fn traverse_selections_and_return_path<'a>(
                 None,
             )
         })?
-        .item
         .lookup(db);
 
     if current_entity.selection_info.as_object().is_none() {
@@ -709,9 +705,7 @@ fn traverse_selections_and_return_path<'a>(
 
         let next_entity_name = selectable.target_entity.item.clone_err()?.inner();
 
-        current_entity = outcome
-            .entities
-            .get(&next_entity_name)
+        current_entity = flattened_entity_named(db, next_entity_name.0)
             .ok_or_else(|| {
                 Diagnostic::new(
                     format!(
@@ -721,7 +715,6 @@ fn traverse_selections_and_return_path<'a>(
                     None,
                 )
             })?
-            .item
             .lookup(db);
 
         if current_entity.selection_info.as_object().is_none() {
