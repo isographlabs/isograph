@@ -13,9 +13,6 @@ use crate::{
     TargetPlatform, ValidatedStage,
 };
 
-// TODO use a type parameter here to ensure that there are no non-fatal diagnostics,
-// though realistically that's impossible - we can always drop them!
-// Perhaps we can have non-droppable diagnostics.
 pub type MapWithNonfatalDiagnostics<TKey, TValue, TError> =
     WithGenericNonFatalDiagnostics<BTreeMap<TKey, TValue>, TError>;
 
