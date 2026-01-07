@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 
 use common_lang_types::{
     DescriptionValue, Diagnostic, EmbeddedLocation, EntityName, Location, SelectableName,
@@ -52,12 +52,6 @@ pub fn process_graphql_type_system_document(
         match type_system_definition {
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                 let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
-
-                let _typename_entity_name = format!("{}__discriminator", server_object_entity_name)
-                    .intern()
-                    .to::<EntityName>()
-                    // And make it not selectable!
-                    .note_todo("Come up with a way to not have these be in the same namespace");
 
                 directives
                     .entry(server_object_entity_name)
