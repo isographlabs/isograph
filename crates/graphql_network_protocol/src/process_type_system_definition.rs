@@ -34,7 +34,6 @@ lazy_static! {
 
 }
 
-#[expect(clippy::too_many_arguments)]
 pub fn process_graphql_type_system_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     type_system_document: GraphQLTypeSystemDocument,
@@ -233,7 +232,6 @@ fn get_refetch_selectable(
     }
 }
 
-#[expect(clippy::too_many_arguments)]
 pub fn process_graphql_type_system_extension_document(
     db: &IsographDatabase<GraphQLAndJavascriptProfile>,
     extension_document: GraphQLTypeSystemExtensionDocument,
