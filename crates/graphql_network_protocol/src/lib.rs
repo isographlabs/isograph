@@ -6,5 +6,4 @@ mod query_text;
 mod read_schema;
 
 pub use graphql_network_protocol::*;
-pub(crate) use parse_type_system_document::*;
 pub use read_schema::*;

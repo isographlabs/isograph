@@ -23,7 +23,7 @@ use prelude::Postfix;
 
 use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
-    NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE, get_js_union_name,
+    NEVER_JAVASCRIPT_TYPE, NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE,
     parse_graphql_schema,
     process_type_system_definition::{
         UnvalidatedTypeRefinementMap, multiple_entity_definitions_found_diagnostic,
@@ -612,4 +612,18 @@ fn process_fields(
     }
 
     selectables
+}
+
+fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
+    if members.is_empty() {
+        *NEVER_JAVASCRIPT_TYPE
+    } else {
+        members
+            .iter()
+            .map(|name| format!("\"{name}\""))
+            .collect::<Vec<String>>()
+            .join(" | ")
+            .intern()
+            .into()
+    }
 }

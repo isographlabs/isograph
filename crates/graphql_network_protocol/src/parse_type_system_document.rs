@@ -1,9 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, JavascriptName,
-    SelectableName, VariableName, WithGenericLocation, WithLocation, WithLocationPostfix,
-    WithNonFatalDiagnostics,
+    DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, SelectableName,
+    VariableName, WithGenericLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
@@ -14,21 +13,17 @@ use isograph_lang_types::{
     UnionVariant, VariableDeclaration,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, ClientFieldVariant, ClientScalarSelectable,
-    DeprecatedParseTypeSystemOutcome, FLOAT_ENTITY_NAME, FlattenedDataModelEntity,
-    FlattenedDataModelSelectable, ID_ENTITY_NAME, INT_ENTITY_NAME, ImperativelyLoadedFieldVariant,
-    IsConcrete, IsographDatabase, RefetchStrategy, RootOperationName, STRING_ENTITY_NAME,
-    ServerEntityDirectives, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, flattened_entity_named, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
+    ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome,
+    FlattenedDataModelEntity, FlattenedDataModelSelectable, ImperativelyLoadedFieldVariant,
+    IsographDatabase, RefetchStrategy, RootOperationName, ServerEntityDirectives,
+    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, flattened_entity_named,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
-    NEVER_JAVASCRIPT_TYPE, NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE,
-    insert_entity_or_multiple_definition_diagnostic, parse_graphql_schema,
+    GraphQLAndJavascriptProfile, parse_graphql_schema,
     process_type_system_definition::{
         get_typename_selectable, process_graphql_type_system_document,
         process_graphql_type_system_extension_document,
@@ -45,7 +40,6 @@ pub(crate) fn parse_type_system_document(
 )> {
     let mut outcome = DeprecatedParseTypeSystemOutcome::default();
     let mut non_fatal_diagnostics = vec![];
-    define_default_graphql_types(db, &mut outcome, &mut non_fatal_diagnostics);
 
     let mut graphql_root_types = None;
     let mut directives = HashMap::new();
@@ -91,38 +85,6 @@ pub(crate) fn parse_type_system_document(
         let interface_definition = with_location.item;
         let server_object_entity_name = interface_definition.name.item;
 
-        insert_entity_or_multiple_definition_diagnostic(
-            &mut outcome.entities,
-            server_object_entity_name,
-            FlattenedDataModelEntity {
-                description: interface_definition.description.map(|description_value| {
-                    description_value
-                        .item
-                        .unchecked_conversion::<DescriptionValue>()
-                        .wrap(Description)
-                        .with_no_location()
-                }),
-                name: interface_definition.name.drop_location(),
-                network_protocol_associated_data: (),
-                selection_info: ServerObjectSelectionInfo {
-                    is_concrete: IsConcrete(false),
-                }
-                .object_selected(),
-                target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
-                    subtypes: supertype_to_subtype_map
-                        .get(&server_object_entity_name)
-                        .cloned()
-                        .unwrap_or_default(),
-                }
-                .object_selected(),
-                selectables: Default::default(),
-            }
-            .interned_value(db)
-            .with_location(with_location.location)
-            .into(),
-            &mut non_fatal_diagnostics,
-        );
-
         directives
             .entry(server_object_entity_name)
             .or_default()
@@ -144,7 +106,12 @@ pub(crate) fn parse_type_system_document(
     for (parent_entity_name, field) in fields_to_process {
         let target: EntityName = field.item.type_.item.inner().unchecked_conversion();
 
-        if is_object_entity(db, &outcome.entities, target) {
+        let entity = flattened_entity_named(db, target);
+        let is_object_entity = entity
+            .map(|x| x.lookup(db).selection_info.as_object().is_some())
+            .unwrap_or(false);
+
+        if is_object_entity {
             insert_selectable_or_multiple_definition_diagnostic(
                 &mut outcome.selectables,
                 (parent_entity_name, field.item.name.item),
@@ -266,29 +233,6 @@ pub(crate) fn parse_type_system_document(
             .to::<EntityName>()
             // And make it not selectable!
             .note_todo("Come up with a way to not have these be in the same namespace");
-
-        insert_entity_or_multiple_definition_diagnostic(
-            &mut outcome.entities,
-            typename_entity_name,
-            FlattenedDataModelEntity {
-                description: format!("The typename of {}", abstract_parent_entity_name)
-                    .intern()
-                    .to::<DescriptionValue>()
-                    .wrap(Description)
-                    .with_no_location()
-                    .wrap_some(),
-                name: typename_entity_name.with_no_location(),
-                selection_info: ().scalar_selected(),
-                network_protocol_associated_data: (),
-                target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
-                    .scalar_selected(),
-                selectables: Default::default(),
-            }
-            .interned_value(db)
-            .with_generated_location()
-            .note_todo("use a better location"),
-            &mut non_fatal_diagnostics,
-        );
 
         insert_selectable_or_multiple_definition_diagnostic(
             &mut outcome.selectables,
@@ -558,100 +502,6 @@ pub(crate) fn parse_type_system_document(
         .wrap_ok()
 }
 
-fn define_default_graphql_types(
-    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
-    outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
-    non_fatal_diagnostics: &mut Vec<Diagnostic>,
-) {
-    insert_entity_or_multiple_definition_diagnostic(
-        &mut outcome.entities,
-        *ID_ENTITY_NAME,
-        FlattenedDataModelEntity {
-            description: None,
-            name: (*ID_ENTITY_NAME).with_no_location(),
-            selection_info: ().scalar_selected(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
-            selectables: Default::default(),
-        }
-        .interned_value(db)
-        .with_generated_location(),
-        non_fatal_diagnostics,
-    );
-    insert_entity_or_multiple_definition_diagnostic(
-        &mut outcome.entities,
-        *STRING_ENTITY_NAME,
-        FlattenedDataModelEntity {
-            description: None,
-            name: (*STRING_ENTITY_NAME).with_no_location(),
-            selection_info: ().scalar_selected(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
-            selectables: Default::default(),
-        }
-        .interned_value(db)
-        .with_generated_location(),
-        non_fatal_diagnostics,
-    );
-    insert_entity_or_multiple_definition_diagnostic(
-        &mut outcome.entities,
-        *BOOLEAN_ENTITY_NAME,
-        FlattenedDataModelEntity {
-            description: None,
-            name: (*BOOLEAN_ENTITY_NAME).with_no_location(),
-            selection_info: ().scalar_selected(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
-            selectables: Default::default(),
-        }
-        .interned_value(db)
-        .with_generated_location(),
-        non_fatal_diagnostics,
-    );
-    insert_entity_or_multiple_definition_diagnostic(
-        &mut outcome.entities,
-        *FLOAT_ENTITY_NAME,
-        FlattenedDataModelEntity {
-            description: None,
-            name: (*FLOAT_ENTITY_NAME).with_no_location(),
-            selection_info: ().scalar_selected(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
-            selectables: Default::default(),
-        }
-        .interned_value(db)
-        .with_generated_location(),
-        non_fatal_diagnostics,
-    );
-    insert_entity_or_multiple_definition_diagnostic(
-        &mut outcome.entities,
-        *INT_ENTITY_NAME,
-        FlattenedDataModelEntity {
-            description: None,
-            name: (*INT_ENTITY_NAME).with_no_location(),
-            selection_info: ().scalar_selected(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
-            selectables: Default::default(),
-        }
-        .interned_value(db)
-        .with_generated_location(),
-        non_fatal_diagnostics,
-    );
-}
-
-// Defaults to false if item is missing... should this panic?
-fn is_object_entity(
-    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
-    entities: &EntitiesDefinedBySchema,
-    target: EntityName,
-) -> bool {
-    entities
-        .get(&target)
-        .map(|entity| entity.item.lookup(db).selection_info.as_object().is_some())
-        .unwrap_or(false)
-}
-
 fn traverse_selections_and_return_path<'a>(
     db: &'a IsographDatabase<GraphQLAndJavascriptProfile>,
     outcome: &'a DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
@@ -732,23 +582,4 @@ fn traverse_selections_and_return_path<'a>(
     }
 
     (output, current_entity).wrap_ok()
-}
-
-type EntitiesDefinedBySchema = BTreeMap<
-    EntityName,
-    WithLocation<pico::MemoRef<FlattenedDataModelEntity<GraphQLAndJavascriptProfile>>>,
->;
-
-pub(crate) fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
-    if members.is_empty() {
-        *NEVER_JAVASCRIPT_TYPE
-    } else {
-        members
-            .iter()
-            .map(|name| format!("\"{name}\""))
-            .collect::<Vec<String>>()
-            .join(" | ")
-            .intern()
-            .into()
-    }
 }

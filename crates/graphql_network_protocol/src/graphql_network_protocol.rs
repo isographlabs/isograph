@@ -1,9 +1,8 @@
 use std::collections::BTreeMap;
-use std::collections::btree_map::Entry;
 
 use common_lang_types::{
-    Diagnostic, DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName,
-    QueryText, SelectableName, WithLocation, WithNonFatalDiagnostics,
+    DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
+    SelectableName, WithNonFatalDiagnostics,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -23,7 +22,6 @@ use prelude::{ErrClone, Postfix};
 
 use crate::nested_schema::parse_nested_schema;
 use crate::parse_type_system_document::parse_type_system_document;
-use crate::process_type_system_definition::multiple_entity_definitions_found_diagnostic;
 use crate::query_text::generate_query_text;
 
 lazy_static! {
@@ -259,23 +257,6 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
 #[derive(Debug, PartialEq, Eq, Clone, Hash, Ord, PartialOrd)]
 pub struct GraphQLSchemaObjectAssociatedData {
     pub subtypes: Vec<EntityName>,
-}
-
-// TODO make this generic over value, too
-pub(crate) fn insert_entity_or_multiple_definition_diagnostic<Value>(
-    map: &mut BTreeMap<EntityName, WithLocation<Value>>,
-    key: EntityName,
-    item: WithLocation<Value>,
-    non_fatal_diagnostics: &mut Vec<Diagnostic>,
-) {
-    match map.entry(key) {
-        Entry::Vacant(vacant_entry) => {
-            vacant_entry.insert(item);
-        }
-        Entry::Occupied(_) => non_fatal_diagnostics.push(
-            multiple_entity_definitions_found_diagnostic(key, item.location.wrap_some()),
-        ),
-    }
 }
 
 fn format_field_definition<TCompilationProfile: CompilationProfile>(

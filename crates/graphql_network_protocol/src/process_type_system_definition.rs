@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, EmbeddedLocation, EntityName, JavascriptName, Location,
-    SelectableName, VariableName, WithEmbeddedLocation, WithLocationPostfix,
+    DescriptionValue, Diagnostic, EmbeddedLocation, EntityName, Location, SelectableName,
+    VariableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{
     GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
@@ -17,21 +17,16 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
-    FlattenedDataModelEntity, FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME,
-    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsConcrete, IsographDatabase,
-    NODE_FIELD_NAME, RefetchStrategy, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
-    WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME,
+    ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME, RefetchStrategy,
+    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, generate_refetch_field_strategy,
     insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
 use pico::MemoRef;
 use prelude::Postfix;
 
-use crate::{
-    GraphQLAndJavascriptProfile, GraphQLRootTypes, GraphQLSchemaObjectAssociatedData,
-    STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE,
-    insert_entity_or_multiple_definition_diagnostic,
-};
+use crate::{GraphQLAndJavascriptProfile, GraphQLRootTypes};
 
 lazy_static! {
     // TODO use schema_data.string_type_id or something
@@ -61,67 +56,12 @@ pub fn process_graphql_type_system_document(
         match type_system_definition {
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                 let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    server_object_entity_name,
-                    FlattenedDataModelEntity {
-                        description: object_type_definition.description.map(|description_value| {
-                            description_value
-                                .item
-                                .unchecked_conversion::<DescriptionValue>()
-                                .wrap(Description)
-                                .with_no_location()
-                        }),
-                        name: server_object_entity_name.with_no_location(),
-                        selection_info: ServerObjectSelectionInfo {
-                            is_concrete: IsConcrete(true),
-                        }
-                        .object_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
-                            subtypes: vec![],
-                        }
-                        .object_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
 
                 let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
                     .intern()
                     .to::<EntityName>()
                     // And make it not selectable!
                     .note_todo("Come up with a way to not have these be in the same namespace");
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    typename_entity_name,
-                    FlattenedDataModelEntity {
-                        description: format!("The typename of {}", server_object_entity_name)
-                            .intern()
-                            .to::<DescriptionValue>()
-                            .wrap(Description)
-                            .with_no_location()
-                            .wrap_some(),
-                        name: typename_entity_name.with_no_location(),
-                        selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: format!(
-                            "\"{}\"",
-                            server_object_entity_name
-                        )
-                        .intern()
-                        .to::<JavascriptName>()
-                        .scalar_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
 
                 insert_selectable_or_multiple_definition_diagnostic(
                     &mut outcome.selectables,
@@ -196,28 +136,7 @@ pub fn process_graphql_type_system_document(
                         .push(server_object_entity_name);
                 }
             }
-            GraphQLTypeSystemDefinition::ScalarTypeDefinition(scalar_type_definition) => {
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    scalar_type_definition.name.item,
-                    FlattenedDataModelEntity {
-                        description: scalar_type_definition
-                            .description
-                            .map(|with_span| with_span.item.wrap(Description).with_no_location()),
-                        name: scalar_type_definition.name.item.with_no_location(),
-                        // TODO allow customization here
-                        selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: (*UNKNOWN_JAVASCRIPT_TYPE)
-                            .scalar_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
-            }
+            GraphQLTypeSystemDefinition::ScalarTypeDefinition(_scalar_type_definition) => {}
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
                 supertype_to_subtype_map
                     .entry(interface_definition.name.item)
@@ -227,37 +146,6 @@ pub fn process_graphql_type_system_document(
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
                 let server_object_entity_name =
                     input_object_definition.name.item.to::<EntityName>();
-
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    server_object_entity_name,
-                    FlattenedDataModelEntity {
-                        description: input_object_definition
-                            .description
-                            .map(|description_value| {
-                                description_value
-                                    .item
-                                    .unchecked_conversion::<DescriptionValue>()
-                                    .wrap(Description)
-                                    .with_no_location()
-                            }),
-                        name: server_object_entity_name.with_no_location(),
-                        selection_info: ServerObjectSelectionInfo {
-                            is_concrete: IsConcrete(true),
-                        }
-                        .object_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
-                            subtypes: vec![],
-                        }
-                        .object_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
 
                 directives
                     .entry(server_object_entity_name)
@@ -275,63 +163,9 @@ pub fn process_graphql_type_system_document(
                 // For now, Isograph ignores directive definitions,
                 // but it might choose to allow-list them.
             }
-            GraphQLTypeSystemDefinition::EnumDefinition(enum_definition) => {
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    enum_definition.name.item,
-                    FlattenedDataModelEntity {
-                        description: enum_definition
-                            .description
-                            .map(|with_span| with_span.item.wrap(Description).with_no_location()),
-                        name: enum_definition.name.item.with_no_location(),
-                        // TODO allow customization here
-                        selection_info: ().scalar_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
-                            .scalar_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
-            }
+            GraphQLTypeSystemDefinition::EnumDefinition(_enum_definition) => {}
             GraphQLTypeSystemDefinition::UnionTypeDefinition(union_definition) => {
                 let server_object_entity_name = union_definition.name.item.to::<EntityName>();
-
-                insert_entity_or_multiple_definition_diagnostic(
-                    &mut outcome.entities,
-                    server_object_entity_name,
-                    FlattenedDataModelEntity {
-                        description: union_definition.description.map(|description_value| {
-                            description_value
-                                .item
-                                .unchecked_conversion::<DescriptionValue>()
-                                .wrap(Description)
-                                .with_no_location()
-                        }),
-                        name: server_object_entity_name.with_no_location(),
-                        selection_info: ServerObjectSelectionInfo {
-                            is_concrete: IsConcrete(false),
-                        }
-                        .object_selected(),
-                        network_protocol_associated_data: (),
-                        target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
-                            subtypes: union_definition
-                                .union_member_types
-                                .iter()
-                                .map(|entity_name| entity_name.item.unchecked_conversion())
-                                .collect(),
-                        }
-                        .object_selected(),
-                        selectables: Default::default(),
-                    }
-                    .interned_value(db)
-                    .with_location(location)
-                    .into(),
-                    non_fatal_diagnostics,
-                );
 
                 directives
                     .entry(server_object_entity_name)

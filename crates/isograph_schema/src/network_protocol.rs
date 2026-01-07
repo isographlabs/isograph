@@ -7,14 +7,12 @@ use common_lang_types::{
 use isograph_lang_types::VariableDeclaration;
 
 use crate::{
-    CompilationProfile, MemoRefSelectable, MemoRefServerEntity, MergedSelectionMap,
-    RefetchStrategy, RootOperationName, isograph_database::IsographDatabase,
+    CompilationProfile, MemoRefSelectable, MergedSelectionMap, RefetchStrategy, RootOperationName,
+    isograph_database::IsographDatabase,
 };
 
 #[derive(Clone, Eq, PartialEq, Hash, Debug, Default)]
 pub struct DeprecatedParseTypeSystemOutcome<TCompilationProfile: CompilationProfile> {
-    pub entities: BTreeMap<EntityName, WithLocation<MemoRefServerEntity<TCompilationProfile>>>,
-
     pub selectables: BTreeMap<
         (EntityName, SelectableName),
         WithLocation<MemoRefSelectable<TCompilationProfile>>,
