@@ -5,7 +5,7 @@ use common_lang_types::{
     VariableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use graphql_lang_types::{
-    GraphQLConstantValue, GraphQLDirective, GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition,
+    GraphQLConstantValue, GraphQLDirective, GraphQLInterfaceTypeDefinition,
     GraphQLTypeSystemDefinition, GraphQLTypeSystemDocument, GraphQLTypeSystemExtension,
     GraphQLTypeSystemExtensionDocument, GraphQLTypeSystemExtensionOrDefinition,
 };
@@ -41,8 +41,6 @@ pub fn process_graphql_type_system_document(
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
-    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithEmbeddedLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -71,7 +69,6 @@ pub fn process_graphql_type_system_document(
                     if field.item.name.item == *ID_FIELD_NAME {
                         has_id_field = true;
                     }
-                    fields_to_process.push((server_object_entity_name, field));
                 }
 
                 let subfields_or_inline_fragments = vec![
@@ -115,19 +112,9 @@ pub fn process_graphql_type_system_document(
                             .wrap_ok(),
                     );
                 }
-
-                for interface_name in object_type_definition.interfaces {
-                    supertype_to_subtype_map
-                        .entry(interface_name.item)
-                        .or_default()
-                        .push(server_object_entity_name);
-                }
             }
             GraphQLTypeSystemDefinition::ScalarTypeDefinition(_scalar_type_definition) => {}
             GraphQLTypeSystemDefinition::InterfaceTypeDefinition(interface_definition) => {
-                supertype_to_subtype_map
-                    .entry(interface_definition.name.item)
-                    .or_default();
                 interfaces_to_process.push(interface_definition.with_location(location));
             }
             GraphQLTypeSystemDefinition::InputObjectTypeDefinition(input_object_definition) => {
@@ -138,10 +125,6 @@ pub fn process_graphql_type_system_document(
                     .entry(server_object_entity_name)
                     .or_default()
                     .extend(input_object_definition.directives);
-
-                for field in input_object_definition.fields {
-                    fields_to_process.push((server_object_entity_name, field.map(From::from)));
-                }
 
                 // inputs do not implement interfaces
                 // nor have typenames
@@ -158,16 +141,6 @@ pub fn process_graphql_type_system_document(
                     .entry(server_object_entity_name)
                     .or_default()
                     .extend(union_definition.directives);
-
-                supertype_to_subtype_map
-                    .entry(server_object_entity_name)
-                    .or_default()
-                    .extend(
-                        union_definition
-                            .union_member_types
-                            .iter()
-                            .map(|entity_name| entity_name.item.to::<EntityName>()),
-                    );
 
                 // unions do not implement interfaces
             }
@@ -273,8 +246,6 @@ pub fn process_graphql_type_system_extension_document(
     graphql_root_types: &mut Option<GraphQLRootTypes>,
     outcome: &mut DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     directives: &mut HashMap<EntityName, Vec<GraphQLDirective<GraphQLConstantValue>>>,
-    fields_to_process: &mut Vec<(EntityName, WithEmbeddedLocation<GraphQLFieldDefinition>)>,
-    supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<WithEmbeddedLocation<GraphQLInterfaceTypeDefinition>>,
     non_fatal_diagnostics: &mut Vec<Diagnostic>,
 ) {
@@ -299,8 +270,6 @@ pub fn process_graphql_type_system_extension_document(
         graphql_root_types,
         outcome,
         directives,
-        fields_to_process,
-        supertype_to_subtype_map,
         interfaces_to_process,
         non_fatal_diagnostics,
     );

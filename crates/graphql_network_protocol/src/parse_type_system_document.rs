@@ -40,8 +40,6 @@ pub(crate) fn parse_type_system_document(
 
     let mut graphql_root_types = None;
     let mut directives = HashMap::new();
-    let mut fields_to_process = vec![];
-    let mut supertype_to_subtype_map = BTreeMap::new();
     let mut interfaces_to_process = vec![];
 
     let (type_system_document, type_system_extension_documents) =
@@ -53,8 +51,6 @@ pub(crate) fn parse_type_system_document(
         &mut graphql_root_types,
         &mut outcome,
         &mut directives,
-        &mut fields_to_process,
-        &mut supertype_to_subtype_map,
         &mut interfaces_to_process,
         &mut non_fatal_diagnostics,
     );
@@ -68,8 +64,6 @@ pub(crate) fn parse_type_system_document(
             &mut graphql_root_types,
             &mut outcome,
             &mut directives,
-            &mut fields_to_process,
-            &mut supertype_to_subtype_map,
             &mut interfaces_to_process,
             &mut non_fatal_diagnostics,
         );
@@ -86,10 +80,6 @@ pub(crate) fn parse_type_system_document(
             .entry(server_object_entity_name)
             .or_default()
             .extend(interface_definition.directives);
-
-        for field in interface_definition.fields {
-            fields_to_process.push((server_object_entity_name, field));
-        }
 
         // I don't think interface-to-interface refinement is handled correctly, let's just
         // ignore it for now.
