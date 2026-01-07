@@ -33,11 +33,11 @@ fn check(critical_severity: DiagnosticSeverity, diagnostics: Diagnostics) -> Dia
 
 /// Escalate all diagnostics at or above the critical severity to the highest severity (DiagnosticSeverity::ERROR)
 fn escalate(critical_severity: DiagnosticSeverity, diagnostics: &mut Diagnostics) {
-    diagnostics.iter_mut().for_each(|diagnostic| {
+    for diagnostic in diagnostics.iter_mut() {
         if diagnostic.severity() <= critical_severity {
             diagnostic.override_severity(DiagnosticSeverity::ERROR);
         }
-    });
+    }
 }
 
 /// Convenience function that runs escalate() followed by check()
