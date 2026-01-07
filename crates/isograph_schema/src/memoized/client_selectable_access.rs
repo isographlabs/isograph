@@ -418,7 +418,7 @@ pub fn insert_selectable_or_multiple_definition_diagnostic<Value>(
             non_fatal_diagnostics.push(multiple_selectable_definitions_found_diagnostic(
                 key.0,
                 key.1,
-                item.location.to::<Location>().wrap_some(),
+                item.location.wrap_some(),
             ))
         }
     }
