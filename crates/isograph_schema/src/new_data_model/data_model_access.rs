@@ -12,7 +12,7 @@ use crate::{
 };
 
 #[memo]
-fn flattened_schema<TCompilationProfile: CompilationProfile>(
+fn flattened_server_schema<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> BTreeMap<
     EntityName,
@@ -31,7 +31,7 @@ fn flattened_schema<TCompilationProfile: CompilationProfile>(
 pub fn flattened_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> BTreeMap<EntityName, MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
-    flattened_schema(db)
+    flattened_server_schema(db)
         .iter()
         .map(|(key, value)| (*key, value.item.0.interned_ref(db)))
         .collect()
@@ -80,7 +80,7 @@ pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
 pub fn flattened_selectables<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>> {
-    flattened_schema(db)
+    flattened_server_schema(db)
         .iter()
         .flat_map(|(_entity_name, value)| {
             value
@@ -98,7 +98,7 @@ pub fn flattened_selectables_for_entity<TCompilationProfile: CompilationProfile>
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> Option<BTreeMap<SelectableName, MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>>> {
-    let entity = flattened_schema(db).get(entity_name.reference())?;
+    let entity = flattened_server_schema(db).get(entity_name.reference())?;
 
     entity
         .item
@@ -116,7 +116,7 @@ pub fn flattened_selectable_named<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> Option<MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>> {
-    let entity = flattened_schema(db).get(&entity_name)?;
+    let entity = flattened_server_schema(db).get(&entity_name)?;
     let (selectable, _) = entity.item.1.item.get(selectable_name.reference())?;
     selectable.interned_ref(db).wrap_some()
 }
