@@ -17,7 +17,8 @@ use isograph_schema::{
     FlattenedDataModelEntity, FlattenedDataModelSelectable, ImperativelyLoadedFieldVariant,
     IsographDatabase, RefetchStrategy, RootOperationName, ServerEntityDirectives,
     TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, flattened_entity_named,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    flattened_selectable_named, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
 };
 use prelude::{ErrClone, Postfix};
@@ -315,19 +316,12 @@ pub(crate) fn parse_type_system_document(
 
             let mutation_subfield_name: SelectableName = field.intern().into();
 
-            let mutation_field = match outcome
-                .selectables
-                .values()
-                .filter_map(|x| x.item.as_server())
-                .find_map(|server_object_selectable| {
-                    let server_object_selectable = server_object_selectable.lookup(db);
-                    if server_object_selectable.name.item == mutation_subfield_name {
-                        Some(server_object_selectable)
-                    } else {
-                        None
-                    }
-                }) {
-                Some(s) => s,
+            let mutation_field = match flattened_selectable_named(
+                db,
+                parent_object_entity_name,
+                mutation_subfield_name,
+            ) {
+                Some(s) => s.lookup(db),
                 None => {
                     non_fatal_diagnostics.push(Diagnostic::new(
                         "Mutation field not found".to_string(),
