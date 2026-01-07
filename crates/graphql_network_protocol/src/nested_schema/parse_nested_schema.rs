@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 
 use common_lang_types::{
-    DescriptionValue, EntityName, JavascriptName, Location, SelectableName, VariableName,
-    WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
+    VariableName, WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition, GraphQLTypeSystemDefinition,
@@ -25,9 +25,6 @@ use crate::{
     BOOLEAN_JAVASCRIPT_TYPE, GraphQLAndJavascriptProfile, GraphQLSchemaObjectAssociatedData,
     NEVER_JAVASCRIPT_TYPE, NUMBER_JAVASCRIPT_TYPE, STRING_JAVASCRIPT_TYPE, UNKNOWN_JAVASCRIPT_TYPE,
     parse_graphql_schema,
-    process_type_system_definition::{
-        UnvalidatedTypeRefinementMap, multiple_entity_definitions_found_diagnostic,
-    },
 };
 
 pub fn parse_nested_schema(
@@ -626,4 +623,16 @@ fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
             .intern()
             .into()
     }
+}
+
+type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
+
+fn multiple_entity_definitions_found_diagnostic(
+    server_object_entity_name: EntityName,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(
+        format!("Multiple definitions of `{server_object_entity_name}` were found."),
+        location,
+    )
 }

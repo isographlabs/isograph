@@ -285,15 +285,3 @@ pub fn process_graphql_type_system_extension_document(
         }
     }
 }
-
-pub type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
-
-pub fn multiple_entity_definitions_found_diagnostic(
-    server_object_entity_name: EntityName,
-    location: Option<Location>,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!("Multiple definitions of `{server_object_entity_name}` were found."),
-        location,
-    )
-}
