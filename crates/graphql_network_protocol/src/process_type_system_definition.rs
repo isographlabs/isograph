@@ -11,19 +11,17 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocationPostfix, Description, EmptyDirectiveSet,
-    NonConstantValue, ScalarSelection, ScalarSelectionDirectiveSet, SelectionSet,
-    SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
+    ArgumentKeyAndValue, Description, EmptyDirectiveSet, NonConstantValue, ScalarSelection,
+    ScalarSelectionDirectiveSet, SelectionSet, SelectionTypePostfix, TypeAnnotationDeclaration,
+    VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
-    FlattenedDataModelSelectable, ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME,
-    ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME, RefetchStrategy,
-    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, generate_refetch_field_strategy,
-    insert_selectable_or_multiple_definition_diagnostic,
+    ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant,
+    IsographDatabase, NODE_FIELD_NAME, RefetchStrategy, WrappedSelectionMapSelection,
+    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
-use pico::MemoRef;
 use prelude::Postfix;
 
 use crate::{GraphQLAndJavascriptProfile, GraphQLRootTypes};
@@ -57,21 +55,11 @@ pub fn process_graphql_type_system_document(
             GraphQLTypeSystemDefinition::ObjectTypeDefinition(object_type_definition) => {
                 let server_object_entity_name = object_type_definition.name.item.to::<EntityName>();
 
-                let typename_entity_name = format!("{}__discriminator", server_object_entity_name)
+                let _typename_entity_name = format!("{}__discriminator", server_object_entity_name)
                     .intern()
                     .to::<EntityName>()
                     // And make it not selectable!
                     .note_todo("Come up with a way to not have these be in the same namespace");
-
-                insert_selectable_or_multiple_definition_diagnostic(
-                    &mut outcome.selectables,
-                    (server_object_entity_name, (*TYPENAME_FIELD_NAME)),
-                    get_typename_selectable(db, server_object_entity_name, typename_entity_name)
-                        .server_defined()
-                        .with_location(location)
-                        .into(),
-                    non_fatal_diagnostics,
-                );
 
                 directives
                     .entry(server_object_entity_name)
@@ -113,7 +101,6 @@ pub fn process_graphql_type_system_document(
                         )
                         .interned_value(db)
                         .scalar_selected()
-                        .client_defined()
                         .with_generated_location(),
                         non_fatal_diagnostics,
                     );
@@ -277,31 +264,6 @@ fn get_refetch_selectable(
         parent_entity_name: server_object_entity_name,
         phantom_data: std::marker::PhantomData,
     }
-}
-
-pub(crate) fn get_typename_selectable(
-    db: &IsographDatabase<GraphQLAndJavascriptProfile>,
-    server_object_entity_name: EntityName,
-    target_entity_name: EntityName,
-) -> MemoRef<FlattenedDataModelSelectable<GraphQLAndJavascriptProfile>> {
-    FlattenedDataModelSelectable {
-        description: format!("A discriminant for the {} type", server_object_entity_name)
-            .intern()
-            .to::<DescriptionValue>()
-            .wrap(Description)
-            .with_no_location()
-            .wrap_some(),
-        name: (*TYPENAME_FIELD_NAME).with_no_location(),
-        target_entity: TypeAnnotationDeclaration::Scalar(target_entity_name.into())
-            .wrap_ok()
-            .with_no_location(),
-        is_inline_fragment: false.into(),
-        parent_entity_name: server_object_entity_name.with_no_location(),
-        arguments: vec![],
-        network_protocol_associated_data: (),
-        target_platform_associated_data: (),
-    }
-    .interned_value(db)
 }
 
 #[expect(clippy::too_many_arguments)]

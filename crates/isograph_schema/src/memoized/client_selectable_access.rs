@@ -285,15 +285,16 @@ pub fn client_selectable_named<TCompilationProfile: CompilationProfile>(
 pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
-    HashMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
+    BTreeMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
 > {
     let outcome = TCompilationProfile::deprecated_parse_type_system_documents(db).clone_err()?;
     let expose_as_field_queue = &outcome.0.item.selectables;
 
     expose_as_field_queue
         .iter()
-        .filter_map(|(key, value)| value.item.as_client().map(|val| (*key, val)))
-        .collect::<HashMap<_, _>>()
+        .map(|(key, value)| (key.dereference(), value.item))
+        .collect::<BTreeMap<_, _>>()
+        .note_todo("Don't clone")
         .wrap_ok()
 }
 

@@ -1,33 +1,29 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap};
+use std::collections::{BTreeMap, HashMap};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, SelectableName,
-    VariableName, WithGenericLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, SelectableName,
+    WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::from_graphql_directives;
 use intern::Lookup;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    DefinitionLocationPostfix, Description, EmptyDirectiveSet, ObjectSelection, ScalarSelection,
-    SelectionSet, SelectionTypePostfix, TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration,
-    UnionVariant, VariableDeclaration,
+    EmptyDirectiveSet, ObjectSelection, ScalarSelection, SelectionSet, SelectionTypePostfix,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome,
     FlattenedDataModelEntity, FlattenedDataModelSelectable, ImperativelyLoadedFieldVariant,
     IsographDatabase, RefetchStrategy, RootOperationName, ServerEntityDirectives,
-    TYPENAME_FIELD_NAME, WrappedSelectionMapSelection, flattened_entity_named,
-    flattened_selectable_named, generate_refetch_field_strategy,
-    imperative_field_subfields_or_inline_fragments,
-    insert_selectable_or_multiple_definition_diagnostic, to_isograph_constant_value,
+    WrappedSelectionMapSelection, flattened_entity_named, flattened_selectable_named,
+    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    insert_selectable_or_multiple_definition_diagnostic,
 };
 use prelude::{ErrClone, Postfix};
 
 use crate::{
     GraphQLAndJavascriptProfile, parse_graphql_schema,
     process_type_system_definition::{
-        get_typename_selectable, process_graphql_type_system_document,
-        process_graphql_type_system_extension_document,
+        process_graphql_type_system_document, process_graphql_type_system_extension_document,
     },
 };
 
@@ -99,203 +95,6 @@ pub(crate) fn parse_type_system_document(
         // ignore it for now.
     }
 
-    // Note: we need to know whether a field points to an object entity or scalar entity, and we
-    // do not have that information when we first encounter that field. So, we accumulate fields
-    // and handle them now. A future refactor will get rid of this: selectables will all be the
-    // the same struct, and you will have to do a follow up request for the target entity to
-    // know whether it is an object or scalar selectable.
-    for (parent_entity_name, field) in fields_to_process {
-        let target: EntityName = field.item.type_.item.inner().unchecked_conversion();
-
-        let entity = flattened_entity_named(db, target);
-        let is_object_entity = entity
-            .map(|x| x.lookup(db).selection_info.as_object().is_some())
-            .unwrap_or(false);
-
-        if is_object_entity {
-            insert_selectable_or_multiple_definition_diagnostic(
-                &mut outcome.selectables,
-                (parent_entity_name, field.item.name.item),
-                FlattenedDataModelSelectable {
-                    description: field
-                        .item
-                        .description
-                        .map(WithGenericLocation::drop_location)
-                        .map(|x| x.map(Description::from)),
-
-                    name: field
-                        .item
-                        .name
-                        .map(|x| x.unchecked_conversion())
-                        .drop_location(),
-                    target_entity: field
-                        .item
-                        .type_
-                        .item
-                        .clone()
-                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
-                        .wrap_ok()
-                        .with_no_location(),
-
-                    is_inline_fragment: false.into(),
-                    parent_entity_name: parent_entity_name.with_no_location(),
-                    arguments: field
-                        .item
-                        .arguments
-                        .into_iter()
-                        .map(|with_location| {
-                            let arg = with_location.item;
-                            VariableDeclaration {
-                                name: arg.name.map(|input_value_name| {
-                                    input_value_name
-                                        .unchecked_conversion::<VariableName>()
-                                        .into()
-                                }),
-                                type_: arg
-                                    .type_
-                                    .map(TypeAnnotationDeclaration::from_graphql_type_annotation),
-                                default_value: arg.default_value.map(|with_location| {
-                                    with_location.map(to_isograph_constant_value)
-                                }),
-                            }
-                        })
-                        .collect(),
-                    network_protocol_associated_data: (),
-                    target_platform_associated_data: (),
-                }
-                .interned_value(db)
-                .server_defined()
-                .with_location(field.location)
-                .into(),
-                &mut non_fatal_diagnostics,
-            );
-        } else {
-            insert_selectable_or_multiple_definition_diagnostic(
-                &mut outcome.selectables,
-                (parent_entity_name, field.item.name.item),
-                FlattenedDataModelSelectable {
-                    description: field
-                        .item
-                        .description
-                        .map(|x| x.drop_location().map(Description::from)),
-                    name: field
-                        .item
-                        .name
-                        .map(|x| x.unchecked_conversion())
-                        .drop_location(),
-                    parent_entity_name: parent_entity_name.with_no_location(),
-                    arguments: field
-                        .item
-                        .arguments
-                        .into_iter()
-                        .map(|with_location| {
-                            let arg = with_location.item;
-                            VariableDeclaration {
-                                name: arg.name.map(|input_value_name| {
-                                    input_value_name
-                                        .unchecked_conversion::<VariableName>()
-                                        .into()
-                                }),
-                                type_: arg
-                                    .type_
-                                    .map(TypeAnnotationDeclaration::from_graphql_type_annotation),
-                                default_value: arg.default_value.map(|with_location| {
-                                    with_location.map(to_isograph_constant_value)
-                                }),
-                            }
-                        })
-                        .collect(),
-                    target_entity: field
-                        .item
-                        .type_
-                        .item
-                        .clone()
-                        .wrap(TypeAnnotationDeclaration::from_graphql_type_annotation)
-                        .wrap_ok()
-                        .with_no_location(),
-
-                    network_protocol_associated_data: (),
-                    is_inline_fragment: false.into(),
-                    target_platform_associated_data: (),
-                }
-                .interned_value(db)
-                .server_defined()
-                .with_location(field.location)
-                .into(),
-                &mut non_fatal_diagnostics,
-            );
-        }
-    }
-
-    // asConcreteType fields
-    for (abstract_parent_entity_name, concrete_child_entity_names) in supertype_to_subtype_map {
-        let typename_entity_name = format!("{}__discriminator", abstract_parent_entity_name)
-            .intern()
-            .to::<EntityName>()
-            // And make it not selectable!
-            .note_todo("Come up with a way to not have these be in the same namespace");
-
-        insert_selectable_or_multiple_definition_diagnostic(
-            &mut outcome.selectables,
-            (abstract_parent_entity_name, (*TYPENAME_FIELD_NAME)),
-            get_typename_selectable(db, abstract_parent_entity_name, typename_entity_name)
-                .server_defined()
-                .with_generated_location()
-                .note_todo("use a better location"),
-            &mut non_fatal_diagnostics,
-        );
-
-        for concrete_child_entity_name in concrete_child_entity_names.iter() {
-            insert_selectable_or_multiple_definition_diagnostic(
-                &mut outcome.selectables,
-                (
-                    abstract_parent_entity_name.unchecked_conversion(),
-                    format!("as{concrete_child_entity_name}").intern().into(),
-                ),
-                FlattenedDataModelSelectable {
-                    description: format!(
-                        "A client pointer for the {} type.",
-                        concrete_child_entity_name
-                    )
-                    .intern()
-                    .to::<DescriptionValue>()
-                    .wrap(Description)
-                    .with_no_location()
-                    .wrap_some(),
-                    name: format!("as{}", concrete_child_entity_name)
-                        .intern()
-                        .to::<SelectableName>()
-                        .with_no_location(),
-                    target_entity: TypeAnnotationDeclaration::Union(
-                        UnionTypeAnnotationDeclaration {
-                            variants: {
-                                let mut variants = BTreeSet::new();
-                                variants.insert(UnionVariant::Scalar(
-                                    concrete_child_entity_name.dereference().into(),
-                                ));
-                                variants
-                            },
-                            nullable: true,
-                        },
-                    )
-                    .wrap_ok()
-                    .with_no_location(),
-                    is_inline_fragment: true.into(),
-                    parent_entity_name: abstract_parent_entity_name
-                        .unchecked_conversion::<EntityName>()
-                        .with_no_location(),
-                    arguments: vec![],
-                    network_protocol_associated_data: (),
-                    target_platform_associated_data: (),
-                }
-                .interned_value(db)
-                .server_defined()
-                .with_generated_location(),
-                &mut non_fatal_diagnostics,
-            );
-        }
-    }
-
     // exposeField directives -> fields
     'exposeField: for (parent_object_entity_name, directives) in directives {
         let result = from_graphql_directives::<ServerEntityDirectives>(&directives)?;
@@ -354,7 +153,6 @@ pub(crate) fn parse_type_system_document(
             let (mut parts_reversed, target_parent_object_entity) =
                 match traverse_selections_and_return_path(
                     db,
-                    &outcome,
                     payload_object_entity_name,
                     &primary_field_name_selection_parts,
                 ) {
@@ -465,7 +263,6 @@ pub(crate) fn parse_type_system_document(
                 mutation_client_scalar_selectable
                     .interned_value(db)
                     .scalar_selected()
-                    .client_defined()
                     .with_generated_location(),
                 &mut non_fatal_diagnostics,
             );
@@ -498,7 +295,6 @@ pub(crate) fn parse_type_system_document(
 
 fn traverse_selections_and_return_path<'a>(
     db: &'a IsographDatabase<GraphQLAndJavascriptProfile>,
-    outcome: &'a DeprecatedParseTypeSystemOutcome<GraphQLAndJavascriptProfile>,
     payload_object_entity_name: EntityName,
     primary_field_selection_name_parts: &[SelectableName],
 ) -> DiagnosticResult<(
@@ -531,21 +327,18 @@ fn traverse_selections_and_return_path<'a>(
     let mut output = vec![];
 
     for selection_name in primary_field_selection_name_parts {
-        let selectable = outcome
-            .selectables
-            .get(&(current_entity.name.item, selection_name.dereference()))
-            .and_then(|x| x.item.as_server())
-            .ok_or_else(|| {
-                Diagnostic::new(
-                    format!(
-                        "Invalid @exposeField directive. Field {} \
-                        not found or is not an object field.",
-                        selection_name
-                    ),
-                    None,
-                )
-            })?
-            .lookup(db);
+        let selectable =
+            flattened_selectable_named(db, current_entity.name.item, selection_name.dereference())
+                .ok_or_else(|| {
+                    Diagnostic::new(
+                        format!(
+                            "Invalid @exposeField directive. Field {} not found.",
+                            selection_name
+                        ),
+                        None,
+                    )
+                })?
+                .lookup(db);
 
         let next_entity_name = selectable.target_entity.item.clone_err()?.inner();
 
