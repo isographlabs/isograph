@@ -22,7 +22,7 @@ pub type MemoRefClientSelectable<TCompilationProfile> = SelectionType<
     MemoRef<ClientObjectSelectable<TCompilationProfile>>,
 >;
 
-/// The struct formally known as a client field, and declared with the field keyword
+/// The struct formerly known as a client field, and declared with the field keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TCompilationProfile: CompilationProfile> {
@@ -44,7 +44,7 @@ impl<TCompilationProfile: CompilationProfile> ClientScalarSelectable<TCompilatio
     }
 }
 
-/// The struct formally known as a client pointer, and declared with the pointer keyword
+/// The struct formerly known as a client pointer, and declared with the pointer keyword
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
