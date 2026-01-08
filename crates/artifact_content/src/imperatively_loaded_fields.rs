@@ -195,7 +195,7 @@ fn get_used_variable_definitions<TCompilationProfile: CompilationProfile>(
                 None
             } else {
                 entrypoint
-                    .variable_definitions
+                    .arguments
                     .iter()
                     .find(|definition| definition.name.item == *variable_name)
                     .unwrap_or_else(|| {

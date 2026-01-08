@@ -1331,8 +1331,8 @@ fn merge_non_loadable_client_type<TCompilationProfile: CompilationProfile>(
     let transformed_child_variable_context = parent_variable_context.child_variable_context(
         selection_arguments,
         match newly_encountered_client_type {
-            SelectionType::Scalar(s) => &s.variable_definitions,
-            SelectionType::Object(o) => &o.variable_definitions,
+            SelectionType::Scalar(s) => &s.arguments,
+            SelectionType::Object(o) => &o.arguments,
         },
         &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
     );

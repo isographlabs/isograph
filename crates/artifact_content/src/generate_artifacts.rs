@@ -300,7 +300,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                             .lookup(db);
 
                             let variable_definitions_iter =
-                                client_scalar_selectable.variable_definitions.iter();
+                                client_scalar_selectable.arguments.iter();
 
                             let id_var = VariableDeclaration {
                                 name: (*ID_FIELD_NAME)

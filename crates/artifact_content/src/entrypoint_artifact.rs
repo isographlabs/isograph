@@ -96,7 +96,7 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
         &merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
-        entrypoint.variable_definitions.iter().collect(),
+        entrypoint.arguments.iter().collect(),
         &fetchable_types(db)
             .as_ref()
             .expect(

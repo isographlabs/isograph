@@ -619,7 +619,7 @@ fn write_param_type_from_client_scalar_selectable<TCompilationProfile: Compilati
                     loadable_fields
                         .insert(client_scalar_selectable.entity_name_and_selectable_name());
                     let provided_arguments = get_provided_arguments(
-                        client_scalar_selectable.variable_definitions.iter(),
+                        client_scalar_selectable.arguments.iter(),
                         &scalar_selection.arguments,
                     );
 

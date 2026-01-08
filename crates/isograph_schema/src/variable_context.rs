@@ -109,8 +109,8 @@ pub fn initial_variable_context<TCompilationProfile: CompilationProfile>(
     // This makes sense, but seems somewhat superfluous. Perhaps we can refactor code such
     // that we do not need to call this.
     let variable_context = match selection_type {
-        SelectionType::Scalar(s) => s.variable_definitions.reference(),
-        SelectionType::Object(o) => o.variable_definitions.reference(),
+        SelectionType::Scalar(s) => s.arguments.reference(),
+        SelectionType::Object(o) => o.arguments.reference(),
     }
     .iter()
     .map(|variable_definition| {

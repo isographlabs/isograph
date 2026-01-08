@@ -30,7 +30,7 @@ pub fn get_link_fields<TCompilationProfile: CompilationProfile>(
                 .wrap_some(),
                 name: field_name,
                 parent_entity_name: parent_entity_name.item,
-                variable_definitions: vec![],
+                arguments: vec![],
                 variant: ClientFieldVariant::Link,
                 phantom_data: std::marker::PhantomData,
             }

@@ -32,7 +32,7 @@ pub struct ClientScalarSelectable<TCompilationProfile: CompilationProfile> {
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub variable_definitions: Vec<VariableDeclaration>,
+    pub arguments: Vec<VariableDeclaration>,
 
     pub parent_entity_name: EntityName,
     pub phantom_data: PhantomData<TCompilationProfile>,
@@ -52,7 +52,7 @@ pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
     pub name: SelectableName,
     pub target_entity_name: TypeAnnotationDeclaration,
 
-    pub variable_definitions: Vec<VariableDeclaration>,
+    pub arguments: Vec<VariableDeclaration>,
 
     pub parent_entity_name: EntityName,
 

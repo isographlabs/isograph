@@ -65,11 +65,11 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
     let (parent_entity_name, client_selectable_name, variable_definitions) = match client_type {
         SelectionType::Scalar(s) => {
             let s = s.lookup(db);
-            (s.parent_entity_name, s.name, &s.variable_definitions)
+            (s.parent_entity_name, s.name, &s.arguments)
         }
         SelectionType::Object(o) => {
             let o = o.lookup(db);
-            (o.parent_entity_name, o.name, &o.variable_definitions)
+            (o.parent_entity_name, o.name, &o.arguments)
         }
     };
 
@@ -154,10 +154,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                             server_scalar_selectable.arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_scalar_selectable) => {
-                            client_scalar_selectable
-                                .lookup(db)
-                                .variable_definitions
-                                .to_vec()
+                            client_scalar_selectable.lookup(db).arguments.to_vec()
                         }
                     };
 
@@ -213,10 +210,7 @@ fn validate_use_of_arguments_for_client_type<TCompilationProfile: CompilationPro
                             server_object_selectable.arguments.to_vec()
                         }
                         DefinitionLocation::Client(client_object_selectable) => {
-                            client_object_selectable
-                                .lookup(db)
-                                .variable_definitions
-                                .to_vec()
+                            client_object_selectable.lookup(db).arguments.to_vec()
                         }
                     };
 

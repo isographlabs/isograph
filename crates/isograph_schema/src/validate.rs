@@ -216,8 +216,8 @@ fn validate_selectables<TCompilationProfile: CompilationProfile>(
         let arguments = match selectable {
             DefinitionLocation::Server(s) => s.lookup(db).arguments.reference(),
             DefinitionLocation::Client(c) => match c {
-                SelectionType::Scalar(s) => s.lookup(db).variable_definitions.reference(),
-                SelectionType::Object(o) => o.lookup(db).variable_definitions.reference(),
+                SelectionType::Scalar(s) => s.lookup(db).arguments.reference(),
+                SelectionType::Object(o) => o.lookup(db).arguments.reference(),
             },
         };
 

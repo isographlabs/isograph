@@ -346,7 +346,7 @@ fn scalar_client_defined_field_ast_node<TCompilationProfile: CompilationProfile>
     let client_scalar_selectable = client_scalar_selectable.lookup(db);
     let client_scalar_selectable_variable_context = parent_variable_context.child_variable_context(
         &scalar_field_selection.arguments,
-        &client_scalar_selectable.variable_definitions,
+        &client_scalar_selectable.arguments,
         &scalar_field_selection.scalar_selection_directive_set,
     );
 
@@ -897,7 +897,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                                     path,
                                     &initial_variable_context.child_variable_context(
                                         &scalar_field_selection.arguments,
-                                        &client_scalar_selectable.variable_definitions,
+                                        &client_scalar_selectable.arguments,
                                         &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                                     ),
                                 );
@@ -956,7 +956,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             path,
                             &initial_variable_context.child_variable_context(
                                 &object_selection.arguments,
-                                &client_object_selectable.variable_definitions,
+                                &client_object_selectable.arguments,
                                 &ScalarSelectionDirectiveSet::None(EmptyDirectiveSet {}),
                             ),
                         );

@@ -96,7 +96,7 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                             (
                                 client.name,
                                 client.description,
-                                client.variable_definitions.reference(),
+                                client.arguments.reference(),
                             )
                         }
                     };
@@ -133,7 +133,7 @@ fn on_hover_impl<TCompilationProfile: CompilationProfile>(
                             (
                                 client.name,
                                 client.description,
-                                client.variable_definitions.reference(),
+                                client.arguments.reference(),
                             )
                         }
                     };

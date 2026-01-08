@@ -226,7 +226,7 @@ fn get_refetch_selectable(
                 default_value: None,
             }],
         }),
-        variable_definitions: vec![],
+        arguments: vec![],
         parent_entity_name: server_object_entity_name,
         phantom_data: std::marker::PhantomData,
     }

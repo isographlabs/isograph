@@ -239,7 +239,7 @@ pub(crate) fn parse_type_system_document(
                         top_level_schema_field_arguments,
                     },
                 ),
-                variable_definitions: vec![],
+                arguments: vec![],
                 parent_entity_name: target_parent_object_entity_name.item,
                 phantom_data: std::marker::PhantomData,
             };

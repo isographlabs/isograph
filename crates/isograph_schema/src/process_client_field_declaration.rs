@@ -188,7 +188,7 @@ pub fn add_client_scalar_selectable_to_entity<TCompilationProfile: CompilationPr
             .map(|client_scalar_selectable_name| *client_scalar_selectable_name)
             .item,
         variant,
-        variable_definitions: client_field_declaration
+        arguments: client_field_declaration
             .variable_definitions
             .iter()
             .map(|x| x.item.clone())
@@ -302,7 +302,7 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
             .map(|client_object_selectable_name| *client_object_selectable_name)
             .item,
 
-        variable_definitions: client_pointer_declaration
+        arguments: client_pointer_declaration
             .variable_definitions
             .iter()
             .map(|variable_definition| variable_definition.item.clone())

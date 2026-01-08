@@ -168,8 +168,8 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     }];
 
     let variable_definitions = match client_selectable {
-        SelectionType::Scalar(s) => s.variable_definitions.reference(),
-        SelectionType::Object(o) => o.variable_definitions.reference(),
+        SelectionType::Scalar(s) => s.arguments.reference(),
+        SelectionType::Object(o) => o.arguments.reference(),
     };
     if !variable_definitions.is_empty() {
         let reader_parameters_type = format!(
@@ -376,8 +376,8 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: Com
     };
 
     let variable_definitions = match client_selectable {
-        SelectionType::Scalar(s) => s.variable_definitions.reference(),
-        SelectionType::Object(o) => o.variable_definitions.reference(),
+        SelectionType::Scalar(s) => s.arguments.reference(),
+        SelectionType::Object(o) => o.arguments.reference(),
     };
     let (parameters_import, parameters_type) = if !variable_definitions.is_empty() {
         let reader_parameters_type = format!(
