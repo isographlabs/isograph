@@ -10,7 +10,7 @@ use pico::MemoRef;
 
 use crate::{
     CompilationProfile, DataModelStage, FlattenedStage, NestedStage, NetworkProtocol,
-    TargetPlatform, ValidatedStage,
+    TargetPlatform, ValidatedStage, flatten::BothFlattenedResults,
 };
 
 pub type MapWithNonfatalDiagnostics<TKey, TValue, TError> =
@@ -26,6 +26,17 @@ pub type DataModelSchema<TCompilationProfile, TStage> = MapWithNonfatalDiagnosti
 >;
 pub type NestedDataModelSchema<TCompilationProfile> =
     DataModelSchema<TCompilationProfile, NestedStage>;
+// TODO this is differently shaped than nested data model schema...
+// which is indicative of a problem! We are ignoring the top-level non fatal
+// diagnostics, because we don't care about it. Anyway, TODO figure out
+// what to do here.
+pub type FlattenedDataModelSchema<TCompilationProfile> = BTreeMap<
+    EntityName,
+    WithGenericLocation<
+        BothFlattenedResults<NestedDataModelEntity<TCompilationProfile>>,
+        <FlattenedStage as DataModelStage>::Location,
+    >,
+>;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DataModelEntity<TCompilationProfile: CompilationProfile, TStage: DataModelStage> {

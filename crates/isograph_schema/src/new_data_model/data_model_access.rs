@@ -1,25 +1,21 @@
 use std::collections::BTreeMap;
 
-use common_lang_types::{EmbeddedLocation, EntityName, SelectableName, WithNoLocation};
+use common_lang_types::{EmbeddedLocation, EntityName, SelectableName};
 use isograph_lang_types::SelectionType;
 use pico::MemoRef;
 use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSelectable, IsographDatabase,
-    NestedDataModelEntity, client_selectable_declaration,
-    flatten::{BothFlattenedResults, Flatten},
+    CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSchema,
+    FlattenedDataModelSelectable, IsographDatabase, client_selectable_declaration,
+    flatten::Flatten,
 };
 
 #[memo]
 fn flattened_server_schema<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
-) -> BTreeMap<
-    EntityName,
-    WithNoLocation<BothFlattenedResults<NestedDataModelEntity<TCompilationProfile>>>,
-> {
-    #[expect(clippy::unnecessary_to_owned)]
+) -> FlattenedDataModelSchema<TCompilationProfile> {
     TCompilationProfile::parse_nested_data_model_schema(db)
         .item
         .iter()
@@ -135,7 +131,9 @@ pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> Option<EmbeddedLocation> {
-    match TCompilationProfile::parse_nested_data_model_schema(db)
+    // TODO we should return None if the selectable is defined in the server schema, but
+    // has no location, instead of checking in the client schema.
+    if let Some(s) = TCompilationProfile::parse_nested_data_model_schema(db)
         .item
         .get(entity_name.reference())
         .and_then(|x| {
@@ -144,10 +142,10 @@ pub fn selectable_definition_location<TCompilationProfile: CompilationProfile>(
                 .item
                 .get(selectable_name.reference())
                 // TODO the selectable should have a location
-                .map(|x| x.name.location)
-        }) {
-        Some(Some(s)) => return s.wrap_some(),
-        _ => {}
+                .and_then(|x| x.name.location)
+        })
+    {
+        return s.wrap_some();
     };
 
     let client_selectable_declaration =
