@@ -9,7 +9,7 @@ use prelude::Postfix;
 use crate::{
     CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSchema,
     FlattenedDataModelSelectable, IsographDatabase, client_selectable_declaration,
-    flatten::Flatten,
+    flatten::Flatten, flattened_client_schema,
 };
 
 #[memo]
@@ -32,10 +32,18 @@ fn flattened_server_schema<TCompilationProfile: CompilationProfile>(
 pub fn flattened_entities<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> BTreeMap<EntityName, MemoRef<FlattenedDataModelEntity<TCompilationProfile>>> {
-    flattened_server_schema(db)
+    let mut entities = flattened_server_schema(db)
         .iter()
         .map(|(key, value)| (*key, value.item.0.interned_ref(db)))
-        .collect()
+        .collect::<BTreeMap<_, _>>();
+
+    entities.extend(
+        flattened_client_schema(db)
+            .iter()
+            .map(|(key, value)| (*key, value.item.0.interned_ref(db))),
+    );
+
+    entities
 }
 
 #[memo]
@@ -81,7 +89,7 @@ pub fn entity_definition_location<TCompilationProfile: CompilationProfile>(
 pub fn flattened_selectables<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>> {
-    flattened_server_schema(db)
+    let mut selectables = flattened_server_schema(db)
         .iter()
         .flat_map(|(_entity_name, value)| {
             value
@@ -91,7 +99,22 @@ pub fn flattened_selectables<TCompilationProfile: CompilationProfile>(
                 .values()
                 .map(|value| value.0.interned_ref(db))
         })
-        .collect()
+        .collect::<Vec<_>>();
+
+    selectables.extend(
+        flattened_client_schema(db)
+            .iter()
+            .flat_map(|(_entity_name, value)| {
+                value
+                    .item
+                    .1
+                    .item
+                    .values()
+                    .map(|value| value.0.interned_ref(db))
+            }),
+    );
+
+    selectables
 }
 
 #[memo]
@@ -99,7 +122,9 @@ pub fn flattened_selectables_for_entity<TCompilationProfile: CompilationProfile>
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> Option<BTreeMap<SelectableName, MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>>> {
-    let entity = flattened_server_schema(db).get(entity_name.reference())?;
+    let entity = flattened_server_schema(db)
+        .get(entity_name.reference())
+        .or_else(|| flattened_client_schema(db).get(entity_name.reference()))?;
 
     entity
         .item
@@ -117,9 +142,10 @@ pub fn flattened_selectable_named<TCompilationProfile: CompilationProfile>(
     entity_name: EntityName,
     selectable_name: SelectableName,
 ) -> Option<MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>> {
-    let entity = flattened_server_schema(db).get(&entity_name)?;
-    let (selectable, _) = entity.item.1.item.get(selectable_name.reference())?;
-    selectable.interned_ref(db).wrap_some()
+    flattened_selectables_for_entity(db, entity_name)
+        .as_ref()?
+        .get(selectable_name.reference())
+        .copied()
 }
 
 // TODO this is hacky AF, clean it up. It also returns the wrong location,

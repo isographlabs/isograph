@@ -1,4 +1,5 @@
 mod accessible_client_selectables_iterator;
+mod client_schema;
 mod client_selectables;
 mod compilation_profile;
 mod create_additional_fields;
@@ -27,6 +28,7 @@ mod variable_context;
 mod visit_selection_set;
 
 pub use accessible_client_selectables_iterator::*;
+pub use client_schema::*;
 pub use client_selectables::*;
 pub use compilation_profile::*;
 pub use create_additional_fields::*;
