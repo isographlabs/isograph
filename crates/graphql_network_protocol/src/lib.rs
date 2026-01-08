@@ -1,5 +1,5 @@
 mod graphql_network_protocol;
-mod nested_schema;
+mod nested_server_schema;
 mod parse_type_system_document;
 mod process_type_system_definition;
 mod query_text;

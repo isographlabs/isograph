@@ -20,7 +20,7 @@ use lazy_static::lazy_static;
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
-use crate::nested_schema::parse_nested_schema;
+use crate::nested_server_schema::parse_nested_schema;
 use crate::parse_type_system_document::parse_type_system_document;
 use crate::query_text::generate_query_text;
 
