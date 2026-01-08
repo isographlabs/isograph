@@ -23,3 +23,9 @@ diff = "0.1"
 lazy_static = "1.4"
 signedsource = { path = "../signedsource" }
 tokio = { version = "1.29.1", features = ["full", "test-util", "tracing"] }
+
+[lints]
+workspace = false
+
+[lints.clippy]
+all = "allow"

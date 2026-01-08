@@ -11,3 +11,9 @@ license = "MIT"
 [dependencies]
 colored = "2.1.0"
 common = { path = "../common" }
+
+[lints]
+workspace = false
+
+[lints.clippy]
+all = "allow"
