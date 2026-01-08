@@ -147,7 +147,7 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
 
                     let inner_reader_ast = generate_reader_ast_with_path(
                         db,
-                        client_object_selectable.target_entity_name.inner().0,
+                        client_object_selectable.target_entity.inner().0,
                         &object_selection.selection_set,
                         indentation_level + 1,
                         reader_imports,
@@ -945,7 +945,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                         let client_object_selectable_name = client_object_selectable.name;
                         let new_paths = refetched_paths_with_path(
                             db,
-                            client_object_selectable.target_entity_name.inner().0,
+                            client_object_selectable.target_entity.inner().0,
                             selectable_reader_selection_set(
                                 db,
                                 parent_object_entity_name,
@@ -988,7 +988,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
 
                         let new_paths = refetched_paths_with_path(
                             db,
-                            client_object_selectable.target_entity_name.inner().0,
+                            client_object_selectable.target_entity.inner().0,
                             &object_selection.selection_set,
                             path,
                             initial_variable_context,

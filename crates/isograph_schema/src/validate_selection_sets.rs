@@ -343,7 +343,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                             ObjectSelectionDirectiveSet::None(_) => {}
                         }
 
-                        c.lookup(db).target_entity_name.inner()
+                        c.lookup(db).target_entity.inner()
                     }
                 }
                 .0;

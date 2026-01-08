@@ -76,7 +76,7 @@ pub(crate) fn visit_selection_set<TCompilationProfile: CompilationProfile>(
                         Ok(annotation) => annotation.inner(),
                         Err(_) => continue,
                     },
-                    DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                    DefinitionLocation::Client(c) => c.lookup(db).target_entity.inner(),
                 }
                 .0;
 

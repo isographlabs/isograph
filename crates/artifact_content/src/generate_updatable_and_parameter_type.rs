@@ -202,13 +202,13 @@ fn write_param_type_from_selection<TCompilationProfile: CompilationProfile>(
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity.inner(),
             }
             .0;
 
             let type_annotation = match object_selectable {
                 DefinitionLocation::Client(client_pointer) => {
-                    client_pointer.lookup(db).target_entity_name.reference()
+                    client_pointer.lookup(db).target_entity.reference()
                 }
                 DefinitionLocation::Server(server_field) => server_field
                     .lookup(db)
@@ -468,7 +468,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
 
             let type_annotation = match object_selectable {
                 DefinitionLocation::Client(client_pointer) => {
-                    client_pointer.lookup(db).target_entity_name.reference()
+                    client_pointer.lookup(db).target_entity.reference()
                 }
                 DefinitionLocation::Server(server_field) => server_field
                     .lookup(db)
@@ -487,7 +487,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                     .as_ref()
                     .expect("Expected target entity to be valid.")
                     .inner(),
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity.inner(),
             }
             .0;
             let inner_text = generate_client_selectable_updatable_data_type(
@@ -509,7 +509,7 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
                         name_or_alias,
                         match object_selectable {
                             DefinitionLocation::Client(client_pointer) => {
-                                client_pointer.lookup(db).target_entity_name.reference()
+                                client_pointer.lookup(db).target_entity.reference()
                             }
                             DefinitionLocation::Server(server_field) => server_field
                                 .lookup(db)

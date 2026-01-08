@@ -101,12 +101,12 @@ export function iso<T>(
             type_and_field.underscore_separated(),
         ));
     } else if let SelectionType::Object(client_object_selectable) = client_type {
-        link_types.insert(client_object_selectable.target_entity_name.inner().0);
+        link_types.insert(client_object_selectable.target_entity.inner().0);
 
         let link_field_name = *LINK_FIELD_NAME;
         let inner_text = format!(
             "{}__{link_field_name}__output_type",
-            client_object_selectable.target_entity_name.inner()
+            client_object_selectable.target_entity.inner()
         );
 
         s.push_str(&format!(
@@ -117,7 +117,7 @@ export function iso<T>(
             formatted_field,
             type_and_field.underscore_separated(),
             print_javascript_type_declaration(
-                client_object_selectable.target_entity_name.reference(),
+                client_object_selectable.target_entity.reference(),
                 inner_text
             )
         ));

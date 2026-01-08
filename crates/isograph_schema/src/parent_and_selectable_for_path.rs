@@ -159,7 +159,7 @@ pub fn get_parent_for_selection_set_path<'a, TCompilationProfile: CompilationPro
                 DefinitionLocation::Server(s) => {
                     s.lookup(db).target_entity.item.clone_err()?.inner()
                 }
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity.inner(),
             }
         }
         SelectionSetParentType::ClientFieldDeclaration(client_field_declaration_path) => {
@@ -200,7 +200,7 @@ pub fn get_parent_and_selectable_for_selection_parent<
                 DefinitionLocation::Server(s) => {
                     s.lookup(db).target_entity.item.clone_err()?.inner()
                 }
-                DefinitionLocation::Client(c) => c.lookup(db).target_entity_name.inner(),
+                DefinitionLocation::Client(c) => c.lookup(db).target_entity.inner(),
             };
 
             parent_object_entity_and_selectable(db, object_parent_entity_name, selectable_name)

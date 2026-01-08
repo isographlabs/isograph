@@ -53,7 +53,7 @@ pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
     pub description: Option<WithNoLocation<Description>>,
 
     pub arguments: Vec<VariableDeclaration>,
-    pub target_entity_name: TypeAnnotationDeclaration,
+    pub target_entity: TypeAnnotationDeclaration,
 
     pub phantom_data: PhantomData<TCompilationProfile>,
     pub info: UserWrittenClientPointerInfo,

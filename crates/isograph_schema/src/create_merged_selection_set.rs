@@ -894,7 +894,7 @@ fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
         .insert(
             (
                 newly_encountered_client_object_selectable
-                    .target_entity_name
+                    .target_entity
                     .inner()
                     .0,
                 *LINK_FIELD_NAME,
@@ -1112,7 +1112,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
     variable_context: &VariableContext,
 ) {
     let target_server_object_entity_name = newly_encountered_client_object_selectable
-        .target_entity_name
+        .target_entity
         .inner()
         .0;
     let target_server_object_entity = &flattened_entity_named(db, target_server_object_entity_name)
@@ -1185,7 +1185,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
             None
         } else {
             (newly_encountered_client_object_selectable
-                .target_entity_name
+                .target_entity
                 .inner()
                 .0)
                 .wrap_some()

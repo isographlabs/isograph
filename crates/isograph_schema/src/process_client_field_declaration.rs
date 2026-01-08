@@ -309,7 +309,7 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
             .collect(),
 
         parent_entity_name,
-        target_entity_name: client_pointer_declaration.target_type.item.clone(),
+        target_entity: client_pointer_declaration.target_type.item.clone(),
         phantom_data: std::marker::PhantomData,
 
         info: UserWrittenClientPointerInfo {

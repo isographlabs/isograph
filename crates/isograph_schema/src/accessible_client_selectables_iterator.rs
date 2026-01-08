@@ -132,9 +132,7 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
                                         This is indicative of a bug in Isograph."
                                     );
                                 }
-                                SelectionType::Object(o) => {
-                                    o.lookup(self.db).target_entity_name.inner()
-                                }
+                                SelectionType::Object(o) => o.lookup(self.db).target_entity.inner(),
                             },
                         };
 
