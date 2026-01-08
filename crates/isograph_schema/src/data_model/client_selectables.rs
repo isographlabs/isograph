@@ -26,15 +26,15 @@ pub type MemoRefClientSelectable<TCompilationProfile> = SelectionType<
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientScalarSelectable<TCompilationProfile: CompilationProfile> {
-    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
+    pub parent_entity_name: EntityName,
+    pub description: Option<WithNoLocation<Description>>,
+
+    pub arguments: Vec<VariableDeclaration>,
 
     // TODO we should probably model this differently
     pub variant: ClientFieldVariant,
 
-    pub arguments: Vec<VariableDeclaration>,
-
-    pub parent_entity_name: EntityName,
     pub phantom_data: PhantomData<TCompilationProfile>,
 }
 
@@ -48,13 +48,12 @@ impl<TCompilationProfile: CompilationProfile> ClientScalarSelectable<TCompilatio
 /// in iso literals.
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
 pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
-    pub description: Option<WithNoLocation<Description>>,
     pub name: SelectableName,
-    pub target_entity_name: TypeAnnotationDeclaration,
+    pub parent_entity_name: EntityName,
+    pub description: Option<WithNoLocation<Description>>,
 
     pub arguments: Vec<VariableDeclaration>,
-
-    pub parent_entity_name: EntityName,
+    pub target_entity_name: TypeAnnotationDeclaration,
 
     pub phantom_data: PhantomData<TCompilationProfile>,
     pub info: UserWrittenClientPointerInfo,
