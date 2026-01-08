@@ -1,8 +1,8 @@
 mod accessible_client_selectables_iterator;
+mod client_selectables;
 mod compilation_profile;
 mod create_additional_fields;
 mod create_merged_selection_set;
-mod data_model;
 mod field_loadability;
 mod field_to_insert_to_server_selectable;
 mod isograph_database;
@@ -27,10 +27,10 @@ mod variable_context;
 mod visit_selection_set;
 
 pub use accessible_client_selectables_iterator::*;
+pub use client_selectables::*;
 pub use compilation_profile::*;
 pub use create_additional_fields::*;
 pub use create_merged_selection_set::*;
-pub use data_model::*;
 pub use field_loadability::*;
 pub use field_to_insert_to_server_selectable::*;
 pub use isograph_database::*;
