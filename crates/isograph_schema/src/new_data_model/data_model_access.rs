@@ -22,9 +22,13 @@ fn flattened_server_schema<TCompilationProfile: CompilationProfile>(
     #[expect(clippy::unnecessary_to_owned)]
     TCompilationProfile::parse_nested_data_model_schema(db)
         .item
-        .to_owned()
-        .into_iter()
-        .map(|(key, value)| (key, value.drop_location().map(|x| x.flatten())))
+        .iter()
+        .map(|(key, value)| {
+            (
+                key.dereference(),
+                value.clone().drop_location().map(|x| x.flatten()),
+            )
+        })
         .collect()
 }
 
