@@ -10,8 +10,11 @@
       "cache": false,
       "persistent": true
     },
+    "tsc": {
+      "dependsOn": ["^compile-libs"]
+    },
     "compile-libs": {
-      "dependsOn": ["^compile-libs"],
+      "dependsOn": ["tsc"],
       "outputs": ["dist/**", "package.json"],
       "inputs": [
         "$TURBO_DEFAULT$",
