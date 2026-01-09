@@ -5,42 +5,54 @@ import {
   retainQuery,
   type RetainedQuery,
 } from '../core/garbageCollection';
-import { ROOT_ID, type BaseStoreLayerData } from '../core/IsographEnvironment';
+import {
+  ROOT_ID,
+  type BaseStoreLayerData,
+  type DataTypeValue,
+  type WithErrorsData,
+} from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
-import { createIsographEnvironment } from '../react/createIsographEnvironment';
+
+function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
+  return {
+    kind: 'Data',
+    value,
+  };
+}
 
 const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
-      me: { __link: '0', __typename: 'Economist' },
-      you: { __link: '1', __typename: 'Economist' },
-      node____id___0: {
+      me: ok({ __link: '0', __typename: 'Economist' }),
+      you: ok({ __link: '1', __typename: 'Economist' }),
+      node____id___0: ok({
         __link: '0',
         __typename: 'Economist',
-      },
+      }),
     },
   },
   Economist: {
     0: {
-      __typename: 'Economist',
-      id: '0',
-      name: 'Jeremy Bentham',
-      successor: { __link: '1', __typename: 'Economist' },
+      __typename: ok('Economist'),
+      id: ok('0'),
+      name: ok('Jeremy Bentham'),
+      successor: ok({ __link: '1', __typename: 'Economist' }),
     },
     1: {
-      __typename: 'Economist',
-      id: '1',
-      name: 'John Stuart Mill',
-      predecessor: { __link: '0', __typename: 'Economist' },
-      successor: { __link: '2', __typename: 'Economist' },
+      __typename: ok('Economist'),
+      id: ok('1'),
+      name: ok('John Stuart Mill'),
+      predecessor: ok({ __link: '0', __typename: 'Economist' }),
+      successor: ok({ __link: '2', __typename: 'Economist' }),
     },
     2: {
-      __typename: 'Economist',
-      id: '2',
-      name: 'Henry Sidgwick',
-      predecessor: { __link: '1', __typename: 'Economist' },
+      __typename: ok('Economist'),
+      id: ok('2'),
+      name: ok('Henry Sidgwick'),
+      predecessor: ok({ __link: '1', __typename: 'Economist' }),
     },
   },
 });
