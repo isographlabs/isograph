@@ -1,4 +1,5 @@
 import { type Factory, ParentCache } from '@isograph/react-disposable-state';
+import type { Brand } from './brand';
 import type {
   NormalizationAstNodes,
   NormalizationInlineFragment,
@@ -46,18 +47,23 @@ export function getOrCreateItemInSuspenseCache<
   return environment.fragmentCache[index];
 }
 
+export type NetworkResponsePlural<T> = null | T | T[] | (null | T)[];
 export type NetworkResponseScalarValue = string | number | boolean | unknown;
+
 export type NetworkResponseValue =
-  | NetworkResponseScalarValue
-  | null
-  | NetworkResponseObject
-  | readonly (NetworkResponseObject | null)[]
-  | readonly (NetworkResponseScalarValue | null)[];
+  | NetworkResponsePlural<NetworkResponseScalarValue>
+  | NetworkResponsePlural<NetworkResponseObject>;
 
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  readonly [index: string]: undefined | NetworkResponseValue;
+  readonly [index: ScalarNetworkResponseKey]:
+    | undefined
+    | NetworkResponsePlural<NetworkResponseScalarValue>;
+  readonly [index: LinkedNetworkResponseKey]:
+    | undefined
+    | NetworkResponsePlural<NetworkResponseObject>;
+} & {
   readonly id?: DataId;
   readonly __typename?: TypeName;
 };
@@ -440,8 +446,11 @@ function normalizeNetworkResponseObject(
 function isScalarOrEmptyArray(
   data: NetworkResponseValue,
 ): data is
-  | NetworkResponseScalarValue
-  | readonly (NetworkResponseScalarValue | null)[] {
+  | null
+  | string
+  | number
+  | boolean
+  | readonly (string | number | boolean | null)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (isArray(data)) {
     return data.every((x) => isScalarOrEmptyArray(x));
@@ -528,6 +537,22 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
+declare const LinkedNetworkResponseKeyBrand: unique symbol;
+export type LinkedNetworkResponseKey = string & {
+  brand?: Brand<undefined, typeof LinkedNetworkResponseKeyBrand>;
+};
+
+declare const ScalarNetworkResponseKeyBrand: unique symbol;
+export type ScalarNetworkResponseKey = string & {
+  brand?: Brand<undefined, typeof ScalarNetworkResponseKeyBrand>;
+};
+
+function getNetworkResponseKey(
+  astNode: NormalizationLinkedField,
+): LinkedNetworkResponseKey;
+function getNetworkResponseKey(
+  astNode: NormalizationScalarField,
+): ScalarNetworkResponseKey;
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
 ): string {
