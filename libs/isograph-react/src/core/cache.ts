@@ -47,7 +47,11 @@ export function getOrCreateItemInSuspenseCache<
   return environment.fragmentCache[index];
 }
 
-export type NetworkResponsePlural<T> = null | T | T[] | (null | T)[];
+export type NetworkResponsePlural<T> =
+  | null
+  | T
+  | readonly T[]
+  | readonly (null | T)[];
 export type NetworkResponseScalarValue = string | number | boolean | unknown;
 
 export type NetworkResponseValue =
