@@ -4,6 +4,8 @@ import {
   type EncounteredIds,
 } from './cache';
 import type { RefetchQueryNormalizationArtifactWrapper } from './entrypoint';
+import { ReadFieldAggregateError } from './errors';
+
 import {
   stableIdForFragmentReference,
   type ExtractParameters,
@@ -14,8 +16,11 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
+  type DataTypeValue,
   type IsographEnvironment,
   type StoreLink,
+  type WithErrors,
+  type WithErrorsData,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import {
@@ -34,6 +39,7 @@ import {
   readScalarFieldData,
   type NetworkRequestReaderOptions,
   type ReadDataResultSuccess,
+  type ReadFieldErrors,
 } from './read';
 import type { ReaderAst } from './reader';
 import { callSubscriptions } from './subscribe';
@@ -123,7 +129,7 @@ export function createUpdatableProxy<
       lastInvalidated: 0,
     },
     mutableUpdatedIds,
-  ).data;
+  ).item.value;
 }
 
 type MutableInvalidationState = {
@@ -181,7 +187,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
   networkRequestOptions: NetworkRequestReaderOptions,
   mutableState: MutableInvalidationState,
   mutableUpdatedIds: EncounteredIds,
-): ReadDataResultSuccess<ExtractUpdatableData<TReadFromStore>> {
+): ReadDataResultSuccess<WithErrorsData<ExtractUpdatableData<TReadFromStore>>> {
   const storeRecord = getMutableStoreRecordProxy(storeLayer, root);
   let target: { [index: string]: any } = {};
 
@@ -200,16 +206,22 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
               storeRecord,
               root,
               variables,
+              [],
             );
-            if (data.kind === 'MissingData') {
-              throw new Error(data.reason);
+            switch (data.kind) {
+              case 'MissingData':
+                throw new Error(data.reason);
+              case 'Success':
+                return readDataOrThrowOnError(data.item);
             }
-            return data.data;
           },
           field.isUpdatable
-            ? (newValue) => {
+            ? (newValue: DataTypeValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
-                storeRecord[storeRecordName] = newValue;
+                storeRecord[storeRecordName] = {
+                  kind: 'Data',
+                  value: newValue,
+                };
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
                   root.__typename,
@@ -249,21 +261,26 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
                   mutableState,
                   mutableUpdatedIds,
                 ),
+              [],
             );
             if (data.kind === 'MissingData') {
               throw new Error(data.reason);
             }
-            return data.data;
+            return readDataOrThrowOnError(data.item);
           },
           'isUpdatable' in field && field.isUpdatable
             ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
-                  storeRecord[storeRecordName] = newValue.map((node) =>
-                    assertLink(node?.__link),
-                  );
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    value: newValue.map((node) => assertLink(node?.__link)),
+                  };
                 } else {
-                  storeRecord[storeRecordName] = assertLink(newValue?.__link);
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    value: assertLink(newValue?.__link),
+                  };
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
@@ -286,11 +303,14 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Success':
+              return readDataOrThrowOnError(data.item);
           }
-          return data.data;
         });
         break;
       }
@@ -305,11 +325,15 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+
+            case 'Success':
+              return readDataOrThrowOnError(data.item);
           }
-          return data.data;
         });
         break;
       }
@@ -323,11 +347,15 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             networkRequest,
             networkRequestOptions,
             new Map(),
+            [],
           );
-          if (data.kind === 'MissingData') {
-            throw new Error(data.reason);
+
+          switch (data.kind) {
+            case 'MissingData':
+              throw new Error(data.reason);
+            case 'Success':
+              return readDataOrThrowOnError(data.item);
           }
-          return data.data;
         });
         break;
       }
@@ -340,6 +368,19 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
 
   return {
     kind: 'Success',
-    data: target as any,
+    item: {
+      kind: 'Data',
+      value: target as any,
+    },
   };
+}
+
+function readDataOrThrowOnError<T>(result: WithErrors<T, ReadFieldErrors>) {
+  switch (result.kind) {
+    case 'Errors':
+      throw new ReadFieldAggregateError(result.errors);
+    case 'Data': {
+      return result.value;
+    }
+  }
 }
