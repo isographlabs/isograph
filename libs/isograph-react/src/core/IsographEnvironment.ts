@@ -143,9 +143,9 @@ export type WithErrorsData<T> = {
 };
 
 export function isWithErrors(
-  value: DataTypeValue | WithErrors<DataTypeValue, StoreError>,
+  _value: DataTypeValue | WithErrors<DataTypeValue, StoreError>,
   isFallible: boolean,
-): value is WithErrors<DataTypeValue, StoreError> {
+): _value is WithErrors<DataTypeValue, StoreError> {
   return isFallible === true;
 }
 
@@ -227,15 +227,21 @@ export function createIsographStore(): BaseStoreLayerData {
   };
 }
 
-export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
+export function assertLink(link: unknown): StoreLink | null | undefined {
   if (isArray(link)) {
     throw new Error('Unexpected array');
   }
   if (link == null) {
     return link;
   }
-  if (typeof link === 'object') {
-    return link;
+  if (
+    typeof link === 'object' &&
+    '__link' in link &&
+    '__typename' in link &&
+    typeof link.__link === 'string' &&
+    typeof link.__typename === 'string'
+  ) {
+    return link as StoreLink
   }
   throw new Error('Invalid link');
 }

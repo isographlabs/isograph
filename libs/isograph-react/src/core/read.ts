@@ -617,9 +617,7 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadDataResult<
-  string | number | boolean | StoreLink | readonly DataTypeValue[] | null
-> {
+): ReadDataResult<DataTypeValue> {
   const storeRecordName = getParentRecordKey(field, variables);
   let value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has

@@ -260,9 +260,19 @@ function normalizeLinkedField(
   mutableEncounteredIds: EncounteredIds,
 ): RecordHasBeenUpdated {
   const networkResponseKey = getNetworkResponseKey(astNode);
-  const networkResponseData = networkResponseParentRecord[networkResponseKey];
+  const networkResponseData = networkResponseParentRecord[
+    networkResponseKey
+  ] as
+    | NetworkResponseObject
+    | null
+    | (NetworkResponseObject | null)[]
+    | NetworkResponseObject[];
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetParentRecord[parentRecordKey];
+
+  if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
+    throw new Error('TODO: write errors');
+  }
 
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
@@ -445,8 +455,12 @@ function normalizeNetworkResponseObject(
 function isScalarOrEmptyArray(
   data: NetworkResponseValue,
 ): data is
-  | NetworkResponseScalarValue
-  | readonly (NetworkResponseScalarValue | null)[] {
+  | null
+  | undefined
+  | string
+  | number
+  | boolean
+  | readonly (null | undefined | string | number | boolean)[] {
   // N.B. empty arrays count as empty arrays of scalar fields.
   if (isArray(data)) {
     return data.every((x) => isScalarOrEmptyArray(x));
@@ -533,9 +547,11 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
+export type NetworkResponseKey = string;
+
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
-): string {
+): NetworkResponseKey {
   let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
 
