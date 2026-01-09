@@ -30,7 +30,8 @@ export { makeNetworkRequest } from './core/makeNetworkRequest';
 export {
   ROOT_ID,
   type DataId,
-  type DataTypeValue,
+  type DataTypeValueLinked,
+  type DataTypeValueScalar,
   type IsographEnvironment,
   type IsographNetworkFunction,
   type BaseStoreLayerData as IsographStore,

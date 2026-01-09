@@ -14,7 +14,7 @@ import type {
 } from './FragmentReference';
 import {
   type DataId,
-  type DataTypeValue,
+  type DataTypeValueLinked,
   getLink,
   type IsographEnvironment,
   ROOT_ID,
@@ -364,7 +364,7 @@ function normalizeInlineFragment(
 }
 
 function dataIdsAreTheSame(
-  existingValue: DataTypeValue,
+  existingValue: DataTypeValueLinked,
   newDataIds: (StoreLink | null)[],
 ): boolean {
   if (isArray(existingValue)) {
@@ -430,6 +430,24 @@ function normalizeNetworkResponseObject(
   return newStoreRecordId;
 }
 
+declare const LinkedParentRecordKeyBrand: unique symbol;
+export type LinkedParentRecordKey = string & {
+  brand?: Brand<undefined, typeof LinkedParentRecordKeyBrand>;
+};
+
+declare const ScalarParentRecordKeyBrand: unique symbol;
+export type ScalarParentRecordKey = string & {
+  brand?: Brand<undefined, typeof ScalarParentRecordKeyBrand>;
+};
+
+export function getParentRecordKey(
+  astNode: NormalizationLinkedField | ReaderLinkedField,
+  variables: Variables,
+): LinkedParentRecordKey;
+export function getParentRecordKey(
+  astNode: NormalizationScalarField | ReaderScalarField,
+  variables: Variables,
+): ScalarParentRecordKey;
 export function getParentRecordKey(
   astNode:
     | NormalizationLinkedField

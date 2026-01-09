@@ -1,5 +1,6 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
+import type { LinkedParentRecordKey, ScalarParentRecordKey } from './cache';
 import type {
   IsographEntrypoint,
   IsographOperation,
@@ -118,25 +119,36 @@ export type StoreLink = {
   readonly __typename: TypeName;
 };
 
-export type DataTypeValue =
+export type DataTypeValueScalar =
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the store.
   | undefined
-  // Singular scalar fields:
+  // Singular fields:
   | unknown
   | number
   | boolean
   | string
   | null
-  // Singular linked fields:
+  // Plural  fields:
+  | readonly DataTypeValueScalar[];
+
+export type DataTypeValueLinked =
+  // N.B. undefined is here to support optional id's, but
+  // undefined should not *actually* be present in the store.
+  | undefined
+  // Singular fields:
+  | null
   | StoreLink
-  // Plural scalar and linked fields:
-  | readonly DataTypeValue[];
+  // Plural fields:
+  | readonly DataTypeValueLinked[];
 
 export type StoreRecord = {
-  [index: DataId | string]: DataTypeValue;
+  [index: ScalarParentRecordKey]: DataTypeValueScalar;
+  [index: LinkedParentRecordKey]: DataTypeValueLinked;
+} & {
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
+  readonly __typename?: TypeName;
   readonly id?: DataId;
 };
 
@@ -199,33 +211,24 @@ export function createIsographStore(): BaseStoreLayerData {
   };
 }
 
-export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
+export function assertLink(
+  link: DataTypeValueLinked,
+): StoreLink | null | undefined {
   if (isArray(link)) {
     throw new Error('Unexpected array');
   }
   if (link == null) {
     return link;
   }
-  if (isLink(link)) {
+  if (typeof link === 'object') {
     return link;
   }
   throw new Error('Invalid link');
 }
 
-function isLink(maybeLink: DataTypeValue): maybeLink is StoreLink {
-  return (
-    maybeLink != null &&
-    typeof maybeLink === 'object' &&
-    '__link' in maybeLink &&
-    '__typename' in maybeLink &&
-    typeof maybeLink.__link === 'string' &&
-    typeof maybeLink.__typename === 'string'
-  );
-}
-
-export function getLink(maybeLink: DataTypeValue): StoreLink | null {
-  if (isLink(maybeLink)) {
-    return maybeLink;
+export function getLink(maybeLink: DataTypeValueLinked): StoreLink | null {
+  if (!isArray(maybeLink)) {
+    return maybeLink ?? null;
   }
   return null;
 }
