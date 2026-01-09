@@ -61,12 +61,11 @@ export type NetworkResponseValue =
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  readonly [index: ScalarNetworkResponseKey]:
-    | undefined
-    | NetworkResponsePlural<NetworkResponseScalarValue>;
-  readonly [index: LinkedNetworkResponseKey]:
-    | undefined
-    | NetworkResponsePlural<NetworkResponseObject>;
+  readonly [K in
+    | ScalarNetworkResponseKey
+    | LinkedNetworkResponseKey]: K extends ScalarNetworkResponseKey
+    ? undefined | NetworkResponsePlural<NetworkResponseScalarValue>
+    : undefined | NetworkResponsePlural<NetworkResponseObject>;
 } & {
   readonly id?: DataId;
   readonly __typename?: TypeName;
