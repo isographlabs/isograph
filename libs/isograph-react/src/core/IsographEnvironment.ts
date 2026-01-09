@@ -123,6 +123,7 @@ export type DataTypeValue =
   // undefined should not *actually* be present in the store.
   | undefined
   // Singular scalar fields:
+  | unknown
   | number
   | boolean
   | string
@@ -205,21 +206,25 @@ export function assertLink(link: DataTypeValue): StoreLink | null | undefined {
   if (link == null) {
     return link;
   }
-  if (typeof link === 'object') {
+  if (isLink(link)) {
     return link;
   }
   throw new Error('Invalid link');
 }
 
-export function getLink(maybeLink: DataTypeValue): StoreLink | null {
-  if (
+function isLink(maybeLink: DataTypeValue): maybeLink is StoreLink {
+  return (
     maybeLink != null &&
     typeof maybeLink === 'object' &&
     '__link' in maybeLink &&
-    maybeLink.__link != null &&
     '__typename' in maybeLink &&
-    maybeLink.__typename != null
-  ) {
+    typeof maybeLink.__link === 'string' &&
+    typeof maybeLink.__typename === 'string'
+  );
+}
+
+export function getLink(maybeLink: DataTypeValue): StoreLink | null {
+  if (isLink(maybeLink)) {
     return maybeLink;
   }
   return null;

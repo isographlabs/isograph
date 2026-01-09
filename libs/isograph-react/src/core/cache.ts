@@ -239,12 +239,8 @@ function normalizeScalarField(
     return existingValue === undefined || existingValue != null;
   }
 
-  if (isScalarOrEmptyArray(networkResponseData)) {
-    targetStoreRecord[parentRecordKey] = networkResponseData;
-    return existingValue !== networkResponseData;
-  } else {
-    throw new Error('Unexpected object array when normalizing scalar');
-  }
+  targetStoreRecord[parentRecordKey] = networkResponseData;
+  return existingValue !== networkResponseData;
 }
 
 /**
@@ -268,15 +264,6 @@ function normalizeLinkedField(
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
-  }
-
-  if (
-    isScalarOrEmptyArray(networkResponseData) &&
-    !isNullOrEmptyArray(networkResponseData)
-  ) {
-    throw new Error(
-      'Unexpected scalar network response when normalizing a linked field',
-    );
   }
 
   if (isArray(networkResponseData)) {
@@ -441,39 +428,6 @@ function normalizeNetworkResponseObject(
   );
 
   return newStoreRecordId;
-}
-
-function isScalarOrEmptyArray(
-  data: NetworkResponseValue,
-): data is
-  | null
-  | string
-  | number
-  | boolean
-  | readonly (string | number | boolean | null)[] {
-  // N.B. empty arrays count as empty arrays of scalar fields.
-  if (isArray(data)) {
-    return data.every((x) => isScalarOrEmptyArray(x));
-  }
-  const isScalarValue =
-    data == null ||
-    typeof data === 'string' ||
-    typeof data === 'number' ||
-    typeof data === 'boolean';
-  return isScalarValue;
-}
-
-function isNullOrEmptyArray(
-  data: unknown,
-): data is readonly never[] | null[] | null {
-  if (isArray(data)) {
-    if (data.length === 0) {
-      return true;
-    }
-    return data.every((x) => isNullOrEmptyArray(x));
-  }
-
-  return data == null;
 }
 
 export function getParentRecordKey(
