@@ -24,8 +24,5 @@ fixture-tests = { path = "../fixture-tests" }
 graphql-cli = { path = "../graphql-cli" }
 tokio = { version = "1.29.1", features = ["full", "test-util", "tracing"] }
 
-[lints]
-workspace = false
-
 [lints.clippy]
 all = "allow"
