@@ -17,6 +17,7 @@ import type {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import type { LogFunction, WrappedLogFunction } from './logging';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { type StoreLayer } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -98,7 +99,10 @@ export type MissingFieldHandler = (
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<{
+  data?: any;
+  errors?: any;
+}>;
 
 export type IsographComponentFunction = <
   TReadFromStore extends UnknownTReadFromStore = any,
@@ -124,16 +128,17 @@ export type WithErrorsData<T> = {
   readonly value: T;
 };
 
-export type WithErrors<T> =
+export type WithErrors<T, Err> =
   | WithErrorsData<T>
   | {
       readonly kind: 'Errors';
+      readonly errors: NonEmptyArray<Err>;
     };
 
 export function isWithErrors<T>(
-  _value: T | WithErrors<T>,
+  _value: T | WithErrors<T, StoreError>,
   isFallible: boolean,
-): _value is WithErrors<T> {
+): _value is WithErrors<T, StoreError> {
   return isFallible === true;
 }
 
@@ -160,13 +165,15 @@ export type DataTypeValueLinked =
   // Plural fields:
   | readonly DataTypeValueLinked[];
 
+export interface StoreError {}
+
 export type StoreRecord = {
   [index: ScalarParentRecordKey]:
     | DataTypeValueScalar
-    | WithErrors<DataTypeValueScalar>;
+    | WithErrors<DataTypeValueScalar, StoreError>;
   [index: LinkedParentRecordKey]:
     | DataTypeValueLinked
-    | WithErrors<DataTypeValueLinked>;
+    | WithErrors<DataTypeValueLinked, StoreError>;
 } & {
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
