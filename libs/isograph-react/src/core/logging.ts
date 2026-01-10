@@ -1,20 +1,27 @@
 import type { CleanupFn } from '@isograph/disposable-types';
-import type { NetworkResponseObject, EncounteredIds } from './cache';
+import type {
+  EncounteredIds,
+  NetworkResponseError,
+  NetworkResponseObject,
+} from './cache';
 import type { CheckResult } from './check';
 import type {
   IsographEntrypoint,
-  RefetchQueryNormalizationArtifact,
   NormalizationAstNodes,
+  RefetchQueryNormalizationArtifact,
 } from './entrypoint';
+
 import type { FragmentReference, Variables } from './FragmentReference';
 import type {
   IsographEnvironment,
-  StoreRecord,
   StoreLink,
+  StoreRecord,
+  WithErrors,
 } from './IsographEnvironment';
-import type { ReadDataResult } from './read';
-import type { Arguments } from './util';
+import type { NonEmptyArray } from './NonEmptyArray';
 import type { StoreLayer } from './optimisticProxy';
+import type { ReadDataResult, ReadFieldErrors } from './read';
+import type { Arguments } from './util';
 
 /**
  * Note: these types are unstable. We will add and remove items from this enum
@@ -32,7 +39,8 @@ export type LogMessage =
   | {
       kind: 'AboutToNormalize';
       normalizationAst: NormalizationAstNodes;
-      networkResponse: NetworkResponseObject;
+      networkResponse: NetworkResponseObject | undefined;
+      errors: NonEmptyArray<NetworkResponseError> | undefined;
       variables: Variables;
     }
   | {
@@ -81,7 +89,7 @@ export type LogMessage =
     }
   | {
       kind: 'DoneReading';
-      response: ReadDataResult<any>;
+      response: ReadDataResult<WithErrors<unknown, ReadFieldErrors>>;
       fieldName: string;
       root: StoreLink;
     }
