@@ -294,11 +294,7 @@ function normalizeScalarField(
         kind: 'Data',
         value: null,
       };
-      return (
-        existingValue?.kind === 'Errors' ||
-        existingValue?.value === undefined ||
-        existingValue != null
-      );
+      return existingValue?.kind !== 'Data' || existingValue?.value != null;
     }
 
     targetStoreRecord[parentRecordKey] = {
@@ -341,32 +337,31 @@ function normalizeLinkedField(
   const existingValue = targetParentRecord[parentRecordKey];
 
   if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
-    throw new Error('TODO: write errors');
+    if (networkResponseData == null) {
+      const errors = findErrors(errorsByPath, path);
+
+      if (errors != null) {
+        targetParentRecord[parentRecordKey] = {
+          kind: 'Errors',
+          errors: stableCopy(errors),
+        };
+        return (
+          existingValue?.kind !== 'Errors' ||
+          JSON.stringify(existingValue.errors) !== JSON.stringify(errors)
+        );
+      }
+      targetParentRecord[parentRecordKey] = {
+        kind: 'Data',
+        value: null,
+      };
+      return existingValue?.kind !== 'Data' || existingValue.value != null;
+    }
+    // same thing as below :/
   }
 
   if (networkResponseData == null) {
-    const errors = findErrors(errorsByPath, path);
-
-    if (errors != null) {
-      targetParentRecord[parentRecordKey] = {
-        kind: 'Errors',
-        errors,
-      };
-      return (
-        existingValue?.kind !== 'Errors' ||
-        JSON.stringify(stableCopy(existingValue.errors)) !==
-          JSON.stringify(stableCopy(errors))
-      );
-    }
-    targetParentRecord[parentRecordKey] = {
-      kind: 'Data',
-      value: null,
-    };
-    return (
-      existingValue?.kind === 'Errors' ||
-      existingValue?.value === undefined ||
-      existingValue != null
-    );
+    targetParentRecord[parentRecordKey] = null;
+    return existingValue === undefined || existingValue != null;
   }
 
   if (isArray(networkResponseData)) {

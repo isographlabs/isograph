@@ -16,7 +16,6 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
-  type DataTypeValue,
   type IsographEnvironment,
   type StoreLink,
   type WithErrors,
@@ -216,7 +215,7 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             }
           },
           field.isUpdatable
-            ? (newValue: DataTypeValue) => {
+            ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 storeRecord[storeRecordName] = {
                   kind: 'Data',
