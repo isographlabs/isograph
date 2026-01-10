@@ -17,6 +17,7 @@ import {
   type DataTypeValueLinked,
   getLink,
   type IsographEnvironment,
+  isWithErrors,
   ROOT_ID,
   type StoreLink,
   type StoreRecord,
@@ -237,6 +238,10 @@ function normalizeScalarField(
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetStoreRecord[parentRecordKey];
 
+  if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
+    throw new Error('TODO: write errors');
+  }
+
   if (networkResponseData == null) {
     targetStoreRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
@@ -263,6 +268,10 @@ function normalizeLinkedField(
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetParentRecord[parentRecordKey];
+
+  if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
+    throw new Error('TODO: write errors');
+  }
 
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
