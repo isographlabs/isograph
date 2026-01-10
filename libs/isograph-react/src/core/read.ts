@@ -26,6 +26,7 @@ import {
   assertLink,
   getOrLoadIsographArtifact,
   getOrLoadReaderWithRefetchQueries,
+  isWithErrors,
   type StoreLink,
   type StoreRecord,
 } from './IsographEnvironment';
@@ -620,7 +621,7 @@ export function readScalarFieldData(
   variables: Variables,
 ): ReadDataResult<DataTypeValueScalar> {
   const storeRecordName = getParentRecordKey(field, variables);
-  const value = storeRecord[storeRecordName];
+  let value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has
   // to happen for when we handle errors.
   if (value === undefined) {
@@ -630,6 +631,14 @@ export function readScalarFieldData(
       recordLink: root,
     };
   }
+
+  if (isWithErrors(value, field.isFallible ?? false)) {
+    if (value.kind === 'Errors') {
+      throw new Error('TODO: read errors');
+    }
+    value = value.value;
+  }
+
   return { kind: 'Success', data: value };
 }
 
@@ -649,6 +658,13 @@ export function readLinkedFieldData(
 ): ReadDataResult<unknown> {
   const storeRecordName = getParentRecordKey(field, variables);
   let value = storeRecord[storeRecordName];
+
+  if (isWithErrors(value, field.isFallible ?? false)) {
+    if (value.kind === 'Errors') {
+      throw new Error('TODO: read errors');
+    }
+    value = value.value;
+  }
 
   if (field.condition != null) {
     const condition = field.condition();
