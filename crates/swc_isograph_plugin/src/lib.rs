@@ -192,7 +192,7 @@ struct ValidIsographTemplateLiteral {
 }
 
 impl ValidIsographTemplateLiteral {
-    fn build_require_expr_from_path(&self, path: &str, mark: Option<Mark>) -> Expr {
+    fn build_require_expr_from_path(path: &str, mark: Option<Mark>) -> Expr {
         Expr::Member(MemberExpr {
             span: DUMMY_SP,
             obj: Box::new(Expr::Call(CallExpr {
@@ -315,11 +315,12 @@ impl IsoLiteralCompilerVisitor<'_> {
             .expect("Failed to get path for artifact.");
 
         match self.config.options.module {
-            ConfigFileJavascriptModule::CommonJs => iso_template_literal
-                .build_require_expr_from_path(
+            ConfigFileJavascriptModule::CommonJs => {
+                ValidIsographTemplateLiteral::build_require_expr_from_path(
                     &file_to_artifact.display().to_string(),
                     self.unresolved_mark,
-                ),
+                )
+            }
             ConfigFileJavascriptModule::EsModule => {
                 // TODO ensure `ident_name` is unique
                 let ident_name = format!(
