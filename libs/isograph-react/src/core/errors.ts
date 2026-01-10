@@ -25,11 +25,14 @@ export class ReadFieldAggregateError extends AggregateError {
 
 export type ReadFieldErrorPath = string | number;
 export class ReadFieldError extends Error {
+  cause!: StoreError;
   constructor(
-    readonly error: StoreError,
-    readonly path: ReadFieldErrorPath[],
+    error: StoreError,
+    readonly path: readonly ReadFieldErrorPath[],
   ) {
-    super('Read field error');
+    super('Read field error', {
+      cause: error,
+    });
     this.name = new.target.name;
   }
 }
