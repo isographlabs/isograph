@@ -6,8 +6,8 @@ import {
   type UnknownTReadFromStore,
 } from '../core/FragmentReference';
 import type { IsographComponentFunction } from '../core/IsographEnvironment';
-import { logMessage } from '../core/logging';
 import { readPromise } from '../core/PromiseWrapper';
+import { logMessage } from '../core/logging';
 import {
   type NetworkRequestReaderOptions,
   readButDoNotEvaluate,
@@ -39,6 +39,11 @@ export function useReadAndSubscribe<
     setReadOutDataAndRecords,
     readerAst,
   );
+
+  if (readOutDataAndRecords.kind === 'Errors') {
+    throw readOutDataAndRecords.errors;
+  }
+
   return readOutDataAndRecords.item;
 }
 

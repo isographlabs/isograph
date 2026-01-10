@@ -1,15 +1,15 @@
 import { getParentRecordKey, TYPENAME_FIELD_NAME } from './cache';
-import type { NormalizationAstNodes, NormalizationAst } from './entrypoint';
+import type { NormalizationAst, NormalizationAstNodes } from './entrypoint';
 import type { Variables } from './FragmentReference';
 import {
   assertLink,
+  isWithErrors,
   type DataId,
   type IsographEnvironment,
-  type StoreRecord,
   type StoreLayerData,
   type StoreLink,
-  type TypeName,
-  isWithErrors,
+  type StoreRecord,
+  type TypeName
 } from './IsographEnvironment';
 import type { BaseStoreLayer } from './optimisticProxy';
 import {
@@ -171,12 +171,14 @@ function recordReachableIdsFromRecord(
       case 'Linked':
         const linkKey = getParentRecordKey(selection, variables ?? {});
         let linkedFieldOrFields = currentRecord[linkKey];
+
         if (isWithErrors(linkedFieldOrFields, selection.isFallible ?? false)) {
           if (linkedFieldOrFields.kind === 'Errors') {
             continue;
           }
           linkedFieldOrFields = linkedFieldOrFields.value;
         }
+
         const links: StoreLink[] = [];
         if (isArray(linkedFieldOrFields)) {
           for (const maybeLink of linkedFieldOrFields) {
