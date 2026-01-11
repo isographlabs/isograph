@@ -690,8 +690,7 @@ fn get_serialized_field_argument(
                         indentation_level + 3,
                     )
                 })
-                .collect::<Vec<_>>()
-                .join("")
+                .collect::<String>()
         ),
     }
 }
