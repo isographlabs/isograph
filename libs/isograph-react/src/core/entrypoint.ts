@@ -124,12 +124,14 @@ export type NormalizationAstLoader = {
 
 export type NormalizationScalarField = {
   readonly kind: 'Scalar';
+  readonly isFallible?: boolean;
   readonly fieldName: string;
   readonly arguments: Arguments | null;
 };
 
 export type NormalizationLinkedField = {
   readonly kind: 'Linked';
+  readonly isFallible?: boolean;
   readonly fieldName: string;
   readonly arguments: Arguments | null;
   readonly selections: NormalizationAstNodes;

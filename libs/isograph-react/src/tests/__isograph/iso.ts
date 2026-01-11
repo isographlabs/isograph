@@ -1,14 +1,28 @@
 import type { IsographEntrypoint } from '@isograph/react';
+import { type Economist__errorsClientFieldComponentField__param } from './Economist/errorsClientFieldComponentField/param_type';
+import { type Economist__errorsClientFieldField__param } from './Economist/errorsClientFieldField/param_type';
+import { type Economist__errorsClientPointerField__param } from './Economist/errorsClientPointerField/param_type';
+import { type Query__errorsClientFieldComponent__param } from './Query/errorsClientFieldComponent/param_type';
+import { type Query__errorsClientField__param } from './Query/errorsClientField/param_type';
+import { type Query__errorsClientPointer__param } from './Query/errorsClientPointer/param_type';
+import { type Query__errors__param } from './Query/errors/param_type';
 import { type Query__linkedUpdate__param } from './Query/linkedUpdate/param_type';
 import { type Query__meNameSuccessor__param } from './Query/meNameSuccessor/param_type';
 import { type Query__meName__param } from './Query/meName/param_type';
+import { type Query__nicknameErrors__param } from './Query/nicknameErrors/param_type';
 import { type Query__nodeField__param } from './Query/nodeField/param_type';
 import { type Query__normalizeUndefinedField__param } from './Query/normalizeUndefinedField/param_type';
 import { type Query__startUpdate__param } from './Query/startUpdate/param_type';
 import { type Query__subquery__param } from './Query/subquery/param_type';
+import { type Economist____link__output_type } from './Economist/__link/output_type';
+import entrypoint_Query__errorsClientFieldComponent from '../__isograph/Query/errorsClientFieldComponent/entrypoint';
+import entrypoint_Query__errorsClientField from '../__isograph/Query/errorsClientField/entrypoint';
+import entrypoint_Query__errorsClientPointer from '../__isograph/Query/errorsClientPointer/entrypoint';
+import entrypoint_Query__errors from '../__isograph/Query/errors/entrypoint';
 import entrypoint_Query__linkedUpdate from '../__isograph/Query/linkedUpdate/entrypoint';
 import entrypoint_Query__meNameSuccessor from '../__isograph/Query/meNameSuccessor/entrypoint';
 import entrypoint_Query__meName from '../__isograph/Query/meName/entrypoint';
+import entrypoint_Query__nicknameErrors from '../__isograph/Query/nicknameErrors/entrypoint';
 import entrypoint_Query__nodeField from '../__isograph/Query/nodeField/entrypoint';
 import entrypoint_Query__normalizeUndefinedField from '../__isograph/Query/normalizeUndefinedField/entrypoint';
 import entrypoint_Query__startUpdate from '../__isograph/Query/startUpdate/entrypoint';
@@ -63,6 +77,34 @@ type MatchesWhitespaceAndString<
 > = Whitespace<T> extends `${TString}${string}` ? T : never;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Economist.errorsClientFieldComponentField', T>
+): IdentityWithParamComponent<Economist__errorsClientFieldComponentField__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Economist.errorsClientFieldField', T>
+): IdentityWithParam<Economist__errorsClientFieldField__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'pointer Economist.errorsClientPointerField', T>
+): IdentityWithParam<Economist__errorsClientPointerField__param, (Economist____link__output_type | null)>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsClientFieldComponent', T>
+): IdentityWithParam<Query__errorsClientFieldComponent__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsClientField', T>
+): IdentityWithParam<Query__errorsClientField__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errorsClientPointer', T>
+): IdentityWithParam<Query__errorsClientPointer__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.errors', T>
+): IdentityWithParam<Query__errors__param>;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.linkedUpdate', T>
 ): IdentityWithParam<Query__linkedUpdate__param>;
 
@@ -73,6 +115,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.meName', T>
 ): IdentityWithParam<Query__meName__param>;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'field Query.nicknameErrors', T>
+): IdentityWithParam<Query__nicknameErrors__param>;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'field Query.nodeField', T>
@@ -91,6 +137,22 @@ export function iso<T>(
 ): IdentityWithParam<Query__subquery__param>;
 
 export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientFieldComponent', T>
+): typeof entrypoint_Query__errorsClientFieldComponent;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientField', T>
+): typeof entrypoint_Query__errorsClientField;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errorsClientPointer', T>
+): typeof entrypoint_Query__errorsClientPointer;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.errors', T>
+): typeof entrypoint_Query__errors;
+
+export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.linkedUpdate', T>
 ): typeof entrypoint_Query__linkedUpdate;
 
@@ -101,6 +163,10 @@ export function iso<T>(
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.meName', T>
 ): typeof entrypoint_Query__meName;
+
+export function iso<T>(
+  param: T & MatchesWhitespaceAndString<'entrypoint Query.nicknameErrors', T>
+): typeof entrypoint_Query__nicknameErrors;
 
 export function iso<T>(
   param: T & MatchesWhitespaceAndString<'entrypoint Query.nodeField', T>

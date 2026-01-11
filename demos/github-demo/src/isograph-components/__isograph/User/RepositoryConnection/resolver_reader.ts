@@ -7,6 +7,7 @@ import Repository__RepositoryRow__resolver_reader from '../../Repository/Reposit
 const readerAst: ReaderAst<User__RepositoryConnection__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "repositories",
     alias: null,
     arguments: [
@@ -26,6 +27,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "pageInfo",
         alias: null,
         arguments: null,
@@ -35,6 +37,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "hasNextPage",
             alias: null,
             arguments: null,
@@ -42,6 +45,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: true,
             fieldName: "endCursor",
             alias: null,
             arguments: null,
@@ -51,6 +55,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
       },
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "edges",
         alias: null,
         arguments: null,
@@ -60,6 +65,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
         selections: [
           {
             kind: "Linked",
+            isFallible: true,
             fieldName: "node",
             alias: null,
             arguments: null,
@@ -76,6 +82,7 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
               },
               {
                 kind: "Scalar",
+                isFallible: false,
                 fieldName: "id",
                 alias: null,
                 arguments: null,

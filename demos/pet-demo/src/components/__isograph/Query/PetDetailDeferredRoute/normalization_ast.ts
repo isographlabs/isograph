@@ -4,12 +4,14 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "namable",
       arguments: null,
       concreteType: null,
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "__typename",
           arguments: null,
         },
@@ -17,12 +19,14 @@ const normalizationAst: NormalizationAst = {
     },
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "notImplemented",
       arguments: null,
       concreteType: null,
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "__typename",
           arguments: null,
         },
@@ -30,6 +34,7 @@ const normalizationAst: NormalizationAst = {
     },
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "pet",
       arguments: [
         [
@@ -41,16 +46,19 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "firstName",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "lastName",
           arguments: null,
         },
@@ -58,6 +66,7 @@ const normalizationAst: NormalizationAst = {
     },
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "topLevelField",
       arguments: [
         [
@@ -78,6 +87,7 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "__typename",
           arguments: null,
         },

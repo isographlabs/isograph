@@ -6,6 +6,7 @@ import Pokemon__Pokemon__resolver_reader from '../../Pokemon/Pokemon/resolver_re
 const readerAst: ReaderAst<Query__HomePage__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "getAllPokemon",
     alias: null,
     arguments: [
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "key",
         alias: null,
         arguments: null,
@@ -32,6 +34,7 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "forme",
         alias: null,
         arguments: null,

@@ -8,6 +8,7 @@ import PullRequest__createdAtFormatted__resolver_reader from '../../PullRequest/
 const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "edges",
     alias: null,
     arguments: null,
@@ -17,6 +18,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "node",
         alias: null,
         arguments: null,
@@ -26,6 +28,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -40,6 +43,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "number",
             alias: null,
             arguments: null,
@@ -47,6 +51,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "title",
             alias: null,
             arguments: null,
@@ -54,6 +59,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           },
           {
             kind: "Linked",
+            isFallible: true,
             fieldName: "author",
             alias: null,
             arguments: null,
@@ -70,6 +76,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
               },
               {
                 kind: "Scalar",
+                isFallible: false,
                 fieldName: "login",
                 alias: null,
                 arguments: null,
@@ -79,6 +86,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "closed",
             alias: null,
             arguments: null,
@@ -86,6 +94,7 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: true,
             fieldName: "totalCommentsCount",
             alias: null,
             arguments: null,

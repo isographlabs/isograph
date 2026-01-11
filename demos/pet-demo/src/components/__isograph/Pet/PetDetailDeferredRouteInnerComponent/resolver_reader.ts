@@ -20,6 +20,7 @@ const readerAst: ReaderAst<Pet__PetDetailDeferredRouteInnerComponent__param> = [
     refetchReaderAst: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,

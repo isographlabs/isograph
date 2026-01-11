@@ -25,6 +25,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
     refetchReaderAst: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
