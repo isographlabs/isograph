@@ -13,6 +13,7 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Query__PetDetailRoute__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "pet",
     alias: null,
     arguments: [

@@ -5,6 +5,7 @@ import { BlogItemMoreDetail as resolver } from '../../../Newsfeed/BlogItemMoreDe
 const readerAst: ReaderAst<BlogItem__BlogItemMoreDetail__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "moreContent",
     alias: null,
     arguments: null,

@@ -5,6 +5,7 @@ import { BlogItem as resolver } from '../../../Newsfeed/AdItem';
 const readerAst: ReaderAst<AdItem__AdItemDisplay__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "advertiser",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<AdItem__AdItemDisplay__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "message",
     alias: null,
     arguments: null,

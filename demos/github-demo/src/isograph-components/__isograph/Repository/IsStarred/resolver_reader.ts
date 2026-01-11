@@ -5,6 +5,7 @@ import { IsStarred as resolver } from '../../../RepositoryDetail';
 const readerAst: ReaderAst<Repository__IsStarred__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "stargazerCount",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<Repository__IsStarred__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "viewerHasStarred",
     alias: null,
     arguments: null,

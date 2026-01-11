@@ -7,6 +7,7 @@ import Checkin__CheckinDisplay__resolver_reader from '../../Checkin/CheckinDispl
 const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "checkins",
     alias: null,
     arguments: [
@@ -33,6 +34,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,

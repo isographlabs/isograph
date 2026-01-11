@@ -5,6 +5,7 @@ import { PetPhraseCard as resolver } from '../../../Pet/PetPhraseCard';
 const readerAst: ReaderAst<Pet__PetPhraseCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<Pet__PetPhraseCard__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "favorite_phrase",
     alias: null,
     arguments: null,

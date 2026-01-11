@@ -5,6 +5,7 @@ import { PetAvatar as resolver } from '../../../Pet/Avatar';
 const readerAst: ReaderAst<Pet__Avatar__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "picture",
     alias: null,
     arguments: null,

@@ -6,6 +6,7 @@ import IssueComment__formattedCommentCreationDate__resolver_reader from '../../I
 const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "comments",
     alias: null,
     arguments: [
@@ -20,6 +21,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "edges",
         alias: null,
         arguments: null,
@@ -29,6 +31,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
         selections: [
           {
             kind: "Linked",
+            isFallible: true,
             fieldName: "node",
             alias: null,
             arguments: null,
@@ -38,6 +41,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
             selections: [
               {
                 kind: "Scalar",
+                isFallible: false,
                 fieldName: "id",
                 alias: null,
                 arguments: null,
@@ -45,6 +49,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
               },
               {
                 kind: "Scalar",
+                isFallible: false,
                 fieldName: "bodyText",
                 alias: null,
                 arguments: null,
@@ -59,6 +64,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
               },
               {
                 kind: "Linked",
+                isFallible: true,
                 fieldName: "author",
                 alias: null,
                 arguments: null,
@@ -68,6 +74,7 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
                 selections: [
                   {
                     kind: "Scalar",
+                    isFallible: false,
                     fieldName: "login",
                     alias: null,
                     arguments: null,

@@ -16,6 +16,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "potential_new_best_friends",
     alias: null,
     arguments: null,
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -48,6 +50,7 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "tagline",
     alias: null,
     arguments: null,

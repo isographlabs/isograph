@@ -6,6 +6,7 @@ import { createdAtFormatted as resolver } from '../../../PullRequestTable';
 const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "createdAt",
     alias: null,
     arguments: null,

@@ -9,6 +9,7 @@ import NewsfeedItem__asBlogItem__resolver_reader from '../../NewsfeedItem/asBlog
 const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "newsfeed",
     alias: null,
     arguments: [
@@ -28,6 +29,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "__typename",
         alias: null,
         arguments: null,
@@ -35,6 +37,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "asAdItem",
         alias: null,
         arguments: null,
@@ -44,6 +47,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -53,6 +57,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "asBlogItem",
         alias: null,
         arguments: null,
@@ -62,6 +67,7 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,

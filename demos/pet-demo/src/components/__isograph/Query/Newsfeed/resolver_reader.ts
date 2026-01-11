@@ -7,6 +7,7 @@ import Viewer__NewsfeedPaginationComponent__entrypoint from '../../Viewer/Newsfe
 const readerAst: ReaderAst<Query__Newsfeed__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "viewer",
     alias: null,
     arguments: null,
@@ -39,6 +40,7 @@ const readerAst: ReaderAst<Query__Newsfeed__param> = [
         refetchReaderAst: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,

@@ -4,6 +4,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "pet",
       arguments: [
         [
@@ -15,21 +16,25 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: true,
           fieldName: "favorite_phrase",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "firstName",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "lastName",
           arguments: null,
         },
