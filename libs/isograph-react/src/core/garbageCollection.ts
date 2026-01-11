@@ -9,6 +9,7 @@ import {
   type StoreLayerData,
   type StoreLink,
   type TypeName,
+  isWithErrors,
 } from './IsographEnvironment';
 import type { BaseStoreLayer } from './optimisticProxy';
 import {
@@ -16,6 +17,7 @@ import {
   type PromiseWrapper,
   type PromiseWrapperOk,
 } from './PromiseWrapper';
+import { isArray } from './util';
 
 export type RetainedQuery = {
   readonly normalizationAst: PromiseWrapper<NormalizationAst>;
@@ -168,10 +170,15 @@ function recordReachableIdsFromRecord(
         continue;
       case 'Linked':
         const linkKey = getParentRecordKey(selection, variables ?? {});
-        const linkedFieldOrFields = currentRecord[linkKey];
-
+        let linkedFieldOrFields = currentRecord[linkKey];
+        if (isWithErrors(linkedFieldOrFields, selection.isFallible ?? false)) {
+          if (linkedFieldOrFields.kind === 'Errors') {
+            continue;
+          }
+          linkedFieldOrFields = linkedFieldOrFields.value;
+        }
         const links: StoreLink[] = [];
-        if (Array.isArray(linkedFieldOrFields)) {
+        if (isArray(linkedFieldOrFields)) {
           for (const maybeLink of linkedFieldOrFields) {
             const link = assertLink(maybeLink);
             if (link != null) {
