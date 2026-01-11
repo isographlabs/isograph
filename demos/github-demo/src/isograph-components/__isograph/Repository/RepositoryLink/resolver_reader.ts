@@ -5,6 +5,7 @@ import { RepositoryLink as resolver } from '../../../RepositoryLink';
 const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "name",
     alias: null,
     arguments: null,
@@ -19,6 +21,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "owner",
     alias: null,
     arguments: null,
@@ -28,6 +31,7 @@ const readerAst: ReaderAst<Repository__RepositoryLink__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "login",
         alias: null,
         arguments: null,

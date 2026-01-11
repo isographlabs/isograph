@@ -74,6 +74,7 @@ pub fn process_graphql_type_system_document(
                             key: (*ID_FIELD_NAME).unchecked_conversion(),
                             value: NonConstantValue::Variable((*ID_VARIABLE_NAME).into()),
                         }],
+                        is_fallible: true,
                         // None -> node is not concrete.
                         // Note that this doesn't matter!
                         concrete_target_entity_name: None,

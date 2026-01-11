@@ -6,6 +6,7 @@ import Actor__asUser__resolver_reader from '../../Actor/asUser/resolver_reader';
 const readerAst: ReaderAst<Actor__UserLink__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "login",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "asUser",
     alias: null,
     arguments: null,
@@ -22,6 +24,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -29,6 +32,7 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "twitterUsername",
         alias: null,
         arguments: null,

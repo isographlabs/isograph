@@ -6,6 +6,7 @@ import Pet__PetDetailDeferredRouteInnerComponent__resolver_reader from '../../Pe
 const readerAst: ReaderAst<Query__PetByName__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "petByName",
     alias: "pet",
     arguments: [
