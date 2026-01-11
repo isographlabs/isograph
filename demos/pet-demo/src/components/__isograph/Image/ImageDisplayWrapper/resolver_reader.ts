@@ -11,6 +11,7 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
     refetchReaderAst: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,

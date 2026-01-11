@@ -23,7 +23,10 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
     match item.reference() {
         MergedServerSelection::ScalarField(scalar_field) => {
             let MergedScalarFieldSelection {
-                name, arguments, ..
+                name,
+                arguments,
+                is_fallible,
+                ..
             } = scalar_field;
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -33,6 +36,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Scalar\",\n\
+                {indent_2}isFallible: {is_fallible},\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent}}},\n"
@@ -43,6 +47,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
                 name,
                 selection_map,
                 arguments,
+                is_fallible,
                 ..
             } = linked_field;
 
@@ -63,6 +68,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
             format!(
                 "{indent}{{\n\
                 {indent_2}kind: \"Linked\",\n\
+                {indent_2}isFallible: {is_fallible},\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
                 {indent_2}concreteType: {concrete_type},\n\

@@ -6,6 +6,7 @@ import { checkinsPointer as resolver } from '../../../SmartestPet';
 const readerAst: ReaderAst<Pet__checkinsPointer__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "checkins",
     alias: null,
     arguments: [

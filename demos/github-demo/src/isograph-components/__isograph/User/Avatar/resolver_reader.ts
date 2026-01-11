@@ -5,6 +5,7 @@ import { Avatar as resolver } from '../../../avatar';
 const readerAst: ReaderAst<User__Avatar__param> = [
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "name",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<User__Avatar__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "avatarUrl",
     alias: null,
     arguments: null,

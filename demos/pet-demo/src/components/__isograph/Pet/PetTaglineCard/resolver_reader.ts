@@ -5,6 +5,7 @@ import { PetTaglineCard as resolver } from '../../../Pet/PetTaglineCard';
 const readerAst: ReaderAst<Pet__PetTaglineCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<Pet__PetTaglineCard__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "tagline",
     alias: null,
     arguments: null,
