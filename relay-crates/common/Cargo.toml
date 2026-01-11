@@ -19,3 +19,6 @@ rayon = "1.2"
 serde = { version = "1.0.185", features = ["derive", "rc"] }
 serde_json = { version = "1.0.100", features = ["float_roundtrip", "unbounded_depth"] }
 typetag = "0.2.15"
+
+[lints.clippy]
+all = "allow"

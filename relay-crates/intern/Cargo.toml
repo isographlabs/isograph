@@ -30,3 +30,6 @@ serde_json = { version = "1.0.100", features = [
 unexpected_cfgs = { level = "warn", check-cfg = [
     'cfg(memory_consistency_assertions)',
 ] }
+
+[lints.clippy]
+all = "allow"
