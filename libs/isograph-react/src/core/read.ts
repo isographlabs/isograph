@@ -18,12 +18,14 @@ import type {
   UnknownTReadFromStore,
   Variables,
 } from './FragmentReference';
-import type { IsographEnvironment } from './IsographEnvironment';
+import type {
+  DataTypeValueScalar,
+  IsographEnvironment,
+} from './IsographEnvironment';
 import {
   assertLink,
   getOrLoadIsographArtifact,
   getOrLoadReaderWithRefetchQueries,
-  type DataTypeValue,
   type StoreLink,
   type StoreRecord,
 } from './IsographEnvironment';
@@ -616,9 +618,7 @@ export function readScalarFieldData(
   storeRecord: StoreRecord,
   root: StoreLink,
   variables: Variables,
-): ReadDataResult<
-  string | number | boolean | StoreLink | readonly DataTypeValue[] | null
-> {
+): ReadDataResult<DataTypeValueScalar> {
   const storeRecordName = getParentRecordKey(field, variables);
   const value = storeRecord[storeRecordName];
   // TODO consider making scalars into discriminated unions. This probably has

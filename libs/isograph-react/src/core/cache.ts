@@ -1,4 +1,5 @@
 import { type Factory, ParentCache } from '@isograph/react-disposable-state';
+import type { Brand } from './brand';
 import type {
   NormalizationAstNodes,
   NormalizationInlineFragment,
@@ -13,7 +14,7 @@ import type {
 } from './FragmentReference';
 import {
   type DataId,
-  type DataTypeValue,
+  type DataTypeValueLinked,
   getLink,
   type IsographEnvironment,
   ROOT_ID,
@@ -46,18 +47,26 @@ export function getOrCreateItemInSuspenseCache<
   return environment.fragmentCache[index];
 }
 
-export type NetworkResponseScalarValue = string | number | boolean | unknown;
-export type NetworkResponseValue =
-  | NetworkResponseScalarValue
+export type NetworkResponsePlural<T> =
   | null
-  | NetworkResponseObject
-  | readonly (NetworkResponseObject | null)[]
-  | readonly (NetworkResponseScalarValue | null)[];
+  | T
+  | readonly T[]
+  | readonly (null | T)[];
+export type NetworkResponseScalarValue = string | number | boolean | unknown;
+
+export type NetworkResponseValue =
+  | NetworkResponsePlural<NetworkResponseScalarValue>
+  | NetworkResponsePlural<NetworkResponseObject>;
 
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  readonly [index: string]: undefined | NetworkResponseValue;
+  readonly [K in
+    | ScalarNetworkResponseKey
+    | LinkedNetworkResponseKey]: K extends ScalarNetworkResponseKey
+    ? undefined | NetworkResponsePlural<NetworkResponseScalarValue>
+    : undefined | NetworkResponsePlural<NetworkResponseObject>;
+} & {
   readonly id?: DataId;
   readonly __typename?: TypeName;
 };
@@ -233,12 +242,8 @@ function normalizeScalarField(
     return existingValue === undefined || existingValue != null;
   }
 
-  if (isScalarOrEmptyArray(networkResponseData)) {
-    targetStoreRecord[parentRecordKey] = networkResponseData;
-    return existingValue !== networkResponseData;
-  } else {
-    throw new Error('Unexpected object array when normalizing scalar');
-  }
+  targetStoreRecord[parentRecordKey] = networkResponseData;
+  return existingValue !== networkResponseData;
 }
 
 /**
@@ -262,15 +267,6 @@ function normalizeLinkedField(
   if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
-  }
-
-  if (
-    isScalarOrEmptyArray(networkResponseData) &&
-    !isNullOrEmptyArray(networkResponseData)
-  ) {
-    throw new Error(
-      'Unexpected scalar network response when normalizing a linked field',
-    );
   }
 
   if (isArray(networkResponseData)) {
@@ -371,7 +367,7 @@ function normalizeInlineFragment(
 }
 
 function dataIdsAreTheSame(
-  existingValue: DataTypeValue,
+  existingValue: DataTypeValueLinked,
   newDataIds: (StoreLink | null)[],
 ): boolean {
   if (isArray(existingValue)) {
@@ -437,36 +433,24 @@ function normalizeNetworkResponseObject(
   return newStoreRecordId;
 }
 
-function isScalarOrEmptyArray(
-  data: NetworkResponseValue,
-): data is
-  | NetworkResponseScalarValue
-  | readonly (NetworkResponseScalarValue | null)[] {
-  // N.B. empty arrays count as empty arrays of scalar fields.
-  if (isArray(data)) {
-    return data.every((x) => isScalarOrEmptyArray(x));
-  }
-  const isScalarValue =
-    data == null ||
-    typeof data === 'string' ||
-    typeof data === 'number' ||
-    typeof data === 'boolean';
-  return isScalarValue;
-}
+declare const LinkedParentRecordKeyBrand: unique symbol;
+export type LinkedParentRecordKey = string & {
+  brand?: Brand<undefined, typeof LinkedParentRecordKeyBrand>;
+};
 
-function isNullOrEmptyArray(
-  data: unknown,
-): data is readonly never[] | null[] | null {
-  if (isArray(data)) {
-    if (data.length === 0) {
-      return true;
-    }
-    return data.every((x) => isNullOrEmptyArray(x));
-  }
+declare const ScalarParentRecordKeyBrand: unique symbol;
+export type ScalarParentRecordKey = string & {
+  brand?: Brand<undefined, typeof ScalarParentRecordKeyBrand>;
+};
 
-  return data == null;
-}
-
+export function getParentRecordKey(
+  astNode: NormalizationLinkedField | ReaderLinkedField,
+  variables: Variables,
+): LinkedParentRecordKey;
+export function getParentRecordKey(
+  astNode: NormalizationScalarField | ReaderScalarField,
+  variables: Variables,
+): ScalarParentRecordKey;
 export function getParentRecordKey(
   astNode:
     | NormalizationLinkedField
@@ -528,6 +512,22 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
+declare const LinkedNetworkResponseKeyBrand: unique symbol;
+export type LinkedNetworkResponseKey = string & {
+  brand?: Brand<undefined, typeof LinkedNetworkResponseKeyBrand>;
+};
+
+declare const ScalarNetworkResponseKeyBrand: unique symbol;
+export type ScalarNetworkResponseKey = string & {
+  brand?: Brand<undefined, typeof ScalarNetworkResponseKeyBrand>;
+};
+
+function getNetworkResponseKey(
+  astNode: NormalizationLinkedField,
+): LinkedNetworkResponseKey;
+function getNetworkResponseKey(
+  astNode: NormalizationScalarField,
+): ScalarNetworkResponseKey;
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
 ): string {
