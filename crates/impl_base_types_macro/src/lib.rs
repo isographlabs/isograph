@@ -7,13 +7,13 @@ use proc_macro::TokenStream;
 
 static SELECTION_TYPE_BASE_TYPE: BaseType = BaseType {
     variant_names: &["Scalar", "Object"],
-    base_type_name: "SelectionType",
+    name: "SelectionType",
     crate_name: "isograph_lang_types",
 };
 
 static DEFINITION_LOCATION_BASE_TYPE: BaseType = BaseType {
     variant_names: &["Server", "Client"],
-    base_type_name: "DefinitionLocation",
+    name: "DefinitionLocation",
     crate_name: "isograph_lang_types",
 };
 

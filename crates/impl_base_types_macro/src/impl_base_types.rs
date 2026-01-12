@@ -8,7 +8,7 @@ use syn::{
 #[derive(Clone, Copy)]
 pub(crate) struct BaseType {
     pub(crate) crate_name: &'static str,
-    pub(crate) base_type_name: &'static str,
+    pub(crate) name: &'static str,
     pub(crate) variant_names: &'static [&'static str],
 }
 
@@ -24,7 +24,7 @@ pub(crate) fn impl_base_types(
     let items = &item_trait.items;
 
     let trait_impls_for_base_types = base_types.iter().map(|base_type| {
-        let base_type_name = Ident::new(base_type.base_type_name, Span::call_site());
+        let base_type_name = Ident::new(base_type.name, Span::call_site());
         let crate_name = Ident::new(base_type.crate_name, Span::call_site());
 
         let method_impls = items.iter().map(|item| match item {
