@@ -25,6 +25,8 @@ pub struct CompilerConfig {
     pub schema: AbsolutePathAndRelativePath,
     /// The absolute path to the schema extensions
     pub schema_extensions: Vec<AbsolutePathAndRelativePath>,
+    /// Network protocol kind
+    pub kind: Kind,
 
     /// Various options that are of lesser importance
     pub options: CompilerConfigOptions,
@@ -39,6 +41,14 @@ pub struct CompilerConfigOptions {
     pub generated_file_header: Option<GeneratedFileHeader>,
     pub persisted_documents: Option<PersistedDocumentsOptions>,
     pub open_telemetry: Option<OpenTelemetryOptions>,
+}
+
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Deserialize, JsonSchema)]
+#[serde(rename_all = "lowercase")]
+pub enum Kind {
+    #[default]
+    GraphQL,
+    SQL,
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
@@ -131,6 +141,9 @@ pub struct IsographProjectConfig {
     /// The relative path to schema extensions
     #[serde(default)]
     pub schema_extensions: Vec<PathBuf>,
+    /// Network protocol kind
+    #[serde(default)]
+    pub kind: Kind,
 
     /// Various options of less importance
     #[serde(default)]
@@ -221,6 +234,7 @@ pub fn create_config(
                 )
             })
             .collect(),
+        kind: config_parsed.kind,
         options: create_options(config_parsed.options),
     }
 }
