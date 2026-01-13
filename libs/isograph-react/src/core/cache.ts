@@ -590,9 +590,17 @@ function getDataIdOfNetworkResponse(
   variables: Variables,
   index: number | null,
 ): DataId {
+  const __typename =
+    astNode.concreteType ?? dataToNormalize[TYPENAME_FIELD_NAME];
+  if (__typename == null) {
+    throw new Error(
+      'Unexpected missing __typename in network response when normalizing a linked field. ' +
+        'This is indicative of a bug in Isograph.',
+    );
+  }
   // If we are dealing with nested Query, use __ROOT as id
   // TODO do not hard code this value here
-  if (astNode.concreteType === 'Query') {
+  if (__typename === 'Query') {
     return ROOT_ID;
   }
 
