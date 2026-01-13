@@ -22,3 +22,4 @@ typetag = "0.2.15"
 
 [lints.clippy]
 all = "allow"
+pedantic = "allow"
