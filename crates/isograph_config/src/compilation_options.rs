@@ -336,9 +336,10 @@ fn create_optional_validation_level(
 fn create_generate_file_extensions(
     optional_generate_file_extensions: bool,
 ) -> GenerateFileExtensionsOption {
-    match optional_generate_file_extensions {
-        true => GenerateFileExtensionsOption::IncludeExtensionsInFileImports,
-        false => GenerateFileExtensionsOption::ExcludeExtensionsInFileImports,
+    if optional_generate_file_extensions {
+        GenerateFileExtensionsOption::IncludeExtensionsInFileImports
+    } else {
+        GenerateFileExtensionsOption::ExcludeExtensionsInFileImports
     }
 }
 
