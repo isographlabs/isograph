@@ -38,15 +38,15 @@ const readerAst: ReaderAst<Actor__UserLink__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Actor__UserLink__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "UserLink",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

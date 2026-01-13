@@ -48,15 +48,15 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   PullRequest__PullRequestLink__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PullRequestLink",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

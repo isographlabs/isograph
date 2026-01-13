@@ -12,15 +12,15 @@ const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__FavoritePhraseLoader__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "FavoritePhraseLoader",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

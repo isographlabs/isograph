@@ -48,15 +48,15 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetCheckinsCard__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetCheckinsCard",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

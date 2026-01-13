@@ -79,15 +79,15 @@ const readerAst: ReaderAst<Query__linkedUpdate__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__linkedUpdate__param,
   Query__linkedUpdate__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "linkedUpdate",
   resolver,
   readerAst,
   hasUpdatable: true,
-};
+});
 
 export default artifact;

@@ -62,15 +62,15 @@ const readerAst: ReaderAst<Pet__PetUpdater__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetUpdater__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetUpdater",
   resolver,
   readerAst,
   hasUpdatable: true,
-};
+});
 
 export default artifact;

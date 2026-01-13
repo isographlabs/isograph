@@ -19,15 +19,15 @@ const readerAst: ReaderAst<Repository__IsStarred__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Repository__IsStarred__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "IsStarred",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

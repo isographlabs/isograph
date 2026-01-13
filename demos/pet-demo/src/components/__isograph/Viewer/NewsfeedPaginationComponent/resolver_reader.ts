@@ -80,15 +80,15 @@ const readerAst: ReaderAst<Viewer__NewsfeedPaginationComponent__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Viewer__NewsfeedPaginationComponent__param,
   Viewer__NewsfeedPaginationComponent__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "NewsfeedPaginationComponent",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -26,15 +26,15 @@ const readerAst: ReaderAst<Image__ImageDisplayWrapper__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Image__ImageDisplayWrapper__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "ImageDisplayWrapper",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

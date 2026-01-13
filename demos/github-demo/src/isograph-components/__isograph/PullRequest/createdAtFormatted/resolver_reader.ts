@@ -13,15 +13,15 @@ const readerAst: ReaderAst<PullRequest__createdAtFormatted__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   PullRequest__createdAtFormatted__param,
   PullRequest__createdAtFormatted__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "createdAtFormatted",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

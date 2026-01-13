@@ -12,15 +12,15 @@ const readerAst: ReaderAst<BlogItem__BlogItemMoreDetail__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   BlogItem__BlogItemMoreDetail__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "BlogItemMoreDetail",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -26,15 +26,15 @@ const readerAst: ReaderAst<Pet__checkinsPointer__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Pet__checkinsPointer__param,
   Pet__checkinsPointer__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "checkinsPointer",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

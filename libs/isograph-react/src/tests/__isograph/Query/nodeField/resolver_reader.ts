@@ -29,15 +29,15 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__nodeField__param,
   Query__nodeField__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "nodeField",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -42,15 +42,15 @@ const readerAst: ReaderAst<Pet__PetCheckinsCardList__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Pet__PetCheckinsCardList__param,
   Pet__PetCheckinsCardList__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "PetCheckinsCardList",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

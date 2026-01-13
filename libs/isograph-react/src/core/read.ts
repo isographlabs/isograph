@@ -550,25 +550,25 @@ export function readResolverFieldData(
 
   const readerWithRefetchQueries = {
     kind: 'ReaderWithRefetchQueries',
-    readerArtifact: field.readerArtifact,
+    readerArtifact: field.readerArtifact(),
     nestedRefetchQueries: resolverRefetchQueries,
   } satisfies ReaderWithRefetchQueries<any, any>;
 
   const fragment = {
     kind: 'FragmentReference',
     readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
-    fieldName: field.readerArtifact.fieldName,
-    readerArtifactKind: field.readerArtifact.kind,
+    fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
+    readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
     root,
     variables: generateChildVariableMap(variables, field.arguments),
     networkRequest,
   } satisfies FragmentReference<any, any>;
 
-  switch (field.readerArtifact.kind) {
+  switch (readerWithRefetchQueries.readerArtifact.kind) {
     case 'EagerReaderArtifact': {
       const data = readData(
         environment,
-        field.readerArtifact.readerAst,
+        readerWithRefetchQueries.readerArtifact.readerAst,
         root,
         generateChildVariableMap(variables, field.arguments),
         resolverRefetchQueries,
@@ -587,7 +587,7 @@ export function readResolverFieldData(
       const firstParameter = {
         data: data.data,
         parameters: variables,
-        startUpdate: field.readerArtifact.hasUpdatable
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
           ? getOrCreateCachedStartUpdate(
               environment,
               fragment,
@@ -597,7 +597,7 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        data: field.readerArtifact.resolver(firstParameter),
+        data: readerWithRefetchQueries.readerArtifact.resolver(firstParameter),
       };
     }
     case 'ComponentReaderArtifact': {

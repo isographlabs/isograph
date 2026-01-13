@@ -124,7 +124,7 @@ export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;
   // TODO don't type this as any
-  readonly readerArtifact: TopLevelReaderArtifact<any, any, any>;
+  readonly readerArtifact: () => TopLevelReaderArtifact<any, any, any>;
   readonly arguments: Arguments | null;
   readonly usedRefetchQueries: number[];
 };

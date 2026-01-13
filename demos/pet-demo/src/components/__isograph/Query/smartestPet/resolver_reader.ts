@@ -39,15 +39,15 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__smartestPet__param,
   Query__smartestPet__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "smartestPet",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;
