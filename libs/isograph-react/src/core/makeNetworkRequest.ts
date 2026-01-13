@@ -404,9 +404,7 @@ function readDataForOnComplete<
     const fragment: FragmentReference<TReadFromStore, TClientFieldValue> = {
       kind: 'FragmentReference',
       // TODO this smells.
-      readerWithRefetchQueries: wrapResolvedValue(
-        readerWithRefetchQueries,
-      ),
+      readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
       fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
       readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
       root,

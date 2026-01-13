@@ -651,7 +651,8 @@ export function readLinkedFieldData(
   let value = storeRecord[storeRecordName];
 
   if (field.condition != null) {
-    const data = readData(field.condition.readerAst, root);
+    const condition = field.condition();
+    const data = readData(condition.readerAst, root);
     if (data.kind === 'MissingData') {
       return {
         kind: 'MissingData',
@@ -664,7 +665,7 @@ export function readLinkedFieldData(
 
     const readerWithRefetchQueries = {
       kind: 'ReaderWithRefetchQueries',
-      readerArtifact: field.condition,
+      readerArtifact: condition,
       // TODO this is wrong
       // should map field.condition.usedRefetchQueries
       // but it doesn't exist
@@ -675,8 +676,8 @@ export function readLinkedFieldData(
       kind: 'FragmentReference',
       readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
       root,
-      fieldName: field.condition.fieldName,
-      readerArtifactKind: field.condition.kind,
+      fieldName: condition.fieldName,
+      readerArtifactKind: condition.kind,
       variables: generateChildVariableMap(
         variables,
         // TODO this is wrong
@@ -687,10 +688,10 @@ export function readLinkedFieldData(
       networkRequest,
     } satisfies FragmentReference<any, any>;
 
-    const condition = field.condition.resolver({
+    const link = condition.resolver({
       data: data.data,
       parameters: {},
-      ...(field.condition.hasUpdatable
+      ...(condition.hasUpdatable
         ? {
             startUpdate: getOrCreateCachedStartUpdate(
               environment,
@@ -700,7 +701,7 @@ export function readLinkedFieldData(
           }
         : undefined),
     });
-    value = condition;
+    value = link;
   }
 
   if (Array.isArray(value)) {
