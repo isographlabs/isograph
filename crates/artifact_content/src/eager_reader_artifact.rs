@@ -255,16 +255,16 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
         "import type {{ EagerReaderArtifact, ReaderAst, Link }} from '@isograph/react';\n\
         {reader_import_statement}\n\
         const readerAst: ReaderAst<{reader_param_type}> = {reader_ast};\n\n\
-        const artifact: EagerReaderArtifact<\n\
+        const artifact = (): EagerReaderArtifact<\n\
         {}{reader_param_type},\n\
         {}{reader_output_type}\n\
-        > = {{\n\
+        > => ({{\n\
         {}kind: \"EagerReaderArtifact\",\n\
         {}fieldName: \"{eager_reader_name}\",\n\
         {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.{link_field_name} : null,\n\
         {}readerAst,\n\
         {}hasUpdatable: false,\n\
-        }};\n\n\
+    }});\n\n\
         export default artifact;\n",
         "  ", "  ", "  ", "  ", "  ", "  ", "  "
     );
