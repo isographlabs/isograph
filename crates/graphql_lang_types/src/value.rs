@@ -109,6 +109,7 @@ impl fmt::Display for FloatValue {
 
 impl std::convert::From<i64> for FloatValue {
     fn from(value: i64) -> Self {
+        #[expect(clippy::cast_precision_loss)]
         FloatValue::new(value as f64)
     }
 }
