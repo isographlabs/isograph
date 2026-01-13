@@ -6,6 +6,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: false,
       fieldName: "make_checkin_super",
       arguments: [
         [
@@ -17,6 +18,7 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Linked",
+          isFallible: true,
           fieldName: "icheckin",
           arguments: null,
           concreteType: "Checkin",
@@ -27,16 +29,19 @@ const normalizationAst: NormalizationAst = {
               selections: [
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "__typename",
                   arguments: null,
                 },
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "id",
                   arguments: null,
                 },
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "location",
                   arguments: null,
                 },

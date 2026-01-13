@@ -8,6 +8,7 @@ type Query {
 type Economist implements Node {
   id: ID!
   name: String!
+  nickname: String
   predecessor: Economist
   successor: Economist
 }
