@@ -16,3 +16,4 @@ regex = "1.9.2"
 
 [lints.clippy]
 all = "allow"
+pedantic = "allow"

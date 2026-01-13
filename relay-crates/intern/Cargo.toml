@@ -33,3 +33,4 @@ unexpected_cfgs = { level = "warn", check-cfg = [
 
 [lints.clippy]
 all = "allow"
+pedantic = "allow"

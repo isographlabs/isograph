@@ -14,3 +14,4 @@ common = { path = "../common" }
 
 [lints.clippy]
 all = "allow"
+pedantic = "allow"
