@@ -5,7 +5,10 @@ import type {Query__subquery__raw_response_type} from './raw_response_type';
 import readerResolver from './resolver_reader';
 import queryText from './query_text';
 import normalizationAst from './normalization_ast';
-const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [];
+import refetchQuery0 from './__refetch__0';
+const nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[] = [
+  { artifact: refetchQuery0, allowedVariables: ["id", ] },
+];
 
 const artifact: IsographEntrypoint<
   Query__subquery__param,

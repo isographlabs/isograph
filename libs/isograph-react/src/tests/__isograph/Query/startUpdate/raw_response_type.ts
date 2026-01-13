@@ -1,4 +1,5 @@
 export type Query__startUpdate__raw_response_type = {
+  id: string,
   node____id___v_id?: ({
     __typename: "Economist",
     id: string,

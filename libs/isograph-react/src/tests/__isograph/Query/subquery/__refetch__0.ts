@@ -1,12 +1,9 @@
-import type {NormalizationAst} from '@isograph/react';
+import type { IsographEntrypoint, ReaderAst, FragmentReference, NormalizationAst, RefetchQueryNormalizationArtifact } from '@isograph/react';
+import queryText from './__refetch__query_text__0';
+
 const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
   selections: [
-    {
-      kind: "Scalar",
-      fieldName: "id",
-      arguments: null,
-    },
     {
       kind: "Linked",
       fieldName: "node",
@@ -19,18 +16,8 @@ const normalizationAst: NormalizationAst = {
       concreteType: null,
       selections: [
         {
-          kind: "Scalar",
-          fieldName: "__typename",
-          arguments: null,
-        },
-        {
-          kind: "Scalar",
-          fieldName: "id",
-          arguments: null,
-        },
-        {
           kind: "InlineFragment",
-          type: "Economist",
+          type: "Query",
           selections: [
             {
               kind: "Scalar",
@@ -42,15 +29,23 @@ const normalizationAst: NormalizationAst = {
               fieldName: "id",
               arguments: null,
             },
-            {
-              kind: "Scalar",
-              fieldName: "name",
-              arguments: null,
-            },
           ],
         },
       ],
     },
   ],
 };
-export default normalizationAst;
+const artifact: RefetchQueryNormalizationArtifact = {
+  kind: "RefetchQuery",
+  networkRequestInfo: {
+    kind: "NetworkRequestInfo",
+    operation: {
+      kind: "Operation",
+      text: queryText,
+    },
+    normalizationAst,
+  },
+  concreteType: "Query",
+};
+
+export default artifact;

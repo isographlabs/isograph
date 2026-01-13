@@ -3,6 +3,11 @@ const normalizationAst: NormalizationAst = {
   kind: "NormalizationAst",
   selections: [
     {
+      kind: "Scalar",
+      fieldName: "id",
+      arguments: null,
+    },
+    {
       kind: "Linked",
       fieldName: "node",
       arguments: [

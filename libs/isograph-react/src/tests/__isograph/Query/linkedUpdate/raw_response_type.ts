@@ -1,4 +1,5 @@
 export type Query__linkedUpdate__raw_response_type = {
+  id: string,
   node____id___l_0?: ({
     __typename: "Economist",
     id: string,

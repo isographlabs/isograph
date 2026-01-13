@@ -7,13 +7,7 @@ import {
   type BaseStoreLayerData,
 } from '../core/IsographEnvironment';
 import { normalizeData } from '../core/cache';
-import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
-import {
-  readButDoNotEvaluate,
-  type WithEncounteredRecords,
-} from '../core/read';
 import { createIsographEnvironment } from '../react/createIsographEnvironment';
-import type { Query__subquery__param } from './__isograph/Query/subquery/param_type';
 
 let store: ReturnType<typeof createIsographStore>;
 let environment: ReturnType<typeof createIsographEnvironment>;
@@ -45,6 +39,7 @@ describe('normalize undefined field', () => {
         .selections,
       {
         me: { __typename: 'Economist', id: '1' },
+        id: 'query',
       },
       {},
       {
@@ -62,6 +57,7 @@ describe('normalize undefined field', () => {
       },
       Query: {
         [ROOT_ID]: {
+          id: 'query',
           me: {
             __typename: 'Economist',
             __link: '1',
@@ -77,7 +73,7 @@ describe('normalize undefined field', () => {
       environment.store,
       normalizeUndefinedFieldEntrypoint.networkRequestInfo.normalizationAst
         .selections,
-      {},
+      { id: 'query' },
       {},
       {
         __link: ROOT_ID,
@@ -88,6 +84,7 @@ describe('normalize undefined field', () => {
     expect(store).toStrictEqual({
       Query: {
         [ROOT_ID]: {
+          id: 'query',
           me: null,
         },
       },
@@ -96,25 +93,23 @@ describe('normalize undefined field', () => {
 });
 
 export const subquery = iso(`
-  field Query.subquery($id: ID!) {
-    query {
-      node(id: $id) {
-        id
-      }
-    }
+  field Query.subquery {
+    __refetch
   }
 `)(() => {});
 
 const entrypoint = iso(`entrypoint Query.subquery`);
+
+import entrypointRefetch from './__isograph/Query/subquery/__refetch__0';
 
 describe('nested Query', () => {
   test('should be normalized', () => {
     normalizeData(
       environment,
       environment.store,
-      entrypoint.networkRequestInfo.normalizationAst.selections,
+      entrypointRefetch.networkRequestInfo.normalizationAst.selections,
       {
-        query: { node____id___v_id: { __typename: 'Economist', id: '1' } },
+        node____id___v_id: { __typename: 'Query', id: '1' },
       },
       { id: '1' },
       { __link: ROOT_ID, __typename: entrypoint.concreteType },
@@ -122,74 +117,13 @@ describe('nested Query', () => {
     );
 
     expect(store).toStrictEqual({
-      Economist: {
-        '1': {
-          __typename: 'Economist',
-          id: '1',
-        },
-      },
       Query: {
         [ROOT_ID]: {
-          node____id___1: {
-            __typename: 'Economist',
-            __link: '1',
-          },
-          query: {
-            __link: ROOT_ID,
-            __typename: 'Query',
-          },
+          id: '1',
+          __typename: 'Query',
+          node____id___1: { __typename: 'Query', __link: ROOT_ID },
         },
       },
     } satisfies BaseStoreLayerData);
-  });
-
-  test('should be read', () => {
-    const store: BaseStoreLayerData = {
-      Economist: {
-        '1': {
-          __typename: 'Economist',
-          id: '1',
-        },
-      },
-      Query: {
-        [ROOT_ID]: {
-          node____id___1: {
-            __typename: 'Economist',
-            __link: '1',
-          },
-          query: {
-            __link: ROOT_ID,
-            __typename: 'Query',
-          },
-        },
-      },
-    };
-    const networkFunction = vi
-      .fn()
-      .mockRejectedValue(new Error('Fetch failed'));
-    const environment = createIsographEnvironment(store, networkFunction);
-    const [_cacheItem, item, _disposeOfTemporaryRetain] =
-      getOrCreateCacheForArtifact(environment, entrypoint, {
-        id: '1',
-      }).getOrPopulateAndTemporaryRetain();
-
-    const data = readButDoNotEvaluate(environment, item, {
-      suspendIfInFlight: true,
-      throwOnNetworkError: false,
-    });
-
-    expect(data).toStrictEqual({
-      encounteredRecords: new Map([
-        ['Economist', new Set(['1'])],
-        ['Query', new Set([ROOT_ID])],
-      ]),
-      item: {
-        query: {
-          node: {
-            id: '1',
-          },
-        },
-      },
-    } satisfies WithEncounteredRecords<Query__subquery__param>);
   });
 });
