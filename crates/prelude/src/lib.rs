@@ -48,6 +48,14 @@ where
     }
 
     #[inline(always)]
+    fn dbg_with_note(self, note: &'static str) -> Self
+    where
+        Self: std::fmt::Debug,
+    {
+        dbg!((note, self)).1
+    }
+
+    #[inline(always)]
     fn note_todo(self, #[allow(unused)] message: &'static str) -> Self {
         self
     }
