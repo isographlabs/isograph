@@ -3,6 +3,7 @@ use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use common_lang_types::{
     DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
     VariableName, WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    WithOptionalLocation,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition, GraphQLTypeSystemDefinition,
@@ -53,7 +54,8 @@ fn define_default_graphql_data_model_entities(
             network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
             selection_info: ().scalar_selected(),
-        },
+        }
+        .with_missing_location(),
     );
 
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
@@ -70,7 +72,8 @@ fn define_default_graphql_data_model_entities(
             network_protocol_associated_data: (),
             target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
             selection_info: ().scalar_selected(),
-        },
+        }
+        .with_missing_location(),
     );
 
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
@@ -82,7 +85,8 @@ fn define_default_graphql_data_model_entities(
             network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
             selection_info: ().scalar_selected(),
-        },
+        }
+        .with_missing_location(),
     );
 
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
@@ -94,7 +98,8 @@ fn define_default_graphql_data_model_entities(
             network_protocol_associated_data: (),
             target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
             selection_info: ().scalar_selected(),
-        },
+        }
+        .with_missing_location(),
     );
 
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
@@ -106,7 +111,8 @@ fn define_default_graphql_data_model_entities(
             network_protocol_associated_data: (),
             target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
             selection_info: ().scalar_selected(),
-        },
+        }
+        .with_missing_location(),
     );
 }
 
@@ -150,21 +156,25 @@ fn insert_parsed_items_into_schema(
 
     for graphql_interface_type_definition in interfaces_to_process {
         let selectables = process_fields(
-            graphql_interface_type_definition.name.item,
-            graphql_interface_type_definition.fields,
+            graphql_interface_type_definition.item.name.item,
+            graphql_interface_type_definition.item.fields,
         );
         insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
             schema,
             DataModelEntity {
-                name: graphql_interface_type_definition.name.map_location(Some),
+                name: graphql_interface_type_definition
+                    .item
+                    .name
+                    .map_location(Some),
                 description: graphql_interface_type_definition
+                    .item
                     .description
                     .map(|x| x.map_location(Some).map(Description)),
                 selectables,
                 network_protocol_associated_data: (),
                 target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
                     subtypes: supertype_to_subtype_map
-                        .get(graphql_interface_type_definition.name.item.reference())
+                        .get(graphql_interface_type_definition.item.name.item.reference())
                         .expect("Expected interface to exist")
                         .clone(),
                 }
@@ -173,7 +183,8 @@ fn insert_parsed_items_into_schema(
                     is_concrete: IsConcrete(false),
                 }
                 .object_selected(),
-            },
+            }
+            .with_some_location(graphql_interface_type_definition.location),
         );
     }
 
@@ -199,7 +210,8 @@ fn insert_parsed_items_into_schema(
                 target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
                     .scalar_selected(),
                 selectables: Default::default(),
-            },
+            }
+            .with_missing_location(),
         );
 
         let selectables = &mut schema
@@ -282,7 +294,7 @@ fn process_graphql_documents(
     schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
     documents: Vec<WithEmbeddedLocation<GraphQLTypeSystemExtensionOrDefinition>>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
-    interfaces_to_process: &mut Vec<GraphQLInterfaceTypeDefinition>,
+    interfaces_to_process: &mut Vec<WithEmbeddedLocation<GraphQLInterfaceTypeDefinition>>,
 ) {
     for document in documents {
         match document.item {
@@ -323,7 +335,8 @@ fn process_graphql_documents(
                                     .to::<JavascriptName>()
                                     .scalar_selected(),
                                 selection_info: ().scalar_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
 
                         selectables.item.insert(
@@ -370,7 +383,8 @@ fn process_graphql_documents(
                                     is_concrete: IsConcrete(true),
                                 }
                                 .object_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
 
                         for interface in graphql_object_type_definition.interfaces {
@@ -397,7 +411,8 @@ fn process_graphql_documents(
                                 target_platform_associated_data: (*UNKNOWN_JAVASCRIPT_TYPE)
                                     .scalar_selected(),
                                 selection_info: ().scalar_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
                     }
                     GraphQLTypeSystemDefinition::InterfaceTypeDefinition(
@@ -406,7 +421,9 @@ fn process_graphql_documents(
                         supertype_to_subtype_map
                             .entry(graphql_interface_type_definition.name.item)
                             .or_default();
-                        interfaces_to_process.push(graphql_interface_type_definition);
+                        interfaces_to_process.push(
+                            graphql_interface_type_definition.with_location(document.location),
+                        );
                     }
                     GraphQLTypeSystemDefinition::InputObjectTypeDefinition(
                         graphql_input_object_type_definition,
@@ -435,7 +452,8 @@ fn process_graphql_documents(
                                     is_concrete: IsConcrete(true),
                                 }
                                 .object_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
                     }
                     GraphQLTypeSystemDefinition::DirectiveDefinition(
@@ -454,7 +472,8 @@ fn process_graphql_documents(
                                 target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
                                     .scalar_selected(),
                                 selection_info: ().scalar_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
                     }
                     GraphQLTypeSystemDefinition::UnionTypeDefinition(
@@ -482,7 +501,8 @@ fn process_graphql_documents(
                                     is_concrete: IsConcrete(false),
                                 }
                                 .object_selected(),
-                            },
+                            }
+                            .with_some_location(document.location),
                         );
 
                         *supertype_to_subtype_map
@@ -514,13 +534,13 @@ fn process_graphql_documents(
 // TODO these should be one method
 fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
     schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
-    item: NestedDataModelEntity<GraphQLAndJavascriptProfile>,
+    entity: WithOptionalLocation<NestedDataModelEntity<GraphQLAndJavascriptProfile>>,
 ) {
-    let key = item.name.item;
+    let key = entity.item.name.item;
     match schema.item.entry(key) {
         Entry::Vacant(vacant_entry) => {
             // TODO parse graphql schema should wrap the items with locations
-            vacant_entry.insert(item.with_missing_location());
+            vacant_entry.insert(entity);
         }
         Entry::Occupied(occupied_entry) => {
             schema
