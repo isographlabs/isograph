@@ -10,7 +10,9 @@ use isograph_lang_types::{
     ClientObjectSelectableNameWrapperParent, ClientScalarSelectableNameWrapperParent,
     DefinitionLocation, IsographResolvedNode,
 };
-use isograph_schema::{CompilationProfile, process_iso_literal_extraction};
+use isograph_schema::{
+    CompilationProfile, process_iso_literal_extraction, read_iso_literals_source_from_relative_path,
+};
 use isograph_schema::{
     IsographDatabase, entity_definition_location, get_parent_and_selectable_for_object_path,
     get_parent_and_selectable_for_scalar_path, selectable_definition_location,
@@ -84,7 +86,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema_source().content,
+                                    db.get_schema_source().content.reference(),
                                 )
                             })
                             .map(lsp_location_to_scalar_response)
@@ -99,7 +101,13 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    (&db.get_schema_source().content).note_todo("Wrong source!"),
+                                    read_iso_literals_source_from_relative_path(
+                                        db,
+                                        location.text_source.relative_path_to_source_file,
+                                    )
+                                    .as_ref()?
+                                    .content
+                                    .reference(),
                                 )
                             })
                             .map(lsp_location_to_scalar_response)
@@ -125,7 +133,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema_source().content,
+                                    db.get_schema_source().content.reference(),
                                 )
                             })
                             .map(lsp_location_to_scalar_response)
@@ -140,7 +148,13 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema_source().content,
+                                    read_iso_literals_source_from_relative_path(
+                                        db,
+                                        location.text_source.relative_path_to_source_file,
+                                    )
+                                    .as_ref()?
+                                    .content
+                                    .reference(),
                                 )
                             })
                             .map(lsp_location_to_scalar_response)
