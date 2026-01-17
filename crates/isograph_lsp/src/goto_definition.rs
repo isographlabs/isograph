@@ -99,7 +99,7 @@ pub fn on_goto_definition_impl<TCompilationProfile: CompilationProfile>(
                                 isograph_location_to_lsp_location(
                                     db,
                                     location,
-                                    &db.get_schema_source().content,
+                                    (&db.get_schema_source().content).note_todo("Wrong source!"),
                                 )
                             })
                             .map(lsp_location_to_scalar_response)
