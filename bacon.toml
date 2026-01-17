@@ -16,6 +16,14 @@ command = [
 watch = ["crates"]
 need_stdout = false
 
+[jobs.build-notif]
+command = [
+	"sh", "-c", 
+    "cargo build --color always && (osascript -e 'display notification \"Compiled succesfully\" with Title \"Isograph\"' &)"
+]
+watch = ["crates"]
+need_stdout = false
+
 [jobs.watch-libs]
 command = ["pnpm", "compile-libs"]
 watch = ["libs"]
