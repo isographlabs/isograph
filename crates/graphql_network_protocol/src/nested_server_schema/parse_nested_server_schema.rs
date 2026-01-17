@@ -125,12 +125,16 @@ fn insert_parsed_items_into_schema(
 
     // TODO clone less etc
     let documents = type_system_document
-        .iter()
-        .map(|x| GraphQLTypeSystemExtensionOrDefinition::Definition(x.item.clone()))
+        .0
+        .into_iter()
+        .map(|with_location| {
+            with_location
+                .map(|definition| GraphQLTypeSystemExtensionOrDefinition::Definition(definition))
+        })
         .chain(
             type_system_extension_documents
                 .iter()
-                .flat_map(|(_, val)| val.lookup(db).clone().0.into_iter().map(|x| x.item)),
+                .flat_map(|(_, val)| val.lookup(db).clone().0.into_iter()),
         )
         .collect::<Vec<_>>();
 
@@ -276,12 +280,12 @@ fn insert_parsed_items_into_schema(
 
 fn process_graphql_documents(
     schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
-    documents: Vec<GraphQLTypeSystemExtensionOrDefinition>,
+    documents: Vec<WithEmbeddedLocation<GraphQLTypeSystemExtensionOrDefinition>>,
     supertype_to_subtype_map: &mut UnvalidatedTypeRefinementMap,
     interfaces_to_process: &mut Vec<GraphQLInterfaceTypeDefinition>,
 ) {
     for document in documents {
-        match document {
+        match document.item {
             GraphQLTypeSystemExtensionOrDefinition::Definition(graphql_type_system_definition) => {
                 match graphql_type_system_definition {
                     GraphQLTypeSystemDefinition::ObjectTypeDefinition(
