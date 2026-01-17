@@ -35,7 +35,7 @@ use lsp_types::{
     HoverProviderCapability,
     request::{
         CodeActionRequest, Completion, DocumentHighlightRequest, ExecuteCommand, HoverRequest,
-        SemanticTokensFullRequest,
+        Request, SemanticTokensFullRequest,
     },
 };
 use lsp_types::{
@@ -46,7 +46,11 @@ use lsp_types::{
     request::{Formatting, GotoDefinition},
 };
 use prelude::{ErrClone, Postfix};
-use std::{collections::BTreeSet, ops::ControlFlow, time::Duration};
+use std::{
+    collections::BTreeSet,
+    ops::{ControlFlow, Not},
+    time::Duration,
+};
 use tokio::time::{Instant, sleep};
 
 /// Initializes an LSP connection, handling the `initialize` message and `initialized` notification
@@ -136,8 +140,13 @@ pub async fn run<TCompilationProfile: CompilationProfile>(
                         match lsp_message {
                             lsp_server::Message::Request(request) => {
                                 eprintln!("\nReceived request: {}", request.method);
+                                let print_full_response = should_print_full_response(&request);
                                 let response = dispatch_request(request, &lsp_state);
-                                eprintln!("Sending response: {response:?}");
+                                if print_full_response {
+                                    eprintln!("Succeeded; sending response: {response:?}");
+                                } else {
+                                    eprintln!("Succeeded; sending response.");
+                                }
                                 connection.sender.send(response.into()).unwrap();
                             }
                             lsp_server::Message::Notification(notification) => {
@@ -280,4 +289,14 @@ fn bridge_crossbeam_to_tokio<T: Send + 'static>(
             }
         }
     });
+}
+
+/// Certain methods have really large responses, and they're not useful! We don't want to print
+/// the full response for those.
+static NON_PRINTABLE_METHODS: &'static [&'static str] = &[SemanticTokensFullRequest::METHOD];
+
+fn should_print_full_response(request: &lsp_server::Request) -> bool {
+    NON_PRINTABLE_METHODS
+        .contains(&request.method.as_str())
+        .not()
 }
