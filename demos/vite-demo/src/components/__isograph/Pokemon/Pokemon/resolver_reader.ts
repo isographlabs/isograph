@@ -33,15 +33,15 @@ const readerAst: ReaderAst<Pokemon__Pokemon__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pokemon__Pokemon__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "Pokemon",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

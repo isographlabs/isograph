@@ -12,15 +12,15 @@ const readerAst: ReaderAst<Pet__MutualBestFriendSetter__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__MutualBestFriendSetter__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "MutualBestFriendSetter",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -40,15 +40,15 @@ const readerAst: ReaderAst<Query__subquery__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__subquery__param,
   Query__subquery__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "subquery",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

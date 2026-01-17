@@ -41,15 +41,15 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__FirstCheckinMakeSuperButton__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "FirstCheckinMakeSuperButton",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

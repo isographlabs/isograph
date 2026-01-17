@@ -89,15 +89,15 @@ const readerAst: ReaderAst<User__RepositoryConnection__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   User__RepositoryConnection__param,
   User__RepositoryConnection__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "RepositoryConnection",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

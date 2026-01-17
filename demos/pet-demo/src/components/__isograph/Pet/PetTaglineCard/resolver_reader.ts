@@ -19,15 +19,15 @@ const readerAst: ReaderAst<Pet__PetTaglineCard__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetTaglineCard__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetTaglineCard",
   resolver,
   readerAst,
   hasUpdatable: true,
-};
+});
 
 export default artifact;

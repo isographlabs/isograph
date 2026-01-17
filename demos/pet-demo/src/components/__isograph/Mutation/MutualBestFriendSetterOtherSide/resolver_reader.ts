@@ -88,15 +88,15 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Mutation__MutualBestFriendSetterOtherSide__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "MutualBestFriendSetterOtherSide",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

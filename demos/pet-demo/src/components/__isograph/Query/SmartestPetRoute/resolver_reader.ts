@@ -84,15 +84,15 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__SmartestPetRoute__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "SmartestPetRoute",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

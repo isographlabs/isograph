@@ -24,15 +24,15 @@ const readerAst: ReaderAst<Query__normalizeUndefinedField__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__normalizeUndefinedField__param,
   Query__normalizeUndefinedField__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "normalizeUndefinedField",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

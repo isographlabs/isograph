@@ -19,15 +19,15 @@ const readerAst: ReaderAst<AdItem__AdItemDisplay__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   AdItem__AdItemDisplay__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "AdItemDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

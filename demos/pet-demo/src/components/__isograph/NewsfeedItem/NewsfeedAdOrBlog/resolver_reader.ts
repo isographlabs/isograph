@@ -58,15 +58,15 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   NewsfeedItem__NewsfeedAdOrBlog__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "NewsfeedAdOrBlog",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

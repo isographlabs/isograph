@@ -5,6 +5,7 @@ import type {
   IsographEntrypoint,
   IsographOperation,
   IsographPersistedOperation,
+  RawReaderWithRefetchQueries,
   ReaderWithRefetchQueries,
   ReaderWithRefetchQueriesLoader,
 } from './entrypoint';
@@ -250,7 +251,7 @@ export function getOrLoadIsographArtifact(
 export function getOrLoadReaderWithRefetchQueries(
   _environment: IsographEnvironment,
   readerWithRefetchQueries:
-    | ReaderWithRefetchQueries<any, any>
+    | RawReaderWithRefetchQueries<any, any>
     | ReaderWithRefetchQueriesLoader<any, any>,
 ): {
   readerWithRefetchQueries: PromiseWrapper<ReaderWithRefetchQueries<any, any>>;
@@ -259,16 +260,28 @@ export function getOrLoadReaderWithRefetchQueries(
 } {
   switch (readerWithRefetchQueries.kind) {
     case 'ReaderWithRefetchQueries':
+      const readerArtifact = readerWithRefetchQueries.readerArtifact();
       return {
-        readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
-        fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
-        readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
+        readerWithRefetchQueries: wrapResolvedValue({
+          kind: 'ReaderWithRefetchQueries',
+          nestedRefetchQueries: readerWithRefetchQueries.nestedRefetchQueries,
+          readerArtifact: readerArtifact,
+        }),
+        fieldName: readerArtifact.fieldName,
+        readerArtifactKind: readerArtifact.kind,
       };
     case 'ReaderWithRefetchQueriesLoader':
       return {
         // TODO: cache promise wrapper
         readerWithRefetchQueries: wrapPromise(
-          readerWithRefetchQueries.loader(),
+          readerWithRefetchQueries
+            .loader()
+            .then((readerWithRefetchQueries) => ({
+              kind: 'ReaderWithRefetchQueries',
+              nestedRefetchQueries:
+                readerWithRefetchQueries.nestedRefetchQueries,
+              readerArtifact: readerWithRefetchQueries.readerArtifact(),
+            })),
         ),
         fieldName: readerWithRefetchQueries.fieldName,
         readerArtifactKind: readerWithRefetchQueries.readerArtifactKind,

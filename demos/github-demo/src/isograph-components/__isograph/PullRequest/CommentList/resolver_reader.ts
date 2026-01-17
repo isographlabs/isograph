@@ -83,15 +83,15 @@ const readerAst: ReaderAst<PullRequest__CommentList__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   PullRequest__CommentList__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "CommentList",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

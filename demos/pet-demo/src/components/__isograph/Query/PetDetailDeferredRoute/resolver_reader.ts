@@ -101,15 +101,15 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__PetDetailDeferredRoute__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetDetailDeferredRoute",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

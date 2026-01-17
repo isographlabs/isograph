@@ -84,15 +84,15 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Repository__RepositoryRow__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "RepositoryRow",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

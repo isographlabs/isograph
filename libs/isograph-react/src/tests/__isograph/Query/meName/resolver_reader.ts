@@ -24,15 +24,15 @@ const readerAst: ReaderAst<Query__meName__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__meName__param,
   Query__meName__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "meName",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

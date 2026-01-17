@@ -41,15 +41,15 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__startUpdate__param,
   Query__startUpdate__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "startUpdate",
   resolver,
   readerAst,
   hasUpdatable: true,
-};
+});
 
 export default artifact;

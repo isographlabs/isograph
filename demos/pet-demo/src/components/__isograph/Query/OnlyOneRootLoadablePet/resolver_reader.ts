@@ -20,15 +20,15 @@ const readerAst: ReaderAst<Query__OnlyOneRootLoadablePet__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__OnlyOneRootLoadablePet__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "OnlyOneRootLoadablePet",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

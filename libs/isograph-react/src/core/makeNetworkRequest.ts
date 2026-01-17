@@ -395,20 +395,18 @@ function readDataForOnComplete<
       suspendIfInFlight: false,
       throwOnNetworkError: false,
     };
-    const resolvedReaderWithRefetchQueries =
-      readerWithRefetchQueries as ReaderWithRefetchQueries<
-        TReadFromStore,
-        TClientFieldValue
-      >;
+    if (readerWithRefetchQueries == null) {
+      throw new Error(
+        'Expected readerWithRefetchQueries to be not null. This is indicative of a bug in Isograph.',
+      );
+    }
 
     const fragment: FragmentReference<TReadFromStore, TClientFieldValue> = {
       kind: 'FragmentReference',
       // TODO this smells.
-      readerWithRefetchQueries: wrapResolvedValue(
-        resolvedReaderWithRefetchQueries,
-      ),
-      fieldName: resolvedReaderWithRefetchQueries.readerArtifact.fieldName,
-      readerArtifactKind: resolvedReaderWithRefetchQueries.readerArtifact.kind,
+      readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
+      fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
+      readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
       root,
       variables,
       networkRequest: fakeNetworkRequest,
@@ -418,7 +416,7 @@ function readDataForOnComplete<
       fragment,
       fakeNetworkRequestOptions,
     ).item;
-    const readerArtifact = resolvedReaderWithRefetchQueries.readerArtifact;
+    const readerArtifact = readerWithRefetchQueries.readerArtifact;
     switch (readerArtifact.kind) {
       case 'ComponentReaderArtifact': {
         // @ts-expect-error We should find a way to encode this in the type system:
@@ -432,7 +430,7 @@ function readDataForOnComplete<
               kind: 'ReaderWithRefetchQueries',
               readerArtifact: readerArtifact,
               nestedRefetchQueries:
-                resolvedReaderWithRefetchQueries.nestedRefetchQueries,
+                readerWithRefetchQueries.nestedRefetchQueries,
             }),
             fieldName: readerArtifact.fieldName,
             readerArtifactKind: readerArtifact.kind,

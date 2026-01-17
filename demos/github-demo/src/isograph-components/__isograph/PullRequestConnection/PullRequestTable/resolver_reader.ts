@@ -104,15 +104,15 @@ const readerAst: ReaderAst<PullRequestConnection__PullRequestTable__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   PullRequestConnection__PullRequestTable__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PullRequestTable",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

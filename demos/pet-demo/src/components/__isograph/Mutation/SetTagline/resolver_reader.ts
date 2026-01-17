@@ -39,15 +39,15 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Mutation__SetTagline__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "SetTagline",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

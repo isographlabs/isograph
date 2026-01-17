@@ -14,15 +14,15 @@ const readerAst: ReaderAst<{ data: any, parameters: Record<PropertyKey, never> }
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   { data: any, parameters: Record<PropertyKey, never> },
   Link<"BlogItem"> | null
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "asBlogItem",
   resolver: ({ data }) => data.__typename === "BlogItem" ? data.__link : null,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

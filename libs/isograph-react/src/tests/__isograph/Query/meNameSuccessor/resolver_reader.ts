@@ -53,15 +53,15 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__meNameSuccessor__param,
   Query__meNameSuccessor__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "meNameSuccessor",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;
