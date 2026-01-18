@@ -7,6 +7,7 @@ import Node__asEconomist__resolver_reader from '../../Node/asEconomist/resolver_
 const readerAst: ReaderAst<Query__startUpdate__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "node",
     alias: null,
     arguments: [
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "asEconomist",
         alias: null,
         arguments: null,
@@ -30,6 +32,7 @@ const readerAst: ReaderAst<Query__startUpdate__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "name",
             alias: null,
             arguments: null,
