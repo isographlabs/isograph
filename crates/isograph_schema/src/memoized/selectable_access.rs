@@ -4,8 +4,8 @@ use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
 use crate::{
-    CompilationProfile, IsographDatabase, MemoRefSelectable, client_selectable_map,
-    client_selectable_named, entity_not_defined_diagnostic, flattened_selectable_named,
+    CompilationProfile, IsographDatabase, MemoRefSelectable, deprecated_client_selectable_map,
+    deprecated_client_selectable_named, entity_not_defined_diagnostic, flattened_selectable_named,
     flattened_selectables, flattened_selectables_for_entity,
     multiple_selectable_definitions_found_diagnostic,
 };
@@ -26,7 +26,7 @@ pub fn selectable_named<TCompilationProfile: CompilationProfile>(
     )
     .as_ref();
 
-    let client_selectable = client_selectable_named(
+    let client_selectable = deprecated_client_selectable_named(
         db,
         parent_server_object_entity_name,
         selectable_name.unchecked_conversion(),
@@ -81,7 +81,7 @@ pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
         .collect::<Vec<_>>();
 
     selectables.extend(
-        client_selectable_map(db)
+        deprecated_client_selectable_map(db)
             .clone_err()?
             .iter()
             .filter(|((entity_name, _selectable_name), _value)| {
@@ -106,7 +106,7 @@ pub fn selectables<TCompilationProfile: CompilationProfile>(
         .collect::<Vec<_>>();
 
     selectables.extend(
-        client_selectable_map(db)
+        deprecated_client_selectable_map(db)
             .clone_err()?
             .iter()
             .flat_map(|(_key, value)| {

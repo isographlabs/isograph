@@ -20,7 +20,7 @@ pub type MemoRefDeclaration =
     SelectionType<MemoRef<ClientFieldDeclaration>, MemoRef<ClientPointerDeclaration>>;
 
 #[memo]
-pub fn client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
@@ -53,7 +53,7 @@ pub fn client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
             }
 
             // Awkward! We also need to check for expose fields. Ay ay ay
-            return client_selectables_defined_by_network_protocol(db)
+            return deprecated_client_selectables_defined_by_network_protocol(db)
                 .clone_err()?
                 .get(&(parent_object_entity_name, client_scalar_selectable_name))
                 .and_then(|x| x.as_scalar())
@@ -68,7 +68,7 @@ pub fn client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
-pub fn client_object_selectable_named<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_client_object_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
@@ -89,7 +89,7 @@ pub fn client_object_selectable_named<TCompilationProfile: CompilationProfile>(
 }
 
 #[memo]
-pub fn client_selectable_named<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_client_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_selectable_name: SelectableName,
@@ -98,14 +98,14 @@ pub fn client_selectable_named<TCompilationProfile: CompilationProfile>(
     // just in general, we can do better! This is awkward!
     // TODO don't call to_owned, since that clones an error unnecessarily
 
-    let object_selectable = client_object_selectable_named(
+    let object_selectable = deprecated_client_object_selectable_named(
         db,
         parent_object_entity_name,
         client_selectable_name.unchecked_conversion(),
     )
     .to_owned();
 
-    let client_selectable = client_scalar_selectable_named(
+    let client_selectable = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         client_selectable_name.unchecked_conversion(),
@@ -142,7 +142,9 @@ pub fn client_selectable_named<TCompilationProfile: CompilationProfile>(
 
 #[memo]
 // TODO this function seems quite useless!
-pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_client_selectables_defined_by_network_protocol<
+    TCompilationProfile: CompilationProfile,
+>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
     BTreeMap<(EntityName, SelectableName), MemoRefClientSelectable<TCompilationProfile>>,
@@ -162,7 +164,7 @@ pub fn client_selectables_defined_by_network_protocol<TCompilationProfile: Compi
 // client_scalar_selectable_named
 #[expect(clippy::type_complexity)]
 #[memo]
-pub fn client_selectable_map<TCompilationProfile: CompilationProfile>(
+pub fn deprecated_client_selectable_map<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> DiagnosticResult<
     HashMap<
@@ -206,7 +208,7 @@ pub fn client_selectable_map<TCompilationProfile: CompilationProfile>(
                 .map(|(key, value)| ((key.0, key.1), value.scalar_selected().wrap_ok())),
         )
         .chain(
-            client_selectables_defined_by_network_protocol(db)
+            deprecated_client_selectables_defined_by_network_protocol(db)
                 .to_owned()?
                 .into_iter()
                 .map(|(key, value)| (key, value.wrap_ok())),

@@ -10,8 +10,8 @@ use std::{cmp::Ordering, collections::BTreeSet};
 use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
 use isograph_schema::{
     ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
-    LINK_FIELD_NAME, MemoRefClientSelectable, client_scalar_selectable_named,
-    client_selectable_map, validated_entrypoints,
+    LINK_FIELD_NAME, MemoRefClientSelectable, deprecated_client_scalar_selectable_named,
+    deprecated_client_selectable_map, validated_entrypoints,
 };
 
 use crate::generate_artifacts::{ISO_TS_FILE_NAME, print_javascript_type_declaration};
@@ -295,7 +295,7 @@ fn sorted_user_written_types<TCompilationProfile: CompilationProfile>(
     MemoRefClientSelectable<TCompilationProfile>,
     ClientScalarSelectableDirectiveSet,
 )> {
-    let mut client_types = client_selectable_map(db)
+    let mut client_types = deprecated_client_selectable_map(db)
         .as_ref()
         .expect("Expected client selectable map to be valid.")
         .iter()
@@ -394,7 +394,7 @@ fn sorted_entrypoints<TCompilationProfile: CompilationProfile>(
 
                 // TODO don't clone, this is only required for lifetime reasons (because
                 // we cannot return references with a 'db lifetime)
-                let client_scalar_selectable = client_scalar_selectable_named(
+                let client_scalar_selectable = deprecated_client_scalar_selectable_named(
                     db,
                     *parent_object_entity_name,
                     *client_scalar_selectable_name,

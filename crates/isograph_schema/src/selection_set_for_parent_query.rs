@@ -3,8 +3,9 @@ use isograph_lang_types::SelectionSet;
 use prelude::ErrClone;
 
 use crate::{
-    ClientFieldVariant, CompilationProfile, IsographDatabase, client_scalar_selectable_named,
-    refetch_strategy_for_client_scalar_selectable_named, selectable_reader_selection_set,
+    ClientFieldVariant, CompilationProfile, IsographDatabase,
+    deprecated_client_scalar_selectable_named, refetch_strategy_for_client_scalar_selectable_named,
+    selectable_reader_selection_set,
 };
 
 pub fn client_scalar_selectable_selection_set_for_parent_query<
@@ -14,7 +15,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) -> DiagnosticResult<WithEmbeddedLocation<SelectionSet>> {
-    let selectable = client_scalar_selectable_named(
+    let selectable = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         client_scalar_selectable_name,

@@ -18,9 +18,9 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
     ClientSelectableId, CompilationProfile, FlattenedDataModelEntity, ID_ENTITY_NAME,
     ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments,
-    PathToRefetchField, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    PathToRefetchField, VariableContext, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, deprecated_client_object_selectable_named,
+    deprecated_client_scalar_selectable_named, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     flattened_entity_named, flattened_selectable_named, initial_variable_context,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
@@ -844,7 +844,7 @@ fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
     parent_object_entity_name: EntityName,
     newly_encountered_client_object_selectable_name: SelectableName,
 ) {
-    let newly_encountered_client_object_selectable = client_object_selectable_named(
+    let newly_encountered_client_object_selectable = deprecated_client_object_selectable_named(
         db,
         parent_object_entity_name,
         newly_encountered_client_object_selectable_name,
@@ -915,7 +915,7 @@ fn merge_client_scalar_field<TCompilationProfile: CompilationProfile>(
     parent_object_entity_name: EntityName,
     newly_encountered_scalar_client_selectable_name: SelectableName,
 ) {
-    let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
+    let newly_encountered_scalar_client_selectable = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         newly_encountered_scalar_client_selectable_name,

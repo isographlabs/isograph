@@ -25,10 +25,10 @@ use isograph_schema::{
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, FlattenedDataModelEntity, Format,
     IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName,
     RootRefetchedPath, ScalarClientFieldTraversalState, WrappedSelectionMapSelection,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
+    client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, fetchable_types, flattened_entity_named,
-    get_reachable_variables, initial_variable_context,
+    current_target_merged_selections, deprecated_client_scalar_selectable_named, fetchable_types,
+    flattened_entity_named, get_reachable_variables, initial_variable_context,
 };
 use prelude::Postfix;
 use std::collections::BTreeSet;
@@ -42,7 +42,7 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = client_scalar_selectable_named(
+    let entrypoint = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         entrypoint_scalar_selectable_name,
