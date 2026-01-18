@@ -2,41 +2,15 @@ import type { EagerReaderArtifact, ReaderAst } from '@isograph/react';
 import { Query__subquery__param } from './param_type';
 import { Query__subquery__output_type } from './output_type';
 import { subquery as resolver } from '../../../normalizeData.test';
+import Query____refetch__refetch_reader from '../../Query/__refetch/refetch_reader';
 
 const readerAst: ReaderAst<Query__subquery__param> = [
   {
-    kind: "Linked",
-    fieldName: "query",
-    alias: null,
-    arguments: null,
-    condition: null,
-    isUpdatable: false,
-    refetchQueryIndex: null,
-    selections: [
-      {
-        kind: "Linked",
-        fieldName: "node",
-        alias: null,
-        arguments: [
-          [
-            "id",
-            { kind: "Variable", name: "id" },
-          ],
-        ],
-        condition: null,
-        isUpdatable: false,
-        refetchQueryIndex: null,
-        selections: [
-          {
-            kind: "Scalar",
-            fieldName: "id",
-            alias: null,
-            arguments: null,
-            isUpdatable: false,
-          },
-        ],
-      },
-    ],
+    kind: "ImperativelyLoadedField",
+    alias: "__refetch",
+    refetchReaderArtifact: Query____refetch__refetch_reader,
+    refetchQueryIndex: 0,
+    name: "__refetch",
   },
 ];
 

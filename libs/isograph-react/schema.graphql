@@ -1,8 +1,8 @@
-type Query {
+type Query implements Node {
+  id: ID!
   me: Economist!
   you: Economist!
   node(id: ID!): Node
-  query: Query!
 }
 
 type Economist implements Node {

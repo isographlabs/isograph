@@ -1,12 +1,11 @@
-import type { Query__subquery__parameters } from './parameters_type';
+import { type Query____refetch__output_type } from '../../Query/__refetch/output_type';
 
 export type Query__subquery__param = {
   readonly data: {
-    readonly query: {
-      readonly node: ({
-        readonly id: string,
-      } | null),
-    },
+    /**
+A refetch field for the Query type.
+    */
+    readonly __refetch: Query____refetch__output_type,
   },
-  readonly parameters: Query__subquery__parameters,
+  readonly parameters: Record<PropertyKey, never>,
 };
