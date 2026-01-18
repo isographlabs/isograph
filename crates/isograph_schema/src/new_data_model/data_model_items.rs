@@ -39,15 +39,20 @@ pub type FlattenedDataModelSchema<TCompilationProfile> = BTreeMap<
 >;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct EntityAssociatedData<TCompilationProfile: CompilationProfile> {
+    pub network_protocol:
+        <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityAssociatedData,
+    pub target_platform:
+        <<TCompilationProfile as CompilationProfile>::TargetPlatform as TargetPlatform>::EntityAssociatedData,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DataModelEntity<TCompilationProfile: CompilationProfile, TStage: DataModelStage> {
     pub name: WithGenericLocation<EntityName, TStage::Location>,
     pub description: Option<WithGenericLocation<Description, TStage::Location>>,
 
     pub selectables: TStage::Selectables<TCompilationProfile>,
-    pub network_protocol_associated_data:
-        <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::EntityAssociatedData,
-    pub target_platform_associated_data:
-        <<TCompilationProfile as CompilationProfile>::TargetPlatform as TargetPlatform>::EntityAssociatedData,
+    pub associated_data: EntityAssociatedData<TCompilationProfile>,
 
     // TODO this is obviously a hack
     // IsConcrete is used in (at least) two situations: first, it is used to add a __typename

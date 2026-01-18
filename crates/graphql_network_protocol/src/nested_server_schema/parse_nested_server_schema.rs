@@ -14,9 +14,10 @@ use isograph_lang_types::{
     UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclarationInner, VariableNameWrapper,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, FLOAT_ENTITY_NAME, ID_ENTITY_NAME,
-    INT_ENTITY_NAME, IsConcrete, IsographDatabase, NestedDataModelSchema,
-    NestedDataModelSelectable, STRING_ENTITY_NAME, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
+    BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, EntityAssociatedData,
+    FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsConcrete, IsographDatabase,
+    NestedDataModelSchema, NestedDataModelSelectable, STRING_ENTITY_NAME,
+    ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic,
     insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic,
     to_isograph_constant_value,
@@ -52,8 +53,10 @@ fn define_default_graphql_data_model_entities(
             name: (*STRING_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            associated_data: EntityAssociatedData {
+                network_protocol: (),
+                target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            },
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -70,8 +73,10 @@ fn define_default_graphql_data_model_entities(
                 .with_missing_location()
                 .wrap_some(),
             selectables: Default::default(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            associated_data: EntityAssociatedData {
+                network_protocol: (),
+                target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+            },
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -83,8 +88,10 @@ fn define_default_graphql_data_model_entities(
             name: (*FLOAT_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            associated_data: EntityAssociatedData {
+                network_protocol: (),
+                target_platform: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            },
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -96,8 +103,10 @@ fn define_default_graphql_data_model_entities(
             name: (*INT_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            associated_data: EntityAssociatedData {
+                network_protocol: (),
+                target_platform: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
+            },
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -109,8 +118,10 @@ fn define_default_graphql_data_model_entities(
             name: (*BOOLEAN_ENTITY_NAME).with_missing_location(),
             description: None,
             selectables: Default::default(),
-            network_protocol_associated_data: (),
-            target_platform_associated_data: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
+            associated_data: EntityAssociatedData {
+                network_protocol: (),
+                target_platform: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
+            },
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -169,14 +180,16 @@ fn insert_parsed_items_into_schema(
                     .description
                     .map(|x| x.map_location(Some).map(Description)),
                 selectables,
-                network_protocol_associated_data: (),
-                target_platform_associated_data: GraphQLSchemaObjectAssociatedData {
-                    subtypes: supertype_to_subtype_map
-                        .get(graphql_interface_type_definition.item.name.item.reference())
-                        .expect("Expected interface to exist")
-                        .clone(),
-                }
-                .object_selected(),
+                associated_data: EntityAssociatedData {
+                    network_protocol: (),
+                    target_platform: GraphQLSchemaObjectAssociatedData {
+                        subtypes: supertype_to_subtype_map
+                            .get(graphql_interface_type_definition.item.name.item.reference())
+                            .expect("Expected interface to exist")
+                            .clone(),
+                    }
+                    .object_selected(),
+                },
                 selection_info: ServerObjectSelectionInfo {
                     is_concrete: IsConcrete(false),
                 }
@@ -204,9 +217,11 @@ fn insert_parsed_items_into_schema(
                     .wrap_some(),
                 name: typename_entity_name.with_missing_location(),
                 selection_info: ().scalar_selected(),
-                network_protocol_associated_data: (),
-                target_platform_associated_data: get_js_union_name(&concrete_child_entity_names)
-                    .scalar_selected(),
+                associated_data: EntityAssociatedData {
+                    network_protocol: (),
+                    target_platform: get_js_union_name(&concrete_child_entity_names)
+                        .scalar_selected(),
+                },
                 selectables: Default::default(),
             }
             .with_missing_location(),
@@ -327,11 +342,13 @@ fn process_graphql_documents(
                                     .with_missing_location()
                                     .wrap_some(),
                                 selectables: Default::default(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: format!("\"{entity_name}\"")
-                                    .intern()
-                                    .to::<JavascriptName>()
-                                    .scalar_selected(),
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: format!("\"{entity_name}\"")
+                                        .intern()
+                                        .to::<JavascriptName>()
+                                        .scalar_selected(),
+                                },
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -373,10 +390,13 @@ fn process_graphql_documents(
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
                                 selectables,
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data:
-                                    GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
-                                        .object_selected(),
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: GraphQLSchemaObjectAssociatedData {
+                                        subtypes: vec![],
+                                    }
+                                    .object_selected(),
+                                },
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(true),
                                 }
@@ -405,9 +425,10 @@ fn process_graphql_documents(
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
                                 selectables: Default::default(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: (*UNKNOWN_JAVASCRIPT_TYPE)
-                                    .scalar_selected(),
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: (*UNKNOWN_JAVASCRIPT_TYPE).scalar_selected(),
+                                },
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -442,10 +463,13 @@ fn process_graphql_documents(
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
                                 selectables,
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data:
-                                    GraphQLSchemaObjectAssociatedData { subtypes: vec![] }
-                                        .object_selected(),
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: GraphQLSchemaObjectAssociatedData {
+                                        subtypes: vec![],
+                                    }
+                                    .object_selected(),
+                                },
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(true),
                                 }
@@ -466,9 +490,10 @@ fn process_graphql_documents(
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
                                 selectables: Default::default(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: (*STRING_JAVASCRIPT_TYPE)
-                                    .scalar_selected(),
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
+                                },
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -485,9 +510,9 @@ fn process_graphql_documents(
                                     .description
                                     .map(|x| x.map_location(Some).map(Description)),
                                 selectables: Default::default(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data:
-                                    GraphQLSchemaObjectAssociatedData {
+                                associated_data: EntityAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: GraphQLSchemaObjectAssociatedData {
                                         subtypes: graphql_union_type_definition
                                             .union_member_types
                                             .iter()
@@ -495,6 +520,7 @@ fn process_graphql_documents(
                                             .collect(),
                                     }
                                     .object_selected(),
+                                },
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(false),
                                 }
