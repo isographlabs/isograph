@@ -160,7 +160,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
         )
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db)
         .target_platform_associated_data

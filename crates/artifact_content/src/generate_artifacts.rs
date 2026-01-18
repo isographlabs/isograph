@@ -183,7 +183,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 .as_ref()
                 .expect(
                     "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .lookup(db);
 
@@ -246,12 +246,12 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 .as_ref()
                 .expect(
                     "Expected parsing to have succeeded by this point. \
-                        This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .as_ref()
                 .expect(
                     "Expected selectable to exist. \
-                        This is indicative of a bug in Isograph.",
+                    This is indicative of a bug in Isograph.",
                 )
                 .lookup(db);
 
@@ -296,7 +296,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                             .as_ref()
                             .expect(
                                 "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
+                                This is indicative of a bug in Isograph.",
                             )
                             .lookup(db);
 
@@ -341,7 +341,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                         .as_ref()
                                         .expect(
                                             "Expected parsing to have succeeded. \
-                                                This is indicative of a bug in Isograph.",
+                                            This is indicative of a bug in Isograph.",
                                         )
                                         .lookup(db);
 
@@ -507,12 +507,12 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
         .as_ref()
         .expect(
             "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .as_ref()
         .expect(
             "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         );
 
         let artifact_path_and_content = match client_selectable {
