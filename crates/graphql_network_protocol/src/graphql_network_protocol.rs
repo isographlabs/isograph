@@ -105,7 +105,15 @@ impl TargetPlatform for JavascriptTargetPlatform {
             This is indicative of a bug in Isograph.",
         );
 
-        match entity.lookup(db).associated_data.target_platform.as_ref() {
+        match entity
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .target_platform
+            .as_ref()
+        {
             SelectionType::Object(_) => {
                 // TODO this is bad; we should never create a type containing all of the fields
                 // on a given object. This is currently used for input objects, and we should
@@ -164,6 +172,9 @@ impl TargetPlatform for JavascriptTargetPlatform {
         )
         .lookup(db)
         .associated_data
+        .as_ref()
+        .as_server()
+        .expect("Expected entity to be server defined.")
         .target_platform
         .as_ref()
         .as_scalar()
@@ -196,6 +207,9 @@ impl TargetPlatform for JavascriptTargetPlatform {
 
         let subtypes = server_object_entity
             .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
             .target_platform
             .as_ref()
             .as_object()

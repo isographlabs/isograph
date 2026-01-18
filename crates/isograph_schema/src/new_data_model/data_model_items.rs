@@ -4,7 +4,7 @@ use common_lang_types::{
     EntityName, SelectableName, WithGenericLocation, WithGenericNonFatalDiagnostics,
 };
 use isograph_lang_types::{
-    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
+    DefinitionLocation, Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
 };
 use pico::MemoRef;
 
@@ -52,7 +52,7 @@ pub struct DataModelEntity<TCompilationProfile: CompilationProfile, TStage: Data
     pub description: Option<WithGenericLocation<Description, TStage::Location>>,
 
     pub selectables: TStage::Selectables<TCompilationProfile>,
-    pub associated_data: EntityAssociatedData<TCompilationProfile>,
+    pub associated_data: DefinitionLocation<EntityAssociatedData<TCompilationProfile>, ()>,
 
     // TODO this is obviously a hack
     // IsConcrete is used in (at least) two situations: first, it is used to add a __typename

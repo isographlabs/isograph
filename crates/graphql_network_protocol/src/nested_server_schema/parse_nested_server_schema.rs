@@ -10,8 +10,9 @@ use graphql_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    Description, EntityNameWrapper, SelectionTypePostfix, TypeAnnotationDeclaration,
-    UnionTypeAnnotationDeclaration, UnionVariant, VariableDeclarationInner, VariableNameWrapper,
+    DefinitionLocationPostfix, Description, EntityNameWrapper, SelectionTypePostfix,
+    TypeAnnotationDeclaration, UnionTypeAnnotationDeclaration, UnionVariant,
+    VariableDeclarationInner, VariableNameWrapper,
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, EntityAssociatedData,
@@ -56,7 +57,8 @@ fn define_default_graphql_data_model_entities(
             associated_data: EntityAssociatedData {
                 network_protocol: (),
                 target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
-            },
+            }
+            .server_defined(),
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -76,7 +78,8 @@ fn define_default_graphql_data_model_entities(
             associated_data: EntityAssociatedData {
                 network_protocol: (),
                 target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
-            },
+            }
+            .server_defined(),
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -91,7 +94,8 @@ fn define_default_graphql_data_model_entities(
             associated_data: EntityAssociatedData {
                 network_protocol: (),
                 target_platform: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
-            },
+            }
+            .server_defined(),
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -106,7 +110,8 @@ fn define_default_graphql_data_model_entities(
             associated_data: EntityAssociatedData {
                 network_protocol: (),
                 target_platform: (*NUMBER_JAVASCRIPT_TYPE).scalar_selected(),
-            },
+            }
+            .server_defined(),
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -121,7 +126,8 @@ fn define_default_graphql_data_model_entities(
             associated_data: EntityAssociatedData {
                 network_protocol: (),
                 target_platform: (*BOOLEAN_JAVASCRIPT_TYPE).scalar_selected(),
-            },
+            }
+            .server_defined(),
             selection_info: ().scalar_selected(),
         }
         .with_missing_location(),
@@ -189,7 +195,8 @@ fn insert_parsed_items_into_schema(
                             .clone(),
                     }
                     .object_selected(),
-                },
+                }
+                .server_defined(),
                 selection_info: ServerObjectSelectionInfo {
                     is_concrete: IsConcrete(false),
                 }
@@ -221,7 +228,8 @@ fn insert_parsed_items_into_schema(
                     network_protocol: (),
                     target_platform: get_js_union_name(&concrete_child_entity_names)
                         .scalar_selected(),
-                },
+                }
+                .server_defined(),
                 selectables: Default::default(),
             }
             .with_missing_location(),
@@ -348,7 +356,8 @@ fn process_graphql_documents(
                                         .intern()
                                         .to::<JavascriptName>()
                                         .scalar_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -396,7 +405,8 @@ fn process_graphql_documents(
                                         subtypes: vec![],
                                     }
                                     .object_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(true),
                                 }
@@ -428,7 +438,8 @@ fn process_graphql_documents(
                                 associated_data: EntityAssociatedData {
                                     network_protocol: (),
                                     target_platform: (*UNKNOWN_JAVASCRIPT_TYPE).scalar_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -469,7 +480,8 @@ fn process_graphql_documents(
                                         subtypes: vec![],
                                     }
                                     .object_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(true),
                                 }
@@ -493,7 +505,8 @@ fn process_graphql_documents(
                                 associated_data: EntityAssociatedData {
                                     network_protocol: (),
                                     target_platform: (*STRING_JAVASCRIPT_TYPE).scalar_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ().scalar_selected(),
                             }
                             .with_some_location(document.location),
@@ -520,7 +533,8 @@ fn process_graphql_documents(
                                             .collect(),
                                     }
                                     .object_selected(),
-                                },
+                                }
+                                .server_defined(),
                                 selection_info: ServerObjectSelectionInfo {
                                     is_concrete: IsConcrete(false),
                                 }
