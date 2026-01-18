@@ -13,6 +13,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "name",
     alias: null,
     arguments: null,
@@ -20,6 +21,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "nameWithOwner",
     alias: null,
     arguments: null,
@@ -27,6 +29,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "description",
     alias: null,
     arguments: null,
@@ -34,6 +37,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "forkCount",
     alias: null,
     arguments: null,
@@ -41,6 +45,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "pullRequests",
     alias: null,
     arguments: null,
@@ -50,6 +55,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "totalCount",
         alias: null,
         arguments: null,
@@ -59,6 +65,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "stargazerCount",
     alias: null,
     arguments: null,
@@ -66,6 +73,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "watchers",
     alias: null,
     arguments: null,
@@ -75,6 +83,7 @@ const readerAst: ReaderAst<Repository__RepositoryRow__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "totalCount",
         alias: null,
         arguments: null,

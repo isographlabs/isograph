@@ -4,6 +4,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: false,
       fieldName: "getAllPokemon",
       arguments: [
         [
@@ -20,31 +21,37 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "bulbapediaPage",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: true,
           fieldName: "forme",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "key",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "num",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "species",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "sprite",
           arguments: null,
         },

@@ -6,6 +6,7 @@ import { subquery as resolver } from '../../../normalizeData.test';
 const readerAst: ReaderAst<Query__subquery__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "query",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "node",
         alias: null,
         arguments: [
@@ -29,6 +31,7 @@ const readerAst: ReaderAst<Query__subquery__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,

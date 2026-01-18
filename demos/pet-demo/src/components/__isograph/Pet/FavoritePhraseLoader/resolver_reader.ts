@@ -5,6 +5,7 @@ import { FavoritePhraseLoader as resolver } from '../../../Pet/FavoritePhraseLoa
 const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,

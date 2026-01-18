@@ -6,6 +6,7 @@ import Pet__PetSummaryCard__resolver_reader from '../../Pet/PetSummaryCard/resol
 const readerAst: ReaderAst<Query__HomeRoute__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "pets",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__HomeRoute__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,

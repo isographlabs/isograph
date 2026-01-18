@@ -8,6 +8,7 @@ import NewsfeedItem__asBlogItem__resolver_reader from '../../NewsfeedItem/asBlog
 const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "asAdItem",
     alias: null,
     arguments: null,
@@ -23,6 +24,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
         refetchReaderAst: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -40,6 +42,7 @@ const readerAst: ReaderAst<NewsfeedItem__NewsfeedAdOrBlog__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "asBlogItem",
     alias: null,
     arguments: null,

@@ -6,6 +6,7 @@ import { fullName as resolver } from '../../../Pet/fullName';
 const readerAst: ReaderAst<Pet__fullName__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "firstName",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Pet__fullName__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "lastName",
     alias: null,
     arguments: null,
