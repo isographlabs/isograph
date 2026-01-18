@@ -1,9 +1,8 @@
-use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
+use std::collections::{BTreeMap, BTreeSet};
 
 use common_lang_types::{
-    DescriptionValue, Diagnostic, EntityName, JavascriptName, Location, SelectableName,
-    VariableName, WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
-    WithOptionalLocation,
+    DescriptionValue, EntityName, JavascriptName, SelectableName, VariableName,
+    WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition, GraphQLTypeSystemDefinition,
@@ -16,9 +15,11 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, FLOAT_ENTITY_NAME, ID_ENTITY_NAME,
-    INT_ENTITY_NAME, IsConcrete, IsographDatabase, NestedDataModelEntity, NestedDataModelSchema,
+    INT_ENTITY_NAME, IsConcrete, IsographDatabase, NestedDataModelSchema,
     NestedDataModelSelectable, STRING_ENTITY_NAME, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
-    multiple_selectable_definitions_found_diagnostic, to_isograph_constant_value,
+    insert_entity_into_schema_or_emit_multiple_definitions_diagnostic,
+    insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic,
+    to_isograph_constant_value,
 };
 use prelude::Postfix;
 
@@ -528,53 +529,6 @@ fn process_graphql_documents(
     }
 }
 
-// TODO these should be one method
-fn insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
-    schema: &mut NestedDataModelSchema<GraphQLAndJavascriptProfile>,
-    entity: WithOptionalLocation<NestedDataModelEntity<GraphQLAndJavascriptProfile>>,
-) {
-    let key = entity.item.name.item;
-    match schema.item.entry(key) {
-        Entry::Vacant(vacant_entry) => {
-            // TODO parse graphql schema should wrap the items with locations
-            vacant_entry.insert(entity);
-        }
-        Entry::Occupied(occupied_entry) => {
-            schema
-                .non_fatal_diagnostics
-                .push(multiple_entity_definitions_found_diagnostic(
-                    key,
-                    occupied_entry.get().location.map(|x| x.to::<Location>()),
-                ));
-        }
-    }
-}
-
-fn insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
-    selectables: &mut WithNonFatalDiagnostics<
-        BTreeMap<SelectableName, NestedDataModelSelectable<GraphQLAndJavascriptProfile>>,
-    >,
-    item: NestedDataModelSelectable<GraphQLAndJavascriptProfile>,
-) {
-    let key = item.name.item;
-    match selectables.item.entry(key) {
-        Entry::Vacant(vacant_entry) => {
-            // TODO parse graphql schema should wrap the items with locations
-            vacant_entry.insert(item);
-        }
-        Entry::Occupied(_) => {
-            selectables.non_fatal_diagnostics.push(
-                multiple_selectable_definitions_found_diagnostic(
-                    item.parent_entity_name.item,
-                    key,
-                    // TODO proper location
-                    None,
-                ),
-            );
-        }
-    }
-}
-
 fn process_fields(
     parent_entity_name: EntityName,
     // TODO accept iterator and don't materialize when processing input items
@@ -647,13 +601,3 @@ fn get_js_union_name(members: &[EntityName]) -> JavascriptName {
 }
 
 type UnvalidatedTypeRefinementMap = BTreeMap<EntityName, Vec<EntityName>>;
-
-fn multiple_entity_definitions_found_diagnostic(
-    server_object_entity_name: EntityName,
-    location: Option<Location>,
-) -> Diagnostic {
-    Diagnostic::new(
-        format!("Multiple definitions of `{server_object_entity_name}` were found."),
-        location,
-    )
-}
