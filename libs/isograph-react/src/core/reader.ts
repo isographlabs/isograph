@@ -88,6 +88,7 @@ export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
 
 export type ReaderScalarField = {
   readonly kind: 'Scalar';
+  readonly isFallible?: boolean;
   readonly fieldName: string;
   readonly alias: string | null;
   readonly arguments: Arguments | null;
@@ -101,6 +102,7 @@ export type ReaderLinkField = {
 
 export type ReaderLinkedField = {
   readonly kind: 'Linked';
+  readonly isFallible?: boolean;
   readonly fieldName: string;
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;

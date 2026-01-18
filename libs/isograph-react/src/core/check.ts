@@ -6,7 +6,7 @@ import type {
   StoreLink,
   StoreRecord,
 } from './IsographEnvironment';
-import { getLink } from './IsographEnvironment';
+import { getLink, isWithErrors } from './IsographEnvironment';
 import { logMessage } from './logging';
 import { getStoreRecordProxy } from './optimisticProxy';
 
@@ -101,7 +101,16 @@ function checkFromRecord(
           variables,
         );
 
-        const linkedValue = record[parentRecordKey];
+        let linkedValue = record[parentRecordKey];
+
+        if (
+          isWithErrors(linkedValue, normalizationAstNode.isFallible ?? false)
+        ) {
+          if (linkedValue.kind === 'Errors') {
+            continue;
+          }
+          linkedValue = linkedValue.value;
+        }
 
         if (linkedValue === undefined) {
           return {
