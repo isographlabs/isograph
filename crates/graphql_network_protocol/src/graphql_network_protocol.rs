@@ -102,7 +102,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
     ) -> String {
         let entity = flattened_entity_named(db, entity_name).expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         );
 
         match entity.lookup(db).target_platform_associated_data.as_ref() {
