@@ -133,10 +133,7 @@ fn insert_parsed_items_into_schema(
     let documents = type_system_document
         .0
         .into_iter()
-        .map(|with_location| {
-            with_location
-                .map(|definition| GraphQLTypeSystemExtensionOrDefinition::Definition(definition))
-        })
+        .map(|with_location| with_location.map(GraphQLTypeSystemExtensionOrDefinition::Definition))
         .chain(
             type_system_extension_documents
                 .iter()

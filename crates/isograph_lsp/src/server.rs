@@ -293,7 +293,7 @@ fn bridge_crossbeam_to_tokio<T: Send + 'static>(
 
 /// Certain methods have really large responses, and they're not useful! We don't want to print
 /// the full response for those.
-static NON_PRINTABLE_METHODS: &'static [&'static str] = &[SemanticTokensFullRequest::METHOD];
+static NON_PRINTABLE_METHODS: &[&str] = &[SemanticTokensFullRequest::METHOD];
 
 fn should_print_full_response(request: &lsp_server::Request) -> bool {
     NON_PRINTABLE_METHODS
