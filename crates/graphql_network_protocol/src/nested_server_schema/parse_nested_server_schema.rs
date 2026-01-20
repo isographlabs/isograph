@@ -17,7 +17,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, EntityAssociatedData,
     FLOAT_ENTITY_NAME, ID_ENTITY_NAME, INT_ENTITY_NAME, IsConcrete, IsographDatabase,
-    NestedDataModelSchema, NestedDataModelSelectable, STRING_ENTITY_NAME,
+    NestedDataModelSchema, NestedDataModelSelectable, STRING_ENTITY_NAME, SelectableAssociatedData,
     ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic,
     insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic,
@@ -261,8 +261,10 @@ fn insert_parsed_items_into_schema(
                 )
                 .wrap_ok()
                 .with_missing_location(),
-                network_protocol_associated_data: (),
-                target_platform_associated_data: (),
+                associated_data: SelectableAssociatedData {
+                    network_protocol: (),
+                    target_platform: (),
+                },
                 is_inline_fragment: false.into(),
             },
         );
@@ -303,8 +305,10 @@ fn insert_parsed_items_into_schema(
                         .unchecked_conversion::<EntityName>()
                         .with_missing_location(),
                     arguments: vec![],
-                    network_protocol_associated_data: (),
-                    target_platform_associated_data: (),
+                    associated_data: SelectableAssociatedData {
+                        network_protocol: (),
+                        target_platform: (),
+                    },
                 },
             );
         }
@@ -385,8 +389,10 @@ fn process_graphql_documents(
                                 )
                                 .wrap_ok()
                                 .with_missing_location(),
-                                network_protocol_associated_data: (),
-                                target_platform_associated_data: (),
+                                associated_data: SelectableAssociatedData {
+                                    network_protocol: (),
+                                    target_platform: (),
+                                },
                                 is_inline_fragment: false.into(),
                             },
                         );
@@ -616,8 +622,10 @@ fn process_fields(
                     .map_location(Some)
                     .map(TypeAnnotationDeclaration::from_graphql_type_annotation)
                     .map(Ok),
-                network_protocol_associated_data: (),
-                target_platform_associated_data: (),
+                associated_data: SelectableAssociatedData {
+                    network_protocol: (),
+                    target_platform: (),
+                },
                 is_inline_fragment: false.into(),
             },
         );

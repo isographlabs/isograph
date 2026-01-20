@@ -71,6 +71,14 @@ pub type ValidatedDataModelEntity<TCompilationProfile> =
     DataModelEntity<TCompilationProfile, ValidatedStage>;
 
 #[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
+pub struct SelectableAssociatedData<TCompilationProfile: CompilationProfile> {
+    pub network_protocol:
+        <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,
+    pub target_platform:
+        <<TCompilationProfile as CompilationProfile>::TargetPlatform as TargetPlatform>::SelectableAssociatedData,
+}
+
+#[derive(Clone, Hash, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: DataModelStage> {
     pub name: WithGenericLocation<SelectableName, TStage::Location>,
     pub parent_entity_name: WithGenericLocation<EntityName, TStage::Location>,
@@ -80,11 +88,9 @@ pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: 
     // Note: we never actually produce any error results here! Note that that's fine.
     // This still forces us to learn how to handle results :) and we will have errors here
     // at some point! (e.g. if the field is something like `fieldName: @asdf`)
-    pub target_entity: WithGenericLocation<Result<TypeAnnotationDeclaration, TStage::Error>, TStage::Location>,
-    pub network_protocol_associated_data:
-        <<TCompilationProfile as CompilationProfile>::NetworkProtocol as NetworkProtocol>::SelectableAssociatedData,
-    pub target_platform_associated_data:
-        <<TCompilationProfile as CompilationProfile>::TargetPlatform as TargetPlatform>::SelectableAssociatedData,
+    pub target_entity:
+        WithGenericLocation<Result<TypeAnnotationDeclaration, TStage::Error>, TStage::Location>,
+    pub associated_data: SelectableAssociatedData<TCompilationProfile>,
 
     // TODO this is obviously a GraphQL-ism! But it's used in a bunch of places, so it's
     // not really easy to move it to TargetPlatform. However, we know it at parse time,
