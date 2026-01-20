@@ -307,11 +307,7 @@ fn insert_parsed_items_into_schema(
                         .unchecked_conversion::<EntityName>()
                         .with_missing_location(),
                     arguments: vec![],
-                    associated_data: SelectableAssociatedData {
-                        network_protocol: (),
-                        target_platform: (),
-                    }
-                    .server_defined(),
+                    associated_data: ().client_defined(),
                 }
                 .with_missing_location(),
             );
