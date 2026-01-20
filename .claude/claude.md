@@ -16,7 +16,7 @@ Before committing:
 
 - always run `pnpm format` and `cargo clippy` and check any changes in.
 - always run `pnpm build-demos` and `pnpm generate-fixture-tests` and ensure that any changes are expected.
-- always run `pnpm check-rs`, `cargo check-all`, `pnpm compile-libs`, and `cargo test` before committing.
+- always run `bacon check-all`, `pnpm compile-libs`, and `cargo test` before committing.
 
 Do not include a line mentioning claude, et al. in the commit message.
 
