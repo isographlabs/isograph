@@ -267,7 +267,8 @@ fn insert_parsed_items_into_schema(
                 }
                 .server_defined(),
                 is_inline_fragment: false.into(),
-            },
+            }
+            .with_missing_location(),
         );
 
         for concrete_child_entity_name in concrete_child_entity_names {
@@ -311,7 +312,8 @@ fn insert_parsed_items_into_schema(
                         target_platform: (),
                     }
                     .server_defined(),
-                },
+                }
+                .with_missing_location(),
             );
         }
     }
@@ -631,7 +633,8 @@ fn process_fields(
                 }
                 .server_defined(),
                 is_inline_fragment: false.into(),
-            },
+            }
+            .with_missing_location(),
         );
     }
 

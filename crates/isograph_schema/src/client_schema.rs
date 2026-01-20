@@ -7,9 +7,8 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, FlattenedDataModelSchema, IsConcrete, IsographDatabase,
-    NestedDataModelEntity, NestedDataModelSchema, ServerObjectSelectionInfo,
-    client_selectable_declaration_map_from_iso_literals, flatten::Flatten,
+    CompilationProfile, FlattenedDataModelSchema, IsographDatabase, NestedDataModelEntity,
+    NestedDataModelSchema, client_selectable_declaration_map_from_iso_literals, flatten::Flatten,
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic,
 };
 
@@ -47,7 +46,7 @@ pub fn create_target_entity_for_each_client_declaration<TCompilationProfile: Com
 ) {
     let declarations = client_selectable_declaration_map_from_iso_literals(db);
 
-    for (_, declaration) in declarations.item.reference() {
+    for declaration in declarations.item.reference().values() {
         match declaration.item {
             SelectionType::Scalar(scalar_declaration) => {
                 let scalar_declaration = scalar_declaration.lookup(db);
