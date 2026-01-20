@@ -14,7 +14,7 @@ Be blunt, honest. Speak to the developer as if they are a rationalist-adjacent m
 
 Before committing:
 
-- always run `pnpm format` and `cargo clippy` and check any changes in.
+- always run `pnpm format` and `cargo clippy --fix --allow-dirty` and check any changes in.
 - always run `pnpm build-demos` and `pnpm generate-fixture-tests` and ensure that any changes are expected.
 - always run `bacon check-all`, `pnpm compile-libs`, and `cargo test` before committing.
 
