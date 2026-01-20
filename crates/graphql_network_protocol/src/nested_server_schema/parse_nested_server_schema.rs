@@ -264,7 +264,8 @@ fn insert_parsed_items_into_schema(
                 associated_data: SelectableAssociatedData {
                     network_protocol: (),
                     target_platform: (),
-                },
+                }
+                .server_defined(),
                 is_inline_fragment: false.into(),
             },
         );
@@ -308,7 +309,8 @@ fn insert_parsed_items_into_schema(
                     associated_data: SelectableAssociatedData {
                         network_protocol: (),
                         target_platform: (),
-                    },
+                    }
+                    .server_defined(),
                 },
             );
         }
@@ -392,7 +394,8 @@ fn process_graphql_documents(
                                 associated_data: SelectableAssociatedData {
                                     network_protocol: (),
                                     target_platform: (),
-                                },
+                                }
+                                .server_defined(),
                                 is_inline_fragment: false.into(),
                             },
                         );
@@ -625,7 +628,8 @@ fn process_fields(
                 associated_data: SelectableAssociatedData {
                     network_protocol: (),
                     target_platform: (),
-                },
+                }
+                .server_defined(),
                 is_inline_fragment: false.into(),
             },
         );
