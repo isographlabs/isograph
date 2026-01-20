@@ -79,41 +79,7 @@ pub fn create_target_entity_for_each_client_declaration<TCompilationProfile: Com
                     .with_some_location(declaration.location),
                 );
             }
-            SelectionType::Object(object_declaration) => {
-                let object_declaration = object_declaration.lookup(db);
-                insert_entity_into_schema_or_emit_multiple_definitions_diagnostic(
-                    schema,
-                    NestedDataModelEntity {
-                        name: format!(
-                            "{}__{}__targetEntity",
-                            object_declaration.parent_type.item,
-                            object_declaration.client_pointer_name.item
-                        )
-                        .intern()
-                        .to::<EntityName>()
-                        .with_missing_location(),
-                        description: format!(
-                            "The anonymous entity for the {}.{} client field",
-                            object_declaration.parent_type.item,
-                            object_declaration.client_pointer_name.item
-                        )
-                        .intern()
-                        .to::<DescriptionValue>()
-                        .to::<Description>()
-                        .with_missing_location()
-                        .wrap_some(),
-                        selectables: Default::default(),
-                        associated_data: ().client_defined(),
-
-                        selection_info: ServerObjectSelectionInfo {
-                            is_concrete: true.wrap(IsConcrete),
-                        }
-                        .note_todo("This is not a server object! This probably belongs on the associated_data")
-                        .object_selected(),
-                    }
-                    .with_some_location(declaration.location),
-                );
-            }
+            SelectionType::Object(_object_declaration) => {}
         }
     }
 }
