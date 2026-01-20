@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "rust-analyzer": {
+      "command": "rust-analyzer-mcp"
+    }
+  }
+}

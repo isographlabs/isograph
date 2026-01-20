@@ -1,5 +1,9 @@
 # Rust Compiler Guidelines
 
+## Tooling & Verification
+- LSP Integration: You have access to `rust-analyzer`. Before refactoring, use "Go to Definition" or "Hover" to confirm type signatures, and rely as much as possible on deterministic refactors (e.g. use rust analyzer to rename.)
+- Diagnostics: Always check for compiler warnings/errors after writing code. Do not consider a task finished if `rust-analyzer` reports diagnostics.
+
 ## Codebase-Specific Patterns
 
 ### Marking Technical Debt
