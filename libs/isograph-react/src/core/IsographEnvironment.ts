@@ -120,6 +120,24 @@ export type StoreLink = {
   readonly __typename: TypeName;
 };
 
+export type WithErrorsData<T> = {
+  readonly kind: 'Data';
+  readonly value: T;
+};
+
+export type WithErrors<T> =
+  | WithErrorsData<T>
+  | {
+      readonly kind: 'Errors';
+    };
+
+export function isWithErrors<T>(
+  _value: T | WithErrors<T>,
+  isFallible: boolean,
+): _value is WithErrors<T> {
+  return isFallible === true;
+}
+
 export type DataTypeValueScalar =
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the store.
@@ -144,8 +162,12 @@ export type DataTypeValueLinked =
   | readonly DataTypeValueLinked[];
 
 export type StoreRecord = {
-  [index: ScalarParentRecordKey]: DataTypeValueScalar;
-  [index: LinkedParentRecordKey]: DataTypeValueLinked;
+  [index: ScalarParentRecordKey]:
+    | DataTypeValueScalar
+    | WithErrors<DataTypeValueScalar>;
+  [index: LinkedParentRecordKey]:
+    | DataTypeValueLinked
+    | WithErrors<DataTypeValueLinked>;
 } & {
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
