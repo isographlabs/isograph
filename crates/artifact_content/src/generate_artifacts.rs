@@ -364,6 +364,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                                 server_object_selectable_name: *NODE_FIELD_NAME,
                                                 arguments: vec![id_arg.clone()],
                                                 concrete_target_entity_name: None,
+                                                is_fallible: true,
                                             },
                                         ],
                                     );

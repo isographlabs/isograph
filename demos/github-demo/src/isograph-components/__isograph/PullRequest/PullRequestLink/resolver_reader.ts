@@ -5,6 +5,7 @@ import { PullRequestLink as resolver } from '../../../PullRequestLink';
 const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "number",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "repository",
     alias: null,
     arguments: null,
@@ -21,6 +23,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -28,6 +31,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "owner",
         alias: null,
         arguments: null,
@@ -37,6 +41,7 @@ const readerAst: ReaderAst<PullRequest__PullRequestLink__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "login",
             alias: null,
             arguments: null,

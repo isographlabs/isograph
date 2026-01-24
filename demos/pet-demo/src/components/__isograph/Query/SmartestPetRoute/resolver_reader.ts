@@ -9,6 +9,7 @@ import Query__smartestPet__resolver_reader from '../../Query/smartestPet/resolve
 const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "smartestPet",
     alias: null,
     arguments: null,
@@ -18,6 +19,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -39,6 +41,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
       },
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "stats",
         alias: null,
         arguments: null,
@@ -48,6 +51,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: true,
             fieldName: "intelligence",
             alias: null,
             arguments: null,
@@ -57,6 +61,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "picture",
         alias: null,
         arguments: null,
@@ -64,6 +69,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "checkinsPointer",
         alias: null,
         arguments: null,
@@ -73,6 +79,7 @@ const readerAst: ReaderAst<Query__SmartestPetRoute__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "location",
             alias: null,
             arguments: null,

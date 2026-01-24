@@ -871,6 +871,7 @@ export function readClientPointerData(
     [
       {
         kind: 'Scalar',
+        isFallible: false,
         fieldName: 'id',
         alias: null,
         arguments: null,

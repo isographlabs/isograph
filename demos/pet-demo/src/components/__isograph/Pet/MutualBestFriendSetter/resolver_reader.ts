@@ -5,6 +5,7 @@ import { MutualBestFriendSetter as resolver } from '../../../Pet/MutualBestFrien
 const readerAst: ReaderAst<Pet__MutualBestFriendSetter__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,

@@ -183,21 +183,19 @@ pub(crate) fn parse_type_system_document(
             let mut subfields_or_inline_fragments = parts_reversed
                 .iter()
                 .map(|server_object_selectable| {
+                    let target_entity = server_object_selectable
+                        .target_entity
+                        .item
+                        .as_ref()
+                        .expect("Expected target entity to be valid");
                     if server_object_selectable.is_inline_fragment.0 {
-                        WrappedSelectionMapSelection::InlineFragment(
-                            server_object_selectable
-                                .target_entity
-                                .item
-                                .as_ref()
-                                .expect("Expected target entity to be valid")
-                                .inner()
-                                .0,
-                        )
+                        WrappedSelectionMapSelection::InlineFragment(target_entity.inner().0)
                     } else {
                         WrappedSelectionMapSelection::LinkedField {
                             parent_object_entity_name: server_object_selectable
                                 .parent_entity_name
                                 .item,
+                            is_fallible: target_entity.is_nullable(),
                             server_object_selectable_name: server_object_selectable.name.item,
                             arguments: vec![],
                             concrete_target_entity_name: target_parent_object_entity_name
@@ -222,6 +220,12 @@ pub(crate) fn parse_type_system_document(
                     None
                 },
                 top_level_schema_field_parent_object_entity_name.item,
+                mutation_field
+                    .target_entity
+                    .item
+                    .as_ref()
+                    .expect("Expected target entity to be valid")
+                    .is_nullable(),
             ));
 
             let mutation_client_scalar_selectable = ClientScalarSelectable {

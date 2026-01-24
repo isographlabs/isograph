@@ -5,6 +5,7 @@ import { ImageDisplay as resolver } from '../../../Newsfeed/ImageDisplay';
 const readerAst: ReaderAst<Image__ImageDisplay__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "url",
     alias: null,
     arguments: null,

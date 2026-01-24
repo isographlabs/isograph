@@ -6,6 +6,7 @@ import PullRequest__CommentList__resolver_reader from '../../PullRequest/Comment
 const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "repository",
     alias: null,
     arguments: [
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "pullRequest",
         alias: null,
         arguments: [
@@ -39,6 +41,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "title",
             alias: null,
             arguments: null,
@@ -46,6 +49,7 @@ const readerAst: ReaderAst<Query__PullRequestDetail__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "bodyHTML",
             alias: null,
             arguments: null,

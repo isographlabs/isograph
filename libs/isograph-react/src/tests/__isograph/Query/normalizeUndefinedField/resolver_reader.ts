@@ -6,6 +6,7 @@ import { normalizeUndefinedField as resolver } from '../../../normalizeData.test
 const readerAst: ReaderAst<Query__normalizeUndefinedField__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "me",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__normalizeUndefinedField__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "name",
         alias: null,
         arguments: null,

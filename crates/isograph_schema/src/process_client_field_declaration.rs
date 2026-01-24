@@ -248,6 +248,7 @@ pub fn get_refetch_stategy<TCompilationProfile: CompilationProfile>(
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: id_top_level_arguments(),
                         concrete_target_entity_name: None,
+                        is_fallible: true,
                     },
                 ],
             ))

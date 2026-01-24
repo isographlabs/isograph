@@ -8,6 +8,7 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -22,6 +23,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "best_friend_relationship",
     alias: null,
     arguments: null,
@@ -31,6 +33,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "picture_together",
         alias: null,
         arguments: null,
@@ -38,6 +41,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "best_friend",
         alias: null,
         arguments: null,
@@ -47,6 +51,7 @@ const readerAst: ReaderAst<Pet__PetBestFriendCard__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,

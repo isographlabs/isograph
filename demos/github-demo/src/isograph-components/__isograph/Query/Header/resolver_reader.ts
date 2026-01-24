@@ -6,6 +6,7 @@ import User__Avatar__resolver_reader from '../../User/Avatar/resolver_reader';
 const readerAst: ReaderAst<Query__Header__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "viewer",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__Header__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "name",
         alias: null,
         arguments: null,

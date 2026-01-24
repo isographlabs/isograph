@@ -6,6 +6,7 @@ import { formattedCommentCreationDate as resolver } from '../../../CommentList';
 const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "createdAt",
     alias: null,
     arguments: null,

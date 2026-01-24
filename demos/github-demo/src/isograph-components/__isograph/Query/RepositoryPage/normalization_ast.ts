@@ -4,6 +4,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "repository",
       arguments: [
         [
@@ -20,53 +21,63 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "nameWithOwner",
           arguments: null,
         },
         {
           kind: "Linked",
+          isFallible: true,
           fieldName: "parent",
           arguments: null,
           concreteType: "Repository",
           selections: [
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "id",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "name",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "nameWithOwner",
               arguments: null,
             },
             {
               kind: "Linked",
+              isFallible: false,
               fieldName: "owner",
               arguments: null,
               concreteType: null,
               selections: [
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "__typename",
                   arguments: null,
                 },
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "id",
                   arguments: null,
                 },
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "login",
                   arguments: null,
                 },
@@ -76,6 +87,7 @@ const normalizationAst: NormalizationAst = {
         },
         {
           kind: "Linked",
+          isFallible: false,
           fieldName: "pullRequests",
           arguments: [
             [
@@ -87,34 +99,40 @@ const normalizationAst: NormalizationAst = {
           selections: [
             {
               kind: "Linked",
+              isFallible: true,
               fieldName: "edges",
               arguments: null,
               concreteType: "PullRequestEdge",
               selections: [
                 {
                   kind: "Linked",
+                  isFallible: true,
                   fieldName: "node",
                   arguments: null,
                   concreteType: "PullRequest",
                   selections: [
                     {
                       kind: "Scalar",
+                      isFallible: false,
                       fieldName: "id",
                       arguments: null,
                     },
                     {
                       kind: "Linked",
+                      isFallible: true,
                       fieldName: "author",
                       arguments: null,
                       concreteType: null,
                       selections: [
                         {
                           kind: "Scalar",
+                          isFallible: false,
                           fieldName: "__typename",
                           arguments: null,
                         },
                         {
                           kind: "Scalar",
+                          isFallible: false,
                           fieldName: "login",
                           arguments: null,
                         },
@@ -124,16 +142,19 @@ const normalizationAst: NormalizationAst = {
                           selections: [
                             {
                               kind: "Scalar",
+                              isFallible: false,
                               fieldName: "__typename",
                               arguments: null,
                             },
                             {
                               kind: "Scalar",
+                              isFallible: false,
                               fieldName: "id",
                               arguments: null,
                             },
                             {
                               kind: "Scalar",
+                              isFallible: true,
                               fieldName: "twitterUsername",
                               arguments: null,
                             },
@@ -143,53 +164,63 @@ const normalizationAst: NormalizationAst = {
                     },
                     {
                       kind: "Scalar",
+                      isFallible: false,
                       fieldName: "closed",
                       arguments: null,
                     },
                     {
                       kind: "Scalar",
+                      isFallible: false,
                       fieldName: "createdAt",
                       arguments: null,
                     },
                     {
                       kind: "Scalar",
+                      isFallible: false,
                       fieldName: "number",
                       arguments: null,
                     },
                     {
                       kind: "Linked",
+                      isFallible: false,
                       fieldName: "repository",
                       arguments: null,
                       concreteType: "Repository",
                       selections: [
                         {
                           kind: "Scalar",
+                          isFallible: false,
                           fieldName: "id",
                           arguments: null,
                         },
                         {
                           kind: "Scalar",
+                          isFallible: false,
                           fieldName: "name",
                           arguments: null,
                         },
                         {
                           kind: "Linked",
+                          isFallible: false,
                           fieldName: "owner",
                           arguments: null,
                           concreteType: null,
                           selections: [
                             {
                               kind: "Scalar",
+                              isFallible: false,
                               fieldName: "__typename",
                               arguments: null,
                             },
                             {
                               kind: "Scalar",
+                              isFallible: false,
                               fieldName: "id",
                               arguments: null,
                             },
                             {
                               kind: "Scalar",
+                              isFallible: false,
                               fieldName: "login",
                               arguments: null,
                             },
@@ -199,11 +230,13 @@ const normalizationAst: NormalizationAst = {
                     },
                     {
                       kind: "Scalar",
+                      isFallible: false,
                       fieldName: "title",
                       arguments: null,
                     },
                     {
                       kind: "Scalar",
+                      isFallible: true,
                       fieldName: "totalCommentsCount",
                       arguments: null,
                     },
@@ -215,11 +248,13 @@ const normalizationAst: NormalizationAst = {
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "stargazerCount",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "viewerHasStarred",
           arguments: null,
         },
@@ -227,22 +262,26 @@ const normalizationAst: NormalizationAst = {
     },
     {
       kind: "Linked",
+      isFallible: false,
       fieldName: "viewer",
       arguments: null,
       concreteType: "User",
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "avatarUrl",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: true,
           fieldName: "name",
           arguments: null,
         },

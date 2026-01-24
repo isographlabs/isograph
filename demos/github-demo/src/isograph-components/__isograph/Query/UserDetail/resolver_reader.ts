@@ -6,6 +6,7 @@ import User__RepositoryList__resolver_reader from '../../User/RepositoryList/res
 const readerAst: ReaderAst<Query__UserDetail__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "user",
     alias: null,
     arguments: [
@@ -20,6 +21,7 @@ const readerAst: ReaderAst<Query__UserDetail__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "name",
         alias: null,
         arguments: null,

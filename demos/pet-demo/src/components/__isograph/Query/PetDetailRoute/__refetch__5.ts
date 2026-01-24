@@ -6,6 +6,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "pet",
       arguments: [
         [
@@ -17,37 +18,44 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Linked",
+          isFallible: true,
           fieldName: "stats",
           arguments: null,
           concreteType: "PetStats",
           selections: [
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "cuteness",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "energy",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "hunger",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "intelligence",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "sociability",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: true,
               fieldName: "weight",
               arguments: null,
             },

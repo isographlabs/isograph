@@ -6,6 +6,7 @@ import { nodeField as resolver } from '../../../nodeQuery';
 const readerAst: ReaderAst<Query__nodeField__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "node",
     alias: null,
     arguments: [
@@ -20,6 +21,7 @@ const readerAst: ReaderAst<Query__nodeField__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
