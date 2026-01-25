@@ -4,6 +4,11 @@ use quote::{format_ident, quote};
 use syn::{Attribute, ItemStruct, Type, Visibility, parse_macro_input, spanned::Spanned};
 
 pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
+    struct TrackedField {
+        field_ident: syn::Ident,
+        field_ty: Type,
+    }
+
     let input = parse_macro_input!(item as ItemStruct);
 
     let fields = match &input.fields {
@@ -17,11 +22,6 @@ pub(crate) fn db_macro(item: TokenStream) -> TokenStream {
 
     let struct_ident = input.ident.clone();
     let (impl_generics, type_generics, where_clause) = input.generics.split_for_impl();
-
-    struct TrackedField {
-        field_ident: syn::Ident,
-        field_ty: Type,
-    }
 
     let mut tracked = Vec::new();
     let mut errors = Vec::new();
