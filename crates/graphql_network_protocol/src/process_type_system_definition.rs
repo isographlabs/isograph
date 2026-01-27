@@ -16,10 +16,11 @@ use isograph_lang_types::{
     VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome, FieldMapItem,
-    ID_ENTITY_NAME, ID_FIELD_NAME, ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant,
-    IsographDatabase, NODE_FIELD_NAME, RefetchStrategy, WrappedSelectionMapSelection,
-    generate_refetch_field_strategy, insert_selectable_or_multiple_definition_diagnostic,
+    ClientFieldVariant, ClientScalarSelectable, ConcreteTargetEntityName,
+    DeprecatedParseTypeSystemOutcome, FieldMapItem, ID_ENTITY_NAME, ID_FIELD_NAME,
+    ID_VARIABLE_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NODE_FIELD_NAME,
+    RefetchStrategy, WrappedSelectionMapSelection, generate_refetch_field_strategy,
+    insert_selectable_or_multiple_definition_diagnostic,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -67,17 +68,13 @@ pub fn process_graphql_type_system_document(
                 let subfields_or_inline_fragments = vec![
                     WrappedSelectionMapSelection::InlineFragment(server_object_entity_name),
                     WrappedSelectionMapSelection::LinkedField {
-                        // TODO this should be query
-                        parent_object_entity_name: server_object_entity_name,
                         server_object_selectable_name: *NODE_FIELD_NAME,
                         arguments: vec![ArgumentKeyAndValue {
                             key: (*ID_FIELD_NAME).unchecked_conversion(),
                             value: NonConstantValue::Variable((*ID_VARIABLE_NAME).into()),
                         }],
                         is_fallible: true,
-                        // None -> node is not concrete.
-                        // Note that this doesn't matter!
-                        concrete_target_entity_name: None,
+                        concrete_target_entity_name: ConcreteTargetEntityName::Abstract,
                     },
                 ];
 

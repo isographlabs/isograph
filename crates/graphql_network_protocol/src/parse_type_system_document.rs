@@ -11,11 +11,12 @@ use isograph_lang_types::{
     EmptyDirectiveSet, ObjectSelection, ScalarSelection, SelectionSet, SelectionTypePostfix,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, DeprecatedParseTypeSystemOutcome,
-    FlattenedDataModelEntity, FlattenedDataModelSelectable, ImperativelyLoadedFieldVariant,
-    IsographDatabase, RefetchStrategy, RootOperationName, ServerEntityDirectives,
-    WrappedSelectionMapSelection, flattened_entity_named, flattened_selectable_named,
-    generate_refetch_field_strategy, imperative_field_subfields_or_inline_fragments,
+    ClientFieldVariant, ClientScalarSelectable, ConcreteTargetEntityName,
+    DeprecatedParseTypeSystemOutcome, FlattenedDataModelEntity, FlattenedDataModelSelectable,
+    ImperativelyLoadedFieldVariant, IsographDatabase, RefetchStrategy, RootOperationName,
+    ServerEntityDirectives, WrappedSelectionMapSelection, flattened_entity_named,
+    flattened_selectable_named, generate_refetch_field_strategy,
+    imperative_field_subfields_or_inline_fragments,
     insert_selectable_or_multiple_definition_diagnostic,
 };
 use prelude::{ErrClone, Postfix};
@@ -131,8 +132,6 @@ pub(crate) fn parse_type_system_document(
             let client_field_scalar_selection_name = expose_field_directive
                 .expose_as
                 .unwrap_or(mutation_field.name.item);
-            let top_level_schema_field_parent_object_entity_name =
-                mutation_field.parent_entity_name;
             let mutation_field_arguments = mutation_field.arguments.clone();
 
             let top_level_schema_field_selection_info =
@@ -192,20 +191,17 @@ pub(crate) fn parse_type_system_document(
                         WrappedSelectionMapSelection::InlineFragment(target_entity.inner().0)
                     } else {
                         WrappedSelectionMapSelection::LinkedField {
-                            parent_object_entity_name: server_object_selectable
-                                .parent_entity_name
-                                .item,
                             is_fallible: target_entity.is_nullable(),
                             server_object_selectable_name: server_object_selectable.name.item,
                             arguments: vec![],
-                            concrete_target_entity_name: target_parent_object_entity_name
-                                .item
-                                .wrap_some()
-                                .note_todo(
-                                    "This is 100% a bug when there are \
-                                    multiple items in parts_reversed, or this \
-                                    field is ignored.",
-                                ),
+                            concrete_target_entity_name: ConcreteTargetEntityName::Concrete(
+                                target_parent_object_entity_name.item,
+                            )
+                            .note_todo(
+                                "This is 100% a bug when there are \
+                                multiple items in parts_reversed, or this \
+                                field is ignored.",
+                            ),
                         }
                     }
                 })
@@ -215,11 +211,10 @@ pub(crate) fn parse_type_system_document(
                 mutation_subfield_name,
                 &top_level_schema_field_arguments,
                 if top_level_schema_field_selection_info.is_concrete.0 {
-                    payload_object_entity_name.wrap_some()
+                    ConcreteTargetEntityName::Concrete(payload_object_entity_name)
                 } else {
-                    None
+                    ConcreteTargetEntityName::Abstract
                 },
-                top_level_schema_field_parent_object_entity_name.item,
                 mutation_field
                     .target_entity
                     .item
