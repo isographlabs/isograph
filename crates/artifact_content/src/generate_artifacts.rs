@@ -13,13 +13,12 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
-    WrappedSelectionMapSelection, accessible_client_selectables,
+    NameAndArguments, NetworkProtocol, NormalizationKey, RefetchStrategy, TargetPlatform,
+    UserWrittenClientTypeInfo, accessible_client_selectables,
     deprecated_client_object_selectable_named, deprecated_client_scalar_selectable_named,
-    deprecated_client_selectable_map, deprecated_client_selectable_named, fetchable_types,
-    flattened_entity_named, inline_fragment_reader_selection_set,
-    refetch_strategy_for_client_scalar_selectable_named, selection_map_wrapped,
-    validate_entire_schema, validated_entrypoints,
+    deprecated_client_selectable_map, deprecated_client_selectable_named, flattened_entity_named,
+    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
+    selection_map_wrapped, validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
@@ -337,37 +336,17 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                     variable_definitions_iter.collect::<Vec<_>>(),
                                 ),
                                 RefetchStrategy::UseRefetchField(_) => {
-                                    let fetchable_types_map = fetchable_types(db)
-                                        .as_ref()
+                                    let wrapped_map =
+                                        TCompilationProfile::NetworkProtocol::wrap_merged_selection_map(
+                                            db,
+                                            type_to_refine_to.name.item,
+                                            merged_selection_map.clone(),
+                                        )
                                         .expect(
-                                            "Expected parsing to have succeeded. \
+                                            "Expected merged selection map to be wrappable. \
                                             This is indicative of a bug in Isograph.",
                                         )
-                                        .lookup(db);
-
-                                    let query_id = fetchable_types_map
-                                        .iter()
-                                        .find(|(_, root_operation_name)| {
-                                            root_operation_name.0 == "query"
-                                        })
-                                        .expect("Expected query to be found")
-                                        .0;
-
-                                    let wrapped_map = selection_map_wrapped(
-                                        merged_selection_map.clone(),
-                                        vec![
-                                            WrappedSelectionMapSelection::InlineFragment(
-                                                type_to_refine_to.name.item,
-                                            ),
-                                            WrappedSelectionMapSelection::LinkedField {
-                                                parent_object_entity_name: *query_id,
-                                                server_object_selectable_name: *NODE_FIELD_NAME,
-                                                arguments: vec![id_arg.clone()],
-                                                concrete_target_entity_name: None,
-                                                is_fallible: true,
-                                            },
-                                        ],
-                                    );
+                                        .merged_selection_map;
 
                                     (
                                         wrapped_map.0,
@@ -400,26 +379,15 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                 })
                                 .collect();
 
-                            let query_type = fetchable_types(db)
-                                .as_ref()
-                                .expect(
-                                    "Expected parsing to have succeeded. \
-                                    This is indicative of a bug in Isograph.",
-                                )
-                                .lookup(db)
-                                .iter()
-                                .find(|(_, root_operation_name)| root_operation_name.0 == "query");
-
                             path_and_contents.extend(
                                 generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result(
                                     db,
                                     client_scalar_selectable,
                                     None,
-                                    &wrapped_map,
+                                    wrapped_map,
                                     &traversal_state,
                                     &encountered_client_type_map,
                                     variable_definitions_iter,
-                                    &query_type,
                                     config.options.include_file_extensions_in_import_statements,
                                     &mut persisted_documents,
                                 ),

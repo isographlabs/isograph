@@ -51,11 +51,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
                 ..
             } = linked_field;
 
-            // TODO don't use strings
-            let concrete_type = match linked_field.concrete_target_entity_name {
-                Some(s) => format!("\"{s}\""),
-                None => "null".to_string(),
-            };
+            let concrete_type = &linked_field.concrete_target_entity_name;
 
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
