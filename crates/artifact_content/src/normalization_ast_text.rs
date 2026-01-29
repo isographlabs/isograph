@@ -48,10 +48,8 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
                 selection_map,
                 arguments,
                 is_fallible,
-                ..
+                concrete_target_entity_name,
             } = linked_field;
-
-            let concrete_type = &linked_field.concrete_target_entity_name;
 
             let indent = "  ".repeat(indentation_level as usize);
             let indent_2 = "  ".repeat((indentation_level + 1) as usize);
@@ -67,7 +65,7 @@ fn generate_normalization_ast_node(item: &MergedServerSelection, indentation_lev
                 {indent_2}isFallible: {is_fallible},\n\
                 {indent_2}fieldName: \"{name}\",\n\
                 {indent_2}arguments: {serialized_arguments},\n\
-                {indent_2}concreteType: {concrete_type},\n\
+                {indent_2}concreteType: {concrete_target_entity_name},\n\
                 {indent_2}selections: {selections},\n\
                 {indent}}},\n"
             )
