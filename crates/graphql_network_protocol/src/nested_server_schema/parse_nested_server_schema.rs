@@ -182,19 +182,19 @@ fn graphql_network_protocol_associated_data_for_object(
     let fetchable = if entity_name == graphql_root_types.query {
         GraphQLFetchableInfo {
             operation_kind: GraphQLOperationKind::Query,
-            wrap_strategy: GraphQLWrapStrategy::None,
+            wrap_strategy: GraphQLWrapStrategy::LeaveAsIs,
         }
         .wrap_some()
     } else if entity_name == graphql_root_types.mutation {
         GraphQLFetchableInfo {
             operation_kind: GraphQLOperationKind::Mutation,
-            wrap_strategy: GraphQLWrapStrategy::None,
+            wrap_strategy: GraphQLWrapStrategy::LeaveAsIs,
         }
         .wrap_some()
     } else if entity_name == graphql_root_types.subscription {
         GraphQLFetchableInfo {
             operation_kind: GraphQLOperationKind::Subscription,
-            wrap_strategy: GraphQLWrapStrategy::None,
+            wrap_strategy: GraphQLWrapStrategy::LeaveAsIs,
         }
         .wrap_some()
     } else if has_id_field {

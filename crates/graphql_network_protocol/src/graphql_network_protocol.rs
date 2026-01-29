@@ -81,7 +81,7 @@ impl fmt::Display for GraphQLOperationKind {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum GraphQLWrapStrategy {
-    None,
+    LeaveAsIs,
     Node { query_root: EntityName },
 }
 
@@ -337,7 +337,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
             })?;
 
         match fetchable_info.wrap_strategy {
-            GraphQLWrapStrategy::None => Ok(WrapMergedSelectionMapResult {
+            GraphQLWrapStrategy::LeaveAsIs => Ok(WrapMergedSelectionMapResult {
                 root_entity,
                 merged_selection_map,
             }),
