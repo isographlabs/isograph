@@ -18,7 +18,7 @@ use isograph_schema::{
     deprecated_client_object_selectable_named, deprecated_client_scalar_selectable_named,
     deprecated_client_selectable_map, deprecated_client_selectable_named, flattened_entity_named,
     inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
-    selection_map_wrapped, validate_entire_schema, validated_entrypoints,
+    validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
