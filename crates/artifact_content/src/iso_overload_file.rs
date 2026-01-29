@@ -228,56 +228,53 @@ type MatchesWhitespaceAndString<
         content.push_str(&entrypoint_overload);
     }
 
-    (match no_babel_transform {
-        false => {
-            content.push_str(
-                "
+    if !no_babel_transform {
+        content.push_str(
+            "
 export function iso(_isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any, any, any>
 {\n",
-            );
-            content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
+        );
+        content.push_str("  throw new Error('iso: Unexpected invocation at runtime. Either the Babel transform ' +
       'was not set up, or it failed to identify this call site. Make sure it ' +
       'is being used verbatim as `iso`. If you cannot use the babel transform, ' + 
       'set options.no_babel_transform to true in your Isograph config. ');\n}")
-        }
-        true => {
-            let switch_cases =
-                sorted_entrypoints(db)
-                    .into_iter()
-                    .map(|(field, entrypoint_declaration_info)| {
-                        let field = field.lookup(db);
-                        format!(
-                            "    case '{}':
+    } else {
+        let switch_cases =
+            sorted_entrypoints(db)
+                .into_iter()
+                .map(|(field, entrypoint_declaration_info)| {
+                    let field = field.lookup(db);
+                    format!(
+                        "    case '{}':
       return entrypoint_{};\n",
-                            entrypoint_declaration_info.iso_literal_text,
-                            field
-                                .entity_name_and_selectable_name()
-                                .underscore_separated()
-                        )
-                    });
+                        entrypoint_declaration_info.iso_literal_text,
+                        field
+                            .entity_name_and_selectable_name()
+                            .underscore_separated()
+                    )
+                });
 
-            content.push_str(
-                "
+        content.push_str(
+            "
 export function iso(isographLiteralText: string):
   | IdentityWithParam<any>
   | IdentityWithParamComponent<any>
   | IsographEntrypoint<any, any, any, any>
 {
   switch (isographLiteralText) {\n",
-            );
+        );
 
-            for switch_case in switch_cases {
-                content.push_str(&switch_case);
-            }
-            content.push_str(
-                "  } 
-  return (clientFieldResolver: any) => clientFieldResolver;\n}",
-            )
+        for switch_case in switch_cases {
+            content.push_str(&switch_case);
         }
-    });
+        content.push_str(
+            "  }
+  return (clientFieldResolver: any) => clientFieldResolver;\n}",
+        )
+    }
 
     imports.push_str(&content);
     ArtifactPathAndContent {
