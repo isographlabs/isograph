@@ -134,15 +134,15 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         merged_selection_map,
     )
     .expect(
-        "Expected merged selection map to be wrappable \
-            This is indicative of a bug in Isograph.",
+        "Expected merged selection map to be wrappable. \
+        This is indicative of a bug in Isograph.",
     );
 
     let root_object_entity = flattened_entity_named(db, root_entity)
         .as_ref()
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 
