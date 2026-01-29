@@ -4,17 +4,20 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: false,
       fieldName: "me",
       arguments: null,
       concreteType: "Economist",
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "name",
           arguments: null,
         },

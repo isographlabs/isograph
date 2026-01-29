@@ -6,6 +6,7 @@ import Pet__PetDetailDeferredRouteInnerComponent__resolver_reader from '../../Pe
 const readerAst: ReaderAst<Query__PetByName__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "petByName",
     alias: "pet",
     arguments: [
@@ -29,15 +30,15 @@ const readerAst: ReaderAst<Query__PetByName__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__PetByName__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetByName",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

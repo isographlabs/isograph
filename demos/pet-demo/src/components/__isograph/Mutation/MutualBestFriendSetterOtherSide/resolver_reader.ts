@@ -6,6 +6,7 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "set_pet_best_friend",
     alias: null,
     arguments: [
@@ -25,6 +26,7 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "pet",
         alias: null,
         arguments: null,
@@ -34,6 +36,7 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -48,6 +51,7 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
           },
           {
             kind: "Linked",
+            isFallible: true,
             fieldName: "best_friend_relationship",
             alias: null,
             arguments: null,
@@ -57,6 +61,7 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
             selections: [
               {
                 kind: "Linked",
+                isFallible: false,
                 fieldName: "best_friend",
                 alias: null,
                 arguments: null,
@@ -66,6 +71,7 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
                 selections: [
                   {
                     kind: "Scalar",
+                    isFallible: false,
                     fieldName: "id",
                     alias: null,
                     arguments: null,
@@ -88,15 +94,15 @@ const readerAst: ReaderAst<Mutation__MutualBestFriendSetterOtherSide__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Mutation__MutualBestFriendSetterOtherSide__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "MutualBestFriendSetterOtherSide",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

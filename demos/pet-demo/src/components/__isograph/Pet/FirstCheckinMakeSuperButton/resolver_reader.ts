@@ -6,6 +6,7 @@ import Checkin__make_super__refetch_reader from '../../Checkin/make_super/refetc
 const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "checkins",
     alias: null,
     arguments: [
@@ -32,6 +33,7 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "location",
         alias: null,
         arguments: null,
@@ -41,15 +43,15 @@ const readerAst: ReaderAst<Pet__FirstCheckinMakeSuperButton__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__FirstCheckinMakeSuperButton__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "FirstCheckinMakeSuperButton",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

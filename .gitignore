@@ -21,4 +21,4 @@ artifacts
 **/.turbo/**
 **/swc_isograph_plugin.wasm
 
-**/.claude/**
+**/.claude/settings.local.json

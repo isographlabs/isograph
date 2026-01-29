@@ -77,10 +77,16 @@ fn generate_reader_ast_node<TCompilationProfile: CompilationProfile>(
             };
 
             match scalar_selectable {
-                DefinitionLocation::Server(_) => server_defined_scalar_field_ast_node(
+                DefinitionLocation::Server(selectable) => server_defined_scalar_field_ast_node(
                     scalar_field_selection,
                     indentation_level,
                     initial_variable_context,
+                    selectable
+                        .target_entity
+                        .item
+                        .as_ref()
+                        .expect("Expected target entity to be valid.")
+                        .is_nullable(),
                 ),
                 DefinitionLocation::Client(client_scalar_selectable) => {
                     scalar_client_defined_field_ast_node(
@@ -265,7 +271,7 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
     let indent_1 = "  ".repeat(indentation_level as usize);
     let indent_2 = "  ".repeat((indentation_level + 1) as usize);
 
-    let condition = match object_selectable {
+    let (condition, is_fallible) = match object_selectable {
         DefinitionLocation::Server(server_object_selectable) => {
             if server_object_selectable.is_inline_fragment.0 {
                 let type_and_field = EntityNameAndSelectableName {
@@ -278,9 +284,17 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
 
                 reader_imports.insert((type_and_field, ImportedFileCategory::ResolverReader));
 
-                reader_artifact_import_name
+                (reader_artifact_import_name, false)
             } else {
-                "null".to_string()
+                (
+                    "null".to_string(),
+                    server_object_selectable
+                        .target_entity
+                        .item
+                        .as_ref()
+                        .expect("Expected target entity to be valid")
+                        .is_nullable(),
+                )
             }
         }
         DefinitionLocation::Client(client_object_selectable) => {
@@ -296,7 +310,7 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
                 ImportedFileCategory::ResolverReader,
             ));
 
-            reader_artifact_import_name
+            (reader_artifact_import_name, false)
         }
     };
 
@@ -321,6 +335,7 @@ fn linked_field_ast_node<TCompilationProfile: CompilationProfile>(
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Linked\",\n\
+        {indent_2}isFallible: {is_fallible},\n\
         {indent_2}fieldName: \"{name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\
@@ -645,6 +660,7 @@ fn server_defined_scalar_field_ast_node(
     scalar_field_selection: &ScalarSelection,
     indentation_level: u8,
     initial_variable_context: &VariableContext,
+    is_fallible: bool,
 ) -> String {
     let field_name = scalar_field_selection.name.item;
     let alias = scalar_field_selection
@@ -671,6 +687,7 @@ fn server_defined_scalar_field_ast_node(
     format!(
         "{indent_1}{{\n\
         {indent_2}kind: \"Scalar\",\n\
+        {indent_2}isFallible: {is_fallible},\n\
         {indent_2}fieldName: \"{field_name}\",\n\
         {indent_2}alias: {alias},\n\
         {indent_2}arguments: {arguments},\n\

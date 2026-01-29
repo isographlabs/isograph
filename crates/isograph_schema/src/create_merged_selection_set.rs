@@ -18,9 +18,9 @@ use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, ClientSelectable,
     ClientSelectableId, CompilationProfile, FlattenedDataModelEntity, ID_ENTITY_NAME,
     ID_FIELD_NAME, ImperativelyLoadedFieldVariant, IsographDatabase, NameAndArguments,
-    PathToRefetchField, VariableContext, client_object_selectable_named,
-    client_scalar_selectable_named, client_scalar_selectable_selection_set_for_parent_query,
-    create_transformed_name_and_arguments, fetchable_types,
+    PathToRefetchField, VariableContext, client_scalar_selectable_selection_set_for_parent_query,
+    create_transformed_name_and_arguments, deprecated_client_object_selectable_named,
+    deprecated_client_scalar_selectable_named, fetchable_types,
     field_loadability::{Loadability, categorize_field_loadability},
     flattened_entity_named, flattened_selectable_named, initial_variable_context,
     refetch_strategy_for_client_scalar_selectable_named, selectable_named,
@@ -105,6 +105,7 @@ pub struct MergedScalarFieldSelection {
     pub parent_object_entity_name: EntityName,
     pub name: SelectableName,
     pub arguments: Vec<ArgumentKeyAndValue>,
+    pub is_fallible: bool,
 }
 
 impl MergedScalarFieldSelection {
@@ -121,6 +122,7 @@ impl MergedScalarFieldSelection {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct MergedLinkedFieldSelection {
     pub parent_object_entity_name: EntityName,
+    pub is_fallible: bool,
     pub name: SelectableName,
     pub selection_map: MergedSelectionMap,
     pub arguments: Vec<ArgumentKeyAndValue>,
@@ -307,6 +309,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                         MergedServerSelection::ScalarField(MergedScalarFieldSelection {
                             parent_object_entity_name: scalar_field_selection
                                 .parent_object_entity_name,
+                            is_fallible: scalar_field_selection.is_fallible,
                             name: scalar_field_selection.name,
                             arguments: transform_arguments_with_child_context(
                                 scalar_field_selection.arguments.into_iter(),
@@ -318,6 +321,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                         MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
+                            is_fallible: linked_field_selection.is_fallible,
                             concrete_target_entity_name: linked_field_selection
                                 .concrete_target_entity_name,
                             name: linked_field_selection.name,
@@ -337,6 +341,7 @@ fn transform_and_merge_child_selection_map_into_parent_map(
                                 .concrete_target_entity_name,
                             parent_object_entity_name: linked_field_selection
                                 .parent_object_entity_name,
+                            is_fallible: linked_field_selection.is_fallible,
                             name: linked_field_selection.name,
                             selection_map: transform_child_map_with_parent_context(
                                 &linked_field_selection.selection_map,
@@ -512,6 +517,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
     top_level_schema_field_arguments: &[VariableDeclaration],
     top_level_schema_field_concrete_target_entity_name: Option<EntityName>,
     top_level_schema_field_parent_object_entity_name: EntityName,
+    top_level_schema_field_is_fallible: bool,
 ) -> WrappedSelectionMapSelection {
     let top_level_schema_field_arguments = top_level_schema_field_arguments
         .iter()
@@ -523,6 +529,7 @@ pub fn imperative_field_subfields_or_inline_fragments(
 
     WrappedSelectionMapSelection::LinkedField {
         parent_object_entity_name: top_level_schema_field_parent_object_entity_name,
+        is_fallible: top_level_schema_field_is_fallible,
         server_object_selectable_name: top_level_schema_field_name,
         arguments: top_level_schema_field_arguments,
         concrete_target_entity_name: top_level_schema_field_concrete_target_entity_name,
@@ -550,13 +557,21 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
         match selection.item.reference() {
             SelectionType::Scalar(scalar_field_selection) => {
                 match selectable {
-                    DefinitionLocation::Server(_) => {
+                    DefinitionLocation::Server(selectable) => {
+                        let selectable = selectable.lookup(db);
+
                         merge_server_scalar_field(
                             scalar_field_selection,
                             parent_map,
                             variable_context,
                             merge_traversal_state,
                             parent_object_entity.name.item,
+                            selectable
+                                .target_entity
+                                .item
+                                .as_ref()
+                                .expect("Expected target entity to be valid.")
+                                .is_nullable(),
                         );
                     }
                     DefinitionLocation::Client(_) => {
@@ -770,13 +785,13 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
         let linked_field = parent_map.entry(normalization_key).or_insert_with(|| {
             let parent_object_entity_name = server_object_selectable.parent_entity_name;
 
-            let concrete_object_entity_name = server_object_selectable
+            let type_annotation = server_object_selectable
                 .target_entity
                 .item
                 .as_ref()
-                .expect("Expected target entity to be valid")
-                .inner()
-                .0;
+                .expect("Expected target entity to be valid");
+
+            let concrete_object_entity_name = type_annotation.inner().0;
 
             let server_object_selection_info =
                 flattened_entity_named(db, concrete_object_entity_name)
@@ -792,6 +807,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
 
             MergedServerSelection::LinkedField(MergedLinkedFieldSelection {
                 parent_object_entity_name: parent_object_entity_name.item,
+                is_fallible: type_annotation.is_nullable(),
                 name: object_selection.name.item,
                 selection_map: BTreeMap::new(),
                 arguments: transform_arguments_with_child_context(
@@ -844,7 +860,7 @@ fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
     parent_object_entity_name: EntityName,
     newly_encountered_client_object_selectable_name: SelectableName,
 ) {
-    let newly_encountered_client_object_selectable = client_object_selectable_named(
+    let newly_encountered_client_object_selectable = deprecated_client_object_selectable_named(
         db,
         parent_object_entity_name,
         newly_encountered_client_object_selectable_name,
@@ -915,7 +931,7 @@ fn merge_client_scalar_field<TCompilationProfile: CompilationProfile>(
     parent_object_entity_name: EntityName,
     newly_encountered_scalar_client_selectable_name: SelectableName,
 ) {
-    let newly_encountered_scalar_client_selectable = client_scalar_selectable_named(
+    let newly_encountered_scalar_client_selectable = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         newly_encountered_scalar_client_selectable_name,
@@ -1165,6 +1181,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
     subfields_or_inline_fragments.push(WrappedSelectionMapSelection::LinkedField {
         parent_object_entity_name: *query_id,
         server_object_selectable_name: *NODE_FIELD_NAME,
+        is_fallible: true,
         arguments: vec![ArgumentKeyAndValue {
             key: ID_FIELD_NAME.unchecked_conversion(),
             value: NonConstantValue::Variable(
@@ -1252,6 +1269,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
                 None
             },
             name: object_selection.name.item,
+            is_fallible: false,
             selection_map: BTreeMap::new(),
             arguments: transform_arguments_with_child_context(
                 object_selection
@@ -1353,6 +1371,7 @@ fn merge_server_scalar_field(
     variable_context: &VariableContext,
     merge_traversal_state: &mut ScalarClientFieldTraversalState,
     parent_object_entity_name: EntityName,
+    is_fallible: bool,
 ) {
     if let ScalarSelectionDirectiveSet::Updatable(_) =
         scalar_field_selection.scalar_selection_directive_set
@@ -1396,6 +1415,7 @@ fn merge_server_scalar_field(
             vacant_entry.insert(MergedServerSelection::ScalarField(
                 MergedScalarFieldSelection {
                     parent_object_entity_name,
+                    is_fallible,
                     name: scalar_field_name.unchecked_conversion(),
                     arguments: transform_arguments_with_child_context(
                         scalar_field_selection
@@ -1454,6 +1474,7 @@ fn select_typename_and_id_fields_in_merged_selection<TCompilationProfile: Compil
                     MergedScalarFieldSelection {
                         parent_object_entity_name: parent_object_entity.name.item,
                         name: id_field.lookup(db).name.item,
+                        is_fallible: false,
                         arguments: vec![],
                     },
                 ));
@@ -1469,6 +1490,7 @@ pub enum WrappedSelectionMapSelection {
         server_object_selectable_name: SelectableName,
         arguments: Vec<ArgumentKeyAndValue>,
         concrete_target_entity_name: Option<EntityName>,
+        is_fallible: bool,
     },
     InlineFragment(EntityName),
 }
@@ -1490,6 +1512,7 @@ pub fn selection_map_wrapped(
                 server_object_selectable_name,
                 arguments,
                 concrete_target_entity_name,
+                is_fallible,
             } => {
                 map.insert(
                     NormalizationKey::ServerField(NameAndArguments {
@@ -1502,6 +1525,7 @@ pub fn selection_map_wrapped(
                         selection_map: inner_selection_map,
                         arguments,
                         concrete_target_entity_name,
+                        is_fallible,
                     }),
                 );
             }
@@ -1533,6 +1557,7 @@ fn maybe_add_typename_selection(
             parent_object_entity_name,
             name: *TYPENAME_FIELD_NAME,
             arguments: vec![],
+            is_fallible: false,
         }),
     );
 }

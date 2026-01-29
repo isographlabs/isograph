@@ -6,6 +6,7 @@ import Checkin__make_super__refetch_reader from '../../Checkin/make_super/refetc
 const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "location",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "time",
     alias: null,
     arguments: null,
@@ -27,15 +29,15 @@ const readerAst: ReaderAst<Checkin__CheckinDisplay__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Checkin__CheckinDisplay__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "CheckinDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

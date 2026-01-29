@@ -8,6 +8,7 @@ import Repository__RepositoryLink__resolver_reader from '../../Repository/Reposi
 const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "repository",
     alias: null,
     arguments: [
@@ -34,6 +35,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "nameWithOwner",
         alias: null,
         arguments: null,
@@ -41,6 +43,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
       },
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "parent",
         alias: null,
         arguments: null,
@@ -57,6 +60,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "nameWithOwner",
             alias: null,
             arguments: null,
@@ -66,6 +70,7 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
       },
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "pullRequests",
         alias: null,
         arguments: [
@@ -91,15 +96,15 @@ const readerAst: ReaderAst<Query__RepositoryDetail__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__RepositoryDetail__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "RepositoryDetail",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

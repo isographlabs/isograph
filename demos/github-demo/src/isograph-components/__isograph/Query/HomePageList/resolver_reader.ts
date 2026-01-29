@@ -7,6 +7,7 @@ import User____refetch__refetch_reader from '../../User/__refetch/refetch_reader
 const readerAst: ReaderAst<Query__HomePageList__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "viewer",
     alias: null,
     arguments: null,
@@ -16,6 +17,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "login",
         alias: null,
         arguments: null,
@@ -23,6 +25,7 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -46,15 +49,15 @@ const readerAst: ReaderAst<Query__HomePageList__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__HomePageList__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "HomePageList",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

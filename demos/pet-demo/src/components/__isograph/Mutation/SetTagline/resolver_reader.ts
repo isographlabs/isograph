@@ -5,6 +5,7 @@ import { setTagline as resolver } from '../../../Pet/PetTaglineCard';
 const readerAst: ReaderAst<Mutation__SetTagline__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "set_pet_tagline",
     alias: null,
     arguments: [
@@ -19,6 +20,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "pet",
         alias: null,
         arguments: null,
@@ -28,6 +30,7 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "tagline",
             alias: null,
             arguments: null,
@@ -39,15 +42,15 @@ const readerAst: ReaderAst<Mutation__SetTagline__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Mutation__SetTagline__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "SetTagline",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

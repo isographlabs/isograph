@@ -8,6 +8,7 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -29,6 +30,7 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "tagline",
     alias: null,
     arguments: null,
@@ -43,15 +45,15 @@ const readerAst: ReaderAst<Pet__PetSummaryCard__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetSummaryCard__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetSummaryCard",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

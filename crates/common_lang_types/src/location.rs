@@ -93,6 +93,13 @@ where
     fn with_missing_location<TLocation>(self) -> WithGenericLocation<Self, Option<TLocation>> {
         WithGenericLocation::new(self, None)
     }
+
+    fn with_some_location<TLocation>(
+        self,
+        location: TLocation,
+    ) -> WithGenericLocation<Self, Option<TLocation>> {
+        WithGenericLocation::new(self, location.wrap_some())
+    }
 }
 
 impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
@@ -104,6 +111,7 @@ impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
     }
 }
 
+pub type WithOptionalLocation<TItem> = WithGenericLocation<TItem, Option<EmbeddedLocation>>;
 pub type WithEmbeddedLocation<TItem> = WithGenericLocation<TItem, EmbeddedLocation>;
 
 impl<T> WithLocationPostfix for T {}

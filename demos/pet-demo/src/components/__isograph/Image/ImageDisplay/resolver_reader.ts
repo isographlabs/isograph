@@ -5,6 +5,7 @@ import { ImageDisplay as resolver } from '../../../Newsfeed/ImageDisplay';
 const readerAst: ReaderAst<Image__ImageDisplay__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "url",
     alias: null,
     arguments: null,
@@ -12,15 +13,15 @@ const readerAst: ReaderAst<Image__ImageDisplay__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Image__ImageDisplay__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "ImageDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

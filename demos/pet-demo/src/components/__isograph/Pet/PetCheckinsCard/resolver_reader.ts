@@ -6,6 +6,7 @@ import Checkin__CheckinDisplay__resolver_reader from '../../Checkin/CheckinDispl
 const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   },
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "checkins",
     alias: null,
     arguments: [
@@ -39,6 +41,7 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -48,15 +51,15 @@ const readerAst: ReaderAst<Pet__PetCheckinsCard__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetCheckinsCard__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetCheckinsCard",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -6,6 +6,7 @@ import Pet__PetDetailDeferredRouteInnerComponent__resolver_reader from '../../Pe
 const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "pet",
     alias: null,
     arguments: [
@@ -29,6 +30,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "topLevelField",
     alias: null,
     arguments: [
@@ -52,6 +54,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "__typename",
         alias: null,
         arguments: null,
@@ -61,6 +64,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "namable",
     alias: null,
     arguments: null,
@@ -70,6 +74,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "__typename",
         alias: null,
         arguments: null,
@@ -79,6 +84,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "notImplemented",
     alias: null,
     arguments: null,
@@ -88,6 +94,7 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "__typename",
         alias: null,
         arguments: null,
@@ -101,15 +108,15 @@ const readerAst: ReaderAst<Query__PetDetailDeferredRoute__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__PetDetailDeferredRoute__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetDetailDeferredRoute",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

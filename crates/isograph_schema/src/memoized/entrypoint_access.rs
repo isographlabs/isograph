@@ -10,7 +10,7 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
-    client_scalar_selectable_named, flattened_entity_named, parse_iso_literal_in_source,
+    deprecated_client_scalar_selectable_named, flattened_entity_named, parse_iso_literal_in_source,
     selectable_is_not_defined_diagnostic, selectable_is_wrong_type_diagnostic, selectable_named,
 };
 
@@ -45,7 +45,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
     // We also validate that it is a fetchable type.
     for entrypoint_declaration_info in entrypoints {
         let value = (|| {
-            client_scalar_selectable_named(
+            deprecated_client_scalar_selectable_named(
                 db,
                 entrypoint_declaration_info.parent_type.item.0,
                 entrypoint_declaration_info.client_field_name.item.0,

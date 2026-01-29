@@ -550,25 +550,25 @@ export function readResolverFieldData(
 
   const readerWithRefetchQueries = {
     kind: 'ReaderWithRefetchQueries',
-    readerArtifact: field.readerArtifact,
+    readerArtifact: field.readerArtifact(),
     nestedRefetchQueries: resolverRefetchQueries,
   } satisfies ReaderWithRefetchQueries<any, any>;
 
   const fragment = {
     kind: 'FragmentReference',
     readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
-    fieldName: field.readerArtifact.fieldName,
-    readerArtifactKind: field.readerArtifact.kind,
+    fieldName: readerWithRefetchQueries.readerArtifact.fieldName,
+    readerArtifactKind: readerWithRefetchQueries.readerArtifact.kind,
     root,
     variables: generateChildVariableMap(variables, field.arguments),
     networkRequest,
   } satisfies FragmentReference<any, any>;
 
-  switch (field.readerArtifact.kind) {
+  switch (readerWithRefetchQueries.readerArtifact.kind) {
     case 'EagerReaderArtifact': {
       const data = readData(
         environment,
-        field.readerArtifact.readerAst,
+        readerWithRefetchQueries.readerArtifact.readerAst,
         root,
         generateChildVariableMap(variables, field.arguments),
         resolverRefetchQueries,
@@ -587,7 +587,7 @@ export function readResolverFieldData(
       const firstParameter = {
         data: data.data,
         parameters: variables,
-        startUpdate: field.readerArtifact.hasUpdatable
+        startUpdate: readerWithRefetchQueries.readerArtifact.hasUpdatable
           ? getOrCreateCachedStartUpdate(
               environment,
               fragment,
@@ -597,7 +597,7 @@ export function readResolverFieldData(
       };
       return {
         kind: 'Success',
-        data: field.readerArtifact.resolver(firstParameter),
+        data: readerWithRefetchQueries.readerArtifact.resolver(firstParameter),
       };
     }
     case 'ComponentReaderArtifact': {
@@ -651,7 +651,8 @@ export function readLinkedFieldData(
   let value = storeRecord[storeRecordName];
 
   if (field.condition != null) {
-    const data = readData(field.condition.readerAst, root);
+    const condition = field.condition();
+    const data = readData(condition.readerAst, root);
     if (data.kind === 'MissingData') {
       return {
         kind: 'MissingData',
@@ -664,7 +665,7 @@ export function readLinkedFieldData(
 
     const readerWithRefetchQueries = {
       kind: 'ReaderWithRefetchQueries',
-      readerArtifact: field.condition,
+      readerArtifact: condition,
       // TODO this is wrong
       // should map field.condition.usedRefetchQueries
       // but it doesn't exist
@@ -675,8 +676,8 @@ export function readLinkedFieldData(
       kind: 'FragmentReference',
       readerWithRefetchQueries: wrapResolvedValue(readerWithRefetchQueries),
       root,
-      fieldName: field.condition.fieldName,
-      readerArtifactKind: field.condition.kind,
+      fieldName: condition.fieldName,
+      readerArtifactKind: condition.kind,
       variables: generateChildVariableMap(
         variables,
         // TODO this is wrong
@@ -687,10 +688,10 @@ export function readLinkedFieldData(
       networkRequest,
     } satisfies FragmentReference<any, any>;
 
-    const condition = field.condition.resolver({
+    const link = condition.resolver({
       data: data.data,
       parameters: {},
-      ...(field.condition.hasUpdatable
+      ...(condition.hasUpdatable
         ? {
             startUpdate: getOrCreateCachedStartUpdate(
               environment,
@@ -700,7 +701,7 @@ export function readLinkedFieldData(
           }
         : undefined),
     });
-    value = condition;
+    value = link;
   }
 
   if (Array.isArray(value)) {
@@ -870,6 +871,7 @@ export function readClientPointerData(
     [
       {
         kind: 'Scalar',
+        isFallible: false,
         fieldName: 'id',
         alias: null,
         arguments: null,

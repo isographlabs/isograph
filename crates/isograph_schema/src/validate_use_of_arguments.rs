@@ -14,7 +14,7 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     CompilationProfile, ID_FIELD_NAME, IsographDatabase, MemoRefClientSelectable,
-    client_selectable_map, flattened_entity_named, selectable_named,
+    deprecated_client_selectable_map, flattened_entity_named, selectable_named,
     selectable_reader_selection_set, validate_argument_types::value_satisfies_type,
     visit_selection_set::visit_selection_set,
 };
@@ -40,7 +40,7 @@ pub fn validate_use_of_arguments<TCompilationProfile: CompilationProfile>(
 ) -> DiagnosticVecResult<()> {
     let mut errors = vec![];
 
-    for client_selectable in client_selectable_map(db)
+    for client_selectable in deprecated_client_selectable_map(db)
         .clone_err()?
         .iter()
         .flat_map(|(_, value)| value.as_ref().ok())

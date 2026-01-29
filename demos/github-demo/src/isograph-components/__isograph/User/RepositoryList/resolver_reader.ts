@@ -25,6 +25,7 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
     refetchReaderAst: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -35,15 +36,15 @@ const readerAst: ReaderAst<User__RepositoryList__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   User__RepositoryList__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "RepositoryList",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

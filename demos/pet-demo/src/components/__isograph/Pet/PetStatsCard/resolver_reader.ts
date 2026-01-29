@@ -6,6 +6,7 @@ import PetStats__refetch_pet_stats__refetch_reader from '../../PetStats/refetch_
 const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "nickname",
     alias: null,
     arguments: null,
@@ -20,6 +22,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "age",
     alias: null,
     arguments: null,
@@ -27,6 +30,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "stats",
     alias: null,
     arguments: null,
@@ -36,6 +40,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "weight",
         alias: null,
         arguments: null,
@@ -43,6 +48,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "intelligence",
         alias: null,
         arguments: null,
@@ -50,6 +56,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "cuteness",
         alias: null,
         arguments: null,
@@ -57,6 +64,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "hunger",
         alias: null,
         arguments: null,
@@ -64,6 +72,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "sociability",
         alias: null,
         arguments: null,
@@ -71,6 +80,7 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
       },
       {
         kind: "Scalar",
+        isFallible: true,
         fieldName: "energy",
         alias: null,
         arguments: null,
@@ -87,15 +97,15 @@ const readerAst: ReaderAst<Pet__PetStatsCard__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__PetStatsCard__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetStatsCard",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

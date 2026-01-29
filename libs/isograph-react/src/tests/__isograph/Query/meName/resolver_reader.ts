@@ -6,6 +6,7 @@ import { meNameField as resolver } from '../../../garbageCollection.test';
 const readerAst: ReaderAst<Query__meName__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "me",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__meName__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -24,15 +26,15 @@ const readerAst: ReaderAst<Query__meName__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__meName__param,
   Query__meName__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "meName",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

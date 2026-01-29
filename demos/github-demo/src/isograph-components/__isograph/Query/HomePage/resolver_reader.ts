@@ -21,15 +21,15 @@ const readerAst: ReaderAst<Query__HomePage__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__HomePage__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "HomePage",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

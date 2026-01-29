@@ -88,6 +88,7 @@ export type ReaderAst<TReadFromStore> = ReadonlyArray<ReaderAstNode>;
 
 export type ReaderScalarField = {
   readonly kind: 'Scalar';
+  readonly isFallible: boolean;
   readonly fieldName: string;
   readonly alias: string | null;
   readonly arguments: Arguments | null;
@@ -101,14 +102,17 @@ export type ReaderLinkField = {
 
 export type ReaderLinkedField = {
   readonly kind: 'Linked';
+  readonly isFallible: boolean;
   readonly fieldName: string;
   readonly alias: string | null;
   readonly selections: ReaderAst<unknown>;
   readonly arguments: Arguments | null;
-  readonly condition: EagerReaderArtifact<
-    { data: any; parameters: any; startUpdate?: StartUpdate<any> },
-    StoreLink | null | (StoreLink | null)[] | StoreLink[]
-  > | null;
+  readonly condition:
+    | (() => EagerReaderArtifact<
+        { data: any; parameters: any; startUpdate?: StartUpdate<any> },
+        StoreLink | null | (StoreLink | null)[] | StoreLink[]
+      >)
+    | null;
   readonly isUpdatable: boolean;
   /**
    * If refetchQueryIndex != null, then the linked field is a client pointer.
@@ -124,7 +128,7 @@ export type ReaderNonLoadableResolverField = {
   readonly kind: 'Resolver';
   readonly alias: string;
   // TODO don't type this as any
-  readonly readerArtifact: TopLevelReaderArtifact<any, any, any>;
+  readonly readerArtifact: () => TopLevelReaderArtifact<any, any, any>;
   readonly arguments: Arguments | null;
   readonly usedRefetchQueries: number[];
 };

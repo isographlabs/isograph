@@ -102,10 +102,18 @@ impl TargetPlatform for JavascriptTargetPlatform {
     ) -> String {
         let entity = flattened_entity_named(db, entity_name).expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         );
 
-        match entity.lookup(db).target_platform_associated_data.as_ref() {
+        match entity
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .target_platform
+            .as_ref()
+        {
             SelectionType::Object(_) => {
                 // TODO this is bad; we should never create a type containing all of the fields
                 // on a given object. This is currently used for input objects, and we should
@@ -160,10 +168,14 @@ impl TargetPlatform for JavascriptTargetPlatform {
         )
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db)
-        .target_platform_associated_data
+        .associated_data
+        .as_ref()
+        .as_server()
+        .expect("Expected entity to be server defined.")
+        .target_platform
         .as_ref()
         .as_scalar()
         .expect("Expected scalar entity to be scalar")
@@ -194,7 +206,11 @@ impl TargetPlatform for JavascriptTargetPlatform {
         }
 
         let subtypes = server_object_entity
-            .target_platform_associated_data
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .target_platform
             .as_ref()
             .as_object()
             .expect("Expected server object entity to have object associated data")

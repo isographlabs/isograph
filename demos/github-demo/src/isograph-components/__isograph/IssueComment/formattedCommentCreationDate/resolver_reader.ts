@@ -6,6 +6,7 @@ import { formattedCommentCreationDate as resolver } from '../../../CommentList';
 const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "createdAt",
     alias: null,
     arguments: null,
@@ -13,15 +14,15 @@ const readerAst: ReaderAst<IssueComment__formattedCommentCreationDate__param> = 
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   IssueComment__formattedCommentCreationDate__param,
   IssueComment__formattedCommentCreationDate__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "formattedCommentCreationDate",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -4,6 +4,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "node",
       arguments: [
         [
@@ -15,11 +16,13 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "__typename",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
@@ -29,16 +32,19 @@ const normalizationAst: NormalizationAst = {
           selections: [
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "__typename",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "id",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "name",
               arguments: null,
             },
@@ -48,6 +54,7 @@ const normalizationAst: NormalizationAst = {
     },
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "node",
       arguments: [
         [
@@ -59,11 +66,13 @@ const normalizationAst: NormalizationAst = {
       selections: [
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "__typename",
           arguments: null,
         },
         {
           kind: "Scalar",
+          isFallible: false,
           fieldName: "id",
           arguments: null,
         },
@@ -73,16 +82,19 @@ const normalizationAst: NormalizationAst = {
           selections: [
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "__typename",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "id",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "name",
               arguments: null,
             },

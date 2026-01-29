@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     ClientFieldVariant, CompilationProfile, IsographDatabase, LINK_FIELD_NAME, TargetPlatform,
-    client_scalar_selectable_named, flattened_entity_named, selectable_named,
+    deprecated_client_scalar_selectable_named, flattened_entity_named, selectable_named,
 };
 use prelude::Postfix;
 
@@ -575,7 +575,7 @@ fn write_param_type_from_client_scalar_selectable<TCompilationProfile: Compilati
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
 ) {
-    let client_scalar_selectable = client_scalar_selectable_named(
+    let client_scalar_selectable = deprecated_client_scalar_selectable_named(
         db,
         parent_object_entity_name,
         client_scalar_selectable_name,

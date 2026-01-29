@@ -6,6 +6,7 @@ import { SmartestPet as resolver } from '../../../SmartestPet';
 const readerAst: ReaderAst<Query__smartestPet__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "pets",
     alias: null,
     arguments: null,
@@ -19,6 +20,7 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
       },
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "stats",
         alias: null,
         arguments: null,
@@ -28,6 +30,7 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: true,
             fieldName: "intelligence",
             alias: null,
             arguments: null,
@@ -39,15 +42,15 @@ const readerAst: ReaderAst<Query__smartestPet__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__smartestPet__param,
   Query__smartestPet__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "smartestPet",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

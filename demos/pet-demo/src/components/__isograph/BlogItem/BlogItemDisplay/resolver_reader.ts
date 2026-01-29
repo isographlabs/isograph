@@ -6,6 +6,7 @@ import Image__ImageDisplayWrapper__resolver_reader from '../../Image/ImageDispla
 const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "author",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "title",
     alias: null,
     arguments: null,
@@ -20,6 +22,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "content",
     alias: null,
     arguments: null,
@@ -33,6 +36,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
     refetchReaderAst: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "id",
         alias: null,
         arguments: null,
@@ -48,6 +52,7 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
   },
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "image",
     alias: null,
     arguments: null,
@@ -66,15 +71,15 @@ const readerAst: ReaderAst<BlogItem__BlogItemDisplay__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   BlogItem__BlogItemDisplay__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "BlogItemDisplay",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

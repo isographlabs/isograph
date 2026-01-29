@@ -22,6 +22,20 @@ export type ReaderWithRefetchQueries<
   readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
 };
 
+export type RawReaderWithRefetchQueries<
+  TReadFromStore extends UnknownTReadFromStore,
+  TClientFieldValue,
+> = {
+  readonly kind: 'ReaderWithRefetchQueries';
+  readonly readerArtifact: () => TopLevelReaderArtifact<
+    TReadFromStore,
+    TClientFieldValue,
+    // TODO don't type this as any
+    any
+  >;
+  readonly nestedRefetchQueries: RefetchQueryNormalizationArtifactWrapper[];
+};
+
 export type ReaderWithRefetchQueriesLoader<
   TReadFromStore extends UnknownTReadFromStore,
   TClientFieldValue,
@@ -32,7 +46,7 @@ export type ReaderWithRefetchQueriesLoader<
     | 'EagerReaderArtifact'
     | 'ComponentReaderArtifact';
   readonly loader: () => Promise<
-    ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    RawReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
   >;
 };
 
@@ -69,7 +83,7 @@ export type IsographEntrypoint<
   readonly kind: 'Entrypoint';
   readonly networkRequestInfo: NetworkRequestInfo<TNormalizationAst>;
   readonly readerWithRefetchQueries:
-    | ReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
+    | RawReaderWithRefetchQueries<TReadFromStore, TClientFieldValue>
     | ReaderWithRefetchQueriesLoader<TReadFromStore, TClientFieldValue>;
   readonly concreteType: TypeName;
   /**
@@ -124,12 +138,14 @@ export type NormalizationAstLoader = {
 
 export type NormalizationScalarField = {
   readonly kind: 'Scalar';
+  readonly isFallible: boolean;
   readonly fieldName: string;
   readonly arguments: Arguments | null;
 };
 
 export type NormalizationLinkedField = {
   readonly kind: 'Linked';
+  readonly isFallible: boolean;
   readonly fieldName: string;
   readonly arguments: Arguments | null;
   readonly selections: NormalizationAstNodes;

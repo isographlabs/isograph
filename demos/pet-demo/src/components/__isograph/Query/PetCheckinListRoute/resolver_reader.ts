@@ -7,6 +7,7 @@ import Pet__fullName__resolver_reader from '../../Pet/fullName/resolver_reader';
 const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "pet",
     alias: null,
     arguments: [
@@ -41,6 +42,7 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
         refetchReaderAst: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -58,15 +60,15 @@ const readerAst: ReaderAst<Query__PetCheckinListRoute__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Query__PetCheckinListRoute__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "PetCheckinListRoute",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

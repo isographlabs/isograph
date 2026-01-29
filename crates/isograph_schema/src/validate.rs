@@ -7,7 +7,7 @@ use prelude::{ErrClone, Postfix};
 
 use crate::{
     ClientFieldVariant, CompilationProfile, ContainsIsoStats, IsographDatabase,
-    client_selectable_declaration_map_from_iso_literals, client_selectable_map,
+    client_selectable_declaration_map_from_iso_literals, deprecated_client_selectable_map,
     entity_not_defined_diagnostic, flattened_entities, flattened_entity_named,
     flattened_selectables, flattened_server_object_entities, parse_iso_literals,
     process_iso_literals, selectables, server_id_selectable,
@@ -168,7 +168,7 @@ fn validate_all_id_fields<TCompilationProfile: CompilationProfile>(
 fn validate_scalar_selectable_directive_sets<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
 ) -> Vec<Diagnostic> {
-    let selectables = match client_selectable_map(db) {
+    let selectables = match deprecated_client_selectable_map(db) {
         Ok(s) => s,
         Err(e) => return vec![e.clone()],
     };

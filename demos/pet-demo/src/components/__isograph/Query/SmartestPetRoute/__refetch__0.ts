@@ -6,6 +6,7 @@ const normalizationAst: NormalizationAst = {
   selections: [
     {
       kind: "Linked",
+      isFallible: true,
       fieldName: "node",
       arguments: [
         [
@@ -21,16 +22,19 @@ const normalizationAst: NormalizationAst = {
           selections: [
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "__typename",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "id",
               arguments: null,
             },
             {
               kind: "Linked",
+              isFallible: false,
               fieldName: "checkins",
               arguments: [
                 [
@@ -42,6 +46,7 @@ const normalizationAst: NormalizationAst = {
               selections: [
                 {
                   kind: "Scalar",
+                  isFallible: false,
                   fieldName: "id",
                   arguments: null,
                 },
@@ -49,27 +54,32 @@ const normalizationAst: NormalizationAst = {
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "firstName",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "lastName",
               arguments: null,
             },
             {
               kind: "Scalar",
+              isFallible: false,
               fieldName: "picture",
               arguments: null,
             },
             {
               kind: "Linked",
+              isFallible: true,
               fieldName: "stats",
               arguments: null,
               concreteType: "PetStats",
               selections: [
                 {
                   kind: "Scalar",
+                  isFallible: true,
                   fieldName: "intelligence",
                   arguments: null,
                 },

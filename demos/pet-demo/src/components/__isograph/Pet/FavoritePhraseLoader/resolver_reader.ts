@@ -5,6 +5,7 @@ import { FavoritePhraseLoader as resolver } from '../../../Pet/FavoritePhraseLoa
 const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -12,15 +13,15 @@ const readerAst: ReaderAst<Pet__FavoritePhraseLoader__param> = [
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Pet__FavoritePhraseLoader__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "FavoritePhraseLoader",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

@@ -6,6 +6,7 @@ import { meNameField as resolver } from '../../../meNameSuccessor';
 const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "me",
     alias: null,
     arguments: null,
@@ -15,6 +16,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
     selections: [
       {
         kind: "Scalar",
+        isFallible: false,
         fieldName: "name",
         alias: null,
         arguments: null,
@@ -22,6 +24,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
       },
       {
         kind: "Linked",
+        isFallible: true,
         fieldName: "successor",
         alias: null,
         arguments: null,
@@ -31,6 +34,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
         selections: [
           {
             kind: "Linked",
+            isFallible: true,
             fieldName: "successor",
             alias: null,
             arguments: null,
@@ -40,6 +44,7 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
             selections: [
               {
                 kind: "Scalar",
+                isFallible: false,
                 fieldName: "name",
                 alias: null,
                 arguments: null,
@@ -53,15 +58,15 @@ const readerAst: ReaderAst<Query__meNameSuccessor__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__meNameSuccessor__param,
   Query__meNameSuccessor__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "meNameSuccessor",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

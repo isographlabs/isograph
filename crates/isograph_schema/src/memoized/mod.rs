@@ -1,3 +1,4 @@
+mod client_declaration_access;
 mod client_selectable_access;
 mod entrypoint_access;
 mod fetchable_types;
@@ -6,6 +7,7 @@ mod selectable_access;
 mod selection_set_access;
 mod server_selectable_access;
 
+pub use client_declaration_access::*;
 pub use client_selectable_access::*;
 pub use entrypoint_access::*;
 pub use fetchable_types::*;

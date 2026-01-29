@@ -6,6 +6,7 @@ import { checkinsPointer as resolver } from '../../../SmartestPet';
 const readerAst: ReaderAst<Pet__checkinsPointer__param> = [
   {
     kind: "Linked",
+    isFallible: false,
     fieldName: "checkins",
     alias: null,
     arguments: [
@@ -26,15 +27,15 @@ const readerAst: ReaderAst<Pet__checkinsPointer__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Pet__checkinsPointer__param,
   Pet__checkinsPointer__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "checkinsPointer",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;
