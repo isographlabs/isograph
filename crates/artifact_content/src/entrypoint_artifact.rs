@@ -121,7 +121,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         .as_ref()
         .expect(
             "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 
