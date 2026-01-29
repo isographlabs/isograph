@@ -12,7 +12,7 @@ use isograph_lang_types::{
 };
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
-    flattened_selectables_for_entity, selectable_named,
+    entity_not_defined_diagnostic, flattened_selectables_for_entity, selectable_named,
 };
 use isograph_schema::{
     ConcreteTargetEntityName, DeprecatedParseTypeSystemOutcome, Format, ID_FIELD_NAME,
@@ -323,9 +323,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         merged_selection_map: MergedSelectionMap,
     ) -> DiagnosticResult<WrapMergedSelectionMapResult> {
         let fetchable_info = flattened_entity_named(db, root_entity)
-            .ok_or_else(|| {
-                Diagnostic::new(format!("Type `{root_entity}` not found in schema."), None)
-            })?
+            .ok_or_else(|| entity_not_defined_diagnostic(root_entity, None))?
             .lookup(db)
             .associated_data
             .as_ref()
