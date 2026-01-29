@@ -333,7 +333,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
 
                             let (wrapped_map, variable_definitions_iter) = match refetch_strategy {
                                 RefetchStrategy::RefetchFromRoot => (
-                                    selection_map_wrapped(merged_selection_map.clone(), vec![]),
+                                    merged_selection_map.clone(),
                                     variable_definitions_iter.collect::<Vec<_>>(),
                                 ),
                                 RefetchStrategy::UseRefetchField(_) => {
