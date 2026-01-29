@@ -28,7 +28,9 @@ pub fn server_id_selectable<TCompilationProfile: CompilationProfile>(
         .ok_or_else(|| {
             entity_not_defined_diagnostic(
                 target_entity_name,
-                Location::Generated.note_todo("Don't be lazy, get a location"),
+                Location::Generated
+                    .note_todo("Don't be lazy, get a location")
+                    .wrap_some(),
             )
         })?
         .lookup(db);

@@ -40,7 +40,10 @@ pub(crate) fn validate_selection_sets<TCompilationProfile: CompilationProfile>(
             None => {
                 // TODO better location... and this is probably already validated elsewhere.
                 // Maybe we can just continue
-                errors.push(entity_not_defined_diagnostic(key.0, Location::Generated));
+                errors.push(entity_not_defined_diagnostic(
+                    key.0,
+                    Location::Generated.wrap_some(),
+                ));
                 continue;
             }
         };
@@ -128,7 +131,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                             None => {
                                 errors.push(entity_not_defined_diagnostic(
                                     target_entity_name,
-                                    scalar_selection.name.location.to::<Location>(),
+                                    scalar_selection.name.location.to::<Location>().wrap_some(),
                                 ));
                                 continue;
                             }
@@ -281,7 +284,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                             None => {
                                 errors.push(entity_not_defined_diagnostic(
                                     target_entity_name,
-                                    object_selection.name.location.to::<Location>(),
+                                    object_selection.name.location.to::<Location>().wrap_some(),
                                 ));
                                 continue;
                             }
@@ -355,7 +358,7 @@ fn validate_selection_set<TCompilationProfile: CompilationProfile>(
                         // This was probably validated elsewhere??
                         errors.push(entity_not_defined_diagnostic(
                             target_entity_name,
-                            object_selection.name.location.to(),
+                            object_selection.name.location.to::<Location>().wrap_some(),
                         ));
                         continue;
                     }

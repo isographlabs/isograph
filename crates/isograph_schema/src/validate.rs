@@ -238,7 +238,8 @@ fn validate_selectables<TCompilationProfile: CompilationProfile>(
                         .name
                         .location
                         .to::<Location>()
-                        .note_todo("Variable definition will not have location at some point"),
+                        .note_todo("Variable definition will not have location at some point")
+                        .wrap_some(),
                 )),
             }
         }

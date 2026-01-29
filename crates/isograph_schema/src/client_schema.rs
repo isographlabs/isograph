@@ -92,7 +92,7 @@ pub fn insert_client_selectables_into_schema<TCompilationProfile: CompilationPro
                         .non_fatal_diagnostics
                         .push(entity_not_defined_diagnostic(
                             scalar_declaration.parent_type.item.0,
-                            declaration.location.to::<Location>(),
+                            declaration.location.to::<Location>().wrap_some(),
                         ));
                     continue;
                 };
@@ -136,7 +136,7 @@ pub fn insert_client_selectables_into_schema<TCompilationProfile: CompilationPro
                         .non_fatal_diagnostics
                         .push(entity_not_defined_diagnostic(
                             object_declaration.parent_type.item.0,
-                            declaration.location.to::<Location>(),
+                            declaration.location.to::<Location>().wrap_some(),
                         ));
                     continue;
                 };

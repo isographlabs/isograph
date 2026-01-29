@@ -74,7 +74,10 @@ pub fn selectables_for_entity<TCompilationProfile: CompilationProfile>(
     let mut selectables = flattened_selectables_for_entity(db, parent_server_object_entity_name)
         .as_ref()
         .ok_or_else(|| {
-            entity_not_defined_diagnostic(parent_server_object_entity_name, Location::Generated)
+            entity_not_defined_diagnostic(
+                parent_server_object_entity_name,
+                Location::Generated.wrap_some(),
+            )
         })?
         .values()
         .map(|value| value.dereference().server_defined().wrap_ok())

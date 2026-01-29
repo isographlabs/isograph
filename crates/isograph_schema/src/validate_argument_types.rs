@@ -370,7 +370,10 @@ fn get_non_nullable_missing_and_provided_fields<TCompilationProfile: Compilation
     let server_selectables = flattened_selectables_for_entity(db, server_object_entity_name)
         .as_ref()
         .ok_or_else(|| {
-            entity_not_defined_diagnostic(server_object_entity_name, Location::Generated)
+            entity_not_defined_diagnostic(
+                server_object_entity_name,
+                Location::Generated.wrap_some(),
+            )
         })?;
 
     server_selectables
@@ -410,7 +413,10 @@ fn validate_no_extraneous_fields<TCompilationProfile: CompilationProfile>(
     let object_fields = flattened_selectables_for_entity(db, parent_server_object_entity_name)
         .as_ref()
         .ok_or_else(|| {
-            entity_not_defined_diagnostic(parent_server_object_entity_name, Location::Generated)
+            entity_not_defined_diagnostic(
+                parent_server_object_entity_name,
+                Location::Generated.wrap_some(),
+            )
         })?;
 
     let extra_fields: Vec<_> = object_literal

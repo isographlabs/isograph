@@ -258,11 +258,11 @@ pub fn selectable_is_not_defined_diagnostic(
     )
 }
 
-pub fn entity_not_defined_diagnostic(entity_name: EntityName, location: Location) -> Diagnostic {
-    Diagnostic::new(
-        format!("`{entity_name}` is not defined."),
-        location.wrap_some(),
-    )
+pub fn entity_not_defined_diagnostic(
+    entity_name: EntityName,
+    location: Option<Location>,
+) -> Diagnostic {
+    Diagnostic::new(format!("`{entity_name}` is not defined."), location)
 }
 
 // TODO make this generic over value, too

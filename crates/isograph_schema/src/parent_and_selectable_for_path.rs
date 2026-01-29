@@ -46,7 +46,9 @@ pub fn get_parent_and_selectable_for_scalar_path<'a, TCompilationProfile: Compil
                 .ok_or_else(|| {
                     entity_not_defined_diagnostic(
                         target_entity_name,
-                        Location::Generated.note_todo("Use a real location"),
+                        Location::Generated
+                            .note_todo("Use a real location")
+                            .wrap_some(),
                     )
                 })?
                 .lookup(db);
@@ -106,7 +108,7 @@ pub fn get_parent_and_selectable_for_object_path<'a, TCompilationProfile: Compil
             let entity = flattened_entity_named(db, target_entity_name)
                 .ok_or_else(|| {
                     let location = object_path.inner.name.location.to::<Location>();
-                    entity_not_defined_diagnostic(target_entity_name, location)
+                    entity_not_defined_diagnostic(target_entity_name, location.wrap_some())
                 })?
                 .lookup(db);
 
@@ -175,7 +177,7 @@ pub fn get_parent_for_selection_set_path<'a, TCompilationProfile: CompilationPro
         entity_not_defined_diagnostic(
             parent_object_entity_name,
             // TODO we can thread a location here?
-            Location::Generated,
+            Location::Generated.wrap_some(),
         )
     })
 }
@@ -230,7 +232,7 @@ pub fn parent_object_entity_and_selectable<TCompilationProfile: CompilationProfi
         entity_not_defined_diagnostic(
             parent_server_object_entity_name.0,
             // TODO we can get a location
-            Location::Generated,
+            Location::Generated.wrap_some(),
         ),
     )?;
 
