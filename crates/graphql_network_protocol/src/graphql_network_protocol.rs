@@ -285,10 +285,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
     ) -> QueryText {
         let operation_kind = flattened_entity_named(db, root_entity)
             .ok_or_else(|| {
-                Diagnostic::new(
-                    format!("Type `{root_entity}` not found in schema."),
-                    None,
-                )
+                entity_not_defined_diagnostic(root_entity, None).note_todo("root_entity should have a location")
             })
             .expect("Expected schema to contain root entity.")
             .lookup(db)
@@ -323,7 +320,10 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
         merged_selection_map: MergedSelectionMap,
     ) -> DiagnosticResult<WrapMergedSelectionMapResult> {
         let fetchable_info = flattened_entity_named(db, root_entity)
-            .ok_or_else(|| entity_not_defined_diagnostic(root_entity, None))?
+            .ok_or_else(|| {
+                entity_not_defined_diagnostic(root_entity, None)
+                    .note_todo("root_entity should have a location")
+            })?
             .lookup(db)
             .associated_data
             .as_ref()

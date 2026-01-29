@@ -197,7 +197,7 @@ fn graphql_network_protocol_associated_data_for_object(
             wrap_strategy: GraphQLWrapStrategy::LeaveAsIs,
         }
         .wrap_some()
-    } else if has_id_field {
+    } else if has_id_field.note_todo("Check node implementation instead") {
         GraphQLFetchableInfo {
             operation_kind: GraphQLOperationKind::Query,
             wrap_strategy: GraphQLWrapStrategy::Node {
