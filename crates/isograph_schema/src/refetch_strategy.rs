@@ -9,8 +9,8 @@ use isograph_lang_types::{
 };
 
 use crate::{
-    ID_FIELD_NAME, MergedSelectionMap, WrappedSelectionMapSelection, get_reachable_variables,
-    selection_map_wrapped,
+    ID_FIELD_NAME, MergedSelectionMap, WrappedMergedSelectionMap, WrappedSelectionMapSelection,
+    get_reachable_variables, selection_map_wrapped,
 };
 
 #[derive(Debug, PartialEq, Eq, Clone, Hash)]
@@ -69,11 +69,11 @@ impl GenerateRefetchQueryImpl {
     pub fn generate_refetch_query(
         &self,
         inner_selection_map: MergedSelectionMap,
-    ) -> (MergedSelectionMap, BTreeSet<VariableNameWrapper>) {
+    ) -> (WrappedMergedSelectionMap, BTreeSet<VariableNameWrapper>) {
         let new_selection_map = selection_map_wrapped(inner_selection_map, self.subfields.clone());
 
         // TODO this seems like a bunch of extra work, and we shouldn't need to do it
-        let variables = get_reachable_variables(&new_selection_map).collect();
+        let variables = get_reachable_variables(&new_selection_map.0).collect();
 
         (new_selection_map, variables)
     }

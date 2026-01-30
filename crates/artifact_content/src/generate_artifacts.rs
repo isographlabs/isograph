@@ -370,7 +370,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                     );
 
                                     (
-                                        wrapped_map,
+                                        wrapped_map.0,
                                         variable_definitions_iter
                                             .chain(std::iter::once(&id_var))
                                             .collect(),

@@ -30,6 +30,9 @@ use crate::{
 
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+pub struct WrappedMergedSelectionMap(pub MergedSelectionMap);
+
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
     DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
@@ -1500,7 +1503,7 @@ pub fn selection_map_wrapped(
     // NOTE: these must be in reverse order, e.g. node { ... on Foo { etc } } would be
     // [foo_inline_fragment, node_field_selection]
     subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
-) -> MergedSelectionMap {
+) -> WrappedMergedSelectionMap {
     // TODO so far we only support regular linked fields, but the goal is to support
     // inline fragments, too.
     // TODO unify this with type_to_refine_to
@@ -1543,7 +1546,7 @@ pub fn selection_map_wrapped(
         inner_selection_map = map;
     }
 
-    inner_selection_map
+    WrappedMergedSelectionMap(inner_selection_map)
 }
 
 fn maybe_add_typename_selection(

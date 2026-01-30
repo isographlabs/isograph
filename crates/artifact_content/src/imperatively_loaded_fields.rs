@@ -100,7 +100,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
         query_name,
-        &query_text_selection_map_wrapped,
+        &query_text_selection_map_wrapped.0,
         definitions_of_used_variables.iter(),
         &root_operation_name,
         Format::Pretty,
@@ -109,7 +109,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let operation_text = generate_operation_text(
         db,
         query_name,
-        &query_text_selection_map_wrapped,
+        &query_text_selection_map_wrapped.0,
         definitions_of_used_variables.iter(),
         &root_operation_name,
         root_object_entity_name,
@@ -118,7 +118,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     );
 
     let normalization_ast_text =
-        generate_normalization_ast_text(normalization_ast_wrapped_selection_map.values(), 1);
+        generate_normalization_ast_text(normalization_ast_wrapped_selection_map.0.values(), 1);
 
     let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, index)
         .intern()
