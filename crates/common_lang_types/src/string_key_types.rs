@@ -36,6 +36,16 @@ string_key_newtype!(InputTypeName);
 // can be converted into this type name.
 string_key_newtype!(EntityName);
 
+pub trait ExpectEntityToExist<T> {
+    fn expect_entity_to_exist(self, entity_name: EntityName) -> T;
+}
+
+impl<T> ExpectEntityToExist<T> for Option<T> {
+    fn expect_entity_to_exist(self, entity_name: EntityName) -> T {
+        self.unwrap_or_else(|| panic!("Expected `{}` to exist.", entity_name))
+    }
+}
+
 string_key_newtype!(ConstExportName);
 
 // Operations

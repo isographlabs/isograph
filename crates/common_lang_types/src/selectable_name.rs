@@ -1,6 +1,26 @@
 use string_key_newtype::{string_key_newtype, string_key_one_way_conversion};
 
+use crate::EntityName;
+
 string_key_newtype!(SelectableName);
+
+pub trait ExpectSelectableToExist<T> {
+    fn expect_selectable_to_exist(
+        self,
+        entity_name: EntityName,
+        selectable_name: SelectableName,
+    ) -> T;
+}
+
+impl<T> ExpectSelectableToExist<T> for Option<T> {
+    fn expect_selectable_to_exist(
+        self,
+        entity_name: EntityName,
+        selectable_name: SelectableName,
+    ) -> T {
+        self.unwrap_or_else(|| panic!("Expected `{}.{}` to exist.", entity_name, selectable_name))
+    }
+}
 
 /**
  * # Aliases
