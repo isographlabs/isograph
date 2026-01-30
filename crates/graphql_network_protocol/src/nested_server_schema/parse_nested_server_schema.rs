@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use common_lang_types::{
-    DescriptionValue, EntityName, JavascriptName, SelectableName, VariableName,
-    WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
+    DescriptionValue, EntityName, ExpectEntityToExist, JavascriptName, SelectableName,
+    VariableName, WithEmbeddedLocation, WithLocationPostfix, WithNonFatalDiagnostics,
 };
 use graphql_lang_types::{
     GraphQLFieldDefinition, GraphQLInterfaceTypeDefinition, GraphQLTypeSystemDefinition,
@@ -238,7 +238,7 @@ fn insert_parsed_items_into_schema(
         let selectables = &mut schema
             .item
             .get_mut(abstract_parent_entity_name.reference())
-            .expect("Expected entity to exist")
+            .expect_entity_to_exist(abstract_parent_entity_name)
             .item
             .selectables;
         insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic(
