@@ -12,7 +12,7 @@ use crate::{
 };
 use common_lang_types::{
     ArtifactPath, ArtifactPathAndContent, EntityName, EntityNameAndSelectableName,
-    QueryOperationName, SelectableName,
+    ExpectEntityToExist, ExpectSelectableToExist, QueryOperationName, SelectableName,
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
@@ -52,19 +52,11 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
         "Expected parsing to have succeeded by this point. \
             This is indicative of a bug in Isograph.",
     )
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-    )
+    .expect_selectable_to_exist(parent_object_entity_name, entrypoint_scalar_selectable_name)
     .lookup(db);
 
     let parent_object_entity = &flattened_entity_named(db, entrypoint.parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(entrypoint.parent_entity_name)
         .lookup(db);
     let FieldTraversalResult {
         traversal_state,
@@ -154,11 +146,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         });
 
     let parent_object_entity = &flattened_entity_named(db, entrypoint.parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(entrypoint.parent_entity_name)
         .lookup(db);
 
     let reachable_variables =
@@ -239,11 +227,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                 })
         };
     let concrete_object_entity = &flattened_entity_named(db, concrete_type_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(concrete_type_entity_name)
         .lookup(db);
 
     let operation_text = generate_operation_text(

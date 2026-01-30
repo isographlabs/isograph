@@ -1,5 +1,6 @@
 use common_lang_types::{
-    ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName, WithEmbeddedLocation,
+    ArtifactPath, ArtifactPathAndContent, EntityNameAndSelectableName, ExpectEntityToExist,
+    WithEmbeddedLocation,
 };
 use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
@@ -53,11 +54,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     };
 
     let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(parent_entity_name)
         .lookup(db);
 
     let (reader_ast, reader_imports) = generate_reader_ast(
@@ -205,32 +202,22 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
 ) -> ArtifactPathAndContent {
     let server_object_selectable_name = server_object_selectable.name;
 
-    let parent_object_entity =
-        &flattened_entity_named(db, server_object_selectable.parent_entity_name.item)
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
-            .lookup(db);
+    let parent_entity_name = server_object_selectable.parent_entity_name.item;
+    let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
+        .expect_entity_to_exist(parent_entity_name)
+        .lookup(db);
 
-    let concrete_type = &flattened_entity_named(
-        db,
-        server_object_selectable
-            .target_entity
-            .item
-            .as_ref()
-            .expect("Expected target entity to be valid.")
-            .inner()
-            .0,
-    )
-    .as_ref()
-    .expect(
-        "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-    )
-    .lookup(db)
-    .name;
+    let target_entity_name = server_object_selectable
+        .target_entity
+        .item
+        .as_ref()
+        .expect("Expected target entity to be valid.")
+        .inner()
+        .0;
+    let concrete_type = &flattened_entity_named(db, target_entity_name)
+        .expect_entity_to_exist(target_entity_name)
+        .lookup(db)
+        .name;
 
     let (reader_ast, reader_imports) = generate_reader_ast(
         db,
@@ -298,11 +285,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: Com
         SelectionType::Scalar(s) => s.parent_entity_name,
     };
     let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(parent_entity_name)
         .lookup(db);
 
     let mut param_type_imports = BTreeSet::new();
@@ -448,11 +431,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
         SelectionType::Object(o) => o.parent_entity_name,
     };
     let parent_object_entity = &flattened_entity_named(db, parent_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(parent_entity_name)
         .lookup(db);
 
     let function_import_statement =
@@ -512,11 +491,7 @@ pub(crate) fn generate_link_output_type_artifact<TCompilationProfile: Compilatio
 ) -> ArtifactPathAndContent {
     let parent_object_entity =
         &flattened_entity_named(db, client_scalar_selectable.parent_entity_name)
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
+            .expect_entity_to_exist(client_scalar_selectable.parent_entity_name)
             .lookup(db);
 
     let client_scalar_selectable_output_type = generate_output_type(db, client_scalar_selectable);

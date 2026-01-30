@@ -1,3 +1,4 @@
+use common_lang_types::ExpectSelectableToExist;
 use intern::Lookup;
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MergedSelectionMap, MergedServerSelection,
@@ -50,10 +51,9 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     scalar_field.parent_object_entity_name,
                     scalar_field.name,
                 )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    scalar_field.parent_object_entity_name,
+                    scalar_field.name,
                 )
                 .lookup(db);
 
@@ -99,10 +99,9 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                     linked_field.parent_object_entity_name,
                     linked_field.name,
                 )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    linked_field.parent_object_entity_name,
+                    linked_field.name,
                 )
                 .lookup(db);
 

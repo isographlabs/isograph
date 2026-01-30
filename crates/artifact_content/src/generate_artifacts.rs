@@ -1,6 +1,7 @@
 use common_lang_types::{
     ArtifactFileName, ArtifactFilePrefix, ArtifactPathAndContent, DiagnosticVecResult,
-    EmbeddedLocation, VariableName, WithLocationPostfix, derive_display,
+    EmbeddedLocation, ExpectEntityToExist, ExpectSelectableToExist, VariableName,
+    WithLocationPostfix, derive_display,
 };
 use core::panic;
 use intern::string_key::Intern;
@@ -180,10 +181,9 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     *parent_object_entity_name,
                     *server_object_selectable_name,
                 )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    *parent_object_entity_name,
+                    *server_object_selectable_name,
                 )
                 .lookup(db);
 
@@ -212,10 +212,9 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     "Expected selectable to be valid. \
                     This is indicative of a bug in Isograph.",
                 )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    *parent_object_entity_name,
+                    *client_object_selectable_name,
                 )
                 .lookup(db);
 
@@ -248,10 +247,9 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     "Expected parsing to have succeeded by this point. \
                     This is indicative of a bug in Isograph.",
                 )
-                .as_ref()
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    *parent_object_entity_name,
+                    *client_scalar_selectable_name,
                 )
                 .lookup(db);
 
@@ -293,11 +291,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                                 db,
                                 client_scalar_selectable.parent_entity_name,
                             )
-                            .as_ref()
-                            .expect(
-                                "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                            )
+                            .expect_entity_to_exist(client_scalar_selectable.parent_entity_name)
                             .lookup(db);
 
                             let variable_definitions_iter =
@@ -510,11 +504,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             "Expected selectable to be valid. \
             This is indicative of a bug in Isograph.",
         )
-        .as_ref()
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+        .expect_selectable_to_exist(parent_object_entity_name, client_selectable_name);
 
         let artifact_path_and_content = match client_selectable {
             SelectionType::Object(client_object_selectable) => {

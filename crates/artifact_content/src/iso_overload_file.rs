@@ -7,7 +7,9 @@ use pico::MemoRef;
 use prelude::Postfix;
 use std::{cmp::Ordering, collections::BTreeSet};
 
-use common_lang_types::{ArtifactPath, ArtifactPathAndContent, EntityName, SelectableName};
+use common_lang_types::{
+    ArtifactPath, ArtifactPathAndContent, EntityName, ExpectSelectableToExist, SelectableName,
+};
 use isograph_schema::{
     ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo, IsographDatabase,
     LINK_FIELD_NAME, MemoRefClientSelectable, deprecated_client_scalar_selectable_named,
@@ -401,9 +403,9 @@ fn sorted_entrypoints<TCompilationProfile: CompilationProfile>(
                     "Expected parsing to have succeeded by this point. \
                     This is indicative of a bug in Isograph.",
                 )
-                .expect(
-                    "Expected selectable to exist. \
-                    This is indicative of a bug in Isograph.",
+                .expect_selectable_to_exist(
+                    *parent_object_entity_name,
+                    *client_scalar_selectable_name,
                 );
                 (client_scalar_selectable, entrypoint_declaration_info)
             },

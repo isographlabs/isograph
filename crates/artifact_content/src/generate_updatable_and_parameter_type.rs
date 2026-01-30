@@ -1,8 +1,8 @@
 use std::{collections::BTreeSet, fmt::Display};
 
 use common_lang_types::{
-    EntityName, EntityNameAndSelectableName, SelectableName, SelectableNameOrAlias,
-    WithEmbeddedLocation, WithGenericLocation,
+    EntityName, EntityNameAndSelectableName, ExpectSelectableToExist, SelectableName,
+    SelectableNameOrAlias, WithEmbeddedLocation, WithGenericLocation,
 };
 use intern::Lookup;
 use isograph_lang_types::{
@@ -307,16 +307,14 @@ fn write_updatable_data_type_from_selection<TCompilationProfile: CompilationProf
     indentation_level: u8,
     updatable_fields: &mut UpdatableImports,
 ) {
-    let selectable = selectable_named(db, parent_object_entity_name, selection.item.name())
+    let selectable_name = selection.item.name();
+    let selectable = selectable_named(db, parent_object_entity_name, selectable_name)
         .as_ref()
         .expect(
             "Expected validation to have succeeded. \
             This is indicative of a bug in Isograph.",
         )
-        .expect(
-            "Expected selectable to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+        .expect_selectable_to_exist(parent_object_entity_name, selectable_name);
 
     match selection.item.reference() {
         SelectionType::Scalar(scalar_selection) => {
@@ -585,11 +583,7 @@ fn write_param_type_from_client_scalar_selectable<TCompilationProfile: Compilati
         "Expected parsing to have succeeded by this point. \
         This is indicative of a bug in Isograph.",
     )
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    )
+    .expect_selectable_to_exist(parent_object_entity_name, client_scalar_selectable_name)
     .lookup(db);
 
     write_optional_description(
