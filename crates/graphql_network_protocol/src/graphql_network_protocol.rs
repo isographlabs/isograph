@@ -368,6 +368,7 @@ impl NetworkProtocol for GraphQLNetworkProtocol {
                             },
                         ],
                     )
+                    .0
                 };
 
                 Ok(WrapMergedSelectionMapResult {

@@ -88,7 +88,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     } = TCompilationProfile::NetworkProtocol::wrap_merged_selection_map(
         db,
         root_object_entity_name,
-        query_text_selection_map_wrapped,
+        query_text_selection_map_wrapped.0,
     )
     .expect(
         "Expected merged selection map to be wrappable. \
