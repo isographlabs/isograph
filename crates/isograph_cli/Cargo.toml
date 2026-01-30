@@ -11,6 +11,7 @@ intern = { path = "../../relay-crates/intern" }
 isograph_compiler = { path = "../isograph_compiler" }
 isograph_config = { path = "../isograph_config" }
 isograph_lsp = { path = "../isograph_lsp" }
+sql_network_protocol = { path = "../sql_network_protocol" }
 colored = { workspace = true }
 clap = { workspace = true }
 thiserror = { workspace = true }

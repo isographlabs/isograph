@@ -22,6 +22,14 @@
         "null"
       ]
     },
+    "kind": {
+      "description": "Network protocol kind",
+      "allOf": [
+        {
+          "$ref": "#/definitions/Kind"
+        }
+      ]
+    },
     "options": {
       "description": "Various options of less importance",
       "allOf": [
@@ -203,6 +211,13 @@
         }
       },
       "additionalProperties": false
+    },
+    "Kind": {
+      "type": "string",
+      "enum": [
+        "graphql",
+        "sql"
+      ]
     }
   }
 }

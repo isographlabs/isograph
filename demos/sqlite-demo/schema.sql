@@ -1,4 +1,4 @@
-PRAGMA foreign_keys = ON;
+PRAGMA foreign_keys = 1;
 
 DROP TABLE IF EXISTS film_species;
 DROP TABLE IF EXISTS film_vehicles;

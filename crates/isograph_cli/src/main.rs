@@ -5,10 +5,11 @@ use common_lang_types::CurrentWorkingDirectory;
 use graphql_network_protocol::GraphQLAndJavascriptProfile;
 use intern::string_key::Intern;
 use isograph_compiler::{compile_and_print, handle_watch_command};
-use isograph_config::{CompilerConfig, create_config};
+use isograph_config::{CompilerConfig, Kind, create_config};
 use opentelemetry::{KeyValue, sdk::Resource};
 use opentelemetry_otlp::WithExportConfig;
 use opt::{Command, CompileCommand, LspCommand, Opt};
+use sql_network_protocol::SQLAndJavascriptProfile;
 use std::io;
 use tracing::{error, info, level_filters::LevelFilter};
 use tracing_subscriber::{EnvFilter, prelude::*};
@@ -40,9 +41,20 @@ async fn start_compiler(
 
     configure_logger(compile_command.log_level, &config);
     if compile_command.watch {
-        match handle_watch_command::<GraphQLAndJavascriptProfile>(config, current_working_directory)
-            .await
-        {
+        let result = match config.kind {
+            Kind::GraphQL => {
+                handle_watch_command::<GraphQLAndJavascriptProfile>(
+                    config,
+                    current_working_directory,
+                )
+                .await
+            }
+            Kind::SQL => {
+                handle_watch_command::<SQLAndJavascriptProfile>(config, current_working_directory)
+                    .await
+            }
+        };
+        match result {
             Ok(_) => {
                 info!("{}", "Successfully watched. Exiting.\n")
             }
@@ -54,10 +66,18 @@ async fn start_compiler(
                 std::process::exit(1);
             }
         };
-    } else if compile_and_print::<GraphQLAndJavascriptProfile>(config, current_working_directory)
-        .is_err()
-    {
-        std::process::exit(1);
+    } else {
+        let result = match config.kind {
+            Kind::GraphQL => {
+                compile_and_print::<GraphQLAndJavascriptProfile>(config, current_working_directory)
+            }
+            Kind::SQL => {
+                compile_and_print::<SQLAndJavascriptProfile>(config, current_working_directory)
+            }
+        };
+        if result.is_err() {
+            std::process::exit(1);
+        }
     }
 }
 
@@ -72,12 +92,23 @@ async fn start_language_server(
     let config = create_config(&config_location, current_working_directory);
 
     configure_logger(lsp_command.log_level, &config);
-    if let Err(e) = isograph_lsp::start_language_server::<GraphQLAndJavascriptProfile>(
-        config,
-        current_working_directory,
-    )
-    .await
-    {
+    let result = match config.kind {
+        Kind::GraphQL => {
+            isograph_lsp::start_language_server::<GraphQLAndJavascriptProfile>(
+                config,
+                current_working_directory,
+            )
+            .await
+        }
+        Kind::SQL => {
+            isograph_lsp::start_language_server::<SQLAndJavascriptProfile>(
+                config,
+                current_working_directory,
+            )
+            .await
+        }
+    };
+    if let Err(e) = result {
         // TODO use eprintln once we figure out how to make clippy not complain
         error!("Error(s) encountered when running language server.");
         for err in e {

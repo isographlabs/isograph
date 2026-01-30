@@ -15,6 +15,8 @@ lazy_static! {
     pub static ref BOOLEAN_ENTITY_NAME: EntityName = "Boolean".intern().into();
     pub static ref ID_FIELD_NAME: SelectableName = "id".intern().into();
     pub static ref ID_VARIABLE_NAME: VariableName = "id".intern().into();
+    pub static ref TEXT_ENTITY_NAME: EntityName = "TEXT".intern().into();
+    pub static ref INTEGER_ENTITY_NAME: EntityName = "INTEGER".intern().into();
 }
 
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

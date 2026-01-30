@@ -1621,6 +1621,7 @@ dependencies = [
  "opentelemetry-otlp",
  "pretty-duration",
  "regex",
+ "sql_network_protocol",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -2599,6 +2600,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "recursive"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0786a43debb760f491b1bc0269fe5e84155353c67482b9e60d0cfb596054b43e"
+dependencies = [
+ "recursive-proc-macro-impl",
+ "stacker",
+]
+
+[[package]]
+name = "recursive-proc-macro-impl"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "76009fbe0614077fc1a2ce255e3a1881a2e3a3527097d5dc6d8212c585e7e38b"
+dependencies = [
+ "quote",
+ "syn 2.0.98",
+]
+
+[[package]]
 name = "redox_syscall"
 version = "0.5.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3024,6 +3045,51 @@ dependencies = [
  "serde_json",
  "unicode-id-start",
  "url",
+]
+
+[[package]]
+name = "sql_lang_types"
+version = "0.5.3"
+dependencies = [
+ "sqlparser",
+]
+
+[[package]]
+name = "sql_network_protocol"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "intern",
+ "isograph_lang_types",
+ "isograph_schema",
+ "lazy_static",
+ "pico",
+ "pico_macros",
+ "prelude",
+ "sql_lang_types",
+ "sql_schema_parser",
+ "sqlparser",
+ "tracing",
+]
+
+[[package]]
+name = "sql_schema_parser"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "prelude",
+ "sql_lang_types",
+ "sqlparser",
+]
+
+[[package]]
+name = "sqlparser"
+version = "0.60.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "505aa16b045c4c1375bf5f125cce3813d0176325bfe9ffc4a903f423de7774ff"
+dependencies = [
+ "log",
+ "recursive",
 ]
 
 [[package]]

@@ -1,0 +1,22 @@
+[package]
+name = "sql_network_protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+sql_lang_types = { path = "../sql_lang_types" }
+sql_schema_parser = { path = "../sql_schema_parser" }
+intern = { path = "../../relay-crates/intern" }
+isograph_lang_types = { path = "../isograph_lang_types" }
+isograph_schema = { path = "../isograph_schema" }
+lazy_static = { workspace = true }
+pico = { path = "../pico" }
+pico_macros = { path = "../pico_macros" }
+prelude = { path = "../prelude" }
+sqlparser = { workspace = true }
+tracing = { workspace = true }
+
+[lints]
+workspace = true

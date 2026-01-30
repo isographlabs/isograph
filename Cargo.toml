@@ -42,6 +42,7 @@ serde = "1.0.197"
 serde_derive = "1.0.197"
 serde_json = "1.0.108"
 sha2 = "0.10.8"
+sqlparser = "0.60.0"
 strum = { version = "0.27.0", features = ["derive"] }
 swc_atoms = "2.0.0"
 swc_core = "3.0.0"
