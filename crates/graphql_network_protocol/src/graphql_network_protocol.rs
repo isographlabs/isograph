@@ -1,8 +1,8 @@
 use std::collections::BTreeMap;
 
 use common_lang_types::{
-    DiagnosticResult, EntityName, JavascriptName, QueryExtraInfo, QueryOperationName, QueryText,
-    SelectableName, WithNonFatalDiagnostics,
+    DiagnosticResult, EntityName, ExpectEntityToExist, ExpectSelectableToExist, JavascriptName,
+    QueryExtraInfo, QueryOperationName, QueryText, SelectableName, WithNonFatalDiagnostics,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -100,10 +100,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
         entity_name: EntityName,
         indentation_level: u8,
     ) -> String {
-        let entity = flattened_entity_named(db, entity_name).expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        );
+        let entity = flattened_entity_named(db, entity_name).expect_entity_to_exist(entity_name);
 
         match entity
             .lookup(db)
@@ -151,35 +148,30 @@ impl TargetPlatform for JavascriptTargetPlatform {
             selectable_named(db, parent_object_entity_name, selectable_name)
                 .clone_err()
                 .expect("Expected parsing to have worked")
-                .expect("Expected selectable to exist")
+                .expect_selectable_to_exist(parent_object_entity_name, selectable_name)
                 .as_server()
                 .expect("Expected selectable to be server selectable")
                 .lookup(db);
 
-        flattened_entity_named(
-            db,
-            server_scalar_selectable
-                .target_entity
-                .item
-                .as_ref()
-                .expect("Expected target entity to be valid.")
-                .inner()
-                .0,
-        )
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
-        .lookup(db)
-        .associated_data
-        .as_ref()
-        .as_server()
-        .expect("Expected entity to be server defined.")
-        .target_platform
-        .as_ref()
-        .as_scalar()
-        .expect("Expected scalar entity to be scalar")
-        .dereference()
+        let target_entity_name = server_scalar_selectable
+            .target_entity
+            .item
+            .as_ref()
+            .expect("Expected target entity to be valid.")
+            .inner()
+            .0;
+        flattened_entity_named(db, target_entity_name)
+            .expect_entity_to_exist(target_entity_name)
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .target_platform
+            .as_ref()
+            .as_scalar()
+            .expect("Expected scalar entity to be scalar")
+            .dereference()
     }
 
     fn generate_link_type<'a, TCompilationProfile: CompilationProfile<TargetPlatform = Self>>(
@@ -187,11 +179,7 @@ impl TargetPlatform for JavascriptTargetPlatform {
         server_object_entity_name: &EntityName,
     ) -> String {
         let server_object_entity = &flattened_entity_named(db, *server_object_entity_name)
-            .as_ref()
-            .expect(
-                "Expected entity to exist. \
-                This is indicative of a bug in Isograph.",
-            )
+            .expect_entity_to_exist(*server_object_entity_name)
             .lookup(db);
 
         if server_object_entity
