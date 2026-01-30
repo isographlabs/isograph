@@ -1,4 +1,6 @@
-use common_lang_types::{EntityName, WithEmbeddedLocation, WithLocationPostfix};
+use common_lang_types::{
+    EntityName, ExpectSelectableToExist, SelectableName, WithEmbeddedLocation, WithLocationPostfix,
+};
 use isograph_lang_types::{DefinitionLocation, SelectionSet, SelectionTypePostfix};
 use prelude::Postfix;
 
@@ -85,17 +87,15 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
             let item = self.selection_set.item.selections.get(self.index);
 
             if let Some(selection) = item {
+                let selectable_name: SelectableName = selection.item.name();
                 let selectable =
-                    selectable_named(self.db, self.parent_entity_name, selection.item.name())
+                    selectable_named(self.db, self.parent_entity_name, selectable_name)
                         .as_ref()
                         .expect(
                             "Expected parsing to have succeeded. \
                             This is indicative of a bug in Isograph.",
                         )
-                        .expect(
-                            "Expected selectable to exist. \
-                            This is indicative of a bug in Isograph.",
-                        );
+                        .expect_selectable_to_exist(self.parent_entity_name, selectable_name);
                 match selection.item.reference() {
                     SelectionType::Scalar(scalar_selection) => {
                         match selectable {

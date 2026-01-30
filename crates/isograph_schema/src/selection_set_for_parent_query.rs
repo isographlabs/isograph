@@ -1,4 +1,6 @@
-use common_lang_types::{DiagnosticResult, EntityName, SelectableName, WithEmbeddedLocation};
+use common_lang_types::{
+    DiagnosticResult, EntityName, ExpectSelectableToExist, SelectableName, WithEmbeddedLocation,
+};
 use isograph_lang_types::SelectionSet;
 use prelude::ErrClone;
 
@@ -21,11 +23,7 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
         client_scalar_selectable_name,
     )
     .clone_err()?
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
-    )
+    .expect_selectable_to_exist(parent_object_entity_name, client_scalar_selectable_name)
     .lookup(db);
 
     Ok(match selectable.variant {

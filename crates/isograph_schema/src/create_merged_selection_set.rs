@@ -1,8 +1,8 @@
 use std::collections::{BTreeMap, BTreeSet, HashSet, btree_map::Entry};
 
 use common_lang_types::{
-    EmbeddedLocation, EntityName, SelectableName, VariableName, WithEmbeddedLocation,
-    WithLocationPostfix,
+    EmbeddedLocation, EntityName, ExpectEntityToExist, ExpectSelectableToExist, SelectableName,
+    VariableName, WithEmbeddedLocation, WithLocationPostfix,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
@@ -608,11 +608,7 @@ fn merge_selection_set_into_selection_map<TCompilationProfile: CompilationProfil
 
                         let object_selection_parent_object_entity =
                             &flattened_entity_named(db, target_object_entity_name)
-                                .as_ref()
-                                .expect(
-                                    "Expected entity to exist. \
-                                    This is indicative of a bug in Isograph.",
-                                )
+                                .expect_entity_to_exist(target_object_entity_name)
                                 .lookup(db);
 
                         merge_server_object_field(
@@ -692,10 +688,9 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
         field_parent_object_entity_name,
         field_server_object_selectable_name,
     )
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
+    .expect_selectable_to_exist(
+        field_parent_object_entity_name,
+        field_server_object_selectable_name,
     )
     .lookup(db);
 
@@ -726,11 +721,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
             MergedServerSelection::InlineFragment(existing_inline_fragment) => {
                 let object_selection_parent_object_entity =
                     &flattened_entity_named(db, parent_object_entity_name)
-                        .as_ref()
-                        .expect(
-                            "Expected entity to exist. \
-                                This is indicative of a bug in Isograph.",
-                        )
+                        .expect_entity_to_exist(parent_object_entity_name)
                         .lookup(db);
 
                 let reader_selection_set = inline_fragment_reader_selection_set();
@@ -798,11 +789,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
 
             let server_object_selection_info =
                 flattened_entity_named(db, concrete_object_entity_name)
-                    .as_ref()
-                    .expect(
-                        "Expected entity to exist. \
-                        This is indicative of a bug in Isograph.",
-                    )
+                    .expect_entity_to_exist(concrete_object_entity_name)
                     .lookup(db)
                     .selection_info
                     .as_object()
@@ -873,10 +860,9 @@ fn merge_client_object_field<TCompilationProfile: CompilationProfile>(
         "Expected selectable to be valid. \
         This is indicative of a bug in Isograph.",
     )
-    .as_ref()
-    .expect(
-        "Expected selectable to exist. \
-        This is indicative of a bug in Isograph.",
+    .expect_selectable_to_exist(
+        parent_object_entity_name,
+        newly_encountered_client_object_selectable_name,
     )
     .lookup(db);
 
@@ -1135,11 +1121,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         .inner()
         .0;
     let target_server_object_entity = &flattened_entity_named(db, target_server_object_entity_name)
-        .as_ref()
-        .expect(
-            "Expected entity to exist. \
-            This is indicative of a bug in Isograph.",
-        )
+        .expect_entity_to_exist(target_server_object_entity_name)
         .lookup(db);
 
     let parent_object_entity_name = newly_encountered_client_object_selectable.parent_entity_name;
