@@ -739,7 +739,7 @@ export function readScalarFieldData(
     };
   }
 
-  if (isWithErrors(value, field.isFallible ?? false)) {
+  if (isWithErrors(value, field.isFallible)) {
     if (value.kind === 'Errors') {
       return {
         kind: 'Success',
@@ -785,7 +785,7 @@ export function readLinkedFieldData(
   const storeRecordName = getParentRecordKey(field, variables);
   let value = storeRecord[storeRecordName];
 
-  if (isWithErrors(value, field.isFallible ?? false)) {
+  if (isWithErrors(value, field.isFallible)) {
     if (value?.kind === 'Errors') {
       return {
         kind: 'Success',

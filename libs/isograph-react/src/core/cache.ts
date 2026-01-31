@@ -275,7 +275,7 @@ function normalizeScalarField(
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetStoreRecord[parentRecordKey];
 
-  if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
+  if (isWithErrors(existingValue, astNode.isFallible)) {
     if (networkResponseData == null) {
       const errors = findErrors(errorsByPath, path);
 
@@ -336,7 +336,7 @@ function normalizeLinkedField(
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetParentRecord[parentRecordKey];
 
-  if (isWithErrors(existingValue, astNode.isFallible ?? false)) {
+  if (isWithErrors(existingValue, astNode.isFallible)) {
     if (networkResponseData == null) {
       const errors = findErrors(errorsByPath, path);
 

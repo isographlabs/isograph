@@ -9,7 +9,7 @@ import {
   type StoreLayerData,
   type StoreLink,
   type StoreRecord,
-  type TypeName
+  type TypeName,
 } from './IsographEnvironment';
 import type { BaseStoreLayer } from './optimisticProxy';
 import {
@@ -172,7 +172,7 @@ function recordReachableIdsFromRecord(
         const linkKey = getParentRecordKey(selection, variables ?? {});
         let linkedFieldOrFields = currentRecord[linkKey];
 
-        if (isWithErrors(linkedFieldOrFields, selection.isFallible ?? false)) {
+        if (isWithErrors(linkedFieldOrFields, selection.isFallible)) {
           if (linkedFieldOrFields.kind === 'Errors') {
             continue;
           }

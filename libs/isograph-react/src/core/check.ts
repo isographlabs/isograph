@@ -103,9 +103,7 @@ function checkFromRecord(
 
         let linkedValue = record[parentRecordKey];
 
-        if (
-          isWithErrors(linkedValue, normalizationAstNode.isFallible ?? false)
-        ) {
+        if (isWithErrors(linkedValue, normalizationAstNode.isFallible)) {
           if (linkedValue.kind === 'Errors') {
             continue;
           }
