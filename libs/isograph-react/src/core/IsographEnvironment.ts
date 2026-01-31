@@ -146,7 +146,7 @@ export function isWithErrors<T>(
   _value: T | WithErrors<T, StoreError>,
   isFallible: boolean,
 ): _value is WithErrors<T, StoreError> {
-  return isFallible === true;
+  return isFallible;
 }
 
 export function isParentRecordKeyFallible(
@@ -161,7 +161,7 @@ export function isParentRecordKeyFallible(
   _parentRecordKey: ParentRecordKey,
   isFallible: boolean,
 ): _parentRecordKey is ParentRecordKey {
-  return isFallible === true;
+  return isFallible;
 }
 
 export type DataTypeValueScalar =

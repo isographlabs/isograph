@@ -218,10 +218,16 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
           field.isUpdatable
             ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
-                storeRecord[storeRecordName] = {
-                  kind: 'Data',
-                  value: newValue,
-                };
+                if (
+                  isParentRecordKeyFallible(storeRecordName, field.isFallible)
+                ) {
+                  storeRecord[storeRecordName] = {
+                    kind: 'Data',
+                    value: newValue,
+                  };
+                } else {
+                  storeRecord[storeRecordName] = newValue;
+                }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
                   root.__typename,

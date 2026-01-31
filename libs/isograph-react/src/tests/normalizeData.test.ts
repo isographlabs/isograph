@@ -81,16 +81,16 @@ describe('normalize undefined field', () => {
     expect(store).toStrictEqual({
       Economist: {
         '1': {
-          id: ok('1'),
-          name: ok(null),
+          id: '1',
+          name: null,
         },
       },
       Query: {
         [ROOT_ID]: {
-          me: ok({
+          me: {
             __typename: 'Economist',
             __link: '1',
-          }),
+          },
         },
       },
     });
@@ -113,7 +113,7 @@ describe('normalize undefined field', () => {
     expect(store).toStrictEqual({
       Query: {
         [ROOT_ID]: {
-          me: ok(null),
+          me: null,
         },
       },
     });
@@ -152,8 +152,8 @@ describe('nested Query', () => {
     expect(store).toStrictEqual({
       Economist: {
         '1': {
-          __typename: ok('Economist'),
-          id: ok('1'),
+          __typename: 'Economist',
+          id: '1',
         },
       },
       Query: {
@@ -162,10 +162,10 @@ describe('nested Query', () => {
             __typename: 'Economist',
             __link: '1',
           }),
-          query: ok({
+          query: {
             __link: ROOT_ID,
             __typename: 'Query',
-          }),
+          },
         },
       },
     } satisfies BaseStoreLayerData);
@@ -175,8 +175,8 @@ describe('nested Query', () => {
     const store: BaseStoreLayerData = {
       Economist: {
         '1': {
-          __typename: ok('Economist'),
-          id: ok('1'),
+          __typename: 'Economist',
+          id: '1',
         },
       },
       Query: {
@@ -185,10 +185,10 @@ describe('nested Query', () => {
             __typename: 'Economist',
             __link: '1',
           }),
-          query: ok({
+          query: {
             __link: ROOT_ID,
             __typename: 'Query',
-          }),
+          },
         },
       },
     };
@@ -391,8 +391,8 @@ describe('errors', () => {
       expect(store).toStrictEqual<BaseStoreLayerData>({
         Economist: {
           '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: err([
               {
                 extensions: undefined,
@@ -494,8 +494,8 @@ describe('errors', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: err([
               {
                 extensions: undefined,
@@ -543,8 +543,8 @@ describe('errors', () => {
       expect(store).toMatchObject<BaseStoreLayerData>({
         Economist: {
           '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: ok(null),
           },
         },
@@ -604,8 +604,8 @@ describe('errors', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           1: {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: err([
               {
                 extensions: undefined,
@@ -659,8 +659,8 @@ describe('errors', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           1: {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: err([
               {
                 extensions: undefined,
@@ -719,8 +719,8 @@ describe('errors', () => {
       const store: BaseStoreLayerData = {
         Economist: {
           1: {
-            __typename: ok('Economist'),
-            id: ok('1'),
+            __typename: 'Economist',
+            id: '1',
             nickname: err([
               {
                 extensions: undefined,
@@ -791,9 +791,9 @@ describe('errors', () => {
         },
         Economist: {
           '1': {
-            __typename: ok('Economist'),
-            id: ok('1'),
-            name: ok('Bob'),
+            __typename: 'Economist',
+            id: '1',
+            name: 'Bob',
           },
         },
       };

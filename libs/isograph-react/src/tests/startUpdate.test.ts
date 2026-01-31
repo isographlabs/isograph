@@ -36,14 +36,14 @@ const getDefaultStore = (): BaseStoreLayerData => ({
   },
   Economist: {
     0: {
-      __typename: ok('Economist'),
-      id: ok('0'),
-      name: ok('Jeremy Bentham'),
+      __typename: 'Economist',
+      id: '0',
+      name: 'Jeremy Bentham',
     },
     1: {
-      __typename: ok('Economist'),
-      id: ok('1'),
-      name: ok('John Stuart Mill'),
+      __typename: 'Economist',
+      id: '1',
+      name: 'John Stuart Mill',
     },
   },
 });
@@ -114,7 +114,7 @@ describe('startUpdate', () => {
       expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           '0': {
-            name: ok('Updated Jeremy Bentham'),
+            name: 'Updated Jeremy Bentham',
           },
         },
       });
@@ -140,7 +140,7 @@ describe('startUpdate', () => {
       expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           '0': {
-            name: ok('Updated Jeremy Bentham'),
+            name: 'Updated Jeremy Bentham',
           },
         },
         Query: {
@@ -196,7 +196,7 @@ describe('startUpdate', () => {
       expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           0: {
-            name: ok('Foo'),
+            name: 'Foo',
           },
         },
       });

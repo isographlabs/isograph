@@ -8,7 +8,6 @@ import {
 import {
   ROOT_ID,
   type BaseStoreLayerData,
-  type DataTypeValueScalar,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
@@ -26,8 +25,8 @@ function ok<T>(value: T): WithErrorsData<T> {
 const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
-      me: ok({ __link: '0', __typename: 'Economist' }),
-      you: ok({ __link: '1', __typename: 'Economist' }),
+      me: { __link: '0', __typename: 'Economist' },
+      you: { __link: '1', __typename: 'Economist' },
       node____id___0: ok({
         __link: '0',
         __typename: 'Economist',
@@ -36,22 +35,22 @@ const getDefaultStore = (): BaseStoreLayerData => ({
   },
   Economist: {
     0: {
-      __typename: ok('Economist'),
-      id: ok('0'),
-      name: ok('Jeremy Bentham'),
+      __typename: 'Economist',
+      id: '0',
+      name: 'Jeremy Bentham',
       successor: ok({ __link: '1', __typename: 'Economist' }),
     },
     1: {
-      __typename: ok('Economist'),
-      id: ok('1'),
-      name: ok('John Stuart Mill'),
+      __typename: 'Economist',
+      id: '1',
+      name: 'John Stuart Mill',
       predecessor: ok({ __link: '0', __typename: 'Economist' }),
       successor: ok({ __link: '2', __typename: 'Economist' }),
     },
     2: {
-      __typename: ok('Economist'),
-      id: ok('2'),
-      name: ok('Henry Sidgwick'),
+      __typename: 'Economist',
+      id: '2',
+      name: 'Henry Sidgwick',
       predecessor: ok({ __link: '1', __typename: 'Economist' }),
     },
   },
