@@ -23,11 +23,11 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo,
     FieldToCompletedMergeTraversalStateMap, FieldTraversalResult, FlattenedDataModelEntity, Format,
-    IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey, RootOperationName,
-    RootRefetchedPath, ScalarClientFieldTraversalState, WrappedSelectionMapSelection,
-    client_scalar_selectable_selection_set_for_parent_query,
+    IsographDatabase, MergedSelectionMap, NetworkProtocol, NormalizationKey, RootRefetchedPath,
+    ScalarClientFieldTraversalState, WrapMergedSelectionMapResult, WrappedMergedSelectionMap,
+    WrappedSelectionMapSelection, client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, deprecated_client_scalar_selectable_named, fetchable_types,
+    current_target_merged_selections, deprecated_client_scalar_selectable_named,
     flattened_entity_named, get_reachable_variables, initial_variable_context,
 };
 use prelude::Postfix;
@@ -85,19 +85,10 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
         db,
         entrypoint,
         info.wrap_some(),
-        &merged_selection_map,
+        merged_selection_map,
         &traversal_state,
         encountered_client_type_map,
         entrypoint.arguments.iter().collect(),
-        &fetchable_types(db)
-            .as_ref()
-            .expect(
-                "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-            )
-            .lookup(db)
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "mutation"),
         file_extensions,
         persisted_documents,
     )
@@ -110,56 +101,51 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     db: &IsographDatabase<TCompilationProfile>,
     entrypoint: &ClientScalarSelectable<TCompilationProfile>,
     info: Option<&EntrypointDeclarationInfo>,
-    merged_selection_map: &MergedSelectionMap,
+    merged_selection_map: MergedSelectionMap,
     traversal_state: &ScalarClientFieldTraversalState,
     encountered_client_type_map: &FieldToCompletedMergeTraversalStateMap,
     variable_definitions: Vec<&VariableDeclaration>,
-    // TODO this implements copy, don't take reference
-    default_root_operation: &Option<(&EntityName, &RootOperationName)>,
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
     let query_name = entrypoint.name.into();
-    // TODO when we do not call generate_entrypoint_artifact extraneously,
-    // we can panic instead of using a default entrypoint type
-    // TODO model this better so that the RootOperationName is somehow a
-    // parameter
-    let fetchable_types_map = fetchable_types(db)
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-                This is indicative of a bug in Isograph.",
-        )
-        .lookup(db);
-
-    let root_operation_name = fetchable_types_map
-        .get(&entrypoint.parent_entity_name)
-        .unwrap_or_else(|| {
-            default_root_operation
-                .map(|(_, operation_name)| operation_name)
-                .unwrap_or_else(|| {
-                    fetchable_types_map
-                        .values()
-                        .next()
-                        .expect("Expected at least one fetchable type to exist")
-                })
-        });
-
-    let parent_object_entity = &flattened_entity_named(db, entrypoint.parent_entity_name)
+    let parent_object_entity = flattened_entity_named(db, entrypoint.parent_entity_name)
         .expect_entity_to_exist(entrypoint.parent_entity_name)
         .lookup(db);
 
-    let reachable_variables =
-        get_used_variable_definitions(merged_selection_map, variable_definitions);
+    let WrapMergedSelectionMapResult {
+        root_entity,
+        merged_selection_map,
+    } = TCompilationProfile::NetworkProtocol::wrap_merged_selection_map(
+        db,
+        entrypoint.parent_entity_name,
+        merged_selection_map,
+    )
+    .expect(
+        "Expected merged selection map to be wrappable. \
+        This is indicative of a bug in Isograph.",
+    );
 
+    let root_object_entity = flattened_entity_named(db, root_entity)
+        .as_ref()
+        .expect_entity_to_exist(root_entity)
+        .lookup(db);
+
+    let inner_merged_selection_map = merged_selection_map.inner();
+    let reachable_variables =
+        get_used_variable_definitions(inner_merged_selection_map.reference(), variable_definitions);
+
+    let merged_selection_map = WrappedMergedSelectionMap::new(inner_merged_selection_map);
     let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
+        root_entity,
         query_name,
-        merged_selection_map,
+        merged_selection_map.reference(),
         reachable_variables.iter().copied(),
-        root_operation_name,
         Format::Pretty,
     );
+
+    let inner_merged_selection_map = merged_selection_map.inner();
     let refetch_paths_with_variables = traversal_state
         .refetch_paths
         .iter()
@@ -169,14 +155,17 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                     let mut linked_fields = path.linked_fields.clone();
                     linked_fields.push(NormalizationKey::ClientPointer(name_and_arguments.clone()));
 
-                    current_target_merged_selections(&linked_fields, merged_selection_map)
+                    current_target_merged_selections(
+                        &linked_fields,
+                        inner_merged_selection_map.reference(),
+                    )
                 }
                 SelectionType::Scalar(_) => {
                     match selection_variant {
                         ScalarSelectionDirectiveSet::Updatable(_)
                         | ScalarSelectionDirectiveSet::None(_) => current_target_merged_selections(
                             &path.linked_fields,
-                            merged_selection_map,
+                            inner_merged_selection_map.reference(),
                         ),
                         ScalarSelectionDirectiveSet::Loadable(_) => {
                             // Note: it would be cleaner to include a reference to the merged selection set here via
@@ -211,32 +200,16 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     let refetch_query_artifact_import =
         generate_refetch_query_artifact_import(&refetch_paths_with_variables, file_extensions);
 
-    let normalization_ast_text = generate_normalization_ast_text(merged_selection_map.values(), 1);
+    let normalization_ast_text =
+        generate_normalization_ast_text(inner_merged_selection_map.values(), 1);
 
-    let concrete_type_entity_name =
-        if fetchable_types_map.contains_key(&entrypoint.parent_entity_name) {
-            entrypoint.parent_entity_name
-        } else {
-            *default_root_operation
-                .map(|(operation_id, _)| operation_id)
-                .unwrap_or_else(|| {
-                    fetchable_types_map
-                        .keys()
-                        .next()
-                        .expect("Expected at least one fetchable type to exist")
-                })
-        };
-    let concrete_object_entity = &flattened_entity_named(db, concrete_type_entity_name)
-        .expect_entity_to_exist(concrete_type_entity_name)
-        .lookup(db);
-
+    let merged_selection_map = WrappedMergedSelectionMap::new(inner_merged_selection_map.clone());
     let operation_text = generate_operation_text(
         db,
         query_name,
-        merged_selection_map,
+        merged_selection_map.reference(),
         reachable_variables.iter().copied(),
-        root_operation_name,
-        concrete_object_entity.name.item,
+        root_entity,
         persisted_documents,
         1,
     );
@@ -255,7 +228,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         parent_object_entity,
         &refetch_query_artifact_import,
         entrypoint.name,
-        concrete_object_entity.name.item,
+        root_object_entity.name.item,
         &directive_set,
         match entrypoint.variant.reference() {
             ClientFieldVariant::UserWritten(info) => {
@@ -273,7 +246,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         },
     );
 
-    let raw_response_type = generate_raw_response_type(db, merged_selection_map, 0);
+    let raw_response_type = generate_raw_response_type(db, root_entity, merged_selection_map, 0);
 
     let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
     path_and_contents.push(ArtifactPathAndContent {
