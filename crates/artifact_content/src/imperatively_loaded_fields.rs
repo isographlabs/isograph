@@ -117,9 +117,10 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         1,
     );
 
-    let normalization_ast_selection_map = normalization_ast_wrapped_selection_map.inner();
-    let normalization_ast_text =
-        generate_normalization_ast_text(normalization_ast_selection_map.values(), 1);
+    let normalization_ast_text = generate_normalization_ast_text(
+        normalization_ast_wrapped_selection_map.inner().values(),
+        1,
+    );
 
     let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, index)
         .intern()
