@@ -1,6 +1,12 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import type { LinkedParentRecordKey, ScalarParentRecordKey } from './cache';
+import type {
+  LinkedParentRecordKey,
+  LinkedParentRecordKeyFallible,
+  ParentRecordKey,
+  ScalarParentRecordKey,
+  ScalarParentRecordKeyFallible,
+} from './cache';
 import type {
   IsographEntrypoint,
   IsographOperation,
@@ -18,6 +24,7 @@ import type {
 } from './FragmentReference';
 import type { RetainedQuery } from './garbageCollection';
 import type { LogFunction, WrappedLogFunction } from './logging';
+import type { NonEmptyArray } from './NonEmptyArray';
 import { type StoreLayer } from './optimisticProxy';
 import type { PromiseWrapper } from './PromiseWrapper';
 import { wrapPromise, wrapResolvedValue } from './PromiseWrapper';
@@ -99,7 +106,10 @@ export type MissingFieldHandler = (
 export type IsographNetworkFunction = (
   operation: IsographOperation | IsographPersistedOperation,
   variables: Variables,
-) => Promise<any>;
+) => Promise<{
+  data?: any;
+  errors?: any;
+}>;
 
 export type IsographComponentFunction = <
   TReadFromStore extends UnknownTReadFromStore = any,
@@ -119,6 +129,40 @@ export type StoreLink = {
   readonly __link: DataId;
   readonly __typename: TypeName;
 };
+
+export type WithErrorsData<T> = {
+  readonly kind: 'Data';
+  readonly value: T;
+};
+
+export type WithErrors<T, Err> =
+  | WithErrorsData<T>
+  | {
+      readonly kind: 'Errors';
+      readonly errors: NonEmptyArray<Err>;
+    };
+
+export function isWithErrors<T>(
+  _value: T | WithErrors<T, StoreError>,
+  isFallible: boolean,
+): _value is WithErrors<T, StoreError> {
+  return isFallible;
+}
+
+export function isParentRecordKeyFallible(
+  _parentRecordKey: LinkedParentRecordKey | LinkedParentRecordKeyFallible,
+  isFallible: boolean,
+): _parentRecordKey is LinkedParentRecordKeyFallible;
+export function isParentRecordKeyFallible(
+  _parentRecordKey: ScalarParentRecordKey | ScalarParentRecordKeyFallible,
+  isFallible: boolean,
+): _parentRecordKey is ScalarParentRecordKeyFallible;
+export function isParentRecordKeyFallible(
+  _parentRecordKey: ParentRecordKey,
+  isFallible: boolean,
+): _parentRecordKey is ParentRecordKey {
+  return isFallible;
+}
 
 export type DataTypeValueScalar =
   // N.B. undefined is here to support optional id's, but
@@ -143,9 +187,18 @@ export type DataTypeValueLinked =
   // Plural fields:
   | readonly DataTypeValueLinked[];
 
+export interface StoreError {}
+
 export type StoreRecord = {
-  [index: ScalarParentRecordKey]: DataTypeValueScalar;
-  [index: LinkedParentRecordKey]: DataTypeValueLinked;
+  [K in ParentRecordKey]: K extends ScalarParentRecordKey
+    ? DataTypeValueScalar
+    : K extends ScalarParentRecordKeyFallible
+      ? WithErrors<DataTypeValueScalar, StoreError>
+      : K extends LinkedParentRecordKey
+        ? DataTypeValueLinked
+        : K extends LinkedParentRecordKeyFallible
+          ? WithErrors<DataTypeValueLinked, StoreError>
+          : never;
 } & {
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id

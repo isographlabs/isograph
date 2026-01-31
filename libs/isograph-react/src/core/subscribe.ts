@@ -134,22 +134,38 @@ function callSubscriptionIfDataChanged<
       throwOnNetworkError: false,
     },
   );
+  if (
+    newEncounteredDataAndRecords.kind === 'Errors' ||
+    subscription.encounteredDataAndRecords.kind === 'Errors'
+  ) {
+    logAnyError(
+      environment,
+      { situation: 'calling FragmentSubscription callback' },
+      () => {
+        subscription.callback(newEncounteredDataAndRecords);
+      },
+    );
+    subscription.encounteredDataAndRecords = newEncounteredDataAndRecords;
+    return;
+  }
+
+  const oldItem = subscription.encounteredDataAndRecords.item;
 
   const mergedItem = mergeObjectsUsingReaderAst(
     subscription.readerAst,
-    subscription.encounteredDataAndRecords.item,
+    oldItem,
     newEncounteredDataAndRecords.item,
   );
 
   logMessage(environment, () => ({
     kind: 'DeepEqualityCheck',
     fragmentReference: subscription.fragmentReference,
-    old: subscription.encounteredDataAndRecords.item,
+    old: oldItem,
     new: newEncounteredDataAndRecords.item,
-    deeplyEqual: mergedItem === subscription.encounteredDataAndRecords.item,
+    deeplyEqual: mergedItem === oldItem,
   }));
 
-  if (mergedItem !== subscription.encounteredDataAndRecords.item) {
+  if (mergedItem !== oldItem) {
     logAnyError(
       environment,
       { situation: 'calling FragmentSubscription callback' },

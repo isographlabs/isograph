@@ -3,23 +3,35 @@ import { beforeEach, describe, expect, test, vi } from 'vitest';
 
 import type { ExtractUpdatableData } from '../core/FragmentReference';
 import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
-import { ROOT_ID, type BaseStoreLayerData } from '../core/IsographEnvironment';
+import {
+  ROOT_ID,
+  type BaseStoreLayerData,
+  type StoreLayerData,
+  type WithErrorsData,
+} from '../core/IsographEnvironment';
 import { createUpdatableProxy } from '../core/startUpdate';
 import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 
+function ok<T>(value: T): WithErrorsData<T> {
+  return {
+    kind: 'Data',
+    value,
+  };
+}
+
 const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
     [ROOT_ID]: {
-      node____id___0: {
+      node____id___0: ok({
         __link: '0',
         __typename: 'Economist',
-      },
-      node____id___1: {
+      }),
+      node____id___1: ok({
         __link: '1',
         __typename: 'Economist',
-      },
+      }),
     },
   },
   Economist: {
@@ -99,7 +111,7 @@ describe('startUpdate', () => {
     test('updates updatable scalar nested in updatable object', () => {
       data.node!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store.data).toMatchObject({
+      expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -125,7 +137,7 @@ describe('startUpdate', () => {
       data.node = data.john_stuart_mill;
       jeremy!.asEconomist!.name = 'Updated Jeremy Bentham';
 
-      expect(environment.store.data).toMatchObject({
+      expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           '0': {
             name: 'Updated Jeremy Bentham',
@@ -133,10 +145,10 @@ describe('startUpdate', () => {
         },
         Query: {
           __ROOT: {
-            node____id___0: {
+            node____id___0: ok({
               __link: '1',
               __typename: 'Economist',
-            },
+            }),
           },
         },
       });
@@ -181,7 +193,7 @@ describe('startUpdate', () => {
     test('updates scalar in cache', () => {
       data.node!.asEconomist!.name = 'Foo';
 
-      expect(environment.store.data).toMatchObject({
+      expect(environment.store.data).toMatchObject<StoreLayerData>({
         Economist: {
           0: {
             name: 'Foo',

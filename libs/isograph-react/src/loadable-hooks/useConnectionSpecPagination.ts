@@ -119,6 +119,10 @@ export function useConnectionSpecPagination<
         fragmentReference.readerWithRefetchQueries,
       );
 
+      if (readOutDataAndRecords[i]?.kind === 'Errors') {
+        throw readOutDataAndRecords[i].errors;
+      }
+
       // invariant: readOutDataAndRecords.length === completedReferences.length
       const data = readOutDataAndRecords[i]?.item;
       if (data == null) {

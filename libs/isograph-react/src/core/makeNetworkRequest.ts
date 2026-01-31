@@ -225,9 +225,6 @@ export function makeNetworkRequest<
         try {
           fetchOptions?.onError?.();
         } catch {}
-        throw new Error('Network response had errors', {
-          cause: networkResponse,
-        });
       }
 
       const root = { __link: ROOT_ID, __typename: artifact.concreteType };
@@ -256,7 +253,10 @@ export function makeNetworkRequest<
             environment,
             environment.store,
             normalizationAst.selections,
-            networkResponse.data ?? {},
+            {
+              data: networkResponse.data ?? undefined,
+              errors: networkResponse.errors ?? undefined,
+            },
             variables,
             root,
             encounteredIds,
@@ -415,7 +415,10 @@ function readDataForOnComplete<
       environment,
       fragment,
       fakeNetworkRequestOptions,
-    ).item;
+    );
+    if (fragmentResult.kind === 'Errors') {
+      return null;
+    }
     const readerArtifact = readerWithRefetchQueries.readerArtifact;
     switch (readerArtifact.kind) {
       case 'ComponentReaderArtifact': {
@@ -443,7 +446,7 @@ function readDataForOnComplete<
       }
       case 'EagerReaderArtifact': {
         return readerArtifact.resolver({
-          data: fragmentResult,
+          data: fragmentResult.item,
           parameters: variables,
           ...(readerArtifact.hasUpdatable
             ? {
@@ -527,7 +530,10 @@ function makeOptimisticUpdate<
     environment,
     environment.store,
     artifact.networkRequestInfo.normalizationAst.selections,
-    optimisticNetworkResponse,
+    {
+      data: optimisticNetworkResponse,
+      errors: undefined,
+    },
     variables,
     root,
     encounteredIds,
