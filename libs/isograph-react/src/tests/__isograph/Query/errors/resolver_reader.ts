@@ -7,6 +7,7 @@ import Node__asEconomist__resolver_reader from '../../Node/asEconomist/resolver_
 const readerAst: ReaderAst<Query__errors__param> = [
   {
     kind: "Linked",
+    isFallible: true,
     fieldName: "node",
     alias: null,
     arguments: [
@@ -21,6 +22,7 @@ const readerAst: ReaderAst<Query__errors__param> = [
     selections: [
       {
         kind: "Linked",
+        isFallible: false,
         fieldName: "asEconomist",
         alias: null,
         arguments: null,
@@ -30,6 +32,7 @@ const readerAst: ReaderAst<Query__errors__param> = [
         selections: [
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "id",
             alias: null,
             arguments: null,
@@ -37,6 +40,7 @@ const readerAst: ReaderAst<Query__errors__param> = [
           },
           {
             kind: "Scalar",
+            isFallible: false,
             fieldName: "name",
             alias: null,
             arguments: null,
@@ -48,15 +52,15 @@ const readerAst: ReaderAst<Query__errors__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Query__errors__param,
   Query__errors__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "errors",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

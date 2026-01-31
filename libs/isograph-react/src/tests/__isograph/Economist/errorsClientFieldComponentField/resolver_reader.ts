@@ -5,6 +5,7 @@ import { errorsClientFieldComponentField as resolver } from '../../../normalizeD
 const readerAst: ReaderAst<Economist__errorsClientFieldComponentField__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -12,6 +13,7 @@ const readerAst: ReaderAst<Economist__errorsClientFieldComponentField__param> = 
   },
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "nickname",
     alias: null,
     arguments: null,
@@ -19,15 +21,15 @@ const readerAst: ReaderAst<Economist__errorsClientFieldComponentField__param> = 
   },
 ];
 
-const artifact: ComponentReaderArtifact<
+const artifact = (): ComponentReaderArtifact<
   Economist__errorsClientFieldComponentField__param,
   ExtractSecondParam<typeof resolver>
-> = {
+> => ({
   kind: "ComponentReaderArtifact",
   fieldName: "errorsClientFieldComponentField",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;

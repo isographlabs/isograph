@@ -6,6 +6,7 @@ import { errorsClientPointerField as resolver } from '../../../normalizeData.tes
 const readerAst: ReaderAst<Economist__errorsClientPointerField__param> = [
   {
     kind: "Scalar",
+    isFallible: false,
     fieldName: "id",
     alias: null,
     arguments: null,
@@ -13,6 +14,7 @@ const readerAst: ReaderAst<Economist__errorsClientPointerField__param> = [
   },
   {
     kind: "Scalar",
+    isFallible: true,
     fieldName: "nickname",
     alias: null,
     arguments: null,
@@ -20,15 +22,15 @@ const readerAst: ReaderAst<Economist__errorsClientPointerField__param> = [
   },
 ];
 
-const artifact: EagerReaderArtifact<
+const artifact = (): EagerReaderArtifact<
   Economist__errorsClientPointerField__param,
   Economist__errorsClientPointerField__output_type
-> = {
+> => ({
   kind: "EagerReaderArtifact",
   fieldName: "errorsClientPointerField",
   resolver,
   readerAst,
   hasUpdatable: false,
-};
+});
 
 export default artifact;
