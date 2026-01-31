@@ -6,7 +6,6 @@ import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact
 import {
   ROOT_ID,
   type BaseStoreLayerData,
-  type DataTypeValue,
   type StoreLayerData,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
@@ -15,7 +14,7 @@ import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import type { Query__linkedUpdate__param } from './__isograph/Query/linkedUpdate/param_type';
 import type { Query__startUpdate__param } from './__isograph/Query/startUpdate/param_type';
 
-function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
+function ok<T>(value: T): WithErrorsData<T> {
   return {
     kind: 'Data',
     value,

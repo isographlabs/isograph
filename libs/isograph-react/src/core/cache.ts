@@ -336,8 +336,8 @@ function normalizeLinkedField(
   const parentRecordKey = getParentRecordKey(astNode, variables);
   const existingValue = targetParentRecord[parentRecordKey];
 
-  if (isWithErrors(existingValue, astNode.isFallible)) {
-    if (networkResponseData == null) {
+  if (networkResponseData == null) {
+    if (isWithErrors(existingValue, astNode.isFallible)) {
       const errors = findErrors(errorsByPath, path);
 
       if (errors != null) {
@@ -356,10 +356,6 @@ function normalizeLinkedField(
       };
       return existingValue?.kind !== 'Data' || existingValue.value != null;
     }
-    // same thing as below :/
-  }
-
-  if (networkResponseData == null) {
     targetParentRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
   }
@@ -401,14 +397,19 @@ function normalizeLinkedField(
         __typename,
       });
     }
-    targetParentRecord[parentRecordKey] = {
-      kind: 'Data',
-      value: dataIds,
-    };
-    return (
-      existingValue?.kind === 'Errors' ||
-      !dataIdsAreTheSame(existingValue?.value, dataIds)
-    );
+    if (isWithErrors(existingValue, astNode.isFallible)) {
+      targetParentRecord[parentRecordKey] = {
+        kind: 'Data',
+        value: dataIds,
+      };
+      return (
+        existingValue?.kind === 'Errors' ||
+        !dataIdsAreTheSame(existingValue?.value, dataIds)
+      );
+    } else {
+      targetParentRecord[parentRecordKey] = dataIds;
+      return !dataIdsAreTheSame(existingValue, dataIds);
+    }
   } else {
     const newStoreRecordId = normalizeNetworkResponseObject(
       environment,
@@ -432,17 +433,30 @@ function normalizeLinkedField(
           'This is indicative of a bug in Isograph.',
       );
     }
+    if (isWithErrors(existingValue, astNode.isFallible)) {
+      targetParentRecord[parentRecordKey] = {
+        kind: 'Data',
+        value: {
+          __link: newStoreRecordId,
+          __typename,
+        },
+      };
+
+      const link =
+        existingValue?.kind === 'Data'
+          ? getLink(existingValue.value)
+          : undefined;
+      return (
+        link?.__link !== newStoreRecordId || link.__typename !== __typename
+      );
+    }
 
     targetParentRecord[parentRecordKey] = {
-      kind: 'Data',
-      value: {
-        __link: newStoreRecordId,
-        __typename,
-      },
+      __link: newStoreRecordId,
+      __typename,
     };
 
-    const link =
-      existingValue?.kind === 'Data' ? getLink(existingValue.value) : undefined;
+    const link = getLink(existingValue);
     return link?.__link !== newStoreRecordId || link.__typename !== __typename;
   }
 }

@@ -8,7 +8,7 @@ import {
 import {
   ROOT_ID,
   type BaseStoreLayerData,
-  type DataTypeValue,
+  type DataTypeValueScalar,
   type WithErrorsData,
 } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
@@ -16,7 +16,7 @@ import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
 
-function ok<T extends DataTypeValue>(value: T): WithErrorsData<T> {
+function ok<T>(value: T): WithErrorsData<T> {
   return {
     kind: 'Data',
     value,
