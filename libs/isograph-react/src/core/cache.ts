@@ -22,7 +22,7 @@ import {
   ROOT_ID,
   type StoreLink,
   type StoreRecord,
-  type TypeName
+  type TypeName,
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import type { NonEmptyArray } from './NonEmptyArray';

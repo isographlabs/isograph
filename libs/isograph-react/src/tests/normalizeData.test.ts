@@ -32,9 +32,7 @@ function ok<T>(value: T): WithErrorsData<T> {
   };
 }
 
-function err(
-  errors: NonEmptyArray<StoreError>,
-): WithErrors<never, StoreError> {
+function err(errors: NonEmptyArray<StoreError>): WithErrors<never, StoreError> {
   return {
     kind: 'Errors',
     errors,
