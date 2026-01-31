@@ -18,11 +18,11 @@ import {
   type DataTypeValueLinked,
   getLink,
   type IsographEnvironment,
-  isWithErrors,
+  isParentRecordKeyFallible,
   ROOT_ID,
   type StoreLink,
   type StoreRecord,
-  type TypeName,
+  type TypeName
 } from './IsographEnvironment';
 import { logMessage } from './logging';
 import type { NonEmptyArray } from './NonEmptyArray';
@@ -64,11 +64,11 @@ export type NetworkResponseValue =
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  readonly [K in
-    | ScalarNetworkResponseKey
-    | LinkedNetworkResponseKey]: K extends ScalarNetworkResponseKey
+  readonly [K in NetworkResponseKey]: K extends ScalarNetworkResponseKey
     ? undefined | NetworkResponsePlural<NetworkResponseScalarValue>
-    : undefined | NetworkResponsePlural<NetworkResponseObject>;
+    : K extends LinkedNetworkResponseKey
+      ? undefined | NetworkResponsePlural<NetworkResponseObject>
+      : never;
 } & {
   readonly id?: DataId;
   readonly __typename?: TypeName;
@@ -273,9 +273,9 @@ function normalizeScalarField(
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
-  const existingValue = targetStoreRecord[parentRecordKey];
 
-  if (isWithErrors(existingValue, astNode.isFallible)) {
+  if (isParentRecordKeyFallible(parentRecordKey, astNode.isFallible)) {
+    const existingValue = targetStoreRecord[parentRecordKey];
     if (networkResponseData == null) {
       const errors = stableCopy(findErrors(errorsByPath, path));
 
@@ -305,7 +305,7 @@ function normalizeScalarField(
       existingValue?.value !== networkResponseData
     );
   }
-
+  const existingValue = targetStoreRecord[parentRecordKey];
   if (networkResponseData == null) {
     targetStoreRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
@@ -333,10 +333,10 @@ function normalizeLinkedField(
   const networkResponseKey = getNetworkResponseKey(astNode);
   const networkResponseData = networkResponseParentRecord[networkResponseKey];
   const parentRecordKey = getParentRecordKey(astNode, variables);
-  const existingValue = targetParentRecord[parentRecordKey];
 
   if (networkResponseData == null) {
-    if (isWithErrors(existingValue, astNode.isFallible)) {
+    if (isParentRecordKeyFallible(parentRecordKey, astNode.isFallible)) {
+      const existingValue = targetParentRecord[parentRecordKey];
       const errors = stableCopy(findErrors(errorsByPath, path));
 
       if (errors != null) {
@@ -355,6 +355,7 @@ function normalizeLinkedField(
       };
       return existingValue?.kind !== 'Data' || existingValue.value != null;
     }
+    const existingValue = targetParentRecord[parentRecordKey];
     targetParentRecord[parentRecordKey] = null;
     return existingValue === undefined || existingValue != null;
   }
@@ -396,7 +397,9 @@ function normalizeLinkedField(
         __typename,
       });
     }
-    if (isWithErrors(existingValue, astNode.isFallible)) {
+
+    if (isParentRecordKeyFallible(parentRecordKey, astNode.isFallible)) {
+      const existingValue = targetParentRecord[parentRecordKey];
       targetParentRecord[parentRecordKey] = {
         kind: 'Data',
         value: dataIds,
@@ -406,6 +409,7 @@ function normalizeLinkedField(
         !dataIdsAreTheSame(existingValue?.value, dataIds)
       );
     } else {
+      const existingValue = targetParentRecord[parentRecordKey];
       targetParentRecord[parentRecordKey] = dataIds;
       return !dataIdsAreTheSame(existingValue, dataIds);
     }
@@ -432,7 +436,8 @@ function normalizeLinkedField(
           'This is indicative of a bug in Isograph.',
       );
     }
-    if (isWithErrors(existingValue, astNode.isFallible)) {
+    if (isParentRecordKeyFallible(parentRecordKey, astNode.isFallible)) {
+      const existingValue = targetParentRecord[parentRecordKey];
       targetParentRecord[parentRecordKey] = {
         kind: 'Data',
         value: {
@@ -454,7 +459,7 @@ function normalizeLinkedField(
       __link: newStoreRecordId,
       __typename,
     };
-
+    const existingValue = targetParentRecord[parentRecordKey];
     const link = getLink(existingValue);
     return link?.__link !== newStoreRecordId || link.__typename !== __typename;
   }
@@ -565,6 +570,12 @@ function normalizeNetworkResponseObject(
   return newStoreRecordId;
 }
 
+export type ParentRecordKey =
+  | LinkedParentRecordKey
+  | ScalarParentRecordKey
+  | LinkedParentRecordKeyFallible
+  | ScalarParentRecordKeyFallible;
+
 declare const LinkedParentRecordKeyBrand: unique symbol;
 export type LinkedParentRecordKey = string & {
   brand?: Brand<undefined, typeof LinkedParentRecordKeyBrand>;
@@ -575,14 +586,24 @@ export type ScalarParentRecordKey = string & {
   brand?: Brand<undefined, typeof ScalarParentRecordKeyBrand>;
 };
 
+declare const LinkedParentRecordKeyBrandFallible: unique symbol;
+export type LinkedParentRecordKeyFallible = string & {
+  brand?: Brand<undefined, typeof LinkedParentRecordKeyBrandFallible>;
+};
+
+declare const ScalarParentRecordKeyBrandFallible: unique symbol;
+export type ScalarParentRecordKeyFallible = string & {
+  brand?: Brand<undefined, typeof ScalarParentRecordKeyBrandFallible>;
+};
+
 export function getParentRecordKey(
   astNode: NormalizationLinkedField | ReaderLinkedField,
   variables: Variables,
-): LinkedParentRecordKey;
+): LinkedParentRecordKey | LinkedParentRecordKeyFallible;
 export function getParentRecordKey(
   astNode: NormalizationScalarField | ReaderScalarField,
   variables: Variables,
-): ScalarParentRecordKey;
+): ScalarParentRecordKey | ScalarParentRecordKeyFallible;
 export function getParentRecordKey(
   astNode:
     | NormalizationLinkedField
@@ -590,7 +611,7 @@ export function getParentRecordKey(
     | ReaderLinkedField
     | ReaderScalarField,
   variables: Variables,
-): string {
+): ParentRecordKey {
   let parentRecordKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
@@ -644,7 +665,9 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
-export type NetworkResponseKey = string;
+export type NetworkResponseKey =
+  | LinkedNetworkResponseKey
+  | ScalarNetworkResponseKey;
 
 declare const LinkedNetworkResponseKeyBrand: unique symbol;
 export type LinkedNetworkResponseKey = string & {

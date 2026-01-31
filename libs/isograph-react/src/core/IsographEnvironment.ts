@@ -1,6 +1,12 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import type { LinkedParentRecordKey, ScalarParentRecordKey } from './cache';
+import type {
+  LinkedParentRecordKey,
+  LinkedParentRecordKeyFallible,
+  ParentRecordKey,
+  ScalarParentRecordKey,
+  ScalarParentRecordKeyFallible,
+} from './cache';
 import type {
   IsographEntrypoint,
   IsographOperation,
@@ -143,6 +149,21 @@ export function isWithErrors<T>(
   return isFallible === true;
 }
 
+export function isParentRecordKeyFallible(
+  _parentRecordKey: LinkedParentRecordKey | LinkedParentRecordKeyFallible,
+  isFallible: boolean,
+): _parentRecordKey is LinkedParentRecordKeyFallible;
+export function isParentRecordKeyFallible(
+  _parentRecordKey: ScalarParentRecordKey | ScalarParentRecordKeyFallible,
+  isFallible: boolean,
+): _parentRecordKey is ScalarParentRecordKeyFallible;
+export function isParentRecordKeyFallible(
+  _parentRecordKey: ParentRecordKey,
+  isFallible: boolean,
+): _parentRecordKey is ParentRecordKey {
+  return isFallible === true;
+}
+
 export type DataTypeValueScalar =
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the store.
@@ -169,12 +190,15 @@ export type DataTypeValueLinked =
 export interface StoreError {}
 
 export type StoreRecord = {
-  [index: ScalarParentRecordKey]:
-    | DataTypeValueScalar
-    | WithErrors<DataTypeValueScalar, StoreError>;
-  [index: LinkedParentRecordKey]:
-    | DataTypeValueLinked
-    | WithErrors<DataTypeValueLinked, StoreError>;
+  [K in ParentRecordKey]: K extends ScalarParentRecordKey
+    ? DataTypeValueScalar
+    : K extends ScalarParentRecordKeyFallible
+      ? WithErrors<DataTypeValueScalar, StoreError>
+      : K extends LinkedParentRecordKey
+        ? DataTypeValueLinked
+        : K extends LinkedParentRecordKeyFallible
+          ? WithErrors<DataTypeValueLinked, StoreError>
+          : never;
 } & {
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id

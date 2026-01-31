@@ -20,7 +20,11 @@ import type {
   UnknownTReadFromStore,
   Variables,
 } from './FragmentReference';
-import type { DataTypeValueScalar, IsographEnvironment, StoreError } from './IsographEnvironment';
+import type {
+  DataTypeValueScalar,
+  IsographEnvironment,
+  StoreError,
+} from './IsographEnvironment';
 import {
   assertLink,
   getOrLoadIsographArtifact,

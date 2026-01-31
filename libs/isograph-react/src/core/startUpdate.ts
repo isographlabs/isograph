@@ -16,6 +16,7 @@ import {
 } from './FragmentReference';
 import {
   assertLink,
+  isParentRecordKeyFallible,
   type IsographEnvironment,
   type StoreLink,
   type WithErrors,
@@ -271,15 +272,30 @@ function readUpdatableData<TReadFromStore extends UnknownTReadFromStore>(
             ? (newValue) => {
                 const storeRecord = getOrInsertRecord(storeLayer.data, root);
                 if (Array.isArray(newValue)) {
-                  storeRecord[storeRecordName] = {
-                    kind: 'Data',
-                    value: newValue.map((node) => assertLink(node?.__link)),
-                  };
+                  const newIds = newValue.map((node) =>
+                    assertLink(node?.__link),
+                  );
+                  if (
+                    isParentRecordKeyFallible(storeRecordName, field.isFallible)
+                  ) {
+                    storeRecord[storeRecordName] = {
+                      kind: 'Data',
+                      value: newIds,
+                    };
+                  } else {
+                    storeRecord[storeRecordName] = newIds;
+                  }
                 } else {
-                  storeRecord[storeRecordName] = {
-                    kind: 'Data',
-                    value: assertLink(newValue?.__link),
-                  };
+                  if (
+                    isParentRecordKeyFallible(storeRecordName, field.isFallible)
+                  ) {
+                    storeRecord[storeRecordName] = {
+                      kind: 'Data',
+                      value: assertLink(newValue?.__link),
+                    };
+                  } else {
+                    storeRecord[storeRecordName] = assertLink(newValue?.__link);
+                  }
                 }
                 const updatedIds = insertEmptySetIfMissing(
                   mutableUpdatedIds,
