@@ -124,7 +124,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: {has_updatable},\n\
-        }});\n\n\
+            }});\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ", "  ",
         )
@@ -146,7 +146,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
             {}resolver,\n\
             {}readerAst,\n\
             {}hasUpdatable: {has_updatable},\n\
-        }});\n\n\
+            }});\n\n\
             export default artifact;\n",
             "  ", "  ", "  ", "  ", "  ", "  ", "  "
         )
@@ -251,7 +251,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
         {}resolver: ({{ data }}) => data.__typename === \"{concrete_type}\" ? data.{link_field_name} : null,\n\
         {}readerAst,\n\
         {}hasUpdatable: false,\n\
-    }});\n\n\
+        }});\n\n\
         export default artifact;\n",
         "  ", "  ", "  ", "  ", "  ", "  ", "  "
     );
