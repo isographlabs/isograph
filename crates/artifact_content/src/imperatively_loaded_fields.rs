@@ -93,14 +93,14 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         .intern()
         .into();
 
-    let query_text_selection_map_wrapped =
-        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
+    let query_text_selection_map =
+        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments).inner();
     let root_fetchable_field = entrypoint.name;
 
     let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
         query_name,
-        &query_text_selection_map_wrapped.0,
+        &query_text_selection_map,
         definitions_of_used_variables.iter(),
         &root_operation_name,
         Format::Pretty,
@@ -109,7 +109,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     let operation_text = generate_operation_text(
         db,
         query_name,
-        &query_text_selection_map_wrapped.0,
+        &query_text_selection_map,
         definitions_of_used_variables.iter(),
         &root_operation_name,
         root_object_entity_name,
@@ -117,8 +117,9 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         1,
     );
 
+    let normalization_ast_selection_map = normalization_ast_wrapped_selection_map.inner();
     let normalization_ast_text =
-        generate_normalization_ast_text(normalization_ast_wrapped_selection_map.0.values(), 1);
+        generate_normalization_ast_text(normalization_ast_selection_map.values(), 1);
 
     let file_name_prefix = format!("{}__{}.ts", *REFETCH_FIELD_NAME, index)
         .intern()

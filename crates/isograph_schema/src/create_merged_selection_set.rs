@@ -31,7 +31,13 @@ use crate::{
 pub type MergedSelectionMap = BTreeMap<NormalizationKey, MergedServerSelection>;
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
-pub struct WrappedMergedSelectionMap(pub MergedSelectionMap);
+pub struct WrappedMergedSelectionMap(MergedSelectionMap);
+
+impl WrappedMergedSelectionMap {
+    pub fn inner(self) -> MergedSelectionMap {
+        self.0
+    }
+}
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
 pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
