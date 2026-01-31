@@ -277,7 +277,7 @@ function normalizeScalarField(
 
   if (isWithErrors(existingValue, astNode.isFallible)) {
     if (networkResponseData == null) {
-      const errors = findErrors(errorsByPath, path);
+      const errors = stableCopy(findErrors(errorsByPath, path));
 
       if (errors != null) {
         targetStoreRecord[parentRecordKey] = {
@@ -286,8 +286,7 @@ function normalizeScalarField(
         };
         return (
           existingValue?.kind !== 'Errors' ||
-          JSON.stringify(stableCopy(existingValue.errors)) !==
-            JSON.stringify(stableCopy(errors))
+          JSON.stringify(existingValue.errors) !== JSON.stringify(errors)
         );
       }
       targetStoreRecord[parentRecordKey] = {
@@ -338,12 +337,12 @@ function normalizeLinkedField(
 
   if (networkResponseData == null) {
     if (isWithErrors(existingValue, astNode.isFallible)) {
-      const errors = findErrors(errorsByPath, path);
+      const errors = stableCopy(findErrors(errorsByPath, path));
 
       if (errors != null) {
         targetParentRecord[parentRecordKey] = {
           kind: 'Errors',
-          errors: stableCopy(errors),
+          errors,
         };
         return (
           existingValue?.kind !== 'Errors' ||
