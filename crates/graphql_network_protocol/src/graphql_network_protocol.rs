@@ -1,20 +1,26 @@
 use std::collections::BTreeMap;
+use std::fmt;
 
 use common_lang_types::{
-    DiagnosticResult, EntityName, ExpectEntityToExist, ExpectSelectableToExist, JavascriptName,
-    QueryExtraInfo, QueryOperationName, QueryText, SelectableName, WithNonFatalDiagnostics,
+    Diagnostic, DiagnosticResult, EntityName, ExpectEntityToExist, ExpectSelectableToExist,
+    JavascriptName, QueryExtraInfo, QueryOperationName, QueryText, SelectableName,
+    WithNonFatalDiagnostics,
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    SelectionType, TypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
+    ArgumentKeyAndValue, NonConstantValue, SelectionType, TypeAnnotationDeclaration, UnionVariant,
+    VariableDeclaration,
 };
 use isograph_schema::{
     CompilationProfile, IsographDatabase, MemoRefServerSelectable, TargetPlatform,
-    flattened_selectables_for_entity, selectable_named,
+    WrappedMergedSelectionMap, entity_not_defined_diagnostic, flattened_selectables_for_entity,
+    selectable_named,
 };
 use isograph_schema::{
-    DeprecatedParseTypeSystemOutcome, Format, MergedSelectionMap, NetworkProtocol,
-    RootOperationName, flattened_entity_named,
+    ConcreteTargetEntityName, DeprecatedParseTypeSystemOutcome, Format, ID_FIELD_NAME,
+    ID_VARIABLE_NAME, MergedSelectionMap, NODE_FIELD_NAME, NetworkProtocol, RootOperationName,
+    WrapMergedSelectionMapResult, WrappedSelectionMapSelection, flattened_entity_named,
+    selection_map_wrapped,
 };
 use lazy_static::lazy_static;
 use pico_macros::memo;
@@ -56,6 +62,40 @@ impl From<GraphQLRootTypes> for BTreeMap<EntityName, RootOperationName> {
         map.insert(val.subscription, RootOperationName("subscription"));
         map
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash)]
+pub enum GraphQLOperationKind {
+    Query,
+    Mutation,
+    Subscription,
+}
+
+impl fmt::Display for GraphQLOperationKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            GraphQLOperationKind::Query => write!(f, "query"),
+            GraphQLOperationKind::Mutation => write!(f, "mutation"),
+            GraphQLOperationKind::Subscription => write!(f, "subscription"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum GraphQLWrapStrategy {
+    LeaveAsIs,
+    Node { query_root: EntityName },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct GraphQLFetchableInfo {
+    pub operation_kind: GraphQLOperationKind,
+    pub wrap_strategy: GraphQLWrapStrategy,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord, Default)]
+pub struct GraphQLNetworkProtocolEntityAssociatedData {
+    pub fetchable: Option<GraphQLFetchableInfo>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd, Ord, Eq, Hash, Default)]
@@ -222,24 +262,125 @@ impl TargetPlatform for JavascriptTargetPlatform {
 pub struct GraphQLNetworkProtocol {}
 
 impl NetworkProtocol for GraphQLNetworkProtocol {
-    type EntityAssociatedData = ();
+    type EntityAssociatedData = GraphQLNetworkProtocolEntityAssociatedData;
     type SelectableAssociatedData = ();
 
     fn generate_query_text<'a, TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
-        _db: &IsographDatabase<TCompilationProfile>,
+        db: &IsographDatabase<TCompilationProfile>,
+        root_entity: EntityName,
         query_name: QueryOperationName,
-        selection_map: &MergedSelectionMap,
+        selection_map: &WrappedMergedSelectionMap,
         query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
-        root_operation_name: &RootOperationName,
         format: Format,
     ) -> QueryText {
+        let operation_kind = flattened_entity_named(db, root_entity)
+            .ok_or_else(|| {
+                entity_not_defined_diagnostic(root_entity, None).note_todo("root_entity should have a location")
+            })
+            .expect("Expected schema to contain root entity.")
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .network_protocol
+            .fetchable
+            .as_ref()
+            .unwrap_or_else(|| {
+                panic!(
+                    "Expected `{root_entity}` to be fetchable (missing network protocol entity associated data)."
+                )
+            })
+            .operation_kind;
+
         generate_query_text(
+            operation_kind,
             query_name,
             selection_map,
             query_variables,
-            root_operation_name,
             format,
         )
+    }
+
+    fn wrap_merged_selection_map<
+        TCompilationProfile: CompilationProfile<NetworkProtocol = Self>,
+    >(
+        db: &IsographDatabase<TCompilationProfile>,
+        root_entity: EntityName,
+        merged_selection_map: MergedSelectionMap,
+    ) -> DiagnosticResult<WrapMergedSelectionMapResult> {
+        let fetchable_info = flattened_entity_named(db, root_entity)
+            .ok_or_else(|| {
+                entity_not_defined_diagnostic(root_entity, None)
+                    .note_todo("root_entity should have a location")
+            })?
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .network_protocol
+            .fetchable
+            .as_ref()
+            .ok_or_else(|| {
+                Diagnostic::new(format!("Type `{root_entity}` is not fetchable."), None)
+            })?;
+
+        match fetchable_info.wrap_strategy {
+            GraphQLWrapStrategy::LeaveAsIs => Ok(WrapMergedSelectionMapResult {
+                root_entity,
+                merged_selection_map: WrappedMergedSelectionMap::new(merged_selection_map),
+            }),
+            GraphQLWrapStrategy::Node { query_root } => {
+                let merged_selection_map = selection_map_wrapped(
+                    merged_selection_map,
+                    vec![
+                        WrappedSelectionMapSelection::InlineFragment(root_entity),
+                        WrappedSelectionMapSelection::LinkedField {
+                            server_object_selectable_name: *NODE_FIELD_NAME,
+                            arguments: vec![ArgumentKeyAndValue {
+                                key: (*ID_FIELD_NAME).unchecked_conversion(),
+                                value: NonConstantValue::Variable((*ID_VARIABLE_NAME).into()),
+                            }],
+                            concrete_target_entity_name: ConcreteTargetEntityName::Abstract,
+                            is_fallible: true,
+                        },
+                    ],
+                );
+
+                Ok(WrapMergedSelectionMapResult {
+                    root_entity: query_root,
+                    merged_selection_map,
+                })
+            }
+        }
+    }
+
+    fn get_query_root_entity<TCompilationProfile: CompilationProfile<NetworkProtocol = Self>>(
+        db: &IsographDatabase<TCompilationProfile>,
+        entity_name: EntityName,
+    ) -> DiagnosticResult<EntityName> {
+        let fetchable_info = flattened_entity_named(db, entity_name)
+            .ok_or_else(|| {
+                entity_not_defined_diagnostic(entity_name, None)
+                    .note_todo("entity_name should have a location")
+            })?
+            .lookup(db)
+            .associated_data
+            .as_ref()
+            .as_server()
+            .expect("Expected entity to be server defined.")
+            .network_protocol
+            .fetchable
+            .as_ref()
+            .ok_or_else(|| {
+                Diagnostic::new(format!("Type `{entity_name}` is not fetchable."), None)
+            })?;
+
+        match fetchable_info.wrap_strategy {
+            GraphQLWrapStrategy::LeaveAsIs => Ok(entity_name),
+            GraphQLWrapStrategy::Node { query_root } => Ok(query_root),
+        }
     }
 
     fn generate_query_extra_info(

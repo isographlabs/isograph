@@ -3,8 +3,7 @@ use intern::string_key::Intern;
 use isograph_config::PersistedDocumentsHashAlgorithm;
 use isograph_lang_types::VariableDeclaration;
 use isograph_schema::{
-    CompilationProfile, Format, IsographDatabase, MergedSelectionMap, NetworkProtocol,
-    RootOperationName,
+    CompilationProfile, Format, IsographDatabase, NetworkProtocol, WrappedMergedSelectionMap,
 };
 use md5::{Digest, Md5};
 use sha2::Sha256;
@@ -15,14 +14,12 @@ use crate::persisted_documents::PersistedDocuments;
 pub(crate) struct OperationText(pub String);
 derive_display!(OperationText);
 
-#[expect(clippy::too_many_arguments)]
 pub(crate) fn generate_operation_text<'a, TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     query_name: QueryOperationName,
-    merged_selection_map: &MergedSelectionMap,
+    merged_selection_map: &WrappedMergedSelectionMap,
     query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
-    root_operation_name: &RootOperationName,
-    operation_name: EntityName,
+    root_entity: EntityName,
     persisted_documents: &mut Option<PersistedDocuments>,
     indentation_level: u8,
 ) -> OperationText {
@@ -31,10 +28,10 @@ pub(crate) fn generate_operation_text<'a, TCompilationProfile: CompilationProfil
         Some(pd) => {
             let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
                 db,
+                root_entity,
                 query_name,
                 merged_selection_map,
                 query_variables,
-                root_operation_name,
                 Format::Compact,
             );
             let operation_id = hash(query_text.0.as_str(), pd.options.algorithm)
@@ -44,7 +41,7 @@ pub(crate) fn generate_operation_text<'a, TCompilationProfile: CompilationProfil
             let query_extra_info = if pd.options.include_extra_info {
                 TCompilationProfile::NetworkProtocol::generate_query_extra_info(
                     query_name,
-                    operation_name,
+                    root_entity,
                     indentation_level + 1,
                 )
             } else {

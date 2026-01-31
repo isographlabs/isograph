@@ -3,28 +3,34 @@ use isograph_lang_types::{
     ArgumentKeyAndValue, NonConstantValue, VariableDeclaration,
     graphql_type_annotation_from_type_annotation,
 };
-use isograph_schema::{Format, MergedSelectionMap, MergedServerSelection, RootOperationName};
+use isograph_schema::{
+    Format, MergedSelectionMap, MergedServerSelection, WrappedMergedSelectionMap,
+};
 use prelude::Postfix;
 
+use crate::GraphQLOperationKind;
+
 pub(crate) fn generate_query_text<'a>(
+    operation_kind: GraphQLOperationKind,
     query_name: QueryOperationName,
-    selection_map: &MergedSelectionMap,
+    selection_map: &WrappedMergedSelectionMap,
     query_variables: impl Iterator<Item = &'a VariableDeclaration> + 'a,
-    root_operation_name: &RootOperationName,
     format: Format,
 ) -> QueryText {
     let mut query_text = String::new();
 
     let variable_text = write_variables_to_string(query_variables);
-    query_text.push_str(&format!(
-        "{} {}{} {{",
-        root_operation_name.0, query_name, variable_text
-    ));
+    query_text.push_str(&format!("{operation_kind} {query_name}{variable_text} {{"));
     match format {
         Format::Pretty => query_text.push_str("\\\n"),
         Format::Compact => query_text.push(' '),
     }
-    write_selections_for_query_text(&mut query_text, selection_map, 1, format);
+    write_selections_for_query_text(
+        &mut query_text,
+        selection_map.clone().inner().reference(),
+        1,
+        format,
+    );
     query_text.push('}');
     QueryText(query_text)
 }

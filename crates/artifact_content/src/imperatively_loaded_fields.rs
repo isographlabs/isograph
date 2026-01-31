@@ -8,7 +8,7 @@ use isograph_schema::{
     ClientScalarSelectable, CompilationProfile, Format, ID_FIELD_NAME,
     ImperativelyLoadedFieldVariant, IsographDatabase, MergedSelectionMap, NetworkProtocol,
     PathToRefetchFieldInfo, REFETCH_FIELD_NAME, RootRefetchedPath, WrappedSelectionMapSelection,
-    fetchable_types, selection_map_wrapped,
+    selection_map_wrapped,
 };
 use prelude::Postfix;
 
@@ -75,44 +75,37 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
 
     let root_parent_object = entrypoint.parent_entity_name;
 
-    let root_operation_name = fetchable_types(db)
-        .as_ref()
-        .expect(
-            "Expected parsing to have succeeded. \
-            This is indicative of a bug in Isograph.",
-        )
-        .lookup(db)
-        .get(&root_object_entity_name)
-        .cloned()
-        .expect(
-            "Expected root type to be fetchable here. \
-            This is indicative of a bug in Isograph.",
-        );
-
     let query_name = format!("{root_parent_object}__{client_selection_name}")
         .intern()
         .into();
 
-    let query_text_selection_map =
-        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments).inner();
+    let query_text_selection_map_wrapped =
+        selection_map_wrapped(nested_selection_map.clone(), subfields_or_inline_fragments);
+
+    let root_entity =
+        TCompilationProfile::NetworkProtocol::get_query_root_entity(db, root_object_entity_name)
+            .expect(
+                "Expected to get query root entity. \
+                This is indicative of a bug in Isograph.",
+            );
+
     let root_fetchable_field = entrypoint.name;
 
     let query_text = TCompilationProfile::NetworkProtocol::generate_query_text(
         db,
+        root_entity,
         query_name,
-        &query_text_selection_map,
+        query_text_selection_map_wrapped.reference(),
         definitions_of_used_variables.iter(),
-        &root_operation_name,
         Format::Pretty,
     );
 
     let operation_text = generate_operation_text(
         db,
         query_name,
-        &query_text_selection_map,
+        query_text_selection_map_wrapped.reference(),
         definitions_of_used_variables.iter(),
-        &root_operation_name,
-        root_object_entity_name,
+        root_entity,
         persisted_documents,
         1,
     );
@@ -153,7 +146,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
         {}  operation: {operation_text},\n\
         {}  normalizationAst,\n\
         {}}},\n\
-        {}concreteType: \"{root_object_entity_name}\",\n\
+        {}concreteType: \"{root_entity}\",\n\
         }};\n\n\
         export default artifact;\n",
         "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ", "  ",

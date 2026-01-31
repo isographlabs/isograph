@@ -9,14 +9,14 @@ use isograph_lang_types::{
     VariableDeclaration,
 };
 use pico::MemoRef;
-use prelude::{ErrClone, Postfix};
+use prelude::Postfix;
 
 use pico_macros::memo;
 
 use crate::{
     ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, FieldMapItem,
-    ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME, WrappedSelectionMapSelection,
-    fetchable_types, flattened_entity_named, flattened_selectable_named,
+    ID_FIELD_NAME, IsographDatabase, NetworkProtocol, WrappedSelectionMapSelection,
+    flattened_entity_named, flattened_selectable_named,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
 
@@ -218,43 +218,34 @@ pub fn get_refetch_stategy<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
 ) -> DiagnosticResult<Option<RefetchStrategy>> {
-    let fetchable_types_map = fetchable_types(db).clone_err()?.lookup(db);
+    if let Ok(wrapped_selection_map) =
+        TCompilationProfile::NetworkProtocol::wrap_merged_selection_map(
+            db,
+            parent_object_entity_name,
+            Default::default(),
+        )
+        && wrapped_selection_map
+            .merged_selection_map
+            .inner()
+            .is_empty()
+    {
+        return RefetchStrategy::RefetchFromRoot.wrap_some().wrap_ok();
+    }
 
-    let is_fetchable = fetchable_types_map.contains_key(&parent_object_entity_name);
+    let id_field = flattened_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME);
 
-    if is_fetchable {
-        Some(RefetchStrategy::RefetchFromRoot)
-    } else {
-        let id_field = flattened_selectable_named(db, parent_object_entity_name, *ID_FIELD_NAME);
-
-        let query_id = fetchable_types_map
-            .iter()
-            .find(|(_, root_operation_name)| root_operation_name.0 == "query")
-            .expect("Expected query to be found")
-            .0;
-
-        id_field.map(|_| {
-            // Assume that if we have an id field, this implements Node
+    id_field
+        .map(|_| {
             RefetchStrategy::UseRefetchField(generate_refetch_field_strategy(
                 SelectionSet {
                     selections: vec![id_selection()],
                 }
                 .with_location(EmbeddedLocation::todo_generated()),
-                *query_id,
-                vec![
-                    WrappedSelectionMapSelection::InlineFragment(parent_object_entity_name),
-                    WrappedSelectionMapSelection::LinkedField {
-                        parent_object_entity_name: *query_id,
-                        server_object_selectable_name: *NODE_FIELD_NAME,
-                        arguments: id_top_level_arguments(),
-                        concrete_target_entity_name: None,
-                        is_fallible: true,
-                    },
-                ],
+                parent_object_entity_name,
+                vec![],
             ))
         })
-    }
-    .wrap_ok()
+        .wrap_ok()
 }
 
 fn add_client_pointer_to_object<TCompilationProfile: CompilationProfile>(
