@@ -170,19 +170,19 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
         },
     ) in &encountered_client_type_map
     {
-        match encountered_field_id {
+        match encountered_field_id.dereference() {
             DefinitionLocation::Server((
                 parent_object_entity_name,
                 server_object_selectable_name,
             )) => {
                 let server_object_selectable = flattened_selectable_named(
                     db,
-                    *parent_object_entity_name,
-                    *server_object_selectable_name,
+                    parent_object_entity_name,
+                    server_object_selectable_name,
                 )
                 .expect_selectable_to_exist(
-                    *parent_object_entity_name,
-                    *server_object_selectable_name,
+                    parent_object_entity_name,
+                    server_object_selectable_name,
                 )
                 .lookup(db);
 
@@ -203,8 +203,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             ))) => {
                 let client_object_selectable = deprecated_client_object_selectable_named(
                     db,
-                    *parent_object_entity_name,
-                    *client_object_selectable_name,
+                    parent_object_entity_name,
+                    client_object_selectable_name,
                 )
                 .as_ref()
                 .expect(
@@ -212,8 +212,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     This is indicative of a bug in Isograph.",
                 )
                 .expect_selectable_to_exist(
-                    *parent_object_entity_name,
-                    *client_object_selectable_name,
+                    parent_object_entity_name,
+                    client_object_selectable_name,
                 )
                 .lookup(db);
 
@@ -238,8 +238,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             ))) => {
                 let client_scalar_selectable = deprecated_client_scalar_selectable_named(
                     db,
-                    *parent_object_entity_name,
-                    *client_scalar_selectable_name,
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
                 )
                 .as_ref()
                 .expect(
@@ -247,8 +247,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     This is indicative of a bug in Isograph.",
                 )
                 .expect_selectable_to_exist(
-                    *parent_object_entity_name,
-                    *client_scalar_selectable_name,
+                    parent_object_entity_name,
+                    client_scalar_selectable_name,
                 )
                 .lookup(db);
 
