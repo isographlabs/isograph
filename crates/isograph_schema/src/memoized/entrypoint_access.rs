@@ -53,19 +53,22 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
             .clone_err()?;
 
             match selectable {
-                None => {
-                    return selectable_is_not_defined_diagnostic(
-                        entrypoint_declaration_info.parent_type.item.0,
-                        entrypoint_declaration_info.client_field_name.item.0,
-                        entrypoint_declaration_info
-                            .client_field_name
-                            .location
-                            .into(),
-                    )
-                    .wrap_err();
-                }
+                None => selectable_is_not_defined_diagnostic(
+                    entrypoint_declaration_info.parent_type.item.0,
+                    entrypoint_declaration_info.client_field_name.item.0,
+                    entrypoint_declaration_info
+                        .client_field_name
+                        .location
+                        .into(),
+                )
+                .wrap_err(),
                 Some(DefinitionLocation::Client(SelectionType::Scalar(_))) => {
-                    // Valid - this is a client scalar selectable (client field)
+                    Ok(EntrypointDeclarationInfo {
+                        iso_literal_text: entrypoint_declaration_info.iso_literal_text,
+                        directive_set: from_isograph_field_directives(
+                            entrypoint_declaration_info.directive_set.reference(),
+                        )?,
+                    })
                 }
                 Some(selectable) => {
                     let actual_type = match selectable {
@@ -94,7 +97,7 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                         DefinitionLocation::Client(SelectionType::Object(_)) => "a client pointer",
                     };
 
-                    return selectable_is_wrong_type_diagnostic(
+                    selectable_is_wrong_type_diagnostic(
                         entrypoint_declaration_info.parent_type.item.0,
                         entrypoint_declaration_info.client_field_name.item.0,
                         "client field",
@@ -104,16 +107,9 @@ pub fn validated_entrypoints<TCompilationProfile: CompilationProfile>(
                             .location
                             .into(),
                     )
-                    .wrap_err();
+                    .wrap_err()
                 }
             }
-
-            Ok(EntrypointDeclarationInfo {
-                iso_literal_text: entrypoint_declaration_info.iso_literal_text,
-                directive_set: from_isograph_field_directives(
-                    entrypoint_declaration_info.directive_set.reference(),
-                )?,
-            })
         })();
 
         let key = (
