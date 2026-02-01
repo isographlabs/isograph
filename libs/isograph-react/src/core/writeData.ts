@@ -1,4 +1,4 @@
-import type { ItemCleanupPair } from '@isograph/isograph-disposable-types/dist';
+import type { ItemCleanupPair } from '@isograph/isograph-disposable-types';
 import { callSubscriptions } from './subscribe';
 import {
   type NetworkResponseObject,
