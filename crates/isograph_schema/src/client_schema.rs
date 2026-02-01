@@ -55,7 +55,7 @@ pub fn define_client_selectables_and_entities<TCompilationProfile: CompilationPr
                 entities.push(FlattenedDataModelEntity {
                     name: target_entity_name.with_no_location(),
                     description: format!(
-                        "The anonymous entity for the {}.{} client field",
+                        "The anonymous entity for the `{}.{}` client field",
                         scalar_declaration.parent_type.item,
                         scalar_declaration.client_field_name.item
                     )
