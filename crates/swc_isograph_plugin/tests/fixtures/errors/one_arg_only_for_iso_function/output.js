@@ -1,9 +1,1 @@
-export const HomeRoute = iso(`
-  field Query.HomeRoute @component {
-    pets {
-      id
-      PetSummaryCard
-    }
-  }
-`)();
-  
+export const HomeRoute = require("@isograph/react").hmr();

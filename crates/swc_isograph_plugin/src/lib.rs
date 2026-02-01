@@ -116,13 +116,21 @@ fn show_error(span: Span, err: &IsographTransformError) -> Result<(), anyhow::Er
 }
 
 #[derive(Debug, Clone)]
-struct IsographImport {
+struct IsographDefaultImport {
     path: Atom,
     item: Atom,
     unresolved_mark: Option<Mark>,
 }
 
-impl IsographImport {
+#[derive(Debug, Clone)]
+struct IsographNamedImport {
+    path: Atom,
+    export_name: Atom,
+    item: Atom,
+    unresolved_mark: Option<Mark>,
+}
+
+impl IsographDefaultImport {
     fn as_module_item(&self) -> ModuleItem {
         ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
             span: Default::default(),
@@ -137,6 +145,37 @@ impl IsographImport {
                     sym: self.item.clone(),
                     optional: false,
                 },
+            })],
+            src: Box::new(self.path.clone().into()),
+            type_only: false,
+            with: None,
+            phase: Default::default(),
+        }))
+    }
+}
+
+impl IsographNamedImport {
+    fn as_module_item(&self) -> ModuleItem {
+        ModuleItem::ModuleDecl(ModuleDecl::Import(ImportDecl {
+            span: Default::default(),
+            specifiers: vec![ImportSpecifier::Named(ImportNamedSpecifier {
+                span: Default::default(),
+                local: Ident {
+                    ctxt: self
+                        .unresolved_mark
+                        .map(|m| SyntaxContext::empty().apply_mark(m))
+                        .unwrap_or_default(),
+                    span: DUMMY_SP,
+                    sym: self.item.clone(),
+                    optional: false,
+                },
+                imported: Some(ModuleExportName::Ident(Ident {
+                    ctxt: SyntaxContext::empty(),
+                    span: DUMMY_SP,
+                    sym: self.export_name.clone(),
+                    optional: false,
+                })),
+                is_type_only: false,
             })],
             src: Box::new(self.path.clone().into()),
             type_only: false,
@@ -192,7 +231,7 @@ struct ValidIsographTemplateLiteral {
 }
 
 impl ValidIsographTemplateLiteral {
-    fn build_require_expr_from_path(path: &str, mark: Option<Mark>) -> Expr {
+    fn build_require_expr_from_path(path: &str, export_name: &str, mark: Option<Mark>) -> Expr {
         Expr::Member(MemberExpr {
             span: DUMMY_SP,
             obj: Box::new(Expr::Call(CallExpr {
@@ -215,7 +254,7 @@ impl ValidIsographTemplateLiteral {
                 ctxt: SyntaxContext::empty(),
             })),
             prop: MemberProp::Ident(IdentName {
-                sym: "default".into(),
+                sym: export_name.into(),
                 span: DUMMY_SP,
             }),
         })
@@ -269,6 +308,12 @@ impl ValidIsographTemplateLiteral {
 }
 
 #[derive(Debug, Clone)]
+enum IsographImport {
+    Default(IsographDefaultImport),
+    Named(IsographNamedImport),
+}
+
+#[derive(Debug, Clone)]
 struct IsoLiteralCompilerVisitor<'a> {
     root_dir: &'a Path,
     config: &'a IsographProjectConfig,
@@ -306,6 +351,36 @@ impl IsoLiteralCompilerVisitor<'_> {
         Err(IsographTransformError::OnlyAllowedTemplateLiteral)
     }
 
+    fn handle_valid_isograph_field_literal(&mut self) -> Expr {
+        let package_name = "@isograph/react";
+        let export_name = "hmr";
+
+        match self.config.options.module {
+            ConfigFileJavascriptModule::CommonJs => {
+                ValidIsographTemplateLiteral::build_require_expr_from_path(
+                    package_name,
+                    export_name,
+                    self.unresolved_mark,
+                )
+            }
+            ConfigFileJavascriptModule::EsModule => {
+                // TODO ensure `ident_name` is unique
+                let ident_name = format!("_{}", export_name);
+
+                // hoist import
+                self.imports
+                    .push(IsographImport::Named(IsographNamedImport {
+                        path: package_name.into(),
+                        export_name: export_name.into(),
+                        item: ident_name.clone().into(),
+                        unresolved_mark: self.unresolved_mark,
+                    }));
+
+                build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
+            }
+        }
+    }
+
     fn handle_valid_isograph_entrypoint_literal(
         &mut self,
         iso_template_literal: ValidIsographTemplateLiteral,
@@ -318,6 +393,7 @@ impl IsoLiteralCompilerVisitor<'_> {
             ConfigFileJavascriptModule::CommonJs => {
                 ValidIsographTemplateLiteral::build_require_expr_from_path(
                     &file_to_artifact.display().to_string(),
+                    "default",
                     self.unresolved_mark,
                 )
             }
@@ -329,11 +405,12 @@ impl IsoLiteralCompilerVisitor<'_> {
                 );
 
                 // hoist import
-                self.imports.push(IsographImport {
-                    path: file_to_artifact.display().to_string().into(),
-                    item: ident_name.clone().into(),
-                    unresolved_mark: self.unresolved_mark,
-                });
+                self.imports
+                    .push(IsographImport::Default(IsographDefaultImport {
+                        path: file_to_artifact.display().to_string().into(),
+                        item: ident_name.clone().into(),
+                        unresolved_mark: self.unresolved_mark,
+                    }));
 
                 build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
             }
@@ -344,7 +421,6 @@ impl IsoLiteralCompilerVisitor<'_> {
         &mut self,
         // iso(iso_args)(fn_args);
         iso_args: &[ExprOrSpread],
-        fn_args: Option<&[ExprOrSpread]>,
     ) -> Result<Expr, IsographTransformError> {
         let first = if let Some((first, [])) = iso_args.split_first() {
             first
@@ -360,19 +436,7 @@ impl IsoLiteralCompilerVisitor<'_> {
             ArtifactType::Entrypoint => self
                 .handle_valid_isograph_entrypoint_literal(iso_template_literal)
                 .wrap_ok(),
-            ArtifactType::Field => {
-                match fn_args {
-                    Some(fn_args) => {
-                        if let Some((first, [])) = fn_args.split_first() {
-                            return first.expr.as_ref().clone().wrap_ok();
-                        }
-                        // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                        return IsographTransformError::IsoFnCallRequiresOneArg.wrap_err();
-                    }
-                    // iso(...)>empty<
-                    None => build_arrow_identity_expr().wrap_ok(),
-                }
-            }
+            ArtifactType::Field => self.handle_valid_isograph_field_literal().wrap_ok(),
         }
     }
 }
@@ -387,48 +451,20 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
             span,
             ..
         }) = &expr
+            && let Expr::Ident(ident) = &**callee
+            && ident.sym == "iso"
         {
-            match &**callee {
-                Expr::Ident(ident) => {
-                    if ident.sym == "iso" {
-                        match self.compile_iso_call_statement(args, None) {
-                            Ok(build_expr) => {
-                                // might have `iso` functions inside the build expr
-                                let build_expr = build_expr.fold_children_with(self);
-                                return build_expr;
-                            }
-                            Err(err) => {
-                                let _ = show_error(*span, &err);
-                                // On error, we keep the same expression and fail showing the error
-                                return expr;
-                            }
-                        }
-                    }
+            match self.compile_iso_call_statement(args) {
+                Ok(build_expr) => {
+                    // might have `iso` functions inside the build expr
+                    let build_expr = build_expr.fold_children_with(self);
+                    return build_expr;
                 }
-                Expr::Call(CallExpr {
-                    callee: Callee::Expr(child_callee),
-                    args: child_args,
-                    span: child_span,
-                    ..
-                }) => {
-                    if let Expr::Ident(ident) = &**child_callee
-                        && ident.sym == "iso"
-                    {
-                        match self.compile_iso_call_statement(child_args, Some(args)) {
-                            Ok(build_expr) => {
-                                // might have `iso` functions inside the build expr
-                                let build_expr = build_expr.fold_children_with(self);
-                                return build_expr;
-                            }
-                            Err(err) => {
-                                let _ = show_error(*child_span, &err);
-                                // On error, we keep the same expression and fail showing the error
-                                return expr;
-                            }
-                        }
-                    }
+                Err(err) => {
+                    let _ = show_error(*span, &err);
+                    // On error, we keep the same expression and fail showing the error
+                    return expr;
                 }
-                _ => {}
             }
         }
 
@@ -443,24 +479,12 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
 
         prepend_stmts(
             &mut items,
-            self.imports.iter().map(|import| import.as_module_item()),
+            self.imports.iter().map(|import| match import {
+                IsographImport::Default(default_import) => default_import.as_module_item(),
+                IsographImport::Named(named_import) => named_import.as_module_item(),
+            }),
         );
 
         items
     }
-}
-
-fn build_arrow_identity_expr() -> Expr {
-    Expr::Arrow(ArrowExpr {
-        params: vec![Pat::Ident(
-            Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()).into(),
-        )],
-        body: Box::new(Ident::new("x".into(), DUMMY_SP, SyntaxContext::empty()).into()),
-        span: DUMMY_SP,
-        is_async: false,
-        is_generator: false,
-        return_type: None,
-        type_params: None,
-        ctxt: SyntaxContext::empty(),
-    })
 }
