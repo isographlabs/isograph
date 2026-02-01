@@ -17,9 +17,9 @@ use isograph_schema::{
     NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
     accessible_client_selectables, deprecated_client_object_selectable_named,
     deprecated_client_scalar_selectable_named, deprecated_client_selectable_map,
-    deprecated_client_selectable_named, flattened_entity_named,
-    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
-    validate_entire_schema, validated_entrypoints,
+    flattened_entity_named, inline_fragment_reader_selection_set,
+    refetch_strategy_for_client_scalar_selectable_named, selectable_named, validate_entire_schema,
+    validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
@@ -444,17 +444,19 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             SelectionType::Scalar(s) => (s.0, s.1),
             SelectionType::Object(o) => (o.0, o.1),
         };
-        let client_selectable = deprecated_client_selectable_named(
-            db,
-            parent_object_entity_name,
-            client_selectable_name,
-        )
-        .as_ref()
-        .expect(
-            "Expected selectable to be valid. \
-            This is indicative of a bug in Isograph.",
-        )
-        .expect_selectable_to_exist(parent_object_entity_name, client_selectable_name);
+        let client_selectable =
+            selectable_named(db, parent_object_entity_name, client_selectable_name)
+                .as_ref()
+                .expect(
+                    "Expected selectable to be valid. \
+                    This is indicative of a bug in Isograph.",
+                )
+                .expect_selectable_to_exist(parent_object_entity_name, client_selectable_name)
+                .as_client()
+                .expect(
+                    "Expected client selectable. \
+                    This is indicative of a bug in Isograph.",
+                );
 
         let artifact_path_and_content = match client_selectable {
             SelectionType::Object(client_object_selectable) => {
