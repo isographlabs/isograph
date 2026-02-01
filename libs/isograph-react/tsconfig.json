@@ -1,6 +1,8 @@
 {
-  "extends": "./tsconfig.pkg.json",
+  "extends": "../../tsconfig.build.json",
   "compilerOptions": {
+    "jsx": "react",
     "noEmit": true
-  }
+  },
+  "include": ["./**/*.ts", "./**/*.tsx"]
 }

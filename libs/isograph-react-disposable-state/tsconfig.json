@@ -1,6 +1,7 @@
 {
-  "extends": "./tsconfig.pkg.json",
+  "extends": "../../tsconfig.build.json",
   "compilerOptions": {
     "noEmit": true
-  }
+  },
+  "include": ["./**/*.ts"]
 }
