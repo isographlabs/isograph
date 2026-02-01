@@ -1,5 +1,5 @@
-import type { ItemCleanupPair } from '@isograph/isograph-disposable-types';
-import type { ParentCache } from '@isograph/isograph-react-disposable-state';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
+import type { ParentCache } from '@isograph/react-disposable-state';
 import {
   type NetworkResponseObject,
   getOrCreateItemInSuspenseCache,

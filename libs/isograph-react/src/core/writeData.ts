@@ -1,15 +1,14 @@
-import type { ItemCleanupPair } from '@isograph/isograph-disposable-types';
-import { callSubscriptions } from './subscribe';
+import type { ItemCleanupPair } from '@isograph/disposable-types';
 import {
-  type NetworkResponseObject,
   type EncounteredIds,
+  type NetworkResponseObject,
   normalizeData,
 } from './cache';
 import type { IsographEntrypoint, NormalizationAst } from './entrypoint';
 import type {
-  UnknownTReadFromStore,
   ExtractParameters,
   FragmentReference,
+  UnknownTReadFromStore,
 } from './FragmentReference';
 import {
   type IsographEnvironment,
@@ -19,6 +18,7 @@ import {
 import { logMessage } from './logging';
 import { retainQueryWithoutMakingNetworkRequest } from './makeNetworkRequest';
 import { addNetworkResponseStoreLayer } from './optimisticProxy';
+import { callSubscriptions } from './subscribe';
 
 export function writeData<
   TReadFromStore extends UnknownTReadFromStore,
