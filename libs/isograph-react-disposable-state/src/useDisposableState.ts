@@ -43,7 +43,7 @@ export function useDisposableState<T = never>(
   useEffect(
     function cleanupItemCleanupPairRefIfSetStateNotCalled() {
       return () => {
-        if (itemCleanupPairRef.current !== null) {
+        if (itemCleanupPairRef.current != null) {
           itemCleanupPairRef.current[1]();
         }
       };
