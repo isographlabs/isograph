@@ -1,6 +1,7 @@
-import { defineConfig } from 'tsdown';
+import { mergeConfig } from 'tsdown';
+import baseConfig from '../../tsdown.config.ts';
 
-export default defineConfig({
+export default mergeConfig(baseConfig, {
   dts: {
     build: true,
   },

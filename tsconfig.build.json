@@ -8,6 +8,7 @@
     "lib": ["dom", "dom.iterable", "esnext"],
     "skipLibCheck": true,
     "jsx": "react",
+    "allowImportingTsExtensions": true,
     "forceConsistentCasingInFileNames": true,
     "declaration": true,
     "declarationMap": true,
@@ -20,6 +21,7 @@
     "paths": {
       "@isograph/*": ["./libs/*"]
     },
+    "noEmit": true,
     "allowUnreachableCode": false
   }
 }
