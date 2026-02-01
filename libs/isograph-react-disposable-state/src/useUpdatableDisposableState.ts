@@ -112,6 +112,7 @@ export function useUpdatableDisposableState<
         undisposedICIs.current.delete(undisposedICI);
         undisposedICI.cleanup();
       }
+      setStateICI(UNASSIGNED_STATE);
     };
   }, []);
 
