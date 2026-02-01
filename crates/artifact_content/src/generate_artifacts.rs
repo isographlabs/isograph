@@ -15,11 +15,9 @@ use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
     NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
-    accessible_client_selectables, deprecated_client_object_selectable_named,
-    deprecated_client_scalar_selectable_named, deprecated_client_selectable_map,
-    flattened_entity_named, inline_fragment_reader_selection_set,
-    refetch_strategy_for_client_scalar_selectable_named, selectable_named, validate_entire_schema,
-    validated_entrypoints,
+    accessible_client_selectables, deprecated_client_selectable_map, flattened_entity_named,
+    inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
+    selectable_named, validate_entire_schema, validated_entrypoints,
 };
 use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
@@ -201,21 +199,28 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 parent_object_entity_name,
                 client_object_selectable_name,
             ))) => {
-                let client_object_selectable = deprecated_client_object_selectable_named(
-                    db,
-                    parent_object_entity_name,
-                    client_object_selectable_name,
-                )
-                .as_ref()
-                .expect(
-                    "Expected selectable to be valid. \
+                let client_object_selectable =
+                    selectable_named(db, parent_object_entity_name, client_object_selectable_name)
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to be valid. \
                     This is indicative of a bug in Isograph.",
-                )
-                .expect_selectable_to_exist(
-                    parent_object_entity_name,
-                    client_object_selectable_name,
-                )
-                .lookup(db);
+                        )
+                        .expect_selectable_to_exist(
+                            parent_object_entity_name,
+                            client_object_selectable_name,
+                        )
+                        .as_client()
+                        .expect(
+                            "Expected client selectable. \
+                    This is indicative of a bug in Isograph.",
+                        )
+                        .as_object()
+                        .expect(
+                            "Expected client object selectable. \
+                    This is indicative of a bug in Isograph.",
+                        )
+                        .lookup(db);
 
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
@@ -236,21 +241,28 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 parent_object_entity_name,
                 client_scalar_selectable_name,
             ))) => {
-                let client_scalar_selectable = deprecated_client_scalar_selectable_named(
-                    db,
-                    parent_object_entity_name,
-                    client_scalar_selectable_name,
-                )
-                .as_ref()
-                .expect(
-                    "Expected parsing to have succeeded by this point. \
+                let client_scalar_selectable =
+                    selectable_named(db, parent_object_entity_name, client_scalar_selectable_name)
+                        .as_ref()
+                        .expect(
+                            "Expected selectable to be valid. \
                     This is indicative of a bug in Isograph.",
-                )
-                .expect_selectable_to_exist(
-                    parent_object_entity_name,
-                    client_scalar_selectable_name,
-                )
-                .lookup(db);
+                        )
+                        .expect_selectable_to_exist(
+                            parent_object_entity_name,
+                            client_scalar_selectable_name,
+                        )
+                        .as_client()
+                        .expect(
+                            "Expected client selectable. \
+                    This is indicative of a bug in Isograph.",
+                        )
+                        .as_scalar()
+                        .expect(
+                            "Expected client scalar selectable. \
+                    This is indicative of a bug in Isograph.",
+                        )
+                        .lookup(db);
 
                 match client_scalar_selectable.variant.reference() {
                     ClientFieldVariant::Link => (),
