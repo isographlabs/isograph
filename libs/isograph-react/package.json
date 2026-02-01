@@ -14,7 +14,7 @@
     "test-watch": "vitest watch",
     "coverage": "vitest run --coverage",
     "prepack": "pnpm run test && pnpm run compile-libs",
-    "tsc": "tsc",
+    "tsc": "tsc -b",
     "tsc-force": "tsc --build --clean && tsc --build --force",
     "iso": "../../target/debug/isograph_cli --config ./isograph.config.json"
   },

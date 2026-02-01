@@ -1,12 +1,7 @@
 {
-  "extends": "../../tsconfig.build.json",
-  "compilerOptions": {
-    "jsx": "react",
-    "noEmit": true,
-    "paths": {
-      "@iso": ["./src/tests/__isograph/iso.ts"],
-      "@isograph/react": ["./src/index.ts"]
-    }
-  },
-  "include": ["./**/*.ts", "./**/*.tsx"]
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.package.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }
