@@ -93,9 +93,6 @@ enum IsographTransformError {
     #[error("Invalid iso tag usage. Expected 'entrypoint', 'field' or 'pointer'.")]
     InvalidIsoKeyword,
 
-    #[error("Invalid iso tag usage. The iso function should be passed exactly one argument.")]
-    IsoFnCallRequiresOneArg,
-
     #[error("Iso invocation require one parameter.")]
     IsoRequiresOneArg,
 
