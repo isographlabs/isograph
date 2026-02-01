@@ -548,7 +548,7 @@ fn generate_function_import_statement(
     );
 
     let normalized_file_name = if cfg!(windows) {
-        Cow::Owned(complete_file_name.replace("\\", "/"))
+        Cow::Owned(complete_file_name.replace('\\', "/"))
     } else {
         Cow::Borrowed(complete_file_name)
     };

@@ -37,7 +37,7 @@ pub fn isograph_location_to_lsp_location<TCompilationProfile: CompilationProfile
             "/{}",
             path.strip_prefix(r"\\?\")
                 .unwrap_or(path)
-                .replace("\\", "/")
+                .replace('\\', "/")
         ))
     } else {
         Cow::Borrowed(path)
