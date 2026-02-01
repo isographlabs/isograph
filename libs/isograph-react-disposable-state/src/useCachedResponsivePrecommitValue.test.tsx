@@ -1,5 +1,9 @@
 import type { ItemCleanupPair } from '@isograph/disposable-types';
-import React, { StrictMode, type MutableRefObject, type ReactElement } from 'react';
+import React, {
+  StrictMode,
+  type MutableRefObject,
+  type ReactElement,
+} from 'react';
 import { create } from 'react-test-renderer';
 import { assert, describe, expect, test, vi } from 'vitest';
 import type { CacheItem, CacheItemState } from './CacheItem';

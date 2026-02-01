@@ -1,3 +1,4 @@
+import React from 'react';
 import type { ItemCleanupPair } from '@isograph/disposable-types';
 import { StrictMode, useEffect, useState } from 'react';
 import { create } from 'react-test-renderer';
