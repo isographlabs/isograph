@@ -256,7 +256,7 @@ impl ValidIsographTemplateLiteral {
 
         if cfg!(target_os = "windows") {
             file_to_artifact =
-                PathBuf::from(format!("{}", file_to_artifact.display()).replace("\\", "/"));
+                PathBuf::from(format!("{}", file_to_artifact.display()).replace('\\', "/"));
         }
 
         // TODO Identify if this is needed
