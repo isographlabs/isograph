@@ -20,7 +20,7 @@ pub type MemoRefDeclaration =
     SelectionType<MemoRef<ClientFieldDeclaration>, MemoRef<ClientPointerDeclaration>>;
 
 #[memo]
-pub fn deprecated_client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
+fn deprecated_client_scalar_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_scalar_selectable_name: SelectableName,
@@ -68,7 +68,7 @@ pub fn deprecated_client_scalar_selectable_named<TCompilationProfile: Compilatio
 }
 
 #[memo]
-pub fn deprecated_client_object_selectable_named<TCompilationProfile: CompilationProfile>(
+fn deprecated_client_object_selectable_named<TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     parent_object_entity_name: EntityName,
     client_object_selectable_name: SelectableName,
