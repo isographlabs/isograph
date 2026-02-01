@@ -27,8 +27,8 @@ use isograph_schema::{
     ScalarClientFieldTraversalState, WrapMergedSelectionMapResult, WrappedMergedSelectionMap,
     WrappedSelectionMapSelection, client_scalar_selectable_selection_set_for_parent_query,
     create_merged_selection_map_for_field_and_insert_into_global_map,
-    current_target_merged_selections, deprecated_client_scalar_selectable_named,
-    flattened_entity_named, get_reachable_variables, initial_variable_context,
+    current_target_merged_selections, flattened_entity_named, get_reachable_variables,
+    initial_variable_context, selectable_named,
 };
 use prelude::Postfix;
 use std::collections::BTreeSet;
@@ -42,17 +42,27 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
-    let entrypoint = deprecated_client_scalar_selectable_named(
+    let entrypoint = selectable_named(
         db,
         parent_object_entity_name,
         entrypoint_scalar_selectable_name,
     )
     .as_ref()
     .expect(
-        "Expected parsing to have succeeded by this point. \
-            This is indicative of a bug in Isograph.",
+        "Expected selectable to be valid. \
+        This is indicative of a bug in Isograph.",
     )
     .expect_selectable_to_exist(parent_object_entity_name, entrypoint_scalar_selectable_name)
+    .as_client()
+    .expect(
+        "Expected client selectable. \
+        This is indicative of a bug in Isograph.",
+    )
+    .as_scalar()
+    .expect(
+        "Expected client scalar selectable. \
+        This is indicative of a bug in Isograph.",
+    )
     .lookup(db);
 
     let parent_object_entity = &flattened_entity_named(db, entrypoint.parent_entity_name)
