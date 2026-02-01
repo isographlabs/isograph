@@ -1,5 +1,4 @@
 import { type Factory, ParentCache } from '@isograph/react-disposable-state';
-import type { Brand } from './brand';
 import type {
   NormalizationAstNodes,
   NormalizationInlineFragment,
@@ -61,12 +60,16 @@ export type NetworkResponseValue =
 export type NetworkResponseObject = {
   // N.B. undefined is here to support optional id's, but
   // undefined should not *actually* be present in the network response.
-  readonly [K in
-    | ScalarNetworkResponseKey
-    | LinkedNetworkResponseKey]: K extends ScalarNetworkResponseKey
-    ? undefined | NetworkResponsePlural<NetworkResponseScalarValue>
-    : undefined | NetworkResponsePlural<NetworkResponseObject>;
-} & {
+  readonly [key: ScalarNetworkResponseKey]:
+    | undefined
+    | NetworkResponsePlural<NetworkResponseScalarValue>;
+  readonly [key: LinkedNetworkResponseKey]:
+    | undefined
+    | NetworkResponsePlural<NetworkResponseObject>;
+  readonly [key: NetworkResponseKey]:
+    | undefined
+    | NetworkResponsePlural<NetworkResponseScalarValue>
+    | NetworkResponsePlural<NetworkResponseObject>;
   readonly id?: DataId;
   readonly __typename?: TypeName;
 };
@@ -433,15 +436,19 @@ function normalizeNetworkResponseObject(
   return newStoreRecordId;
 }
 
-declare const LinkedParentRecordKeyBrand: unique symbol;
-export type LinkedParentRecordKey = string & {
-  brand?: Brand<undefined, typeof LinkedParentRecordKeyBrand>;
-};
+export type ParentRecordKey = string;
 
-declare const ScalarParentRecordKeyBrand: unique symbol;
-export type ScalarParentRecordKey = string & {
-  brand?: Brand<undefined, typeof ScalarParentRecordKeyBrand>;
-};
+/**
+ * these don't actually start with a or b, but this let's us use multiple indexes e.g.
+ * {
+ *   readonly [key: `a-${string} `]: ...
+ *   readonly [key: `b-${string} `]: ...
+ * }
+ */
+export type LinkedParentRecordKey =
+  `NOT_AN_ACTUAL_TYPE_LinkedParentRecordKey_${string}`;
+export type ScalarParentRecordKey =
+  `NOT_AN_ACTUAL_TYPE_ScalarParentRecordKey_${string}`;
 
 export function getParentRecordKey(
   astNode: NormalizationLinkedField | ReaderLinkedField,
@@ -458,7 +465,7 @@ export function getParentRecordKey(
     | ReaderLinkedField
     | ReaderScalarField,
   variables: Variables,
-): string {
+): ParentRecordKey {
   let parentRecordKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
   if (fieldParameters != null) {
@@ -512,15 +519,19 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
   return `${FIRST_SPLIT_KEY}${argumentName}${SECOND_SPLIT_KEY}${chunk}`;
 }
 
-declare const LinkedNetworkResponseKeyBrand: unique symbol;
-export type LinkedNetworkResponseKey = string & {
-  brand?: Brand<undefined, typeof LinkedNetworkResponseKeyBrand>;
-};
+export type NetworkResponseKey = string;
 
-declare const ScalarNetworkResponseKeyBrand: unique symbol;
-export type ScalarNetworkResponseKey = string & {
-  brand?: Brand<undefined, typeof ScalarNetworkResponseKeyBrand>;
-};
+/**
+ * these don't actually start with a or b, but this let's us use multiple indexes e.g.
+ * {
+ *   readonly [key: `a-${string} `]: ...
+ *   readonly [key: `b-${string} `]: ...
+ * }
+ */
+export type LinkedNetworkResponseKey =
+  `NOT_AN_ACTUAL_TYPE_LinkedNetworkResponseKey_${string}`;
+export type ScalarNetworkResponseKey =
+  `NOT_AN_ACTUAL_TYPE_ScalarNetworkResponseKey_${string}`;
 
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField,
@@ -530,7 +541,7 @@ function getNetworkResponseKey(
 ): ScalarNetworkResponseKey;
 function getNetworkResponseKey(
   astNode: NormalizationLinkedField | NormalizationScalarField,
-): string {
+): NetworkResponseKey {
   let networkResponseKey = astNode.fieldName;
   const fieldParameters = astNode.arguments;
 

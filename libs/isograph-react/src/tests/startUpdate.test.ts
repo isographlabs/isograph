@@ -84,7 +84,7 @@ describe('startUpdate', () => {
           {},
         ).getOrPopulateAndTemporaryRetain();
 
-      data = createUpdatableProxy(
+      data = createUpdatableProxy<Query__linkedUpdate__param>(
         environment,
         environment.store,
         item,
@@ -156,7 +156,7 @@ describe('startUpdate', () => {
           },
         ).getOrPopulateAndTemporaryRetain();
 
-      data = createUpdatableProxy(
+      data = createUpdatableProxy<Query__startUpdate__param>(
         environment,
         environment.store,
         item,

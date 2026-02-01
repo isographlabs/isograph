@@ -7,9 +7,9 @@ import {
 } from '../core/garbageCollection';
 import { ROOT_ID, type BaseStoreLayerData } from '../core/IsographEnvironment';
 import { wrapResolvedValue } from '../core/PromiseWrapper';
+import { createIsographEnvironment } from '../react/createIsographEnvironment';
 import { meNameSuccessorRetainedQuery } from './meNameSuccessor';
 import { nodeFieldRetainedQuery } from './nodeQuery';
-import { createIsographEnvironment } from '../react/createIsographEnvironment';
 
 const getDefaultStore = (): BaseStoreLayerData => ({
   Query: {
@@ -71,13 +71,13 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store.Economist?.[1]).not.toBe(undefined);
+    expect(store['Economist']?.[1]).not.toBe(undefined);
 
     // TODO enable babel so we don't have to do this
     retainQuery(environment, meNameRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store.Economist?.[1]).toBe(undefined);
+    expect(store['Economist']?.[1]).toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected', () => {
@@ -88,13 +88,13 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store.Economist?.[0]).not.toBe(undefined);
+    expect(store['Economist']?.[0]).not.toBe(undefined);
 
     // TODO enable babel so we don't have to do this
     retainQuery(environment, meNameRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store.Economist?.[0]).not.toBe(undefined);
+    expect(store['Economist']?.[0]).not.toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected, and this should work with variables', () => {
@@ -105,12 +105,12 @@ describe('garbage collection', () => {
       null as any,
     );
 
-    expect(store.Economist?.[0]).not.toBe(undefined);
+    expect(store['Economist']?.[0]).not.toBe(undefined);
 
     retainQuery(environment, nodeFieldRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store.Economist?.[0]).not.toBe(undefined);
+    expect(store['Economist']?.[0]).not.toBe(undefined);
   });
 
   test('Referenced records should not be garbage collected, and this should work through multiple levels', () => {
@@ -124,9 +124,9 @@ describe('garbage collection', () => {
     retainQuery(environment, meNameSuccessorRetainedQuery);
     garbageCollectEnvironment(environment);
 
-    expect(store.Economist?.[0]).not.toBe(undefined);
-    expect(store.Economist?.[1]).not.toBe(undefined);
-    expect(store.Economist?.[2]).not.toBe(undefined);
+    expect(store['Economist']?.[0]).not.toBe(undefined);
+    expect(store['Economist']?.[1]).not.toBe(undefined);
+    expect(store['Economist']?.[2]).not.toBe(undefined);
   });
 
   test('ROOT_ID should be garbage collected, if there are no retained queries', () => {
@@ -139,6 +139,6 @@ describe('garbage collection', () => {
     garbageCollectEnvironment(environment);
 
     expect(store.Query?.[ROOT_ID]).toBe(undefined);
-    expect(store.Economist?.[0]).toBe(undefined);
+    expect(store['Economist']?.[0]).toBe(undefined);
   });
 });
