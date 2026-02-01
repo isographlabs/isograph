@@ -1,6 +1,6 @@
 import { iso } from '@iso';
 import { Card, CardContent, Typography } from '@mui/material';
-import React, { useRef, useState } from 'react';
+import React, { useRef } from 'react';
 import { useOnScreen } from './useIntersection';
 
 function capitalize(str: string) {
