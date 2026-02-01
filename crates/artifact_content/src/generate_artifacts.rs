@@ -204,7 +204,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                         .as_ref()
                         .expect(
                             "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .expect_selectable_to_exist(
                             parent_object_entity_name,
@@ -213,12 +213,12 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                         .as_client()
                         .expect(
                             "Expected client selectable. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .as_object()
                         .expect(
                             "Expected client object selectable. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .lookup(db);
 
@@ -246,7 +246,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                         .as_ref()
                         .expect(
                             "Expected selectable to be valid. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .expect_selectable_to_exist(
                             parent_object_entity_name,
@@ -255,12 +255,12 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                         .as_client()
                         .expect(
                             "Expected client selectable. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .as_scalar()
                         .expect(
                             "Expected client scalar selectable. \
-                    This is indicative of a bug in Isograph.",
+                            This is indicative of a bug in Isograph.",
                         )
                         .lookup(db);
 

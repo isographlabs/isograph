@@ -23,12 +23,12 @@ pub fn client_scalar_selectable_selection_set_for_parent_query<
         .as_client()
         .expect(
             "Expected client selectable. \
-        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .as_scalar()
         .expect(
             "Expected client scalar selectable. \
-        This is indicative of a bug in Isograph.",
+            This is indicative of a bug in Isograph.",
         )
         .lookup(db);
 

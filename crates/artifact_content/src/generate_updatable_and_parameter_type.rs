@@ -578,18 +578,18 @@ fn write_param_type_from_client_scalar_selectable<TCompilationProfile: Compilati
             .as_ref()
             .expect(
                 "Expected selectable to be valid. \
-        This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .expect_selectable_to_exist(parent_object_entity_name, client_scalar_selectable_name)
             .as_client()
             .expect(
                 "Expected client selectable. \
-        This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .as_scalar()
             .expect(
                 "Expected client scalar selectable. \
-        This is indicative of a bug in Isograph.",
+                This is indicative of a bug in Isograph.",
             )
             .lookup(db);
 
