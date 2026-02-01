@@ -39,8 +39,9 @@ pub fn flattened_entities<TCompilationProfile: CompilationProfile>(
 
     entities.extend(
         flattened_client_schema(db)
+            .0
             .iter()
-            .map(|(key, value)| (*key, value.item.0.interned_ref(db))),
+            .map(|value| (value.name.item, value.interned_ref(db))),
     );
 
     entities
@@ -103,15 +104,9 @@ pub fn flattened_selectables<TCompilationProfile: CompilationProfile>(
 
     selectables.extend(
         flattened_client_schema(db)
+            .1
             .iter()
-            .flat_map(|(_entity_name, value)| {
-                value
-                    .item
-                    .1
-                    .item
-                    .values()
-                    .map(|value| value.0.interned_ref(db))
-            }),
+            .map(|value| value.interned_ref(db)),
     );
 
     selectables
@@ -122,18 +117,27 @@ pub fn flattened_selectables_for_entity<TCompilationProfile: CompilationProfile>
     db: &IsographDatabase<TCompilationProfile>,
     entity_name: EntityName,
 ) -> Option<BTreeMap<SelectableName, MemoRef<FlattenedDataModelSelectable<TCompilationProfile>>>> {
-    let entity = flattened_server_schema(db)
-        .get(entity_name.reference())
-        .or_else(|| flattened_client_schema(db).get(entity_name.reference()))?;
+    // TODO entity_name currently must be server-defined, but we should loosen that.
+    let entity = flattened_server_schema(db).get(entity_name.reference())?;
 
-    entity
+    let server_selectables = entity
         .item
         .1
         .item
         .iter()
-        .map(|(key, value)| (key.dereference(), value.0.interned_ref(db)))
-        .collect::<BTreeMap<_, _>>()
-        .wrap_some()
+        .map(|(key, value)| (key.dereference(), value.0.interned_ref(db)));
+
+    let selectables = server_selectables.chain(flattened_client_schema(db).1.iter().filter_map(
+        |selectable| {
+            if selectable.parent_entity_name.item == entity_name {
+                (selectable.name.item, selectable.interned_ref(db)).wrap_some()
+            } else {
+                None
+            }
+        },
+    ));
+
+    selectables.collect::<BTreeMap<_, _>>().wrap_some()
 }
 
 #[memo]
