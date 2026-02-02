@@ -1203,7 +1203,7 @@ fn insert_client_object_selectable_into_refetch_paths<TCompilationProfile: Compi
         },
 
         imperatively_loaded_field_variant: ImperativelyLoadedFieldVariant {
-            client_selection_name: newly_encountered_client_object_selectable.name,
+            selectable_name: newly_encountered_client_object_selectable.name,
             top_level_schema_field_arguments: id_arguments(),
             // top_level_schema_field_name: *NODE_FIELD_NAME,
             // top_level_schema_field_concrete_type: None,

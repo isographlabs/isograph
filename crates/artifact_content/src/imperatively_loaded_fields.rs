@@ -41,7 +41,7 @@ pub(crate) fn get_paths_and_contents_for_imperatively_loaded_field<
     } = path_to_refetch_field_info;
 
     let ImperativelyLoadedFieldVariant {
-        client_selection_name,
+        selectable_name: client_selection_name,
         root_object_entity_name,
         mut subfields_or_inline_fragments,
         top_level_schema_field_arguments,

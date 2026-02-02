@@ -326,7 +326,7 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct ImperativelyLoadedFieldVariant {
-    pub client_selection_name: SelectableName,
+    pub selectable_name: SelectableName,
 
     // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
     pub root_object_entity_name: EntityName,

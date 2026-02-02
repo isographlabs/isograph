@@ -228,8 +228,7 @@ pub(crate) fn parse_type_system_document(
                 name: client_field_scalar_selection_name.unchecked_conversion::<SelectableName>(),
                 variant: ClientFieldVariant::ImperativelyLoadedField(
                     ImperativelyLoadedFieldVariant {
-                        client_selection_name: client_field_scalar_selection_name
-                            .unchecked_conversion(),
+                        selectable_name: client_field_scalar_selection_name.unchecked_conversion(),
                         root_object_entity_name: parent_object_entity_name,
                         // This is fishy! subfields_or_inline_fragments is cloned and stored in multiple locations,
                         // but presumably we could access it from one location only

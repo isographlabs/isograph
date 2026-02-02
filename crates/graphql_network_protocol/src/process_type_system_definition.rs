@@ -206,7 +206,7 @@ fn get_refetch_selectable(
         .wrap_some(),
         name: (*REFETCH_FIELD_NAME),
         variant: ClientFieldVariant::ImperativelyLoadedField(ImperativelyLoadedFieldVariant {
-            client_selection_name: (*REFETCH_FIELD_NAME),
+            selectable_name: (*REFETCH_FIELD_NAME),
             // TODO use the actual schema query type
             root_object_entity_name: "Query".intern().into(),
             subfields_or_inline_fragments,
