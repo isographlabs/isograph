@@ -9,8 +9,8 @@ use isograph_lang_types::{
 use pico::MemoRef;
 
 use crate::{
-    CompilationProfile, DataModelStage, FlattenedStage, NestedStage, NetworkProtocol,
-    TargetPlatform, ValidatedStage, flatten::BothFlattenedResults,
+    ClientFieldVariant, CompilationProfile, DataModelStage, FlattenedStage, NestedStage,
+    NetworkProtocol, TargetPlatform, ValidatedStage, flatten::BothFlattenedResults,
 };
 
 pub type MapWithNonfatalDiagnostics<TKey, TValue, TError> =
@@ -90,7 +90,8 @@ pub struct DataModelSelectable<TCompilationProfile: CompilationProfile, TStage: 
     // at some point! (e.g. if the field is something like `fieldName: @asdf`)
     pub target_entity:
         WithGenericLocation<Result<TypeAnnotationDeclaration, TStage::Error>, TStage::Location>,
-    pub associated_data: DefinitionLocation<SelectableAssociatedData<TCompilationProfile>, ()>,
+    pub associated_data:
+        DefinitionLocation<SelectableAssociatedData<TCompilationProfile>, ClientFieldVariant>,
 
     // TODO this is obviously a GraphQL-ism! But it's used in a bunch of places, so it's
     // not really easy to move it to TargetPlatform. However, we know it at parse time,

@@ -15,10 +15,10 @@ use isograph_lang_types::{
     VariableDeclarationInner, VariableNameWrapper,
 };
 use isograph_schema::{
-    BOOLEAN_ENTITY_NAME, DataModelEntity, DataModelSelectable, EntityAssociatedData,
-    FLOAT_ENTITY_NAME, ID_ENTITY_NAME, ID_FIELD_NAME, INT_ENTITY_NAME, IsConcrete,
-    IsographDatabase, NestedDataModelSchema, NestedDataModelSelectable, STRING_ENTITY_NAME,
-    SelectableAssociatedData, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
+    BOOLEAN_ENTITY_NAME, ClientFieldVariant, DataModelEntity, DataModelSelectable,
+    EntityAssociatedData, FLOAT_ENTITY_NAME, ID_ENTITY_NAME, ID_FIELD_NAME, INT_ENTITY_NAME,
+    IsConcrete, IsographDatabase, NestedDataModelSchema, NestedDataModelSelectable,
+    STRING_ENTITY_NAME, SelectableAssociatedData, ServerObjectSelectionInfo, TYPENAME_FIELD_NAME,
     insert_entity_into_schema_or_emit_multiple_definitions_diagnostic,
     insert_selectable_into_schema_or_emit_multiple_definitions_diagnostic,
     to_isograph_constant_value,
@@ -395,7 +395,12 @@ fn insert_parsed_items_into_schema(
                         .unchecked_conversion::<EntityName>()
                         .with_missing_location(),
                     arguments: vec![],
-                    associated_data: ().client_defined(),
+                    associated_data: ClientFieldVariant::Link
+                        .note_todo(
+                            "as_concrete_type fields are not links. Add a dedicated variant \
+                            for server-derived selectables, or use DefinitionLocation::ServerDefined.",
+                        )
+                        .client_defined(),
                 }
                 .with_missing_location(),
             );

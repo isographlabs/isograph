@@ -10,8 +10,9 @@ use pico_macros::memo;
 use prelude::Postfix;
 
 use crate::{
-    CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSelectable, IsInlineFragment,
-    IsographDatabase, client_selectable_declaration_map_from_iso_literals,
+    ClientFieldVariant, CompilationProfile, FlattenedDataModelEntity, FlattenedDataModelSelectable,
+    IsInlineFragment, IsoLiteralExportInfo, IsographDatabase, UserWrittenClientTypeInfo,
+    client_selectable_declaration_map_from_iso_literals,
 };
 
 #[memo]
@@ -94,7 +95,14 @@ pub fn define_client_selectables_and_entities<TCompilationProfile: CompilationPr
                     )
                     .wrap_ok()
                     .with_no_location(),
-                    associated_data: ().client_defined(),
+                    associated_data: ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+                        info: IsoLiteralExportInfo {
+                            const_export_name: scalar_declaration.const_export_name,
+                            file_path: scalar_declaration.definition_path,
+                        },
+                        directive_set: scalar_declaration.directive_set.clone(),
+                    })
+                    .client_defined(),
                     is_inline_fragment: IsInlineFragment(false),
                 });
             }
@@ -128,7 +136,14 @@ pub fn define_client_selectables_and_entities<TCompilationProfile: CompilationPr
                         // .map_location(Some)
                         .drop_location()
                         .map(Ok),
-                    associated_data: ().client_defined(),
+                    associated_data: ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+                        info: IsoLiteralExportInfo {
+                            const_export_name: object_declaration.const_export_name,
+                            file_path: object_declaration.definition_path,
+                        },
+                        directive_set: object_declaration.directives.clone(),
+                    })
+                    .client_defined(),
                     is_inline_fragment: IsInlineFragment(false),
                 });
             }
