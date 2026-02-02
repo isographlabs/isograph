@@ -46,7 +46,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
     let ts_file_extension = file_extensions.ts();
-    let user_written_component_variant = info.client_scalar_selectable_directive_set.clone();
+    let user_written_component_variant = info.directive_set.clone();
 
     let parent_entity_name = match client_selectable {
         SelectionType::Scalar(s) => s.parent_entity_name,
@@ -459,7 +459,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     );
 
     let final_output_type_text = if let ClientScalarSelectableDirectiveSet::None(_) =
-        info.client_scalar_selectable_directive_set.clone().expect(
+        info.directive_set.clone().expect(
             "Expected directive set to have been validated. \
             This is indicative of a bug in Isograph.",
         ) {

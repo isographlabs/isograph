@@ -201,8 +201,10 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     config,
                     &UserWrittenClientTypeInfo {
                         info: client_object_selectable.variant,
-                        client_scalar_selectable_directive_set:
-                            ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}).wrap_ok(),
+                        directive_set: ClientScalarSelectableDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        )
+                        .wrap_ok(),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
@@ -422,18 +424,19 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             SelectionType::Object(client_object_selectable) => {
                 let client_object_selectable = client_object_selectable.lookup(db);
                 generate_eager_reader_output_type_artifact(
-                        db,
-                        &client_object_selectable.object_selected(),
-                        config,
-                        &UserWrittenClientTypeInfo {
-                            info: client_object_selectable.variant,
-                            client_scalar_selectable_directive_set:
-                                ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
-                                    .wrap_ok(),
-                        },
-                        config.options.include_file_extensions_in_import_statements,
-                    )
-                    .wrap_some()
+                    db,
+                    &client_object_selectable.object_selected(),
+                    config,
+                    &UserWrittenClientTypeInfo {
+                        info: client_object_selectable.variant,
+                        directive_set: ClientScalarSelectableDirectiveSet::None(
+                            EmptyDirectiveSet {},
+                        )
+                        .wrap_ok(),
+                    },
+                    config.options.include_file_extensions_in_import_statements,
+                )
+                .wrap_some()
             }
             SelectionType::Scalar(client_scalar_selectable) => {
                 let client_scalar_selectable = client_scalar_selectable.lookup(db);
@@ -613,13 +616,10 @@ pub(crate) fn generate_output_type<TCompilationProfile: CompilationProfile>(
                 &client_scalar_selectable.parent_entity_name,
             ),
         ),
-        ClientFieldVariant::UserWritten(info) => match info
-            .client_scalar_selectable_directive_set
-            .clone()
-            .expect(
-                "Expected client scalar selectable directive set to have been validated. \
+        ClientFieldVariant::UserWritten(info) => match info.directive_set.clone().expect(
+            "Expected client scalar selectable directive set to have been validated. \
                 This is indicative of a bug in Isograph.",
-            ) {
+        ) {
             ClientScalarSelectableDirectiveSet::None(_) => {
                 ClientScalarSelectableOutputType("ReturnType<typeof resolver>".to_string())
             }

@@ -87,8 +87,7 @@ pub struct ImperativelyLoadedFieldVariant {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
     pub info: IsoLiteralExportInfo,
-    pub client_scalar_selectable_directive_set:
-        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
+    pub directive_set: Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

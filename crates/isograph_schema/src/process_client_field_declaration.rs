@@ -328,7 +328,7 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
             const_export_name: client_field_declaration.const_export_name,
             file_path: client_field_declaration.definition_path,
         },
-        client_scalar_selectable_directive_set: client_field_declaration
+        directive_set: client_field_declaration
             .client_scalar_selectable_directive_set
             .clone(),
     })

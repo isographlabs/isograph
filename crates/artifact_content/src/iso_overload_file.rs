@@ -320,13 +320,10 @@ fn sorted_user_written_types<TCompilationProfile: CompilationProfile>(
                     SelectionType::Scalar(scalar) => match scalar.lookup(db).variant.reference() {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
-                        ) => user_written_client_type_info
-                            .client_scalar_selectable_directive_set
-                            .clone()
-                            .expect(
-                                "Expected directive set to have been validated. \
+                        ) => user_written_client_type_info.directive_set.clone().expect(
+                            "Expected directive set to have been validated. \
                                 This is indicative of a bug in Isograph.",
-                            ),
+                        ),
                         isograph_schema::ClientFieldVariant::ImperativelyLoadedField(_) => {
                             ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
                         }

@@ -184,7 +184,7 @@ fn validate_scalar_selectable_directive_sets<TCompilationProfile: CompilationPro
             match selection {
                 SelectionType::Scalar(s) => {
                     if let ClientFieldVariant::UserWritten(u) = &s.lookup(db).variant
-                        && let Err(e) = &u.client_scalar_selectable_directive_set
+                        && let Err(e) = &u.directive_set
                     {
                         return Some(e.clone());
                     }

@@ -568,12 +568,10 @@ fn loadably_selected_field_ast_node<TCompilationProfile: CompilationProfile>(
             .entity_name_and_selectable_name()
             .parent_entity_name;
         let field_directive_set = match client_scalar_selectable.variant.reference() {
-            ClientFieldVariant::UserWritten(info) => {
-                info.client_scalar_selectable_directive_set.clone().expect(
-                    "Expected directive set to have been validated. \
+            ClientFieldVariant::UserWritten(info) => info.directive_set.clone().expect(
+                "Expected directive set to have been validated. \
                     This is indicative of a bug in Isograph.",
-                )
-            }
+            ),
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }
