@@ -103,3 +103,16 @@ pub enum ClientFieldVariant {
     ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
     Link,
 }
+
+impl ClientFieldVariant {
+    pub fn unwrap_user_written_variant(self) -> UserWrittenClientTypeInfo {
+        if let ClientFieldVariant::UserWritten(u) = self {
+            u
+        } else {
+            panic!(
+                "Unexpected non-user-written variant. \
+                This is indicative of a bug in Isograph."
+            )
+        }
+    }
+}
