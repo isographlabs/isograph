@@ -18,7 +18,7 @@ use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, EntrypointDirectiveSet,
     ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix, VariableDeclaration,
-    VariableNameWrapper,
+    VariableNameWrapper, from_isograph_field_directives,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo,
@@ -239,10 +239,12 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
         root_object_entity.name.item,
         &directive_set,
         match entrypoint.variant.reference() {
-            ClientFieldVariant::UserWritten(info) => info.directive_set.clone().expect(
-                "Expected directive set to have been validated by now. \
+            ClientFieldVariant::UserWritten(info) => {
+                from_isograph_field_directives(&info.directive_set).expect(
+                    "Expected directive set to have been validated by now. \
                     This is indicative of a bug in Isograph.",
-            ),
+                )
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }

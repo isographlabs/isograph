@@ -6,7 +6,7 @@ use intern::Lookup;
 use isograph_config::{CompilerConfig, GenerateFileExtensionsOption};
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, SelectionSet, SelectionType, SelectionTypePostfix,
-    VariableDeclaration,
+    VariableDeclaration, from_isograph_field_directives,
 };
 use isograph_schema::{
     ClientScalarSelectable, ClientSelectable, CompilationProfile, FlattenedDataModelSelectable,
@@ -98,7 +98,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     );
 
     let reader_content = if let ClientScalarSelectableDirectiveSet::None(_) =
-        user_written_component_variant.expect(
+        from_isograph_field_directives(&user_written_component_variant).expect(
             "Expected component variant to be valid. \
             This is indicative of a bug in Isograph.",
         ) {
@@ -459,7 +459,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     );
 
     let final_output_type_text = if let ClientScalarSelectableDirectiveSet::None(_) =
-        info.directive_set.clone().expect(
+        from_isograph_field_directives(&info.directive_set).expect(
             "Expected directive set to have been validated. \
             This is indicative of a bug in Isograph.",
         ) {

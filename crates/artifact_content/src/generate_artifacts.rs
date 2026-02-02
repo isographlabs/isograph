@@ -6,9 +6,9 @@ use common_lang_types::{
 use core::panic;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
-    NonConstantValue, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant,
-    VariableDeclaration, VariableNameWrapper,
+    ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation, NonConstantValue,
+    SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant,
+    VariableDeclaration, VariableNameWrapper, from_isograph_field_directives,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, ContainsIsoStats, FieldMapItem,
@@ -201,10 +201,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     config,
                     &UserWrittenClientTypeInfo {
                         info: client_object_selectable.variant,
-                        directive_set: ClientScalarSelectableDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        )
-                        .wrap_ok(),
+                        directive_set: vec![].with_location(EmbeddedLocation::todo_generated()),
                     },
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
@@ -429,10 +426,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     config,
                     &UserWrittenClientTypeInfo {
                         info: client_object_selectable.variant,
-                        directive_set: ClientScalarSelectableDirectiveSet::None(
-                            EmptyDirectiveSet {},
-                        )
-                        .wrap_ok(),
+                        directive_set: vec![].with_location(EmbeddedLocation::todo_generated()),
                     },
                     config.options.include_file_extensions_in_import_statements,
                 )
@@ -616,7 +610,10 @@ pub(crate) fn generate_output_type<TCompilationProfile: CompilationProfile>(
                 &client_scalar_selectable.parent_entity_name,
             ),
         ),
-        ClientFieldVariant::UserWritten(info) => match info.directive_set.clone().expect(
+        ClientFieldVariant::UserWritten(info) => match from_isograph_field_directives(
+            &info.directive_set,
+        )
+        .expect(
             "Expected client scalar selectable directive set to have been validated. \
                 This is indicative of a bug in Isograph.",
         ) {

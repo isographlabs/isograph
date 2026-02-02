@@ -8,7 +8,7 @@ use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, DefinitionLocation, DefinitionLocationPostfix,
     EmptyDirectiveSet, LoadableDirectiveParameters, ObjectSelection, ObjectSelectionDirectiveSet,
     ScalarSelection, ScalarSelectionDirectiveSet, Selection, SelectionSet, SelectionType,
-    SelectionTypePostfix,
+    SelectionTypePostfix, from_isograph_field_directives,
 };
 use isograph_schema::{
     BorrowedObjectSelectable, ClientFieldVariant, ClientScalarSelectable, CompilationProfile,
@@ -568,10 +568,12 @@ fn loadably_selected_field_ast_node<TCompilationProfile: CompilationProfile>(
             .entity_name_and_selectable_name()
             .parent_entity_name;
         let field_directive_set = match client_scalar_selectable.variant.reference() {
-            ClientFieldVariant::UserWritten(info) => info.directive_set.clone().expect(
-                "Expected directive set to have been validated. \
+            ClientFieldVariant::UserWritten(info) => {
+                from_isograph_field_directives(&info.directive_set).expect(
+                    "Expected directive set to have been validated. \
                     This is indicative of a bug in Isograph.",
-            ),
+                )
+            }
             ClientFieldVariant::ImperativelyLoadedField(_) => {
                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
             }

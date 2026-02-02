@@ -1,7 +1,10 @@
 use std::collections::BTreeSet;
 
 use common_lang_types::{Diagnostic, DiagnosticVecResult, Location};
-use isograph_lang_types::{DefinitionLocation, SelectionType};
+use isograph_lang_types::{
+    ClientScalarSelectableDirectiveSet, DefinitionLocation, SelectionType,
+    from_isograph_field_directives,
+};
 use pico_macros::memo;
 use prelude::{ErrClone, Postfix};
 
@@ -184,9 +187,11 @@ fn validate_scalar_selectable_directive_sets<TCompilationProfile: CompilationPro
             match selection {
                 SelectionType::Scalar(s) => {
                     if let ClientFieldVariant::UserWritten(u) = &s.lookup(db).variant
-                        && let Err(e) = &u.directive_set
+                        && let Err(e) = from_isograph_field_directives::<
+                            ClientScalarSelectableDirectiveSet,
+                        >(&u.directive_set)
                     {
-                        return Some(e.clone());
+                        return Some(e);
                     }
                 }
                 SelectionType::Object(_) => {

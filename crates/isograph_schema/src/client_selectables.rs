@@ -1,11 +1,11 @@
 use std::{fmt::Debug, marker::PhantomData};
 
 use common_lang_types::{
-    ConstExportName, Diagnostic, EntityName, EntityNameAndSelectableName, RelativePathToSourceFile,
-    SelectableName, WithNoLocation,
+    ConstExportName, EntityName, EntityNameAndSelectableName, RelativePathToSourceFile,
+    SelectableName, WithEmbeddedLocation, WithNoLocation,
 };
 use isograph_lang_types::{
-    ClientScalarSelectableDirectiveSet, Description, SelectionType, TypeAnnotationDeclaration,
+    Description, IsographFieldDirective, SelectionType, TypeAnnotationDeclaration,
     VariableDeclaration,
 };
 use pico::MemoRef;
@@ -87,7 +87,7 @@ pub struct ImperativelyLoadedFieldVariant {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
     pub info: IsoLiteralExportInfo,
-    pub directive_set: Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
+    pub directive_set: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

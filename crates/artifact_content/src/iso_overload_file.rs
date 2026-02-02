@@ -2,6 +2,7 @@ use intern::Lookup;
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
     ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, SelectionType, SelectionTypePostfix,
+    from_isograph_field_directives,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -320,7 +321,10 @@ fn sorted_user_written_types<TCompilationProfile: CompilationProfile>(
                     SelectionType::Scalar(scalar) => match scalar.lookup(db).variant.reference() {
                         isograph_schema::ClientFieldVariant::UserWritten(
                             user_written_client_type_info,
-                        ) => user_written_client_type_info.directive_set.clone().expect(
+                        ) => from_isograph_field_directives(
+                            &user_written_client_type_info.directive_set,
+                        )
+                        .expect(
                             "Expected directive set to have been validated. \
                                 This is indicative of a bug in Isograph.",
                         ),
