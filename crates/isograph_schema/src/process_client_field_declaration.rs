@@ -302,10 +302,13 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
         target_entity: client_pointer_declaration.target_type.item.clone(),
         phantom_data: std::marker::PhantomData,
 
-        variant: IsoLiteralExportInfo {
-            const_export_name: client_pointer_declaration.const_export_name,
-            file_path: client_pointer_declaration.definition_path,
-        },
+        variant: ClientFieldVariant::UserWritten(UserWrittenClientTypeInfo {
+            info: IsoLiteralExportInfo {
+                const_export_name: client_pointer_declaration.const_export_name,
+                file_path: client_pointer_declaration.definition_path,
+            },
+            directive_set: client_pointer_declaration.directives.clone(),
+        }),
     };
 
     Ok((

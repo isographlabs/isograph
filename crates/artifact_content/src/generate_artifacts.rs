@@ -13,7 +13,7 @@ use isograph_lang_types::{
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, ContainsIsoStats, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
-    NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
+    NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform,
     accessible_client_selectables, deprecated_client_selectable_map, flattened_entity_named,
     inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, validate_entire_schema, validated_entrypoints,
@@ -199,10 +199,10 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     db,
                     &client_object_selectable.object_selected(),
                     config,
-                    &UserWrittenClientTypeInfo {
-                        info: client_object_selectable.variant,
-                        directive_set: vec![].with_location(EmbeddedLocation::todo_generated()),
-                    },
+                    &client_object_selectable
+                        .variant
+                        .clone()
+                        .unwrap_user_written_variant(),
                     &traversal_state.refetch_paths,
                     config.options.include_file_extensions_in_import_statements,
                     traversal_state.has_updatable,
@@ -424,10 +424,10 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     db,
                     &client_object_selectable.object_selected(),
                     config,
-                    &UserWrittenClientTypeInfo {
-                        info: client_object_selectable.variant,
-                        directive_set: vec![].with_location(EmbeddedLocation::todo_generated()),
-                    },
+                    &client_object_selectable
+                        .variant
+                        .clone()
+                        .unwrap_user_written_variant(),
                     config.options.include_file_extensions_in_import_statements,
                 )
                 .wrap_some()
