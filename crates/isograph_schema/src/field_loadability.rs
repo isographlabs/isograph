@@ -1,11 +1,8 @@
 //! TODO this is deprecated and should be removed
 
 use isograph_lang_types::{LoadableDirectiveParameters, ScalarSelectionDirectiveSet};
-use prelude::Postfix;
 
-use crate::{
-    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, ImperativelyLoadedFieldVariant,
-};
+use crate::{ClientFieldVariant, ImperativelyLoadedFieldVariant};
 
 pub enum Loadability<'a> {
     LoadablySelectedField(&'a LoadableDirectiveParameters),
@@ -22,11 +19,11 @@ pub enum Loadability<'a> {
 /// as an immediate follow-up request. Once we do this, there will always be one
 /// source of truth for whether a field is fetched imperatively: the presence of the
 /// @loadable directive.
-pub fn categorize_field_loadability<'a, TCompilationProfile: CompilationProfile>(
-    client_scalar_selectable: &'a ClientScalarSelectable<TCompilationProfile>,
+pub fn categorize_field_loadability<'a>(
+    variant: &'a ClientFieldVariant,
     selection_variant: &'a ScalarSelectionDirectiveSet,
 ) -> Option<Loadability<'a>> {
-    match client_scalar_selectable.variant.reference() {
+    match variant {
         ClientFieldVariant::Link => None,
         ClientFieldVariant::UserWritten(_) => match selection_variant {
             ScalarSelectionDirectiveSet::None(_) => None,

@@ -969,7 +969,9 @@ fn merge_client_scalar_field<TCompilationProfile: CompilationProfile>(
     // If the field is selected loadably or is imperative, we must note the refetch path,
     // because this results in an artifact being generated.
     match categorize_field_loadability(
-        newly_encountered_scalar_client_selectable,
+        newly_encountered_scalar_client_selectable
+            .variant
+            .reference(),
         &scalar_field_selection.scalar_selection_directive_set,
     ) {
         Some(Loadability::LoadablySelectedField(_loadable_variant)) => {

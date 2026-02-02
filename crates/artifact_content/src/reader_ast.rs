@@ -366,7 +366,7 @@ fn scalar_client_defined_field_ast_node<TCompilationProfile: CompilationProfile>
     );
 
     match categorize_field_loadability(
-        client_scalar_selectable,
+        client_scalar_selectable.variant.reference(),
         &scalar_field_selection.scalar_selection_directive_set,
     ) {
         Some(Loadability::LoadablySelectedField(loadable_directive_parameters)) => {
@@ -889,7 +889,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                     DefinitionLocation::Client(client_scalar_selectable) => {
                         let client_scalar_selectable = client_scalar_selectable.lookup(db);
                         match categorize_field_loadability(
-                            client_scalar_selectable,
+                            client_scalar_selectable.variant.reference(),
                             &scalar_field_selection.scalar_selection_directive_set,
                         ) {
                             Some(Loadability::ImperativelyLoadedField(_)) => {
