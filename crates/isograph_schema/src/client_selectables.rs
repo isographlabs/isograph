@@ -86,9 +86,7 @@ pub struct ImperativelyLoadedFieldVariant {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct UserWrittenClientTypeInfo {
-    // TODO use a shared struct
-    pub const_export_name: ConstExportName,
-    pub file_path: RelativePathToSourceFile,
+    pub info: IsoLiteralExportInfo,
     pub client_scalar_selectable_directive_set:
         Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
 }

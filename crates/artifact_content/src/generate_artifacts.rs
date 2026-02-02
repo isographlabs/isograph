@@ -200,8 +200,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     &client_object_selectable.object_selected(),
                     config,
                     &UserWrittenClientTypeInfo {
-                        const_export_name: client_object_selectable.info.const_export_name,
-                        file_path: client_object_selectable.info.file_path,
+                        info: client_object_selectable.info,
                         client_scalar_selectable_directive_set:
                             ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {}).wrap_ok(),
                     },
@@ -427,8 +426,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                         &client_object_selectable.object_selected(),
                         config,
                         &UserWrittenClientTypeInfo {
-                            const_export_name: client_object_selectable.info.const_export_name,
-                            file_path: client_object_selectable.info.file_path,
+                            info: client_object_selectable.info,
                             client_scalar_selectable_directive_set:
                                 ClientScalarSelectableDirectiveSet::None(EmptyDirectiveSet {})
                                     .wrap_ok(),

@@ -536,7 +536,7 @@ fn generate_function_import_statement(
     // Anyway, TODO do better.
     let relative_path_to_current_artifact =
         PathBuf::from(config.artifact_directory.relative_path.lookup()).join("Type/Field");
-    let relative_path_to_client_scalar_selectable = target_field_info.file_path.lookup();
+    let relative_path_to_client_scalar_selectable = target_field_info.info.file_path.lookup();
 
     let relative_path = pathdiff::diff_paths(
         relative_path_to_client_scalar_selectable,
@@ -563,7 +563,7 @@ fn generate_function_import_statement(
         GenerateFileExtensionsOption::IncludeExtensionsInFileImports => &normalized_file_name,
     };
 
-    let const_export_name = target_field_info.const_export_name;
+    let const_export_name = target_field_info.info.const_export_name;
     ClientScalarSelectableFunctionImportStatement(format!(
         "import {{ {const_export_name} as resolver }} from '{file_name}';"
     ))
