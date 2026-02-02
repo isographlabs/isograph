@@ -1,12 +1,16 @@
 use std::{fmt::Debug, marker::PhantomData};
 
-use common_lang_types::{EntityName, EntityNameAndSelectableName, SelectableName, WithNoLocation};
+use common_lang_types::{
+    ConstExportName, Diagnostic, EntityName, EntityNameAndSelectableName, RelativePathToSourceFile,
+    SelectableName, WithNoLocation,
+};
 use isograph_lang_types::{
-    Description, SelectionType, TypeAnnotationDeclaration, VariableDeclaration,
+    ClientScalarSelectableDirectiveSet, Description, SelectionType, TypeAnnotationDeclaration,
+    VariableDeclaration,
 };
 use pico::MemoRef;
 
-use crate::{ClientFieldVariant, CompilationProfile, UserWrittenClientPointerInfo};
+use crate::{CompilationProfile, FieldMapItem, WrappedSelectionMapSelection};
 
 // TODO rename
 pub type ClientSelectableId =
@@ -63,4 +67,42 @@ impl<TCompilationProfile: CompilationProfile> ClientObjectSelectable<TCompilatio
     pub fn entity_name_and_selectable_name(&self) -> EntityNameAndSelectableName {
         EntityNameAndSelectableName::new(self.parent_entity_name, self.name)
     }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct ImperativelyLoadedFieldVariant {
+    pub selectable_name: SelectableName,
+
+    // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
+    pub root_object_entity_name: EntityName,
+    pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
+    pub field_map: Vec<FieldMapItem>,
+    /// The arguments we must pass to the top level schema field, e.g. id: ID!
+    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
+    /// but we nonetheless need to put them into the query definition, and we need
+    /// the variable's type, not just the variable.
+    pub top_level_schema_field_arguments: Vec<VariableDeclaration>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct UserWrittenClientTypeInfo {
+    // TODO use a shared struct
+    pub const_export_name: ConstExportName,
+    pub file_path: RelativePathToSourceFile,
+    pub client_scalar_selectable_directive_set:
+        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+// TODO refactor this https://github.com/isographlabs/isograph/pull/435#discussion_r1970489356
+pub struct UserWrittenClientPointerInfo {
+    pub const_export_name: ConstExportName,
+    pub file_path: RelativePathToSourceFile,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ClientFieldVariant {
+    UserWritten(UserWrittenClientTypeInfo),
+    ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
+    Link,
 }

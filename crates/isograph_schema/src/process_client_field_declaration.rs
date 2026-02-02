@@ -1,12 +1,10 @@
 use common_lang_types::{
-    ConstExportName, Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location,
-    RelativePathToSourceFile, SelectableName, VariableName, WithEmbeddedLocation,
-    WithGenericLocation, WithLocationPostfix,
+    Diagnostic, DiagnosticResult, EmbeddedLocation, EntityName, Location, SelectableName,
+    VariableName, WithEmbeddedLocation, WithGenericLocation, WithLocationPostfix,
 };
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration,
-    ClientScalarSelectableDirectiveSet, NonConstantValue, SelectionSet, SelectionType,
-    VariableDeclaration,
+    ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, NonConstantValue,
+    SelectionSet, SelectionType,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -14,9 +12,9 @@ use prelude::Postfix;
 use pico_macros::memo;
 
 use crate::{
-    ClientObjectSelectable, ClientScalarSelectable, CompilationProfile, FieldMapItem,
-    ID_FIELD_NAME, IsographDatabase, NetworkProtocol, WrappedSelectionMapSelection,
-    flattened_entity_named, flattened_selectable_named,
+    ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, CompilationProfile,
+    ID_FIELD_NAME, IsographDatabase, NetworkProtocol, UserWrittenClientPointerInfo,
+    UserWrittenClientTypeInfo, flattened_entity_named, flattened_selectable_named,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
 
@@ -322,44 +320,6 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
         },
         client_object_selectable.interned_value(db),
     ))
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct ImperativelyLoadedFieldVariant {
-    pub selectable_name: SelectableName,
-
-    // Mutation or Query or whatnot. Awkward! A GraphQL-ism!
-    pub root_object_entity_name: EntityName,
-    pub subfields_or_inline_fragments: Vec<WrappedSelectionMapSelection>,
-    pub field_map: Vec<FieldMapItem>,
-    /// The arguments we must pass to the top level schema field, e.g. id: ID!
-    /// for node(id: $id). These are already encoded in the subfields_or_inline_fragments,
-    /// but we nonetheless need to put them into the query definition, and we need
-    /// the variable's type, not just the variable.
-    pub top_level_schema_field_arguments: Vec<VariableDeclaration>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct UserWrittenClientTypeInfo {
-    // TODO use a shared struct
-    pub const_export_name: ConstExportName,
-    pub file_path: RelativePathToSourceFile,
-    pub client_scalar_selectable_directive_set:
-        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-// TODO refactor this https://github.com/isographlabs/isograph/pull/435#discussion_r1970489356
-pub struct UserWrittenClientPointerInfo {
-    pub const_export_name: ConstExportName,
-    pub file_path: RelativePathToSourceFile,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum ClientFieldVariant {
-    UserWritten(UserWrittenClientTypeInfo),
-    ImperativelyLoadedField(ImperativelyLoadedFieldVariant),
-    Link,
 }
 
 fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> ClientFieldVariant {
