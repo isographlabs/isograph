@@ -60,7 +60,7 @@ pub struct ClientObjectSelectable<TCompilationProfile: CompilationProfile> {
     pub target_entity: TypeAnnotationDeclaration,
 
     pub phantom_data: PhantomData<TCompilationProfile>,
-    pub info: IsoLiteralExportInfo,
+    pub variant: IsoLiteralExportInfo,
 }
 
 impl<TCompilationProfile: CompilationProfile> ClientObjectSelectable<TCompilationProfile> {
