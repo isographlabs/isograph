@@ -1,15 +1,12 @@
-use common_lang_types::{
-    ConstExportName, Diagnostic, RelativePathToSourceFile, WithEmbeddedLocation,
-};
+use common_lang_types::{ConstExportName, RelativePathToSourceFile, WithEmbeddedLocation};
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use std::fmt::Debug;
 
 use crate::{
-    ClientObjectSelectableNameWrapper, ClientScalarSelectableDirectiveSet,
-    ClientScalarSelectableNameWrapper, EntityNameWrapper, IsographFieldDirective,
-    IsographSemanticToken, ObjectSelectionPath, Selection, TypeAnnotationDeclaration,
-    VariableDeclaration, isograph_resolved_node::IsographResolvedNode,
+    ClientObjectSelectableNameWrapper, ClientScalarSelectableNameWrapper, EntityNameWrapper,
+    IsographFieldDirective, IsographSemanticToken, ObjectSelectionPath, Selection,
+    TypeAnnotationDeclaration, VariableDeclaration, isograph_resolved_node::IsographResolvedNode,
     string_key_wrappers::Description,
 };
 
@@ -25,8 +22,7 @@ pub struct ClientFieldDeclaration {
     pub description: Option<WithEmbeddedLocation<Description>>,
     #[resolve_field]
     pub selection_set: WithEmbeddedLocation<SelectionSet>,
-    pub client_scalar_selectable_directive_set:
-        Result<ClientScalarSelectableDirectiveSet, Diagnostic>,
+    pub directive_set: WithEmbeddedLocation<Vec<WithEmbeddedLocation<IsographFieldDirective>>>,
     #[resolve_field]
     pub variable_definitions: Vec<WithEmbeddedLocation<VariableDeclaration>>,
     pub definition_path: RelativePathToSourceFile,

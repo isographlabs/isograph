@@ -188,8 +188,6 @@ fn parse_client_field_declaration_inner(
 
         let directives = parse_directives(tokens)?;
 
-        let client_field_directive_set = from_isograph_field_directives(&directives);
-
         let description = parse_optional_description(tokens);
 
         let selection_set = parse_optional_selection_set(tokens)?.ok_or_else(|| {
@@ -215,7 +213,7 @@ fn parse_client_field_declaration_inner(
             description,
             selection_set,
             definition_path: definition_file_path,
-            client_scalar_selectable_directive_set: client_field_directive_set,
+            directive_set: directives,
             const_export_name: const_export_name.intern().into(),
             variable_definitions,
 

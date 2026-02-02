@@ -4,7 +4,7 @@ use common_lang_types::{
 };
 use isograph_lang_types::{
     ArgumentKeyAndValue, ClientFieldDeclaration, ClientPointerDeclaration, NonConstantValue,
-    SelectionSet, SelectionType,
+    SelectionSet, SelectionType, from_isograph_field_directives,
 };
 use pico::MemoRef;
 use prelude::Postfix;
@@ -328,9 +328,7 @@ fn get_client_variant(client_field_declaration: &ClientFieldDeclaration) -> Clie
             const_export_name: client_field_declaration.const_export_name,
             file_path: client_field_declaration.definition_path,
         },
-        directive_set: client_field_declaration
-            .client_scalar_selectable_directive_set
-            .clone(),
+        directive_set: from_isograph_field_directives(&client_field_declaration.directive_set),
     })
 }
 
