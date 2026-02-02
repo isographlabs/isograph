@@ -6,20 +6,18 @@ use common_lang_types::{
 use core::panic;
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation,
-    DefinitionLocationPostfix, EmptyDirectiveSet, NonConstantValue, SelectionType,
-    SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant, VariableDeclaration,
-    VariableNameWrapper,
+    ArgumentKeyAndValue, ClientScalarSelectableDirectiveSet, DefinitionLocation, EmptyDirectiveSet,
+    NonConstantValue, SelectionType, SelectionTypePostfix, TypeAnnotationDeclaration, UnionVariant,
+    VariableDeclaration, VariableNameWrapper,
 };
 use isograph_schema::{
-    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, FieldMapItem,
+    ClientFieldVariant, ClientScalarSelectable, CompilationProfile, ContainsIsoStats, FieldMapItem,
     FieldTraversalResult, ID_ENTITY_NAME, ID_FIELD_NAME, IsographDatabase, NODE_FIELD_NAME,
     NameAndArguments, NormalizationKey, RefetchStrategy, TargetPlatform, UserWrittenClientTypeInfo,
     accessible_client_selectables, deprecated_client_selectable_map, flattened_entity_named,
     inline_fragment_reader_selection_set, refetch_strategy_for_client_scalar_selectable_named,
     selectable_named, validate_entire_schema, validated_entrypoints,
 };
-use isograph_schema::{ContainsIsoStats, flattened_selectable_named};
 use lazy_static::lazy_static;
 use prelude::*;
 use std::{
@@ -159,7 +157,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
     }
 
     for (
-        encountered_field_id,
+        (parent_object_entity_name, selectable_name),
         FieldTraversalResult {
             traversal_state,
             merged_selection_map,
@@ -168,21 +166,20 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
         },
     ) in &encountered_client_type_map
     {
-        match encountered_field_id.dereference() {
-            DefinitionLocation::Server((
-                parent_object_entity_name,
-                server_object_selectable_name,
-            )) => {
-                let server_object_selectable = flattened_selectable_named(
-                    db,
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )
-                .expect_selectable_to_exist(
-                    parent_object_entity_name,
-                    server_object_selectable_name,
-                )
-                .lookup(db);
+        let selectable = selectable_named(db, *parent_object_entity_name, *selectable_name)
+            .as_ref()
+            .expect(
+                "Expected selectable to be valid. \
+                This is indicative of a bug in Isograph.",
+            )
+            .expect(
+                "Expected selectable to exist. \
+                This is indicative of a bug in Isograph.",
+            );
+
+        match selectable {
+            DefinitionLocation::Server(server_selectable) => {
+                let server_object_selectable = server_selectable.lookup(db);
 
                 if server_object_selectable.is_inline_fragment.0 {
                     path_and_contents.push(generate_eager_reader_condition_artifact(
@@ -195,32 +192,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                 }
             }
 
-            DefinitionLocation::Client(SelectionType::Object((
-                parent_object_entity_name,
-                client_object_selectable_name,
-            ))) => {
-                let client_object_selectable =
-                    selectable_named(db, parent_object_entity_name, client_object_selectable_name)
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to be valid. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect_selectable_to_exist(
-                            parent_object_entity_name,
-                            client_object_selectable_name,
-                        )
-                        .as_client()
-                        .expect(
-                            "Expected client selectable. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_object()
-                        .expect(
-                            "Expected client object selectable. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db);
+            DefinitionLocation::Client(SelectionType::Object(client_object_selectable_ref)) => {
+                let client_object_selectable = client_object_selectable_ref.lookup(db);
 
                 path_and_contents.extend(generate_eager_reader_artifacts(
                     db,
@@ -237,32 +210,8 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
                     traversal_state.has_updatable,
                 ));
             }
-            DefinitionLocation::Client(SelectionType::Scalar((
-                parent_object_entity_name,
-                client_scalar_selectable_name,
-            ))) => {
-                let client_scalar_selectable =
-                    selectable_named(db, parent_object_entity_name, client_scalar_selectable_name)
-                        .as_ref()
-                        .expect(
-                            "Expected selectable to be valid. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .expect_selectable_to_exist(
-                            parent_object_entity_name,
-                            client_scalar_selectable_name,
-                        )
-                        .as_client()
-                        .expect(
-                            "Expected client selectable. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .as_scalar()
-                        .expect(
-                            "Expected client scalar selectable. \
-                            This is indicative of a bug in Isograph.",
-                        )
-                        .lookup(db);
+            DefinitionLocation::Client(SelectionType::Scalar(client_scalar_selectable_ref)) => {
+                let client_scalar_selectable = client_scalar_selectable_ref.lookup(db);
 
                 match client_scalar_selectable.variant.reference() {
                     ClientFieldVariant::Link => (),
@@ -430,7 +379,7 @@ fn get_artifact_path_and_content_impl<TCompilationProfile: CompilationProfile>(
             config.options.include_file_extensions_in_import_statements,
         ));
 
-        match encountered_client_type_map.get(&client_type_name.client_defined()) {
+        match encountered_client_type_map.get(&client_type_name.inner()) {
             Some(FieldTraversalResult {
                 traversal_state, ..
             }) => {

@@ -16,9 +16,9 @@ use common_lang_types::{
 };
 use isograph_config::GenerateFileExtensionsOption;
 use isograph_lang_types::{
-    ClientScalarSelectableDirectiveSet, DefinitionLocationPostfix, EmptyDirectiveSet,
-    EntrypointDirectiveSet, ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix,
-    VariableDeclaration, VariableNameWrapper,
+    ClientScalarSelectableDirectiveSet, EmptyDirectiveSet, EntrypointDirectiveSet,
+    ScalarSelectionDirectiveSet, SelectionType, SelectionTypePostfix, VariableDeclaration,
+    VariableNameWrapper,
 };
 use isograph_schema::{
     ClientFieldVariant, ClientScalarSelectable, CompilationProfile, EntrypointDeclarationInfo,
@@ -85,9 +85,7 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
         (
             entrypoint.parent_entity_name,
             entrypoint_scalar_selectable_name,
-        )
-            .scalar_selected()
-            .client_defined(),
+        ),
         &initial_variable_context(&entrypoint.scalar_selected()),
     );
 
@@ -185,7 +183,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
                                     &root_refetch_path
                                         .path_to_refetch_field_info
                                         .client_selectable_id
-                                        .client_defined(),
+                                        .inner(),
                                 )
                                 .expect(
                                     "Expected field to have been encountered, \

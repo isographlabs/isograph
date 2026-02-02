@@ -9,10 +9,10 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use isograph_lang_types::{
-    ArgumentKeyAndValue, DefinitionLocation, DefinitionLocationPostfix, EmptyDirectiveSet,
-    NonConstantValue, ObjectSelection, ObjectSelectionDirectiveSet, ScalarSelection,
-    ScalarSelectionDirectiveSet, SelectionFieldArgument, SelectionSet, SelectionType,
-    SelectionTypePostfix, TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
+    ArgumentKeyAndValue, DefinitionLocation, EmptyDirectiveSet, NonConstantValue, ObjectSelection,
+    ObjectSelectionDirectiveSet, ScalarSelection, ScalarSelectionDirectiveSet,
+    SelectionFieldArgument, SelectionSet, SelectionType, SelectionTypePostfix,
+    TypeAnnotationDeclaration, VariableDeclaration, VariableNameWrapper,
 };
 use lazy_static::lazy_static;
 use prelude::Postfix;
@@ -46,10 +46,8 @@ impl WrappedMergedSelectionMap {
 }
 
 // Maybe this should be FNVHashMap? We don't really need stable iteration order
-pub type FieldToCompletedMergeTraversalStateMap = BTreeMap<
-    DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
-    FieldTraversalResult,
->;
+pub type FieldToCompletedMergeTraversalStateMap =
+    BTreeMap<(EntityName, SelectableName), FieldTraversalResult>;
 
 #[derive(Clone, Debug)]
 pub struct FieldTraversalResult {
@@ -475,7 +473,7 @@ pub fn create_merged_selection_map_for_field_and_insert_into_global_map<
     parent_object_entity: &FlattenedDataModelEntity<TCompilationProfile>,
     selection_set: &WithEmbeddedLocation<SelectionSet>,
     encountered_client_type_map: &mut FieldToCompletedMergeTraversalStateMap,
-    root_field_id: DefinitionLocation<(EntityName, SelectableName), ClientSelectableId>,
+    root_field_id: (EntityName, SelectableName),
     variable_context: &VariableContext,
     // TODO return Cow?
 ) -> FieldTraversalResult {
@@ -768,8 +766,7 @@ fn merge_server_object_field<TCompilationProfile: CompilationProfile>(
                     (
                         field_parent_object_entity_name,
                         field_server_object_selectable_name,
-                    )
-                        .server_defined(),
+                    ),
                     &server_object_selectable.initial_variable_context(),
                 );
             }
@@ -990,23 +987,17 @@ fn merge_client_scalar_field<TCompilationProfile: CompilationProfile>(
                 (
                     parent_object_entity_name,
                     newly_encountered_scalar_client_selectable_name,
-                )
-                    .scalar_selected()
-                    .client_defined(),
+                ),
                 &initial_variable_context(
                     &newly_encountered_scalar_client_selectable.scalar_selected(),
                 ),
             );
 
             let state = encountered_client_type_map
-                .get_mut(
-                    &(
-                        parent_object_entity_name,
-                        newly_encountered_scalar_client_selectable_name,
-                    )
-                        .scalar_selected()
-                        .client_defined(),
-                )
+                .get_mut(&(
+                    parent_object_entity_name,
+                    newly_encountered_scalar_client_selectable_name,
+                ))
                 .expect(
                     "Expected field to exist when \
                                                 it is encountered loadably",
@@ -1133,9 +1124,7 @@ fn insert_imperative_field_into_refetch_paths<TCompilationProfile: CompilationPr
         (
             parent_object_entity_name,
             newly_encountered_scalar_client_selectable_name,
-        )
-            .scalar_selected()
-            .client_defined(),
+        ),
         &initial_variable_context(&newly_encountered_client_scalar_selectable.scalar_selected()),
     );
 }
@@ -1334,7 +1323,7 @@ fn merge_non_loadable_client_type<TCompilationProfile: CompilationProfile>(
         parent_object_entity,
         selections,
         encountered_client_type_map,
-        newly_encountered_client_type_id.client_defined(),
+        newly_encountered_client_type_id.inner(),
         &initial_variable_context(&newly_encountered_client_type),
     );
 
