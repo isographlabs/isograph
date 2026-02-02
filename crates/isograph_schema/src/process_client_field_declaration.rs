@@ -13,7 +13,7 @@ use pico_macros::memo;
 
 use crate::{
     ClientFieldVariant, ClientObjectSelectable, ClientScalarSelectable, CompilationProfile,
-    ID_FIELD_NAME, IsographDatabase, NetworkProtocol, UserWrittenClientPointerInfo,
+    ID_FIELD_NAME, IsoLiteralExportInfo, IsographDatabase, NetworkProtocol,
     UserWrittenClientTypeInfo, flattened_entity_named, flattened_selectable_named,
     refetch_strategy::{RefetchStrategy, generate_refetch_field_strategy, id_selection},
 };
@@ -302,7 +302,7 @@ pub fn process_client_pointer_declaration_inner<TCompilationProfile: Compilation
         target_entity: client_pointer_declaration.target_type.item.clone(),
         phantom_data: std::marker::PhantomData,
 
-        info: UserWrittenClientPointerInfo {
+        info: IsoLiteralExportInfo {
             const_export_name: client_pointer_declaration.const_export_name,
             file_path: client_pointer_declaration.definition_path,
         },
