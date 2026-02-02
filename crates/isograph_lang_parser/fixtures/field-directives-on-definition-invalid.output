@@ -77,13 +77,15 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Err(
-                        Diagnostic(
-                            DiagnosticData {
-                                message: "Error when deserializing.\n\ndata did not match any variant of untagged enum ClientScalarSelectableDirectiveSet",
-                                location: Some(
-                                    Embedded(
-                                        EmbeddedLocation {
+                    directive_set: WithGenericLocation {
+                        item: [
+                            WithGenericLocation {
+                                item: IsographFieldDirective {
+                                    name: WithGenericLocation {
+                                        item: IsographDirectiveName(
+                                            "hello",
+                                        ),
+                                        location: EmbeddedLocation {
                                             text_source: TextSource {
                                                 relative_path_to_source_file: RelativePathToSourceFile(
                                                     "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
@@ -96,16 +98,94 @@ Ok(
                                                 ),
                                             },
                                             span: Span {
-                                                start: 19,
+                                                start: 20,
+                                                end: 25,
+                                            },
+                                        },
+                                    },
+                                    arguments: [],
+                                },
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 31,
+                                                end: 70,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 19,
+                                        end: 25,
+                                    },
+                                },
+                            },
+                            WithGenericLocation {
+                                item: IsographFieldDirective {
+                                    name: WithGenericLocation {
+                                        item: IsographDirectiveName(
+                                            "there",
+                                        ),
+                                        location: EmbeddedLocation {
+                                            text_source: TextSource {
+                                                relative_path_to_source_file: RelativePathToSourceFile(
+                                                    "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
+                                                ),
+                                                span: Some(
+                                                    Span {
+                                                        start: 31,
+                                                        end: 70,
+                                                    },
+                                                ),
+                                            },
+                                            span: Span {
+                                                start: 27,
                                                 end: 32,
                                             },
                                         },
-                                    ),
-                                ),
-                                code_actions: [],
+                                    },
+                                    arguments: [],
+                                },
+                                location: EmbeddedLocation {
+                                    text_source: TextSource {
+                                        relative_path_to_source_file: RelativePathToSourceFile(
+                                            "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
+                                        ),
+                                        span: Some(
+                                            Span {
+                                                start: 31,
+                                                end: 70,
+                                            },
+                                        ),
+                                    },
+                                    span: Span {
+                                        start: 26,
+                                        end: 32,
+                                    },
+                                },
                             },
-                        ),
-                    ),
+                        ],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 70,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 19,
+                                end: 32,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-definition-invalid.input.js",

@@ -132,11 +132,26 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Ok(
-                        None(
-                            EmptyDirectiveSet,
-                        ),
-                    ),
+                    directive_set: WithGenericLocation {
+                        item: [],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 77,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -606,11 +621,26 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Ok(
-                        None(
-                            EmptyDirectiveSet,
-                        ),
-                    ),
+                    directive_set: WithGenericLocation {
+                        item: [],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 116,
+                                        end: 187,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1246,11 +1276,26 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Ok(
-                        None(
-                            EmptyDirectiveSet,
-                        ),
-                    ),
+                    directive_set: WithGenericLocation {
+                        item: [],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 226,
+                                        end: 296,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
@@ -1884,11 +1929,26 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Ok(
-                        None(
-                            EmptyDirectiveSet,
-                        ),
-                    ),
+                    directive_set: WithGenericLocation {
+                        item: [],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 333,
+                                        end: 380,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-directives-on-scalar-valid.input.js",

@@ -102,11 +102,26 @@ Ok(
                             },
                         },
                     },
-                    client_scalar_selectable_directive_set: Ok(
-                        None(
-                            EmptyDirectiveSet,
-                        ),
-                    ),
+                    directive_set: WithGenericLocation {
+                        item: [],
+                        location: EmbeddedLocation {
+                            text_source: TextSource {
+                                relative_path_to_source_file: RelativePathToSourceFile(
+                                    "crates/isograph_lang_parser/fixtures/field-single-line-description.input.js",
+                                ),
+                                span: Some(
+                                    Span {
+                                        start: 31,
+                                        end: 137,
+                                    },
+                                ),
+                            },
+                            span: Span {
+                                start: 0,
+                                end: 0,
+                            },
+                        },
+                    },
                     variable_definitions: [],
                     definition_path: RelativePathToSourceFile(
                         "crates/isograph_lang_parser/fixtures/field-single-line-description.input.js",
