@@ -3,8 +3,8 @@
   "version": "0.5.3",
   "description": "Reference counted pointers enable sharing of disposable items.",
   "homepage": "https://isograph.dev",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/index.cjs",
+  "types": "./dist/index.d.cts",
   "author": "Isograph Labs",
   "license": "MIT",
   "scripts": {
@@ -31,8 +31,8 @@
   "module": "./dist/index.mjs",
   "exports": {
     ".": {
-      "import": "./dist/index.mjs",
-      "require": "./dist/index.js"
+      "require": "./dist/index.cjs",
+      "import": "./dist/index.mjs"
     },
     "./package.json": "./package.json"
   }

@@ -8,6 +8,7 @@ import {
 } from '../core/IsographEnvironment';
 import { normalizeData } from '../core/cache';
 import { getOrCreateCacheForArtifact } from '../core/getOrCreateCacheForArtifact';
+import type { StoreLayer } from '../core/optimisticProxy';
 import {
   readButDoNotEvaluate,
   type WithEncounteredRecords,
@@ -36,11 +37,18 @@ const normalizeUndefinedFieldEntrypoint = iso(
   `entrypoint Query.normalizeUndefinedField`,
 );
 
+function getBaseStoreLayer(node: StoreLayer) {
+  if (node.kind === 'BaseStoreLayer') {
+    return node;
+  }
+  return getBaseStoreLayer(node.parentStoreLayer);
+}
+
 describe('normalize undefined field', () => {
   test('should normalize scalar field to null', () => {
     normalizeData(
       environment,
-      environment.store,
+      getBaseStoreLayer(environment.store),
       normalizeUndefinedFieldEntrypoint.networkRequestInfo.normalizationAst
         .selections,
       {
@@ -74,7 +82,7 @@ describe('normalize undefined field', () => {
   test('should normalize linked field to null', () => {
     normalizeData(
       environment,
-      environment.store,
+      getBaseStoreLayer(environment.store),
       normalizeUndefinedFieldEntrypoint.networkRequestInfo.normalizationAst
         .selections,
       {},
@@ -111,7 +119,7 @@ describe('nested Query', () => {
   test('should be normalized', () => {
     normalizeData(
       environment,
-      environment.store,
+      getBaseStoreLayer(environment.store),
       entrypoint.networkRequestInfo.normalizationAst.selections,
       {
         query: { node____id___v_id: { __typename: 'Economist', id: '1' } },

@@ -1,0 +1,12 @@
+{
+  "extends": "../../tsconfig.build.json",
+  "compilerOptions": {
+    "jsx": "react",
+    "noUnusedLocals": false,
+    "paths": {
+      "@iso": ["./src/tests/__isograph/iso.ts"],
+      "@isograph/react": ["./src/index.ts"]
+    }
+  },
+  "include": ["src/tests/**/*.ts", "src/tests/**/*.tsx"]
+}

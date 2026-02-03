@@ -1,6 +1,10 @@
 import type { ParentCache } from '@isograph/react-disposable-state';
 import type { Brand } from './brand';
-import type { LinkedParentRecordKey, ScalarParentRecordKey } from './cache';
+import type {
+  LinkedParentRecordKey,
+  ParentRecordKey,
+  ScalarParentRecordKey,
+} from './cache';
 import type {
   IsographEntrypoint,
   IsographOperation,
@@ -144,9 +148,9 @@ export type DataTypeValueLinked =
   | readonly DataTypeValueLinked[];
 
 export type StoreRecord = {
-  [index: ScalarParentRecordKey]: DataTypeValueScalar;
-  [index: LinkedParentRecordKey]: DataTypeValueLinked;
-} & {
+  [key: ScalarParentRecordKey]: DataTypeValueScalar;
+  [key: LinkedParentRecordKey]: DataTypeValueLinked;
+  readonly [key: ParentRecordKey]: DataTypeValueScalar | DataTypeValueLinked;
   // TODO __typename?: T, which is restricted to being a concrete string
   // TODO this shouldn't always be named id
   readonly __typename?: TypeName;

@@ -28,7 +28,7 @@ export default defineProject({
   ],
   resolve: {
     alias: {
-      '@iso': './tests/__isograph/iso.ts',
+      '@iso': './src/tests/__isograph/iso.ts',
     },
   },
 });

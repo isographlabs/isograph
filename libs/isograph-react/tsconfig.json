@@ -1,6 +1,7 @@
 {
-  "extends": "./tsconfig.pkg.json",
-  "compilerOptions": {
-    "noEmit": true
-  }
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.package.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }
