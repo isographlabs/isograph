@@ -21,11 +21,9 @@ export function useLazyDisposableState<T>(
   state: T;
 } {
   const itemCleanupPairRef = useRef<ItemCleanupPair<T> | null>(null);
-
   const preCommitItem = useCachedResponsivePrecommitValue(
     parentCache,
     (pair) => {
-      itemCleanupPairRef.current?.[1]();
       itemCleanupPairRef.current = pair;
     },
   );
@@ -39,9 +37,10 @@ export function useLazyDisposableState<T>(
           'cleanupFn unexpectedly null. This indicates a bug in react-disposable-state.',
         );
       }
-      return cleanupFn();
+      cleanupFn();
+      itemCleanupPairRef.current = null;
     };
-  }, []);
+  }, [parentCache]);
 
   const returnedItem = preCommitItem?.state ?? itemCleanupPairRef.current?.[0];
 

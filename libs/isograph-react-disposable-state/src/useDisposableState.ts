@@ -21,7 +21,6 @@ export function useDisposableState<T = never>(
   const preCommitItem = useCachedResponsivePrecommitValue(
     parentCache,
     (pair) => {
-      itemCleanupPairRef.current?.[1]();
       itemCleanupPairRef.current = pair;
     },
   );
@@ -35,25 +34,22 @@ export function useDisposableState<T = never>(
         if (itemCleanupPairRef.current != null) {
           itemCleanupPairRef.current[1]();
           itemCleanupPairRef.current = null;
-        } else {
-          throw new Error(
-            'itemCleanupPairRef.current is unexpectedly null. ' +
-              'This indicates a bug in react-disposable-state.',
-          );
         }
       }
     },
     [stateFromDisposableStateHook],
   );
 
-  useEffect(function cleanupItemCleanupPairRefIfSetStateNotCalled() {
-    return () => {
-      if (itemCleanupPairRef.current != null) {
-        itemCleanupPairRef.current[1]();
-        itemCleanupPairRef.current = null;
-      }
-    };
-  }, []);
+  useEffect(
+    function cleanupItemCleanupPairRefIfSetStateNotCalled() {
+      return () => {
+        if (itemCleanupPairRef.current != null) {
+          itemCleanupPairRef.current[1]();
+        }
+      };
+    },
+    [parentCache],
+  );
   const state: T | undefined =
     (stateFromDisposableStateHook !== UNASSIGNED_STATE
       ? stateFromDisposableStateHook
@@ -67,7 +63,6 @@ export function useDisposableState<T = never>(
       setState,
     };
   }
-
   // Safety: we can be in one of three states. Pre-commit, in which case
   // preCommitItem is assigned, post-commit but before setState has been
   // called, in which case itemCleanupPairRef.current is assigned, or

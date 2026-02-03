@@ -49,6 +49,20 @@ export function useCachedResponsivePrecommitValue<T>(
   const [, rerender] = useState<{} | null>(null);
   const lastCommittedParentCache = useRef<ParentCache<T> | null>(null);
 
+  const maybeHiddenOrFastRefresh = useRef(false);
+  useEffect(() => {
+    return () => {
+      // Attempt to detect if the component was
+      // hidden (by Offscreen API), or fast refresh occured;
+      // Only in these situations would the effect cleanup
+      // for "unmounting" run multiple times, so if
+      // we are ever able to read this ref with a value
+      // of true, it means that one of these cases
+      // has happened.
+      maybeHiddenOrFastRefresh.current = true;
+    };
+  }, []);
+
   useEffect(() => {
     lastCommittedParentCache.current = parentCache;
     // On commit, cacheItem may be disposed, because during the render phase,
@@ -67,28 +81,32 @@ export function useCachedResponsivePrecommitValue<T>(
     //
     // After the above, we have a non-disposed item and a cleanup function, which we
     // can pass to onCommit.
-    const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
-      disposeOfTemporaryRetain,
-    );
-    if (undisposedPair != null) {
-      onCommit(undisposedPair);
-    } else {
-      // The cache item we created during render has been disposed. Check if the parent
-      // cache is populated.
-      const existingCacheItemCleanupPair =
-        parentCache.getAndPermanentRetainIfPresent();
-      if (existingCacheItemCleanupPair != null) {
-        onCommit(existingCacheItemCleanupPair);
-      } else {
-        // We did not find an item in the parent cache, create a new one.
-        onCommit(parentCache.factory());
+    if (maybeHiddenOrFastRefresh.current === false) {
+      const undisposedPair = cacheItem.permanentRetainIfNotDisposed(
+        disposeOfTemporaryRetain,
+      );
+      if (undisposedPair != null) {
+        onCommit(undisposedPair);
+        return;
       }
-      // TODO: Consider whether we always want to rerender if the committed item
-      // was not returned during the last render, or whether some callers will
-      // prefer opting out of this behavior (e.g. if every disposable item behaves
-      // identically, but must be loaded.)
-      rerender({});
     }
+    maybeHiddenOrFastRefresh.current = false;
+
+    // The cache item we created during render has been disposed. Check if the parent
+    // cache is populated.
+    const existingCacheItemCleanupPair =
+      parentCache.getAndPermanentRetainIfPresent();
+    if (existingCacheItemCleanupPair != null) {
+      onCommit(existingCacheItemCleanupPair);
+    } else {
+      // We did not find an item in the parent cache, create a new one.
+      onCommit(parentCache.factory());
+    }
+    // TODO: Consider whether we always want to rerender if the committed item
+    // was not returned during the last render, or whether some callers will
+    // prefer opting out of this behavior (e.g. if every disposable item behaves
+    // identically, but must be loaded.)
+    rerender({});
   }, [parentCache]);
 
   if (lastCommittedParentCache.current === parentCache) {
