@@ -439,10 +439,11 @@ function normalizeNetworkResponseObject(
 export type ParentRecordKey = string;
 
 /**
- * these don't actually start with a or b, but this let's us use multiple indexes e.g.
+ * these don't actually start with the different prefixes, but they let
+ * us use multiple indexes, e.g.
  * {
- *   readonly [key: `a-${string} `]: ...
- *   readonly [key: `b-${string} `]: ...
+ *   readonly [key: `NOT_AN_ACTUAL_TYPE_LinkedParentRecordKey_${string} `]: ...
+ *   readonly [key: `NOT_AN_ACTUAL_TYPE_ScalarParentRecordKey_${string} `]: ...
  * }
  */
 export type LinkedParentRecordKey =
@@ -522,10 +523,11 @@ function getStoreKeyChunkForArgument(argument: Argument, variables: Variables) {
 export type NetworkResponseKey = string;
 
 /**
- * these don't actually start with a or b, but this let's us use multiple indexes e.g.
+ * these don't actually start with the different prefixes, but they let
+ * us use multiple indexes, e.g.
  * {
- *   readonly [key: `a-${string} `]: ...
- *   readonly [key: `b-${string} `]: ...
+ *   readonly [key: `NOT_AN_ACTUAL_TYPE_LinkedNetworkResponseKey_${string} `]: ...
+ *   readonly [key: `NOT_AN_ACTUAL_TYPE_ScalarNetworkResponseKey_${string} `]: ...
  * }
  */
 export type LinkedNetworkResponseKey =
