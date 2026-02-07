@@ -153,7 +153,7 @@ describe('CacheItem', () => {
 
       expect(() => {
         disposeTemporaryRetain();
-      }).toThrow();
+      }).toThrow('A temporary retain should only be cleared once.');
     });
   });
 
