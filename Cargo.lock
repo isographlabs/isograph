@@ -382,6 +382,7 @@ dependencies = [
 name = "artifact_content"
 version = "0.5.3"
 dependencies = [
+ "base64 0.22.1",
  "common_lang_types",
  "datafusion",
  "graphql_lang_types",
@@ -3183,6 +3184,7 @@ version = "0.1.0"
 dependencies = [
  "arrow",
  "axum 0.7.9",
+ "base64 0.22.1",
  "datafusion",
  "datafusion-federation",
  "datafusion-substrait",

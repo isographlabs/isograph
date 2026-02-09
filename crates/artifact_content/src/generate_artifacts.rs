@@ -59,6 +59,8 @@ lazy_static! {
     pub static ref NORMALIZATION_AST: ArtifactFilePrefix = "normalization_ast".intern().into();
     pub static ref QUERY_TEXT_FILE_NAME: ArtifactFileName = "query_text.ts".intern().into();
     pub static ref QUERY_TEXT: ArtifactFilePrefix = "query_text".intern().into();
+    pub static ref QUERY_PLAN_FILE_NAME: ArtifactFileName = "query_plan.bin".intern().into();
+    pub static ref QUERY_PLAN: ArtifactFilePrefix = "query_plan".intern().into();
     pub static ref REFETCH_READER_FILE_NAME: ArtifactFileName = "refetch_reader.ts".intern().into();
     pub static ref REFETCH_READER: ArtifactFilePrefix = "refetch_reader".intern().into();
     pub static ref RESOLVER_OUTPUT_TYPE_FILE_NAME: ArtifactFileName =

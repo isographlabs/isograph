@@ -46,10 +46,18 @@ async fn execute_query(
 
     // 1. Load Substrait plan from disk
     let plan_path = format!("__isograph/{}/query_plan.bin", req.plan_id.replace("__", "/"));
-    let plan_bytes = std::fs::read(&plan_path)
+    let plan_contents = std::fs::read_to_string(&plan_path)
         .map_err(|e| {
             tracing::error!("Failed to read plan file {}: {}", plan_path, e);
             StatusCode::NOT_FOUND
+        })?;
+
+    // Decode base64 (Phase 1 uses base64 encoding for binary data)
+    use base64::prelude::*;
+    let plan_bytes = BASE64_STANDARD.decode(plan_contents.trim())
+        .map_err(|e| {
+            tracing::error!("Failed to decode base64 Substrait plan: {}", e);
+            StatusCode::BAD_REQUEST
         })?;
 
     // 2. Deserialize Substrait → LogicalPlan

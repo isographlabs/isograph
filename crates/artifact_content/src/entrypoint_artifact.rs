@@ -1,8 +1,8 @@
 use crate::{
     generate_artifacts::{
-        ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, QUERY_TEXT,
-        QUERY_TEXT_FILE_NAME, RAW_RESPONSE_TYPE, RAW_RESPONSE_TYPE_FILE_NAME, RESOLVER_OUTPUT_TYPE,
-        RESOLVER_PARAM_TYPE, RESOLVER_READER, RefetchQueryArtifactImport,
+        ENTRYPOINT_FILE_NAME, NORMALIZATION_AST, NORMALIZATION_AST_FILE_NAME, QUERY_PLAN_FILE_NAME,
+        QUERY_TEXT, QUERY_TEXT_FILE_NAME, RAW_RESPONSE_TYPE, RAW_RESPONSE_TYPE_FILE_NAME,
+        RESOLVER_OUTPUT_TYPE, RESOLVER_PARAM_TYPE, RESOLVER_READER, RefetchQueryArtifactImport,
     },
     imperatively_loaded_fields::get_paths_and_contents_for_imperatively_loaded_field,
     normalization_ast_text::generate_normalization_ast_text,
@@ -31,6 +31,7 @@ use isograph_schema::{
     flattened_entity_named, get_reachable_variables, initial_variable_context,
 };
 use prelude::Postfix;
+use std::any::TypeId;
 use std::collections::BTreeSet;
 
 pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProfile>(
@@ -254,7 +255,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
 
     let raw_response_type = generate_raw_response_type(db, root_entity, &merged_selection_map, 0);
 
-    let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 3);
+    let mut path_and_contents = Vec::with_capacity(refetch_paths_with_variables.len() + 4);
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!("export default '{query_text}';").into(),
         artifact_path: ArtifactPath {
@@ -266,6 +267,35 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
             .wrap_some(),
         },
     });
+
+    // Generate Substrait binary artifact for SQL profiles
+    if TypeId::of::<TCompilationProfile>() == TypeId::of::<sql_network_protocol::SQLAndJavascriptProfile>() {
+        match generate_substrait_artifact(root_entity, &merged_selection_map) {
+            Ok(substrait_bytes) => {
+                // NOTE: For Phase 1, we base64-encode the binary Substrait plan since FileContent
+                // only supports String. In the future, we should extend FileContent to support
+                // binary data or write binary files directly.
+                use base64::prelude::*;
+                let base64_encoded = BASE64_STANDARD.encode(&substrait_bytes);
+
+                path_and_contents.push(ArtifactPathAndContent {
+                    file_content: base64_encoded.into(),
+                    artifact_path: ArtifactPath {
+                        file_name: *QUERY_PLAN_FILE_NAME,
+                        type_and_field: EntityNameAndSelectableName {
+                            parent_entity_name: type_name.item,
+                            selectable_name: field_name,
+                        }
+                        .wrap_some(),
+                    },
+                });
+            }
+            Err(e) => {
+                tracing::warn!("Failed to generate Substrait artifact: {}", e);
+            }
+        }
+    }
+
     path_and_contents.push(ArtifactPathAndContent {
         file_content: format!(
             "import type {{NormalizationAst}} from '@isograph/react';\n\
@@ -560,4 +590,26 @@ fn get_used_variables_for_refetch_query_import(
     }
 
     variables
+}
+
+/// Generate Substrait binary artifact from MergedSelectionMap
+///
+/// For Phase 1: Simple SELECT with column projection (no WHERE, no JOINs)
+fn generate_substrait_artifact(
+    entity_name: EntityName,
+    merged_selection_map: &MergedSelectionMap,
+) -> Result<Vec<u8>, String> {
+    use datafusion::prelude::*;
+
+    // Build LogicalPlan from selection map
+    let logical_plan = sql_network_protocol::query_generation::logical_plan_builder::build_logical_plan(
+        entity_name,
+        merged_selection_map,
+    )?;
+
+    // Serialize to Substrait binary
+    let ctx = SessionContext::new();
+    let session_state = ctx.state();
+
+    sql_network_protocol::substrait::serialize::serialize_to_substrait(&logical_plan, &session_state)
 }
