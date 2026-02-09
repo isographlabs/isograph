@@ -7,9 +7,11 @@ license = { workspace = true }
 [dependencies]
 common_lang_types = { path = "../common_lang_types" }
 graphql_lang_types = { path = "../graphql_lang_types" }
+sql_network_protocol = { path = "../sql_network_protocol" }
 intern = { path = "../../relay-crates/intern" }
 isograph_schema = { path = "../isograph_schema" }
 isograph_config = { path = "../isograph_config" }
+datafusion = "52.1"
 pico = { path = "../pico" }
 isograph_lang_types = { path = "../isograph_lang_types" }
 prelude = { path = "../prelude" }

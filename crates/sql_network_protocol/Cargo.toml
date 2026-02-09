@@ -17,6 +17,14 @@ pico_macros = { path = "../pico_macros" }
 prelude = { path = "../prelude" }
 sqlparser = { workspace = true }
 tracing = { workspace = true }
+datafusion = "52.1"
+datafusion-substrait = "52.1"
+substrait = "0.62"
+prost = "0.14"
+arrow = "57.3"
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full"] }
 
 [lints]
 workspace = true

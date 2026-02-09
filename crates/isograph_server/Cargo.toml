@@ -1,0 +1,22 @@
+[package]
+name = "isograph_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = "0.7"
+tokio = { version = "1", features = ["full"] }
+datafusion = "52.1"
+datafusion-substrait = "52.1"
+datafusion-federation = "0.4.14"
+substrait = "0.62"
+prost = "0.14"
+arrow = "57.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[[bin]]
+name = "isograph-server"
+path = "src/main.rs"
