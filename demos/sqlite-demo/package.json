@@ -9,7 +9,10 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "tsc": "tsc -b",
-    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json"
+    "iso": "../../target/debug/isograph_cli --config ./isograph.config.json",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:headed": "playwright test --headed"
   },
   "dependencies": {
     "@isograph/react": "workspace:*",
@@ -20,6 +23,7 @@
     "@babel/preset-typescript": "^7.24.7",
     "@eslint/js": "^9.11.1",
     "@isograph/compiler": "workspace:*",
+    "@playwright/test": "^1.48.0",
     "@types/node": "^22.7.5",
     "@types/react": "18.3.1",
     "@types/react-dom": "18.3.1",
