@@ -269,7 +269,9 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     });
 
     // Generate Substrait binary artifact for SQL profiles
-    if TypeId::of::<TCompilationProfile>() == TypeId::of::<sql_network_protocol::SQLAndJavascriptProfile>() {
+    if TypeId::of::<TCompilationProfile>()
+        == TypeId::of::<sql_network_protocol::SQLAndJavascriptProfile>()
+    {
         match generate_substrait_artifact(root_entity, &merged_selection_map) {
             Ok(substrait_bytes) => {
                 // NOTE: For Phase 1, we base64-encode the binary Substrait plan since FileContent
@@ -602,14 +604,18 @@ fn generate_substrait_artifact(
     use datafusion::prelude::*;
 
     // Build LogicalPlan from selection map
-    let logical_plan = sql_network_protocol::query_generation::logical_plan_builder::build_logical_plan(
-        entity_name,
-        merged_selection_map,
-    )?;
+    let logical_plan =
+        sql_network_protocol::query_generation::logical_plan_builder::build_logical_plan(
+            entity_name,
+            merged_selection_map,
+        )?;
 
     // Serialize to Substrait binary
     let ctx = SessionContext::new();
     let session_state = ctx.state();
 
-    sql_network_protocol::substrait::serialize::serialize_to_substrait(&logical_plan, &session_state)
+    sql_network_protocol::substrait::serialize::serialize_to_substrait(
+        &logical_plan,
+        &session_state,
+    )
 }

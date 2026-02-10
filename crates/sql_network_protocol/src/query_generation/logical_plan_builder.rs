@@ -1,8 +1,8 @@
 use common_lang_types::EntityName;
 use datafusion::arrow::array::RecordBatch;
 use datafusion::arrow::datatypes::{DataType, Field, Schema};
-use datafusion::datasource::{provider_as_source, MemTable};
-use datafusion::logical_expr::{col, LogicalPlan, LogicalPlanBuilder};
+use datafusion::datasource::{MemTable, provider_as_source};
+use datafusion::logical_expr::{LogicalPlan, LogicalPlanBuilder, col};
 use intern::Lookup;
 use isograph_schema::{MergedSelectionMap, MergedServerSelection};
 use prelude::Postfix;

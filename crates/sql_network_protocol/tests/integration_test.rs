@@ -1,10 +1,14 @@
+use common_lang_types::EntityName;
 use datafusion::prelude::*;
 use intern::string_key::Intern;
+use isograph_schema::{
+    MergedScalarFieldSelection, MergedServerSelection, NameAndArguments, NormalizationKey,
+};
 use sql_network_protocol::query_generation::logical_plan_builder::build_logical_plan;
-use sql_network_protocol::substrait::serialize::{serialize_to_substrait, write_substrait_artifact};
+use sql_network_protocol::substrait::serialize::{
+    serialize_to_substrait, write_substrait_artifact,
+};
 use std::collections::BTreeMap;
-use common_lang_types::EntityName;
-use isograph_schema::{MergedScalarFieldSelection, MergedServerSelection, NormalizationKey, NameAndArguments};
 use std::path::PathBuf;
 
 #[tokio::test]
@@ -36,8 +40,8 @@ async fn test_substrait_round_trip() {
     let entity_name: EntityName = "users".intern().into();
 
     // Build LogicalPlan
-    let logical_plan = build_logical_plan(entity_name, &selection_map)
-        .expect("Failed to build logical plan");
+    let logical_plan =
+        build_logical_plan(entity_name, &selection_map).expect("Failed to build logical plan");
 
     // 2. Serialize to Substrait
     let ctx = SessionContext::new();
@@ -46,7 +50,10 @@ async fn test_substrait_round_trip() {
     let substrait_bytes = serialize_to_substrait(&logical_plan, &session_state)
         .expect("Failed to serialize to Substrait");
 
-    assert!(!substrait_bytes.is_empty(), "Substrait bytes should not be empty");
+    assert!(
+        !substrait_bytes.is_empty(),
+        "Substrait bytes should not be empty"
+    );
 
     // 3. Write to disk
     let test_path = PathBuf::from("/tmp/test_query_plan.bin");
