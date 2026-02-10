@@ -11,7 +11,6 @@ use prost::Message;
 use serde::Deserialize;
 use std::collections::HashMap;
 use substrait::proto::Plan;
-use tracing_subscriber;
 
 #[derive(Debug, Deserialize)]
 struct QueryRequest {

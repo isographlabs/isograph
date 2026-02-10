@@ -41,7 +41,7 @@ pub fn build_logical_plan(
     let table_source = provider_as_source(Arc::new(mem_table));
 
     // Build logical plan: Table scan + projection
-    let projections: Vec<_> = columns.iter().map(|c| col(c)).collect();
+    let projections: Vec<_> = columns.iter().map(col).collect();
 
     let plan = LogicalPlanBuilder::scan(
         &table_name,

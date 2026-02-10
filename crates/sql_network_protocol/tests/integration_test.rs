@@ -58,6 +58,4 @@ async fn test_substrait_round_trip() {
 
     // Clean up
     std::fs::remove_file(test_path).ok();
-
-    println!("✅ Substrait round-trip test passed!");
 }
