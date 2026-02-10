@@ -6,9 +6,13 @@ test.describe('Phase 1: SQL Support E2E', () => {
     await page.goto('/');
   });
 
-  test('should load and display planet data from SQL database', async ({ page }) => {
+  test('should load and display planet data from SQL database', async ({
+    page,
+  }) => {
     // Wait for the loading state to disappear
-    await expect(page.getByText(/Loading Pokemon/i)).toBeVisible({ timeout: 1000 }).catch(() => {});
+    await expect(page.getByText(/Loading Pokemon/i))
+      .toBeVisible({ timeout: 1000 })
+      .catch(() => {});
 
     // Wait for the HomePage component to render
     await page.waitForSelector('text=/Home Page/', { timeout: 10000 });
@@ -21,11 +25,13 @@ test.describe('Phase 1: SQL Support E2E', () => {
     await expect(homePage).toContainText(/Home Page - \w+/);
   });
 
-  test('should make request to isograph-server with Substrait plan', async ({ page }) => {
+  test('should make request to isograph-server with Substrait plan', async ({
+    page,
+  }) => {
     // Set up request interception to verify API calls
     const apiRequests: any[] = [];
 
-    page.on('request', request => {
+    page.on('request', (request) => {
       const url = request.url();
       if (url.includes('/query') || url.includes('8080')) {
         apiRequests.push({
@@ -43,7 +49,7 @@ test.describe('Phase 1: SQL Support E2E', () => {
     expect(apiRequests.length).toBeGreaterThan(0);
 
     // Verify request format (if using isograph-server)
-    const queryRequest = apiRequests.find(req => req.url.includes('/query'));
+    const queryRequest = apiRequests.find((req) => req.url.includes('/query'));
     if (queryRequest) {
       const postData = JSON.parse(queryRequest.postData);
       expect(postData).toHaveProperty('plan_id');
@@ -60,7 +66,7 @@ test.describe('Phase 1: SQL Support E2E', () => {
 
     // Page should not show JavaScript errors
     const errors: string[] = [];
-    page.on('pageerror', err => errors.push(err.message));
+    page.on('pageerror', (err) => errors.push(err.message));
 
     // Wait a bit to catch any errors
     await page.waitForTimeout(2000);
@@ -77,7 +83,7 @@ test.describe('Phase 1: SQL Support E2E', () => {
 
     // Check network tab for loaded files
     const resources: string[] = [];
-    page.on('response', response => {
+    page.on('response', (response) => {
       resources.push(response.url());
     });
 

@@ -10,6 +10,7 @@
 ## ✅ What Works (Verified Locally)
 
 ### Rust Code
+
 - ✅ `cargo clippy -p sql_network_protocol -p artifact_content -p isograph_server` - **PASS**
 - ✅ `cargo fmt --check` - **PASS**
 - ✅ `cargo test -p sql_network_protocol -p isograph_server` - **ALL TESTS PASS** (5/5)
@@ -17,6 +18,7 @@
 - ✅ Compiler generates artifacts correctly (query_plan.bin files created)
 
 ### Phase 1 Implementation
+
 - ✅ LogicalPlan builder works
 - ✅ Substrait serialization works
 - ✅ Base64 encoding/decoding works
@@ -53,10 +55,11 @@ environment variable. To install it on Debian, run `apt-get install protobuf-com
 
 **Root cause**: CI environment missing protobuf compiler (needed for substrait crate)
 **Impact**: Tests can't build
-**My fault?**: ⚠️  Partially - I added `substrait` dependency which requires protoc
+**My fault?**: ⚠️ Partially - I added `substrait` dependency which requires protoc
 **Fix needed**: Add protoc installation step to CI workflow
 
 **Suggested CI fix**:
+
 ```yaml
 - name: Install protoc
   run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
@@ -68,10 +71,11 @@ environment variable. To install it on Debian, run `apt-get install protobuf-com
 
 **Root cause**: Unknown - logs don't show specific files
 **Possible causes**:
-  - Missing prettier plugin (`@ianvs/prettier-plugin-sort-imports`)
-  - My Playwright test files might need formatting
 
-**My fault?**: ⚠️  Possibly - I added new TS files without running prettier
+- Missing prettier plugin (`@ianvs/prettier-plugin-sort-imports`)
+- My Playwright test files might need formatting
+
+**My fault?**: ⚠️ Possibly - I added new TS files without running prettier
 **Fix needed**: Run `pnpm run format-prettier` on the branch
 
 ---
@@ -79,7 +83,7 @@ environment variable. To install it on Debian, run `apt-get install protobuf-com
 ### 4. **lint** - ❌ JS linting errors
 
 **Root cause**: Unknown - logs don't show specific files
-**My fault?**: ⚠️  Possibly - Playwright config or test files might have lint issues
+**My fault?**: ⚠️ Possibly - Playwright config or test files might have lint issues
 **Fix needed**: Run `pnpm run lint --fix` on the branch
 
 ---
@@ -124,6 +128,7 @@ environment variable. To install it on Debian, run `apt-get install protobuf-com
 ### Medium Priority
 
 3. **Run prettier on branch**:
+
    ```bash
    pnpm run format-prettier
    git add -u
@@ -142,12 +147,14 @@ environment variable. To install it on Debian, run `apt-get install protobuf-com
 ## ✅ Conclusion
 
 **My Phase 1 SQL code is solid**:
+
 - All Rust code passes clippy ✅
 - All Rust code is properly formatted ✅
 - All tests for modified packages pass ✅
 - Compiler works and generates artifacts ✅
 
 **CI failures are mostly unrelated**:
+
 - swc_common issue: Pre-existing dependency problem
 - protoc missing: New dependency requirement (easy CI fix)
 - JS formatting: Minor, fixable with one command

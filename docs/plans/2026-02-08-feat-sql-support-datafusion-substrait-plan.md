@@ -13,10 +13,12 @@ Enable Isograph to compile ISO literals into SQL queries using DataFusion's quer
 ## Problem Statement
 
 Current work on the `ch1ffa/sql` branch has basic SQL query generation but:
+
 - ❌ No FROM clause, JOINs, or WHERE variables
 - ❌ **Critical**: No query dispatch/execution layer (0% implemented)
 
 We need a smarter approach than SQL string generation:
+
 - Use DataFusion to build optimized LogicalPlans at compile-time
 - Serialize as Substrait (cross-language query format)
 - Execute at runtime via datafusion-federation
@@ -99,6 +101,7 @@ pub fn build_logical_plan(
 ```
 
 **Key Functions to Implement**:
+
 - `determine_root_table()` - Extract table name from entity type
 - `extract_parameters()` - Find all `$var` in selections
 - `extract_linked_fields()` - Identify fields that need JOINs
@@ -248,6 +251,7 @@ fn json_to_scalar_value(value: &serde_json::Value) -> ScalarValue {
 ```
 
 **Cargo.toml**:
+
 ```toml
 [package]
 name = "isograph_server"
@@ -276,7 +280,7 @@ import { tableFromIPC } from 'apache-arrow';
 
 export async function executeQuery(
   planId: string,
-  params: Record<string, any>
+  params: Record<string, any>,
 ): Promise<any[]> {
   // 1. Call Rust endpoint
   const response = await fetch('http://localhost:8080/query', {
@@ -301,11 +305,13 @@ export async function executeQuery(
 ```
 
 **Install Arrow JS**:
+
 ```bash
 npm install apache-arrow
 ```
 
 **Usage in Next.js**:
+
 ```typescript
 import { executeQuery } from '@isograph/react';
 
@@ -335,10 +341,12 @@ export default async function UserPage({ params }: { params: { id: string } }) {
 | `List(Utf8)` | `string[]` |
 
 **Null Handling**:
+
 - Arrow nullable field → TypeScript `field: string | null`
 - Arrow non-nullable → TypeScript `field: string`
 
 **TypeScript Codegen Update** (`artifact_content/src/generate_artifacts.rs`):
+
 ```rust
 // Generate TypeScript types from Arrow schema
 fn arrow_type_to_typescript(arrow_type: &DataType) -> String {
@@ -359,6 +367,7 @@ fn arrow_type_to_typescript(arrow_type: &DataType) -> String {
 ### Compile-Time Components
 
 **sql_network_protocol crate**:
+
 - [x] `src/query_generation/logical_plan_builder.rs` - Build LogicalPlan from MergedSelectionMap (Phase 1: simple SELECT)
 - [ ] `src/query_generation/foreign_key_resolver.rs` - Map linked fields to JOINs (Phase 3)
 - [ ] `src/query_generation/parameter_binding.rs` - Extract parameters and create placeholders (Phase 2)
@@ -366,12 +375,14 @@ fn arrow_type_to_typescript(arrow_type: &DataType) -> String {
 - [ ] `src/schema/parse_sql_schema.rs` - Parse SQL schema definition (future)
 
 **Integration with compiler**:
+
 - [ ] Update `artifact_content/src/generate_artifacts.rs` to call Substrait serialization
 - [ ] Write query_plan.bin to artifact directory
 
 ### Runtime Components
 
 **isograph_server crate**:
+
 - [x] `src/main.rs` - Axum HTTP server with /query endpoint
 - [x] Load Substrait from disk
 - [x] Deserialize Substrait → LogicalPlan
@@ -380,6 +391,7 @@ fn arrow_type_to_typescript(arrow_type: &DataType) -> String {
 - [x] Serialize response to Arrow IPC
 
 **Next.js integration**:
+
 - [ ] Install `apache-arrow` npm package
 - [ ] Update `@isograph/react` network function to call Rust endpoint
 - [ ] Deserialize Arrow IPC to JS objects
@@ -409,25 +421,30 @@ fn arrow_type_to_typescript(arrow_type: &DataType) -> String {
 ### 1. Foreign Key Declaration
 
 **Option A: Schema annotations**
+
 ```graphql
 type User @sqlTable(name: "users") {
-  posts: [Post!]! @sqlForeignKey(table: "posts", column: "user_id", references: "id")
+  posts: [Post!]!
+    @sqlForeignKey(table: "posts", column: "user_id", references: "id")
 }
 ```
 
 **Option B: Convention-based inference**
+
 - Field name `posts` → table `posts`
-- FK column `user_id` (snake_case of parent type + _id)
+- FK column `user_id` (snake_case of parent type + \_id)
 
 **Recommendation**: Start with Option A (explicit) for correctness, add Option B later for convenience.
 
 ### 2. Parameter Type Coercion
 
 **Strict mode** (recommended):
+
 - Client sends String, plan expects Int → Error 400
 - Forces type correctness at compile-time
 
 **Permissive mode**:
+
 - Attempt coercion (e.g., "123" → 123)
 - Risk of unexpected behavior
 
@@ -443,6 +460,7 @@ type User @sqlTable(name: "users") {
 ## Dependencies
 
 **Rust crates**:
+
 - `datafusion` (v52.1.0) - LogicalPlan building
 - `datafusion-substrait` (v52.1.0) - Substrait serialization
 - `datafusion-federation` (v0.4.14) - Query dispatch
@@ -451,25 +469,31 @@ type User @sqlTable(name: "users") {
 - `arrow` (v53.0) - Arrow IPC serialization
 
 **JavaScript packages**:
+
 - `apache-arrow` (v21.1.0) - Arrow IPC deserialization
 
 ## Risks & Mitigations
 
 **Risk 1: Substrait doesn't support all DataFusion features**
+
 - **Mitigation**: Test with real queries in Phase 1, document limitations
 
 **Risk 2: Schema changes break compiled plans**
+
 - **Mitigation**: Version artifacts, validate schema on server startup (future enhancement)
 
 **Risk 3: Parameter type mismatches at runtime**
+
 - **Mitigation**: Strict type validation in Rust endpoint, return 400 Bad Request
 
 **Risk 4: Variable-length array parameters (`WHERE id IN ($ids)`)**
+
 - **Mitigation**: Research Substrait support, may need workarounds or unsupported (document)
 
 ## Files to Create/Modify
 
 **New Files**:
+
 - `crates/isograph_server/src/main.rs`
 - `crates/isograph_server/Cargo.toml`
 - `crates/sql_network_protocol/src/query_generation/logical_plan_builder.rs`
@@ -477,6 +501,7 @@ type User @sqlTable(name: "users") {
 - `libs/isograph-react/src/arrow/deserialize.ts`
 
 **Modified Files**:
+
 - `crates/artifact_content/src/generate_artifacts.rs` (add Substrait generation)
 - `libs/isograph-react/src/network.ts` (call Rust endpoint, deserialize Arrow)
 - `crates/sql_network_protocol/src/sql_network_protocol.rs` (complete implementation)
@@ -484,6 +509,7 @@ type User @sqlTable(name: "users") {
 ## Example End-to-End Flow
 
 **ISO Literal**:
+
 ```typescript
 iso(`
   field User.getById($id: ID!) {
@@ -491,10 +517,11 @@ iso(`
     name
     email
   }
-`)
+`);
 ```
 
 **Compile-Time**:
+
 1. Parse → `ClientFieldDeclaration`
 2. Build LogicalPlan:
    ```rust
@@ -506,12 +533,14 @@ iso(`
 3. Serialize to Substrait → `__isograph/User/getById/query_plan.bin`
 
 **Runtime (Next.js)**:
+
 ```typescript
 const users = await executeQuery('User__getById', { id: '123' });
 // users = [{ id: '123', name: 'Alice', email: 'alice@example.com' }]
 ```
 
 **Server Executes**:
+
 ```sql
 SELECT id, name, email FROM users WHERE id = $1
 -- $1 = '123'

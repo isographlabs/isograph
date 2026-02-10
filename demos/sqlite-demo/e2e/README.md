@@ -5,21 +5,25 @@ End-to-end tests for Phase 1 SQL support using Playwright.
 ## Setup
 
 1. **Install dependencies** (from repo root):
+
    ```bash
    pnpm install
    ```
 
 2. **Build the Isograph compiler**:
+
    ```bash
    cargo build
    ```
 
 3. **Initialize test database**:
+
    ```bash
    ./test-fixtures/databases/init-db.sh
    ```
 
 4. **Generate artifacts** (compile ISO literals → Substrait plans):
+
    ```bash
    cd demos/sqlite-demo
    npm run iso
@@ -30,6 +34,7 @@ End-to-end tests for Phase 1 SQL support using Playwright.
    - TypeScript artifacts (entrypoint.ts, normalization_ast.ts, etc.)
 
 5. **Start isograph-server** (in a separate terminal):
+
    ```bash
    cd crates/isograph_server
    cargo run
@@ -40,16 +45,19 @@ End-to-end tests for Phase 1 SQL support using Playwright.
 ## Running Tests
 
 ### Run all E2E tests
+
 ```bash
 npm run test:e2e
 ```
 
 ### Run with UI mode (interactive)
+
 ```bash
 npm run test:e2e:ui
 ```
 
 ### Run in headed mode (see browser)
+
 ```bash
 npm run test:e2e:headed
 ```
@@ -57,6 +65,7 @@ npm run test:e2e:headed
 ## Test Structure
 
 ### `phase1-sql.spec.ts`
+
 Tests for Phase 1 SQL support:
 
 1. **Load and display planet data**
@@ -115,33 +124,39 @@ Tests for Phase 1 SQL support:
 ## Troubleshooting
 
 ### Compiler errors
+
 - Ensure `cargo build` completed successfully
 - Check that `isograph.config.json` has `"kind": "sql"`
 
 ### Server not responding
+
 - Verify server is running: `curl http://localhost:8080/health`
 - Check server logs for errors
 
 ### Artifacts not generated
+
 - Run `npm run iso` from sqlite-demo directory
 - Check for compiler errors in output
 
 ### Tests failing
+
 - Ensure dev server is running (Playwright will auto-start it)
 - Check browser console for errors: `npm run test:e2e:headed`
 
 ## Next Steps (Phase 2 & 3)
 
 **Phase 2**: Add WHERE clauses with parameters
+
 ```typescript
 // Example: Filter by planet ID
 const { fragmentReference } = useLazyReference(
   iso(`entrypoint planets.PlanetDetail`),
-  { id: 1 }  // Parameter binding
+  { id: 1 }, // Parameter binding
 );
 ```
 
 **Phase 3**: Add JOINs for linked fields
+
 ```
 field planets.PlanetWithPeople @component {
   name

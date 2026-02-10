@@ -2,7 +2,7 @@ import {
   createIsographEnvironment,
   createIsographStore,
   IsographEnvironmentProvider,
-  IsographOperation,
+  type IsographOperation,
 } from '@isograph/react';
 import { Suspense, useMemo } from 'react';
 import HomePageRoute from './components/HomePageRoute';
