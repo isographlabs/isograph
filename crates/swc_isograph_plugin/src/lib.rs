@@ -363,10 +363,11 @@ impl IsoLiteralCompilerVisitor<'_> {
                 match fn_args {
                     Some(fn_args) => {
                         if let Some((first, [])) = fn_args.split_first() {
-                            return first.expr.as_ref().clone().wrap_ok();
+                            first.expr.as_ref().clone().wrap_ok()
+                        } else {
+                            // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
+                            IsographTransformError::IsoFnCallRequiresOneArg.wrap_err()
                         }
-                        // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                        return IsographTransformError::IsoFnCallRequiresOneArg.wrap_err();
                     }
                     // iso(...)>empty<
                     None => build_arrow_identity_expr().wrap_ok(),
