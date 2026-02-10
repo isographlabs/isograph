@@ -237,6 +237,8 @@ jobs:
         with:
           toolchain: stable
           components: clippy
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Run cargo clippy
         run: cargo clippy
 
@@ -250,6 +252,8 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
+      - name: Install protoc
+        run: sudo apt-get update && sudo apt-get install -y protobuf-compiler
       - name: Run cargo test
         run: cargo test
 
