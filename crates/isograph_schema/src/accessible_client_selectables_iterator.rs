@@ -101,7 +101,6 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
                         match selectable {
                             DefinitionLocation::Server(_) => {
                                 self.index += 1;
-                                continue 'main_loop;
                             }
                             DefinitionLocation::Client(_) => {
                                 self.index += 1;
@@ -164,7 +163,6 @@ impl<'db, TCompilationProfile: CompilationProfile> Iterator
                             return next;
                         }
                         self.index += 1;
-                        continue 'main_loop;
                     }
                 }
             } else {
