@@ -1,0 +1,10 @@
+# Cross.toml — configuration for cross-compilation via the `cross` tool.
+# The `pre-build` commands run inside the cross Docker container before cargo build.
+# This is needed because `substrait` (via prost-build) requires `protoc` at compile time,
+# but the cross Docker images don't include it by default.
+
+[target.aarch64-unknown-linux-musl]
+pre-build = ["apt-get update && apt-get install -y protobuf-compiler"]
+
+[target.aarch64-unknown-linux-gnu]
+pre-build = ["apt-get update && apt-get install -y protobuf-compiler"]
