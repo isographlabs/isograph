@@ -1,18 +1,18 @@
 export type Query__Newsfeed__raw_response_type = {
-  viewer: {
-    id: string,
-    newsfeed____skip___l_0____limit___l_6: ReadonlyArray<{
-      __typename: "AdItem",
-      id: string,
+  readonly viewer: {
+    readonly id: string,
+    readonly newsfeed____skip___l_0____limit___l_6: ReadonlyArray<{
+      readonly __typename: "AdItem",
+      readonly id: string,
     } | {
-      __typename: "BlogItem",
-      id: string,
-      author: string,
-      content: string,
-      image?: ({
-        id: string,
+      readonly __typename: "BlogItem",
+      readonly id: string,
+      readonly author: string,
+      readonly content: string,
+      readonly image?: ({
+        readonly id: string,
       } | null),
-      title: string,
+      readonly title: string,
     }>,
   },
 }

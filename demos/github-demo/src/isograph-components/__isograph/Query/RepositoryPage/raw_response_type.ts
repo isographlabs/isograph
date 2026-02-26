@@ -1,51 +1,51 @@
 export type Query__RepositoryPage__raw_response_type = {
-  repository____name___v_repositoryName____owner___v_repositoryOwner?: ({
-    id: string,
-    nameWithOwner: string,
-    parent?: ({
-      id: string,
-      name: string,
-      nameWithOwner: string,
-      owner: {
-        __typename: "Organization" | "User",
-        id: string,
-        login: string,
+  readonly repository____name___v_repositoryName____owner___v_repositoryOwner?: ({
+    readonly id: string,
+    readonly nameWithOwner: string,
+    readonly parent?: ({
+      readonly id: string,
+      readonly name: string,
+      readonly nameWithOwner: string,
+      readonly owner: {
+        readonly __typename: "Organization" | "User",
+        readonly id: string,
+        readonly login: string,
       },
     } | null),
-    pullRequests____last___v_first: {
-      edges?: (ReadonlyArray<({
-        node?: ({
-          id: string,
-          author?: ({
-            __typename: "User",
-            id: string,
-            login: string,
-            twitterUsername?: (string | null),
+    readonly pullRequests____last___v_first: {
+      readonly edges?: (ReadonlyArray<({
+        readonly node?: ({
+          readonly id: string,
+          readonly author?: ({
+            readonly __typename: "User",
+            readonly id: string,
+            readonly login: string,
+            readonly twitterUsername?: (string | null),
           } | null),
-          closed: boolean,
-          createdAt: unknown,
-          number: number,
-          repository: {
-            id: string,
-            name: string,
-            owner: {
-              __typename: "Organization" | "User",
-              id: string,
-              login: string,
+          readonly closed: boolean,
+          readonly createdAt: unknown,
+          readonly number: number,
+          readonly repository: {
+            readonly id: string,
+            readonly name: string,
+            readonly owner: {
+              readonly __typename: "Organization" | "User",
+              readonly id: string,
+              readonly login: string,
             },
           },
-          title: string,
-          totalCommentsCount?: (number | null),
+          readonly title: string,
+          readonly totalCommentsCount?: (number | null),
         } | null),
       } | null)> | null),
     },
-    stargazerCount: number,
-    viewerHasStarred: boolean,
+    readonly stargazerCount: number,
+    readonly viewerHasStarred: boolean,
   } | null),
-  viewer: {
-    id: string,
-    avatarUrl: unknown,
-    name?: (string | null),
+  readonly viewer: {
+    readonly id: string,
+    readonly avatarUrl: unknown,
+    readonly name?: (string | null),
   },
 }
 

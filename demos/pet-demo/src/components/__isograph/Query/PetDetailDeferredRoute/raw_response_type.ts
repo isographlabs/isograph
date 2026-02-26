@@ -1,17 +1,17 @@
 export type Query__PetDetailDeferredRoute__raw_response_type = {
-  namable?: ({
-    __typename: "Pet",
+  readonly namable?: ({
+    readonly __typename: "Pet",
   } | null),
-  notImplemented?: ({
-    __typename: never,
+  readonly notImplemented?: ({
+    readonly __typename: never,
   } | null),
-  pet____id___v_id?: ({
-    id: string,
-    firstName: string,
-    lastName: string,
+  readonly pet____id___v_id?: ({
+    readonly id: string,
+    readonly firstName: string,
+    readonly lastName: string,
   } | null),
-  topLevelField____input___o_name__s_ThisIsJustHereToTestObjectLiterals_c?: ({
-    __typename: "TopLevelField",
+  readonly topLevelField____input___o_name__s_ThisIsJustHereToTestObjectLiterals_c?: ({
+    readonly __typename: "TopLevelField",
   } | null),
 }
 

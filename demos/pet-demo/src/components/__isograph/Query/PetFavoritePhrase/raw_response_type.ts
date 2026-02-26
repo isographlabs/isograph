@@ -1,9 +1,9 @@
 export type Query__PetFavoritePhrase__raw_response_type = {
-  pet____id___v_id?: ({
-    id: string,
-    favorite_phrase?: (string | null),
-    firstName: string,
-    lastName: string,
+  readonly pet____id___v_id?: ({
+    readonly id: string,
+    readonly favorite_phrase?: (string | null),
+    readonly firstName: string,
+    readonly lastName: string,
   } | null),
 }
 

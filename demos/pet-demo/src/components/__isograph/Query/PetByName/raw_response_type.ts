@@ -1,8 +1,8 @@
 export type Query__PetByName__raw_response_type = {
-  petByName____name___v_name?: ({
-    id: string,
-    firstName: string,
-    lastName: string,
+  readonly petByName____name___v_name?: ({
+    readonly id: string,
+    readonly firstName: string,
+    readonly lastName: string,
   } | null),
 }
 
