@@ -78,8 +78,9 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                             server_scalar_selectable.name.item,
                         );
 
+                    let field_name = format_field_name(name);
                     raw_response_type.push_str(&format!(
-                        "{indent}{name}{}: {},\n",
+                        "{indent}readonly {field_name}{}: {},\n",
                         if server_scalar_selectable
                             .target_entity
                             .item
@@ -139,8 +140,9 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
                         raw_response_type_declaration
                     };
 
+                    let field_name = format_field_name(name);
                     raw_response_type.push_str(&format!(
-                        "{indent}{name}{}: {},\n",
+                        "{indent}readonly {field_name}{}: {},\n",
                         if server_object_selectable
                             .target_entity
                             .item
@@ -195,5 +197,31 @@ pub fn generate_raw_response_type_inner<TCompilationProfile: CompilationProfile>
     for (_, fragment) in iter {
         raw_response_type.push_str(&format!("{indent}}} | {{\n"));
         raw_response_type.push_str(&fragment);
+    }
+}
+
+/// Returns true if the field name must be quoted to be a valid TypeScript property key.
+/// Names that start with non-letter/non-underscore/non-dollar characters, or contain
+/// characters outside [a-zA-Z0-9_$], require quoting (e.g. `"first-name"`, `"1id"`).
+fn needs_quoting(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        None => true,
+        Some(first) => {
+            if !first.is_ascii_alphabetic() && first != '_' && first != '$' {
+                return true;
+            }
+            !chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '$')
+        }
+    }
+}
+
+/// Formats a SQL column name as a valid TypeScript property key.
+/// If the name requires quoting, wraps it in double quotes with inner quotes escaped.
+fn format_field_name(name: &str) -> String {
+    if needs_quoting(name) {
+        format!("\"{}\"", name.replace('"', "\\\""))
+    } else {
+        name.to_string()
     }
 }

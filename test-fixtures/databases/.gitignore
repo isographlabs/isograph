@@ -1,0 +1,5 @@
+# Ignore generated database files
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
