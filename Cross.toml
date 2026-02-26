@@ -1,10 +1,18 @@
 # Cross.toml — configuration for cross-compilation via the `cross` tool.
 # The `pre-build` commands run inside the cross Docker container before cargo build.
-# This is needed because `substrait` (via prost-build) requires `protoc` at compile time,
-# but the cross Docker images don't include it by default.
+# This is needed because `substrait` (via prost-build) requires protoc >= 3.15 at
+# compile time (proto3 optional fields), but the cross Docker images ship an older
+# protobuf-compiler from apt that rejects the `optional` keyword.
+# We download protoc 25.x from the official GitHub releases instead.
 
 [target.aarch64-unknown-linux-musl]
-pre-build = ["apt-get update && apt-get install -y protobuf-compiler"]
+pre-build = [
+  "apt-get update -q && apt-get install -yq curl unzip",
+  "curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v25.3/protoc-25.3-linux-x86_64.zip -o /tmp/protoc.zip && unzip /tmp/protoc.zip -d /usr/local bin/protoc && rm /tmp/protoc.zip",
+]
 
 [target.aarch64-unknown-linux-gnu]
-pre-build = ["apt-get update && apt-get install -y protobuf-compiler"]
+pre-build = [
+  "apt-get update -q && apt-get install -yq curl unzip",
+  "curl -sL https://github.com/protocolbuffers/protobuf/releases/download/v25.3/protoc-25.3-linux-x86_64.zip -o /tmp/protoc.zip && unzip /tmp/protoc.zip -d /usr/local bin/protoc && rm /tmp/protoc.zip",
+]

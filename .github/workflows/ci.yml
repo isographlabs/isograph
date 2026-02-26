@@ -13,6 +13,11 @@ env:
 jobs:
   build-cli:
     name: Build compiler
+    # substrait + DataFusion significantly increase compile time; 45 min gives
+    # enough headroom for a cold build on slow targets (Windows, macOS ARM64).
+    # Note: timeout-minutes in a called reusable workflow is ignored by GitHub
+    # Actions, so it must be set here in the caller.
+    timeout-minutes: 45
     strategy:
       matrix:
         target:
@@ -46,6 +51,7 @@ jobs:
 
   build-cli-linux:
     name: Build compiler (x86_64-unknown-linux-musl)
+    timeout-minutes: 45
     uses: ./.github/workflows/build-cli.yml
     with:
       target: x86_64-unknown-linux-musl
