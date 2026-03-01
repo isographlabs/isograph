@@ -18,10 +18,8 @@
     "noUnusedParameters": true,
     "exactOptionalPropertyTypes": true,
     "noUncheckedIndexedAccess": true,
-    "paths": {
-      "@isograph/*": ["./libs/*"]
-    },
     "noEmit": true,
-    "allowUnreachableCode": false
+    "allowUnreachableCode": false,
+    "isolatedDeclarations": true
   }
 }

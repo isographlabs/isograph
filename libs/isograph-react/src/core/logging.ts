@@ -119,7 +119,7 @@ export type WrappedLogFunction = {
 export function logMessage(
   environment: IsographEnvironment,
   getMessage: () => LogMessage,
-) {
+): void {
   if (environment.loggers.size > 0) {
     const message = getMessage();
     for (const logger of environment.loggers) {

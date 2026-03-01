@@ -4,7 +4,7 @@ import type { NetworkRequestReaderOptions } from '../core/read';
 export function maybeUnwrapNetworkRequest(
   networkRequest: PromiseWrapper<void, any>,
   networkRequestOptions: NetworkRequestReaderOptions,
-) {
+): void {
   const state = getPromiseState(networkRequest);
   if (state.kind === 'Err' && networkRequestOptions.throwOnNetworkError) {
     throw state.error;
