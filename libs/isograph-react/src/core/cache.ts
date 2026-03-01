@@ -219,7 +219,10 @@ function normalizeDataIntoRecord(
   return recordHasBeenUpdated;
 }
 
-export function insertEmptySetIfMissing<K, V>(map: Map<K, Set<V>>, key: K): Set<V> {
+export function insertEmptySetIfMissing<K, V>(
+  map: Map<K, Set<V>>,
+  key: K,
+): Set<V> {
   let result = map.get(key);
   if (result === undefined) {
     result = new Set();
