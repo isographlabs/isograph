@@ -11,17 +11,17 @@
   "dependencies": {
     "@isograph/react-disposable-state": "workspace:*",
     "@types/node": "18.16.3",
-    "@types/react": "18.3.1",
-    "@types/react-dom": "18.3.1",
+    "@types/react": "catalog:",
+    "@types/react-dom": "catalog:",
     "eslint": "8.39.0",
     "eslint-config-next": "13.3.2",
     "next": "13.3.2",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "react-no-ssr": "^1.1.0",
-    "typescript": "5.6.3"
+    "react": "catalog:",
+    "react-dom": "catalog:",
+    "react-no-ssr": "catalog:",
+    "typescript": "catalog:"
   },
   "devDependencies": {
-    "@types/react-no-ssr": "^1.1.3"
+    "@types/react-no-ssr": "catalog:"
   }
 }

@@ -22,12 +22,13 @@
     "@isograph/disposable-types": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "catalog:peer"
   },
   "devDependencies": {
-    "@types/react": "18.3.1",
-    "react-test-renderer": "^18.2.0",
-    "typescript": "5.6.3"
+    "@types/react": "catalog:",
+    "react-test-renderer": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "repository": {
     "type": "git",
