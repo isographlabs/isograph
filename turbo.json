@@ -18,7 +18,7 @@
       "outputs": ["dist/**", "package.json"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "$TURBO_ROOT$/tsdown.config.ts",
+        "$TURBO_ROOT$/tsdown.config.mts",
         "$TURBO_ROOT$/tsconfig.json",
         "$TURBO_ROOT$/tsconfig.build.json"
       ]
