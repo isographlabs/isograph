@@ -1,10 +1,10 @@
 export type Query__HomeRoute__raw_response_type = {
-  pets: ReadonlyArray<{
-    id: string,
-    firstName: string,
-    lastName: string,
-    picture: unknown,
-    tagline: string,
+  readonly pets: ReadonlyArray<{
+    readonly id: string,
+    readonly firstName: string,
+    readonly lastName: string,
+    readonly picture: unknown,
+    readonly tagline: string,
   }>,
 }
 

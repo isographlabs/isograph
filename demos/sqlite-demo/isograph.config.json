@@ -1,0 +1,10 @@
+{
+  "$schema": "../../libs/isograph-compiler/isograph-config-schema.json",
+  "project_root": "./src/components",
+  "kind": "sql",
+  "schema": "./schema.sql",
+  "options": {
+    "module": "esmodule",
+    "on_invalid_id_type": "warn"
+  }
+}

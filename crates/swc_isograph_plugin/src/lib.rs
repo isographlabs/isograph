@@ -206,7 +206,7 @@ impl ValidIsographTemplateLiteral {
                 args: vec![
                     Lit::Str(Str {
                         span: Default::default(),
-                        value: Atom::from(path),
+                        value: Atom::from(path).into(),
                         raw: None,
                     })
                     .as_arg(),
@@ -280,7 +280,6 @@ struct IsoLiteralCompilerVisitor<'a> {
 #[swc_trace]
 impl IsoLiteralCompilerVisitor<'_> {
     fn parse_iso_template_literal(
-        &self,
         expr_or_spread: &ExprOrSpread,
     ) -> Result<ValidIsographTemplateLiteral, IsographTransformError> {
         if let Expr::Tpl(Tpl { quasis, .. }) = &*expr_or_spread.expr {
@@ -352,7 +351,7 @@ impl IsoLiteralCompilerVisitor<'_> {
             return Err(IsographTransformError::IsoRequiresOneArg);
         };
 
-        let iso_template_literal = self.parse_iso_template_literal(first)?;
+        let iso_template_literal = Self::parse_iso_template_literal(first)?;
 
         debug!("iso_template_literal: {:#?}", iso_template_literal);
 
@@ -364,10 +363,11 @@ impl IsoLiteralCompilerVisitor<'_> {
                 match fn_args {
                     Some(fn_args) => {
                         if let Some((first, [])) = fn_args.split_first() {
-                            return first.expr.as_ref().clone().wrap_ok();
+                            first.expr.as_ref().clone().wrap_ok()
+                        } else {
+                            // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
+                            IsographTransformError::IsoFnCallRequiresOneArg.wrap_err()
                         }
-                        // iso(...)(>args empty<) or iso(...)(first_arg, second_arg)
-                        return IsographTransformError::IsoFnCallRequiresOneArg.wrap_err();
                     }
                     // iso(...)>empty<
                     None => build_arrow_identity_expr().wrap_ok(),

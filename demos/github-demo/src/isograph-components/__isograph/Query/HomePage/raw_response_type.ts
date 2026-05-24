@@ -1,34 +1,34 @@
 export type Query__HomePage__raw_response_type = {
-  viewer: {
-    id: string,
-    avatarUrl: unknown,
-    login: string,
-    name?: (string | null),
-    repositories____first___l_10____after___l_null: {
-      edges?: (ReadonlyArray<({
-        node?: ({
-          id: string,
-          description?: (string | null),
-          forkCount: number,
-          name: string,
-          nameWithOwner: string,
-          owner: {
-            __typename: "Organization" | "User",
-            id: string,
-            login: string,
+  readonly viewer: {
+    readonly id: string,
+    readonly avatarUrl: unknown,
+    readonly login: string,
+    readonly name?: (string | null),
+    readonly repositories____first___l_10____after___l_null: {
+      readonly edges?: (ReadonlyArray<({
+        readonly node?: ({
+          readonly id: string,
+          readonly description?: (string | null),
+          readonly forkCount: number,
+          readonly name: string,
+          readonly nameWithOwner: string,
+          readonly owner: {
+            readonly __typename: "Organization" | "User",
+            readonly id: string,
+            readonly login: string,
           },
-          pullRequests: {
-            totalCount: number,
+          readonly pullRequests: {
+            readonly totalCount: number,
           },
-          stargazerCount: number,
-          watchers: {
-            totalCount: number,
+          readonly stargazerCount: number,
+          readonly watchers: {
+            readonly totalCount: number,
           },
         } | null),
       } | null)> | null),
-      pageInfo: {
-        endCursor?: (string | null),
-        hasNextPage: boolean,
+      readonly pageInfo: {
+        readonly endCursor?: (string | null),
+        readonly hasNextPage: boolean,
       },
     },
   },
