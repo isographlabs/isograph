@@ -21,19 +21,19 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@babel/helper-module-imports": "^7.0.0",
-    "babel-plugin-macros": "^2.0.0",
-    "cosmiconfig": "^5.0.5",
+    "@babel/helper-module-imports": "catalog:",
+    "babel-plugin-macros": "catalog:",
+    "cosmiconfig": "catalog:",
     "graphql": "15.3.0"
   },
   "devDependencies": {
-    "@babel/core": "^7.20.0",
-    "@babel/types": "^7.25.6",
-    "@types/babel__core": "^7.20.5",
-    "@types/babel__helper-module-imports": "^7.18.3",
-    "@types/cosmiconfig": "^5.0.3",
-    "prettier": "2.8.8",
-    "prettier-plugin-hermes-parser": "0.16.0"
+    "@babel/core": "catalog:",
+    "@babel/types": "catalog:",
+    "@types/babel__core": "catalog:",
+    "@types/babel__helper-module-imports": "catalog:",
+    "@types/cosmiconfig": "catalog:",
+    "prettier-plugin-hermes-parser": "catalog:",
+    "vitest": "catalog:"
   },
   "sideEffects": false
 }

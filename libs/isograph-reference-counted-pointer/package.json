@@ -20,7 +20,8 @@
     "@isograph/disposable-types": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "5.6.3"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "repository": {
     "type": "git",

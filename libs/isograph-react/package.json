@@ -24,15 +24,16 @@
     "@isograph/reference-counted-pointer": "workspace:*"
   },
   "peerDependencies": {
-    "react": "^18.0.0 || ^19.0.0"
+    "react": "catalog:peer"
   },
   "devDependencies": {
-    "@babel/preset-typescript": "^7.24.7",
-    "@types/react": "18.3.1",
-    "react-test-renderer": "^18.2.0",
-    "typescript": "5.6.3",
-    "vite-plugin-babel": "^1.2.0",
-    "vite-plugin-commonjs": "^0.10.1"
+    "@babel/preset-typescript": "catalog:",
+    "@types/react": "catalog:",
+    "react-test-renderer": "catalog:",
+    "typescript": "catalog:",
+    "vite-plugin-babel": "catalog:",
+    "vite-plugin-commonjs": "catalog:",
+    "vitest": "catalog:"
   },
   "repository": {
     "type": "git",

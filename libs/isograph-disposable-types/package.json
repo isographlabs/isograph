@@ -17,9 +17,9 @@
     "tsc": "tsc",
     "tsc-force": "tsc --build --clean && tsc --build --force"
   },
-  "dependencies": {},
   "devDependencies": {
-    "typescript": "5.6.3"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "repository": {
     "type": "git",
