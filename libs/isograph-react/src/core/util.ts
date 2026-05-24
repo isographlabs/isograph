@@ -1,7 +1,16 @@
 import type React from 'react';
 
-export type ExtractSecondParam<T extends (arg1: any, arg2: any) => any> =
-  T extends (arg1: any, arg2: infer P) => any ? P : never;
+export type ExtractSecondParam<
+  T extends (props: {
+    firstParameter: any;
+    additionalRuntimeProps: any;
+  }) => any,
+> = T extends (props: {
+  firstParameter: any;
+  additionalRuntimeProps: infer P;
+}) => any
+  ? P
+  : never;
 export type CombineWithIntrinsicAttributes<T> =
   T extends Record<PropertyKey, never>
     ? React.JSX.IntrinsicAttributes
