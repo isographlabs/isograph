@@ -209,6 +209,7 @@ export class CacheItem<T> {
                 'This indicates a bug in react-disposable-state.',
             );
           } else if (status === 'Uncleared') {
+            status = 'ClearedByCallback';
             switch (this.__state.kind) {
               case 'InParentCacheAndNotDisposed': {
                 this.__state.temporaryRetainCount--;
