@@ -51,7 +51,7 @@ export function useSubscribeToMultiple<
     fragmentReference: FragmentReference<TReadFromStore, any>;
     readerAst: ReaderAst<TReadFromStore>;
   }>,
-) {
+): void {
   const environment = useIsographEnvironment();
   useEffect(
     () => {
