@@ -69,23 +69,6 @@ Add two aliases to your `tsconfig.json`'s `compilerOptions` field. These alias s
 }
 ```
 
-## Disable React strict mode
-
-NextJS defaults to using strict mode. Isograph is currently incompatible with strict mode. Disable strict mode in your `next.config.js` file as follows:
-
-```js
-// next.config.js
-const nextConfig = {
-  reactStrictMode: false,
-};
-```
-
-TanStack Start also uses `StrictMode` in the default configuration of the [client entry point](https://tanstack.com/start/latest/docs/framework/react/guide/client-entry-point). Strict mode can be disabled by creating a custom client entry point in `src/client.tsx` and omitting `StrictMode`.
-
-:::note Why is this necessary?
-See [this FAQ item](/docs/faq/#why-does-isograph-not-support-strict-mode) for an explanation.
-:::
-
 ## Create a `.babelrc.js`
 
 To enable Babel and the Isograph Babel plugin, create a `.babelrc.js` with the following contents:
