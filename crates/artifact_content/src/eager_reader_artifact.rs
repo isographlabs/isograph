@@ -45,6 +45,7 @@ pub(crate) fn generate_eager_reader_artifacts<TCompilationProfile: CompilationPr
     file_extensions: GenerateFileExtensionsOption,
     has_updatable: bool,
 ) -> Vec<ArtifactPathAndContent> {
+    eprintln!("[fn] generate_eager_reader_artifacts");
     let ts_file_extension = file_extensions.ts();
     let user_written_component_variant = info.directive_set.clone();
 
@@ -200,6 +201,7 @@ pub(crate) fn generate_eager_reader_condition_artifact<TCompilationProfile: Comp
     refetch_paths: &RefetchedPathsMap,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
+    eprintln!("[fn] generate_eager_reader_condition_artifact");
     let server_object_selectable_name = server_object_selectable.name;
 
     let parent_entity_name = server_object_selectable.parent_entity_name.item;
@@ -274,6 +276,7 @@ pub(crate) fn generate_eager_reader_param_type_artifact<TCompilationProfile: Com
     client_selectable: MemoRefClientSelectable<TCompilationProfile>,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
+    eprintln!("[fn] generate_eager_reader_param_type_artifact");
     let client_selectable = match client_selectable {
         SelectionType::Scalar(s) => s.lookup(db).scalar_selected(),
         SelectionType::Object(o) => o.lookup(db).object_selected(),
@@ -426,6 +429,7 @@ pub(crate) fn generate_eager_reader_output_type_artifact<
     info: &UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ArtifactPathAndContent {
+    eprintln!("[fn] generate_eager_reader_output_type_artifact");
     let parent_entity_name = match client_selectable {
         SelectionType::Scalar(s) => s.parent_entity_name,
         SelectionType::Object(o) => o.parent_entity_name,
@@ -489,6 +493,7 @@ pub(crate) fn generate_link_output_type_artifact<TCompilationProfile: Compilatio
     db: &IsographDatabase<TCompilationProfile>,
     client_scalar_selectable: &ClientScalarSelectable<TCompilationProfile>,
 ) -> ArtifactPathAndContent {
+    eprintln!("[fn] generate_link_output_type_artifact");
     let parent_object_entity =
         &flattened_entity_named(db, client_scalar_selectable.parent_entity_name)
             .expect_entity_to_exist(client_scalar_selectable.parent_entity_name)
@@ -523,6 +528,7 @@ fn generate_function_import_statement(
     target_field_info: &UserWrittenClientTypeInfo,
     file_extensions: GenerateFileExtensionsOption,
 ) -> ClientScalarSelectableFunctionImportStatement {
+    eprintln!("[fn] generate_function_import_statement");
     // artifact directory includes __isograph, so artifact_directory.join("Type/Field")
     // is a directory "two levels deep" within the artifact_directory.
     //
@@ -573,6 +579,7 @@ fn generate_parameters<'a, TCompilationProfile: CompilationProfile>(
     db: &IsographDatabase<TCompilationProfile>,
     argument_definitions: impl Iterator<Item = &'a VariableDeclaration>,
 ) -> String {
+    eprintln!("[fn] generate_parameters");
     let mut s = "{\n".to_string();
     let indent = "  ";
     for arg in argument_definitions {
