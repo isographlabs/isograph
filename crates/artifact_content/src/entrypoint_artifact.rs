@@ -42,6 +42,7 @@ pub(crate) fn generate_entrypoint_artifacts<TCompilationProfile: CompilationProf
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
+    eprintln!("[fn] generate_entrypoint_artifacts");
     let entrypoint = selectable_named(
         db,
         parent_object_entity_name,
@@ -116,6 +117,7 @@ pub(crate) fn generate_entrypoint_artifacts_with_client_scalar_selectable_traver
     file_extensions: GenerateFileExtensionsOption,
     persisted_documents: &mut Option<PersistedDocuments>,
 ) -> Vec<ArtifactPathAndContent> {
+    eprintln!("[fn] generate_entrypoint_artifacts_with_client_scalar_selectable_traversal_result");
     let query_name = entrypoint.name.into();
     let parent_object_entity = flattened_entity_named(db, entrypoint.parent_entity_name)
         .expect_entity_to_exist(entrypoint.parent_entity_name)
@@ -342,6 +344,7 @@ fn get_used_variable_definitions<'a>(
     merged_selection_map: &MergedSelectionMap,
     variable_definitions: Vec<&'a VariableDeclaration>,
 ) -> BTreeSet<&'a VariableDeclaration> {
+    eprintln!("[fn] get_used_variable_definitions");
     get_reachable_variables(merged_selection_map)
         .map(|variable_name| {
             *variable_definitions
@@ -363,6 +366,7 @@ fn generate_refetch_query_artifact_import(
     )],
     file_extensions: GenerateFileExtensionsOption,
 ) -> RefetchQueryArtifactImport {
+    eprintln!("[fn] generate_refetch_query_artifact_import");
     // TODO name the refetch queries with the path, or something, instead of
     // with indexes.
     let mut output = String::new();
@@ -415,6 +419,7 @@ fn entrypoint_file_content<TCompilationProfile: CompilationProfile>(
     directive_set: &EntrypointDirectiveSet,
     field_directive_set: ClientScalarSelectableDirectiveSet,
 ) -> String {
+    eprintln!("[fn] entrypoint_file_content");
     let ts_file_extension = file_extensions.ts();
     let entrypoint_params_typename = format!("{}__{}__param", parent_type.name, query_name);
     let entrypoint_output_type_name = format!("{}__{}__output_type", parent_type.name, query_name);
@@ -530,6 +535,7 @@ fn variable_names_to_string(
     variable_names: &BTreeSet<VariableNameWrapper>,
     field_variables: impl Iterator<Item = VariableNameWrapper>,
 ) -> String {
+    eprintln!("[fn] variable_names_to_string");
     let mut s = "[".to_string();
 
     for variable in variable_names {
@@ -547,6 +553,7 @@ fn variable_names_to_string(
 fn get_used_variables_for_refetch_query_import(
     inline_fragments_or_linked_fields: &[WrappedSelectionMapSelection],
 ) -> BTreeSet<VariableNameWrapper> {
+    eprintln!("[fn] get_used_variables_for_refetch_query_import");
     // TODO return impl iterator
     let mut variables = BTreeSet::new();
 

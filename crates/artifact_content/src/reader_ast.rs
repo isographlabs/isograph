@@ -919,7 +919,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                                     ),
                                 );
 
-                                paths.extend(new_paths.into_iter());
+                                paths.extend(new_paths);
                             }
                         }
                     }
@@ -978,7 +978,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             ),
                         );
 
-                        paths.extend(new_paths.into_iter());
+                        paths.extend(new_paths);
 
                         let name_and_arguments = NameAndArguments {
                             // TODO use alias
@@ -1011,7 +1011,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             initial_variable_context,
                         );
 
-                        paths.extend(new_paths.into_iter());
+                        paths.extend(new_paths);
 
                         path.pop();
                     }
@@ -1059,7 +1059,7 @@ fn refetched_paths_with_path<TCompilationProfile: CompilationProfile>(
                             initial_variable_context,
                         );
 
-                        paths.extend(new_paths.into_iter());
+                        paths.extend(new_paths);
 
                         path.pop();
                     }

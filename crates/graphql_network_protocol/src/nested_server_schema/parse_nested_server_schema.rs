@@ -231,9 +231,7 @@ fn insert_parsed_items_into_schema(
         .into_iter()
         .map(|with_location| with_location.map(GraphQLTypeSystemExtensionOrDefinition::Definition))
         .chain(
-            type_system_extension_documents
-                .iter()
-                .flat_map(|(_, val)| val.lookup(db).clone().0.into_iter()),
+            type_system_extension_documents.values().flat_map(|val| val.lookup(db).clone().0.into_iter()),
         )
         .collect::<Vec<_>>();
 
