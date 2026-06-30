@@ -7,6 +7,7 @@ pub struct WithDuration<T> {
 
 impl<T> WithDuration<T> {
     pub fn new(calculate: impl FnOnce() -> T) -> WithDuration<T> {
+        eprintln!("[fn] WithDuration::new");
         let start = Instant::now();
         let item = calculate();
         WithDuration {
