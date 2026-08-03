@@ -2,8 +2,6 @@ packages:
   - libs/*
   - demos/*
   - docs-website
-  # if you are working on tree-sitter code, uncomment these lines!
-  # - tree-sitter
 
 ignoredBuiltDependencies:
   - '@swc/core'
@@ -13,10 +11,3 @@ ignoredBuiltDependencies:
   - esbuild
   - fsevents
   - unrs-resolver
-
-# onlyBuiltDependencies:
-#   - tree-sitter
-#   - tree-sitter-cli
-
-patchedDependencies:
-  '@docusaurus/tsconfig': patches/@docusaurus__tsconfig.patch
