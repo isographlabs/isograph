@@ -939,6 +939,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "isograph_parser"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "resolve_position",
+]
+
+[[package]]
 name = "itoa"
 version = "1.0.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2219,6 +2227,15 @@ dependencies = [
  "regex",
  "relative-path",
  "syn 2.0.98",
+]
+
+[[package]]
+name = "tests"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "isograph_parser",
+ "resolve_position",
 ]
 
 [[package]]

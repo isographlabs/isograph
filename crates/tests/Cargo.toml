@@ -1,0 +1,15 @@
+[package]
+name = "tests"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+
+[dev-dependencies]
+common_lang_types = { path = "../common_lang_types" }
+isograph_parser = { path = "../isograph_parser" }
+resolve_position = { path = "../resolve_position" }
+
+[lints]
+workspace = true
