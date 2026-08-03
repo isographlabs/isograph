@@ -402,10 +402,33 @@ impl Fixture {
         Fixture { text, tree }
     }
 
-    /// The node at a 0-indexed line and character; the character indexes bytes in the line.
+    /// The node at the first byte of `pattern`, which must occur exactly once in the
+    /// fixture. The preferred way to point at a position: editing the fixture cannot
+    /// silently shift what the test asserts about, and a pattern that stops being unique
+    /// fails loudly instead.
+    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_> {
+        let offset = self.unique_offset(pattern);
+        self.tree.resolve((), Span::new(offset, offset + 1))
+    }
+
+    /// The node at a 0-indexed line and character; the character indexes bytes in the
+    /// line. For positions no distinctive text names, such as whitespace between two
+    /// sibling groups.
     pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_> {
         let offset = self.offset(line, character);
         self.tree.resolve((), Span::new(offset, offset + 1))
+    }
+
+    fn unique_offset(&self, pattern: &str) -> u32 {
+        let mut occurrences = self.text.match_indices(pattern);
+        let (offset, _) = occurrences
+            .next()
+            .expect("the pattern the test anchors on occurs in the fixture");
+        assert!(
+            occurrences.next().is_none(),
+            "the pattern the test anchors on occurs exactly once in the fixture"
+        );
+        offset as u32
     }
 
     fn offset(&self, line: u32, character: u32) -> u32 {
@@ -442,25 +465,27 @@ use tests::Fixture;
 #[test]
 fn unclosed_paren_is_an_invalid_section() {
     let fixture = Fixture::load("unclosed_paren");
-    // On `broken (`, which the `}` refuses to close.
-    assert!(matches!(fixture.at(1, 9).validity(), SectionValidity::Invalid));
+    // The `(` that the `}` refuses to close; it is the fixture's only paren.
+    assert!(matches!(fixture.on("(").validity(), SectionValidity::Invalid));
 }
 
 #[test]
 fn the_enclosing_curly_group_stays_valid() {
     let fixture = Fixture::load("unclosed_paren");
-    // Inside `first { ... }`, before the invalid paren section.
-    assert!(matches!(fixture.at(0, 3).validity(), SectionValidity::Valid));
+    // The text inside `first { ... }`, before the invalid paren section begins.
+    assert!(matches!(fixture.on("broken").validity(), SectionValidity::Valid));
     // Inside `second { ok }`, after the broken section.
-    assert!(matches!(fixture.at(4, 3).validity(), SectionValidity::Valid));
+    assert!(matches!(fixture.on("ok").validity(), SectionValidity::Valid));
 }
 
 #[test]
 fn the_unmatched_group_is_the_leaf_it_resolves_to() {
     let fixture = Fixture::load("unclosed_paren");
-    let node = fixture.at(1, 9);
+    let node = fixture.on("(");
     assert!(matches!(node, ResolvedBracketNode::UnmatchedOpen(_)));
 }
 ```
+
+The anchor points at the first byte of the pattern, so `on("broken")` sits in the text segment before the `(` (valid), while `on("(")` sits on the unmatched open itself (invalid). The invalid section starts at the bracket, not at the word before it.
 
 The initial fixture set follows `bracket-matching-cases.md`, one fixture per case there, each with the assertions its case states.
