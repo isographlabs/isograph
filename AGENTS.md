@@ -1,0 +1,94 @@
+# i2
+
+A re-implementation of isograph, rebuilt from the parser up. From upstream isograph we keep pico and pico_macros (unchanged), the swc plugin and its dependency chain (isograph_config, common_lang_types, string_key_newtype, prelude), resolve_position, the relay crates, the demos, the docs website, and the build process. The new work is `crates/isograph_parser` (the parser), `crates/tests` (its tests), and `crates/isograph_cli` (freddie_cli's lifecycle verbs around the daemon).
+
+The parser does not use pico. The explicit assumption is that parsing a literal is trivially cheap and not worth memoizing; memoization applies above the parser (which files changed, which literals were extracted), and parser functions are plain functions over `&str`.
+
+## Commits
+
+Commit after every change, small and atomically, without being asked. Each logical change is its own commit.
+
+## Refactor docs
+
+This section is extremely important. A frequent source of frustration is deviations from this protocol. Take it very seriously and frequently refresh your memory on how to write planning documents. 99% of our time is spent iterating on planning documents, so it is extremely important that you do this correctly.
+
+- The primary way we plan things is through documents in the `refactors/` folder.
+- Move a `refactors/pending` doc to `refactors/past` when we will not work on it in the future.
+- Each doc must, at all times that we are actively working on it, conform to several standards:
+  - It should describe what we are building. Do not discuss how we came to a conclusion, or what we are not building. Do not narrate your thought process. Do not discuss what has already landed.
+  - It should have enough information for a new agent, with no context, to completely implement the feature **without making any important decisions.** All decisions are made as part of the planning document. Do not take shortcuts.
+  - Stubs, hand-waving, and "sketch this later" are disallowed. The planning document must be comprehensive: write out the real types, functions, call sites, and before/after snippets. If we do not actually write the stuff out, it is impossible to know whether the implementation is real or just fantasy.
+  - Every struct, enum, and other data type must be written out in full. The data layout is the most important thing to review; a prose description of the shape is not a substitute for the actual fields and variants.
+  - Every interface must be explicit: the functions, their signatures, who calls them, and what they return. The end-user experience must be written out too (what the user does, what they see), not left as a gloss on the code.
+  - If a step involves a complicated algorithm, procedural macros, or recursion, write out the generated or expanded code. The expansion is what we review; the generator is not a substitute for it.
+  - All changes should have before and after snippets. New functions, new structs, etc. should be written out in advance.
+  - If you need to have an additional scratch pad, you may — but do not do that work within this repository, and do not check it in. Do not "write tests" for work that is still under active discussion.
+  - Paragraphs of text are useless. Prefer code snippets.
+  - Follow all coding standards listed below.
+- The docs may have two parts (which may be split across multiple docs):
+  - An overall discussion of the problem being worked on, and
+  - An ordered list of changes. Each change should be self-contained and independently shippable. It should be ordered such that early changes are prefactors that make the actual, consequential change as easy as possible.
+- When we are discussing a change, always try to identify independently shippable changes. If these changes are guaranteed (or nigh thereunto), then we can ship them as a prefactor, and thus limit the complexity of the actual change (and planning document).
+- When a doc is not being actively worked on, it may become stale. That is okay. It should be updated to not be stale when we start working on it in the future. In other words, if we are working on `A`, and `B` depends on `A`, we do not need to keep `B` up to date unless it's part of the discussion.
+- If a refactor is too large and should be broken up into smaller steps, let the user know, and do so. The files should be "conceptually different".
+- While we are iterating on a pending doc, stay in the doc. Start implementing only when the user gives explicit permission to implement. "Looks good," edits to the doc, "go on," "continue," or further planning discussion are not permission. If there is any ambiguity about whether implementation has been authorized, do not start implementing.
+
+## Implementing a refactor doc
+
+Implementation begins only after the explicit permission above. Starting an implementation is not a commitment to finish it no matter what the code turns out to say. The doc was written so that no important decisions are left to the implementer, so when you hit something the doc did not anticipate, the decision is still the user's to make, not yours to improvise.
+
+- Stop and ask as soon as the doc stops matching the code. A step that assumed a type, a call site, or an ownership arrangement that is not there is a defect in the doc, and the fix goes into the doc first.
+- The signal to stop is complexity, above all. If a step that read as small turns out to pull in a redesign, a new shared-state primitive, a new trait, or a change to a crate the doc never mentioned, that is exactly the case to raise rather than absorb quietly. Say what exploded and what the options are, and let the user pick.
+- `git stash` the half-finished work while we settle it, if that leaves a cleaner tree to discuss against. Say what you stashed and what state it is in, so nothing is lost while the doc is being corrected.
+- Do not paper over the gap by choosing the easy version, leaving a TODO, or narrowing the step so it fits. Those hide the decision instead of surfacing it.
+
+## Tests
+
+- No snapshot tests. A snapshot pins the implementation's entire output, so it tests the implementation rather than the behavior: every refactor churns the snapshots, and a reviewer cannot tell an intended change from a regression by reading the diff.
+- Assert facts about the result instead. A test states what must be true of the output — this position sits in a matched section, this group has these children, this parse produced an error covering this span — and nothing else.
+- Test behavior, not implementation. If a test breaks under a refactor that preserves behavior, the test was asserting the wrong thing.
+- Fixtures are inputs only. Expected results live in the test as explicit assertions, never in checked-in expected-output files.
+- Tests may `expect` with a reason that names an invariant the test itself established (a fixture it built, an env the harness sets). Production code is not a test fixture.
+
+## Booleans
+
+`bool` is almost always the wrong reach. Prefer an enum whose variants name the states. A boolean is two anonymous cases; an enum makes those cases part of the type, so call sites match on meaning rather than on `true`/`false`, and a third state is a new variant instead of a second flag or a comment.
+
+So when a design proposes a `bool` field, parameter, or return type, three things happen every time:
+
+- Question whether it is needed at all. Most of the time the two cases have names and belong as variants of an enum, not as `true`/`false` on a field called `is_*`.
+- Default to the enum. Write that version first and only fall back to a `bool` when the value is genuinely a pure yes/no with no domain names worth carrying — not merely because a flag is shorter to type.
+- Raise it with the user, every single time, before it goes into a planning doc or into code. There are no exceptions to this. Name the `bool`, say what the two cases mean, and wait for the user's decision if an enum is not the obvious replacement.
+
+This is the same maintainability rule as "make impossible states unrepresentable." A field that only exists when a flag is set is not `flag: bool` plus `payload: Option<T>`; it is `Option<T>`, or an enum with a payload-bearing variant. Two booleans that cannot both be true are not two fields; they are one enum.
+
+## unwrap, unreachable, Infallible
+
+`unwrap`, `expect`, `unreachable!`, `panic!`, `todo!`, `unimplemented!`, and `Infallible` (including a `Result<T, Infallible>` or any other type-level claim that a failure case cannot occur) are almost always the wrong reach. So when a design proposes any of these, three things happen every time:
+
+- Question whether it is needed at all. Most of the time the type is wrong. An `Option` or `Result` the body will always unwrap should not have been optional. A match arm that is always unreachable is a state the function should never have been handed. An `Infallible` error type is a `Result` that should not be a `Result`.
+- Default to the version that does not need it. Fix the types so the success path is the only path the compiler allows. Write that version first and only fall back to a panic or an infallibility claim when the non-panicking version is genuinely, provably impossible — not merely more work.
+- Raise it with the user, every single time, before it goes into a planning doc or into code. There are no exceptions to this. Name the construct, say what invariant it is asserting and why the type system cannot express that invariant, and wait for the user's decision.
+
+This is distinct from total handling of values the outside world owns. A parse of user-supplied source text, a file read, a socket read: those can fail for reasons the program does not control, and the response is a typed error or a recovered region — never a panic. The parser in particular never panics on any input; malformed input is a representable state.
+
+## Coding standards
+
+- Maintainability is the most important standard. And that specifically means one thing: make impossible states unrepresentable and use the correct underlying representation or building blocks. Prefer enums over booleans (see Booleans above). If a field is not used when a flag is one way or the other, use an `Option` or a sum type, not a `bool` plus a spare field.
+- If we have to do extra refactoring work to maintain the above, we should do the extra work. If we need to refactor large parts of this repo in order to have the right building blocks, then we will do that.
+- Prefer the structurally correct solution to the easy one, even when the easy one is fast. Find the version that reuses the seams the code already has and generalizes to the next problem, and do the work to reach it; the right structure is what lets us build far more complicated things on top.
+- If we need a more performant, but less idiomatic impl, then create a newtype/struct/enum that encapsulates the ugly complexity but exposes an idiomatic API.
+- If a comment provides no more information than one would get by reading the code, do not include the comment.
+- A comment should not describe what wasn't done, ESPECIALLY if "we didn't do x" is more indicative of the fact that we either previously discussed doing X or in a previous iteration of a planning doc, you suggested doing X.
+- A comment must not describe what lives elsewhere unless a reader of this file has a concrete reason to expect it here. A doc comment names what the thing is and stops.
+- Never rely on discipline what we can enforce with newtypes.
+- Custom traits are generally to be avoided. Prefer a concrete type, an enum, a plain function, or a standard-library trait (`From`/`Into`, `Default`, the iterator traits) over introducing a trait of our own. A trait earns its place when several types genuinely implement it or it marks a real abstraction boundary; a trait with one implementor, reached for to make a generic infer or to fold a single call site's boilerplate, is the case to avoid. When a design introduces a trait, say what it buys over a concrete type, and default to the version without it.
+
+## Audits
+
+When told to audit, the deliverable is the whole class fixed everywhere, not the instance that was quoted. Sweep every file the standard touches before reporting done; the failure mode is the user opening the most obvious place and finding the problem still there. An audit that only edits what was pointed at is not an audit.
+
+## Coding standards: nits
+
+- Rust enums should take one of two forms: `enum Foo { NoData }` or `enum Foo { NamedStruct(Struct) }`, and not `Tuple(A, B)` or `Curlies { foo: Bar }`. `Tuple((A, B))` is appropriate, though.
+- The map `entry` API is encouraged. Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over a separate `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
