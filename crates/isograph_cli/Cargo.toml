@@ -1,17 +1,33 @@
 [package]
 name = "isograph_cli"
-version = { workspace = true }
-edition = { workspace = true }
-license = { workspace = true }
+version = "0.5.3"
+edition = "2024"
+license = "MIT"
+
+# Excluded from the root workspace so this crate resolves its own lockfile: freddie_cli
+# requires serde >= 1.0.229, and swc_common 2.0.1 does not compile against serde >= 1.0.229.
+[workspace]
 
 [[bin]]
 name = "isograph"
 path = "src/main.rs"
 
 [dependencies]
-clap = { workspace = true }
+clap = { version = "4.5.18", features = ["derive"] }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "04d3be57eef63608ef013004a7626505a4245bbf" }
-tracing = { workspace = true }
+tracing = "0.1.41"
 
-[lints]
-workspace = true
+[lints.clippy]
+print_stderr = "deny"
+print_stdout = "deny"
+explicit_deref_methods = "deny"
+explicit_into_iter_loop = "deny"
+match_wild_err_arm = "deny"
+unnecessary_join = "deny"
+unused_self = "deny"
+needless_for_each = "deny"
+struct_field_names = "deny"
+cast_precision_loss = "deny"
+match_bool = "deny"
+items_after_statements = "deny"
+single_char_pattern = "deny"
