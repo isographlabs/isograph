@@ -1,9 +1,0 @@
-extend type Mutation
-  @exposeField(
-    field: "set_pet_tagline.pet"
-    fieldMap: [{ from: "id", to: "input.id" }]
-  )
-  @exposeField(
-    field: "set_pet_best_friend.pet"
-    fieldMap: [{ from: "id", to: "id" }]
-  )
