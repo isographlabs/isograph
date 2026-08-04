@@ -19,40 +19,56 @@ The rule:
 What the pass generates (`resilient-parser.md`'s Change 1 implements exactly this):
 
 ```rust
-pub struct BracketTree<T> {
-    pub items: Vec<WithSpan<BracketItem<T>>>,
+/// The types one bracket tree holds: what a leaf run is, and what the two bracket errors
+/// carry. A pipeline stage is an implementor, and a pass that changes any of these changes
+/// all of them at once, through `try_map` (error-refinement.md).
+pub trait TreeContents {
+    type Text: fmt::Debug + PartialEq + Eq;
+    type Stray: fmt::Debug + PartialEq + Eq;
+    type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
-/// `T` is what a run between brackets is. This pass leaves runs unparsed — it produces
-/// `BracketTree<String>` — and later passes replace `T` with their own parsed nodes while
-/// keeping the brackets. Spans live on the `WithSpan` wrapping each item.
-pub enum BracketItem<T> {
+/// What this pass produces: unparsed runs, both bracket errors representable.
+pub struct Unparsed;
+
+impl TreeContents for Unparsed {
+    type Text = String;
+    type Stray = BracketKind;
+    type Unclosed = ();
+}
+
+/// Spans live on the `WithSpan` wrapping each item.
+pub struct BracketTree<TContents: TreeContents> {
+    pub items: Vec<WithSpan<BracketItem<TContents>>>,
+}
+
+pub enum BracketItem<TContents: TreeContents> {
     /// A maximal run containing no brackets.
-    Text(T),
-    Bracketed(Bracketed<T>),
+    Text(TContents::Text),
+    Bracketed(Bracketed<TContents>),
     /// A close bracket no open of its kind was waiting for: an invalid section one character
     /// wide.
-    StrayClose(BracketKind),
+    StrayClose(TContents::Stray),
 }
 
 /// An open bracket, everything up to its close, and the close — always present, so every pass
 /// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
 /// from the start of the opening to the end of a real closing, or to where the group was
 /// forced to end when the closing is synthetic.
-pub struct Bracketed<T> {
+pub struct Bracketed<TContents: TreeContents> {
     pub opening: WithSpan<BracketKind>,
-    pub closing: Closing,
-    pub children: Vec<WithSpan<BracketItem<T>>>,
+    pub closing: Closing<TContents>,
+    pub children: Vec<WithSpan<BracketItem<TContents>>>,
 }
 
-pub enum Closing {
+pub enum Closing<TContents: TreeContents> {
     /// The close bracket the author typed.
     Real(Span),
     /// The group never got its close and was forced to end: just before the close bracket an
     /// enclosing group owns, or at the end of the literal. Where it ended is the end of the
     /// wrapping `WithSpan`'s span; the missing close has no span of its own. What makes the
     /// group an invalid section.
-    Synthetic,
+    Synthetic(TContents::Unclosed),
 }
 
 /// The bracket kinds, named as isograph names its tokens: paren `()`, brace `{}`,
@@ -64,7 +80,7 @@ pub enum BracketKind {
 }
 ```
 
-A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 3 walk one shape. The stray close is its own variant because it is neither text nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable.
+A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 3 walk one shape. The stray close is its own variant because it is neither text nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below spell the `Unparsed` instantiation, since that is what this pass generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
 
 The pass's errors are derived from the tree, in source order:
 
