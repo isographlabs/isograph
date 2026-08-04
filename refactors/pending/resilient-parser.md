@@ -108,14 +108,14 @@ pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
     UnexpectedClose(WithSpan<BracketKind>),
     /// A group whose close was synthesized.
-    Unclosed(UnclosedGroup),
+    Unclosed(WithSpan<UnclosedGroup>),
 }
 
+/// The wrapping `WithSpan`'s span is the whole group; its end is where the close should have
+/// been.
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnclosedGroup {
     pub opening: WithSpan<BracketKind>,
-    /// The whole group; its end is where the close should have been.
-    pub span: Span,
 }
 
 impl<TContents> MatchedBrackets<TContents>
@@ -145,10 +145,12 @@ fn collect_errors<TContents>(
             }
             BracketItem::Bracketed(bracketed) => {
                 if matches!(bracketed.closing, Closing::Synthetic(())) {
-                    errors.push(BracketError::Unclosed(UnclosedGroup {
-                        opening: bracketed.opening,
-                        span: item.span,
-                    }));
+                    errors.push(BracketError::Unclosed(WithSpan::new(
+                        UnclosedGroup {
+                            opening: bracketed.opening,
+                        },
+                        item.span,
+                    )));
                 }
                 collect_errors(&bracketed.children, errors);
             }
@@ -563,7 +565,7 @@ fn the_unclosed_paren_is_the_only_error() {
     let errors = fixture.tree.errors();
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.opening.span, span_of(&fixture.text, "("));
+            assert_eq!(unclosed.item.opening.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
     }

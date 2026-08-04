@@ -14,7 +14,7 @@ One parameter rather than one per slot, because the slots change together: a pas
 
 ## `try_map`
 
-In `crates/isograph_parser/src/matched_brackets.rs`, beside the types. The mappers receive spans (and, for an unclosed group, the same `UnclosedGroup` struct the error vocabulary already uses), so a refusing mapper can build its diagnostic without help. All refusals are collected — the walk continues past a failure so one crossing reports every problem — and rebuilt nodes are kept only when nothing refused, so a dropped node never reaches a consumer. For a refusal-per-bracket-error crossing, the refusal list matches `errors()` on the source tree, ordering included: a group's `Unclosed` comes before the errors inside it.
+In `crates/isograph_parser/src/matched_brackets.rs`, beside the types. The mappers receive spans (and, for an unclosed group, the same `WithSpan<UnclosedGroup>` the error vocabulary already uses), so a refusing mapper can build its diagnostic without help. All refusals are collected — the walk continues past a failure so one crossing reports every problem — and rebuilt nodes are kept only when nothing refused, so a dropped node never reaches a consumer. For a refusal-per-bracket-error crossing, the refusal list matches `errors()` on the source tree, ordering included: a group's `Unclosed` comes before the errors inside it.
 
 ```rust
 impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
@@ -24,7 +24,10 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
         self,
         map_text: &mut impl FnMut(WithSpan<TFrom::Text>) -> Result<TTo::Text, TError>,
         map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
-        map_unclosed: &mut impl FnMut(TFrom::Unclosed, UnclosedGroup) -> Result<TTo::Unclosed, TError>,
+        map_unclosed: &mut impl FnMut(
+            TFrom::Unclosed,
+            WithSpan<UnclosedGroup>,
+        ) -> Result<TTo::Unclosed, TError>,
     ) -> Result<MatchedBrackets<TTo>, Vec<TError>> {
         let mut errors = Vec::new();
         let items = try_map_items(self.0, &mut errors, map_text, map_stray, map_unclosed);
@@ -41,7 +44,10 @@ fn try_map_items<TFrom, TTo, TError>(
     errors: &mut Vec<TError>,
     map_text: &mut impl FnMut(WithSpan<TFrom::Text>) -> Result<TTo::Text, TError>,
     map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
-    map_unclosed: &mut impl FnMut(TFrom::Unclosed, UnclosedGroup) -> Result<TTo::Unclosed, TError>,
+    map_unclosed: &mut impl FnMut(
+        TFrom::Unclosed,
+        WithSpan<UnclosedGroup>,
+    ) -> Result<TTo::Unclosed, TError>,
 ) -> Vec<WithSpan<BracketItem<TTo>>>
 where
     TFrom: TreeContents,
@@ -67,7 +73,8 @@ where
                 let closing = match closing {
                     Closing::Real(close) => Some(Closing::Real(close)),
                     Closing::Synthetic(payload) => {
-                        match map_unclosed(payload, UnclosedGroup { opening, span }) {
+                        let group = WithSpan::new(UnclosedGroup { opening }, span);
+                        match map_unclosed(payload, group) {
                             Ok(payload) => Some(Closing::Synthetic(payload)),
                             Err(e) => {
                                 errors.push(e);
@@ -175,7 +182,7 @@ fn refining_reports_the_unclosed_paren() {
     let errors = refine(fixture.tree).expect_err("the fixture's paren never closes");
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.opening.span, span_of(&fixture.text, "("));
+            assert_eq!(unclosed.item.opening.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
     }

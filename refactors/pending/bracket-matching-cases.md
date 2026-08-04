@@ -83,13 +83,13 @@ pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
     UnexpectedClose(WithSpan<BracketKind>),
     /// A group whose close was synthesized.
-    Unclosed(UnclosedGroup),
+    Unclosed(WithSpan<UnclosedGroup>),
 }
 
+/// The wrapping `WithSpan`'s span is the whole group; its end is where the close should have
+/// been.
 pub struct UnclosedGroup {
     pub opening: WithSpan<BracketKind>,
-    /// The whole group; its end is where the close should have been.
-    pub span: Span,
 }
 
 impl<TContents> MatchedBrackets<TContents>
