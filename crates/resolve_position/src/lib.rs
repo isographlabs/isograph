@@ -1,4 +1,4 @@
-use common_lang_types::Span;
+use parser_lang_types::Span;
 
 /// This module defines a trait [`ResolvePosition`], which is used to convert a
 /// mouse or keyboard cursor position (given by a [`Span`]) to a
@@ -101,7 +101,7 @@ mod test {
     use std::ops::ControlFlow;
 
     use crate::{PositionResolutionPath, ResolvePosition};
-    use common_lang_types::{Span, WithSpan};
+    use parser_lang_types::{Span, WithSpan};
 
     #[derive(Debug)]
     enum TestResolvedNode<'a> {
