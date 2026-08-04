@@ -45,9 +45,9 @@ pub trait TreeContents {
 
 /// What `match_brackets` produces: runs of lexed tokens, both bracket errors representable.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Lexed;
+pub struct BracketsMatched;
 
-impl TreeContents for Lexed {
+impl TreeContents for BracketsMatched {
     type Text = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
@@ -172,7 +172,7 @@ type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>
 
 pub fn match_brackets(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
-) -> MatchedBrackets<Lexed> {
+) -> MatchedBrackets<BracketsMatched> {
     let mut tokens = tokens.into_iter().peekable();
     let mut enclosing = Vec::new();
     let items = parse_items(&mut tokens, &mut enclosing);
@@ -187,7 +187,7 @@ pub fn match_brackets(
 fn parse_items(
     tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
-) -> Vec<WithSpan<BracketItem<Lexed>>> {
+) -> Vec<WithSpan<BracketItem<BracketsMatched>>> {
     let mut items = Vec::new();
     let mut run: Vec<WithSpan<NonBracketTokenKind>> = Vec::new();
     while let Some(&token) = tokens.peek() {
@@ -220,7 +220,7 @@ fn parse_items(
 /// End the run in progress, if any: one `Text` item spanning its first token's start to its
 /// last token's end.
 fn flush_run(
-    items: &mut Vec<WithSpan<BracketItem<Lexed>>>,
+    items: &mut Vec<WithSpan<BracketItem<BracketsMatched>>>,
     run: &mut Vec<WithSpan<NonBracketTokenKind>>,
 ) {
     let span = match (run.first(), run.last()) {
@@ -237,7 +237,7 @@ fn parse_bracketed(
     tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
     opening: WithSpan<BracketKind>,
-) -> WithSpan<BracketItem<Lexed>> {
+) -> WithSpan<BracketItem<BracketsMatched>> {
     enclosing.push(opening.item);
     let children = parse_items(tokens, enclosing);
     enclosing.pop();
@@ -444,7 +444,7 @@ span = { path = "../span" }
 ```rust
 use std::path::Path;
 
-use isograph_parser::{match_brackets, tokenize, Lexed, MatchedBrackets, ResolvedBracketNode};
+use isograph_parser::{match_brackets, tokenize, BracketsMatched, MatchedBrackets, ResolvedBracketNode};
 use resolve_position::ResolvePosition;
 use span::Span;
 
@@ -466,7 +466,7 @@ pub fn span_of(text: &str, pattern: &str) -> Span {
 
 pub struct Fixture {
     pub text: String,
-    pub tree: MatchedBrackets<Lexed>,
+    pub tree: MatchedBrackets<BracketsMatched>,
 }
 
 impl Fixture {
@@ -481,18 +481,18 @@ impl Fixture {
     }
 
     /// The path to the node containing `span`.
-    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_, Lexed> {
+    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_, BracketsMatched> {
         self.tree.resolve((), span)
     }
 
     /// `resolve` at the unique occurrence of `pattern` in the fixture's text.
-    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_, Lexed> {
+    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_, BracketsMatched> {
         self.resolve(span_of(&self.text, pattern))
     }
 
     /// The node at a 0-indexed line and character; the character indexes bytes in the
     /// line. For positions no distinctive text names.
-    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_, Lexed> {
+    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_, BracketsMatched> {
         let offset = self.offset(line, character);
         self.resolve(Span::new(offset, offset + 1))
     }

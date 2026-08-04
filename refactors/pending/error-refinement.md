@@ -140,22 +140,22 @@ In `crates/tests/tests/bracket_matching.rs`. The refined stage marker is test-lo
 use std::convert::Infallible;
 
 use isograph_parser::{
-    BracketError, Lexed, MatchedBrackets, NonBracketTokenKind, TreeContents,
+    BracketError, BracketsMatched, MatchedBrackets, NonBracketTokenKind, TreeContents,
 };
 use span::WithSpan;
 
 #[derive(Debug, PartialEq, Eq)]
-struct LexedNoErrors;
+struct BracketsMatchedNoErrors;
 
-impl TreeContents for LexedNoErrors {
+impl TreeContents for BracketsMatchedNoErrors {
     type Text = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = Infallible;
     type Unclosed = Infallible;
 }
 
 fn refine(
-    tree: MatchedBrackets<Lexed>,
-) -> Result<MatchedBrackets<LexedNoErrors>, Vec<BracketError>> {
+    tree: MatchedBrackets<BracketsMatched>,
+) -> Result<MatchedBrackets<BracketsMatchedNoErrors>, Vec<BracketError>> {
     tree.try_map(
         &mut |tokens| Ok(tokens.item),
         &mut |stray| Err(BracketError::UnexpectedClose(stray)),
