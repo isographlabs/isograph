@@ -3,36 +3,39 @@
 `isograph_parser` parses isograph literals in passes, and every pass is resilient: a malformed region degrades that region, never its siblings and never the file.
 
 1. Extract the isograph literal from a source file. (Not a parsing pass; it hands the passes below a `&str` and the literal's offset in the file.)
-2. Match brackets — `()`, `{}`, `[]` — within the literal. This pass runs first, always, and its output is balanced: every group has a close, real or synthesized, so no later pass ever sees an unclosed bracket. A synthetically closed group is an invalid section; everything around it stays valid.
-3. Parse each group's contents into the real AST, over the guaranteed-balanced tree. There will be other such passes.
+2. Tokenize the literal. This landed with the tokenizer copy: `token_kind.rs` (isograph's `IsographLangTokenKind`, verbatim), `tokenize()` producing `Vec<WithSpan<IsographLangTokenKind>>`, and the split layer — `NonBracketTokenKind` (the token enum with the six brackets unrepresentable), `BracketKind`, `BracketToken`, and the total `SplitToken` conversion.
+3. Match brackets over the token stream. This pass runs before everything downstream of the tokenizer, and its output is balanced: every group has a close, real or synthesized, so no later pass ever sees an unclosed bracket. A synthetically closed group is an invalid section; everything around it stays valid.
+4. Parse each run of non-bracket tokens into the real AST, over the guaranteed-balanced tree. There will be other such passes, each adding structure to what sits between the brackets.
 
-Each pass owns its errors. This pass reports unexpected closes and unclosed groups; stage 3 produces its own, separate error tokens, and one input may carry both kinds at once.
+Each pass owns its errors. The bracket matcher reports unexpected closes and unclosed groups; stage 4 produces its own, separate error tokens (the tokenizer's `Error*` kinds already flow through as run tokens), and one input may carry several kinds at once.
 
-This doc specifies stage 2 and its tests. Stage 3 gets its own doc once stage 2 lands; extraction is scheduled with it. The changes here land after `parser-lang-types.md`, whose `parser_lang_types` crate supplies `Span` and `WithSpan`. The matching rule's behavior, case by case, with the reasons behind it, the tree each case generates, and the open validity-at-end-of-literal question, lives in `bracket-matching-cases.md`; this doc implements what that one decides. Everything here is spans relative to the literal; no location or file type appears.
+This doc specifies the bracket matcher (pass 3) and its tests. Stage 4 gets its own doc once this lands; extraction is scheduled with it. The matching rule's behavior, case by case, with the reasons behind it, the tree each case generates, and the open validity-at-end question, lives in `bracket-matching-cases.md`; this doc implements what that one decides. Everything here is spans relative to the literal, from the `span` crate (`refactors/past/parser-lang-types.md`); no location or file type appears.
 
-The tests need three functions, and stage 2 is done when they exist and the fixture suite passes:
+The tests need three functions, and this pass is done when they exist and the fixture suite passes:
 
 1. Turn a unique string into a `Span` (test-only, a free function over the original string; it needs no parsed structure).
-2. Given a span and the bracket tree, produce a path in the `resolve_position` sense, from which a test asserts facts — above all, whether the position sits inside matched or unmatched brackets.
+2. Given a span and the matched-brackets tree, produce a path in the `resolve_position` sense, from which a test asserts facts — above all, whether the position sits inside matched or unmatched brackets.
 3. Ask the tree whether the pass produced any errors, such as an unexpected closing bracket.
 
-## Change 1: the bracket tree and `match_brackets`
+## Change 1: `MatchedBrackets` and `match_brackets`
 
-New module `crates/isograph_parser/src/bracket_tree.rs`, re-exported from `lib.rs`. Spans are byte offsets into the literal (not the containing file).
+New module `crates/isograph_parser/src/matched_brackets.rs`, re-exported from `lib.rs`. Spans are byte offsets into the literal (not the containing file).
 
-The tree is the one `bracket-matching-cases.md` specifies. Bracket kinds are named as isograph names its tokens: paren `()`, brace `{}`, bracket `[]`.
+The tree is the one `bracket-matching-cases.md` specifies:
 
 ```rust
 use std::fmt;
 
-use parser_lang_types::{Span, WithSpan};
+use span::{Span, WithSpan};
 
-/// The types one bracket tree holds: what a leaf run is, and what the two bracket errors
-/// carry. A pipeline stage is an implementor, and a pass that changes any of these changes
-/// all of them at once, through `try_map` (error-refinement.md). The bounds on the slots are
-/// what keep the tree types' derives.
+use crate::{BracketKind, NonBracketTokenKind};
+
+/// The types one matched-brackets tree holds: what a run between brackets is, and what the
+/// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
+/// of these changes all of them at once, through `try_map` (error-refinement.md). The bounds
+/// on the slots are what keep the tree types' derives.
 pub trait TreeContents {
-    /// A maximal run between brackets: unparsed text at first, parsed nodes later.
+    /// A maximal run between brackets: lexed tokens at first, parsed nodes later.
     type Text: fmt::Debug + PartialEq + Eq;
     /// What a stray close carries: the bracket kind, or nothing constructible.
     type Stray: fmt::Debug + PartialEq + Eq;
@@ -40,12 +43,12 @@ pub trait TreeContents {
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
-/// What `match_brackets` produces: unparsed runs, both bracket errors representable.
+/// What `match_brackets` produces: runs of lexed tokens, both bracket errors representable.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Unparsed;
+pub struct Lexed;
 
-impl TreeContents for Unparsed {
-    type Text = String;
+impl TreeContents for Lexed {
+    type Text = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
 }
@@ -53,24 +56,23 @@ impl TreeContents for Unparsed {
 /// One isograph literal with its brackets matched. Spans live on the `WithSpan` wrapping
 /// each item.
 #[derive(Debug, PartialEq, Eq)]
-pub struct BracketTree<TContents: TreeContents> {
-    pub items: Vec<WithSpan<BracketItem<TContents>>>,
-}
+pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem<TContents>>>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketItem<TContents: TreeContents> {
-    /// A maximal run containing no brackets.
+    /// A maximal run containing no brackets. Its span runs from its first token's start to
+    /// its last token's end, whitespace between them included.
     Text(TContents::Text),
     Bracketed(Bracketed<TContents>),
-    /// A close bracket no open of its kind was waiting for: an invalid section one character
+    /// A close bracket no open of its kind was waiting for: an invalid section one token
     /// wide.
     StrayClose(TContents::Stray),
 }
 
 /// An open bracket, everything up to its close, and the close — always present, so every pass
 /// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
-/// from the start of the opening to the end of a real closing, or to where the group was
-/// forced to end when the closing is synthetic.
+/// from the start of the opening to the end of a real closing, or to the end of the last
+/// child when the closing is synthetic.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bracketed<TContents: TreeContents> {
     pub opening: WithSpan<BracketKind>,
@@ -82,27 +84,18 @@ pub struct Bracketed<TContents: TreeContents> {
 pub enum Closing<TContents: TreeContents> {
     /// The close bracket the author typed.
     Real(Span),
-    /// The group never got its close and was forced to end: just before the close bracket an
-    /// enclosing group owns, or at the end of the literal. Where it ended is the end of the
+    /// The group never got its close and was forced to end: at the close bracket an
+    /// enclosing group owns, or at the end of the tokens. Where it ended is the end of the
     /// wrapping `WithSpan`'s span; the missing close has no span of its own. What makes the
     /// group an invalid section.
     Synthetic(TContents::Unclosed),
 }
-
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum BracketKind {
-    Paren,
-    Brace,
-    Bracket,
-}
 ```
-
-Every `(`, `)`, `{`, `}`, `[`, and `]` in the literal is structural at this stage.
 
 ### The matching rule
 
-- An open bracket begins a group; its children are parsed until the literal ends or a close bracket that this group or an enclosing one owns appears.
-- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is `Closing::Synthetic`, forced to end the moment the close it cannot match, or the end of the literal, is encountered; that position becomes the end of its span. Groups between a close and the group that owns it all end this way, innermost first, which is the nesting `bracket-matching-cases.md` shows.
+- An open bracket begins a group; its children are parsed until the tokens end or a close bracket that this group or an enclosing one owns appears.
+- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is `Closing::Synthetic`, forced to end the moment the close it cannot match, or the end of the tokens, is encountered; it ends where its last child does, or at its opening when it has no children. Groups between a close and the group that owns it all end this way, innermost first, which is the nesting `bracket-matching-cases.md` shows.
 - A close bracket that no group in the enclosing stack owns is a `StrayClose` where it stands. It consumes nothing: an open of a different kind stays open and may still match later.
 
 ### The errors
@@ -125,7 +118,7 @@ pub struct UnclosedGroup {
     pub span: Span,
 }
 
-impl<TContents> BracketTree<TContents>
+impl<TContents> MatchedBrackets<TContents>
 where
     TContents: TreeContents<Stray = BracketKind, Unclosed = ()>,
 {
@@ -133,7 +126,7 @@ where
     /// Empty iff every bracket matched.
     pub fn errors(&self) -> Vec<BracketError> {
         let mut errors = Vec::new();
-        collect_errors(&self.items, &mut errors);
+        collect_errors(&self.0, &mut errors);
         errors
     }
 }
@@ -168,153 +161,101 @@ fn collect_errors<TContents>(
 
 ### Implementation
 
-A scanner with one token of lookahead and a recursive descent over it — the same shape as the existing parser's `PeekableLexer`. The `enclosing` vector is context about brackets already consumed, not lookahead: the parser never sees past the one peeked token.
+A recursive descent over the token stream with one token of lookahead — `Peekable` over the tokenizer's output, the same discipline as the existing parser's `PeekableLexer`. The `enclosing` vector is context about brackets already consumed, not lookahead: the parser never sees past the one peeked token. `SplitToken` is the only place bracket-ness is decided, so the matcher and the runs cannot disagree about what counts as a bracket.
 
 ```rust
-pub fn match_brackets(literal: &str) -> BracketTree<Unparsed> {
-    let mut lexer = BracketLexer::new(literal);
+use std::iter::Peekable;
+
+use crate::{BracketToken, IsographLangTokenKind, SplitToken};
+
+type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
+
+pub fn match_brackets(
+    tokens: Vec<WithSpan<IsographLangTokenKind>>,
+) -> MatchedBrackets<Lexed> {
+    let mut tokens = tokens.into_iter().peekable();
     let mut enclosing = Vec::new();
-    let items = parse_items(&mut lexer, &mut enclosing);
-    BracketTree { items }
+    let items = parse_items(&mut tokens, &mut enclosing);
+    MatchedBrackets(items)
 }
 
-/// What the scanner hands out: one bracket, or the maximal run between brackets.
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-enum BracketToken {
-    Text,
-    Open(BracketKind),
-    Close(BracketKind),
-}
-
-fn bracket_token(byte: u8) -> Option<BracketToken> {
-    Some(match byte {
-        b'(' => BracketToken::Open(BracketKind::Paren),
-        b')' => BracketToken::Close(BracketKind::Paren),
-        b'{' => BracketToken::Open(BracketKind::Brace),
-        b'}' => BracketToken::Close(BracketKind::Brace),
-        b'[' => BracketToken::Open(BracketKind::Bracket),
-        b']' => BracketToken::Close(BracketKind::Bracket),
-        _ => None,
-    })
-}
-
-/// The scanner, holding exactly one token of lookahead.
-struct BracketLexer<'a> {
-    literal: &'a str,
-    /// The one token of lookahead; `None` once the literal is exhausted.
-    peeked: Option<WithSpan<BracketToken>>,
-    /// Where the token after `peeked` starts.
-    offset: usize,
-}
-
-impl<'a> BracketLexer<'a> {
-    fn new(literal: &'a str) -> Self {
-        let mut lexer = BracketLexer {
-            literal,
-            peeked: None,
-            offset: 0,
-        };
-        lexer.peeked = lexer.lex();
-        lexer
-    }
-
-    /// The next token without consuming it: the whole of the parser's lookahead.
-    fn peek(&self) -> Option<WithSpan<BracketToken>> {
-        self.peeked
-    }
-
-    /// Consume the peeked token; `peek` then sees the one after it.
-    fn advance(&mut self) {
-        self.peeked = self.lex();
-    }
-
-    /// The literal's text under `span`. Every span boundary sits beside a one-byte ASCII
-    /// bracket or at an end of the literal, so it is a char boundary.
-    fn text(&self, span: Span) -> &'a str {
-        &self.literal[span.as_usize_range()]
-    }
-
-    /// The offset just past the last byte of the literal. The conversion is the one
-    /// `Span::from_usize` makes; a literal longer than `u32::MAX` bytes is out of scope
-    /// (parser-lang-types.md).
-    fn end_of_literal(&self) -> u32 {
-        Span::from_usize(self.literal.len(), self.literal.len()).end
-    }
-
-    /// The token starting at `offset`: one bracket, or the maximal bracket-free run.
-    fn lex(&mut self) -> Option<WithSpan<BracketToken>> {
-        let bytes = self.literal.as_bytes();
-        let start = self.offset;
-        let first = *bytes.get(start)?;
-        if let Some(token) = bracket_token(first) {
-            self.offset = start + 1;
-            return Some(WithSpan::new(token, Span::from_usize(start, start + 1)));
-        }
-        let mut end = start + 1;
-        while end < bytes.len() && bracket_token(bytes[end]).is_none() {
-            end += 1;
-        }
-        self.offset = end;
-        Some(WithSpan::new(BracketToken::Text, Span::from_usize(start, end)))
-    }
-}
-
-/// Parse items until a close bracket some enclosing group owns, or the end of the literal.
+/// Parse items until a close bracket some enclosing group owns, or the end of the tokens.
 ///
 /// `enclosing` is the kind of every group this level sits inside, innermost last, the group
 /// being parsed included; it is how a close bracket with no open of its kind anywhere is
 /// recognized as stray rather than left to end this level.
 fn parse_items(
-    lexer: &mut BracketLexer<'_>,
+    tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
-) -> Vec<WithSpan<BracketItem<Unparsed>>> {
+) -> Vec<WithSpan<BracketItem<Lexed>>> {
     let mut items = Vec::new();
-    while let Some(token) = lexer.peek() {
-        match token.item {
-            BracketToken::Text => {
-                lexer.advance();
-                items.push(WithSpan::new(
-                    BracketItem::Text(lexer.text(token.span).to_owned()),
-                    token.span,
-                ));
+    let mut run: Vec<WithSpan<NonBracketTokenKind>> = Vec::new();
+    while let Some(&token) = tokens.peek() {
+        match SplitToken::from(token.item) {
+            SplitToken::NonBracket(kind) => {
+                tokens.next();
+                run.push(WithSpan::new(kind, token.span));
             }
-            BracketToken::Open(kind) => {
-                lexer.advance();
-                items.push(parse_bracketed(lexer, enclosing, WithSpan::new(kind, token.span)));
+            SplitToken::Bracket(BracketToken::Open(kind)) => {
+                flush_run(&mut items, &mut run);
+                tokens.next();
+                items.push(parse_bracketed(tokens, enclosing, WithSpan::new(kind, token.span)));
             }
-            BracketToken::Close(kind) => {
+            SplitToken::Bracket(BracketToken::Close(kind)) => {
                 if enclosing.contains(&kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
                     // synthetically closes every group between here and its owner.
                     break;
                 }
-                lexer.advance();
+                flush_run(&mut items, &mut run);
+                tokens.next();
                 items.push(WithSpan::new(BracketItem::StrayClose(kind), token.span));
             }
         }
     }
+    flush_run(&mut items, &mut run);
     items
+}
+
+/// End the run in progress, if any: one `Text` item spanning its first token's start to its
+/// last token's end.
+fn flush_run(
+    items: &mut Vec<WithSpan<BracketItem<Lexed>>>,
+    run: &mut Vec<WithSpan<NonBracketTokenKind>>,
+) {
+    let span = match (run.first(), run.last()) {
+        (Some(first), Some(last)) => Span::join(first.span, last.span),
+        _ => return,
+    };
+    items.push(WithSpan::new(BracketItem::Text(std::mem::take(run)), span));
 }
 
 /// One group, its opening already consumed: parse children, then look at the one token that
 /// stopped them — this group's own close (consumed, `Closing::Real`) or something an
 /// enclosing group owns (left alone, and this group is closed synthetically where it stands).
 fn parse_bracketed(
-    lexer: &mut BracketLexer<'_>,
+    tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
     opening: WithSpan<BracketKind>,
-) -> WithSpan<BracketItem<Unparsed>> {
+) -> WithSpan<BracketItem<Lexed>> {
     enclosing.push(opening.item);
-    let children = parse_items(lexer, enclosing);
+    let children = parse_items(tokens, enclosing);
     enclosing.pop();
 
-    let (closing, end) = match lexer.peek() {
-        Some(token) if token.item == BracketToken::Close(opening.item) => {
-            lexer.advance();
+    let (closing, end) = match tokens.peek() {
+        Some(&token)
+            if SplitToken::from(token.item)
+                == SplitToken::Bracket(BracketToken::Close(opening.item)) =>
+        {
+            tokens.next();
             (Closing::Real(token.span), token.span.end)
         }
-        Some(token) => (Closing::Synthetic(()), token.span.start),
-        None => (Closing::Synthetic(()), lexer.end_of_literal()),
+        // The group was forced to end: at a close an enclosing group owns, or at the end of
+        // the tokens. It ends where its last child does.
+        _ => (
+            Closing::Synthetic(()),
+            children.last().map_or(opening.span.end, |last| last.span.end),
+        ),
     };
 
     let span = Span::new(opening.span.start, end);
@@ -329,33 +270,33 @@ fn parse_bracketed(
 }
 ```
 
-At the top level `enclosing` is empty, so `parse_items` never breaks there: every close bracket the recursion hands back up is consumed as a stray or by the group that owns it, and `match_brackets` consumes the whole literal. Synthetically closed groups nest correctly because each recursion level returns without consuming the close that stopped it: closing `}` against open `{`, `(`, `[` returns out of the `[` group's level, then the `(` group's, closing each synthetically at the `}`'s position, before the `{` group consumes the `}` as its own.
+At the top level `enclosing` is empty, so `parse_items` never breaks there: every close bracket the recursion hands back up is consumed as a stray or by the group that owns it, and `match_brackets` consumes every token. Synthetically closed groups nest correctly because each recursion level returns without consuming the close that stopped it: closing `}` against open `{`, `(`, `[` returns out of the `[` group's level, then the `(` group's, ending each at its own last child, before the `{` group consumes the `}` as its own.
 
 ## Change 2: position resolution and validity
 
-New module `crates/isograph_parser/src/resolve_bracket_tree.rs`, implementing `resolve_position::ResolvePosition` for the bracket tree, the way `resolve_position`'s own doc comment describes.
+New module `crates/isograph_parser/src/resolve_matched_brackets.rs`, implementing `resolve_position::ResolvePosition` for the matched-brackets tree, the way `resolve_position`'s own doc comment describes.
 
-A path points at its variant's payload — the `T` of a text run, the `Bracketed<T>`, a stray's `BracketKind` — plus the parent chain. The resolved item's span lives on the `WithSpan` wrapping it in the tree, and the caller of `resolve` already holds the position it asked about.
+A path points at its variant's payload — the `TContents::Text` of a run, the `Bracketed<TContents>`, a stray's `TContents::Stray` — plus the parent chain. The resolved item's span lives on the `WithSpan` wrapping it in the tree, and the caller of `resolve` already holds the position it asked about. A position the tokenizer skipped (whitespace between items) resolves to the enclosing group, which is the leaf that contains it.
 
 ```rust
-use parser_lang_types::{Span, WithSpan};
+use span::{Span, WithSpan};
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 
 #[derive(Debug)]
 pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
-    BracketTree(BracketTreePath<'a, TContents>),
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
     Text(TextPath<'a, TContents>),
     Bracketed(BracketedPath<'a, TContents>),
     StrayClose(StrayClosePath<'a, TContents>),
 }
 
-pub type BracketTreePath<'a, TContents> =
-    PositionResolutionPath<&'a BracketTree<TContents>, ()>;
+pub type MatchedBracketsPath<'a, TContents> =
+    PositionResolutionPath<&'a MatchedBrackets<TContents>, ()>;
 
 /// Everything a `BracketItem` can sit inside.
 #[derive(Debug)]
 pub enum BracketItemParent<'a, TContents: TreeContents> {
-    BracketTree(BracketTreePath<'a, TContents>),
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
     Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
@@ -370,7 +311,7 @@ pub type StrayClosePath<'a, TContents: TreeContents> =
 Each impl finds the child containing the position and delegates; a node none of whose children contain the position is the leaf. The parent path is built once, in the branch that uses it:
 
 ```rust
-impl<TContents: TreeContents> ResolvePosition for BracketTree<TContents> {
+impl<TContents: TreeContents> ResolvePosition for MatchedBrackets<TContents> {
     type Parent<'a>
         = ()
     where
@@ -381,12 +322,12 @@ impl<TContents: TreeContents> ResolvePosition for BracketTree<TContents> {
         Self: 'a;
 
     fn resolve<'a>(&'a self, parent: (), position: Span) -> ResolvedBracketNode<'a, TContents> {
-        match containing_child(&self.items, position) {
+        match containing_child(&self.0, position) {
             Some(child) => {
-                let parent = BracketItemParent::BracketTree(self.path(parent));
+                let parent = BracketItemParent::MatchedBrackets(self.path(parent));
                 resolve_child(child, parent, position)
             }
-            None => ResolvedBracketNode::BracketTree(self.path(parent)),
+            None => ResolvedBracketNode::MatchedBrackets(self.path(parent)),
         }
     }
 }
@@ -457,12 +398,12 @@ impl<TContents: TreeContents> ResolvedBracketNode<'_, TContents> {
     pub fn validity(&self) -> SectionValidity {
         match self {
             ResolvedBracketNode::StrayClose(_) => SectionValidity::Invalid,
-            ResolvedBracketNode::BracketTree(_) => SectionValidity::Valid,
+            ResolvedBracketNode::MatchedBrackets(_) => SectionValidity::Valid,
             ResolvedBracketNode::Text(path) => path.parent.validity(),
             ResolvedBracketNode::Bracketed(path) => match path.inner.closing {
                 Closing::Real(_) => path.parent.validity(),
                 // Provisional: whether a group synthetically closed at the end of the
-                // literal counts as invalid is the open question in
+                // tokens counts as invalid is the open question in
                 // bracket-matching-cases.md.
                 Closing::Synthetic(_) => SectionValidity::Invalid,
             },
@@ -473,7 +414,7 @@ impl<TContents: TreeContents> ResolvedBracketNode<'_, TContents> {
 impl<TContents: TreeContents> BracketItemParent<'_, TContents> {
     fn validity(&self) -> SectionValidity {
         match self {
-            BracketItemParent::BracketTree(_) => SectionValidity::Valid,
+            BracketItemParent::MatchedBrackets(_) => SectionValidity::Valid,
             BracketItemParent::Bracketed(path) => match path.inner.closing {
                 Closing::Real(_) => path.parent.validity(),
                 Closing::Synthetic(_) => SectionValidity::Invalid,
@@ -494,8 +435,8 @@ A position inside a synthetically closed group is `Invalid` however deep it sits
 ```toml
 [dependencies]
 isograph_parser = { path = "../isograph_parser" }
-parser_lang_types = { path = "../parser_lang_types" }
 resolve_position = { path = "../resolve_position" }
+span = { path = "../span" }
 ```
 
 `src/lib.rs`:
@@ -503,9 +444,9 @@ resolve_position = { path = "../resolve_position" }
 ```rust
 use std::path::Path;
 
-use isograph_parser::{match_brackets, BracketTree, ResolvedBracketNode, Unparsed};
-use parser_lang_types::Span;
+use isograph_parser::{match_brackets, tokenize, Lexed, MatchedBrackets, ResolvedBracketNode};
 use resolve_position::ResolvePosition;
+use span::Span;
 
 /// The span of `pattern`, which must occur exactly once in `text`. The preferred way for a
 /// test to point at a position: it needs nothing but the original string, editing the fixture
@@ -525,7 +466,7 @@ pub fn span_of(text: &str, pattern: &str) -> Span {
 
 pub struct Fixture {
     pub text: String,
-    pub tree: BracketTree<Unparsed>,
+    pub tree: MatchedBrackets<Lexed>,
 }
 
 impl Fixture {
@@ -535,24 +476,23 @@ impl Fixture {
             .join(format!("{name}.iso"));
         let text = std::fs::read_to_string(&path)
             .expect("the fixture named by the test exists under crates/tests/fixtures");
-        let tree = match_brackets(&text);
+        let tree = match_brackets(tokenize(&text));
         Fixture { text, tree }
     }
 
     /// The path to the node containing `span`.
-    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_, Unparsed> {
+    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_, Lexed> {
         self.tree.resolve((), span)
     }
 
     /// `resolve` at the unique occurrence of `pattern` in the fixture's text.
-    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_, Unparsed> {
+    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_, Lexed> {
         self.resolve(span_of(&self.text, pattern))
     }
 
     /// The node at a 0-indexed line and character; the character indexes bytes in the
-    /// line. For positions no distinctive text names, such as whitespace between two
-    /// sibling groups.
-    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_, Unparsed> {
+    /// line. For positions no distinctive text names.
+    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_, Lexed> {
         let offset = self.offset(line, character);
         self.resolve(Span::new(offset, offset + 1))
     }
@@ -569,7 +509,7 @@ impl Fixture {
 }
 ```
 
-`on` resolves the whole pattern's span, so the node it lands on must contain every byte of the pattern: `on("broken")` sits in the text before the `(`, `on("(")` sits on the group whose opening that is, and a pattern spanning two siblings resolves to their common ancestor, which is itself a fact a test may assert.
+`on` resolves the whole pattern's span, so the node it lands on must contain every byte of the pattern: `on("broken")` sits in the run before the `(`, `on("(")` sits on the group whose opening that is, and a pattern spanning two siblings resolves to their common ancestor, which is itself a fact a test may assert.
 
 A test names a fixture, points at positions, and asserts facts:
 
@@ -600,7 +540,7 @@ fn unclosed_paren_is_an_invalid_section() {
 #[test]
 fn the_enclosing_brace_group_stays_valid() {
     let fixture = Fixture::load("unclosed_paren");
-    // The text inside `first { ... }`, before the invalid paren section begins.
+    // The run inside `first { ... }`, before the invalid paren section begins.
     assert!(matches!(fixture.on("broken").validity(), SectionValidity::Valid));
     // Inside `second { ok }`, after the broken section.
     assert!(matches!(fixture.on("ok").validity(), SectionValidity::Valid));

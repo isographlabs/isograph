@@ -1,60 +1,60 @@
 # Bracket matching: the cases and why
 
-The behavior of stage 2 of `resilient-parser.md`, pattern by pattern, with the reason for each. The governing goal: the rule must be easy to reason about. A single left-to-right pass, one token of lookahead — the discipline the existing parser's peekable lexer already sets — and no heuristics; we accept a worse tree on a rare edge case to keep every case predictable from the rule alone.
+The behavior of the bracket matcher (`resilient-parser.md`), pattern by pattern, with the reason for each. The governing goal: the rule must be easy to reason about. A single left-to-right pass over the tokenizer's output, one token of lookahead — the discipline the existing parser's peekable lexer already sets — and no heuristics; we accept a worse tree on a rare edge case to keep every case predictable from the rule alone.
 
-Bracket matching is the first pass, always, and its output is balanced: every group it hands downstream has a close, real or synthesized, so no later pass ever sees an unclosed bracket. Each pass owns its own errors: the `UnexpectedClose` and `Unclosed` errors below are this pass's, and stage 3 produces its own, separate error tokens over the balanced tree. There will be other such passes.
+The tokenizer feeds the matcher, and everything else runs after it, on its balanced output: every group the matcher hands downstream has a close, real or synthesized, so no later pass ever sees an unclosed bracket. Each pass owns its own errors: the `UnexpectedClose` and `Unclosed` errors below are the matcher's; the tokenizer's `Error*` kinds ride through as run tokens, and stage 4 produces its own error tokens over the balanced tree. There will be other such passes.
 
 The rule:
 
 - `()`, `{}`, and `[]` are all matched.
-- An open bracket begins a group. The group's children are parsed until the literal ends or a close bracket that this group or an enclosing one owns appears.
-- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is `Closing::Synthetic`: it is forced to end the moment the close it cannot match (or the end of the literal) is encountered, that position becomes the end of its span, and it is an invalid section and an `Unclosed` error. Groups between a close and the group that owns it all end this way, innermost first.
-- Seen from the close's side, the same rule reads: a close bracket pairs with the nearest open bracket of its kind, and open brackets of other kinds above that one are synthetically closed just before it.
-- A close bracket whose kind is open nowhere is a `StrayClose` where it stands: an invalid section one character wide and an `UnexpectedClose` error. It consumes nothing.
+- An open bracket begins a group. The group's children are parsed until the tokens end or a close bracket that this group or an enclosing one owns appears.
+- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is `Closing::Synthetic`: it is forced to end the moment the close it cannot match (or the end of the tokens) is encountered, it ends where its last child does (at its opening, when it has none), and it is an invalid section and an `Unclosed` error.
+- Seen from the close's side, the same rule reads: a close bracket pairs with the nearest open bracket of its kind, and open brackets of other kinds above that one are synthetically closed before it, innermost first.
+- A close bracket whose kind is open nowhere is a `StrayClose` where it stands: an invalid section one token wide and an `UnexpectedClose` error. It consumes nothing.
 - Invalidity never spreads outward: not to siblings, not to the enclosing group. A position is in an invalid section iff the node it resolves to, or an ancestor, is a `StrayClose` or a synthetically closed group.
-- Text outside any bracket is a valid section by itself.
+- A run of non-bracket tokens outside any bracket is a valid section by itself.
 
 ## The tree
 
-What the pass generates (`resilient-parser.md`'s Change 1 implements exactly this):
+What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly this):
 
 ```rust
-/// The types one bracket tree holds: what a leaf run is, and what the two bracket errors
-/// carry. A pipeline stage is an implementor, and a pass that changes any of these changes
-/// all of them at once, through `try_map` (error-refinement.md).
+/// The types one matched-brackets tree holds: what a run between brackets is, and what the
+/// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
+/// of these changes all of them at once, through `try_map` (error-refinement.md).
 pub trait TreeContents {
     type Text: fmt::Debug + PartialEq + Eq;
     type Stray: fmt::Debug + PartialEq + Eq;
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
-/// What this pass produces: unparsed runs, both bracket errors representable.
-pub struct Unparsed;
+/// What `match_brackets` produces: runs of lexed tokens, both bracket errors representable.
+pub struct Lexed;
 
-impl TreeContents for Unparsed {
-    type Text = String;
+impl TreeContents for Lexed {
+    type Text = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
 }
 
-/// Spans live on the `WithSpan` wrapping each item.
-pub struct BracketTree<TContents: TreeContents> {
-    pub items: Vec<WithSpan<BracketItem<TContents>>>,
-}
+/// One isograph literal with its brackets matched. Spans live on the `WithSpan` wrapping
+/// each item.
+pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem<TContents>>>);
 
 pub enum BracketItem<TContents: TreeContents> {
-    /// A maximal run containing no brackets.
+    /// A maximal run containing no brackets. Its span runs from its first token's start to
+    /// its last token's end, whitespace between them included.
     Text(TContents::Text),
     Bracketed(Bracketed<TContents>),
-    /// A close bracket no open of its kind was waiting for: an invalid section one character
+    /// A close bracket no open of its kind was waiting for: an invalid section one token
     /// wide.
     StrayClose(TContents::Stray),
 }
 
 /// An open bracket, everything up to its close, and the close — always present, so every pass
 /// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
-/// from the start of the opening to the end of a real closing, or to where the group was
-/// forced to end when the closing is synthetic.
+/// from the start of the opening to the end of a real closing, or to the end of the last
+/// child when the closing is synthetic.
 pub struct Bracketed<TContents: TreeContents> {
     pub opening: WithSpan<BracketKind>,
     pub closing: Closing<TContents>,
@@ -64,25 +64,19 @@ pub struct Bracketed<TContents: TreeContents> {
 pub enum Closing<TContents: TreeContents> {
     /// The close bracket the author typed.
     Real(Span),
-    /// The group never got its close and was forced to end: just before the close bracket an
-    /// enclosing group owns, or at the end of the literal. Where it ended is the end of the
+    /// The group never got its close and was forced to end: at the close bracket an
+    /// enclosing group owns, or at the end of the tokens. Where it ended is the end of the
     /// wrapping `WithSpan`'s span; the missing close has no span of its own. What makes the
     /// group an invalid section.
     Synthetic(TContents::Unclosed),
 }
-
-/// The bracket kinds, named as isograph names its tokens: paren `()`, brace `{}`,
-/// bracket `[]`.
-pub enum BracketKind {
-    Paren,
-    Brace,
-    Bracket,
-}
 ```
 
-A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 3 walk one shape. The stray close is its own variant because it is neither text nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below spell the `Unparsed` instantiation, since that is what this pass generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
+`BracketKind` (paren `()`, brace `{}`, bracket `[]`, isograph's token vocabulary) and `NonBracketTokenKind` landed with the tokenizer.
 
-The pass's errors are derived from the tree, in source order:
+A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below spell the `Lexed` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
+
+The matcher's errors are derived from the tree, in source order:
 
 ```rust
 pub enum BracketError {
@@ -98,13 +92,16 @@ pub struct UnclosedGroup {
     pub span: Span,
 }
 
-impl<T> BracketTree<T> {
+impl<TContents> MatchedBrackets<TContents>
+where
+    TContents: TreeContents<Stray = BracketKind, Unclosed = ()>,
+{
     /// Empty iff every bracket matched.
     pub fn errors(&self) -> Vec<BracketError>;
 }
 ```
 
-Positions marked below use `^` under the character; `valid`/`invalid` states what `validity()` returns there.
+Positions marked below use `^` under the character; `valid`/`invalid` states what `validity()` returns there. A position on whitespace the tokenizer skipped resolves to the enclosing group.
 
 ## Case: text outside any bracket
 
@@ -113,9 +110,9 @@ field Query.Foo
       ^ valid
 ```
 
-Generates: one `Text` item carrying the whole literal, unparsed. No errors.
+Generates: one `Text` run holding the lexed tokens (`Identifier`, `Identifier`, `Period`, `Identifier`). No errors.
 
-Unbracketed text cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
+An unbracketed run cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
 
 ## Case: balanced, mixed kinds
 
@@ -132,13 +129,12 @@ Every close is its group's own; the rule degenerates to ordinary matching. The r
 
 ```
 field Query.Foo { bar( }
-       ^ valid        ^
-                 (paren section: invalid)
+       ^ valid       ^ invalid (the paren group, which is just the `(`)
 ```
 
-Generates: the brace group with `Closing::Real`; among its children, the paren group with `Closing::Synthetic`, its span ending just before the `}`. One error: `Unclosed` for the paren.
+Generates: the brace group with `Closing::Real`; among its children, the paren group with `Closing::Synthetic` and no children, so its span is the `(` alone. One error: `Unclosed` for the paren.
 
-Reason: the `}` is strong evidence the author considers the brace section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 3 keep working everywhere else in the group.
+Reason: the `}` is strong evidence the author considers the brace section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 4 keep working everywhere else in the group.
 
 ## Case: several wrong-kind opens
 
@@ -148,7 +144,7 @@ Reason: the `}` is strong evidence the author considers the brace section finish
     ^ invalid (the `[` section, nested inside the paren section)
 ```
 
-Generates: the brace group with `Closing::Real`; inside it the paren group, and inside that the `[` group, both `Closing::Synthetic` with spans ending just before the `}`. Two `Unclosed` errors, in source order of their openings.
+Generates: the brace group with `Closing::Real`; inside it the paren group, and inside that the `[` group, both `Closing::Synthetic` — the `[` group childless (its span is the `[` alone), the paren group ending at its last child, the `[` group. Two `Unclosed` errors, in source order of their openings.
 
 Same reason as above, applied twice; nesting is preserved so a position resolves through the same ancestry the author typed.
 
@@ -161,7 +157,7 @@ Same reason as above, applied twice; nesting is preserved so a position resolves
         ^ valid
 ```
 
-Generates: the brace group with `Closing::Real`, whose children are a `Text`, a `StrayClose(Paren)`, and a `Text`. One error: `UnexpectedClose`.
+Generates: the brace group with `Closing::Real`, whose children are a `Text` run, a `StrayClose(Paren)`, and a `Text` run. One error: `UnexpectedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 
@@ -181,11 +177,11 @@ If the `}` had ended the `(` group, the `)` that was coming would have become a 
 
 ```
 ( { ) }
-  ^ invalid (brace section, ends before the `)`)
+  ^ invalid (the brace group, which is just the `{`)
       ^ invalid (the trailing `}`, whose `{` was already consumed)
 ```
 
-Generates: the paren group with `Closing::Real`, holding the brace group with `Closing::Synthetic`, its span ending just before the `)`; after it, a top-level `StrayClose(Brace)`. Two errors: `Unclosed` for the brace group, then `UnexpectedClose` for the trailing `}`.
+Generates: the paren group with `Closing::Real`, holding the brace group with `Closing::Synthetic` and no children (its span is the `{` alone); after the paren group, a top-level `StrayClose(Brace)`. Two errors: `Unclosed` for the brace group, then `UnexpectedClose` for the trailing `}`.
 
 One crossing produces two invalid sections even though a smarter matcher could have paired `{` with `}`.
 
@@ -200,13 +196,25 @@ a {
 }
 ```
 
-Generates: b's brace group with `Closing::Real`; a's brace group with `Closing::Synthetic`, its span reaching the end of the literal, its children kept. One error: `Unclosed` for a's group.
+Generates: b's brace group with `Closing::Real`; a's brace group with `Closing::Synthetic`, its children kept and its span reaching its last child (b's group). One error: `Unclosed` for a's group.
 
 The `}` pairs with the nearest `{` (b's), because same-kind matching is always nearest-first: nesting is the common intent, and "nearest of its kind" is the rule everywhere else.
 
-## Open question: validity at the end of the literal
+## Brackets inside strings
 
-The tree at the end of the literal is settled: every group still open is closed synthetically at the end, its children kept and their nesting preserved, and each one is an `Unclosed` error. What is open is what `validity()` reports inside such a group. `resilient-parser.md` provisionally implements option A; deciding this question updates it.
+Resolved by running the matcher over the tokenizer's output: the tokenizer lexes string and block-string literals whole, so a bracket inside a string is part of a `StringLiteral` token and never structural.
+
+```
+{ name: "a}" }
+          ^ valid (inside a StringLiteral token, in the brace group's run)
+             ^ this closes the brace group
+```
+
+A malformed string lexes as whatever the tokenizer produces for it (an `Error` run token); that is an inner error for a later pass to report, and the matcher just sees a non-bracket token.
+
+## Open question: validity at the end of the tokens
+
+The tree at the end of the tokens is settled: every group still open is closed synthetically, ending at its last child, its children kept and their nesting preserved, and each one is an `Unclosed` error. What is open is what `validity()` reports inside such a group. `resilient-parser.md` provisionally implements option A; deciding this question updates it.
 
 The dominant real-world input is a literal being typed: the user has just written `{` and everything that follows is momentarily "after an unclosed open". Whatever we pick is the LSP experience during typing.
 
@@ -218,9 +226,9 @@ field Query.Foo {
   ^ invalid
 ```
 
-One rule with no special case: `Closing::Synthetic` is invalid wherever it sits. The cost: while the user types inside a new `{`, the entire rest of the literal is invalid, so stage 3 has nothing to say about the content most likely to be under the cursor.
+One rule with no special case: `Closing::Synthetic` is invalid wherever the group ended. The cost: while the user types inside a new `{`, the entire rest of the literal is invalid, so stage 4 has nothing to say about the content most likely to be under the cursor.
 
-### Option B: valid when the group's forced end is the end of the literal
+### Option B: valid when the group's forced end is the end of the tokens
 
 ```
 field Query.Foo {
@@ -228,22 +236,4 @@ field Query.Foo {
   ^ valid (inside the brace group)
 ```
 
-Content stays valid while typing, nesting is already correct, nothing restructures when the real close is typed, and the missing brace is still reported: the `Unclosed` error exists either way, because errors are separate from validity. The cost: `validity()` special-cases where the group was forced to end, and a group that is valid while it touches the end of the literal flips invalid when a wrong-kind close later forces it shut mid-literal — a change of state from an edit made elsewhere.
-
-## Open question: brackets inside strings
-
-The scanner treats every bracket as structural, including inside quoted strings:
-
-```
-{ name: "a}" }
-          ^ this ends the brace group
-             ^ stray close, invalid
-```
-
-### Option A: accept it
-
-String arguments containing brackets are rare in isograph literals today. No scanner state, no new cases.
-
-### Option B: skip quoted regions
-
-The scanner learns double-quoted strings with backslash escapes, and brackets inside them are text. This adds one piece of scanner state and one new end-of-literal question (an unterminated string swallows every bracket after it, which is the previous section's question applied to quotes).
+Content stays valid while typing, nesting is already correct, nothing restructures when the real close is typed, and the missing brace is still reported: the `Unclosed` error exists either way, because errors are separate from validity. The cost: `validity()` special-cases where the group was forced to end, and a group that is valid while it reaches the end of the tokens flips invalid when a wrong-kind close later forces it shut mid-literal — a change of state from an edit made elsewhere.

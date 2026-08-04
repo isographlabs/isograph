@@ -19,7 +19,7 @@ One more thing the split gives regardless of memoization: the compile path can d
 
 ## The machinery
 
-`parser_lang_types`'s `WithSpan` gains a defaulted parameter, so existing code is untouched (this amends `parser-lang-types.md` if adopted):
+The `span` crate's `WithSpan` gains a defaulted parameter, so existing code is untouched (this amends what `refactors/past/parser-lang-types.md` landed, if adopted):
 
 ```rust
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
@@ -50,6 +50,8 @@ impl SpanAnnotation for NoSpan {
     }
 }
 ```
+
+Deferred alongside the rest of this doc, and noted here because this is the doc that generalizes the wrapper: `WithSpan<T>` may instead become an alias of a general annotated pair, `With<T, Span>` — the shape `common_lang_types`' `WithGenericLocation` already has — in which case `TSpan` above is `With`'s second parameter rather than a parameter added to `WithSpan`. Either spelling is the same mechanical change, decided later.
 
 The bracket tree threads the parameter, defaulted so spanned code reads as it does today:
 
