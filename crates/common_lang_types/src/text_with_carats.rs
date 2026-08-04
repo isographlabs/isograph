@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use colored::Colorize;
 
-use parser_lang_types::Span;
+use span::Span;
 
 enum SpanState {
     /// We have not yet reached the start of the span
@@ -197,7 +197,7 @@ mod test {
 
     use std::sync::{LazyLock, Mutex};
 
-    use parser_lang_types::Span;
+    use span::Span;
 
     use crate::{
         OneIndexedColNumber, OneIndexedRowNumber,

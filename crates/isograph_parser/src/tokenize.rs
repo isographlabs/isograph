@@ -1,5 +1,5 @@
 use logos::Logos;
-use parser_lang_types::{Span, WithSpan};
+use span::{Span, WithSpan};
 
 use crate::IsographLangTokenKind;
 
@@ -19,7 +19,7 @@ pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
 mod tests {
     use super::tokenize;
     use crate::IsographLangTokenKind;
-    use parser_lang_types::Span;
+    use span::Span;
 
     #[test]
     fn tokens_carry_their_spans() {

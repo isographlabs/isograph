@@ -7,7 +7,7 @@ license = { workspace = true }
 
 [dependencies]
 intern = { path = "../../relay-crates/intern" }
-parser_lang_types = { path = "../parser_lang_types" }
+span = { path = "../span" }
 string_key_newtype = { path = "../string_key_newtype" }
 pico = { path = "../pico" }
 prelude = { path = "../prelude" }

@@ -302,11 +302,11 @@ dependencies = [
  "colored",
  "intern",
  "lazy_static",
- "parser_lang_types",
  "pathdiff",
  "pico",
  "prelude",
  "serde",
+ "span",
  "string_key_newtype",
  "thiserror 1.0.69",
 ]
@@ -950,8 +950,8 @@ name = "isograph_parser"
 version = "0.5.3"
 dependencies = [
  "logos",
- "parser_lang_types",
  "resolve_position",
+ "span",
 ]
 
 [[package]]
@@ -1185,10 +1185,6 @@ dependencies = [
  "smallvec",
  "windows-targets",
 ]
-
-[[package]]
-name = "parser_lang_types"
-version = "0.5.3"
 
 [[package]]
 name = "pathdiff"
@@ -1490,7 +1486,7 @@ dependencies = [
 name = "resolve_position"
 version = "0.5.3"
 dependencies = [
- "parser_lang_types",
+ "span",
 ]
 
 [[package]]
@@ -1750,6 +1746,10 @@ dependencies = [
  "unicode-id-start",
  "url",
 ]
+
+[[package]]
+name = "span"
+version = "0.5.3"
 
 [[package]]
 name = "stable_deref_trait"
@@ -2269,8 +2269,8 @@ name = "tests"
 version = "0.5.3"
 dependencies = [
  "isograph_parser",
- "parser_lang_types",
  "resolve_position",
+ "span",
 ]
 
 [[package]]

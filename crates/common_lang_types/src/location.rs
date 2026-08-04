@@ -2,7 +2,7 @@ use intern::string_key::{Intern, Lookup};
 use prelude::Postfix;
 use std::path::PathBuf;
 
-use parser_lang_types::Span;
+use span::Span;
 
 use crate::{CurrentWorkingDirectory, RelativePathToSourceFile};
 

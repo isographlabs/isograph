@@ -6,7 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 isograph_parser = { path = "../isograph_parser" }
-parser_lang_types = { path = "../parser_lang_types" }
+span = { path = "../span" }
 resolve_position = { path = "../resolve_position" }
 
 [lints]
