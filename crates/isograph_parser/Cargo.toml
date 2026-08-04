@@ -5,6 +5,7 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+logos = { workspace = true }
 parser_lang_types = { path = "../parser_lang_types" }
 resolve_position = { path = "../resolve_position" }
 
