@@ -19,29 +19,30 @@ The rule:
 What the pass generates (`resilient-parser.md`'s Change 1 implements exactly this):
 
 ```rust
-pub struct BracketTree {
-    pub items: Vec<BracketItem>,
+pub struct BracketTree<T> {
+    pub items: Vec<WithSpan<BracketItem<T>>>,
 }
 
-pub enum BracketItem {
-    Text(WithSpan<Text>),
-    Bracketed(WithSpan<Bracketed>),
+/// `T` is what a run between brackets is. This pass leaves runs unparsed — it produces
+/// `BracketTree<String>` — and later passes replace `T` with their own parsed nodes while
+/// keeping the brackets. Spans live on the `WithSpan` wrapping each item.
+pub enum BracketItem<T> {
+    /// A maximal run containing no brackets.
+    Text(T),
+    Bracketed(Bracketed<T>),
     /// A close bracket no open of its kind was waiting for: an invalid section one character
     /// wide.
-    StrayClose(WithSpan<Bracket>),
+    StrayClose(BracketKind),
 }
 
-/// A maximal run of text containing no brackets. Its span lives on the enclosing `WithSpan`.
-pub struct Text;
-
 /// An open bracket, everything up to its close, and the close — always present, so every pass
-/// after this one works with guaranteed matching brackets. The enclosing `WithSpan`'s span
-/// runs from the start of the opening to the end of a real closing, or to where the group was
+/// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
+/// from the start of the opening to the end of a real closing, or to where the group was
 /// forced to end when the closing is synthetic.
-pub struct Bracketed {
-    pub opening: WithSpan<Bracket>,
+pub struct Bracketed<T> {
+    pub opening: WithSpan<BracketKind>,
     pub closing: Closing,
-    pub children: Vec<BracketItem>,
+    pub children: Vec<WithSpan<BracketItem<T>>>,
 }
 
 pub enum Closing {
@@ -49,15 +50,17 @@ pub enum Closing {
     Real(Span),
     /// The group never got its close and was forced to end: just before the close bracket an
     /// enclosing group owns, or at the end of the literal. Where it ended is the end of the
-    /// enclosing `WithSpan`'s span; the missing close has no span of its own. What makes the
+    /// wrapping `WithSpan`'s span; the missing close has no span of its own. What makes the
     /// group an invalid section.
     Synthetic,
 }
 
-pub enum Bracket {
+/// The bracket kinds, named as isograph names its tokens: paren `()`, brace `{}`,
+/// bracket `[]`.
+pub enum BracketKind {
     Paren,
-    Curly,
-    Square,
+    Brace,
+    Bracket,
 }
 ```
 
@@ -68,18 +71,18 @@ The pass's errors are derived from the tree, in source order:
 ```rust
 pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
-    UnexpectedClose(WithSpan<Bracket>),
+    UnexpectedClose(WithSpan<BracketKind>),
     /// A group whose close was synthesized.
     Unclosed(UnclosedGroup),
 }
 
 pub struct UnclosedGroup {
-    pub opening: WithSpan<Bracket>,
+    pub opening: WithSpan<BracketKind>,
     /// The whole group; its end is where the close should have been.
     pub span: Span,
 }
 
-impl BracketTree {
+impl<T> BracketTree<T> {
     /// Empty iff every bracket matched.
     pub fn errors(&self) -> Vec<BracketError>;
 }
@@ -94,7 +97,7 @@ field Query.Foo
       ^ valid
 ```
 
-Generates: one `Text` item covering the whole literal. No errors.
+Generates: one `Text` item carrying the whole literal, unparsed. No errors.
 
 Unbracketed text cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
 
@@ -117,19 +120,19 @@ field Query.Foo { bar( }
                  (paren section: invalid)
 ```
 
-Generates: the curly group with `Closing::Real`; among its children, the paren group with `Closing::Synthetic`, its span ending just before the `}`. One error: `Unclosed` for the paren.
+Generates: the brace group with `Closing::Real`; among its children, the paren group with `Closing::Synthetic`, its span ending just before the `}`. One error: `Unclosed` for the paren.
 
-Reason: the `}` is strong evidence the author considers the curly section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 3 keep working everywhere else in the group.
+Reason: the `}` is strong evidence the author considers the brace section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 3 keep working everywhere else in the group.
 
 ## Case: several wrong-kind opens
 
 ```
 { ( [ }
   ^ invalid (paren section)
-    ^ invalid (square section, nested inside the paren section)
+    ^ invalid (the `[` section, nested inside the paren section)
 ```
 
-Generates: the curly group with `Closing::Real`; inside it the paren group, and inside that the square group, both `Closing::Synthetic` with spans ending just before the `}`. Two `Unclosed` errors, in source order of their openings.
+Generates: the brace group with `Closing::Real`; inside it the paren group, and inside that the `[` group, both `Closing::Synthetic` with spans ending just before the `}`. Two `Unclosed` errors, in source order of their openings.
 
 Same reason as above, applied twice; nesting is preserved so a position resolves through the same ancestry the author typed.
 
@@ -142,7 +145,7 @@ Same reason as above, applied twice; nesting is preserved so a position resolves
         ^ valid
 ```
 
-Generates: the curly group with `Closing::Real`, whose children are a `Text`, a `StrayClose(Paren)`, and a `Text`. One error: `UnexpectedClose`.
+Generates: the brace group with `Closing::Real`, whose children are a `Text`, a `StrayClose(Paren)`, and a `Text`. One error: `UnexpectedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 
@@ -154,7 +157,7 @@ Reason: consuming an open of a different kind would destroy a pair that may stil
   ^ invalid (the `}` alone)
 ```
 
-Generates: the paren group with `Closing::Real`, holding a `StrayClose(Curly)`. One error: `UnexpectedClose`.
+Generates: the paren group with `Closing::Real`, holding a `StrayClose(Brace)`. One error: `UnexpectedClose`.
 
 If the `}` had ended the `(` group, the `)` that was coming would have become a second error. One typo, one invalid section.
 
@@ -162,11 +165,11 @@ If the `}` had ended the `(` group, the `)` that was coming would have become a 
 
 ```
 ( { ) }
-  ^ invalid (curly section, ends before the `)`)
+  ^ invalid (brace section, ends before the `)`)
       ^ invalid (the trailing `}`, whose `{` was already consumed)
 ```
 
-Generates: the paren group with `Closing::Real`, holding the curly group with `Closing::Synthetic`, its span ending just before the `)`; after it, a top-level `StrayClose(Curly)`. Two errors: `Unclosed` for the curly, then `UnexpectedClose` for the trailing `}`.
+Generates: the paren group with `Closing::Real`, holding the brace group with `Closing::Synthetic`, its span ending just before the `)`; after it, a top-level `StrayClose(Brace)`. Two errors: `Unclosed` for the brace group, then `UnexpectedClose` for the trailing `}`.
 
 One crossing produces two invalid sections even though a smarter matcher could have paired `{` with `}`.
 
@@ -181,7 +184,7 @@ a {
 }
 ```
 
-Generates: b's curly group with `Closing::Real`; a's curly group with `Closing::Synthetic`, its span reaching the end of the literal, its children kept. One error: `Unclosed` for a's group.
+Generates: b's brace group with `Closing::Real`; a's brace group with `Closing::Synthetic`, its span reaching the end of the literal, its children kept. One error: `Unclosed` for a's group.
 
 The `}` pairs with the nearest `{` (b's), because same-kind matching is always nearest-first: nesting is the common intent, and "nearest of its kind" is the rule everywhere else.
 
@@ -206,7 +209,7 @@ One rule with no special case: `Closing::Synthetic` is invalid wherever it sits.
 ```
 field Query.Foo {
   id
-  ^ valid (inside the curly group)
+  ^ valid (inside the brace group)
 ```
 
 Content stays valid while typing, nesting is already correct, nothing restructures when the real close is typed, and the missing brace is still reported: the `Unclosed` error exists either way, because errors are separate from validity. The cost: `validity()` special-cases where the group was forced to end, and a group that is valid while it touches the end of the literal flips invalid when a wrong-kind close later forces it shut mid-literal — a change of state from an edit made elsewhere.
@@ -217,7 +220,7 @@ The scanner treats every bracket as structural, including inside quoted strings:
 
 ```
 { name: "a}" }
-          ^ this ends the curly group
+          ^ this ends the brace group
              ^ stray close, invalid
 ```
 
