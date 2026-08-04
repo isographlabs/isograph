@@ -1,14 +1,54 @@
 # Bracket matching: the cases and why
 
-The behavior of stage 2 of `resilient-parser.md`, pattern by pattern, with the reason for each. The governing goal: the rule must be easy to reason about. A single left-to-right pass, no lookahead, no heuristics; we accept a worse tree on a rare edge case to keep every case predictable from the rule alone.
+The behavior of stage 2 of `resilient-parser.md`, pattern by pattern, with the reason for each. The governing goal: the rule must be easy to reason about. A single left-to-right pass, one token of lookahead — the discipline the existing parser's peekable lexer already sets — and no heuristics; we accept a worse tree on a rare edge case to keep every case predictable from the rule alone.
 
 The rule:
 
 - `()`, `{}`, and `[]` are all matched.
-- A close bracket pairs with the nearest open bracket of its kind. Open brackets of other kinds above that one become invalid sections, ending just before the close.
-- A close bracket whose kind is open nowhere is itself an invalid section, one character wide. It consumes nothing.
-- Invalidity never spreads outward: not to siblings, not to the enclosing group. A position is in an invalid section iff the node it resolves to, or an ancestor, is unmatched.
+- An open bracket begins a group. The group's children are parsed until the literal ends or a close bracket that this group or an enclosing one owns appears. The group then consumes that close if it is its own (`closing: Some`), and otherwise ends without one (`closing: None`), which is what makes it an invalid section.
+- Seen from the close's side, the same rule reads: a close bracket pairs with the nearest open bracket of its kind, and open brackets of other kinds above that one end as invalid sections just before the close.
+- A close bracket whose kind is open nowhere is a `StrayClose` where it stands: an invalid section one character wide. It consumes nothing.
+- Invalidity never spreads outward: not to siblings, not to the enclosing group. A position is in an invalid section iff the node it resolves to, or an ancestor, is a `StrayClose` or a group with `closing: None`.
 - Text outside any bracket is a valid section by itself.
+
+## The tree
+
+What stage 2 generates (`resilient-parser.md`'s Change 1 implements exactly this):
+
+```rust
+pub struct BracketTree {
+    pub items: Vec<BracketItem>,
+}
+
+pub enum BracketItem {
+    Text(WithSpan<Text>),
+    Bracketed(WithSpan<Bracketed>),
+    /// A close bracket no open of its kind was waiting for: an invalid section one character
+    /// wide.
+    StrayClose(WithSpan<Bracket>),
+}
+
+/// A maximal run of text containing no brackets. Its span lives on the enclosing `WithSpan`.
+pub struct Text;
+
+/// An open bracket, everything up to its close, and the close if it ever arrived. The
+/// enclosing `WithSpan`'s span runs from the start of the opening to the end of the closing,
+/// or to the end of the children when there is none.
+pub struct Bracketed {
+    pub opening: WithSpan<Bracket>,
+    /// The matching close. `None` is what makes the group an invalid section.
+    pub closing: Option<Span>,
+    pub children: Vec<BracketItem>,
+}
+
+pub enum Bracket {
+    Paren,
+    Curly,
+    Square,
+}
+```
+
+A matched group and an unmatched one are one variant: a group that never got its close is `closing: None`, not a different node, so position resolution and stage 3 walk one shape and unmatchedness is a field to look at, not a case to remember. The stray close is its own variant because it is neither text nor a group: it has no opening and no children, and folding it into `Bracketed` would put an `Option` on `opening` beside the one on `closing`, making a both-`None` item representable that means nothing.
 
 Positions marked below use `^` under the character; `valid`/`invalid` states what `validity()` returns there.
 
@@ -19,6 +59,8 @@ field Query.Foo
       ^ valid
 ```
 
+Generates: one `Text` item covering the whole literal.
+
 Unbracketed text cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
 
 ## Case: balanced, mixed kinds
@@ -28,7 +70,9 @@ field Query.Foo { bar(arg: [1, 2]) { id } }
                         ^ valid      ^ valid
 ```
 
-Every close finds its kind at the top of the stack; the rule degenerates to ordinary matching. The recovery machinery costs nothing on well-formed input.
+Generates: `Bracketed` items nested as typed, every one `closing: Some`, with the runs between brackets as `Text` items.
+
+Every close is its group's own; the rule degenerates to ordinary matching. The recovery machinery costs nothing on well-formed input.
 
 ## Case: wrong-kind close with a same-kind open below
 
@@ -38,7 +82,7 @@ field Query.Foo { bar( }
                  (paren section: invalid)
 ```
 
-The `}` pairs with `{`; the open `(` above it becomes an invalid section ending just before the `}`. The curly group is valid; only the paren section is not.
+Generates: the curly group with `closing: Some`; among its children, the paren group with `closing: None`, ending just before the `}`.
 
 Reason: the `}` is strong evidence the author considers the curly section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 3 keep working everywhere else in the group.
 
@@ -50,7 +94,9 @@ Reason: the `}` is strong evidence the author considers the curly section finish
     ^ invalid (square section, nested inside the paren section)
 ```
 
-The `}` ends `[` and then `(` as invalid sections, nested in the order they were opened, and pairs with `{`. Same reason as above, applied twice; nesting is preserved so a position resolves through the same ancestry the author typed.
+Generates: the curly group with `closing: Some`; inside it the paren group with `closing: None`, whose children hold the square group with `closing: None`.
+
+Same reason as above, applied twice; nesting is preserved so a position resolves through the same ancestry the author typed.
 
 ## Case: close of a kind that is open nowhere
 
@@ -61,7 +107,9 @@ The `}` ends `[` and then `(` as invalid sections, nested in the order they were
         ^ valid
 ```
 
-The `)` is a one-character invalid section. It does not end the `{` group and does not consume anything.
+Generates: the curly group with `closing: Some`, whose children are a `Text`, a `StrayClose(Paren)`, and a `Text`.
+
+The `)` does not end the `{` group and does not consume anything.
 
 Reason: consuming an open of a different kind would destroy a pair that may still complete. The stray-close rule is what makes this work:
 
@@ -70,6 +118,8 @@ Reason: consuming an open of a different kind would destroy a pair that may stil
 ^ matched pair ^
   ^ invalid (the `}` alone)
 ```
+
+Generates: the paren group with `closing: Some`, holding a `StrayClose(Curly)`.
 
 If the `}` had ended the `(` group, the `)` that was coming would have become a second error. One typo, one invalid section.
 
@@ -81,9 +131,11 @@ If the `}` had ended the `(` group, the `)` that was coming would have become a 
       ^ invalid (the trailing `}`, whose `{` was already consumed)
 ```
 
-The `)` pairs with `(` and ends the `{` as an invalid section; the later `}` then finds no open curly and is a stray close. One crossing produces two invalid sections even though a smarter matcher could have paired `{` with `}`.
+Generates: the paren group with `closing: Some`, holding the curly group with `closing: None`; after it, a top-level `StrayClose(Curly)`.
 
-Reason to accept this: pairing them requires lookahead past the `)`, and any lookahead rule reintroduces the hard-to-predict behavior this design exists to avoid. Crossing brackets are rare in real literals; the pass stays single and left-to-right.
+One crossing produces two invalid sections even though a smarter matcher could have paired `{` with `}`.
+
+Reason to accept this: pairing them requires looking past the `)` an unbounded distance, and any such rule reintroduces the hard-to-predict behavior this design exists to avoid. Crossing brackets are rare in real literals; the pass stays single, left-to-right, one token ahead.
 
 ## Case: adjacent same-kind opens, one close
 
@@ -94,7 +146,9 @@ a {
 }
 ```
 
-The `}` pairs with the nearest `{` (b's), because same-kind matching is always nearest-first: nesting is the common intent, and "nearest of its kind" is the rule everywhere else. That leaves a's `{` open at the end of the literal, which is the next case.
+Generates: b's curly group with `closing: Some`; a's curly group with `closing: None`, reaching the end of the literal (the open question below).
+
+The `}` pairs with the nearest `{` (b's), because same-kind matching is always nearest-first: nesting is the common intent, and "nearest of its kind" is the rule everywhere else.
 
 ## Open question: the end of the literal
 
@@ -104,7 +158,7 @@ The dominant real-world input is a literal being typed: the user has just writte
 
 ### Option A: unmatched to the end
 
-Every still-open bracket becomes an invalid section from its open to the end of the literal, nested.
+Every still-open group is `closing: None` with its span running from its opening to the end of the literal, nested.
 
 ```
 field Query.Foo {
@@ -112,11 +166,11 @@ field Query.Foo {
   ^ invalid
 ```
 
-Simple, and symmetric with every other unmatched-open case. The cost: while the user types inside a new `{`, the entire rest of the literal is invalid, so stage 3 has nothing to say about the content most likely to be under the cursor.
+Simple, and symmetric with every other unclosed-group case. The cost: while the user types inside a new `{`, the entire rest of the literal is invalid, so stage 3 has nothing to say about the content most likely to be under the cursor.
 
 ### Option B: only the open bracket is invalid
 
-The unclosed open becomes a one-character invalid section (like a stray close); its would-be children are matched as if it were absent, attached to the enclosing level.
+The unclosed open becomes a `Bracketed` with `closing: None` and no children; its would-be children are matched as if it were absent, attached to the enclosing level.
 
 ```
 field Query.Foo {
@@ -128,7 +182,7 @@ Content stays valid while typing. The cost: the tree lies about nesting — `id`
 
 ### Option C: the end of the literal closes everything
 
-Still-open brackets are matched by an implied zero-width close at the end; the groups count as valid.
+Still-open groups count as closed by the end of the literal; their content is valid.
 
 ```
 field Query.Foo {
@@ -136,7 +190,7 @@ field Query.Foo {
   ^ valid (inside the curly group)
 ```
 
-Correct nesting and valid content while typing, and no restructuring when the real close arrives. The cost: an unclosed bracket at the end is no longer representable as an error, so `MatchedGroup.close` would need to admit an absent close (an `Option`, or a third item variant), and a genuinely forgotten close brace at the end of a finished literal is reported by nothing at this stage.
+Correct nesting and valid content while typing, and no restructuring when the real close arrives. The cost: `closing` must either hold a fabricated zero-width span no one typed, or stay `None` with validity special-casing groups that reach the end of the literal; either way an unclosed group at the end and a finished one become hard to tell apart, and a genuinely forgotten close brace at the end of a finished literal is reported by nothing at this stage.
 
 ## Open question: brackets inside strings
 
