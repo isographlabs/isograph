@@ -12,7 +12,7 @@ This doc specifies stage 2 and its tests. Stage 3 gets its own doc once stage 2 
 
 The tests need three functions, and stage 2 is done when they exist and the fixture suite passes:
 
-1. Turn a unique string in a fixture into a `Span` (test-only, on the harness).
+1. Turn a unique string into a `Span` (test-only, a free function over the original string; it needs no parsed structure).
 2. Given a span and the bracket tree, produce a path in the `resolve_position` sense, from which a test asserts facts — above all, whether the position sits inside matched or unmatched brackets.
 3. Ask the tree whether the pass produced any errors, such as an unexpected closing bracket.
 
@@ -47,7 +47,8 @@ pub struct Text;
 
 /// An open bracket, everything up to its close, and the close — always present, so every pass
 /// after this one works with guaranteed matching brackets. The enclosing `WithSpan`'s span
-/// runs from the start of the opening to the end of the closing.
+/// runs from the start of the opening to the end of a real closing, or to where the group was
+/// forced to end when the closing is synthetic.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bracketed {
     pub opening: WithSpan<Bracket>,
@@ -59,18 +60,11 @@ pub struct Bracketed {
 pub enum Closing {
     /// The close bracket the author typed.
     Real(Span),
-    /// A zero-width close at the position the group was forced to end: just before the close
-    /// bracket an enclosing group owns, or at the end of the literal. What makes the group an
-    /// invalid section.
-    Synthetic(Span),
-}
-
-impl Closing {
-    pub fn span(&self) -> Span {
-        match self {
-            Closing::Real(span) | Closing::Synthetic(span) => *span,
-        }
-    }
+    /// The group never got its close and was forced to end: just before the close bracket an
+    /// enclosing group owns, or at the end of the literal. Where it ended is the end of the
+    /// enclosing `WithSpan`'s span; the missing close has no span of its own. What makes the
+    /// group an invalid section.
+    Synthetic,
 }
 
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
@@ -90,14 +84,12 @@ pub fn item_span(item: &BracketItem) -> Span {
 }
 ```
 
-A synthetic close's span is zero-width at a real offset the scanner reached, built with `Span::new`; `parser_lang_types` needs no generated-span constructor for it.
-
 Every `(`, `)`, `{`, `}`, `[`, and `]` in the literal is structural at this stage.
 
 ### The matching rule
 
 - An open bracket begins a group; its children are parsed until the literal ends or a close bracket that this group or an enclosing one owns appears.
-- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is closed synthetically the moment the close it cannot match, or the end of the literal, is encountered: `Closing::Synthetic`, zero-width at that position. Groups between a close and the group that owns it all end this way, innermost first, which is the nesting `bracket-matching-cases.md` shows.
+- The group consumes that close if it is its own: `Closing::Real`. Otherwise the group is `Closing::Synthetic`, forced to end the moment the close it cannot match, or the end of the literal, is encountered; that position becomes the end of its span. Groups between a close and the group that owns it all end this way, innermost first, which is the nesting `bracket-matching-cases.md` shows.
 - A close bracket that no group in the enclosing stack owns is a `StrayClose` where it stands. It consumes nothing: an open of a different kind stays open and may still match later.
 
 ### The errors
@@ -116,8 +108,8 @@ pub enum BracketError {
 #[derive(Debug, PartialEq, Eq)]
 pub struct UnclosedGroup {
     pub opening: WithSpan<Bracket>,
-    /// The zero-width close synthesized where the group was forced to end.
-    pub synthetic_close: Span,
+    /// The whole group; its end is where the close should have been.
+    pub span: Span,
 }
 
 impl BracketTree {
@@ -138,10 +130,10 @@ fn collect_errors(items: &[BracketItem], errors: &mut Vec<BracketError>) {
                 errors.push(BracketError::UnexpectedClose(*close));
             }
             BracketItem::Bracketed(bracketed) => {
-                if let Closing::Synthetic(synthetic_close) = bracketed.item.closing {
+                if matches!(bracketed.item.closing, Closing::Synthetic) {
                     errors.push(BracketError::Unclosed(UnclosedGroup {
                         opening: bracketed.item.opening,
-                        synthetic_close,
+                        span: bracketed.span,
                     }));
                 }
                 collect_errors(&bracketed.item.children, errors);
@@ -215,9 +207,11 @@ impl<'a> BracketLexer<'a> {
         self.peeked = self.lex();
     }
 
-    /// The zero-width span at the end of the literal.
-    fn end_of_literal(&self) -> Span {
-        Span::from_usize(self.bytes.len(), self.bytes.len())
+    /// The offset just past the last byte of the literal. The conversion is the one
+    /// `Span::from_usize` makes; a literal longer than `u32::MAX` bytes is out of scope
+    /// (parser-lang-types.md).
+    fn end_of_literal(&self) -> u32 {
+        Span::from_usize(self.bytes.len(), self.bytes.len()).end
     }
 
     /// The token starting at `offset`: one bracket, or the maximal bracket-free run.
@@ -280,16 +274,16 @@ fn parse_bracketed(
     let children = parse_items(lexer, enclosing);
     enclosing.pop();
 
-    let closing = match lexer.peek() {
+    let (closing, end) = match lexer.peek() {
         Some(token) if token.item == BracketToken::Close(opening.item) => {
             lexer.advance();
-            Closing::Real(token.span)
+            (Closing::Real(token.span), token.span.end)
         }
-        Some(token) => Closing::Synthetic(Span::new(token.span.start, token.span.start)),
-        None => Closing::Synthetic(lexer.end_of_literal()),
+        Some(token) => (Closing::Synthetic, token.span.start),
+        None => (Closing::Synthetic, lexer.end_of_literal()),
     };
 
-    let span = Span::new(opening.span.start, closing.span().end);
+    let span = Span::new(opening.span.start, end);
     BracketItem::Bracketed(WithSpan::new(
         Bracketed {
             opening,
@@ -417,7 +411,7 @@ impl ResolvedBracketNode<'_> {
                 // Provisional: whether a group synthetically closed at the end of the
                 // literal counts as invalid is the open question in
                 // bracket-matching-cases.md.
-                Closing::Synthetic(_) => SectionValidity::Invalid,
+                Closing::Synthetic => SectionValidity::Invalid,
             },
         }
     }
@@ -429,7 +423,7 @@ impl BracketItemParent<'_> {
             BracketItemParent::BracketTree(_) => SectionValidity::Valid,
             BracketItemParent::Bracketed(path) => match path.inner.closing {
                 Closing::Real(_) => path.parent.validity(),
-                Closing::Synthetic(_) => SectionValidity::Invalid,
+                Closing::Synthetic => SectionValidity::Invalid,
             },
         }
     }
@@ -460,6 +454,22 @@ use isograph_parser::{match_brackets, BracketTree, ResolvedBracketNode};
 use parser_lang_types::Span;
 use resolve_position::ResolvePosition;
 
+/// The span of `pattern`, which must occur exactly once in `text`. The preferred way for a
+/// test to point at a position: it needs nothing but the original string, editing the fixture
+/// cannot silently shift what the test asserts about, and a pattern that stops being unique
+/// fails loudly instead.
+pub fn span_of(text: &str, pattern: &str) -> Span {
+    let mut occurrences = text.match_indices(pattern);
+    let (offset, _) = occurrences
+        .next()
+        .expect("the pattern the test anchors on occurs in the fixture");
+    assert!(
+        occurrences.next().is_none(),
+        "the pattern the test anchors on occurs exactly once in the fixture"
+    );
+    Span::from_usize(offset, offset + pattern.len())
+}
+
 pub struct Fixture {
     pub text: String,
     pub tree: BracketTree,
@@ -476,29 +486,14 @@ impl Fixture {
         Fixture { text, tree }
     }
 
-    /// The span of `pattern`, which must occur exactly once in the fixture. The preferred
-    /// way to point at a position: editing the fixture cannot silently shift what the test
-    /// asserts about, and a pattern that stops being unique fails loudly instead.
-    pub fn span_of(&self, pattern: &str) -> Span {
-        let mut occurrences = self.text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the fixture");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the fixture"
-        );
-        Span::from_usize(offset, offset + pattern.len())
-    }
-
     /// The path to the node containing `span`.
     pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_> {
         self.tree.resolve((), span)
     }
 
-    /// `resolve` at the unique occurrence of `pattern`.
+    /// `resolve` at the unique occurrence of `pattern` in the fixture's text.
     pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_> {
-        self.resolve(self.span_of(pattern))
+        self.resolve(span_of(&self.text, pattern))
     }
 
     /// The node at a 0-indexed line and character; the character indexes bytes in the
@@ -540,7 +535,7 @@ second {
 
 ```rust
 use isograph_parser::{BracketError, Closing, ResolvedBracketNode, SectionValidity};
-use tests::Fixture;
+use tests::{Fixture, span_of};
 
 #[test]
 fn unclosed_paren_is_an_invalid_section() {
@@ -563,7 +558,7 @@ fn the_unclosed_group_is_the_leaf_it_resolves_to() {
     let fixture = Fixture::load("unclosed_paren");
     match fixture.on("(") {
         ResolvedBracketNode::Bracketed(path) => {
-            assert!(matches!(path.inner.closing, Closing::Synthetic(_)));
+            assert!(matches!(path.inner.closing, Closing::Synthetic));
         }
         node => panic!("expected the unclosed paren group, got {node:?}"),
     }
@@ -575,7 +570,7 @@ fn the_unclosed_paren_is_the_only_error() {
     let errors = fixture.tree.errors();
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.opening.span, fixture.span_of("("));
+            assert_eq!(unclosed.opening.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
     }
