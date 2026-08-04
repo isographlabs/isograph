@@ -1,14 +1,8 @@
 use std::{fmt, ops::Range};
 
-use prelude::Postfix;
-
-use crate::{EmbeddedLocation, Location, TextSource, WithEmbeddedLocation, WithLocation};
-
-// TODO have two newtype wrappers: Span's that identify where an iso literal is in a file,
-// and Span's that refer to where something is within an iso literal.
-//
-// For schema sources, the first span is missing, and everything is the second type.
-// Invariant: end >= start
+/// A range of byte offsets into source text. The parser stack uses these relative to one
+/// literal (see the location model in parser-lang-types.md).
+/// Invariant: end >= start.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Span {
     pub start: u32,
@@ -21,8 +15,8 @@ impl fmt::Display for Span {
     }
 }
 
-impl From<std::ops::Range<usize>> for Span {
-    fn from(range: std::ops::Range<usize>) -> Self {
+impl From<Range<usize>> for Span {
+    fn from(range: Range<usize>) -> Self {
         Span::from_usize(range.start, range.end)
     }
 }
@@ -37,16 +31,12 @@ impl Span {
         Span { start, end }
     }
 
-    pub fn todo_generated() -> Self {
-        // Calling this indicates we have no actual span, which is indicative of
-        // poor modeling.
-        Span::new(0, 0)
-    }
-
     pub fn is_empty(&self) -> bool {
         self.start == self.end
     }
 
+    /// Rebase a literal-relative span to a file-absolute one, at the top level that
+    /// holds the literal's offset in its file.
     pub fn with_offset(self, offset: u32) -> Self {
         Self::new(self.start + offset, self.end + offset)
     }
@@ -100,7 +90,7 @@ impl<T> WithSpan<T> {
     }
 
     pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithSpan<U>, E> {
-        WithSpan::new(map(self.item)?, self.span).wrap_ok()
+        Ok(WithSpan::new(map(self.item)?, self.span))
     }
 
     pub fn as_ref(&self) -> WithSpan<&T> {
@@ -108,14 +98,6 @@ impl<T> WithSpan<T> {
             item: &self.item,
             span: self.span,
         }
-    }
-
-    pub fn to_with_location(self, text_source: TextSource) -> WithLocation<T> {
-        WithLocation::new(self.item, Location::new(text_source, self.span))
-    }
-
-    pub fn to_with_embedded_location(self, text_source: TextSource) -> WithEmbeddedLocation<T> {
-        WithEmbeddedLocation::new(self.item, EmbeddedLocation::new(text_source, self.span))
     }
 }
 
@@ -125,10 +107,6 @@ where
 {
     fn with_span(self, span: Span) -> WithSpan<Self> {
         WithSpan::new(self, span)
-    }
-
-    fn with_generated_span(self) -> WithSpan<Self> {
-        WithSpan::new(self, Span::todo_generated())
     }
 }
 

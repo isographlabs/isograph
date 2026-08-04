@@ -1,0 +1,10 @@
+[package]
+name = "parser_lang_types"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+
+[lints]
+workspace = true

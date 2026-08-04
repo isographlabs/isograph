@@ -1,9 +1,10 @@
 use intern::string_key::{Intern, Lookup};
-use lazy_static::lazy_static;
 use prelude::Postfix;
 use std::path::PathBuf;
 
-use crate::{CurrentWorkingDirectory, RelativePathToSourceFile, Span};
+use parser_lang_types::Span;
+
+use crate::{CurrentWorkingDirectory, RelativePathToSourceFile};
 
 /// A source, which consists of a filename, and an optional span
 /// indicating the subset of the file which corresponds to the
@@ -18,28 +19,12 @@ pub struct TextSource {
     pub span: Option<Span>,
 }
 
-lazy_static! {
-    // This is a horrible hack! If this is printed, we presumably blow up.
-    pub static ref GENERATED_FILE_DO_NOT_PRINT: TextSource = TextSource {
-        relative_path_to_source_file: "generated".intern().into(),
-        span: None,
-    };
-}
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub struct EmbeddedLocation {
     pub text_source: TextSource,
     /// The span is relative to the Source's span, not to the
     /// entire source file.
     pub span: Span,
-}
-
-impl EmbeddedLocation {
-    /// This function will give us an embedded location that will probably cause
-    /// a panic if printed! It's use is indicative that we need to refactor somehow.
-    pub fn todo_generated() -> EmbeddedLocation {
-        EmbeddedLocation::new(*GENERATED_FILE_DO_NOT_PRINT, Span::todo_generated())
-    }
 }
 
 impl From<EmbeddedLocation> for Location {

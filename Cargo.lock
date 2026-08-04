@@ -296,6 +296,7 @@ dependencies = [
  "colored",
  "intern",
  "lazy_static",
+ "parser_lang_types",
  "pathdiff",
  "pico",
  "prelude",
@@ -942,7 +943,7 @@ dependencies = [
 name = "isograph_parser"
 version = "0.5.3"
 dependencies = [
- "common_lang_types",
+ "parser_lang_types",
  "resolve_position",
 ]
 
@@ -1154,6 +1155,10 @@ dependencies = [
  "smallvec",
  "windows-targets",
 ]
+
+[[package]]
+name = "parser_lang_types"
+version = "0.5.3"
 
 [[package]]
 name = "pathdiff"
@@ -1455,7 +1460,7 @@ dependencies = [
 name = "resolve_position"
 version = "0.5.3"
 dependencies = [
- "common_lang_types",
+ "parser_lang_types",
 ]
 
 [[package]]
@@ -2233,8 +2238,8 @@ dependencies = [
 name = "tests"
 version = "0.5.3"
 dependencies = [
- "common_lang_types",
  "isograph_parser",
+ "parser_lang_types",
  "resolve_position",
 ]
 

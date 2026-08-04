@@ -2,7 +2,7 @@ use std::num::NonZeroU32;
 
 use colored::Colorize;
 
-use crate::Span;
+use parser_lang_types::Span;
 
 enum SpanState {
     /// We have not yet reached the start of the span
@@ -197,8 +197,10 @@ mod test {
 
     use std::sync::{LazyLock, Mutex};
 
+    use parser_lang_types::Span;
+
     use crate::{
-        OneIndexedColNumber, OneIndexedRowNumber, Span,
+        OneIndexedColNumber, OneIndexedRowNumber,
         text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers,
     };
 
