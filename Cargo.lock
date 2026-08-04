@@ -301,7 +301,6 @@ version = "0.5.3"
 dependencies = [
  "colored",
  "intern",
- "lazy_static",
  "pathdiff",
  "pico",
  "prelude",
