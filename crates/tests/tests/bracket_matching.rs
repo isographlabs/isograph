@@ -19,8 +19,8 @@ fn the_enclosing_brace_group_stays_valid() {
     let fixture = Fixture::load("unclosed_paren");
     // The run inside `first { ... }`, before the invalid paren section begins.
     assert!(matches!(fixture.on("broken").validity(), SectionValidity::Valid));
-    // Inside `second { ok }`, after the broken section.
-    assert!(matches!(fixture.on("ok").validity(), SectionValidity::Valid));
+    // Inside `second { fine }`, after the broken section.
+    assert!(matches!(fixture.on("fine").validity(), SectionValidity::Valid));
 }
 
 #[test]
