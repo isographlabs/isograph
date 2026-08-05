@@ -105,9 +105,27 @@ fn wrong_kind_opens_close_synthetically_and_nest() {
 fn a_stray_close_is_one_token_of_invalid() {
     let fixture = Fixture::load("stray_close");
     assert!(matches!(fixture.on("foo").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on(")"), ResolvedBracketNode::StrayClose(_)));
     assert!(matches!(fixture.on(")").validity(), SectionValidity::Invalid));
     assert!(matches!(fixture.on("bar").validity(), SectionValidity::Valid));
+    // The exact path at the `)`: a stray paren close, sitting inside the matched brace
+    // group, at the top level.
+    match fixture.on(")") {
+        ResolvedBracketNode::StrayClose(stray) => {
+            assert_eq!(*stray.inner, BracketKind::Paren);
+            match stray.parent {
+                BracketItemParent::Bracketed(brace_group) => {
+                    assert_eq!(brace_group.inner.opening.item, BracketKind::Brace);
+                    assert!(matches!(brace_group.inner.closing, Closing::Real(_)));
+                    assert!(matches!(
+                        brace_group.parent,
+                        BracketItemParent::MatchedBrackets(_)
+                    ));
+                }
+                parent => panic!("expected the brace group above the stray, got {parent:?}"),
+            }
+        }
+        node => panic!("expected the stray close, got {node:?}"),
+    }
     match fixture.tree.errors().as_slice() {
         [BracketError::UnexpectedClose(stray)] => {
             assert_eq!(stray.span, span_of(&fixture.text, ")"));
@@ -137,7 +155,18 @@ fn crossing_pairs_produce_two_errors_in_source_order() {
     let fixture = Fixture::load("crossing_pairs");
     assert!(matches!(fixture.on("(").validity(), SectionValidity::Valid));
     assert!(matches!(fixture.on("{").validity(), SectionValidity::Invalid));
-    assert!(matches!(fixture.on("}"), ResolvedBracketNode::StrayClose(_)));
+    // The trailing `}` is a stray brace close at the top level: its `{` was consumed inside
+    // the paren group.
+    match fixture.on("}") {
+        ResolvedBracketNode::StrayClose(stray) => {
+            assert_eq!(*stray.inner, BracketKind::Brace);
+            assert!(matches!(
+                stray.parent,
+                BracketItemParent::MatchedBrackets(_)
+            ));
+        }
+        node => panic!("expected the stray close, got {node:?}"),
+    }
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(brace), BracketError::UnexpectedClose(stray)] => {
             assert_eq!(brace.item.0.span, span_of(&fixture.text, "{"));
@@ -156,9 +185,11 @@ fn the_close_pairs_with_the_nearest_open() {
     match fixture.on("c") {
         ResolvedBracketNode::Inner(run) => match run.parent {
             BracketItemParent::Bracketed(b_group) => {
+                assert_eq!(b_group.inner.opening.item, BracketKind::Brace);
                 assert!(matches!(b_group.inner.closing, Closing::Real(_)));
                 match b_group.parent {
                     BracketItemParent::Bracketed(a_group) => {
+                        assert_eq!(a_group.inner.opening.item, BracketKind::Brace);
                         assert!(matches!(a_group.inner.closing, Closing::Synthetic(())));
                         assert!(matches!(
                             a_group.parent,
