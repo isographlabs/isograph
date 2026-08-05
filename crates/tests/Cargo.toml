@@ -5,6 +5,9 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+isograph_parser = { path = "../isograph_parser" }
+resolve_position = { path = "../resolve_position" }
+span = { path = "../span" }
 
 [lints]
 workspace = true

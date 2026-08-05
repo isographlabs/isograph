@@ -1,0 +1,1 @@
+field Query.Foo { bar(arg: [1, 2]) { id } }
