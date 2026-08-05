@@ -100,7 +100,7 @@ pub enum Closing<TContents: TreeContents> {
 
 ### The errors
 
-Derived from the tree rather than accumulated beside it, so there is one source of truth. `errors()` exists for every stage that still represents bracket errors, which the bound spells; a refined stage (error-refinement.md) has nothing for it to find and does not carry it:
+Derived from the tree rather than accumulated beside it, so there is one source of truth. `errors()` exists for every stage that still represents bracket errors — the `where` bound below states exactly that condition; a refined stage (error-refinement.md) has nothing for it to find and does not carry it:
 
 ```rust
 #[derive(Debug, PartialEq, Eq)]

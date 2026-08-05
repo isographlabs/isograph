@@ -74,7 +74,7 @@ pub enum Closing<TContents: TreeContents> {
 
 `BracketKind` (paren `()`, brace `{}`, bracket `[]`, isograph's token vocabulary) and `NonBracketTokenKind` landed with the tokenizer.
 
-A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below spell the `BracketsMatched` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
+A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
 
 The matcher's errors are derived from the tree, in source order:
 

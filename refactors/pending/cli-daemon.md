@@ -848,9 +848,11 @@ fn is_tracked_source(path: &Path) -> bool {
         return false;
     };
     TRACKED_EXTENSIONS.contains(&extension)
-        && !path
-            .components()
-            .any(|component| SKIPPED_DIRECTORIES.contains_os(component.as_os_str()))
+        && !path.components().any(|component| {
+            SKIPPED_DIRECTORIES
+                .iter()
+                .any(|skipped| component.as_os_str() == OsStr::new(skipped))
+        })
 }
 
 fn is_skipped_directory(path: &Path) -> bool {
@@ -888,8 +890,6 @@ fn scan(dir: &Path, event_tx: &UnboundedSender<IsographEvent>) {
     }
 }
 ```
-
-(`contains_os` above is shorthand the implementation spells out: `SKIPPED_DIRECTORIES.iter().any(|skipped| component.as_os_str() == OsStr::new(skipped))`.)
 
 `src/main.rs`: `run_daemon` hands over to the module.
 

@@ -51,7 +51,7 @@ impl SpanAnnotation for NoSpan {
 }
 ```
 
-Deferred alongside the rest of this doc, and noted here because this is the doc that generalizes the wrapper: `WithSpan<T>` may instead become an alias of a general annotated pair, `With<T, Span>` — the shape `common_lang_types`' `WithGenericLocation` already has — in which case `TSpan` above is `With`'s second parameter rather than a parameter added to `WithSpan`. Either spelling is the same mechanical change, decided later.
+Deferred alongside the rest of this doc, and noted here because this is the doc that generalizes the wrapper: `WithSpan<T>` may instead become an alias of a general annotated pair, `With<T, Span>` — the shape `common_lang_types`' `WithGenericLocation` already has — in which case `TSpan` above is `With`'s second parameter rather than a parameter added to `WithSpan`. Either form is the same mechanical change, decided later.
 
 The bracket tree threads the parameter, defaulted so spanned code reads as it does today:
 
