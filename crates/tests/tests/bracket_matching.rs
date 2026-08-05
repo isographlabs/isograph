@@ -1,8 +1,8 @@
 use std::convert::Infallible;
 
 use isograph_parser::{
-    BracketError, BracketKind, BracketsMatched, Closing, MatchedBrackets, NonBracketTokenKind,
-    ResolvedBracketNode, SectionValidity, TreeContents,
+    BracketError, BracketItemParent, BracketKind, BracketsMatched, Closing, MatchedBrackets,
+    NonBracketTokenKind, ResolvedBracketNode, SectionValidity, TreeContents,
 };
 use span::{Span, WithSpan};
 use tests::{span_of, Fixture};
@@ -151,10 +151,27 @@ fn crossing_pairs_produce_two_errors_in_source_order() {
 fn the_close_pairs_with_the_nearest_open() {
     let fixture = Fixture::load("adjacent_same_kind");
     assert!(matches!(fixture.on("a").validity(), SectionValidity::Valid));
-    // Everything inside a's unclosed group is invalid under the provisional
-    // end-of-tokens rule (bracket-matching-cases.md's open question), including the
-    // content of b's matched group.
-    assert!(matches!(fixture.on("c").validity(), SectionValidity::Invalid));
+    // The exact path at `c`: its run sits inside b's balanced group, and b's group sits
+    // inside a's non-balanced group.
+    match fixture.on("c") {
+        ResolvedBracketNode::Inner(run) => match run.parent {
+            BracketItemParent::Bracketed(b_group) => {
+                assert!(matches!(b_group.inner.closing, Closing::Real(_)));
+                match b_group.parent {
+                    BracketItemParent::Bracketed(a_group) => {
+                        assert!(matches!(a_group.inner.closing, Closing::Synthetic(())));
+                        assert!(matches!(
+                            a_group.parent,
+                            BracketItemParent::MatchedBrackets(_)
+                        ));
+                    }
+                    parent => panic!("expected a's group above b's, got {parent:?}"),
+                }
+            }
+            parent => panic!("expected b's group above the run, got {parent:?}"),
+        },
+        node => panic!("expected the run holding c, got {node:?}"),
+    }
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(unclosed)] => {
             // The unclosed group is the outer one: it contains `b`, which b's own group
