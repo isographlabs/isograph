@@ -1,14 +1,25 @@
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 use span::{Span, WithSpan};
 
-use crate::{BracketItem, Bracketed, MatchedBrackets, TreeContents};
+use crate::{BracketItem, BracketKind, Bracketed, Closing, MatchedBrackets, TreeContents};
 
+/// Every node a position can resolve to while only brackets are matched. Once later passes
+/// add their nodes, the full isograph path enum replaces this one.
 #[derive(Debug)]
 pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
+    /// A position outside every item.
     MatchedBrackets(MatchedBracketsPath<'a, TContents>),
-    Inner(InnerPath<'a, TContents>),
+    /// A position on whitespace inside a group: on none of its children and on neither of
+    /// its brackets.
     Bracketed(BracketedPath<'a, TContents>),
-    StrayClose(StrayClosePath<'a, TContents>),
+    /// A position in a run of non-bracket tokens.
+    Inner(InnerPath<'a, TContents>),
+    /// A position on a group's opening bracket.
+    OpenBracket(OpenBracketPath<'a, TContents>),
+    /// A position on a group's real closing bracket.
+    MatchedClose(MatchedClosePath<'a, TContents>),
+    /// A position on a close bracket no open of its kind was waiting for.
+    UnmatchedClose(UnmatchedClosePath<'a, TContents>),
 }
 
 pub type MatchedBracketsPath<'a, TContents> =
@@ -27,7 +38,11 @@ pub type InnerPath<'a, TContents> = PositionResolutionPath<
 >;
 pub type BracketedPath<'a, TContents> =
     PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
-pub type StrayClosePath<'a, TContents> = PositionResolutionPath<
+pub type OpenBracketPath<'a, TContents> =
+    PositionResolutionPath<&'a WithSpan<BracketKind>, Box<BracketedPath<'a, TContents>>>;
+pub type MatchedClosePath<'a, TContents> =
+    PositionResolutionPath<&'a Span, Box<BracketedPath<'a, TContents>>>;
+pub type UnmatchedClosePath<'a, TContents> = PositionResolutionPath<
     &'a <TContents as TreeContents>::Stray,
     BracketItemParent<'a, TContents>,
 >;
@@ -68,6 +83,20 @@ impl<TContents: TreeContents> ResolvePosition for Bracketed<TContents> {
         parent: BracketItemParent<'a, TContents>,
         position: Span,
     ) -> ResolvedBracketNode<'a, TContents> {
+        if self.opening.span.contains(position) {
+            return ResolvedBracketNode::OpenBracket(PositionResolutionPath {
+                inner: &self.opening,
+                parent: Box::new(self.path(parent)),
+            });
+        }
+        if let Closing::Real(close) = &self.closing {
+            if close.contains(position) {
+                return ResolvedBracketNode::MatchedClose(PositionResolutionPath {
+                    inner: close,
+                    parent: Box::new(self.path(parent)),
+                });
+            }
+        }
         match containing_child(&self.children, position) {
             Some(child) => {
                 let parent = BracketItemParent::Bracketed(Box::new(self.path(parent)));
@@ -97,10 +126,11 @@ fn resolve_child<'a, TContents: TreeContents>(
             ResolvedBracketNode::Inner(PositionResolutionPath { inner, parent })
         }
         BracketItem::Bracketed(bracketed) => bracketed.resolve(parent, position),
-        BracketItem::StrayClose(stray) => ResolvedBracketNode::StrayClose(PositionResolutionPath {
-            inner: stray,
-            parent,
-        }),
+        BracketItem::StrayClose(stray) => {
+            ResolvedBracketNode::UnmatchedClose(PositionResolutionPath {
+                inner: stray,
+                parent,
+            })
+        }
     }
 }
-
