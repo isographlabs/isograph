@@ -10,18 +10,19 @@ use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKin
 /// of these changes all of them at once, through `try_map` (error-refinement.md). The slots
 /// carry these bounds so the tree types' derives compile.
 pub trait TreeContents {
-    /// What a run between brackets is: `Vec<WithSpan<NonBracketTokenKind>>` out of the
-    /// matcher, parsed nodes later.
+    /// What a run between brackets is. The matcher produces
+    /// `Vec<WithSpan<NonBracketTokenKind>>`; later passes replace it with parsed nodes.
     type Inner: fmt::Debug + PartialEq + Eq;
-    /// What a stray close carries: `BracketKind` while bracket errors are representable,
-    /// `Infallible` once refined.
+    /// What a stray close carries. Dirty stages use `BracketKind`; refined stages use
+    /// `Infallible`, which makes the variant unconstructible.
     type Stray: fmt::Debug + PartialEq + Eq;
-    /// What a synthetic closing carries: `()` while bracket errors are representable,
-    /// `Infallible` once refined.
+    /// What a synthetic closing carries. Dirty stages use `()`; refined stages use
+    /// `Infallible`, which makes the variant unconstructible.
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
-/// What `match_brackets` produces: runs of lexed tokens, both bracket errors representable.
+/// The stage `match_brackets` produces: its runs hold lexed tokens, and the tree can carry
+/// both bracket errors.
 #[derive(Debug, PartialEq, Eq)]
 pub struct BracketsMatched;
 
@@ -42,15 +43,15 @@ pub enum BracketItem<TContents: TreeContents> {
     /// its last token's end, whitespace between them included.
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
-    /// A close bracket no open of its kind was waiting for: an invalid section one token
-    /// wide.
+    /// A close bracket no open of its kind was waiting for; it is an invalid section one
+    /// token wide.
     StrayClose(TContents::Stray),
 }
 
-/// An open bracket, everything up to its close, and the close — always present, so every pass
-/// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
-/// from the start of the opening to the end of a real closing, or to the end of the last
-/// child when the closing is synthetic.
+/// An open bracket, everything up to its close, and the close, which is always present, so
+/// every pass after this one works with guaranteed matching brackets. The wrapping
+/// `WithSpan`'s span runs from the start of the opening to the end of a real closing, or to
+/// the end of the last child when the closing is synthetic.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Bracketed<TContents: TreeContents> {
     pub opening: WithSpan<BracketKind>,
@@ -89,7 +90,7 @@ where
     TContents: TreeContents<Stray = BracketKind, Unclosed = ()>,
 {
     /// Every error the pass produced, in source order of the position each error starts at.
-    /// Empty iff every bracket matched.
+    /// The list is empty iff every bracket matched.
     pub fn errors(&self) -> Vec<BracketError> {
         let mut errors = Vec::new();
         collect_errors(&self.0, &mut errors);
@@ -177,8 +178,8 @@ fn parse_items(
     items
 }
 
-/// End the run in progress, if any: one `Inner` item spanning its first token's start to its
-/// last token's end.
+/// End the run in progress, if any, into one `Inner` item spanning its first token's start
+/// to its last token's end.
 fn flush_run(
     items: &mut Vec<WithSpan<BracketItem<BracketsMatched>>>,
     run: &mut Vec<WithSpan<NonBracketTokenKind>>,
@@ -190,9 +191,10 @@ fn flush_run(
     items.push(WithSpan::new(BracketItem::Inner(std::mem::take(run)), span));
 }
 
-/// One group, its opening already consumed: parse children, then look at the one token that
-/// stopped them — this group's own close (consumed, `Closing::Real`) or something an
-/// enclosing group owns (left alone, and this group is closed synthetically where it stands).
+/// One group, whose opening the caller already consumed. This parses the children, then
+/// looks at the one token that stopped them: the group's own close, which it consumes into
+/// `Closing::Real`, or a close an enclosing group owns, which it leaves alone while closing
+/// this group synthetically where it stands.
 fn parse_bracketed(
     tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
@@ -230,8 +232,8 @@ fn parse_bracketed(
 }
 
 impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
-    /// Cross the tree to another stage: every slot mapped, fallibly. Either every node
-    /// crossed, or every refusal, in source order.
+    /// Cross the tree to another stage, mapping every slot fallibly. The result is either
+    /// the whole crossed tree or every refusal, in source order.
     pub fn try_map<TTo: TreeContents, TError>(
         self,
         map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> Result<TTo::Inner, TError>,

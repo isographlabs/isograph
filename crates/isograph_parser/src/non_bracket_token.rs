@@ -3,8 +3,8 @@ use std::fmt;
 use crate::IsographLangTokenKind;
 
 /// `IsographLangTokenKind` with the six bracket tokens unrepresentable: what the runs between
-/// brackets hold once the bracket matcher has consumed the brackets. One variant per
-/// non-bracket token, same names as the tokenizer's.
+/// brackets hold once the bracket matcher has consumed the brackets. It has one variant per
+/// non-bracket token, under the tokenizer's names.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum NonBracketTokenKind {
     Error,
@@ -44,8 +44,9 @@ pub enum BracketToken {
     Close(BracketKind),
 }
 
-/// Every token is a bracket or it is not. The one place that split is defined, so the bracket
-/// matcher and the runs it produces cannot disagree about what counts as a bracket.
+/// Every token is a bracket or it is not. This enum is the one place that split is defined,
+/// so the bracket matcher and the runs it produces cannot disagree about what counts as a
+/// bracket.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum SplitToken {
     Bracket(BracketToken),

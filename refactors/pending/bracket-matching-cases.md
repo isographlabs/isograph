@@ -28,7 +28,8 @@ pub trait TreeContents {
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
-/// What `match_brackets` produces: runs of lexed tokens, both bracket errors representable.
+/// The stage `match_brackets` produces: its runs hold lexed tokens, and the tree can carry
+/// both bracket errors.
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
@@ -46,15 +47,15 @@ pub enum BracketItem<TContents: TreeContents> {
     /// its last token's end, whitespace between them included.
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
-    /// A close bracket no open of its kind was waiting for: an invalid section one token
-    /// wide.
+    /// A close bracket no open of its kind was waiting for; it is an invalid section one
+    /// token wide.
     StrayClose(TContents::Stray),
 }
 
-/// An open bracket, everything up to its close, and the close — always present, so every pass
-/// after this one works with guaranteed matching brackets. The wrapping `WithSpan`'s span runs
-/// from the start of the opening to the end of a real closing, or to the end of the last
-/// child when the closing is synthetic.
+/// An open bracket, everything up to its close, and the close, which is always present, so
+/// every pass after this one works with guaranteed matching brackets. The wrapping
+/// `WithSpan`'s span runs from the start of the opening to the end of a real closing, or to
+/// the end of the last child when the closing is synthetic.
 pub struct Bracketed<TContents: TreeContents> {
     pub opening: WithSpan<BracketKind>,
     pub closing: Closing<TContents>,
