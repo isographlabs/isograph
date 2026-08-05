@@ -91,4 +91,5 @@ When told to audit, the deliverable is the whole class fixed everywhere, not the
 ## Coding standards: nits
 
 - Rust enums should take one of two forms: `enum Foo { NoData }` or `enum Foo { NamedStruct(Struct) }`, and not `Tuple(A, B)` or `Curlies { foo: Bar }`. `Tuple((A, B))` is appropriate, though.
+- A struct with exactly one field is a newtype (`struct Foo(pub Bar)`), not a struct with one named field — especially when no second field is possible. The exceptions are shapes an external derive dictates: serde types where the field name is the wire key, clap types where the field name is the flag.
 - The map `entry` API is encouraged. Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over a separate `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
