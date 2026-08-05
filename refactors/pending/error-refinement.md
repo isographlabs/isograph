@@ -1,6 +1,6 @@
 # Error refinement: contents that change all at once
 
-The matched-brackets tree is generic over one parameter, `TContents: TreeContents`, bundling every per-stage type: what a run between brackets is (`Text`), what a stray close carries (`Stray`), and what a synthetic closing carries (`Unclosed`). The trait and the generic types live in `resilient-parser.md`'s Change 1; this doc is the crossing between stages and the rules for who consumes which.
+The matched-brackets tree is generic over one parameter, `TContents: TreeContents`, bundling every per-stage type: what a run between brackets is (`Run`), what a stray close carries (`Stray`), and what a synthetic closing carries (`Unclosed`). The trait and the generic types live in `resilient-parser.md`'s Change 1; this doc is the crossing between stages and the rules for who consumes which.
 
 One parameter rather than one per slot, because the slots change together: a pass that parses runs also decides what the errors of its output are, and separate parameters would make half-crossed trees representable that no pass produces. Crossing is one function, `try_map`: every slot is mapped fallibly, and either the whole tree crosses or the full refusal list comes back. Refinement is a `try_map` whose target stage has `Infallible` slots — after it there are no bracket-matching errors and no inner errors (the tokenizer's `Error*` kinds inside runs, and stage 4's error tokens once runs are parsed), by construction rather than by promise.
 
@@ -22,7 +22,7 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
     /// crossed, or every refusal, in source order.
     pub fn try_map<TTo: TreeContents, TError>(
         self,
-        map_text: &mut impl FnMut(WithSpan<TFrom::Text>) -> Result<TTo::Text, TError>,
+        map_run: &mut impl FnMut(WithSpan<TFrom::Run>) -> Result<TTo::Run, TError>,
         map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
         map_unclosed: &mut impl FnMut(
             TFrom::Unclosed,
@@ -30,7 +30,7 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
         ) -> Result<TTo::Unclosed, TError>,
     ) -> Result<MatchedBrackets<TTo>, Vec<TError>> {
         let mut errors = Vec::new();
-        let items = try_map_items(self.0, &mut errors, map_text, map_stray, map_unclosed);
+        let items = try_map_items(self.0, &mut errors, map_run, map_stray, map_unclosed);
         if errors.is_empty() {
             Ok(MatchedBrackets(items))
         } else {
@@ -42,7 +42,7 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
 fn try_map_items<TFrom, TTo, TError>(
     items: Vec<WithSpan<BracketItem<TFrom>>>,
     errors: &mut Vec<TError>,
-    map_text: &mut impl FnMut(WithSpan<TFrom::Text>) -> Result<TTo::Text, TError>,
+    map_run: &mut impl FnMut(WithSpan<TFrom::Run>) -> Result<TTo::Run, TError>,
     map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
     map_unclosed: &mut impl FnMut(
         TFrom::Unclosed,
@@ -57,8 +57,8 @@ where
     for with_span in items {
         let WithSpan { item, span } = with_span;
         match item {
-            BracketItem::Text(text) => match map_text(WithSpan::new(text, span)) {
-                Ok(text) => mapped.push(WithSpan::new(BracketItem::Text(text), span)),
+            BracketItem::Run(run) => match map_run(WithSpan::new(run, span)) {
+                Ok(run) => mapped.push(WithSpan::new(BracketItem::Run(run), span)),
                 Err(e) => errors.push(e),
             },
             BracketItem::StrayClose(stray) => match map_stray(WithSpan::new(stray, span)) {
@@ -83,7 +83,7 @@ where
                         }
                     }
                 };
-                let children = try_map_items(children, errors, map_text, map_stray, map_unclosed);
+                let children = try_map_items(children, errors, map_run, map_stray, map_unclosed);
                 if let Some(closing) = closing {
                     mapped.push(WithSpan::new(
                         BracketItem::Bracketed(Bracketed {
@@ -103,14 +103,14 @@ where
 
 ## Refining
 
-A refining crossing maps both bracket-error slots to refusals; what `map_text` does is the target stage's business. Before stage 4 exists, the two error mappers are already fully determined:
+A refining crossing maps both bracket-error slots to refusals; what `map_run` does is the target stage's business. Before stage 4 exists, the two error mappers are already fully determined:
 
 ```rust
 &mut |stray| Err(BracketError::UnexpectedClose(stray)),
 &mut |(), group| Err(BracketError::Unclosed(group)),
 ```
 
-Stage 4's doc defines its stages as implementors of the same trait — a dirty stage whose `Text` is its node type with error tokens and whose bracket slots are `BracketKind` and `()`, and a refined stage whose `Text` is the node type without error variants and whose bracket slots are both `Infallible`. Its refine is one `try_map` whose `map_text` refuses on inner error tokens and whose other two mappers are the pair above, so the crossing removes matching errors and inner errors together. (If `spanless-parsing.md` is adopted, its span slot becomes a fourth associated type on the same trait, changing at the same crossings.)
+Stage 4's doc defines its stages as implementors of the same trait — a dirty stage whose `Run` is its node type with error tokens and whose bracket slots are `BracketKind` and `()`, and a refined stage whose `Run` is the node type without error variants and whose bracket slots are both `Infallible`. Its refine is one `try_map` whose `map_run` refuses on inner error tokens and whose other two mappers are the pair above, so the crossing removes matching errors and inner errors together. (If `spanless-parsing.md` is adopted, its span slot becomes a fourth associated type on the same trait, changing at the same crossings.)
 
 ## Matching on a refined stage
 
@@ -125,7 +125,7 @@ where
 {
     for item in items {
         match &item.item {
-            BracketItem::Text(text) => { /* ... */ }
+            BracketItem::Run(run) => { /* ... */ }
             BracketItem::Bracketed(bracketed) => {
                 match &bracketed.closing {
                     Closing::Real(_close) => { /* ... */ }
@@ -155,7 +155,7 @@ use span::WithSpan;
 struct BracketsMatchedNoErrors;
 
 impl TreeContents for BracketsMatchedNoErrors {
-    type Text = Vec<WithSpan<NonBracketTokenKind>>;
+    type Run = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = Infallible;
     type Unclosed = Infallible;
 }

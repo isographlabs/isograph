@@ -23,7 +23,7 @@ What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly 
 /// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
 /// of these changes all of them at once, through `try_map` (error-refinement.md).
 pub trait TreeContents {
-    type Text: fmt::Debug + PartialEq + Eq;
+    type Run: fmt::Debug + PartialEq + Eq;
     type Stray: fmt::Debug + PartialEq + Eq;
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
@@ -32,7 +32,7 @@ pub trait TreeContents {
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
-    type Text = Vec<WithSpan<NonBracketTokenKind>>;
+    type Run = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
 }
@@ -44,7 +44,7 @@ pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem
 pub enum BracketItem<TContents: TreeContents> {
     /// A maximal run containing no brackets. Its span runs from its first token's start to
     /// its last token's end, whitespace between them included.
-    Text(TContents::Text),
+    Run(TContents::Run),
     Bracketed(Bracketed<TContents>),
     /// A close bracket no open of its kind was waiting for: an invalid section one token
     /// wide.
@@ -66,8 +66,8 @@ pub enum Closing<TContents: TreeContents> {
     Real(Span),
     /// The group never got its close and was forced to end: at the close bracket an
     /// enclosing group owns, or at the end of the tokens. Where it ended is the end of the
-    /// wrapping `WithSpan`'s span; the missing close has no span of its own. What makes the
-    /// group an invalid section.
+    /// wrapping `WithSpan`'s span; the missing close has no span of its own. A group closed
+    /// this way is an invalid section.
     Synthetic(TContents::Unclosed),
 }
 ```
@@ -110,7 +110,7 @@ field Query.Foo
       ^ valid
 ```
 
-Generates: one `Text` run holding the lexed tokens (`Identifier`, `Identifier`, `Period`, `Identifier`). No errors.
+Generates: one `Run` item holding the lexed tokens (`Identifier`, `Identifier`, `Period`, `Identifier`). No errors.
 
 An unbracketed run cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
 
@@ -121,7 +121,7 @@ field Query.Foo { bar(arg: [1, 2]) { id } }
                         ^ valid      ^ valid
 ```
 
-Generates: `Bracketed` items nested as typed, every one `Closing::Real`, with the runs between brackets as `Text` items. No errors.
+Generates: `Bracketed` items nested as typed, every one `Closing::Real`, with the runs between brackets as `Run` items. No errors.
 
 Every close is its group's own; the rule degenerates to ordinary matching. The recovery machinery costs nothing on well-formed input.
 
@@ -157,7 +157,7 @@ Same reason as above, applied twice; nesting is preserved so a position resolves
         ^ valid
 ```
 
-Generates: the brace group with `Closing::Real`, whose children are a `Text` run, a `StrayClose(Paren)`, and a `Text` run. One error: `UnexpectedClose`.
+Generates: the brace group with `Closing::Real`, whose children are a `Run` item, a `StrayClose(Paren)`, and a `Run` item. One error: `UnexpectedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 
