@@ -6,6 +6,7 @@ license = { workspace = true }
 
 [dependencies]
 logos = { workspace = true }
+resolve_position = { path = "../resolve_position" }
 span = { path = "../span" }
 
 [lints]

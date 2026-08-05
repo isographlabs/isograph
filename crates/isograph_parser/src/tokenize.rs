@@ -1,5 +1,5 @@
 use logos::Logos;
-use span::{Span, WithSpan};
+use span::WithSpan;
 
 use crate::IsographLangTokenKind;
 
