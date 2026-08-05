@@ -16,14 +16,14 @@ The rule:
 
 ## The tree
 
-What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly this):
+What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly this). `BracketKind` (paren `()`, brace `{}`, bracket `[]`) and `NonBracketTokenKind` are landed code from the tokenizer's split layer:
 
 ```rust
 /// The types one matched-brackets tree holds: what a run between brackets is, and what the
 /// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
 /// of these changes all of them at once, through `try_map` (error-refinement.md).
 pub trait TreeContents {
-    type Run: fmt::Debug + PartialEq + Eq;
+    type Inner: fmt::Debug + PartialEq + Eq;
     type Stray: fmt::Debug + PartialEq + Eq;
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
@@ -32,7 +32,7 @@ pub trait TreeContents {
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
-    type Run = Vec<WithSpan<NonBracketTokenKind>>;
+    type Inner = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
 }
@@ -44,7 +44,7 @@ pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem
 pub enum BracketItem<TContents: TreeContents> {
     /// A maximal run containing no brackets. Its span runs from its first token's start to
     /// its last token's end, whitespace between them included.
-    Run(TContents::Run),
+    Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
     /// A close bracket no open of its kind was waiting for: an invalid section one token
     /// wide.
@@ -71,8 +71,6 @@ pub enum Closing<TContents: TreeContents> {
     Synthetic(TContents::Unclosed),
 }
 ```
-
-`BracketKind` (paren `()`, brace `{}`, bracket `[]`, isograph's token vocabulary) and `NonBracketTokenKind` landed with the tokenizer.
 
 A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
 
@@ -110,7 +108,7 @@ field Query.Foo
       ^ valid
 ```
 
-Generates: one `Run` item holding the lexed tokens (`Identifier`, `Identifier`, `Period`, `Identifier`). No errors.
+Generates: one `Inner` item holding the lexed tokens (`Identifier`, `Identifier`, `Period`, `Identifier`). No errors.
 
 An unbracketed run cannot be malformed at this stage, so it is a valid section on its own. This is what keeps a literal useful while it is mostly prose and the user has not typed a bracket yet.
 
@@ -121,7 +119,7 @@ field Query.Foo { bar(arg: [1, 2]) { id } }
                         ^ valid      ^ valid
 ```
 
-Generates: `Bracketed` items nested as typed, every one `Closing::Real`, with the runs between brackets as `Run` items. No errors.
+Generates: `Bracketed` items nested as typed, every one `Closing::Real`, with the runs between brackets as `Inner` items. No errors.
 
 Every close is its group's own; the rule degenerates to ordinary matching. The recovery machinery costs nothing on well-formed input.
 
@@ -157,7 +155,7 @@ Same reason as above, applied twice; nesting is preserved so a position resolves
         ^ valid
 ```
 
-Generates: the brace group with `Closing::Real`, whose children are a `Run` item, a `StrayClose(Paren)`, and a `Run` item. One error: `UnexpectedClose`.
+Generates: the brace group with `Closing::Real`, whose children are a `Inner` item, a `StrayClose(Paren)`, and a `Inner` item. One error: `UnexpectedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 

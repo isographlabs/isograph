@@ -32,14 +32,17 @@ use crate::{BracketKind, NonBracketTokenKind};
 
 /// The types one matched-brackets tree holds: what a run between brackets is, and what the
 /// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
-/// of these changes all of them at once, through `try_map` (error-refinement.md). The bounds
-/// on the slots are what keep the tree types' derives.
+/// of these changes all of them at once, through `try_map` (error-refinement.md). The slots
+/// carry these bounds so the tree types' derives compile.
 pub trait TreeContents {
-    /// A maximal run between brackets: lexed tokens at first, parsed nodes later.
-    type Run: fmt::Debug + PartialEq + Eq;
-    /// What a stray close carries: the bracket kind, or nothing constructible.
+    /// What a run between brackets is: `Vec<WithSpan<NonBracketTokenKind>>` out of the
+    /// matcher, parsed nodes later.
+    type Inner: fmt::Debug + PartialEq + Eq;
+    /// What a stray close carries: `BracketKind` while bracket errors are representable,
+    /// `Infallible` once refined.
     type Stray: fmt::Debug + PartialEq + Eq;
-    /// What a synthetic closing carries: unit, or nothing constructible.
+    /// What a synthetic closing carries: `()` while bracket errors are representable,
+    /// `Infallible` once refined.
     type Unclosed: fmt::Debug + PartialEq + Eq;
 }
 
@@ -48,7 +51,7 @@ pub trait TreeContents {
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
-    type Run = Vec<WithSpan<NonBracketTokenKind>>;
+    type Inner = Vec<WithSpan<NonBracketTokenKind>>;
     type Stray = BracketKind;
     type Unclosed = ();
 }
@@ -62,7 +65,7 @@ pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem
 pub enum BracketItem<TContents: TreeContents> {
     /// A maximal run containing no brackets. Its span runs from its first token's start to
     /// its last token's end, whitespace between them included.
-    Run(TContents::Run),
+    Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
     /// A close bracket no open of its kind was waiting for: an invalid section one token
     /// wide.
@@ -89,6 +92,17 @@ pub enum Closing<TContents: TreeContents> {
     /// wrapping `WithSpan`'s span; the missing close has no span of its own. A group closed
     /// this way is an invalid section.
     Synthetic(TContents::Unclosed),
+}
+```
+
+`BracketKind` and `NonBracketTokenKind` are landed code, in `non_bracket_token.rs`; for reference:
+
+```rust
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum BracketKind {
+    Paren,
+    Brace,
+    Bracket,
 }
 ```
 
@@ -139,7 +153,7 @@ fn collect_errors<TContents>(
 {
     for item in items {
         match &item.item {
-            BracketItem::Run(_) => {}
+            BracketItem::Inner(_) => {}
             BracketItem::StrayClose(kind) => {
                 errors.push(BracketError::UnexpectedClose(WithSpan::new(*kind, item.span)));
             }
@@ -219,7 +233,7 @@ fn parse_items(
     items
 }
 
-/// End the run in progress, if any: one `Run` item spanning its first token's start to its
+/// End the run in progress, if any: one `Inner` item spanning its first token's start to its
 /// last token's end.
 fn flush_run(
     items: &mut Vec<WithSpan<BracketItem<BracketsMatched>>>,
@@ -229,7 +243,7 @@ fn flush_run(
         (Some(first), Some(last)) => Span::join(first.span, last.span),
         _ => return,
     };
-    items.push(WithSpan::new(BracketItem::Run(std::mem::take(run)), span));
+    items.push(WithSpan::new(BracketItem::Inner(std::mem::take(run)), span));
 }
 
 /// One group, its opening already consumed: parse children, then look at the one token that
@@ -278,7 +292,7 @@ At the top level `enclosing` is empty, so `parse_items` never breaks there: ever
 
 New module `crates/isograph_parser/src/resolve_matched_brackets.rs`, implementing `resolve_position::ResolvePosition` for the matched-brackets tree, the way `resolve_position`'s own doc comment describes.
 
-A path points at its variant's payload — the `TContents::Run` of a run, the `Bracketed<TContents>`, a stray's `TContents::Stray` — plus the parent chain. The resolved item's span lives on the `WithSpan` wrapping it in the tree, and the caller of `resolve` already holds the position it asked about. A position the tokenizer skipped (whitespace between items) resolves to the enclosing group, which is the leaf that contains it.
+A path points at its variant's payload — the `TContents::Inner` of a run, the `Bracketed<TContents>`, a stray's `TContents::Stray` — plus the parent chain. The resolved item's span lives on the `WithSpan` wrapping it in the tree, and the caller of `resolve` already holds the position it asked about. A position the tokenizer skipped (whitespace between items) resolves to the enclosing group, which is the leaf that contains it.
 
 ```rust
 use span::{Span, WithSpan};
@@ -287,7 +301,7 @@ use resolve_position::{PositionResolutionPath, ResolvePosition};
 #[derive(Debug)]
 pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
     MatchedBrackets(MatchedBracketsPath<'a, TContents>),
-    Run(RunPath<'a, TContents>),
+    Inner(InnerPath<'a, TContents>),
     Bracketed(BracketedPath<'a, TContents>),
     StrayClose(StrayClosePath<'a, TContents>),
 }
@@ -302,8 +316,8 @@ pub enum BracketItemParent<'a, TContents: TreeContents> {
     Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
-pub type RunPath<'a, TContents: TreeContents> =
-    PositionResolutionPath<&'a TContents::Run, BracketItemParent<'a, TContents>>;
+pub type InnerPath<'a, TContents: TreeContents> =
+    PositionResolutionPath<&'a TContents::Inner, BracketItemParent<'a, TContents>>;
 pub type BracketedPath<'a, TContents: TreeContents> =
     PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
 pub type StrayClosePath<'a, TContents: TreeContents> =
@@ -374,8 +388,8 @@ fn resolve_child<'a, TContents: TreeContents>(
     position: Span,
 ) -> ResolvedBracketNode<'a, TContents> {
     match &child.item {
-        BracketItem::Run(run) => ResolvedBracketNode::Run(PositionResolutionPath {
-            inner: run,
+        BracketItem::Inner(inner) => ResolvedBracketNode::Inner(PositionResolutionPath {
+            inner,
             parent,
         }),
         BracketItem::Bracketed(bracketed) => bracketed.resolve(parent, position),
@@ -401,7 +415,7 @@ impl<TContents: TreeContents> ResolvedBracketNode<'_, TContents> {
         match self {
             ResolvedBracketNode::StrayClose(_) => SectionValidity::Invalid,
             ResolvedBracketNode::MatchedBrackets(_) => SectionValidity::Valid,
-            ResolvedBracketNode::Run(path) => path.parent.validity(),
+            ResolvedBracketNode::Inner(path) => path.parent.validity(),
             ResolvedBracketNode::Bracketed(path) => match path.inner.closing {
                 Closing::Real(_) => path.parent.validity(),
                 // Provisional: whether a group synthetically closed at the end of the
@@ -426,7 +440,7 @@ impl<TContents: TreeContents> BracketItemParent<'_, TContents> {
 }
 ```
 
-A position inside a synthetically closed group is `Invalid` however deep it sits: the `Run` and really-closed `Bracketed` arms keep walking up, and the walk stops at the first `Closing::Synthetic` ancestor.
+A position inside a synthetically closed group is `Invalid` however deep it sits: the `Inner` and really-closed `Bracketed` arms keep walking up, and the walk stops at the first `Closing::Synthetic` ancestor.
 
 ## Change 3: the test harness
 
