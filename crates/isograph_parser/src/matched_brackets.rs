@@ -78,12 +78,10 @@ pub enum BracketError {
     Unclosed(WithSpan<UnclosedGroup>),
 }
 
-/// The wrapping `WithSpan`'s span is the whole group; its end is where the close should have
-/// been.
+/// The opening bracket of a group whose close was synthesized. The wrapping `WithSpan`'s span
+/// is the whole group; its end is where the close should have been.
 #[derive(Debug, PartialEq, Eq)]
-pub struct UnclosedGroup {
-    pub opening: WithSpan<BracketKind>,
-}
+pub struct UnclosedGroup(pub WithSpan<BracketKind>);
 
 impl<TContents> MatchedBrackets<TContents>
 where
@@ -113,9 +111,7 @@ fn collect_errors<TContents>(
             BracketItem::Bracketed(bracketed) => {
                 if matches!(bracketed.closing, Closing::Synthetic(())) {
                     errors.push(BracketError::Unclosed(WithSpan::new(
-                        UnclosedGroup {
-                            opening: bracketed.opening,
-                        },
+                        UnclosedGroup(bracketed.opening),
                         item.span,
                     )));
                 }
@@ -287,7 +283,7 @@ where
                 let closing = match closing {
                     Closing::Real(close) => Some(Closing::Real(close)),
                     Closing::Synthetic(payload) => {
-                        let group = WithSpan::new(UnclosedGroup { opening }, span);
+                        let group = WithSpan::new(UnclosedGroup(opening), span);
                         match map_unclosed(payload, group) {
                             Ok(payload) => Some(Closing::Synthetic(payload)),
                             Err(e) => {

@@ -40,7 +40,7 @@ fn the_unclosed_paren_is_the_only_error() {
     let errors = fixture.tree.errors();
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.item.opening.span, span_of(&fixture.text, "("));
+            assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
     }
@@ -73,7 +73,7 @@ fn a_wrong_kind_close_leaves_only_the_paren_invalid() {
     assert!(matches!(fixture.at(0, 22).validity(), SectionValidity::Valid));
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.item.opening.span, span_of(&fixture.text, "("));
+            assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "("));
             // The childless group's span is its opening alone.
             assert_eq!(unclosed.span, span_of(&fixture.text, "("));
         }
@@ -89,8 +89,8 @@ fn wrong_kind_opens_close_synthetically_and_nest() {
     assert!(matches!(fixture.on("[").validity(), SectionValidity::Invalid));
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(paren), BracketError::Unclosed(square)] => {
-            assert_eq!(paren.item.opening.span, span_of(&fixture.text, "("));
-            assert_eq!(square.item.opening.span, span_of(&fixture.text, "["));
+            assert_eq!(paren.item.0.span, span_of(&fixture.text, "("));
+            assert_eq!(square.item.0.span, span_of(&fixture.text, "["));
             // The paren group reaches its last child, the `[` group.
             assert_eq!(
                 paren.span,
@@ -140,7 +140,7 @@ fn crossing_pairs_produce_two_errors_in_source_order() {
     assert!(matches!(fixture.on("}"), ResolvedBracketNode::StrayClose(_)));
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(brace), BracketError::UnexpectedClose(stray)] => {
-            assert_eq!(brace.item.opening.span, span_of(&fixture.text, "{"));
+            assert_eq!(brace.item.0.span, span_of(&fixture.text, "{"));
             assert_eq!(stray.span, span_of(&fixture.text, "}"));
         }
         errors => panic!("expected the unclosed brace then the stray close, got {errors:?}"),
@@ -206,7 +206,7 @@ fn refining_reports_the_unclosed_paren() {
     let errors = refine(fixture.tree).expect_err("the fixture's paren never closes");
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
-            assert_eq!(unclosed.item.opening.span, span_of(&fixture.text, "("));
+            assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
     }
