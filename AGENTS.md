@@ -49,6 +49,7 @@ Implementation begins only after the explicit permission above. Starting an impl
 - Test behavior, not implementation. If a test breaks under a refactor that preserves behavior, the test was asserting the wrong thing.
 - Fixtures are inputs only. Expected results live in the test as explicit assertions, never in checked-in expected-output files.
 - Tests may `expect` with a reason that names an invariant the test itself established (a fixture it built, an env the harness sets). Production code is not a test fixture.
+- An API that only tests call should not exist: delete it and assert on the real structures instead. A helper the tests genuinely need lives with the tests — in the tests crate or under `#[cfg(test)]` — never in the production surface.
 
 ## Booleans
 
