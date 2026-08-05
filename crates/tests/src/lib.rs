@@ -28,10 +28,11 @@ pub struct Fixture {
 }
 
 impl Fixture {
-    pub fn load(name: &str) -> Fixture {
+    /// Load `file_name` (extension included) from `crates/tests/fixtures`.
+    pub fn load(file_name: &str) -> Fixture {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("fixtures")
-            .join(format!("{name}.iso"));
+            .join(file_name);
         let text = std::fs::read_to_string(&path)
             .expect("the fixture named by the test exists under crates/tests/fixtures");
         let tree = match_brackets(tokenize(&text));

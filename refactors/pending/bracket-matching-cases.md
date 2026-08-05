@@ -98,7 +98,7 @@ where
 }
 ```
 
-Positions marked below use `^` under the character; `valid`/`invalid` states what `validity()` returns there. A position on whitespace the tokenizer skipped resolves to the enclosing group.
+Positions marked below use `^` under the character. A position is called invalid when the path from the node it resolves to up to the root passes through an unbalanced group or a stray close; the pass ships no collapsed answer, so a consumer reads this off the path. A position on whitespace the tokenizer skipped resolves to the enclosing group.
 
 ## Case: text outside any bracket
 
@@ -211,7 +211,7 @@ A malformed string lexes as whatever the tokenizer produces for it (an `Error` r
 
 ## Open question: validity at the end of the tokens
 
-The tree at the end of the tokens is settled: every group still open is closed synthetically, ending at its last child, its children kept and their nesting preserved, and each one is an `Unclosed` error. What is open is what `validity()` reports inside such a group. `resilient-parser.md` provisionally implements option A; deciding this question updates it.
+The tree at the end of the tokens is settled: every group still open is closed synthetically, ending at its last child, its children kept and their nesting preserved, and each one is an `Unclosed` error. The pass exposes the path and nothing else, so what is open is the policy of whichever consumer collapses the path into one answer (the LSP's diagnostics and features): does content inside a group forced shut at the end of the tokens count as inside an unbalanced group?
 
 The dominant real-world input is a literal being typed: the user has just written `{` and everything that follows is momentarily "after an unclosed open". Whatever we pick is the LSP experience during typing.
 
@@ -223,9 +223,9 @@ field Query.Foo {
   ^ invalid
 ```
 
-One rule with no special case: `Closing::Synthetic` is invalid wherever the group ended. The cost: while the user types inside a new `{`, the entire rest of the literal is invalid, so stage 4 has nothing to say about the content most likely to be under the cursor.
+One rule with no special case: a synthetically closed group counts as unbalanced wherever it ended. The cost: while the user types inside a new `{`, the entire rest of the literal counts as unbalanced, so stage 4 has nothing to say about the content most likely to be under the cursor.
 
-### Option B: valid when the group's forced end is the end of the tokens
+### Option B: balanced when the group's forced end is the end of the tokens
 
 ```
 field Query.Foo {
@@ -233,4 +233,4 @@ field Query.Foo {
   ^ valid (inside the brace group)
 ```
 
-Content stays valid while typing, nesting is already correct, nothing restructures when the real close is typed, and the missing brace is still reported: the `Unclosed` error exists either way, because errors are separate from validity. The cost: `validity()` special-cases where the group was forced to end, and a group that is valid while it reaches the end of the tokens flips invalid when a wrong-kind close later forces it shut mid-literal — a change of state from an edit made elsewhere.
+Content counts as balanced while typing, nesting is already correct, nothing restructures when the real close is typed, and the missing brace is still reported: the `Unclosed` error exists either way, because errors are separate from the collapse. The cost: the collapse special-cases where the group was forced to end, and a group that counts as balanced while it reaches the end of the tokens flips when a wrong-kind close later forces it shut mid-literal — a change of state from an edit made elsewhere.

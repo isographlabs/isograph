@@ -1,7 +1,7 @@
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 use span::{Span, WithSpan};
 
-use crate::{BracketItem, Bracketed, Closing, MatchedBrackets, TreeContents};
+use crate::{BracketItem, Bracketed, MatchedBrackets, TreeContents};
 
 #[derive(Debug)]
 pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
@@ -104,37 +104,3 @@ fn resolve_child<'a, TContents: TreeContents>(
     }
 }
 
-#[derive(Debug)]
-pub enum SectionValidity {
-    Valid,
-    Invalid,
-}
-
-impl<TContents: TreeContents> ResolvedBracketNode<'_, TContents> {
-    pub fn validity(&self) -> SectionValidity {
-        match self {
-            ResolvedBracketNode::StrayClose(_) => SectionValidity::Invalid,
-            ResolvedBracketNode::MatchedBrackets(_) => SectionValidity::Valid,
-            ResolvedBracketNode::Inner(path) => path.parent.validity(),
-            ResolvedBracketNode::Bracketed(path) => match path.inner.closing {
-                Closing::Real(_) => path.parent.validity(),
-                // Provisional: whether a group synthetically closed at the end of the
-                // tokens counts as invalid is the open question in
-                // bracket-matching-cases.md.
-                Closing::Synthetic(_) => SectionValidity::Invalid,
-            },
-        }
-    }
-}
-
-impl<TContents: TreeContents> BracketItemParent<'_, TContents> {
-    fn validity(&self) -> SectionValidity {
-        match self {
-            BracketItemParent::MatchedBrackets(_) => SectionValidity::Valid,
-            BracketItemParent::Bracketed(path) => match path.inner.closing {
-                Closing::Real(_) => path.parent.validity(),
-                Closing::Synthetic(_) => SectionValidity::Invalid,
-            },
-        }
-    }
-}

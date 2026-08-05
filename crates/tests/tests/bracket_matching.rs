@@ -1,42 +1,82 @@
 use std::convert::Infallible;
 
 use isograph_parser::{
-    BracketError, BracketItemParent, BracketKind, BracketsMatched, Closing, MatchedBrackets,
-    NonBracketTokenKind, ResolvedBracketNode, SectionValidity, TreeContents,
+    BracketError, BracketItemParent, BracketKind, Bracketed, BracketsMatched, Closing,
+    MatchedBrackets, NonBracketTokenKind, ResolvedBracketNode, TreeContents,
 };
 use span::{Span, WithSpan};
 use tests::{span_of, Fixture};
 
-#[test]
-fn unclosed_paren_is_an_invalid_section() {
-    let fixture = Fixture::load("unclosed_paren");
-    // The `(` that the `}` refuses to close; it is the fixture's only paren.
-    assert!(matches!(fixture.on("(").validity(), SectionValidity::Invalid));
+use BracketKind::{Brace, Bracket, Paren};
+use PathStep::{Balanced, Inner, StrayClose, Unbalanced};
+
+/// One node on the path from a resolved position up to the root, leaf first, root omitted.
+#[derive(Debug, PartialEq, Eq)]
+enum PathStep {
+    Inner,
+    StrayClose(BracketKind),
+    Balanced(BracketKind),
+    Unbalanced(BracketKind),
 }
 
-#[test]
-fn the_enclosing_brace_group_stays_valid() {
-    let fixture = Fixture::load("unclosed_paren");
-    // The run inside `first { ... }`, before the invalid paren section begins.
-    assert!(matches!(fixture.on("broken").validity(), SectionValidity::Valid));
-    // Inside `second { fine }`, after the broken section.
-    assert!(matches!(fixture.on("fine").validity(), SectionValidity::Valid));
-}
-
-#[test]
-fn the_unclosed_group_is_the_leaf_it_resolves_to() {
-    let fixture = Fixture::load("unclosed_paren");
-    match fixture.on("(") {
-        ResolvedBracketNode::Bracketed(path) => {
-            assert!(matches!(path.inner.closing, Closing::Synthetic(())));
+/// The path from the node a position resolves to up to the root, as comparable steps.
+fn path_of(node: ResolvedBracketNode<'_, BracketsMatched>) -> Vec<PathStep> {
+    let mut steps = Vec::new();
+    let mut parent = match node {
+        ResolvedBracketNode::MatchedBrackets(_) => return steps,
+        ResolvedBracketNode::Inner(path) => {
+            steps.push(Inner);
+            path.parent
         }
-        node => panic!("expected the unclosed paren group, got {node:?}"),
+        ResolvedBracketNode::StrayClose(path) => {
+            steps.push(StrayClose(*path.inner));
+            path.parent
+        }
+        ResolvedBracketNode::Bracketed(path) => {
+            steps.push(step_of(path.inner));
+            path.parent
+        }
+    };
+    loop {
+        parent = match parent {
+            BracketItemParent::MatchedBrackets(_) => return steps,
+            BracketItemParent::Bracketed(path) => {
+                steps.push(step_of(path.inner));
+                path.parent
+            }
+        };
+    }
+}
+
+fn step_of(group: &Bracketed<BracketsMatched>) -> PathStep {
+    match group.closing {
+        Closing::Real(_) => Balanced(group.opening.item),
+        Closing::Synthetic(()) => Unbalanced(group.opening.item),
     }
 }
 
 #[test]
+fn the_unclosed_paren_is_an_unbalanced_group_inside_the_balanced_brace() {
+    let fixture = Fixture::load("unclosed_paren.iso");
+    // The `(` that the `}` refuses to close; it is the fixture's only paren.
+    assert_eq!(
+        path_of(fixture.on("(")),
+        vec![Unbalanced(Paren), Balanced(Brace)]
+    );
+}
+
+#[test]
+fn the_enclosing_brace_groups_stay_balanced() {
+    let fixture = Fixture::load("unclosed_paren.iso");
+    // The run inside `first { ... }`, before the unbalanced paren section begins.
+    assert_eq!(path_of(fixture.on("broken")), vec![Inner, Balanced(Brace)]);
+    // Inside `second { fine }`, after the broken section.
+    assert_eq!(path_of(fixture.on("fine")), vec![Inner, Balanced(Brace)]);
+}
+
+#[test]
 fn the_unclosed_paren_is_the_only_error() {
-    let fixture = Fixture::load("unclosed_paren");
+    let fixture = Fixture::load("unclosed_paren.iso");
     let errors = fixture.tree.errors();
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
@@ -47,30 +87,38 @@ fn the_unclosed_paren_is_the_only_error() {
 }
 
 #[test]
-fn an_unbracketed_run_is_valid_and_error_free() {
-    let fixture = Fixture::load("text_outside");
-    assert!(matches!(fixture.on("Query"), ResolvedBracketNode::Inner(_)));
-    assert!(matches!(fixture.on("Query").validity(), SectionValidity::Valid));
+fn an_unbracketed_run_sits_at_the_top_level() {
+    let fixture = Fixture::load("text_outside.iso");
+    assert_eq!(path_of(fixture.on("Query")), vec![Inner]);
     assert_eq!(fixture.tree.errors(), vec![]);
 }
 
 #[test]
-fn balanced_input_is_valid_everywhere_and_error_free() {
-    let fixture = Fixture::load("balanced");
-    assert!(matches!(fixture.on("1").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on("id").validity(), SectionValidity::Valid));
+fn balanced_input_nests_as_typed() {
+    let fixture = Fixture::load("balanced.iso");
+    assert_eq!(
+        path_of(fixture.on("1")),
+        vec![Inner, Balanced(Bracket), Balanced(Paren), Balanced(Brace)]
+    );
+    assert_eq!(
+        path_of(fixture.on("id")),
+        vec![Inner, Balanced(Brace), Balanced(Brace)]
+    );
     assert_eq!(fixture.tree.errors(), vec![]);
 }
 
 #[test]
-fn a_wrong_kind_close_leaves_only_the_paren_invalid() {
-    let fixture = Fixture::load("wrong_kind_close");
-    assert!(matches!(fixture.on("(").validity(), SectionValidity::Invalid));
-    assert!(matches!(fixture.on("bar").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on("Query").validity(), SectionValidity::Valid));
+fn a_wrong_kind_close_leaves_only_the_paren_unbalanced() {
+    let fixture = Fixture::load("wrong_kind_close.iso");
+    assert_eq!(
+        path_of(fixture.on("(")),
+        vec![Unbalanced(Paren), Balanced(Brace)]
+    );
+    assert_eq!(path_of(fixture.on("bar")), vec![Inner, Balanced(Brace)]);
+    assert_eq!(path_of(fixture.on("Query")), vec![Inner]);
     // Whitespace after the `(` sits outside the childless paren group, so it resolves to
     // the enclosing brace group.
-    assert!(matches!(fixture.at(0, 22).validity(), SectionValidity::Valid));
+    assert_eq!(path_of(fixture.at(0, 22)), vec![Balanced(Brace)]);
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(unclosed)] => {
             assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "("));
@@ -83,10 +131,16 @@ fn a_wrong_kind_close_leaves_only_the_paren_invalid() {
 
 #[test]
 fn wrong_kind_opens_close_synthetically_and_nest() {
-    let fixture = Fixture::load("several_wrong_kind_opens");
-    assert!(matches!(fixture.on("{").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on("(").validity(), SectionValidity::Invalid));
-    assert!(matches!(fixture.on("[").validity(), SectionValidity::Invalid));
+    let fixture = Fixture::load("several_wrong_kind_opens.iso");
+    assert_eq!(path_of(fixture.on("{")), vec![Balanced(Brace)]);
+    assert_eq!(
+        path_of(fixture.on("(")),
+        vec![Unbalanced(Paren), Balanced(Brace)]
+    );
+    assert_eq!(
+        path_of(fixture.on("[")),
+        vec![Unbalanced(Bracket), Unbalanced(Paren), Balanced(Brace)]
+    );
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(paren), BracketError::Unclosed(square)] => {
             assert_eq!(paren.item.0.span, span_of(&fixture.text, "("));
@@ -102,30 +156,14 @@ fn wrong_kind_opens_close_synthetically_and_nest() {
 }
 
 #[test]
-fn a_stray_close_is_one_token_of_invalid() {
-    let fixture = Fixture::load("stray_close");
-    assert!(matches!(fixture.on("foo").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on(")").validity(), SectionValidity::Invalid));
-    assert!(matches!(fixture.on("bar").validity(), SectionValidity::Valid));
-    // The exact path at the `)`: a stray paren close, sitting inside the matched brace
-    // group, at the top level.
-    match fixture.on(")") {
-        ResolvedBracketNode::StrayClose(stray) => {
-            assert_eq!(*stray.inner, BracketKind::Paren);
-            match stray.parent {
-                BracketItemParent::Bracketed(brace_group) => {
-                    assert_eq!(brace_group.inner.opening.item, BracketKind::Brace);
-                    assert!(matches!(brace_group.inner.closing, Closing::Real(_)));
-                    assert!(matches!(
-                        brace_group.parent,
-                        BracketItemParent::MatchedBrackets(_)
-                    ));
-                }
-                parent => panic!("expected the brace group above the stray, got {parent:?}"),
-            }
-        }
-        node => panic!("expected the stray close, got {node:?}"),
-    }
+fn a_stray_close_is_one_token_inside_the_balanced_brace() {
+    let fixture = Fixture::load("stray_close.iso");
+    assert_eq!(path_of(fixture.on("foo")), vec![Inner, Balanced(Brace)]);
+    assert_eq!(
+        path_of(fixture.on(")")),
+        vec![StrayClose(Paren), Balanced(Brace)]
+    );
+    assert_eq!(path_of(fixture.on("bar")), vec![Inner, Balanced(Brace)]);
     match fixture.tree.errors().as_slice() {
         [BracketError::UnexpectedClose(stray)] => {
             assert_eq!(stray.span, span_of(&fixture.text, ")"));
@@ -137,10 +175,13 @@ fn a_stray_close_is_one_token_of_invalid() {
 
 #[test]
 fn a_stray_close_does_not_end_a_different_kind() {
-    let fixture = Fixture::load("stray_close_inside_paren");
+    let fixture = Fixture::load("stray_close_inside_paren.iso");
     // The paren pair still matches around the stray `}`.
-    assert!(matches!(fixture.on("(").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on("}").validity(), SectionValidity::Invalid));
+    assert_eq!(path_of(fixture.on("(")), vec![Balanced(Paren)]);
+    assert_eq!(
+        path_of(fixture.on("}")),
+        vec![StrayClose(Brace), Balanced(Paren)]
+    );
     match fixture.tree.errors().as_slice() {
         [BracketError::UnexpectedClose(stray)] => {
             assert_eq!(stray.span, span_of(&fixture.text, "}"));
@@ -152,21 +193,15 @@ fn a_stray_close_does_not_end_a_different_kind() {
 
 #[test]
 fn crossing_pairs_produce_two_errors_in_source_order() {
-    let fixture = Fixture::load("crossing_pairs");
-    assert!(matches!(fixture.on("(").validity(), SectionValidity::Valid));
-    assert!(matches!(fixture.on("{").validity(), SectionValidity::Invalid));
+    let fixture = Fixture::load("crossing_pairs.iso");
+    assert_eq!(path_of(fixture.on("(")), vec![Balanced(Paren)]);
+    assert_eq!(
+        path_of(fixture.on("{")),
+        vec![Unbalanced(Brace), Balanced(Paren)]
+    );
     // The trailing `}` is a stray brace close at the top level: its `{` was consumed inside
     // the paren group.
-    match fixture.on("}") {
-        ResolvedBracketNode::StrayClose(stray) => {
-            assert_eq!(*stray.inner, BracketKind::Brace);
-            assert!(matches!(
-                stray.parent,
-                BracketItemParent::MatchedBrackets(_)
-            ));
-        }
-        node => panic!("expected the stray close, got {node:?}"),
-    }
+    assert_eq!(path_of(fixture.on("}")), vec![StrayClose(Brace)]);
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(brace), BracketError::UnexpectedClose(stray)] => {
             assert_eq!(brace.item.0.span, span_of(&fixture.text, "{"));
@@ -178,31 +213,14 @@ fn crossing_pairs_produce_two_errors_in_source_order() {
 
 #[test]
 fn the_close_pairs_with_the_nearest_open() {
-    let fixture = Fixture::load("adjacent_same_kind");
-    assert!(matches!(fixture.on("a").validity(), SectionValidity::Valid));
-    // The exact path at `c`: its run sits inside b's balanced group, and b's group sits
-    // inside a's non-balanced group.
-    match fixture.on("c") {
-        ResolvedBracketNode::Inner(run) => match run.parent {
-            BracketItemParent::Bracketed(b_group) => {
-                assert_eq!(b_group.inner.opening.item, BracketKind::Brace);
-                assert!(matches!(b_group.inner.closing, Closing::Real(_)));
-                match b_group.parent {
-                    BracketItemParent::Bracketed(a_group) => {
-                        assert_eq!(a_group.inner.opening.item, BracketKind::Brace);
-                        assert!(matches!(a_group.inner.closing, Closing::Synthetic(())));
-                        assert!(matches!(
-                            a_group.parent,
-                            BracketItemParent::MatchedBrackets(_)
-                        ));
-                    }
-                    parent => panic!("expected a's group above b's, got {parent:?}"),
-                }
-            }
-            parent => panic!("expected b's group above the run, got {parent:?}"),
-        },
-        node => panic!("expected the run holding c, got {node:?}"),
-    }
+    let fixture = Fixture::load("adjacent_same_kind.iso");
+    assert_eq!(path_of(fixture.on("a")), vec![Inner]);
+    // `c` sits in a run inside b's balanced brace group, which sits inside a's unbalanced
+    // brace group.
+    assert_eq!(
+        path_of(fixture.on("c")),
+        vec![Inner, Balanced(Brace), Unbalanced(Brace)]
+    );
     match fixture.tree.errors().as_slice() {
         [BracketError::Unclosed(unclosed)] => {
             // The unclosed group is the outer one: it contains `b`, which b's own group
@@ -215,11 +233,11 @@ fn the_close_pairs_with_the_nearest_open() {
 
 #[test]
 fn brackets_inside_strings_are_not_structural() {
-    let fixture = Fixture::load("string_brackets");
-    assert!(matches!(
-        fixture.on("\"a}\"").validity(),
-        SectionValidity::Valid
-    ));
+    let fixture = Fixture::load("string_brackets.iso");
+    assert_eq!(
+        path_of(fixture.on("\"a}\"")),
+        vec![Inner, Balanced(Brace)]
+    );
     assert_eq!(fixture.tree.errors(), vec![]);
 }
 
@@ -244,18 +262,44 @@ fn refine(
 
 #[test]
 fn a_clean_tree_refines() {
-    let fixture = Fixture::load("balanced");
+    let fixture = Fixture::load("balanced.iso");
     assert!(refine(fixture.tree).is_ok());
 }
 
 #[test]
 fn refining_reports_the_unclosed_paren() {
-    let fixture = Fixture::load("unclosed_paren");
+    let fixture = Fixture::load("unclosed_paren.iso");
     let errors = refine(fixture.tree).expect_err("the fixture's paren never closes");
     match errors.as_slice() {
         [BracketError::Unclosed(unclosed)] => {
             assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "("));
         }
         errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
+    }
+}
+
+#[test]
+fn content_after_an_unclosed_open_sits_inside_the_unbalanced_group() {
+    let fixture = Fixture::load("unclosed_at_end.iso");
+    assert_eq!(path_of(fixture.on("b")), vec![Inner, Unbalanced(Brace)]);
+    match fixture.tree.errors().as_slice() {
+        [BracketError::Unclosed(unclosed)] => {
+            assert_eq!(unclosed.item.0.span, span_of(&fixture.text, "{"));
+        }
+        errors => panic!("expected exactly the unclosed brace, got {errors:?}"),
+    }
+}
+
+#[test]
+fn a_stray_close_at_the_top_level_is_a_leaf_of_the_root() {
+    let fixture = Fixture::load("stray_close_alone.iso");
+    assert_eq!(path_of(fixture.on("a")), vec![Inner]);
+    assert_eq!(path_of(fixture.on("}")), vec![StrayClose(Brace)]);
+    match fixture.tree.errors().as_slice() {
+        [BracketError::UnexpectedClose(stray)] => {
+            assert_eq!(stray.span, span_of(&fixture.text, "}"));
+            assert_eq!(stray.item, BracketKind::Brace);
+        }
+        errors => panic!("expected exactly the stray close, got {errors:?}"),
     }
 }
