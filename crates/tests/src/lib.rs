@@ -40,18 +40,18 @@ impl Fixture {
     }
 
     /// The path to the node containing `span`.
-    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_, BracketsMatched> {
+    pub fn resolve(&self, span: Span) -> ResolvedBracketNode<'_> {
         self.tree.resolve((), span)
     }
 
     /// `resolve` at the unique occurrence of `pattern` in the fixture's text.
-    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_, BracketsMatched> {
+    pub fn on(&self, pattern: &str) -> ResolvedBracketNode<'_> {
         self.resolve(span_of(&self.text, pattern))
     }
 
     /// The node at a 0-indexed line and character; the character indexes bytes in the
     /// line. For positions no distinctive text names.
-    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_, BracketsMatched> {
+    pub fn at(&self, line: u32, character: u32) -> ResolvedBracketNode<'_> {
         let offset = self.offset(line, character);
         self.resolve(Span::new(offset, offset + 1))
     }
