@@ -16,7 +16,15 @@ These rules are authoritative as written; old isograph is no longer the source o
 ## The rules
 
 - Line breaks and commas are the separators, and they are equivalent, at every level. One field per line, or fields delimited by commas. Any nonempty mix of consecutive separators is one boundary; separators at the start or end of a level produce no empty chunks; a blank line is a boundary, not two.
-- A separator only separates at its own level. A nested bracket group is a single opaque item at the level it appears in, so the commas and line breaks inside it never split the enclosing level; they separate that group's own chunks when the walk descends into it.
+- A separator only separates at its own level. A nested bracket group is a single opaque item at the level it appears in, so the commas and line breaks inside it never split the enclosing level; they separate that group's own chunks when the walk descends into it. So
+
+  ```
+  a(
+  ) {
+  }
+  ```
+
+  is one chunk: both line breaks sit inside groups, and the top level sees `a`, the paren group, and the brace group with no comma or line break anywhere between them. Multi-line argument formatting can never split a selection.
 - A chunk is a maximal separator-free sequence of a level's items. Run tokens split at separator tokens; a group glues onto whichever chunk is open where it appears, whatever its bracket kind. So `foo { ... }` is one chunk (name tokens plus the adjacent brace group), and the brace group's interior chunks independently by the same rules. A group appearing right after a boundary opens a chunk of its own.
 - Chunking is infallible. It validates nothing and emits no errors: every token that survived the bracket pass lands in some chunk. `baz watttt` is one chunk — a chunk that will produce an error when it is parsed, not two chunks and not a chunking error. Arguments, variable lists, and values are the same: a paren or square group just rides along in its chunk, and whether it belongs there is the chunk parser's question later. Boundaries come from separators and bracket structure only, never from token-shape heuristics.
 - Each chunk is parsed independently. Token-level garbage inside a chunk is that chunk's error and nothing else's. A bracket-level malformation keeps the containment the bracket pass already gave it: an unclosed `(` still forces its group shut where the bracket rules say, and material swallowed into it stays chunked inside it — chunking never widens or narrows that boundary.
