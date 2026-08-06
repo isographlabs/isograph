@@ -9,6 +9,8 @@ qux }
 
 is four chunks: `foo { ... }` at the top level, containing the three chunks `bar`, `baz`, and `qux`.
 
+The containment always goes through a level: `foo { bar }` is one chunk, which contains a selection set containing a single chunk. The chunk holds the run `foo` and the brace group; the group's interior is a selection set of its own, with `bar` as its one chunk.
+
 These rules are authoritative as written; old isograph is no longer the source of truth for them.
 
 ## The rules
