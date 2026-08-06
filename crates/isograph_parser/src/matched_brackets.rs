@@ -674,6 +674,18 @@ mod tests {
     }
 
     #[test]
+    fn an_empty_group_is_balanced_and_childless() {
+        let text = "a {}";
+        let tree = tree(text);
+        let OpenBracketParent::Bracketed(brace_group) =
+            open_bracket(resolved(&tree, text, "{")).parent;
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        assert!(brace_group.inner.children.is_empty());
+        assert_eq!(tree.errors(), vec![]);
+    }
+
+    #[test]
     fn brackets_inside_strings_are_not_structural() {
         let text = "{ name: \"a}\" }";
         let tree = tree(text);
