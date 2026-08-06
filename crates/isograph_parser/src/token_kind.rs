@@ -2,14 +2,16 @@ use std::fmt;
 
 use logos::{Lexer, Logos};
 
-// TODO support line breaks as separate tokens
-
 #[derive(Logos, Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum IsographLangTokenKind {
-    // TODO don't skip comments and whitespace, since we want to auto-format etc
-    #[regex(r"[ \t\r\n\f\ufeff]+", logos::skip)]
+    // TODO don't skip comments and spaces, since we want to auto-format etc
+    #[regex(r"[ \t\f\ufeff]+", logos::skip)]
     #[error]
     Error,
+
+    /// One line break: `\r\n`, `\n`, or `\r`. A blank line is two of these.
+    #[regex(r"\r\n|\n|\r")]
+    LineBreak,
 
     ErrorUnterminatedString,
     ErrorUnsupportedStringCharacter,
@@ -166,6 +168,7 @@ impl fmt::Display for IsographLangTokenKind {
             IsographLangTokenKind::Exclamation => "exclamation mark ('!')",
             // IsographLangTokenKind::FloatLiteral => "floating point value (e.g. '3.14')",
             IsographLangTokenKind::Identifier => "non-variable identifier (e.g. 'x' or 'Foo')",
+            IsographLangTokenKind::LineBreak => "line break",
             IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
             IsographLangTokenKind::OpenBrace => "open brace ('{')",
             IsographLangTokenKind::OpenBracket => "open bracket ('[')",
