@@ -63,23 +63,24 @@ pub enum BracketItem<TContents: TreeContents> {
 
 /// An open bracket, everything up to its close, and the close, which is always present, so
 /// every pass after this one works with guaranteed matching brackets. The wrapping
-/// `WithSpan`'s span runs from the start of the opening to the end of a real closing, or to
-/// the end of the last child when the closing is synthetic.
+/// `WithSpan`'s span runs from the start of the opening to the end of the closing's span.
 pub struct Bracketed<TContents: TreeContents> {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
-    pub closing: Closing<TContents>,
+    /// A real closing's span is its close token; a synthetic closing's span is zero-width
+    /// where the close should have been: after the last child, or right after the opening
+    /// when there is none.
+    pub closing: WithSpan<Closing<TContents>>,
     #[resolve_field]
     pub children: Vec<WithSpan<BracketItem<TContents>>>,
 }
 
 pub enum Closing<TContents: TreeContents> {
     /// The close bracket the author typed.
-    Real(Span),
+    Real,
     /// The group never got its close and was forced to end: at the close bracket an
-    /// enclosing group owns, or at the end of the tokens. Where it ended is the end of the
-    /// wrapping `WithSpan`'s span; the missing close has no span of its own. A group closed
-    /// this way is an invalid section.
+    /// enclosing group owns, or at the end of the tokens. A group closed this way is an
+    /// invalid section.
     Synthetic(TContents::Unclosed),
 }
 ```

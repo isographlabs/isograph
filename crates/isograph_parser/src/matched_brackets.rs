@@ -87,7 +87,9 @@ pub enum BracketItem<TContents: TreeContents> {
 pub struct Bracketed<TContents: TreeContents> {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
-    pub closing: Closing<TContents>,
+    /// A real closing's span is its close token; a synthetic closing's span is zero-width
+    /// where the close should have been.
+    pub closing: WithSpan<Closing<TContents>>,
     #[resolve_field]
     pub children: Vec<WithSpan<BracketItem<TContents>>>,
 }
@@ -95,11 +97,10 @@ pub struct Bracketed<TContents: TreeContents> {
 #[derive(Debug, PartialEq, Eq)]
 pub enum Closing<TContents: TreeContents> {
     /// The close bracket the author typed.
-    Real(Span),
+    Real,
     /// The group never got its close and was forced to end: at the close bracket an
-    /// enclosing group owns, or at the end of the tokens. Where it ended is the end of the
-    /// wrapping `WithSpan`'s span; the missing close has no span of its own. A group closed
-    /// this way is an invalid section.
+    /// enclosing group owns, or at the end of the tokens. A group closed this way is an
+    /// invalid section.
     Synthetic(TContents::Unclosed),
 }
 
@@ -181,7 +182,7 @@ fn collect_errors<TContents>(
                 )));
             }
             BracketItem::Bracketed(bracketed) => {
-                if matches!(bracketed.closing, Closing::Synthetic(())) {
+                if matches!(bracketed.closing.item, Closing::Synthetic(())) {
                     errors.push(BracketError::Unclosed(WithSpan::new(
                         UnclosedGroup(bracketed.opening),
                         item.location,
@@ -278,25 +279,26 @@ fn parse_bracketed(
     let children = parse_items(tokens, enclosing);
     enclosing.pop();
 
-    let (closing, end) = match tokens.peek() {
+    let closing = match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
                 == SplitToken::Bracket(BracketToken::Close(opening.item.0)) =>
         {
             tokens.next();
-            (Closing::Real(token.location), token.location.end)
+            WithSpan::new(Closing::Real, token.location)
         }
         // The group was forced to end: at a close an enclosing group owns, or at the end of
-        // the tokens. It ends where its last child does.
-        _ => (
-            Closing::Synthetic(()),
-            children
+        // the tokens. The synthetic closing's span is zero-width where the close should
+        // have been: after the last child, or right after the opening when there is none.
+        _ => {
+            let end = children
                 .last()
-                .map_or(opening.location.end, |last| last.location.end),
-        ),
+                .map_or(opening.location.end, |last| last.location.end);
+            WithSpan::new(Closing::Synthetic(()), Span::new(end, end))
+        }
     };
 
-    let span = Span::new(opening.location.start, end);
+    let span = Span::new(opening.location.start, closing.location.end);
     WithSpan::new(
         BracketItem::Bracketed(Bracketed {
             opening,
@@ -363,12 +365,17 @@ where
                 closing,
                 children,
             }) => {
-                let closing = match closing {
-                    Closing::Real(close) => Some(Closing::Real(close)),
+                let closing = match closing.item {
+                    Closing::Real => {
+                        Some(WithSpan::new(Closing::Real, closing.location))
+                    }
                     Closing::Synthetic(payload) => {
                         let group = WithSpan::new(UnclosedGroup(opening), span);
                         match map_unclosed(payload, group) {
-                            Ok(payload) => Some(Closing::Synthetic(payload)),
+                            Ok(payload) => Some(WithSpan::new(
+                                Closing::Synthetic(payload),
+                                closing.location,
+                            )),
                             Err(e) => {
                                 errors.push(e);
                                 None
