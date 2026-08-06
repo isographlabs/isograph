@@ -43,16 +43,6 @@ A tandem pass with the same rules would produce the same output, so the question
 
 The intermediate `MatchedBrackets` tree also has consumers of its own: it retains the separator tokens that the chunk tree discards, which anything wanting the lossless token sequence (the formatter, eventually comments and whitespace) reads.
 
-## Recovery
-
-By error class:
-
-- Token-level garbage (half-typed names, stray punctuation): the separators are the synchronization tokens, so the worst outcome is one lost chunk. This is structurally better than traditional panic-mode recovery, and strictly better than v1, which bails on the first error.
-- Bracket-level errors: identical to a tandem pass, because recovery behavior is a function of the rules, not the pass structure. The honest cost relative to a heuristic-rich parser is misattachment: in `foo {\n bar\nqux {\n baz\n}` the one `}` pairs with the nearest open, so `foo`'s group swallows the rest. The swallowed material is still chunked and parsed, just nested one level too deep; what breaks is anything depending on nesting depth, like which parent type a completion resolves against. If that ever matters, the fix (line-break- or indentation-informed placement of the synthetic close) lands entirely inside `match_brackets`, and chunking keeps consuming the same balanced tree.
-- Genuinely ambiguous inputs (a missing close, crossing pairs like `( { ) }`, a wrong-kind close that might be a typo): no algorithm resolves these, because the input underdetermines the intent; heuristics only change which token gets blamed. What the pass guarantees instead: the choice is deterministic (a close with an owner on the stack always wins), the diagnostic is explainable, and every mis-bet stays contained as dirty-but-parsed structure. Worked example: in `foo { bar(a: }) }` the first `}` force-closes the paren group synthetically and is consumed as the brace group's real close, leaving `)` and the final `}` as strays; the top level is one chunk (no separators) holding `foo`, the group, and the two strays, with three pointed diagnostics. Append `\nqux { id }` and `qux` is its own clean chunk, unaffected.
-
-Editors auto-close brackets, so live unbalanced states are dominated by the missing-close family, mid-edit, where the swallowed tail is usually exactly what the author is still typing.
-
 ## The formatter
 
 Formatter policy follows from the error classes, per literal (literals are independent; one broken literal must not stop formatting of its neighbors):
