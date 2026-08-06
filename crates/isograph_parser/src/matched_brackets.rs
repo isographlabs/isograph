@@ -399,3 +399,355 @@ where
     }
     mapped
 }
+
+#[cfg(test)]
+mod tests {
+    use std::convert::Infallible;
+
+    use resolve_position::ResolvePosition;
+
+    use super::*;
+    use crate::tokenize;
+    use BracketKind::{Brace, Bracket, Paren};
+
+    fn tree(literal: &str) -> MatchedBrackets<BracketsMatched> {
+        match_brackets(tokenize(literal))
+    }
+
+    /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
+    /// cannot silently shift, and one that fails loudly when it stops being unique.
+    fn span_of(text: &str, pattern: &str) -> Span {
+        let mut occurrences = text.match_indices(pattern);
+        let (offset, _) = occurrences
+            .next()
+            .expect("the pattern the test anchors on occurs in the literal");
+        assert!(
+            occurrences.next().is_none(),
+            "the pattern the test anchors on occurs exactly once in the literal"
+        );
+        Span::from_usize(offset, offset + pattern.len())
+    }
+
+    fn resolved<'a>(
+        tree: &'a MatchedBrackets<BracketsMatched>,
+        text: &str,
+        pattern: &str,
+    ) -> ResolvedBracketNode<'a> {
+        tree.resolve((), span_of(text, pattern))
+    }
+
+    fn run(node: ResolvedBracketNode<'_>) -> InnerPath<'_> {
+        match node {
+            ResolvedBracketNode::Inner(run) => run,
+            node => panic!("expected a run, got {node:?}"),
+        }
+    }
+
+    fn open_bracket(node: ResolvedBracketNode<'_>) -> OpenBracketPath<'_> {
+        match node {
+            ResolvedBracketNode::OpenBracket(open) => open,
+            node => panic!("expected an open bracket, got {node:?}"),
+        }
+    }
+
+    fn unmatched_close(node: ResolvedBracketNode<'_>) -> UnmatchedClosePath<'_> {
+        match node {
+            ResolvedBracketNode::UnmatchedClose(close) => close,
+            node => panic!("expected an unmatched close, got {node:?}"),
+        }
+    }
+
+    fn group_leaf(node: ResolvedBracketNode<'_>) -> BracketedPath<'_> {
+        match node {
+            ResolvedBracketNode::Bracketed(group) => group,
+            node => panic!("expected a group, got {node:?}"),
+        }
+    }
+
+    fn enclosing_group(parent: BracketItemParent<'_>) -> BracketedPath<'_> {
+        match parent {
+            BracketItemParent::Bracketed(group) => *group,
+            parent => panic!("expected an enclosing group, got {parent:?}"),
+        }
+    }
+
+    fn assert_root(parent: BracketItemParent<'_>) {
+        assert!(matches!(parent, BracketItemParent::MatchedBrackets(_)));
+    }
+
+    fn assert_balanced(group: &BracketedPath<'_>, kind: BracketKind) {
+        assert_eq!(group.inner.opening.item.0, kind);
+        assert!(matches!(group.inner.closing.item, Closing::Real));
+    }
+
+    fn assert_unbalanced(group: &BracketedPath<'_>, kind: BracketKind) {
+        assert_eq!(group.inner.opening.item.0, kind);
+        assert!(matches!(group.inner.closing.item, Closing::Synthetic(())));
+    }
+
+    #[test]
+    fn an_unbracketed_run_sits_at_the_top_level() {
+        let text = "field Query.Foo";
+        let tree = tree(text);
+        assert_root(run(resolved(&tree, text, "Query")).parent);
+        assert_eq!(tree.errors(), vec![]);
+    }
+
+    #[test]
+    fn balanced_input_nests_as_typed() {
+        let text = "field Query.Foo { bar(arg: [1, 2]) { id } }";
+        let tree = tree(text);
+        // `1` sits in the `[...]` inside the `(...)` inside the outer `{...}`.
+        let square_group = enclosing_group(run(resolved(&tree, text, "1")).parent);
+        assert_balanced(&square_group, Bracket);
+        let paren_group = enclosing_group(square_group.parent);
+        assert_balanced(&paren_group, Paren);
+        let brace_group = enclosing_group(paren_group.parent);
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        // `id` sits in the inner `{...}` inside the outer `{...}`.
+        let inner_brace_group = enclosing_group(run(resolved(&tree, text, "id")).parent);
+        assert_balanced(&inner_brace_group, Brace);
+        let outer_brace_group = enclosing_group(inner_brace_group.parent);
+        assert_balanced(&outer_brace_group, Brace);
+        assert_root(outer_brace_group.parent);
+        assert_eq!(tree.errors(), vec![]);
+    }
+
+    #[test]
+    fn a_wrong_kind_close_leaves_only_the_paren_unbalanced() {
+        let text = "field Query.Foo { bar( }";
+        let tree = tree(text);
+        let open = open_bracket(resolved(&tree, text, "("));
+        assert_eq!(open.inner.0, Paren);
+        let OpenBracketParent::Bracketed(paren_group) = open.parent;
+        assert_unbalanced(&paren_group, Paren);
+        let brace_group = enclosing_group(paren_group.parent);
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        assert_balanced(
+            &enclosing_group(run(resolved(&tree, text, "bar")).parent),
+            Brace,
+        );
+        assert_root(run(resolved(&tree, text, "Query")).parent);
+        // The whitespace between `(` and `}` (byte 22) sits outside the childless paren
+        // group, so it resolves to the enclosing brace group.
+        assert_balanced(&group_leaf(tree.resolve((), Span::new(22, 23))), Brace);
+        match tree.errors().as_slice() {
+            [BracketError::Unclosed(unclosed)] => {
+                assert_eq!(unclosed.item.0.location, span_of(text, "("));
+                // The childless group's span is its opening alone.
+                assert_eq!(unclosed.location, span_of(text, "("));
+            }
+            errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn wrong_kind_opens_close_synthetically_and_nest() {
+        let text = "{ ( [ }";
+        let tree = tree(text);
+        let OpenBracketParent::Bracketed(brace_group) =
+            open_bracket(resolved(&tree, text, "{")).parent;
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        let OpenBracketParent::Bracketed(square_group) =
+            open_bracket(resolved(&tree, text, "[")).parent;
+        assert_unbalanced(&square_group, Bracket);
+        let paren_group = enclosing_group(square_group.parent);
+        assert_unbalanced(&paren_group, Paren);
+        let outer_group = enclosing_group(paren_group.parent);
+        assert_balanced(&outer_group, Brace);
+        assert_root(outer_group.parent);
+        match tree.errors().as_slice() {
+            [BracketError::Unclosed(paren), BracketError::Unclosed(square)] => {
+                assert_eq!(paren.item.0.location, span_of(text, "("));
+                assert_eq!(square.item.0.location, span_of(text, "["));
+                // The paren group reaches its last child, the `[` group.
+                assert_eq!(
+                    paren.location,
+                    Span::join(span_of(text, "("), span_of(text, "[")),
+                );
+            }
+            errors => panic!("expected the paren then the bracket, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn a_stray_close_is_one_token_inside_the_balanced_brace() {
+        let text = "{ foo ) bar }";
+        let tree = tree(text);
+        assert_balanced(
+            &enclosing_group(run(resolved(&tree, text, "foo")).parent),
+            Brace,
+        );
+        let stray = unmatched_close(resolved(&tree, text, ")"));
+        assert_eq!(stray.inner.0, Paren);
+        let brace_group = enclosing_group(stray.parent);
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        assert_balanced(
+            &enclosing_group(run(resolved(&tree, text, "bar")).parent),
+            Brace,
+        );
+        match tree.errors().as_slice() {
+            [BracketError::UnexpectedClose(stray)] => {
+                assert_eq!(stray.location, span_of(text, ")"));
+                assert_eq!(stray.item.0, Paren);
+            }
+            errors => panic!("expected exactly the stray close, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn a_stray_close_does_not_end_a_different_kind() {
+        let text = "( } )";
+        let tree = tree(text);
+        // The paren pair still matches around the stray `}`.
+        let OpenBracketParent::Bracketed(paren_group) =
+            open_bracket(resolved(&tree, text, "(")).parent;
+        assert_balanced(&paren_group, Paren);
+        assert_root(paren_group.parent);
+        let stray = unmatched_close(resolved(&tree, text, "}"));
+        assert_eq!(stray.inner.0, Brace);
+        assert_balanced(&enclosing_group(stray.parent), Paren);
+        match tree.errors().as_slice() {
+            [BracketError::UnexpectedClose(stray)] => {
+                assert_eq!(stray.location, span_of(text, "}"));
+                assert_eq!(stray.item.0, Brace);
+            }
+            errors => panic!("expected exactly the stray close, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn crossing_pairs_produce_two_errors_in_source_order() {
+        let text = "( { ) }";
+        let tree = tree(text);
+        let OpenBracketParent::Bracketed(paren_group) =
+            open_bracket(resolved(&tree, text, "(")).parent;
+        assert_balanced(&paren_group, Paren);
+        assert_root(paren_group.parent);
+        let OpenBracketParent::Bracketed(brace_group) =
+            open_bracket(resolved(&tree, text, "{")).parent;
+        assert_unbalanced(&brace_group, Brace);
+        assert_balanced(&enclosing_group(brace_group.parent), Paren);
+        // The trailing `}` is a stray brace close at the top level: its `{` was consumed
+        // inside the paren group.
+        let stray = unmatched_close(resolved(&tree, text, "}"));
+        assert_eq!(stray.inner.0, Brace);
+        assert_root(stray.parent);
+        match tree.errors().as_slice() {
+            [BracketError::Unclosed(brace), BracketError::UnexpectedClose(stray)] => {
+                assert_eq!(brace.item.0.location, span_of(text, "{"));
+                assert_eq!(stray.location, span_of(text, "}"));
+            }
+            errors => panic!("expected the unclosed brace then the stray close, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn the_close_pairs_with_the_nearest_open() {
+        let text = "a {\n  b {\n    c\n}\n";
+        let tree = tree(text);
+        assert_root(run(resolved(&tree, text, "a")).parent);
+        // `c` sits in a run inside b's balanced brace group, which sits inside a's
+        // unbalanced brace group.
+        let b_group = enclosing_group(run(resolved(&tree, text, "c")).parent);
+        assert_balanced(&b_group, Brace);
+        let a_group = enclosing_group(b_group.parent);
+        assert_unbalanced(&a_group, Brace);
+        assert_root(a_group.parent);
+        // The one `}` is b's: until closings resolve (resolve-option-like-enums.md), a
+        // position on it answers b's group.
+        let close_group = group_leaf(resolved(&tree, text, "}"));
+        assert_balanced(&close_group, Brace);
+        assert_unbalanced(&enclosing_group(close_group.parent), Brace);
+        match tree.errors().as_slice() {
+            [BracketError::Unclosed(unclosed)] => {
+                // The unclosed group is the outer one: it contains `b`, which b's own
+                // group does not.
+                assert!(unclosed.location.contains(span_of(text, "b")));
+            }
+            errors => panic!("expected exactly the outer unclosed brace, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn brackets_inside_strings_are_not_structural() {
+        let text = "{ name: \"a}\" }";
+        let tree = tree(text);
+        let brace_group = enclosing_group(run(resolved(&tree, text, "\"a}\"")).parent);
+        assert_balanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        assert_eq!(tree.errors(), vec![]);
+    }
+
+    #[test]
+    fn content_after_an_unclosed_open_sits_inside_the_unbalanced_group() {
+        let text = "a {\n  b\n";
+        let tree = tree(text);
+        let brace_group = enclosing_group(run(resolved(&tree, text, "b")).parent);
+        assert_unbalanced(&brace_group, Brace);
+        assert_root(brace_group.parent);
+        match tree.errors().as_slice() {
+            [BracketError::Unclosed(unclosed)] => {
+                assert_eq!(unclosed.item.0.location, span_of(text, "{"));
+            }
+            errors => panic!("expected exactly the unclosed brace, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn a_stray_close_at_the_top_level_is_a_leaf_of_the_root() {
+        let text = "a }";
+        let tree = tree(text);
+        assert_root(run(resolved(&tree, text, "a")).parent);
+        let stray = unmatched_close(resolved(&tree, text, "}"));
+        assert_eq!(stray.inner.0, Brace);
+        assert_root(stray.parent);
+        match tree.errors().as_slice() {
+            [BracketError::UnexpectedClose(stray)] => {
+                assert_eq!(stray.location, span_of(text, "}"));
+                assert_eq!(stray.item.0, Brace);
+            }
+            errors => panic!("expected exactly the stray close, got {errors:?}"),
+        }
+    }
+
+    #[derive(Debug, PartialEq, Eq)]
+    struct BracketsMatchedNoErrors;
+
+    impl TreeContents for BracketsMatchedNoErrors {
+        type Inner = Inner;
+        type Stray = Infallible;
+        type Unclosed = Infallible;
+    }
+
+    fn refine(
+        tree: MatchedBrackets<BracketsMatched>,
+    ) -> Result<MatchedBrackets<BracketsMatchedNoErrors>, Vec<BracketError>> {
+        tree.try_map(
+            &mut |tokens| Ok(tokens.item),
+            &mut |stray| Err(BracketError::UnexpectedClose(stray)),
+            &mut |(), group| Err(BracketError::Unclosed(group)),
+        )
+    }
+
+    #[test]
+    fn a_clean_tree_refines() {
+        assert!(refine(tree("field Query.Foo { bar(arg: [1, 2]) { id } }")).is_ok());
+    }
+
+    #[test]
+    fn refining_reports_the_unclosed_paren() {
+        let text = "first {\n  broken (\n}\n";
+        let errors = refine(tree(text)).expect_err("the literal's paren never closes");
+        match errors.as_slice() {
+            [BracketError::Unclosed(unclosed)] => {
+                assert_eq!(unclosed.item.0.location, span_of(text, "("));
+            }
+            errors => panic!("expected exactly the unclosed paren, got {errors:?}"),
+        }
+    }
+}

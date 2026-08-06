@@ -2278,11 +2278,6 @@ dependencies = [
 [[package]]
 name = "tests"
 version = "0.5.3"
-dependencies = [
- "isograph_parser",
- "resolve_position",
- "span",
-]
 
 [[package]]
 name = "textwrap"
