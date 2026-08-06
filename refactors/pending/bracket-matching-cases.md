@@ -33,22 +33,31 @@ pub trait TreeContents {
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
-    type Inner = Vec<WithSpan<NonBracketTokenKind>>;
-    type Stray = BracketKind;
+    type Inner = Inner;
+    type Stray = UnmatchedClose;
     type Unclosed = ();
 }
 
+/// A maximal run of non-bracket tokens between brackets. Its span runs from its first
+/// token's start to its last token's end, whitespace between them included.
+pub struct Inner(pub Vec<WithSpan<NonBracketTokenKind>>);
+
+/// A group's opening bracket.
+pub struct OpenBracket(pub BracketKind);
+
+/// A close bracket no open of its kind was waiting for; it is an invalid section one token
+/// wide.
+pub struct UnmatchedClose(pub BracketKind);
+
 /// One isograph literal with its brackets matched. Spans live on the `WithSpan` wrapping
 /// each item.
-pub struct MatchedBrackets<TContents: TreeContents>(pub Vec<WithSpan<BracketItem<TContents>>>);
+pub struct MatchedBrackets<TContents: TreeContents>(
+    #[resolve_field] pub Vec<WithSpan<BracketItem<TContents>>>,
+);
 
 pub enum BracketItem<TContents: TreeContents> {
-    /// A maximal run containing no brackets. Its span runs from its first token's start to
-    /// its last token's end, whitespace between them included.
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
-    /// A close bracket no open of its kind was waiting for; it is an invalid section one
-    /// token wide.
     StrayClose(TContents::Stray),
 }
 
@@ -57,8 +66,10 @@ pub enum BracketItem<TContents: TreeContents> {
 /// `WithSpan`'s span runs from the start of the opening to the end of a real closing, or to
 /// the end of the last child when the closing is synthetic.
 pub struct Bracketed<TContents: TreeContents> {
-    pub opening: WithSpan<BracketKind>,
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
     pub closing: Closing<TContents>,
+    #[resolve_field]
     pub children: Vec<WithSpan<BracketItem<TContents>>>,
 }
 
@@ -73,25 +84,27 @@ pub enum Closing<TContents: TreeContents> {
 }
 ```
 
-A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`.
+A matched group and an unmatched one are one variant: unmatchedness is `Closing::Synthetic`, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `Closing::Synthetic` in them abbreviates `Closing::Synthetic(())`, and `StrayClose(Paren)` abbreviates `StrayClose(UnmatchedClose(Paren))`.
+
+Every resolve impl is derived: the tree types and the three role types (`Inner`, `OpenBracket`, `UnmatchedClose`) carry `#[derive(ResolvePosition)]`, with `#[resolve_field]` on the fields shown above, concretely over `BracketsMatched`. Resolving a position against the tree yields a `ResolvedBracketNode` path whose leaves are a run, an opening bracket, or an unmatched close; a position on a group's real close or on whitespace inside it resolves to the group, and one outside every item resolves to the root.
 
 The matcher's errors are derived from the tree, in source order:
 
 ```rust
 pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
-    UnexpectedClose(WithSpan<BracketKind>),
+    UnexpectedClose(WithSpan<UnmatchedClose>),
     /// A group whose close was synthesized.
     Unclosed(WithSpan<UnclosedGroup>),
 }
 
 /// The opening bracket of a group whose close was synthesized. The wrapping `WithSpan`'s span
 /// is the whole group; its end is where the close should have been.
-pub struct UnclosedGroup(pub WithSpan<BracketKind>);
+pub struct UnclosedGroup(pub WithSpan<OpenBracket>);
 
 impl<TContents> MatchedBrackets<TContents>
 where
-    TContents: TreeContents<Stray = BracketKind, Unclosed = ()>,
+    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
 {
     /// Empty iff every bracket matched.
     pub fn errors(&self) -> Vec<BracketError>;
