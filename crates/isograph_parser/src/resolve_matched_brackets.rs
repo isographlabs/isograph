@@ -83,7 +83,7 @@ impl<TContents: TreeContents> ResolvePosition for Bracketed<TContents> {
         parent: BracketItemParent<'a, TContents>,
         position: Span,
     ) -> ResolvedBracketNode<'a, TContents> {
-        if self.opening.span.contains(position) {
+        if self.opening.location.contains(position) {
             return ResolvedBracketNode::OpenBracket(PositionResolutionPath {
                 inner: &self.opening,
                 parent: Box::new(self.path(parent)),
@@ -112,7 +112,7 @@ fn containing_child<'a, TContents: TreeContents>(
     items: &'a [WithSpan<BracketItem<TContents>>],
     position: Span,
 ) -> Option<&'a WithSpan<BracketItem<TContents>>> {
-    items.iter().find(|item| item.span.contains(position))
+    items.iter().find(|item| item.location.contains(position))
 }
 
 /// Resolve into an item already known to contain the position.

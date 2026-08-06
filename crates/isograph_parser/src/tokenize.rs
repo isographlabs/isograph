@@ -34,8 +34,8 @@ mod tests {
                 IsographLangTokenKind::Identifier,
             ]
         );
-        assert_eq!(tokens[0].span, Span::new(0, 5));
-        assert_eq!(tokens[3].span, Span::new(12, 15));
+        assert_eq!(tokens[0].location, Span::new(0, 5));
+        assert_eq!(tokens[3].location, Span::new(12, 15));
     }
 
     #[test]

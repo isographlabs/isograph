@@ -106,13 +106,13 @@ fn collect_errors<TContents>(
         match &item.item {
             BracketItem::Inner(_) => {}
             BracketItem::StrayClose(kind) => {
-                errors.push(BracketError::UnexpectedClose(WithSpan::new(*kind, item.span)));
+                errors.push(BracketError::UnexpectedClose(WithSpan::new(*kind, item.location)));
             }
             BracketItem::Bracketed(bracketed) => {
                 if matches!(bracketed.closing, Closing::Synthetic(())) {
                     errors.push(BracketError::Unclosed(WithSpan::new(
                         UnclosedGroup(bracketed.opening),
-                        item.span,
+                        item.location,
                     )));
                 }
                 collect_errors(&bracketed.children, errors);
@@ -147,7 +147,7 @@ fn parse_items(
         match SplitToken::from(token.item) {
             SplitToken::NonBracket(kind) => {
                 tokens.next();
-                run.push(WithSpan::new(kind, token.span));
+                run.push(WithSpan::new(kind, token.location));
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 flush_run(&mut items, &mut run);
@@ -155,7 +155,7 @@ fn parse_items(
                 items.push(parse_bracketed(
                     tokens,
                     enclosing,
-                    WithSpan::new(kind, token.span),
+                    WithSpan::new(kind, token.location),
                 ));
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
@@ -166,7 +166,7 @@ fn parse_items(
                 }
                 flush_run(&mut items, &mut run);
                 tokens.next();
-                items.push(WithSpan::new(BracketItem::StrayClose(kind), token.span));
+                items.push(WithSpan::new(BracketItem::StrayClose(kind), token.location));
             }
         }
     }
@@ -181,7 +181,7 @@ fn flush_run(
     run: &mut Vec<WithSpan<NonBracketTokenKind>>,
 ) {
     let span = match (run.first(), run.last()) {
-        (Some(first), Some(last)) => Span::join(first.span, last.span),
+        (Some(first), Some(last)) => Span::join(first.location, last.location),
         _ => return,
     };
     items.push(WithSpan::new(BracketItem::Inner(std::mem::take(run)), span));
@@ -206,17 +206,17 @@ fn parse_bracketed(
                 == SplitToken::Bracket(BracketToken::Close(opening.item)) =>
         {
             tokens.next();
-            (Closing::Real(token.span), token.span.end)
+            (Closing::Real(token.location), token.location.end)
         }
         // The group was forced to end: at a close an enclosing group owns, or at the end of
         // the tokens. It ends where its last child does.
         _ => (
             Closing::Synthetic(()),
-            children.last().map_or(opening.span.end, |last| last.span.end),
+            children.last().map_or(opening.location.end, |last| last.location.end),
         ),
     };
 
-    let span = Span::new(opening.span.start, end);
+    let span = Span::new(opening.location.start, end);
     WithSpan::new(
         BracketItem::Bracketed(Bracketed {
             opening,
@@ -265,7 +265,10 @@ where
 {
     let mut mapped = Vec::new();
     for with_span in items {
-        let WithSpan { item, span } = with_span;
+        let WithSpan {
+            item,
+            location: span,
+        } = with_span;
         match item {
             BracketItem::Inner(inner) => match map_inner(WithSpan::new(inner, span)) {
                 Ok(inner) => mapped.push(WithSpan::new(BracketItem::Inner(inner), span)),

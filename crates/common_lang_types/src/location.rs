@@ -2,6 +2,7 @@ use intern::string_key::{Intern, Lookup};
 use prelude::Postfix;
 use std::path::PathBuf;
 
+pub use span::WithGenericLocation;
 use span::Span;
 
 use crate::{CurrentWorkingDirectory, RelativePathToSourceFile};
@@ -87,15 +88,6 @@ where
     }
 }
 
-impl<TItem> From<WithEmbeddedLocation<TItem>> for WithLocation<TItem> {
-    fn from(value: WithEmbeddedLocation<TItem>) -> Self {
-        WithGenericLocation {
-            item: value.item,
-            location: value.location.into(),
-        }
-    }
-}
-
 pub type WithOptionalLocation<TItem> = WithGenericLocation<TItem, Option<EmbeddedLocation>>;
 pub type WithEmbeddedLocation<TItem> = WithGenericLocation<TItem, EmbeddedLocation>;
 
@@ -116,74 +108,4 @@ pub fn relative_path_from_absolute_and_working_directory(
     .into()
 }
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, Hash)]
-pub struct WithGenericLocation<TItem, TLocation> {
-    pub item: TItem,
-    pub location: TLocation,
-}
-
-impl<T, TLocation> WithGenericLocation<T, TLocation> {
-    pub fn new(item: T, location: TLocation) -> Self {
-        WithGenericLocation { item, location }
-    }
-
-    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithGenericLocation<U, TLocation>
-    where
-        TLocation: Copy,
-    {
-        WithGenericLocation::new(map(self.item), self.location)
-    }
-
-    pub fn map_location<U>(self, map: impl FnOnce(TLocation) -> U) -> WithGenericLocation<T, U> {
-        WithGenericLocation::new(self.item, map(self.location))
-    }
-
-    pub fn and_then<U, E>(
-        self,
-        map: impl FnOnce(T) -> Result<U, E>,
-    ) -> Result<WithGenericLocation<U, TLocation>, E>
-    where
-        TLocation: Copy,
-    {
-        WithGenericLocation::new(map(self.item)?, self.location).wrap_ok()
-    }
-
-    pub fn as_ref(&self) -> WithGenericLocation<&T, TLocation>
-    where
-        TLocation: Copy,
-    {
-        WithGenericLocation {
-            location: self.location,
-            item: &self.item,
-        }
-    }
-
-    pub fn drop_location(self) -> WithNoLocation<T> {
-        self.map_location(|_| ())
-    }
-
-    pub fn item(self) -> T {
-        self.item
-    }
-}
-
-impl<TValue: PartialOrd, TLocation: PartialOrd> PartialOrd
-    for WithGenericLocation<TValue, TLocation>
-{
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        // Compare item first
-        match self.item.partial_cmp(&other.item) {
-            Some(core::cmp::Ordering::Equal) => {}
-            ord => return ord,
-        }
-        self.location.partial_cmp(&other.location)
-    }
-}
-
 pub type WithNoLocation<TItem> = WithGenericLocation<TItem, ()>;
-
-impl<TItem: std::fmt::Display> std::fmt::Display for WithNoLocation<TItem> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.item.fmt(f)
-    }
-}

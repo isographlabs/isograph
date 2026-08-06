@@ -1,4 +1,4 @@
-use span::Span;
+use span::{Span, WithGenericLocation};
 
 /// This module defines a trait [`ResolvePosition`], which is used to convert a
 /// mouse or keyboard cursor position (given by a [`Span`]) to a
@@ -59,7 +59,7 @@ use span::Span;
 /// The actual logic lives in the implementation of `ResolvePosition::resolve`
 /// for each AST node. The implementation must behave as follows:
 /// - It must check whether each subnode contains the position, most often by
-///   calling `field.span.contains(position)`. When the child node containing the
+///   calling `field.location.contains(position)`. When the child node containing the
 ///   position is discovered, it must return the result of calling `.resolve()`
 ///   on that child.
 /// - If no child contains the position, then the node must assume that it is
@@ -80,7 +80,7 @@ pub trait ResolvePosition: Sized {
         Self: 'a;
 
     /// Called when we are sure that the node contains the cursor. i.e. the parent must check
-    /// self.field.span.contains(position) before calling .resolve().
+    /// self.field.location.contains(position) before calling .resolve().
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a>;
 
     fn path<'a, TParent: From<Self::Parent<'a>>>(
@@ -91,6 +91,24 @@ pub trait ResolvePosition: Sized {
             inner: self,
             parent: parent.into(),
         }
+    }
+}
+
+/// A located wrapper resolves as its item. The parent already checked the span before
+/// delegating, per this trait's convention, so the wrapper adds nothing but the field
+/// access.
+impl<T: ResolvePosition, TLocation> ResolvePosition for WithGenericLocation<T, TLocation> {
+    type Parent<'a>
+        = T::Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+        = T::ResolvedNode<'a>
+    where
+        Self: 'a;
+
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a> {
+        self.item.resolve(parent, position)
     }
 }
 
@@ -146,7 +164,7 @@ mod test {
             position: Span,
         ) -> Self::ResolvedNode<'a> {
             for child in self.children.iter() {
-                if child.span.contains(position) {
+                if child.location.contains(position) {
                     let parent = <Child as ResolvePosition>::Parent::Parent(self.path(parent));
                     return child.item.resolve(parent, position);
                 }
@@ -167,7 +185,7 @@ mod test {
             position: Span,
         ) -> Self::ResolvedNode<'a> {
             for child in self.children.iter() {
-                if child.span.contains(position) {
+                if child.location.contains(position) {
                     let parent = <Child as ResolvePosition>::Parent::Child(self.path(parent));
                     return child.item.resolve(parent, position);
                 }

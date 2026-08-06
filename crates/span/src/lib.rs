@@ -1,7 +1,7 @@
 use std::{fmt, ops::Range};
 
 /// A range of byte offsets into source text. The parser stack uses these relative to one
-/// literal (see the location model in parser-lang-types.md).
+/// literal (see the location model in refactors/past/parser-lang-types.md).
 /// Invariant: end >= start.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
 pub struct Span {
@@ -74,30 +74,65 @@ impl Span {
     }
 }
 
+/// One item plus whatever locates it: a `Span` here, `common_lang_types`' location family
+/// in the kept chain, `()` for nothing.
 #[derive(Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash, Debug)]
-pub struct WithSpan<T> {
-    pub item: T,
-    pub span: Span,
+pub struct WithGenericLocation<TItem, TLocation> {
+    pub item: TItem,
+    pub location: TLocation,
 }
 
-impl<T> WithSpan<T> {
-    pub fn new(item: T, span: Span) -> Self {
-        WithSpan { item, span }
+/// An item located by a `Span`.
+pub type WithSpan<T> = WithGenericLocation<T, Span>;
+
+impl<T, TLocation> WithGenericLocation<T, TLocation> {
+    pub fn new(item: T, location: TLocation) -> Self {
+        WithGenericLocation { item, location }
     }
 
-    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithSpan<U> {
-        WithSpan::new(map(self.item), self.span)
+    pub fn map<U>(self, map: impl FnOnce(T) -> U) -> WithGenericLocation<U, TLocation>
+    where
+        TLocation: Copy,
+    {
+        WithGenericLocation::new(map(self.item), self.location)
     }
 
-    pub fn and_then<U, E>(self, map: impl FnOnce(T) -> Result<U, E>) -> Result<WithSpan<U>, E> {
-        Ok(WithSpan::new(map(self.item)?, self.span))
+    pub fn map_location<U>(self, map: impl FnOnce(TLocation) -> U) -> WithGenericLocation<T, U> {
+        WithGenericLocation::new(self.item, map(self.location))
     }
 
-    pub fn as_ref(&self) -> WithSpan<&T> {
-        WithSpan {
+    pub fn and_then<U, E>(
+        self,
+        map: impl FnOnce(T) -> Result<U, E>,
+    ) -> Result<WithGenericLocation<U, TLocation>, E>
+    where
+        TLocation: Copy,
+    {
+        Ok(WithGenericLocation::new(map(self.item)?, self.location))
+    }
+
+    pub fn as_ref(&self) -> WithGenericLocation<&T, TLocation>
+    where
+        TLocation: Copy,
+    {
+        WithGenericLocation {
+            location: self.location,
             item: &self.item,
-            span: self.span,
         }
+    }
+
+    pub fn drop_location(self) -> WithGenericLocation<T, ()> {
+        self.map_location(|_| ())
+    }
+
+    pub fn item(self) -> T {
+        self.item
+    }
+}
+
+impl<TItem: fmt::Display> fmt::Display for WithGenericLocation<TItem, ()> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.item.fmt(f)
     }
 }
 
