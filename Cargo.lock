@@ -950,6 +950,7 @@ version = "0.5.3"
 dependencies = [
  "logos",
  "resolve_position",
+ "resolve_position_macros",
  "span",
 ]
 
@@ -1486,6 +1487,17 @@ name = "resolve_position"
 version = "0.5.3"
 dependencies = [
  "span",
+]
+
+[[package]]
+name = "resolve_position_macros"
+version = "0.5.3"
+dependencies = [
+ "deluxe",
+ "prelude",
+ "proc-macro2",
+ "quote",
+ "syn 2.0.98",
 ]
 
 [[package]]
