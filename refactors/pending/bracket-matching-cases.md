@@ -30,6 +30,7 @@ pub trait TreeContents {
 
 /// The stage `match_brackets` produces: its runs hold lexed tokens, and the tree can carry
 /// both bracket errors.
+#[derive(Debug, PartialEq, Eq)]
 pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
@@ -39,20 +40,38 @@ impl TreeContents for BracketsMatched {
 
 /// A maximal run of non-bracket tokens between brackets. Its span runs from its first
 /// token's start to its last token's end, whitespace between them included.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Inner(pub Vec<WithSpan<NonBracketTokenKind>>);
 
 /// A group's opening bracket.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = OpenBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
 /// A close bracket token.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
 
 /// One isograph literal with its brackets matched. Spans live on the `WithSpan` wrapping
 /// each item.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = (),
+    resolved_node = ResolvedBracketNode<'a>,
+    self_type_generics = <BracketsMatched>
+)]
 pub struct MatchedBrackets<TContents: TreeContents>(
     #[resolve_field] pub Vec<WithSpan<BracketItem<TContents>>>,
 );
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = BracketItemParent<'a>,
+    resolved_node = ResolvedBracketNode<'a>,
+    self_type_generics = <BracketsMatched>
+)]
 pub enum BracketItem<TContents: TreeContents> {
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
@@ -62,6 +81,12 @@ pub enum BracketItem<TContents: TreeContents> {
 /// An open bracket, its children, and its close. The wrapping `WithSpan`'s span runs from
 /// the start of the opening to the end of a real closing, or to the end of the last child
 /// when the closing is `None`.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = BracketItemParent<'a>,
+    resolved_node = ResolvedBracketNode<'a>,
+    self_type_generics = <BracketsMatched>
+)]
 pub struct Bracketed<TContents: TreeContents> {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
@@ -83,6 +108,7 @@ The matcher's errors are derived from the tree, in source order:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
+#[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
     UnexpectedClose(WithSpan<CloseBracket>),
@@ -92,6 +118,7 @@ pub enum BracketError {
 
 /// The opening bracket of a group that never got its close. The wrapping `WithSpan`'s span
 /// is the whole group; its end is where the close should have been.
+#[derive(Debug, PartialEq, Eq)]
 pub struct UnclosedGroup(pub WithSpan<OpenBracket>);
 
 impl<TContents> MatchedBrackets<TContents>

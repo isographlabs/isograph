@@ -89,6 +89,12 @@ pub trait TreeContents {
     type SyntheticClose: fmt::Debug + PartialEq + Eq;
 }
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = BracketItemParent<'a>,
+    resolved_node = ResolvedBracketNode<'a>,
+    self_type_generics = <BracketsMatched>
+)]
 pub struct Bracketed<TContents: TreeContents> {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
@@ -99,6 +105,7 @@ pub struct Bracketed<TContents: TreeContents> {
     pub children: Vec<WithSpan<BracketItem<TContents>>>,
 }
 
+#[derive(Debug, PartialEq, Eq)]
 pub enum Closing<TContents: TreeContents> {
     Real,
     Synthetic(TContents::SyntheticClose),
@@ -114,6 +121,12 @@ pub trait TreeContents {
     type StrayClose: fmt::Debug + PartialEq + Eq;
 }
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = BracketItemParent<'a>,
+    resolved_node = ResolvedBracketNode<'a>,
+    self_type_generics = <BracketsMatched>
+)]
 pub struct Bracketed<TContents: TreeContents> {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
