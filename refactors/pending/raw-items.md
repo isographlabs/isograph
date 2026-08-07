@@ -61,7 +61,7 @@ pub fn match_brackets(tokens: Vec<WithSpan<IsographLangTokenKind>>) -> MatchedBr
 /// in which case the caller stores the opening as a raw item and the children as its
 /// siblings.
 enum ParsedGroup {
-    Closed(WithSpan<BracketItem>),
+    Closed(Bracketed),
     Unclosed(UnclosedGroup),
 }
 
@@ -89,7 +89,13 @@ fn parse_items(
                 tokens.next();
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing, opening) {
-                    ParsedGroup::Closed(group) => items.push(group),
+                    ParsedGroup::Closed(group) => {
+                        let span = Span::new(
+                            group.opening.location.start,
+                            group.closing.location.end,
+                        );
+                        items.push(WithSpan::new(BracketItem::Bracketed(group), span));
+                    }
                     ParsedGroup::Unclosed(UnclosedGroup { opening, children }) => {
                         items.push(WithSpan::new(
                             BracketItem::Raw(RawToken::Open(opening.item)),
@@ -135,15 +141,11 @@ fn parse_bracketed(
             tokens.next();
             let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
             let interior = Span::new(opening.location.end, closing.location.start);
-            let span = Span::new(opening.location.start, closing.location.end);
-            ParsedGroup::Closed(WithSpan::new(
-                BracketItem::Bracketed(Bracketed {
-                    opening,
-                    children: WithSpan::new(MatchedBrackets(children), interior),
-                    closing,
-                }),
-                span,
-            ))
+            ParsedGroup::Closed(Bracketed {
+                opening,
+                children: WithSpan::new(MatchedBrackets(children), interior),
+                closing,
+            })
         }
         _ => ParsedGroup::Unclosed(UnclosedGroup { opening, children }),
     }
