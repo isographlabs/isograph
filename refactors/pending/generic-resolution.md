@@ -1,12 +1,75 @@
 # Generic resolution
 
-`ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside, converting each leaf payload through `std::borrow::Borrow`, which is reflexive for free and lets the generic stray arm hand the concrete `&CloseBracket` to the one `CloseBracket` variant.
+`ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside. The close bracket's parent is its own enum, `CloseBracketParent`: a genuine closing and a stray close are different variants, and at a stage whose stray slot is `Infallible` the `Stray` variant's payload is uninhabited.
 
 Two changes: the macro emits generic impls with leaf modes, and the test extractors become derived.
 
-## The stray slot borrows to the close token
+## The close bracket's parent
 
-The `StrayClose` leaf arm holds `&TContents::StrayClose` and the `CloseBracket` variant's payload holds `&CloseBracket`; the bound that connects them at every stage is `Borrow<CloseBracket>` on the slot. std's blanket `Borrow<T> for T` covers every stage whose slot is `CloseBracket`, and a stage whose slot is `Infallible` writes the vacuous impl — legal under the orphan rule because `CloseBracket` is local, and its `match *self {}` asserts an invariant the type system itself expresses: no value of `Infallible` exists, and no tree at such a stage can hold a stray to resolve.
+A close bracket sits in one of two positions, and its parent enum says which:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// The two positions a close bracket can sit in. At a stage whose stray slot is
+/// `Infallible`, the `Stray` payload is uninhabited and every close is a `Closing`.
+#[derive(Debug)]
+pub enum CloseBracketParent<'a, TContents: TreeContents = BracketsMatched> {
+    /// The group whose closing this is.
+    Closing(Box<BracketedPath<'a, TContents>>),
+    /// A stray item: the slot value it came from, at the position it sits in.
+    Stray(StrayClosePath<'a, TContents>),
+}
+
+pub type StrayClosePath<'a, TContents = BracketsMatched> = PositionResolutionPath<
+    &'a <TContents as TreeContents>::StrayClose,
+    BracketItemParent<'a, TContents>,
+>;
+```
+
+`CloseBracketPath` reparents onto it.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+pub type CloseBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+pub type CloseBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a CloseBracket, CloseBracketParent<'a, TContents>>;
+```
+
+The two conversions the emissions construct through: a closing's parent converts from the group's path, and a stray's whole leaf path converts from the slot-typed path, borrowing the token out of the slot and keeping the slot path as the parent:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for CloseBracketParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        CloseBracketParent::Closing(Box::new(path))
+    }
+}
+
+impl<'a, TContents: TreeContents> From<StrayClosePath<'a, TContents>>
+    for CloseBracketPath<'a, TContents>
+{
+    fn from(path: StrayClosePath<'a, TContents>) -> Self {
+        let token = std::borrow::Borrow::borrow(path.inner);
+        CloseBracketPath {
+            inner: token,
+            parent: CloseBracketParent::Stray(path),
+        }
+    }
+}
+```
+
+The borrow is what connects the slot to the token at every stage, so the slot carries the bound.
 
 Before:
 
@@ -22,10 +85,28 @@ After:
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
     /// What a stray close carries: `CloseBracket` while bracket errors are representable,
-    /// `Infallible` once refined. Every carrier borrows to the token, so the stray leaf
-    /// answers the concrete `CloseBracket` variant at every stage.
+    /// `Infallible` once refined. Every carrier borrows to the token, so a stray answers
+    /// the concrete `CloseBracket` leaf at every stage.
     type StrayClose: fmt::Debug + PartialEq + Eq + std::borrow::Borrow<CloseBracket>;
 ```
+
+std's blanket `Borrow<T> for T` covers every stage whose slot is `CloseBracket`. A stage whose slot is `Infallible` writes the vacuous impl — legal under the orphan rule because `CloseBracket` is local — and its consumers, on stable, write the one vacuous arm the exhaustiveness checker still demands for the uninhabited variant:
+
+```rust
+// from a future refined stage
+impl std::borrow::Borrow<CloseBracket> for Infallible {
+    fn borrow(&self) -> &CloseBracket {
+        match *self {}
+    }
+}
+
+match close.parent {
+    CloseBracketParent::Closing(group) => ...,
+    CloseBracketParent::Stray(path) => match *path.inner {},
+}
+```
+
+The `Stray` arm disappears entirely if `never_patterns` lands on stable; until then it is the compiler-checked residue of the impossibility.
 
 ## Change 1: the macro emits generic impls with leaf modes
 
@@ -33,7 +114,7 @@ In `resolve_position_macros`, `resolve_position`, and the derive sites. One unit
 
 ### Attribute surface
 
-`self_type_generics` is deleted, and with it the `map_generics` module: the derive emits one impl over the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into. `#[resolve_field(leaf = VariantName)]` marks a field or enum variant whose payload is a leaf: the emission constructs the payload's path and wraps it in the named `ResolvedNode` variant, delegating nothing, and the payload type needs no `ResolvePosition` impl. Every leaf payload passes through `::std::borrow::Borrow::borrow`, with the target inferred from the variant's payload type: reflexive and free at concrete sites, and the conversion that lets a slot-typed payload answer a concrete variant.
+`self_type_generics` is deleted, and with it the `map_generics` module: the derive emits one impl over the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into. `#[resolve_field(leaf = VariantName)]` marks a field or enum variant whose payload is a leaf: the emission constructs a path and wraps it in the named `ResolvedNode` variant, delegating nothing, and the payload type needs no `ResolvePosition` impl. A leaf field's path holds the field's payload with the container's own path converted into the leaf's parent. A leaf variant's emission builds the payload's slot-typed path and converts the whole path into the variant's payload type — the reflexive `From` when the two are the same type (`Inner`), and a written conversion when they differ (`StrayClosePath` into `CloseBracketPath`).
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
@@ -303,7 +384,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
                 parent,
             };
             return Self::ResolvedNode::OpenBracket(::resolve_position::PositionResolutionPath {
-                inner: ::std::borrow::Borrow::borrow(&self.opening.item),
+                inner: &self.opening.item,
                 parent: own_path.into(),
             });
         }
@@ -326,7 +407,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
                 };
                 return Self::ResolvedNode::CloseBracket(
                     ::resolve_position::PositionResolutionPath {
-                        inner: ::std::borrow::Borrow::borrow(&item.item),
+                        inner: &item.item,
                         parent: own_path.into(),
                     },
                 );
@@ -363,17 +444,15 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for BracketIte
             // #[resolve_field(leaf = ...)]: the payload's path is the answer; the parent
             // passes through the reflexive From.
             BracketItem::Inner(inner) => {
-                Self::ResolvedNode::Inner(::resolve_position::PositionResolutionPath {
-                    inner: ::std::borrow::Borrow::borrow(inner),
-                    parent: parent.into(),
-                })
+                Self::ResolvedNode::Inner(
+                    ::resolve_position::PositionResolutionPath { inner, parent }.into(),
+                )
             }
             BracketItem::Bracketed(inner) => inner.resolve(parent, position),
             BracketItem::StrayClose(inner) => {
-                Self::ResolvedNode::CloseBracket(::resolve_position::PositionResolutionPath {
-                    inner: ::std::borrow::Borrow::borrow(inner),
-                    parent: parent.into(),
-                })
+                Self::ResolvedNode::CloseBracket(
+                    ::resolve_position::PositionResolutionPath { inner, parent }.into(),
+                )
             }
         }
     }
