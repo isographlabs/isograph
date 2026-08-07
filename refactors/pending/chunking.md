@@ -1,6 +1,6 @@
 # Chunking
 
-The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible: it validates nothing, emits no errors, and every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
+The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible. It validates nothing and emits no errors; every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
 
 A group is not part of any chunk. In `foo { bar }` the top level is a chunked run holding the chunk `foo`, followed by the brace group as its sibling item; that a selection is a chunk plus the group after it is an adjacency the chunk-parsing pass reads off the level when it assembles selections.
 
@@ -103,7 +103,7 @@ The stage and its run type:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-/// The stage `chunk` produces: the bracket tree's shape, with every run chunked.
+/// The stage `chunk` produces. The tree keeps the bracket tree's shape, with every run chunked.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chunked;
 
@@ -112,8 +112,8 @@ impl TreeContents for Chunked {
     type StrayClose = CloseBracket;
 }
 
-/// One run, chunked: chunks and separators alternating, built with no two adjacent
-/// separators (one boundary absorbs a run of them) and no empty chunks.
+/// One run, chunked into alternating chunks and separators, built with no two adjacent
+/// separators (one boundary absorbs consecutive separator tokens) and no empty chunks.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ChunkedRun(pub Vec<WithSpan<ChunkedRunItem>>);
 
@@ -123,13 +123,13 @@ pub enum ChunkedRunItem {
     Separator(Separator),
 }
 
-/// A maximal separator-free run of tokens: what the chunk-parsing pass consumes as one
+/// A maximal separator-free run of tokens; the chunk-parsing pass consumes it as one
 /// unit. The wrapping `WithSpan`'s span runs from the first token's start to the last
 /// token's end.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chunk(pub Vec<WithSpan<NonBracketTokenKind>>);
 
-/// One boundary between chunks: every comma and line-break token it absorbed, in order.
+/// One boundary between chunks, holding every comma and line-break token it absorbed, in order.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Separator(pub Vec<WithSpan<SeparatorToken>>);
 
@@ -145,8 +145,8 @@ The pass:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-/// Chunk every run of a matched-brackets tree. Infallible: every token lands in a chunk
-/// or a separator, and no grammar is checked.
+/// Chunk every run of a matched-brackets tree. The pass is infallible. Every token
+/// lands in a chunk or a separator, and no grammar is checked.
 pub fn chunk(tree: MatchedBrackets<BracketsMatched>) -> MatchedBrackets<Chunked> {
     tree.map(&mut |run| chunk_run(run.item), &mut |stray| stray.item)
 }
@@ -160,7 +160,8 @@ fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
     }
 }
 
-/// One run: split at separator tokens, absorbing each run of separators into one boundary.
+/// Split one token run at separator tokens; consecutive separator tokens collapse into
+/// one boundary.
 fn chunk_run(Inner(tokens): Inner) -> ChunkedRun {
     let mut items = Vec::new();
     let mut chunk: Vec<WithSpan<NonBracketTokenKind>> = Vec::new();
