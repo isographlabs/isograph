@@ -7,10 +7,10 @@ use span::{Span, WithSpan};
 
 use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKind, SplitToken};
 
-/// The types one matched-brackets tree holds: what a run between brackets is, and what the
-/// two bracket errors carry. A pipeline stage is an implementor, and a pass that changes any
-/// of these changes all of them at once, through `try_map` (refactors/past/error-refinement.md).
-/// The slots carry these bounds so the tree types' derives compile.
+/// The types one matched-brackets tree holds: what a run between brackets is, and what a
+/// stray close carries. A pipeline stage is an implementor, and a pass that changes any of
+/// these changes all of them at once, through `map`. The slots carry these bounds so the
+/// tree types' derives compile.
 pub trait TreeContents {
     /// What a run between brackets is: the `Inner` run of lexed tokens out of the matcher,
     /// parsed nodes later.
@@ -178,6 +178,55 @@ fn collect_errors<TContents>(
     }
 }
 
+impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
+    /// Cross the tree to another stage, mapping every slot. The shape is unchanged.
+    pub fn map<TTo: TreeContents>(
+        self,
+        map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
+        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
+    ) -> MatchedBrackets<TTo> {
+        MatchedBrackets(map_items(self.0, map_inner, map_stray_close))
+    }
+}
+
+fn map_items<TFrom, TTo>(
+    items: Vec<WithSpan<BracketItem<TFrom>>>,
+    map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
+    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
+) -> Vec<WithSpan<BracketItem<TTo>>>
+where
+    TFrom: TreeContents,
+    TTo: TreeContents,
+{
+    items
+        .into_iter()
+        .map(|with_span| {
+            let WithSpan {
+                item,
+                location: span,
+            } = with_span;
+            let item = match item {
+                BracketItem::Inner(inner) => {
+                    BracketItem::Inner(map_inner(WithSpan::new(inner, span)))
+                }
+                BracketItem::StrayClose(stray) => {
+                    BracketItem::StrayClose(map_stray_close(WithSpan::new(stray, span)))
+                }
+                BracketItem::Bracketed(Bracketed {
+                    opening,
+                    children,
+                    closing,
+                }) => BracketItem::Bracketed(Bracketed {
+                    opening,
+                    children: map_items(children, map_inner, map_stray_close),
+                    closing,
+                }),
+            };
+            WithSpan::new(item, span)
+        })
+        .collect()
+}
+
 type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
 pub fn match_brackets(
@@ -296,120 +345,8 @@ fn parse_bracketed(
     )
 }
 
-impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
-    /// Cross the tree to another stage, mapping every slot fallibly. The result is either
-    /// the whole crossed tree or every refusal, in source order.
-    pub fn try_map<TTo: TreeContents, TError>(
-        self,
-        map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> Result<TTo::Inner, TError>,
-        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> Result<TTo::StrayClose, TError>,
-    ) -> Result<MatchedBrackets<TTo>, Vec<TError>> {
-        let mut errors = Vec::new();
-        let items = try_map_items(self.0, &mut errors, map_inner, map_stray_close);
-        if errors.is_empty() {
-            Ok(MatchedBrackets(items))
-        } else {
-            Err(errors)
-        }
-    }
-
-    /// Cross the tree to another stage, mapping every slot. The shape is unchanged.
-    pub fn map<TTo: TreeContents>(
-        self,
-        map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
-        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
-    ) -> MatchedBrackets<TTo> {
-        MatchedBrackets(map_items(self.0, map_inner, map_stray_close))
-    }
-}
-
-fn map_items<TFrom, TTo>(
-    items: Vec<WithSpan<BracketItem<TFrom>>>,
-    map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
-    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
-) -> Vec<WithSpan<BracketItem<TTo>>>
-where
-    TFrom: TreeContents,
-    TTo: TreeContents,
-{
-    items
-        .into_iter()
-        .map(|with_span| {
-            let WithSpan {
-                item,
-                location: span,
-            } = with_span;
-            let item = match item {
-                BracketItem::Inner(inner) => {
-                    BracketItem::Inner(map_inner(WithSpan::new(inner, span)))
-                }
-                BracketItem::StrayClose(stray) => {
-                    BracketItem::StrayClose(map_stray_close(WithSpan::new(stray, span)))
-                }
-                BracketItem::Bracketed(Bracketed {
-                    opening,
-                    children,
-                    closing,
-                }) => BracketItem::Bracketed(Bracketed {
-                    opening,
-                    children: map_items(children, map_inner, map_stray_close),
-                    closing,
-                }),
-            };
-            WithSpan::new(item, span)
-        })
-        .collect()
-}
-
-fn try_map_items<TFrom, TTo, TError>(
-    items: Vec<WithSpan<BracketItem<TFrom>>>,
-    errors: &mut Vec<TError>,
-    map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> Result<TTo::Inner, TError>,
-    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> Result<TTo::StrayClose, TError>,
-) -> Vec<WithSpan<BracketItem<TTo>>>
-where
-    TFrom: TreeContents,
-    TTo: TreeContents,
-{
-    let mut mapped = Vec::new();
-    for with_span in items {
-        let WithSpan {
-            item,
-            location: span,
-        } = with_span;
-        match item {
-            BracketItem::Inner(inner) => match map_inner(WithSpan::new(inner, span)) {
-                Ok(inner) => mapped.push(WithSpan::new(BracketItem::Inner(inner), span)),
-                Err(e) => errors.push(e),
-            },
-            BracketItem::StrayClose(stray) => match map_stray_close(WithSpan::new(stray, span)) {
-                Ok(stray) => mapped.push(WithSpan::new(BracketItem::StrayClose(stray), span)),
-                Err(e) => errors.push(e),
-            },
-            BracketItem::Bracketed(Bracketed {
-                opening,
-                children,
-                closing,
-            }) => {
-                let children = try_map_items(children, errors, map_inner, map_stray_close);
-                mapped.push(WithSpan::new(
-                    BracketItem::Bracketed(Bracketed {
-                        opening,
-                        children,
-                        closing,
-                    }),
-                    span,
-                ));
-            }
-        }
-    }
-    mapped
-}
-
 #[cfg(test)]
 mod tests {
-    use std::convert::Infallible;
-
     use resolve_position::ResolvePosition;
 
     use super::*;
@@ -739,26 +676,5 @@ mod tests {
             }
             errors => panic!("expected exactly the stray close, got {errors:?}"),
         }
-    }
-
-    #[derive(Debug, PartialEq, Eq)]
-    struct BracketsMatchedNoErrors;
-
-    impl TreeContents for BracketsMatchedNoErrors {
-        type Inner = Inner;
-        type StrayClose = Infallible;
-    }
-
-    fn refine(
-        tree: MatchedBrackets<BracketsMatched>,
-    ) -> Result<MatchedBrackets<BracketsMatchedNoErrors>, Vec<BracketError>> {
-        tree.try_map(&mut |tokens| Ok(tokens.item), &mut |stray| {
-            Err(BracketError::UnexpectedClose(stray))
-        })
-    }
-
-    #[test]
-    fn a_clean_tree_refines() {
-        assert!(refine(tree("field Query.Foo { bar(arg: [1, 2]) { id } }")).is_ok());
     }
 }
