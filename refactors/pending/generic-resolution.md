@@ -126,7 +126,186 @@ struct ResolvePositionArgs {
 }
 ```
 
-`ResolvePosition::path` in the `resolve_position` crate is deleted — construction is literal — and that crate's test module rewrites its hand impls in the literal style.
+### `path()` is deleted
+
+The trait's one helper builds a node's own path, converting the parent on the way in. The new emissions build the struct literal and convert the completed path instead, so nothing calls it, and its only remaining users would be `resolve_position`'s own test module.
+
+Before:
+
+```rust
+// from crates/resolve_position/src/lib.rs
+pub trait ResolvePosition: Sized {
+    type Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+    where
+        Self: 'a;
+
+    /// Called when we are sure that the node contains the cursor. i.e. the parent must check
+    /// self.field.location.contains(position) before calling .resolve().
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a>;
+
+    fn path<'a, TParent: From<Self::Parent<'a>>>(
+        &'a self,
+        parent: Self::Parent<'a>,
+    ) -> PositionResolutionPath<&'a Self, TParent> {
+        PositionResolutionPath {
+            inner: self,
+            parent: parent.into(),
+        }
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/resolve_position/src/lib.rs
+pub trait ResolvePosition: Sized {
+    type Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+    where
+        Self: 'a;
+
+    /// Called when we are sure that the node contains the cursor. i.e. the parent must check
+    /// self.field.location.contains(position) before calling .resolve().
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a>;
+}
+```
+
+The test module's two hand impls document the convention, so they rewrite to the exact shape the derive now emits.
+
+Before:
+
+```rust
+// from crates/resolve_position/src/lib.rs
+    impl ResolvePosition for Parent {
+        type Parent<'a> = ();
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            parent: Self::Parent<'a>,
+            position: Span,
+        ) -> Self::ResolvedNode<'a> {
+            for child in self.children.iter() {
+                if child.location.contains(position) {
+                    let parent = <Child as ResolvePosition>::Parent::Parent(self.path(parent));
+                    return child.item.resolve(parent, position);
+                }
+            }
+
+            Self::ResolvedNode::Parent(self.path(parent))
+        }
+    }
+
+    impl ResolvePosition for Child {
+        type Parent<'a> = ChildParent<'a>;
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            mut parent: Self::Parent<'a>,
+            position: Span,
+        ) -> Self::ResolvedNode<'a> {
+            for child in self.children.iter() {
+                if child.location.contains(position) {
+                    let parent = <Child as ResolvePosition>::Parent::Child(self.path(parent));
+                    return child.item.resolve(parent, position);
+                }
+            }
+
+            Self::ResolvedNode::Child(self.path(parent))
+        }
+    }
+```
+
+After:
+
+```rust
+// from crates/resolve_position/src/lib.rs
+    impl ResolvePosition for Parent {
+        type Parent<'a> = ();
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            parent: Self::Parent<'a>,
+            position: Span,
+        ) -> Self::ResolvedNode<'a> {
+            for child in self.children.iter() {
+                if child.location.contains(position) {
+                    let parent = ChildParent::Parent(PositionResolutionPath {
+                        inner: self,
+                        parent,
+                    });
+                    return child.item.resolve(parent, position);
+                }
+            }
+
+            Self::ResolvedNode::Parent(PositionResolutionPath {
+                inner: self,
+                parent,
+            })
+        }
+    }
+
+    impl ResolvePosition for Child {
+        type Parent<'a> = ChildParent<'a>;
+
+        type ResolvedNode<'a> = TestResolvedNode<'a>;
+
+        fn resolve<'a>(
+            &'a self,
+            parent: Self::Parent<'a>,
+            position: Span,
+        ) -> Self::ResolvedNode<'a> {
+            for child in self.children.iter() {
+                if child.location.contains(position) {
+                    let parent = ChildParent::Child(PositionResolutionPath {
+                        inner: self,
+                        parent: Box::new(parent),
+                    });
+                    return child.item.resolve(parent, position);
+                }
+            }
+
+            Self::ResolvedNode::Child(PositionResolutionPath {
+                inner: self,
+                parent: Box::new(parent),
+            })
+        }
+    }
+```
+
+### Two defects this change's first implementation attempt surfaced
+
+Both are recorded here so the doc, not the implementer, decides.
+
+The first is mechanical and now fixed in this doc: the generic `MatchedBrackets` impl delegates through `own_path.into()` like every other container, so `BracketItemParent` needs a `From` for the root path too, alongside the group conversion Change 1 landed:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+impl<'a, TContents: TreeContents> From<MatchedBracketsPath<'a, TContents>>
+    for BracketItemParent<'a, TContents>
+{
+    fn from(path: MatchedBracketsPath<'a, TContents>) -> Self {
+        BracketItemParent::MatchedBrackets(path)
+    }
+}
+```
+
+The second is open and blocks Change 2: the `StrayClose` leaf arm builds a path whose inner is `&TContents::StrayClose`, but the `CloseBracket` variant's payload is `CloseBracketPath`, whose inner is the concrete `&CloseBracket`. Generic code cannot equate them — rustc demands `TContents: TreeContents<StrayClose = CloseBracket>` somewhere. The options:
+
+- Bound the tree types: `BracketItem<TContents: TreeContents<StrayClose = CloseBracket>>`. Compiles today, and forecloses the refined stage whose stray slot is `Infallible` — the slot would be pinned forever.
+- Split the leaf: the enum gains a sixth variant `StrayClose(StrayClosePath<'a, TContents>)`, the stray arm targets it, and the closing field keeps `CloseBracket`. Restores the stray-versus-closing distinction in the leaf enum that the close-bracket work deliberately collapsed.
+- Unify the slot: `TreeContents::StrayClose` becomes the type of every close token, and `Bracketed.closing` becomes `Option<WithSpan<TContents::StrayClose>>`. Both leaf sites then build the same slot-typed path, the `CloseBracket` variant's payload becomes that path, and the collapse survives generically; a refined stage's slot change flows through closings and strays together, which matches their shared meaning.
 
 ### Derive sites
 
