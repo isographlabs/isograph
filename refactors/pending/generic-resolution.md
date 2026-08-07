@@ -2,113 +2,17 @@
 
 `ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). `TreeContents` is unchanged. Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside.
 
-Three changes: the path family gains the stage parameter (ships alone, behavior unchanged), the macro emits generic impls with leaf modes, and the test extractors become derived.
+Two changes: the macro emits generic impls with leaf modes, and the test extractors become derived. One decision is open below; the doc is implementable once it is made.
 
-## Change 1 (prefactor): the path family gains the stage parameter
+## Open decision: the stray slot's type
 
-In `matched_brackets.rs`. Every parent enum, path alias, and the resolved enum gain `TContents`, defaulting to `BracketsMatched` where existing code names them with one lifetime; the derives stay pinned in this change and keep compiling because the defaults keep the names they emit meaningful.
+The `StrayClose` leaf arm builds a path whose inner is `&TContents::StrayClose`; the `CloseBracket` variant's payload is `CloseBracketPath`, whose inner is the concrete `&CloseBracket`. Generic code cannot equate them, so one of the following holds:
 
-Before:
+- The tree types bound the slot: `BracketItem<TContents: TreeContents<StrayClose = CloseBracket>>`. The refined stage whose stray slot is `Infallible` becomes unrepresentable, permanently.
+- The enum splits the leaf: a sixth variant `StrayClose(StrayClosePath<'a, TContents>)`, targeted by the stray arm, with the closing field keeping `CloseBracket`. The stray-versus-closing distinction returns to the leaf enum.
+- The slot unifies: `TreeContents::StrayClose` is the type of every close token, `Bracketed.closing` is `Option<WithSpan<TContents::StrayClose>>`, and the `CloseBracket` variant's payload is the slot-typed path. Both leaf sites build the same path type, the collapse holds generically, and a stage that changes the slot changes closings and strays together.
 
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Debug)]
-pub enum ResolvedBracketNode<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    Bracketed(BracketedPath<'a>),
-    Inner(InnerPath<'a>),
-    OpenBracket(OpenBracketPath<'a>),
-    CloseBracket(CloseBracketPath<'a>),
-}
-
-pub type MatchedBracketsPath<'a> = PositionResolutionPath<&'a MatchedBrackets<BracketsMatched>, ()>;
-
-/// Everything a `BracketItem` can sit inside.
-#[derive(Debug)]
-pub enum BracketItemParent<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    Bracketed(Box<BracketedPath<'a>>),
-}
-
-pub type BracketedPath<'a> =
-    PositionResolutionPath<&'a Bracketed<BracketsMatched>, BracketItemParent<'a>>;
-pub type InnerPath<'a> = PositionResolutionPath<&'a Inner, BracketItemParent<'a>>;
-
-/// The one place an opening bracket can sit: its group.
-#[derive(Debug)]
-pub enum OpenBracketParent<'a> {
-    Bracketed(Box<BracketedPath<'a>>),
-}
-
-pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
-pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-/// Every node a position can resolve to, at any stage. `Inner` is the tree-level answer
-/// for a position in a run; a stage whose run type has interior structure answers the
-/// finer question with a second resolve on the run, parented by the `InnerPath`.
-#[derive(Debug)]
-pub enum ResolvedBracketNode<'a, TContents: TreeContents = BracketsMatched> {
-    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
-    Bracketed(BracketedPath<'a, TContents>),
-    Inner(InnerPath<'a, TContents>),
-    OpenBracket(OpenBracketPath<'a, TContents>),
-    CloseBracket(CloseBracketPath<'a, TContents>),
-}
-
-pub type MatchedBracketsPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a MatchedBrackets<TContents>, ()>;
-
-/// Everything a `BracketItem` can sit inside.
-#[derive(Debug)]
-pub enum BracketItemParent<'a, TContents: TreeContents = BracketsMatched> {
-    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
-    Bracketed(Box<BracketedPath<'a, TContents>>),
-}
-
-/// The conversion the leaf emissions build parents through.
-impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
-    for BracketItemParent<'a, TContents>
-{
-    fn from(path: BracketedPath<'a, TContents>) -> Self {
-        BracketItemParent::Bracketed(Box::new(path))
-    }
-}
-
-pub type BracketedPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
-pub type InnerPath<'a, TContents = BracketsMatched> = PositionResolutionPath<
-    &'a <TContents as TreeContents>::Inner,
-    BracketItemParent<'a, TContents>,
->;
-
-/// The one place an opening bracket can sit: its group.
-#[derive(Debug)]
-pub enum OpenBracketParent<'a, TContents: TreeContents = BracketsMatched> {
-    Bracketed(Box<BracketedPath<'a, TContents>>),
-}
-
-impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
-    for OpenBracketParent<'a, TContents>
-{
-    fn from(path: BracketedPath<'a, TContents>) -> Self {
-        OpenBracketParent::Bracketed(Box::new(path))
-    }
-}
-
-pub type OpenBracketPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a, TContents>>;
-pub type CloseBracketPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
-```
-
-`InnerPath<'a>` now means `InnerPath<'a, BracketsMatched>`, whose inner is `&Inner` as before, and the enums carry the same default, so the tests' helper signatures, the pinned derives' attribute sites, and every assertion are untouched. `TContents::StrayClose` at every stage is `CloseBracket` or a future refined type; the stray's path is `CloseBracketPath` today, and a stage that changes the slot writes its own alias then.
-
-## Change 2: the macro emits generic impls with leaf modes
+## Change 1: the macro emits generic impls with leaf modes
 
 In `resolve_position_macros`, `resolve_position`, and the derive sites. One unit.
 
@@ -284,11 +188,9 @@ After:
     }
 ```
 
-### Two defects this change's first implementation attempt surfaced
+### matched_brackets.rs conversions
 
-Both are recorded here so the doc, not the implementer, decides.
-
-The first is mechanical and now fixed in this doc: the generic `MatchedBrackets` impl delegates through `own_path.into()` like every other container, so `BracketItemParent` needs a `From` for the root path too, alongside the group conversion Change 1 landed:
+The generic `MatchedBrackets` impl delegates through `own_path.into()` like every other container, so `BracketItemParent` carries the root conversion beside the group one:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -300,12 +202,6 @@ impl<'a, TContents: TreeContents> From<MatchedBracketsPath<'a, TContents>>
     }
 }
 ```
-
-The second is open and blocks Change 2: the `StrayClose` leaf arm builds a path whose inner is `&TContents::StrayClose`, but the `CloseBracket` variant's payload is `CloseBracketPath`, whose inner is the concrete `&CloseBracket`. Generic code cannot equate them — rustc demands `TContents: TreeContents<StrayClose = CloseBracket>` somewhere. The options:
-
-- Bound the tree types: `BracketItem<TContents: TreeContents<StrayClose = CloseBracket>>`. Compiles today, and forecloses the refined stage whose stray slot is `Infallible` — the slot would be pinned forever.
-- Split the leaf: the enum gains a sixth variant `StrayClose(StrayClosePath<'a, TContents>)`, the stray arm targets it, and the closing field keeps `CloseBracket`. Restores the stray-versus-closing distinction in the leaf enum that the close-bracket work deliberately collapsed.
-- Unify the slot: `TreeContents::StrayClose` becomes the type of every close token, and `Bracketed.closing` becomes `Option<WithSpan<TContents::StrayClose>>`. Both leaf sites then build the same slot-typed path, the `CloseBracket` variant's payload becomes that path, and the collapse survives generically; a refined stage's slot change flows through closings and strays together, which matches their shared meaning.
 
 ### Derive sites
 
@@ -477,13 +373,13 @@ The stray arm's `inner` is `&TContents::StrayClose` and the variant's payload wa
 
 The bracket suite keeps every assertion: at `BracketsMatched` the answers are unchanged. One addition: a `#[cfg(test)]` second `TreeContents` implementor whose `Inner` is a newtype run, with one test resolving into `ResolvedBracketNode::Inner` at that stage — proving the walk is generic in fact.
 
-## Change 3: derived test extractors
+## Change 2: derived test extractors
 
 `ResolvedBracketNode` gains `#[cfg_attr(test, derive(derive_more::Unwrap))]`, with `derive_more = { version = "2", features = ["unwrap"] }` as a dev-dependency (mercury in freddie is the precedent). The tests' bespoke extractors (`run`, `open_bracket`, `close_bracket`, `group_leaf`) are deleted in favor of the derived `unwrap_inner()`, `unwrap_open_bracket()`, `unwrap_close_bracket()`, `unwrap_bracketed()`; under `cfg_attr(test, ...)` the panicking methods exist only in test builds, so no production surface grows.
 
 ## Landing checklist
 
-1. Change 1; `cargo test` green with no test edits.
-2. Change 2; `cargo test` green with no assertion edits.
-3. Change 3; the bespoke extractors deleted.
+1. The open decision above is made and folded into the snippets it touches.
+2. Change 1; `cargo test` green with no assertion edits.
+3. Change 2; the bespoke extractors deleted.
 4. chunking.md's resolution section is implementable on top; move this doc to refactors/past.
