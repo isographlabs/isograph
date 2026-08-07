@@ -312,6 +312,53 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
             Err(errors)
         }
     }
+
+    /// Cross the tree to another stage, mapping every slot. The shape is unchanged.
+    pub fn map<TTo: TreeContents>(
+        self,
+        map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
+        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
+    ) -> MatchedBrackets<TTo> {
+        MatchedBrackets(map_items(self.0, map_inner, map_stray_close))
+    }
+}
+
+fn map_items<TFrom, TTo>(
+    items: Vec<WithSpan<BracketItem<TFrom>>>,
+    map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
+    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
+) -> Vec<WithSpan<BracketItem<TTo>>>
+where
+    TFrom: TreeContents,
+    TTo: TreeContents,
+{
+    items
+        .into_iter()
+        .map(|with_span| {
+            let WithSpan {
+                item,
+                location: span,
+            } = with_span;
+            let item = match item {
+                BracketItem::Inner(inner) => {
+                    BracketItem::Inner(map_inner(WithSpan::new(inner, span)))
+                }
+                BracketItem::StrayClose(stray) => {
+                    BracketItem::StrayClose(map_stray_close(WithSpan::new(stray, span)))
+                }
+                BracketItem::Bracketed(Bracketed {
+                    opening,
+                    children,
+                    closing,
+                }) => BracketItem::Bracketed(Bracketed {
+                    opening,
+                    children: map_items(children, map_inner, map_stray_close),
+                    closing,
+                }),
+            };
+            WithSpan::new(item, span)
+        })
+        .collect()
 }
 
 fn try_map_items<TFrom, TTo, TError>(
