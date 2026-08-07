@@ -33,7 +33,7 @@ pub enum NonBracketTokenKind {
 /// bracket `[]`.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 pub enum BracketKind {
-    Paren,
+    Parenthesis,
     Brace,
     Bracket,
 }
@@ -57,11 +57,11 @@ pub enum SplitToken {
 impl From<IsographLangTokenKind> for SplitToken {
     fn from(kind: IsographLangTokenKind) -> Self {
         match kind {
-            IsographLangTokenKind::OpenParen => {
-                SplitToken::Bracket(BracketToken::Open(BracketKind::Paren))
+            IsographLangTokenKind::OpenParenthesis => {
+                SplitToken::Bracket(BracketToken::Open(BracketKind::Parenthesis))
             }
-            IsographLangTokenKind::CloseParen => {
-                SplitToken::Bracket(BracketToken::Close(BracketKind::Paren))
+            IsographLangTokenKind::CloseParenthesis => {
+                SplitToken::Bracket(BracketToken::Close(BracketKind::Parenthesis))
             }
             IsographLangTokenKind::OpenBrace => {
                 SplitToken::Bracket(BracketToken::Open(BracketKind::Brace))
@@ -172,19 +172,19 @@ impl fmt::Display for NonBracketTokenKind {
 
 #[cfg(test)]
 mod tests {
-    use super::{BracketKind, BracketToken, NonBracketTokenKind, SplitToken};
+    use super::{BracketKind, BracketToken, SplitToken};
     use crate::IsographLangTokenKind;
 
     #[test]
     fn the_six_brackets_split_as_brackets() {
         for (kind, expected) in [
             (
-                IsographLangTokenKind::OpenParen,
-                BracketToken::Open(BracketKind::Paren),
+                IsographLangTokenKind::OpenParenthesis,
+                BracketToken::Open(BracketKind::Parenthesis),
             ),
             (
-                IsographLangTokenKind::CloseParen,
-                BracketToken::Close(BracketKind::Paren),
+                IsographLangTokenKind::CloseParenthesis,
+                BracketToken::Close(BracketKind::Parenthesis),
             ),
             (
                 IsographLangTokenKind::OpenBrace,

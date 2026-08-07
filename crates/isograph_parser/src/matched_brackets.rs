@@ -367,7 +367,7 @@ mod tests {
 
     use super::*;
     use crate::tokenize;
-    use BracketKind::{Brace, Bracket, Paren};
+    use BracketKind::{Brace, Bracket, Parenthesis};
 
     fn tree(literal: &str) -> MatchedBrackets<BracketsMatched> {
         match_brackets(tokenize(literal))
@@ -459,9 +459,9 @@ mod tests {
         // `1` sits in the `[...]` inside the `(...)` inside the outer `{...}`.
         let square_group = enclosing_group(run(resolved(&tree, text, "1")).parent);
         assert_balanced(&square_group, Bracket);
-        let paren_group = enclosing_group(square_group.parent);
-        assert_balanced(&paren_group, Paren);
-        let brace_group = enclosing_group(paren_group.parent);
+        let parenthesis_group = enclosing_group(square_group.parent);
+        assert_balanced(&parenthesis_group, Parenthesis);
+        let brace_group = enclosing_group(parenthesis_group.parent);
         assert_balanced(&brace_group, Brace);
         assert_root(brace_group.parent);
         // `id` sits in the inner `{...}` inside the outer `{...}`.
@@ -478,10 +478,10 @@ mod tests {
         let text = "field Query.Foo { bar( }";
         let tree = tree(text);
         let open = open_bracket(resolved(&tree, text, "("));
-        assert_eq!(open.inner.0, Paren);
-        let OpenBracketParent::Bracketed(paren_group) = open.parent;
-        assert_unbalanced(&paren_group, Paren);
-        let brace_group = enclosing_group(paren_group.parent);
+        assert_eq!(open.inner.0, Parenthesis);
+        let OpenBracketParent::Bracketed(parenthesis_group) = open.parent;
+        assert_unbalanced(&parenthesis_group, Parenthesis);
+        let brace_group = enclosing_group(parenthesis_group.parent);
         assert_balanced(&brace_group, Brace);
         assert_root(brace_group.parent);
         assert_balanced(
@@ -513,9 +513,9 @@ mod tests {
         let OpenBracketParent::Bracketed(square_group) =
             open_bracket(resolved(&tree, text, "[")).parent;
         assert_unbalanced(&square_group, Bracket);
-        let paren_group = enclosing_group(square_group.parent);
-        assert_unbalanced(&paren_group, Paren);
-        let outer_group = enclosing_group(paren_group.parent);
+        let parenthesis_group = enclosing_group(square_group.parent);
+        assert_unbalanced(&parenthesis_group, Parenthesis);
+        let outer_group = enclosing_group(parenthesis_group.parent);
         assert_balanced(&outer_group, Brace);
         assert_root(outer_group.parent);
         match tree.errors().as_slice() {
@@ -544,7 +544,7 @@ mod tests {
             Brace,
         );
         let stray = close_bracket(resolved(&tree, text, ")"));
-        assert_eq!(stray.inner.0, Paren);
+        assert_eq!(stray.inner.0, Parenthesis);
         let brace_group = enclosing_group(stray.parent);
         assert_balanced(&brace_group, Brace);
         assert_root(brace_group.parent);
@@ -555,7 +555,7 @@ mod tests {
         match tree.errors().as_slice() {
             [BracketError::UnexpectedClose(stray)] => {
                 assert_eq!(stray.location, span_of(text, ")"));
-                assert_eq!(stray.item.0, Paren);
+                assert_eq!(stray.item.0, Parenthesis);
             }
             errors => panic!("expected exactly the stray close, got {errors:?}"),
         }
@@ -566,13 +566,13 @@ mod tests {
         let text = "( } )";
         let tree = tree(text);
         // The paren pair still matches around the stray `}`.
-        let OpenBracketParent::Bracketed(paren_group) =
+        let OpenBracketParent::Bracketed(parenthesis_group) =
             open_bracket(resolved(&tree, text, "(")).parent;
-        assert_balanced(&paren_group, Paren);
-        assert_root(paren_group.parent);
+        assert_balanced(&parenthesis_group, Parenthesis);
+        assert_root(parenthesis_group.parent);
         let stray = close_bracket(resolved(&tree, text, "}"));
         assert_eq!(stray.inner.0, Brace);
-        assert_balanced(&enclosing_group(stray.parent), Paren);
+        assert_balanced(&enclosing_group(stray.parent), Parenthesis);
         match tree.errors().as_slice() {
             [BracketError::UnexpectedClose(stray)] => {
                 assert_eq!(stray.location, span_of(text, "}"));
@@ -586,14 +586,14 @@ mod tests {
     fn crossing_pairs_produce_two_errors_in_source_order() {
         let text = "( { ) }";
         let tree = tree(text);
-        let OpenBracketParent::Bracketed(paren_group) =
+        let OpenBracketParent::Bracketed(parenthesis_group) =
             open_bracket(resolved(&tree, text, "(")).parent;
-        assert_balanced(&paren_group, Paren);
-        assert_root(paren_group.parent);
+        assert_balanced(&parenthesis_group, Parenthesis);
+        assert_root(parenthesis_group.parent);
         let OpenBracketParent::Bracketed(brace_group) =
             open_bracket(resolved(&tree, text, "{")).parent;
         assert_unbalanced(&brace_group, Brace);
-        assert_balanced(&enclosing_group(brace_group.parent), Paren);
+        assert_balanced(&enclosing_group(brace_group.parent), Parenthesis);
         // The trailing `}` is a stray brace close at the top level: its `{` was consumed
         // inside the paren group.
         let stray = close_bracket(resolved(&tree, text, "}"));

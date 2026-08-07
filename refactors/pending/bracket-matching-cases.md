@@ -16,7 +16,7 @@ The rule:
 
 ## The tree
 
-What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly this). `BracketKind` (paren `()`, brace `{}`, bracket `[]`) and `NonBracketTokenKind` are landed code from the tokenizer's split layer:
+What the matcher generates (`resilient-parser.md`'s Change 1 implements exactly this). `BracketKind` (parenthesis `()`, brace `{}`, bracket `[]`) and `NonBracketTokenKind` are landed code from the tokenizer's split layer:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -100,7 +100,7 @@ pub struct Bracketed<TContents: TreeContents> {
 }
 ```
 
-A matched group and an unmatched one are one shape: unmatchedness is the `None` closing, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `StrayClose(Paren)` in them abbreviates `StrayClose(CloseBracket(Paren))`.
+A matched group and an unmatched one are one shape: unmatchedness is the `None` closing, not a different node, so position resolution and stage 4 walk one shape. The stray close is its own variant because it is neither a run nor a group: it has no opening and no children, and folding it into `Bracketed` would make an item with neither bracket representable. The cases below are written against the `BracketsMatched` instantiation, since that is what the matcher generates; `StrayClose(Parenthesis)` in them abbreviates `StrayClose(CloseBracket(Parenthesis))`.
 
 Every resolve impl is derived: the tree types and the three role types (`Inner`, `OpenBracket`, `CloseBracket`) carry `#[derive(ResolvePosition)]`, with `#[resolve_field]` on the fields shown above, concretely over `BracketsMatched`. Resolving a position against the tree yields a `ResolvedBracketNode` path whose leaves are a run, an opening bracket, or a close bracket; any close bracket resolves to `CloseBracket`, and the path says whether it is a group's closing or a stray item. A position on whitespace inside a group resolves to the group, and one outside every item resolves to the root.
 
@@ -158,10 +158,10 @@ Every close is its group's own; the rule degenerates to ordinary matching. The r
 
 ```
 field Query.Foo { bar( }
-       ^ valid       ^ invalid (the paren group, which is just the `(`)
+       ^ valid       ^ invalid (the parenthesis group, which is just the `(`)
 ```
 
-Generates: the brace group with its real closing; among its children, the paren group with a `None` closing and no children, so its span is the `(` alone. One error: `Unclosed` for the paren.
+Generates: the brace group with its real closing; among its children, the parenthesis group with a `None` closing and no children, so its span is the `(` alone. One error: `Unclosed` for the parenthesis.
 
 Reason: the `}` is strong evidence the author considers the brace section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and stage 4 keep working everywhere else in the group.
 
@@ -169,11 +169,11 @@ Reason: the `}` is strong evidence the author considers the brace section finish
 
 ```
 { ( [ }
-  ^ invalid (paren section)
-    ^ invalid (the `[` section, nested inside the paren section)
+  ^ invalid (parenthesis section)
+    ^ invalid (the `[` section, nested inside the parenthesis section)
 ```
 
-Generates: the brace group with its real closing; inside it the paren group, and inside that the `[` group, both with `None` closings — the `[` group childless (its span is the `[` alone), the paren group ending at its last child, the `[` group. Two `Unclosed` errors, in source order of their openings.
+Generates: the brace group with its real closing; inside it the parenthesis group, and inside that the `[` group, both with `None` closings — the `[` group childless (its span is the `[` alone), the parenthesis group ending at its last child, the `[` group. Two `Unclosed` errors, in source order of their openings.
 
 Same reason as above, applied twice; nesting is preserved so a position resolves through the same ancestry the author typed.
 
@@ -186,7 +186,7 @@ Same reason as above, applied twice; nesting is preserved so a position resolves
         ^ valid
 ```
 
-Generates: the brace group with its real closing, whose children are a `Inner` item, a `StrayClose(Paren)`, and a `Inner` item. One error: `UnexpectedClose`.
+Generates: the brace group with its real closing, whose children are a `Inner` item, a `StrayClose(Parenthesis)`, and a `Inner` item. One error: `UnexpectedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 
@@ -198,7 +198,7 @@ Reason: consuming an open of a different kind would destroy a pair that may stil
   ^ invalid (the `}` alone)
 ```
 
-Generates: the paren group with its real closing, holding a `StrayClose(Brace)`. One error: `UnexpectedClose`.
+Generates: the parenthesis group with its real closing, holding a `StrayClose(Brace)`. One error: `UnexpectedClose`.
 
 If the `}` had ended the `(` group, the `)` that was coming would have become a second error. One typo, one invalid section.
 
@@ -210,7 +210,7 @@ If the `}` had ended the `(` group, the `)` that was coming would have become a 
       ^ invalid (the trailing `}`, whose `{` was already consumed)
 ```
 
-Generates: the paren group with its real closing, holding the brace group with a `None` closing and no children (its span is the `{` alone); after the paren group, a top-level `StrayClose(Brace)`. Two errors: `Unclosed` for the brace group, then `UnexpectedClose` for the trailing `}`.
+Generates: the parenthesis group with its real closing, holding the brace group with a `None` closing and no children (its span is the `{` alone); after the parenthesis group, a top-level `StrayClose(Brace)`. Two errors: `Unclosed` for the brace group, then `UnexpectedClose` for the trailing `}`.
 
 One crossing produces two invalid sections even though a smarter matcher could have paired `{` with `}`.
 

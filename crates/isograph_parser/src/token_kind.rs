@@ -26,7 +26,7 @@ pub enum IsographLangTokenKind {
     #[token("]")]
     CloseBracket,
     #[token(")")]
-    CloseParen,
+    CloseParenthesis,
     #[token(":")]
     Colon,
     #[token("$")]
@@ -64,7 +64,7 @@ pub enum IsographLangTokenKind {
     #[token("[")]
     OpenBracket,
     #[token("(")]
-    OpenParen,
+    OpenParenthesis,
     #[token(".")]
     Period,
     // #[token("..")]
@@ -160,7 +160,7 @@ impl fmt::Display for IsographLangTokenKind {
             IsographLangTokenKind::At => "at symbol ('@')",
             IsographLangTokenKind::CloseBrace => "closing brace ('}')",
             IsographLangTokenKind::CloseBracket => "closing bracket (']')",
-            IsographLangTokenKind::CloseParen => "closing paren (')')",
+            IsographLangTokenKind::CloseParenthesis => "closing parenthesis (')')",
             // IsographLangTokenKind::Colon => "colon (':')",
             IsographLangTokenKind::Dollar => "dollar ('$')",
             IsographLangTokenKind::EndOfFile => "end of file",
@@ -172,7 +172,7 @@ impl fmt::Display for IsographLangTokenKind {
             IsographLangTokenKind::IntegerLiteral => "integer value (e.g. '0' or '42')",
             IsographLangTokenKind::OpenBrace => "open brace ('{')",
             IsographLangTokenKind::OpenBracket => "open bracket ('[')",
-            IsographLangTokenKind::OpenParen => "open parenthesis ('(')",
+            IsographLangTokenKind::OpenParenthesis => "open parenthesis ('(')",
             IsographLangTokenKind::Period => "period ('.')",
             // IsographLangTokenKind::PeriodPeriod => "double period ('..')",
             // IsographLangTokenKind::Pipe => "pipe ('|')",

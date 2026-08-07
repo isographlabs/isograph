@@ -1,6 +1,6 @@
 # Chunking selection sets
 
-The pass after bracket matching. It takes `MatchedBrackets<BracketsMatched>`, assumes the literal is a selection set, and regroups every selection-set level (the root, and each brace group's interior, recursively) into an alternation of chunks (one per selection) and separator boundaries. Paren and square groups are not chunked at this stage: they are carried through unchanged as `Bracketed`, and this stage is cleanly separable from whatever chunks them later. Chunking is infallible: it validates nothing, emits no errors, and every token that survived the bracket pass lands in some chunk or separator. Each chunk is parsed independently by later passes.
+The pass after bracket matching. It takes `MatchedBrackets<BracketsMatched>`, assumes the literal is a selection set, and regroups every selection-set level (the root, and each brace group's interior, recursively) into an alternation of chunks (one per selection) and separator boundaries. Parenthesis and square groups are not chunked at this stage: they are carried through unchanged as `Bracketed`, and this stage is cleanly separable from whatever chunks them later. Chunking is infallible: it validates nothing, emits no errors, and every token that survived the bracket pass lands in some chunk or separator. Each chunk is parsed independently by later passes.
 
 The chunked tree has its own path enum, `ResolvedChunkedSelectionSetNode`, fully separate from `ResolvedBracketNode`. Resolving a position against the bracket tree answers at token granularity (a run of `Vec<WithSpan<NonBracketTokenKind>>`, an opening, a close); resolving the same position against the chunked tree answers at chunk granularity (which chunk, which separator, which selection set). Two trees, two independent queries; nothing in `matched_brackets.rs`'s path family changes.
 
@@ -8,7 +8,7 @@ The chunked tree has its own path enum, `ResolvedChunkedSelectionSetNode`, fully
 
 - Commas and line breaks are the separators, equivalent. Any nonempty mix of consecutive separators is one boundary, held as one `Separator` node in the tree. Separators at the start or end of a level produce no empty chunks; they are just boundary nodes there.
 - Separators are required between fields, so `baz watttt` is one chunk, and it is that chunk's own parse that later fails ("expected a comma or line break"). Chunking never splits on token shape.
-- A separator only separates at its own level. A group is one opaque item at the level it appears in, so the separators inside a paren or square group never split a selection-set level.
+- A separator only separates at its own level. A group is one opaque item at the level it appears in, so the separators inside a parenthesis or square group never split a selection-set level.
 - A chunk is a maximal separator-free sequence of a level's items. Runs split at separator tokens; a group or a stray close joins the chunk that is open where it appears. A group right after a boundary opens a chunk of its own.
 - A chunk's span runs from its first item's start to its last item's end; a separator's span runs from its first token's start to its last token's end. Whitespace between tokens belongs to no node and resolves to the nearest enclosing node, as at the bracket stage.
 
@@ -122,7 +122,7 @@ pub use chunk::*;
 pub use matched_brackets::*;
 ```
 
-There is no new stage marker. The chunked tree holds the same contents as the bracket tree (`Inner` runs, `CloseBracket` strays, optional closings); what changes is the shape, so the chunk types are generic over the same `TreeContents` and their derives instantiate at `BracketsMatched` via `self_type_generics`. `Bracketed` moves into the chunk tree wholesale for paren and square groups, and closings move over untouched.
+There is no new stage marker. The chunked tree holds the same contents as the bracket tree (`Inner` runs, `CloseBracket` strays, optional closings); what changes is the shape, so the chunk types are generic over the same `TreeContents` and their derives instantiate at `BracketsMatched` via `self_type_generics`. `Bracketed` moves into the chunk tree wholesale for parenthesis and square groups, and closings move over untouched.
 
 ### Tree types
 
@@ -183,7 +183,7 @@ pub enum SeparatorToken {
 }
 
 /// What a chunk holds: runs split at separators, a brace group with its interior chunked,
-/// a paren or square group carried through unchunked, or a stray close riding along. Only
+/// a parenthesis or square group carried through unchunked, or a stray close riding along. Only
 /// the selection set resolves deeper in the chunk query; the other variants answer the
 /// enclosing chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -201,7 +201,7 @@ pub enum ChunkItem<TContents: TreeContents> {
     StrayClose(TContents::StrayClose),
 }
 
-/// A brace group whose interior is chunked. Built only from brace groups; paren and square
+/// A brace group whose interior is chunked. Built only from brace groups; parenthesis and square
 /// groups stay `ChunkItem::Bracketed`. `opening` and `closing` carry no `#[resolve_field]`:
 /// they resolve in the bracket query, and in the chunk query a position on them answers
 /// this selection set.
@@ -310,7 +310,7 @@ fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
 
 /// One selection-set level: split the runs at separator tokens, absorb each run of
 /// separators into one boundary, and let every non-separator item join the chunk that is
-/// open where it appears. Brace groups' interiors go through this recursively; paren and
+/// open where it appears. Brace groups' interiors go through this recursively; parenthesis and
 /// square groups move over unchanged.
 fn chunk_items(
     items: Vec<WithSpan<BracketItem<BracketsMatched>>>,
@@ -346,7 +346,7 @@ fn chunk_items(
                         closing: bracketed.closing,
                         children: chunk_items(bracketed.children),
                     }),
-                    BracketKind::Paren | BracketKind::Bracket => {
+                    BracketKind::Parenthesis | BracketKind::Bracket => {
                         ChunkItem::Bracketed(bracketed)
                     }
                 };
@@ -478,7 +478,7 @@ fn collect_chunk_errors<TContents>(
 fn a_position_resolves_to_its_chunk() {
     let text = "foo { bar(asdf) }";
     let tree = chunk(match_brackets(tokenize(text)));
-    // `asdf` sits inside the carried-through paren group, so the chunk query answers the
+    // `asdf` sits inside the carried-through parenthesis group, so the chunk query answers the
     // enclosing chunk `bar(asdf)`; the selection set above it rides in the chunk
     // `foo { ... }` at the root.
     let bar_chunk = chunk_leaf(tree.resolve((), span_of(text, "asdf")));
@@ -497,7 +497,7 @@ The full suite:
 - `a, b` and `a\nb` and `a,\n\n,b` all yield two chunks; the third yields exactly one `Separator` holding the four tokens comma, line break, line break, comma.
 - `\n, a, b,\n`: two chunks, with boundary nodes leading and trailing and no empty chunks.
 - `bar, baz watttt, qux`: three chunks; the middle one holds one run of two identifiers.
-- `bar(abc), qux`: two chunks; the first holds the run `bar` and a `ChunkItem::Bracketed` paren group whose interior is the untouched bracket-stage items.
+- `bar(abc), qux`: two chunks; the first holds the run `bar` and a `ChunkItem::Bracketed` parenthesis group whose interior is the untouched bracket-stage items.
 - `foo\n{ bar }`: two chunks; the second holds only the selection set.
 - `a(\n) {\n}`: one chunk; the line breaks inside the groups separate nothing at the top level.
 - `foo {}`: the selection set holds zero items. `""`: zero items at the root; `" \n , \n "`: one item, a single `Separator`.
@@ -507,4 +507,4 @@ The full suite:
 - `foo, bar`: the comma's `Separator` has the root as its parent.
 - `a ) b`: one chunk; the `)` resolves to that `Chunk` (the chunk query does not descend into strays); `errors()` reports the one stray close at `span_of(text, ")")`.
 - `foo { bar`: the selection set's closing is `None`; `errors()` reports the one unclosed brace.
-- `foo(a`: the carried-through paren group's closing is `None`; `errors()` reports the one unclosed paren, through the shared `collect_group_errors`.
+- `foo(a`: the carried-through parenthesis group's closing is `None`; `errors()` reports the one unclosed parenthesis, through the shared `collect_group_errors`.
