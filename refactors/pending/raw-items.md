@@ -62,10 +62,13 @@ pub fn match_brackets(tokens: Vec<WithSpan<IsographLangTokenKind>>) -> MatchedBr
 /// siblings.
 enum ParsedGroup {
     Closed(WithSpan<BracketItem>),
-    Unclosed {
-        opening: WithSpan<OpenBracket>,
-        children: Vec<WithSpan<BracketItem>>,
-    },
+    Unclosed(UnclosedGroup),
+}
+
+/// A group that never got its close: its opening, and the children it had parsed.
+struct UnclosedGroup {
+    opening: WithSpan<OpenBracket>,
+    children: Vec<WithSpan<BracketItem>>,
 }
 
 fn parse_items(
@@ -87,7 +90,7 @@ fn parse_items(
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing, opening) {
                     ParsedGroup::Closed(group) => items.push(group),
-                    ParsedGroup::Unclosed { opening, children } => {
+                    ParsedGroup::Unclosed(UnclosedGroup { opening, children }) => {
                         items.push(WithSpan::new(
                             BracketItem::Raw(RawToken::Open(opening.item)),
                             opening.location,
@@ -142,7 +145,7 @@ fn parse_bracketed(
                 span,
             ))
         }
-        _ => ParsedGroup::Unclosed { opening, children },
+        _ => ParsedGroup::Unclosed(UnclosedGroup { opening, children }),
     }
 }
 ```
