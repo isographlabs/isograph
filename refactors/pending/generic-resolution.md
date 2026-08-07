@@ -1,16 +1,31 @@
 # Generic resolution
 
-`ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). `TreeContents` is unchanged. Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside.
+`ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside, converting each leaf payload through `std::borrow::Borrow`, which is reflexive for free and lets the generic stray arm hand the concrete `&CloseBracket` to the one `CloseBracket` variant.
 
-Two changes: the macro emits generic impls with leaf modes, and the test extractors become derived. One decision is open below; the doc is implementable once it is made.
+Two changes: the macro emits generic impls with leaf modes, and the test extractors become derived.
 
-## Open decision: the stray slot's type
+## The stray slot borrows to the close token
 
-The `StrayClose` leaf arm builds a path whose inner is `&TContents::StrayClose`; the `CloseBracket` variant's payload is `CloseBracketPath`, whose inner is the concrete `&CloseBracket`. Generic code cannot equate them, so one of the following holds:
+The `StrayClose` leaf arm holds `&TContents::StrayClose` and the `CloseBracket` variant's payload holds `&CloseBracket`; the bound that connects them at every stage is `Borrow<CloseBracket>` on the slot. std's blanket `Borrow<T> for T` covers every stage whose slot is `CloseBracket`, and a stage whose slot is `Infallible` writes the vacuous impl — legal under the orphan rule because `CloseBracket` is local, and its `match *self {}` asserts an invariant the type system itself expresses: no value of `Infallible` exists, and no tree at such a stage can hold a stray to resolve.
 
-- The tree types bound the slot: `BracketItem<TContents: TreeContents<StrayClose = CloseBracket>>`. The refined stage whose stray slot is `Infallible` becomes unrepresentable, permanently.
-- The enum splits the leaf: a sixth variant `StrayClose(StrayClosePath<'a, TContents>)`, targeted by the stray arm, with the closing field keeping `CloseBracket`. The stray-versus-closing distinction returns to the leaf enum.
-- The slot unifies: `TreeContents::StrayClose` is the type of every close token, `Bracketed.closing` is `Option<WithSpan<TContents::StrayClose>>`, and the `CloseBracket` variant's payload is the slot-typed path. Both leaf sites build the same path type, the collapse holds generically, and a stage that changes the slot changes closings and strays together.
+Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+    /// What a stray close carries: `CloseBracket` while bracket errors are representable,
+    /// `Infallible` once refined.
+    type StrayClose: fmt::Debug + PartialEq + Eq;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+    /// What a stray close carries: `CloseBracket` while bracket errors are representable,
+    /// `Infallible` once refined. Every carrier borrows to the token, so the stray leaf
+    /// answers the concrete `CloseBracket` variant at every stage.
+    type StrayClose: fmt::Debug + PartialEq + Eq + std::borrow::Borrow<CloseBracket>;
+```
 
 ## Change 1: the macro emits generic impls with leaf modes
 
@@ -18,7 +33,7 @@ In `resolve_position_macros`, `resolve_position`, and the derive sites. One unit
 
 ### Attribute surface
 
-`self_type_generics` is deleted, and with it the `map_generics` module: the derive emits one impl over the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into. `#[resolve_field(leaf = VariantName)]` marks a field or enum variant whose payload is a leaf: the emission constructs the payload's path and wraps it in the named `ResolvedNode` variant, delegating nothing, and the payload type needs no `ResolvePosition` impl.
+`self_type_generics` is deleted, and with it the `map_generics` module: the derive emits one impl over the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into. `#[resolve_field(leaf = VariantName)]` marks a field or enum variant whose payload is a leaf: the emission constructs the payload's path and wraps it in the named `ResolvedNode` variant, delegating nothing, and the payload type needs no `ResolvePosition` impl. Every leaf payload passes through `::std::borrow::Borrow::borrow`, with the target inferred from the variant's payload type: reflexive and free at concrete sites, and the conversion that lets a slot-typed payload answer a concrete variant.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
@@ -288,7 +303,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
                 parent,
             };
             return Self::ResolvedNode::OpenBracket(::resolve_position::PositionResolutionPath {
-                inner: &self.opening.item,
+                inner: ::std::borrow::Borrow::borrow(&self.opening.item),
                 parent: own_path.into(),
             });
         }
@@ -311,7 +326,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
                 };
                 return Self::ResolvedNode::CloseBracket(
                     ::resolve_position::PositionResolutionPath {
-                        inner: &item.item,
+                        inner: ::std::borrow::Borrow::borrow(&item.item),
                         parent: own_path.into(),
                     },
                 );
@@ -349,14 +364,14 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for BracketIte
             // passes through the reflexive From.
             BracketItem::Inner(inner) => {
                 Self::ResolvedNode::Inner(::resolve_position::PositionResolutionPath {
-                    inner,
+                    inner: ::std::borrow::Borrow::borrow(inner),
                     parent: parent.into(),
                 })
             }
             BracketItem::Bracketed(inner) => inner.resolve(parent, position),
             BracketItem::StrayClose(inner) => {
                 Self::ResolvedNode::CloseBracket(::resolve_position::PositionResolutionPath {
-                    inner,
+                    inner: ::std::borrow::Borrow::borrow(inner),
                     parent: parent.into(),
                 })
             }
@@ -366,8 +381,6 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for BracketIte
 ```
 
 `MatchedBrackets<TContents>` keeps today's shape: the items loop delegating through `own_path.into()`, then the fallback `Self::ResolvedNode::MatchedBrackets(...)`.
-
-The stray arm's `inner` is `&TContents::StrayClose` and the variant's payload wants `&CloseBracket`: this compiles at any stage whose slot is `CloseBracket`, which is every planned stage, and a stage that changes the slot gets a compile error at its `resolve` call sites — the error is the feature, since such a stage must decide its stray leaf then.
 
 ### Tests
 
@@ -379,7 +392,6 @@ The bracket suite keeps every assertion: at `BracketsMatched` the answers are un
 
 ## Landing checklist
 
-1. The open decision above is made and folded into the snippets it touches.
-2. Change 1; `cargo test` green with no assertion edits.
-3. Change 2; the bespoke extractors deleted.
-4. chunking.md's resolution section is implementable on top; move this doc to refactors/past.
+1. Change 1; `cargo test` green with no assertion edits.
+2. Change 2; the bespoke extractors deleted.
+3. chunking.md's resolution section is implementable on top; move this doc to refactors/past.
