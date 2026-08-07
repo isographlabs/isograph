@@ -463,11 +463,8 @@ pub enum MatchedBracketsParent<'a> {
 pub type MatchedBracketsPath<'a> =
     PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
 
-/// The one place an item can sit: its level.
-#[derive(Debug)]
-pub enum BracketItemParent<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-}
+/// The one place an item can sit: its level, so the parent is the path directly.
+pub type BracketItemParent<'a> = MatchedBracketsPath<'a>;
 
 pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
 
@@ -549,8 +546,8 @@ impl ::resolve_position::ResolvePosition for MatchedBrackets {
         for item in self.0.iter() {
             if item.location.contains(position) {
                 let new_parent =
-                    <BracketItem as ::resolve_position::ResolvePosition>::Parent::MatchedBrackets(
-                        self.path(parent).into(),
+                    <BracketItem as ::resolve_position::ResolvePosition>::Parent::from(
+                        self.path(parent),
                     );
                 return item.item.resolve(new_parent, position);
             }
@@ -586,22 +583,22 @@ impl ::resolve_position::ResolvePosition for Bracketed {
     ) -> Self::ResolvedNode<'a> {
         if self.opening.location.contains(position) {
             let new_parent =
-                <OpenBracket as ::resolve_position::ResolvePosition>::Parent::Bracketed(
-                    self.path(parent).into(),
+                <OpenBracket as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
                 );
             return self.opening.item.resolve(new_parent, position);
         }
         if self.children.location.contains(position) {
             let new_parent =
-                <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::Bracketed(
-                    self.path(parent).into(),
+                <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
                 );
             return self.children.item.resolve(new_parent, position);
         }
         if self.closing.location.contains(position) {
             let new_parent =
-                <CloseBracket as ::resolve_position::ResolvePosition>::Parent::Bracketed(
-                    self.path(parent).into(),
+                <CloseBracket as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
                 );
             return self.closing.item.resolve(new_parent, position);
         }
@@ -654,36 +651,37 @@ impl ::resolve_position::ResolvePosition for RawToken {
 }
 ```
 
-and the three total conversions, written out:
+and the conversions, written out. The fallback's `parent.into()` is the reflexive `From`, since `BracketItemParent` is the level path itself; the bracket parents convert from both of their positions:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-/// The fallback's unwrap: an ordinary raw token answers the level it sits in.
-impl<'a> From<BracketItemParent<'a>> for MatchedBracketsPath<'a> {
-    fn from(parent: BracketItemParent<'a>) -> Self {
-        match parent {
-            BracketItemParent::MatchedBrackets(level) => level,
-        }
-    }
-}
-
 impl<'a> From<BracketItemParent<'a>> for OpenBracketParent<'a> {
-    fn from(parent: BracketItemParent<'a>) -> Self {
-        match parent {
-            BracketItemParent::MatchedBrackets(level) => {
-                OpenBracketParent::MatchedBrackets(level)
-            }
-        }
+    fn from(level: BracketItemParent<'a>) -> Self {
+        OpenBracketParent::MatchedBrackets(level)
     }
 }
 
 impl<'a> From<BracketItemParent<'a>> for CloseBracketParent<'a> {
-    fn from(parent: BracketItemParent<'a>) -> Self {
-        match parent {
-            BracketItemParent::MatchedBrackets(level) => {
-                CloseBracketParent::MatchedBrackets(level)
-            }
-        }
+    fn from(level: BracketItemParent<'a>) -> Self {
+        CloseBracketParent::MatchedBrackets(level)
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for OpenBracketParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        OpenBracketParent::Bracketed(Box::new(group))
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for CloseBracketParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        CloseBracketParent::Bracketed(Box::new(group))
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for MatchedBracketsParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        MatchedBracketsParent::Bracketed(Box::new(group))
     }
 }
 ```
