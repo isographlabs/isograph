@@ -267,7 +267,11 @@ mod tests {
         let tree = tree(text);
         let brace = group(&tree.item.0, 4);
         assert_eq!(brace.opening.item.0, Brace);
-        assert_eq!(brace.opening.location, span_of(text, "{ bar").first_char());
+        let brace_anchor = span_of(text, "{ bar");
+        assert_eq!(
+            brace.opening.location,
+            Span::new(brace_anchor.start, brace_anchor.start + 1)
+        );
         let parenthesis = group(&brace.children.item.0, 1);
         assert_eq!(parenthesis.opening.item.0, Parenthesis);
         let square = group(&parenthesis.children.item.0, 2);
@@ -329,7 +333,8 @@ mod tests {
             ] => {
                 assert_eq!(open.location, span_of(text, "("));
                 assert_eq!(parenthesis.location, span_of(text, ")"));
-                assert_eq!(brace_close.location, span_of(text, ") }").last_char());
+                let tail = span_of(text, ") }");
+                assert_eq!(brace_close.location, Span::new(tail.end - 1, tail.end));
             }
             errors => panic!("expected three unmatched brackets, got {errors:?}"),
         }
@@ -383,7 +388,11 @@ mod tests {
         ));
         match tree.item.errors().as_slice() {
             [BracketError::UnmatchedOpen(open)] => {
-                assert_eq!(open.location, span_of(text, "{ b").first_char());
+                let open_anchor = span_of(text, "{ b");
+                assert_eq!(
+                    open.location,
+                    Span::new(open_anchor.start, open_anchor.start + 1)
+                );
             }
             errors => panic!("expected exactly the unmatched open, got {errors:?}"),
         }
@@ -427,8 +436,6 @@ mod tests {
     }
 }
 ```
-
-Two helper calls above are shorthand this module defines on `Span` in `#[cfg(test)]`: `first_char` and `last_char` take a multi-character anchor's span to its first or last byte, for anchoring a pattern that is not unique on its own (`span_of(text, "{ b").first_char()`).
 
 bracket-matching-cases.md is rewritten against these shapes as part of this change: taking unclosed groups apart replaces forcing them shut, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes — content after an unmatched open sits in the enclosing level, so nothing is trapped inside an invalid group while typing.
 
