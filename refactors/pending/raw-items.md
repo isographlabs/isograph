@@ -1,6 +1,6 @@
-# Raw items: unmatched brackets dissolve
+# Raw items
 
-A level is a flat sequence of individual items, each raw or grouped: what can be grouped is grouped, and everything else is raw. The bracket tree keeps only matched pairs as structure. A close bracket with no open of its kind is a raw item where it stands; an open bracket whose group gets forced shut dissolves, its token becoming a raw item and its children splicing back into the enclosing level, matched groups among them surviving. Every `Bracketed` has a real opening and a real closing, required fields, and a group's interior is the same type as the root, so no level is special. The chunk-parsing pass reports leftover bracket tokens it finds inside chunks.
+A level is a flat sequence of individual items, each raw or grouped: what can be grouped is grouped, and everything else is raw. The bracket tree keeps only matched pairs as structure. A close bracket with no open of its kind is a raw item where it stands. When a group never gets its close, the group is taken apart: its opening becomes a raw item, and its children move into the enclosing level, matched groups among them surviving. Every `Bracketed` has a real opening and a real closing, required fields, and a group's interior is the same type as the root, so no level is special. The chunk-parsing pass reports leftover bracket tokens it finds inside chunks.
 
 With one stage shape left, `TreeContents`, `BracketsMatched`, `Inner`, and `map` have no callers and are deleted; every tree type is concrete.
 
@@ -27,7 +27,7 @@ pub enum BracketItem {
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RawToken {
     NonBracket(NonBracketTokenKind),
-    /// An open bracket whose group never closed and was dissolved.
+    /// An open bracket whose group never closed and was taken apart.
     Open(OpenBracket),
     /// A close bracket no open of its kind was waiting for.
     Close(CloseBracket),
@@ -47,7 +47,7 @@ pub struct Bracketed {
 
 ### The matcher
 
-The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and force-shut groups dissolve:
+The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -57,11 +57,12 @@ pub fn match_brackets(tokens: Vec<WithSpan<IsographLangTokenKind>>) -> MatchedBr
     MatchedBrackets(parse_items(&mut tokens, &mut enclosing))
 }
 
-/// What parsing a group produced: the group closed for real, or it was forced to end and
-/// dissolves into its opening token plus its children.
+/// What parsing a group produced: the group closed for real, or it never got its close,
+/// in which case the caller stores the opening as a raw item and the children as its
+/// siblings.
 enum ParsedGroup {
     Closed(WithSpan<BracketItem>),
-    Dissolved {
+    Unclosed {
         opening: WithSpan<OpenBracket>,
         children: Vec<WithSpan<BracketItem>>,
     },
@@ -86,7 +87,7 @@ fn parse_items(
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing, opening) {
                     ParsedGroup::Closed(group) => items.push(group),
-                    ParsedGroup::Dissolved { opening, children } => {
+                    ParsedGroup::Unclosed { opening, children } => {
                         items.push(WithSpan::new(
                             BracketItem::Raw(RawToken::Open(opening.item)),
                             opening.location,
@@ -98,7 +99,7 @@ fn parse_items(
             SplitToken::Bracket(BracketToken::Close(kind)) => {
                 if enclosing.contains(&kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
-                    // dissolves every group between here and its owner.
+                    // takes apart every group between here and its owner.
                     break;
                 }
                 tokens.next();
@@ -112,8 +113,8 @@ fn parse_items(
     items
 }
 
-/// One group, whose opening the caller already consumed. Its own close closes it; a close
-/// an enclosing group owns, or the end of the tokens, dissolves it.
+/// One group, whose opening the caller already consumed. Its own close closes it; at a
+/// close an enclosing group owns, or at the end of the tokens, it never closes.
 fn parse_bracketed(
     tokens: &mut TokenStream,
     enclosing: &mut Vec<BracketKind>,
@@ -141,12 +142,12 @@ fn parse_bracketed(
                 span,
             ))
         }
-        _ => ParsedGroup::Dissolved { opening, children },
+        _ => ParsedGroup::Unclosed { opening, children },
     }
 }
 ```
 
-`flush_run` and the run merging logic are deleted with `Inner`; dissolution splices with `items.extend`, and inner dissolutions have already flattened by the time an outer group dissolves.
+`flush_run` and the run merging logic are deleted with `Inner`. The caller stores an unclosed group's pieces with one push and `items.extend`, and inner unclosed groups have already flattened by the time an outer one comes apart.
 
 ### Errors
 
@@ -203,12 +204,12 @@ The structural half of the suite rewrites to these shapes; resolution assertions
 - `foo { ( }`: the brace closes; its interior holds the `(` as `RawToken::Open`; one `UnmatchedOpen`.
 - `foo { (}) }`: the brace's interior holds the raw `(`; the brace closes at the first `}`; `)` and the trailing `}` are raw items at the top level. One `UnmatchedOpen`, two `UnmatchedClose`, in source order.
 - `foo { ( } }`: the brace's interior holds the raw `(`; the brace closes; the trailing `}` is a raw item at the top level.
-- `foo { bar(a: }`: both groups dissolve at the end of the tokens; the top level is six raw items — `foo`, `{`, `bar`, `(`, `a`, `:` — with two `UnmatchedOpen`.
-- `a { b { c }`: the one `}` closes `b`'s group; `a`'s brace dissolves; the top level is `a`, the raw `{`, `b`, then the group `{ c }`. One `UnmatchedOpen`.
+- `foo { bar(a: }`: neither group ever closes, so both come apart at the end of the tokens; the top level is six raw items — `foo`, `{`, `bar`, `(`, `a`, `:` — with two `UnmatchedOpen`.
+- `a { b { c }`: the one `}` closes `b`'s group; `a`'s brace never closes and comes apart; the top level is `a`, the raw `{`, `b`, then the group `{ c }`. One `UnmatchedOpen`.
 - `{ name: "a}" }`: brackets inside strings stay lexical; no errors.
 - `( } )`: the parenthesis pair matches; its interior holds the raw `}`; one `UnmatchedClose`.
 
-bracket-matching-cases.md is rewritten against these shapes as part of this change: dissolution replaces forced-shut groups, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes — content after a dissolved open sits in the enclosing level, so nothing is trapped inside an invalid group while typing.
+bracket-matching-cases.md is rewritten against these shapes as part of this change: taking unclosed groups apart replaces forcing them shut, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes — content after an unmatched open sits in the enclosing level, so nothing is trapped inside an invalid group while typing.
 
 ## Change 2: resolution
 
