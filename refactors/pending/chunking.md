@@ -45,6 +45,12 @@ The stage and its run type:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+use span::{Span, WithSpan};
+
+use crate::{
+    BracketsMatched, CloseBracket, Inner, MatchedBrackets, NonBracketTokenKind, TreeContents,
+};
+
 /// The stage `chunk` produces. The tree keeps the bracket tree's shape, with every run chunked.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Chunked;
@@ -143,20 +149,270 @@ fn chunk_run(Inner(tokens): Inner) -> ChunkedRun {
 
 `errors()` needs nothing: its bound is `TreeContents<StrayClose = CloseBracket>`, which `Chunked` satisfies, so `MatchedBrackets<Chunked>` answers the errors query as-is.
 
-Resolution over the chunked tree is the resolve phase, after chunking lands: the derives must emit impls generic over `TContents` (today `self_type_generics` pins them to `<BracketsMatched>`), so that resolving `MatchedBrackets<Chunked>` monomorphizes the same walk with `ChunkedRun`'s own resolve at the run slot and chunk and separator leaves. That work gets its own doc; nothing in this one blocks on it.
+### Resolution: none at this stage, explicitly
+
+The chunk types carry no `ResolvePosition` derives, and the tree types' derives are pinned to `<BracketsMatched>` by `self_type_generics`, so `MatchedBrackets<Chunked>` has no `resolve` at all — calling it is a compile error, not a degraded answer. While that holds:
+
+- Every position query runs against the bracket-stage tree, at token granularity. "Which chunk is this position in, which separator" has no answer anywhere.
+- A consumer that needs position answers and chunked structure at the same time holds both trees: the bracket tree for resolution, the chunked tree for structure.
+- The chunk-parsing pass is unaffected; it walks the chunked tree structurally, not by position.
+
+The resolve phase lifts this, in its own doc, with three pieces: the macro emits impls generic over `TContents` instead of pinned (freddie's bind_macro carries the `split_for_impl` precedent), a resolved-node enum for the `Chunked` instantiation lands beside `ResolvedBracketNode` (two enums, one per stage), and `ChunkedRun`, `Chunk`, and `Separator` get leaf derives so the run slot's delegation bottoms out at chunk and separator leaves. Nothing in this doc blocks on any of it.
 
 ### Tests
 
-`#[cfg(test)]` in chunk.rs, in the style of the bracket tests: inline literals, `span_of` anchors, assertions by walking the mapped tree. The suite:
+`#[cfg(test)]` in chunk.rs, written out in full. `span_of` is the same anchor helper the bracket tests use; the extractors panic with the mismatch when a walk hits the wrong item kind, as the bracket tests' extractors do.
 
-- `foo { bar, baz\nqux }`: the top-level run is one chunk `foo` of one identifier token; the brace group's interior run is chunk, separator, chunk, separator, chunk, and the separator after `baz` holds one line-break token.
-- `a, b` and `a\nb` and `a,\n\n,b` all chunk to chunk-separator-chunk; the third's separator holds the four tokens comma, line break, line break, comma.
-- `\n, a, b,\n`: separator, chunk, separator, chunk, separator — boundaries first and last, no empty chunks.
-- `bar, baz watttt, qux`: three chunks; the middle one holds two identifier tokens.
-- `bar(abc), qux`: the top level is chunk `bar`, then the parenthesis group (its interior one chunk `abc`), then a run holding separator, chunk `qux`.
-- `foo\n{ bar }`: chunk `foo` and a separator, then the brace group as the next item.
-- `a(\n) {\n}`: each group's interior run is one lone separator; the top level's runs hold one chunk `a` and nothing else.
-- `foo {}`: the brace group has no children. `""`: no items. `" \n , \n "`: one run holding one `Separator` with all three separator tokens.
-- `foo , bar`: the chunk spans equal `span_of(text, "foo")` and `span_of(text, "bar")`, and the separator's span equals `span_of(text, ",")`.
-- `a ) b`: the stray `)` carries through as `BracketItem::StrayClose(CloseBracket(Parenthesis))` between two one-chunk runs; `errors()` on the chunked tree reports the one stray close at `span_of(text, ")")`.
-- `foo { bar`: the brace group's closing is `None` in the chunked tree; `errors()` reports the one unclosed brace.
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{BracketItem, Bracketed, match_brackets, tokenize};
+
+    fn chunked(literal: &str) -> MatchedBrackets<Chunked> {
+        chunk(match_brackets(tokenize(literal)))
+    }
+
+    /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
+    /// cannot silently shift, and one that fails loudly when it stops being unique.
+    fn span_of(text: &str, pattern: &str) -> Span {
+        let mut occurrences = text.match_indices(pattern);
+        let (offset, _) = occurrences
+            .next()
+            .expect("the pattern the test anchors on occurs in the literal");
+        assert!(
+            occurrences.next().is_none(),
+            "the pattern the test anchors on occurs exactly once in the literal"
+        );
+        Span::from_usize(offset, offset + pattern.len())
+    }
+
+    fn run(items: &[WithSpan<BracketItem<Chunked>>], index: usize) -> &ChunkedRun {
+        match &items[index].item {
+            BracketItem::Inner(run) => run,
+            item => panic!("expected a chunked run at {index}, got {item:?}"),
+        }
+    }
+
+    fn group(items: &[WithSpan<BracketItem<Chunked>>], index: usize) -> &Bracketed<Chunked> {
+        match &items[index].item {
+            BracketItem::Bracketed(group) => group,
+            item => panic!("expected a group at {index}, got {item:?}"),
+        }
+    }
+
+    fn chunk_at(run: &ChunkedRun, index: usize) -> &WithSpan<ChunkedRunItem> {
+        let item = &run.0[index];
+        assert!(
+            matches!(item.item, ChunkedRunItem::Chunk(_)),
+            "expected a chunk at {index}, got {item:?}"
+        );
+        item
+    }
+
+    fn separator_at(run: &ChunkedRun, index: usize) -> &WithSpan<ChunkedRunItem> {
+        let item = &run.0[index];
+        assert!(
+            matches!(item.item, ChunkedRunItem::Separator(_)),
+            "expected a separator at {index}, got {item:?}"
+        );
+        item
+    }
+
+    /// The token kinds of the chunk at `index`.
+    fn chunk_kinds(run: &ChunkedRun, index: usize) -> Vec<NonBracketTokenKind> {
+        match &chunk_at(run, index).item {
+            ChunkedRunItem::Chunk(Chunk(tokens)) => {
+                tokens.iter().map(|token| token.item).collect()
+            }
+            item => panic!("expected a chunk at {index}, got {item:?}"),
+        }
+    }
+
+    /// The separator kinds of the boundary at `index`.
+    fn separator_kinds(run: &ChunkedRun, index: usize) -> Vec<SeparatorToken> {
+        match &separator_at(run, index).item {
+            ChunkedRunItem::Separator(Separator(tokens)) => {
+                tokens.iter().map(|token| token.item).collect()
+            }
+            item => panic!("expected a separator at {index}, got {item:?}"),
+        }
+    }
+
+    #[test]
+    fn a_selection_set_chunks_by_separator() {
+        let tree = chunked("foo { bar, baz\nqux }");
+        assert_eq!(tree.0.len(), 2);
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 1);
+        assert_eq!(chunk_kinds(top, 0), vec![NonBracketTokenKind::Identifier]);
+        let brace = group(&tree.0, 1);
+        assert_eq!(brace.children.len(), 1);
+        let interior = run(&brace.children, 0);
+        assert_eq!(interior.0.len(), 5);
+        assert_eq!(chunk_kinds(interior, 0), vec![NonBracketTokenKind::Identifier]);
+        assert_eq!(separator_kinds(interior, 1), vec![SeparatorToken::Comma]);
+        assert_eq!(chunk_kinds(interior, 2), vec![NonBracketTokenKind::Identifier]);
+        assert_eq!(separator_kinds(interior, 3), vec![SeparatorToken::LineBreak]);
+        assert_eq!(chunk_kinds(interior, 4), vec![NonBracketTokenKind::Identifier]);
+        assert_eq!(tree.errors(), vec![]);
+    }
+
+    #[test]
+    fn a_comma_a_line_break_and_a_mix_separate_identically() {
+        for text in ["a, b", "a\nb"] {
+            let tree = chunked(text);
+            let top = run(&tree.0, 0);
+            assert_eq!(top.0.len(), 3, "for {text:?}");
+            chunk_at(top, 0);
+            separator_at(top, 1);
+            chunk_at(top, 2);
+        }
+        let tree = chunked("a,\n\n,b");
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 3);
+        assert_eq!(
+            separator_kinds(top, 1),
+            vec![
+                SeparatorToken::Comma,
+                SeparatorToken::LineBreak,
+                SeparatorToken::LineBreak,
+                SeparatorToken::Comma,
+            ]
+        );
+    }
+
+    #[test]
+    fn boundaries_sit_first_and_last_with_no_empty_chunks() {
+        let tree = chunked("\n, a, b,\n");
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 5);
+        separator_at(top, 0);
+        chunk_at(top, 1);
+        separator_at(top, 2);
+        chunk_at(top, 3);
+        separator_at(top, 4);
+    }
+
+    #[test]
+    fn garbage_between_separators_is_one_chunk() {
+        let tree = chunked("bar, baz watttt, qux");
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 5);
+        assert_eq!(
+            chunk_kinds(top, 2),
+            vec![
+                NonBracketTokenKind::Identifier,
+                NonBracketTokenKind::Identifier,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_group_sits_between_the_runs_it_splits() {
+        let tree = chunked("bar(abc), qux");
+        assert_eq!(tree.0.len(), 3);
+        let before = run(&tree.0, 0);
+        assert_eq!(before.0.len(), 1);
+        assert_eq!(chunk_kinds(before, 0), vec![NonBracketTokenKind::Identifier]);
+        let parenthesis = group(&tree.0, 1);
+        let interior = run(&parenthesis.children, 0);
+        assert_eq!(interior.0.len(), 1);
+        assert_eq!(chunk_kinds(interior, 0), vec![NonBracketTokenKind::Identifier]);
+        let after = run(&tree.0, 2);
+        assert_eq!(after.0.len(), 2);
+        separator_at(after, 0);
+        assert_eq!(chunk_kinds(after, 1), vec![NonBracketTokenKind::Identifier]);
+    }
+
+    #[test]
+    fn a_line_break_before_the_brace_is_a_boundary() {
+        let tree = chunked("foo\n{ bar }");
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 2);
+        chunk_at(top, 0);
+        separator_at(top, 1);
+        group(&tree.0, 1);
+    }
+
+    #[test]
+    fn separators_inside_groups_do_not_reach_the_outer_level() {
+        let tree = chunked("a(\n) {\n}");
+        assert_eq!(tree.0.len(), 3);
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 1);
+        assert_eq!(chunk_kinds(top, 0), vec![NonBracketTokenKind::Identifier]);
+        let parenthesis = group(&tree.0, 1);
+        assert_eq!(separator_kinds(run(&parenthesis.children, 0), 0), vec![SeparatorToken::LineBreak]);
+        let brace = group(&tree.0, 2);
+        assert_eq!(separator_kinds(run(&brace.children, 0), 0), vec![SeparatorToken::LineBreak]);
+    }
+
+    #[test]
+    fn empty_trees_stay_empty() {
+        let tree = chunked("foo {}");
+        assert!(group(&tree.0, 1).children.is_empty());
+        assert!(chunked("").0.is_empty());
+        let tree = chunked(" \n , \n ");
+        let top = run(&tree.0, 0);
+        assert_eq!(top.0.len(), 1);
+        assert_eq!(
+            separator_kinds(top, 0),
+            vec![
+                SeparatorToken::LineBreak,
+                SeparatorToken::Comma,
+                SeparatorToken::LineBreak,
+            ]
+        );
+    }
+
+    #[test]
+    fn chunk_and_separator_spans_are_tight() {
+        let text = "foo , bar";
+        let tree = chunked(text);
+        let top = run(&tree.0, 0);
+        assert_eq!(chunk_at(top, 0).location, span_of(text, "foo"));
+        assert_eq!(separator_at(top, 1).location, span_of(text, ","));
+        assert_eq!(chunk_at(top, 2).location, span_of(text, "bar"));
+    }
+
+    #[test]
+    fn a_stray_close_carries_through_between_runs() {
+        let text = "a ) b";
+        let tree = chunked(text);
+        assert_eq!(tree.0.len(), 3);
+        assert!(matches!(
+            tree.0[1].item,
+            BracketItem::StrayClose(CloseBracket(crate::BracketKind::Parenthesis))
+        ));
+        match tree.errors().as_slice() {
+            [crate::BracketError::UnexpectedClose(stray)] => {
+                assert_eq!(stray.location, span_of(text, ")"));
+            }
+            errors => panic!("expected exactly the stray close, got {errors:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unclosed_group_keeps_its_none_closing() {
+        let text = "foo { bar";
+        let tree = chunked(text);
+        let brace = group(&tree.0, 1);
+        assert!(brace.closing.is_none());
+        assert_eq!(chunk_kinds(run(&brace.children, 0), 0), vec![NonBracketTokenKind::Identifier]);
+        match tree.errors().as_slice() {
+            [crate::BracketError::Unclosed(unclosed)] => {
+                assert_eq!(unclosed.item.0.location, span_of(text, "{"));
+            }
+            errors => panic!("expected exactly the unclosed brace, got {errors:?}"),
+        }
+    }
+}
+```
+
+### Landing checklist
+
+1. Add chunk.rs with the types, the pass, and the test module above; register `mod chunk;` and `pub use chunk::*;` in lib.rs.
+2. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+3. Move this doc to refactors/past.
