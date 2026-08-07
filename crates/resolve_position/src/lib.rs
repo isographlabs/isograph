@@ -3,7 +3,8 @@ use span::{Span, WithGenericLocation};
 /// This module defines a trait [`ResolvePosition`], which is used to convert a
 /// mouse or keyboard cursor position (given by a [`Span`]) to a
 /// [`ResolvedNode`](ResolvePosition::ResolvedNode), which is (by
-/// convention) an enum of possible items where the cursor could be sitting.
+/// convention) an enum of resolution leaves: the items the cursor could be
+/// sitting on.
 /// (Indeed, in the actual implementation of `ResolvePosition` in the
 /// `isograph_lang_types` crate has an enum for `ResolvedNode`.)
 ///
@@ -62,8 +63,8 @@ use span::{Span, WithGenericLocation};
 ///   calling `field.location.contains(position)`. When the child node containing the
 ///   position is discovered, it must return the result of calling `.resolve()`
 ///   on that child.
-/// - If no child contains the position, then the node must assume that it is
-///   the leaf node and returns its own variant of `ResolvedNode`.
+/// - If no child contains the position, then the node is the resolution leaf
+///   and returns its own variant of `ResolvedNode`.
 
 #[derive(Debug)]
 pub struct PositionResolutionPath<Inner, Parent> {
