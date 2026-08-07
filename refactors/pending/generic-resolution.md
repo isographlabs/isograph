@@ -1,30 +1,24 @@
-# Generic resolution: every stage resolves
+# Generic resolution
 
-`MatchedBrackets<TContents>` resolves at every stage, through one generic walk. Each stage supplies its own resolved-node enum as an associated type on `TreeContents`, so resolving a `MatchedBrackets<BracketsMatched>` answers `ResolvedBracketNode` and resolving a `MatchedBrackets<Chunked>` answers that stage's enum, with the same generated code walking both. Generated code never names an enum variant; every path becomes a node through `From`, and each stage's enum implements `From` for the paths that can occur at that stage.
+`ResolvedBracketNode` becomes generic over the stage, and `MatchedBrackets<TContents>` resolves at every stage through one generic walk. The enum stays closed at five variants. `Inner(InnerPath<'a, TContents>)` is the tree-level answer for a position in a run; a stage whose run type has interior structure answers the finer question with a second resolve on the run itself, whose parent is the `InnerPath` from the first answer, so ancestry chains across the two queries (chunking.md's `ChunkedRun` is the first such run type). `TreeContents` is unchanged. Leaf types (`Inner`, `OpenBracket`, `CloseBracket`) stop implementing `ResolvePosition` at the tree level; the walk constructs their paths from outside.
 
-The division of labor:
-
-- The tree types (`MatchedBrackets`, `BracketItem`, `Bracketed`) get impls generic over `TContents`. They walk spans and delegate.
-- A stage's run slot (`TContents::Inner`) is a stage-specific type with its own concrete impl, and a trait bound forces its resolution to land in the stage's enum. This is where a stage's extra leaves live: the chunked stage's run resolves further, into chunks and separators.
-- Stage-independent leaf types (`OpenBracket`, `CloseBracket`) implement nothing. A leaf mode in the macro constructs their path and converts it, so one concrete type serves every stage.
-
-Two changes: the path family reshape (ships alone, no behavior change), then the macro rewrite and the derive updates (one unit).
+Three changes: the path family gains the stage parameter (ships alone, behavior unchanged), the macro emits generic impls with leaf modes, and the test extractors become derived.
 
 ## Change 1 (prefactor): the path family gains the stage parameter
 
-In `matched_brackets.rs`. The parent enums and path aliases become generic over `TContents`, defaulting to `BracketsMatched` so every existing use keeps compiling unchanged; `TreeContents` gains the stage's resolved enum; `ResolvedBracketNode` gains its `From` impls. The derives stay pinned in this change and still name variants; both construction styles coexist until Change 2.
+In `matched_brackets.rs`. Every parent enum, path alias, and the resolved enum gain `TContents`, defaulting to `BracketsMatched` where existing code names them with one lifetime; the derives stay pinned in this change and keep compiling because the defaults keep the names they emit meaningful.
 
 Before:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-pub trait TreeContents {
-    /// What a run between brackets is: the `Inner` run of lexed tokens out of the matcher,
-    /// parsed nodes later.
-    type Inner: fmt::Debug + PartialEq + Eq;
-    /// What a stray close carries: `CloseBracket` while bracket errors are representable,
-    /// `Infallible` once refined.
-    type StrayClose: fmt::Debug + PartialEq + Eq;
+#[derive(Debug)]
+pub enum ResolvedBracketNode<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+    Bracketed(BracketedPath<'a>),
+    Inner(InnerPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
 }
 
 pub type MatchedBracketsPath<'a> = PositionResolutionPath<&'a MatchedBrackets<BracketsMatched>, ()>;
@@ -54,27 +48,16 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-pub trait TreeContents: Sized + 'static {
-    /// What a run between brackets is: the `Inner` run of lexed tokens out of the matcher,
-    /// chunked or parsed forms later. It resolves into this stage's enum; this bound is
-    /// what lets the generic walk delegate into it.
-    type Inner: fmt::Debug
-        + PartialEq
-        + Eq
-        + for<'a> ResolvePosition<
-            Parent<'a> = BracketItemParent<'a, Self>,
-            ResolvedNode<'a> = Self::Resolved<'a>,
-        >;
-    /// What a stray close carries: `CloseBracket` while bracket errors are representable,
-    /// `Infallible` once refined. A leaf; its path converts into the stage's enum.
-    type StrayClose: fmt::Debug + PartialEq + Eq + 'static;
-    /// The stage's resolved-node enum: every node a position can resolve to at this
-    /// stage. The `From` bounds are the constructions the generic walk performs.
-    type Resolved<'a>: From<MatchedBracketsPath<'a, Self>>
-        + From<BracketedPath<'a, Self>>
-        + From<OpenBracketPath<'a, Self>>
-        + From<CloseBracketPath<'a, Self>>
-        + From<StrayClosePath<'a, Self>>;
+/// Every node a position can resolve to, at any stage. `Inner` is the tree-level answer
+/// for a position in a run; a stage whose run type has interior structure answers the
+/// finer question with a second resolve on the run, parented by the `InnerPath`.
+#[derive(Debug)]
+pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
+    Bracketed(BracketedPath<'a, TContents>),
+    Inner(InnerPath<'a, TContents>),
+    OpenBracket(OpenBracketPath<'a, TContents>),
+    CloseBracket(CloseBracketPath<'a, TContents>),
 }
 
 pub type MatchedBracketsPath<'a, TContents = BracketsMatched> =
@@ -87,87 +70,26 @@ pub enum BracketItemParent<'a, TContents: TreeContents> {
     Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
-pub type BracketedPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
-pub type InnerPath<'a> = PositionResolutionPath<&'a Inner, BracketItemParent<'a, BracketsMatched>>;
-
-/// The one place an opening bracket can sit: its group.
-#[derive(Debug)]
-pub enum OpenBracketParent<'a, TContents: TreeContents> {
-    Bracketed(Box<BracketedPath<'a, TContents>>),
-}
-
-pub type OpenBracketPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a, TContents>>;
-pub type CloseBracketPath<'a, TContents = BracketsMatched> =
-    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
-pub type StrayClosePath<'a, TContents> = PositionResolutionPath<
-    &'a <TContents as TreeContents>::StrayClose,
-    BracketItemParent<'a, TContents>,
->;
-```
-
-At `BracketsMatched`, `StrayClosePath` normalizes to `CloseBracketPath`, so its `From` bound is satisfied by the `CloseBracketPath` impl and no second impl exists (a second one would conflict). A refined stage with `StrayClose = Infallible` satisfies the bound with `match *path.inner {}`.
-
-The stage impl and the `From` impls:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-impl TreeContents for BracketsMatched {
-    type Inner = Inner;
-    type StrayClose = CloseBracket;
-    type Resolved<'a> = ResolvedBracketNode<'a>;
-}
-
-impl<'a> From<MatchedBracketsPath<'a>> for ResolvedBracketNode<'a> {
-    fn from(path: MatchedBracketsPath<'a>) -> Self {
-        ResolvedBracketNode::MatchedBrackets(path)
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for ResolvedBracketNode<'a> {
-    fn from(path: BracketedPath<'a>) -> Self {
-        ResolvedBracketNode::Bracketed(path)
-    }
-}
-
-impl<'a> From<InnerPath<'a>> for ResolvedBracketNode<'a> {
-    fn from(path: InnerPath<'a>) -> Self {
-        ResolvedBracketNode::Inner(path)
-    }
-}
-
-impl<'a> From<OpenBracketPath<'a>> for ResolvedBracketNode<'a> {
-    fn from(path: OpenBracketPath<'a>) -> Self {
-        ResolvedBracketNode::OpenBracket(path)
-    }
-}
-
-impl<'a> From<CloseBracketPath<'a>> for ResolvedBracketNode<'a> {
-    fn from(path: CloseBracketPath<'a>) -> Self {
-        ResolvedBracketNode::CloseBracket(path)
-    }
-}
-```
-
-The parent enums' conversions, used by Change 2's emissions (each parent enum implements `From` of the container paths that can hold the child; the boxing lives here):
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-impl<'a, TContents: TreeContents> From<MatchedBracketsPath<'a, TContents>>
-    for BracketItemParent<'a, TContents>
-{
-    fn from(path: MatchedBracketsPath<'a, TContents>) -> Self {
-        BracketItemParent::MatchedBrackets(path)
-    }
-}
-
+/// The conversion the leaf emissions build parents through.
 impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
     for BracketItemParent<'a, TContents>
 {
     fn from(path: BracketedPath<'a, TContents>) -> Self {
         BracketItemParent::Bracketed(Box::new(path))
     }
+}
+
+pub type BracketedPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
+pub type InnerPath<'a, TContents = BracketsMatched> = PositionResolutionPath<
+    &'a <TContents as TreeContents>::Inner,
+    BracketItemParent<'a, TContents>,
+>;
+
+/// The one place an opening bracket can sit: its group.
+#[derive(Debug)]
+pub enum OpenBracketParent<'a, TContents: TreeContents> {
+    Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
 impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
@@ -177,17 +99,22 @@ impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
         OpenBracketParent::Bracketed(Box::new(path))
     }
 }
+
+pub type OpenBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a, TContents>>;
+pub type CloseBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
 ```
 
-`ResolvedBracketNode` itself is unchanged in variants; the existing tests compile and pass untouched, since every alias they name defaults to `BracketsMatched`.
+`InnerPath<'a>` now means `InnerPath<'a, BracketsMatched>`, whose inner is `&Inner` as before, so the tests' helper signatures and assertions are untouched. `ResolvedBracketNode<'a>` in the pinned derives becomes `ResolvedBracketNode<'a, BracketsMatched>` at their attribute sites. `TContents::StrayClose` at every stage is `CloseBracket` or a future refined type; the stray's path is `CloseBracketPath` today, and a stage that changes the slot writes its own alias then.
 
-## Change 2: the macro emits generic impls and `From`-based construction
+## Change 2: the macro emits generic impls with leaf modes
 
-In `resolve_position_macros` and the derive sites. One unit: the emission style and the attributes change together.
+In `resolve_position_macros`, `resolve_position`, and the derive sites. One unit.
 
-### The attribute surface
+### Attribute surface
 
-`self_type_generics` is deleted, and with it the whole `map_generics` module; the derive emits one impl using the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into; `#[resolve_field(leaf)]` marks a field or enum variant whose payload is a leaf — the emission constructs the payload's path and converts it, delegating nothing.
+`self_type_generics` is deleted, and with it the `map_generics` module: the derive emits one impl over the type's own generics via `split_for_impl`, the way freddie's bind_macro does. `#[resolve_field]` keeps marking what resolution descends into. `#[resolve_field(leaf = VariantName)]` marks a field or enum variant whose payload is a leaf: the emission constructs the payload's path and wraps it in the named `ResolvedNode` variant, delegating nothing, and the payload type needs no `ResolvePosition` impl.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
@@ -199,14 +126,14 @@ struct ResolvePositionArgs {
 }
 ```
 
-The field cases keep the `WithSpan`/`Option`/`Vec` shape detection, but the emissions no longer name the child's type or any enum variant, so `extract_single_generic_type` and the generics map go. `ResolvePosition::path` in the `resolve_position` crate is deleted too — nothing calls it once construction is literal — and that crate's own test module rewrites its hand impls in the literal-plus-`From` style.
+`ResolvePosition::path` in the `resolve_position` crate is deleted — construction is literal — and that crate's test module rewrites its hand impls in the literal style.
 
-### The derive sites
+### Derive sites
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a, BracketsMatched>, resolved_node = ResolvedBracketNode<'a>)]
+/// A maximal run of non-bracket tokens between brackets.
+#[derive(Debug, PartialEq, Eq)]
 pub struct Inner(pub Vec<WithSpan<NonBracketTokenKind>>);
 
 /// A group's opening bracket.
@@ -218,7 +145,7 @@ pub struct OpenBracket(pub BracketKind);
 pub struct CloseBracket(pub BracketKind);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = TContents::Resolved<'a>)]
+#[resolve_position(parent_type = (), resolved_node = ResolvedBracketNode<'a, TContents>)]
 pub struct MatchedBrackets<TContents: TreeContents>(
     #[resolve_field] pub Vec<WithSpan<BracketItem<TContents>>>,
 );
@@ -226,36 +153,37 @@ pub struct MatchedBrackets<TContents: TreeContents>(
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = BracketItemParent<'a, TContents>,
-    resolved_node = TContents::Resolved<'a>
+    resolved_node = ResolvedBracketNode<'a, TContents>
 )]
 pub enum BracketItem<TContents: TreeContents> {
+    #[resolve_field(leaf = Inner)]
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
-    #[resolve_field(leaf)]
+    #[resolve_field(leaf = CloseBracket)]
     StrayClose(TContents::StrayClose),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = BracketItemParent<'a, TContents>,
-    resolved_node = TContents::Resolved<'a>
+    resolved_node = ResolvedBracketNode<'a, TContents>
 )]
 pub struct Bracketed<TContents: TreeContents> {
-    #[resolve_field(leaf)]
+    #[resolve_field(leaf = OpenBracket)]
     pub opening: WithSpan<OpenBracket>,
     #[resolve_field]
     pub children: Vec<WithSpan<BracketItem<TContents>>>,
     /// The close the author typed, or `None` for a group that never got its close and was
     /// forced to end: at the close bracket an enclosing group owns, or at the end of the
     /// tokens. A `None` group is an invalid section.
-    #[resolve_field(leaf)]
+    #[resolve_field(leaf = CloseBracket)]
     pub closing: Option<WithSpan<CloseBracket>>,
 }
 ```
 
-`OpenBracket` and `CloseBracket` lose their `ResolvePosition` derives entirely: they are data, and the leaf emissions build their paths from outside.
+`Inner` loses its derive along with `OpenBracket` and `CloseBracket`: at the tree level all three are leaves, and `Inner`'s old impl answered exactly what the leaf emission answers.
 
-### The generated code
+### Generated code
 
 For `Bracketed<TContents>`:
 
@@ -267,7 +195,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
     where
         Self: 'a;
     type ResolvedNode<'a>
-        = TContents::Resolved<'a>
+        = ResolvedBracketNode<'a, TContents>
     where
         Self: 'a;
 
@@ -276,19 +204,20 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
         parent: Self::Parent<'a>,
         position: ::span::Span,
     ) -> Self::ResolvedNode<'a> {
-        // opening: #[resolve_field(leaf)] on a WithSpan field.
+        // opening: #[resolve_field(leaf = OpenBracket)] on a WithSpan field. The leaf's
+        // parent converts from the container's own path; the `.into()` target is inferred
+        // from the named variant's payload type.
         if self.opening.location.contains(position) {
             let own_path = ::resolve_position::PositionResolutionPath {
                 inner: self,
                 parent,
             };
-            return ::resolve_position::PositionResolutionPath {
+            return Self::ResolvedNode::OpenBracket(::resolve_position::PositionResolutionPath {
                 inner: &self.opening.item,
                 parent: own_path.into(),
-            }
-            .into();
+            });
         }
-        // children: #[resolve_field] on a Vec<WithSpan> field.
+        // children: #[resolve_field] on a Vec<WithSpan> field delegates.
         for item in self.children.iter() {
             if item.location.contains(position) {
                 let own_path = ::resolve_position::PositionResolutionPath {
@@ -298,30 +227,28 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for Bracketed<
                 return item.item.resolve(own_path.into(), position);
             }
         }
-        // closing: #[resolve_field(leaf)] on an Option<WithSpan> field.
+        // closing: #[resolve_field(leaf = CloseBracket)] on an Option<WithSpan> field.
         for item in self.closing.iter() {
             if item.location.contains(position) {
                 let own_path = ::resolve_position::PositionResolutionPath {
                     inner: self,
                     parent,
                 };
-                return ::resolve_position::PositionResolutionPath {
-                    inner: &item.item,
-                    parent: own_path.into(),
-                }
-                .into();
+                return Self::ResolvedNode::CloseBracket(
+                    ::resolve_position::PositionResolutionPath {
+                        inner: &item.item,
+                        parent: own_path.into(),
+                    },
+                );
             }
         }
-        ::resolve_position::PositionResolutionPath {
+        Self::ResolvedNode::Bracketed(::resolve_position::PositionResolutionPath {
             inner: self,
             parent,
-        }
-        .into()
+        })
     }
 }
 ```
-
-The delegating arm's `own_path.into()` resolves to the child's `Parent` type through the parent enum's `From` impls; the leaf arms' outer `.into()` resolves to `Self::ResolvedNode` through the stage enum's `From` bounds. One field of the walk moved on purpose: a delegating field builds `own_path` inside the span check, so the borrow of `self` stays shared until a hit.
 
 For `BracketItem<TContents>`:
 
@@ -333,7 +260,7 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for BracketIte
     where
         Self: 'a;
     type ResolvedNode<'a>
-        = TContents::Resolved<'a>
+        = ResolvedBracketNode<'a, TContents>
     where
         Self: 'a;
 
@@ -343,30 +270,41 @@ impl<TContents: TreeContents> ::resolve_position::ResolvePosition for BracketIte
         position: ::span::Span,
     ) -> Self::ResolvedNode<'a> {
         match self {
-            BracketItem::Inner(inner) => inner.resolve(parent, position),
-            BracketItem::Bracketed(inner) => inner.resolve(parent, position),
-            // #[resolve_field(leaf)]: the payload's path converts, no delegation.
-            BracketItem::StrayClose(inner) => ::resolve_position::PositionResolutionPath {
-                inner,
-                parent,
+            // #[resolve_field(leaf = ...)]: the payload's path is the answer; the parent
+            // passes through the reflexive From.
+            BracketItem::Inner(inner) => {
+                Self::ResolvedNode::Inner(::resolve_position::PositionResolutionPath {
+                    inner,
+                    parent: parent.into(),
+                })
             }
-            .into(),
+            BracketItem::Bracketed(inner) => inner.resolve(parent, position),
+            BracketItem::StrayClose(inner) => {
+                Self::ResolvedNode::CloseBracket(::resolve_position::PositionResolutionPath {
+                    inner,
+                    parent: parent.into(),
+                })
+            }
         }
     }
 }
 ```
 
-`MatchedBrackets<TContents>` generates the same shape as today's root — the loop over items with `own_path.into()` delegation, then the fallback `PositionResolutionPath { inner: self, parent }.into()`.
+`MatchedBrackets<TContents>` keeps today's shape: the items loop delegating through `own_path.into()`, then the fallback `Self::ResolvedNode::MatchedBrackets(...)`.
+
+The stray arm's `inner` is `&TContents::StrayClose` and the variant's payload wants `&CloseBracket`: this compiles at any stage whose slot is `CloseBracket`, which is every planned stage, and a stage that changes the slot gets a compile error at its `resolve` call sites — the error is the feature, since such a stage must decide its stray leaf then.
 
 ### Tests
 
-The bracket suite is the regression harness: every existing resolution test keeps its assertions, since at `BracketsMatched` the answers are unchanged. One addition proves the generic walk is generic in more than name:
+The bracket suite keeps every assertion: at `BracketsMatched` the answers are unchanged. One addition: a `#[cfg(test)]` second `TreeContents` implementor whose `Inner` is a newtype run, with one test resolving into `ResolvedBracketNode::Inner` at that stage — proving the walk is generic in fact.
 
-- A second `TreeContents` implementor in `#[cfg(test)]` whose `Inner` is a run newtype with its own resolved enum, resolved through `MatchedBrackets<ThatStage>` — the compile is most of the assertion, and one test resolves a position into the stage-specific leaf.
+## Change 3: derived test extractors
+
+`ResolvedBracketNode` gains `#[cfg_attr(test, derive(derive_more::Unwrap))]`, with `derive_more = { version = "2", features = ["unwrap"] }` as a dev-dependency (mercury in freddie is the precedent). The tests' bespoke extractors (`run`, `open_bracket`, `close_bracket`, `group_leaf`) are deleted in favor of the derived `unwrap_inner()`, `unwrap_open_bracket()`, `unwrap_close_bracket()`, `unwrap_bracketed()`; under `cfg_attr(test, ...)` the panicking methods exist only in test builds, so no production surface grows.
 
 ## Landing checklist
 
-1. Change 1 in matched_brackets.rs; `cargo test` green with no test edits.
-2. Change 2 across resolve_position, resolve_position_macros, and matched_brackets.rs; `cargo test` green with no assertion edits.
-3. chunking.md's resolution section becomes implementable; its doc gains the `Chunked` resolved enum on top of this.
-4. Move this doc to refactors/past.
+1. Change 1; `cargo test` green with no test edits.
+2. Change 2; `cargo test` green with no assertion edits.
+3. Change 3; the bespoke extractors deleted.
+4. chunking.md's resolution section is implementable on top; move this doc to refactors/past.

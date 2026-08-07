@@ -1,6 +1,6 @@
 # Chunking
 
-Requires generic-resolution.md, which is what makes `MatchedBrackets<Chunked>` resolvable; the resolution section below lands on top of it.
+Requires generic-resolution.md, which is what makes `MatchedBrackets<Chunked>` resolvable at the tree level; the resolution section below adds the run-interior step on top of it.
 
 The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>` through `map`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible. It validates nothing and emits no errors; every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
 
@@ -153,32 +153,22 @@ fn chunk_run(Inner(tokens): Inner) -> ChunkedRun {
 
 ### Resolution
 
-`Chunked` supplies its resolved enum through generic-resolution.md's machinery, so `MatchedBrackets<Chunked>` resolves the day it exists. The stage impl grows the associated type:
+The tree query needs nothing from this doc: generic-resolution.md makes `MatchedBrackets<Chunked>` resolve as-is, with a position in a run answering `ResolvedBracketNode::Inner(InnerPath<'a, Chunked>)` — a path to the `ChunkedRun` with its full ancestry. The chunk-level question is the second step: `ChunkedRun` resolves its own interior, parented by that `InnerPath`, so a chunk's path chains run, group, root.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-impl TreeContents for Chunked {
-    type Inner = ChunkedRun;
-    type StrayClose = CloseBracket;
-    type Resolved<'a> = ResolvedChunkedNode<'a>;
-}
-
-/// Every node a position can resolve to at the chunked stage. The bracket-structure
-/// variants are the generic walk's answers; the last three are this stage's leaves,
-/// reached through `ChunkedRun`'s own resolve.
+/// Every node a position can resolve to inside one chunked run: the run itself (a
+/// position on whitespace between its items), a chunk, or a separator.
 #[derive(Debug)]
-pub enum ResolvedChunkedNode<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a, Chunked>),
-    Bracketed(BracketedPath<'a, Chunked>),
-    OpenBracket(OpenBracketPath<'a, Chunked>),
-    CloseBracket(CloseBracketPath<'a, Chunked>),
+#[cfg_attr(test, derive(derive_more::Unwrap))]
+pub enum ResolvedChunkedRunNode<'a> {
     ChunkedRun(ChunkedRunPath<'a>),
     Chunk(ChunkPath<'a>),
     Separator(SeparatorPath<'a>),
 }
 
 pub type ChunkedRunPath<'a> =
-    PositionResolutionPath<&'a ChunkedRun, BracketItemParent<'a, Chunked>>;
+    PositionResolutionPath<&'a ChunkedRun, InnerPath<'a, Chunked>>;
 
 /// The one place a `ChunkedRunItem` can sit: its run.
 #[derive(Debug)]
@@ -186,100 +176,52 @@ pub enum ChunkedRunItemParent<'a> {
     ChunkedRun(ChunkedRunPath<'a>),
 }
 
-impl<'a> From<ChunkedRunPath<'a>> for ChunkedRunItemParent<'a> {
-    fn from(path: ChunkedRunPath<'a>) -> Self {
-        ChunkedRunItemParent::ChunkedRun(path)
-    }
-}
-
 pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedRunItemParent<'a>>;
 pub type SeparatorPath<'a> = PositionResolutionPath<&'a Separator, ChunkedRunItemParent<'a>>;
 ```
 
-The `From` impls that satisfy `Chunked::Resolved`'s bounds and this stage's own constructions; `StrayClosePath<'a, Chunked>` normalizes to `CloseBracketPath<'a, Chunked>`, so the one impl covers the stray bound:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl<'a> From<MatchedBracketsPath<'a, Chunked>> for ResolvedChunkedNode<'a> {
-    fn from(path: MatchedBracketsPath<'a, Chunked>) -> Self {
-        ResolvedChunkedNode::MatchedBrackets(path)
-    }
-}
-
-impl<'a> From<BracketedPath<'a, Chunked>> for ResolvedChunkedNode<'a> {
-    fn from(path: BracketedPath<'a, Chunked>) -> Self {
-        ResolvedChunkedNode::Bracketed(path)
-    }
-}
-
-impl<'a> From<OpenBracketPath<'a, Chunked>> for ResolvedChunkedNode<'a> {
-    fn from(path: OpenBracketPath<'a, Chunked>) -> Self {
-        ResolvedChunkedNode::OpenBracket(path)
-    }
-}
-
-impl<'a> From<CloseBracketPath<'a, Chunked>> for ResolvedChunkedNode<'a> {
-    fn from(path: CloseBracketPath<'a, Chunked>) -> Self {
-        ResolvedChunkedNode::CloseBracket(path)
-    }
-}
-
-impl<'a> From<ChunkedRunPath<'a>> for ResolvedChunkedNode<'a> {
-    fn from(path: ChunkedRunPath<'a>) -> Self {
-        ResolvedChunkedNode::ChunkedRun(path)
-    }
-}
-
-impl<'a> From<ChunkPath<'a>> for ResolvedChunkedNode<'a> {
-    fn from(path: ChunkPath<'a>) -> Self {
-        ResolvedChunkedNode::Chunk(path)
-    }
-}
-
-impl<'a> From<SeparatorPath<'a>> for ResolvedChunkedNode<'a> {
-    fn from(path: SeparatorPath<'a>) -> Self {
-        ResolvedChunkedNode::Separator(path)
-    }
-}
-```
-
-and the chunk types' derives replace the plain derive lines shown above:
+The derives, replacing the plain derive lines shown above — `ChunkedRun` delegates into its items, and the items are leaves; `Chunk` and `Separator` implement nothing:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = BracketItemParent<'a, Chunked>,
-    resolved_node = ResolvedChunkedNode<'a>
+    parent_type = InnerPath<'a, Chunked>,
+    resolved_node = ResolvedChunkedRunNode<'a>
 )]
 pub struct ChunkedRun(#[resolve_field] pub Vec<WithSpan<ChunkedRunItem>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = ChunkedRunItemParent<'a>,
-    resolved_node = ResolvedChunkedNode<'a>
+    resolved_node = ResolvedChunkedRunNode<'a>
 )]
 pub enum ChunkedRunItem {
+    #[resolve_field(leaf = Chunk)]
     Chunk(Chunk),
+    #[resolve_field(leaf = Separator)]
     Separator(Separator),
 }
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = ChunkedRunItemParent<'a>,
-    resolved_node = ResolvedChunkedNode<'a>
-)]
-pub struct Chunk(pub Vec<WithSpan<NonBracketTokenKind>>);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = ChunkedRunItemParent<'a>,
-    resolved_node = ResolvedChunkedNode<'a>
-)]
-pub struct Separator(pub Vec<WithSpan<SeparatorToken>>);
 ```
 
-`ChunkedRunItem` is all-delegate; `Chunk` and `Separator` have no marked fields, so each is a leaf answering its own path, and a position on any token inside a chunk answers that chunk. The resolution answers, on `foo { bar, baz }`: `baz` answers its `Chunk`, whose path climbs the interior `ChunkedRun`, the brace `Bracketed`, and the root; the comma answers its `Separator`; `{` answers `OpenBracket`; whitespace inside a run but outside its items answers the `ChunkedRun`; whitespace outside every item answers the group or the root.
+with the one `From` the delegation needs:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+impl<'a> From<ChunkedRunPath<'a>> for ChunkedRunItemParent<'a> {
+    fn from(path: ChunkedRunPath<'a>) -> Self {
+        ChunkedRunItemParent::ChunkedRun(path)
+    }
+}
+```
+
+The two-step query, as a consumer writes it: resolve the tree, and when the answer is `Inner`, resolve the run with that path as the parent.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs (tests)
+let run_path = tree.resolve((), position).unwrap_inner();
+let node = run_path.inner.resolve(run_path, position);
+```
 
 ### Tests
 
@@ -516,25 +458,30 @@ mod tests {
         }
     }
 
+    /// The two-step query: the tree answers the run, the run answers its interior.
+    fn resolve_within_run(
+        tree: &MatchedBrackets<Chunked>,
+        position: Span,
+    ) -> ResolvedChunkedRunNode<'_> {
+        let run_path = tree.resolve((), position).unwrap_inner();
+        run_path.inner.resolve(run_path, position)
+    }
+
     #[test]
     fn a_chunk_resolves_with_its_full_ancestry() {
         let text = "foo { bar, baz }";
         let tree = chunked(text);
-        match tree.resolve((), span_of(text, "baz")) {
-            ResolvedChunkedNode::Chunk(baz) => {
-                let ChunkedRunItemParent::ChunkedRun(interior) = baz.parent;
-                match interior.parent {
-                    BracketItemParent::Bracketed(brace) => {
-                        assert!(brace.inner.closing.is_some());
-                        assert!(matches!(
-                            brace.parent,
-                            BracketItemParent::MatchedBrackets(_)
-                        ));
-                    }
-                    parent => panic!("expected the brace group, got {parent:?}"),
-                }
+        let baz = resolve_within_run(&tree, span_of(text, "baz")).unwrap_chunk();
+        let ChunkedRunItemParent::ChunkedRun(interior) = baz.parent;
+        match interior.parent.parent {
+            BracketItemParent::Bracketed(brace) => {
+                assert!(brace.inner.closing.is_some());
+                assert!(matches!(
+                    brace.parent,
+                    BracketItemParent::MatchedBrackets(_)
+                ));
             }
-            node => panic!("expected the chunk leaf, got {node:?}"),
+            parent => panic!("expected the brace group, got {parent:?}"),
         }
     }
 
@@ -542,16 +489,15 @@ mod tests {
     fn a_separator_and_a_brace_resolve_to_their_nodes() {
         let text = "foo { bar, baz }";
         let tree = chunked(text);
-        match tree.resolve((), span_of(text, ",")) {
-            ResolvedChunkedNode::Separator(comma) => {
-                let ChunkedRunItemParent::ChunkedRun(interior) = comma.parent;
-                assert!(matches!(interior.parent, BracketItemParent::Bracketed(_)));
-            }
-            node => panic!("expected the separator leaf, got {node:?}"),
-        }
+        let comma = resolve_within_run(&tree, span_of(text, ",")).unwrap_separator();
+        let ChunkedRunItemParent::ChunkedRun(interior) = comma.parent;
+        assert!(matches!(
+            interior.parent.parent,
+            BracketItemParent::Bracketed(_)
+        ));
         assert!(matches!(
             tree.resolve((), span_of(text, "{")),
-            ResolvedChunkedNode::OpenBracket(_)
+            ResolvedBracketNode::OpenBracket(_)
         ));
     }
 
