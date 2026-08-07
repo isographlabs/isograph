@@ -1,6 +1,6 @@
 # resolve_position: mixed enums
 
-`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out mixed enums, where only some variants continue into the same resolved-node family: chunking.md's `ChunkItem`, whose `SelectionSet` variant descends in the chunk query while its other variants answer the enclosing chunk. This doc adds variant-level marking to the macro's enum derive: `#[resolve_field]` on a variant marks it as delegating, and unmarked variants answer a declared fallback. A delegating variant's payload shares the enum's `Parent` type, as in the all-delegate emission.
+`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out mixed enums, where only some variants continue into the same resolved-node family. `ChunkItem` was the one candidate user, and chunking's rewrite as a map over the run slot deleted it, so this doc is parked with no current user. It adds variant-level marking to the macro's enum derive: `#[resolve_field]` on a variant marks it as delegating, and unmarked variants answer a declared fallback. A delegating variant's payload shares the enum's `Parent` type, as in the all-delegate emission.
 
 ## The change
 
@@ -41,8 +41,6 @@ impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
 }
 ```
 
-The fallback arm's `parent.into()` asks for one conversion, `From<Parent>` into the fallback variant's payload; for a single-variant parent enum that is a five-line unwrap, written where the parent enum lives. chunking.md's `From<ChunkItemParent<'a>> for ChunkPath<'a>` is the first one.
+The fallback arm's `parent.into()` asks for one conversion, `From<Parent>` into the fallback variant's payload; for a single-variant parent enum that is a five-line unwrap, written where the parent enum lives.
 
 `fallback` is required iff some variant is unmarked, and giving it on an all-delegate enum is an error. A variant with named fields or multiple unnamed fields is an error, as today. A marked unit variant is an error (there is no payload to delegate into), and an enum whose every variant is marked is the all-delegate emission with redundant marks, rejected with an error saying to drop the marks.
-
-`ChunkItem`'s generated impl, written out in chunking.md, is the first use of the mixed emission.
