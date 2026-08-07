@@ -2,7 +2,7 @@
 
 The macro's enum delegation arms call `inner.resolve(parent.into(), position)` instead of `inner.resolve(parent, position)`.
 
-Today a payload's `Parent` type must equal its containing enum's `Parent` type, because the parent is passed through untouched. With the conversion, a payload may have its own parent enum, one total `From` away: the path then records which position the node sits in, and one node type can appear in several positions. The first user is `CloseBracket` (close-bracket-parent.md), which sits both as a group's real closing and as a stray item, with `CloseBracketParent` an enum of the two.
+Today a payload's `Parent` type must equal its containing enum's `Parent` type, because the parent is passed through untouched. With the conversion, a payload may have its own parent enum, one total `From` away: the path then records which position the node sits in, and one node type can appear in several positions. No current design needs it: the close bracket's two positions are served by a stray newtype whose hand-written resolve builds the parent, with no macro change. Parked until a delegation arm genuinely needs a conversion.
 
 This ships alone with no behavior change: `impl<T> From<T> for T` makes the conversion the identity for every existing derive.
 
@@ -48,4 +48,4 @@ impl ::resolve_position::ResolvePosition for BracketItem<BracketsMatched> {
 }
 ```
 
-Every payload here has `Parent = BracketItemParent`, so each `.into()` is the reflexive `From` and the impl is unchanged in behavior. close-bracket-parent.md's `From<BracketItemParent> for CloseBracketParent` is the first non-reflexive conversion.
+Every payload here has `Parent = BracketItemParent`, so each `.into()` is the reflexive `From` and the impl is unchanged in behavior.

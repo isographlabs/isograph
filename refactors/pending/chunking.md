@@ -50,7 +50,7 @@ The stage and its run type:
 use span::{Span, WithSpan};
 
 use crate::{
-    BracketsMatched, CloseBracket, Inner, MatchedBrackets, NonBracketTokenKind, TreeContents,
+    BracketsMatched, Inner, MatchedBrackets, NonBracketTokenKind, StrayClose, TreeContents,
 };
 
 /// The stage `chunk` produces. The tree keeps the bracket tree's shape, with every run chunked.
@@ -59,7 +59,7 @@ pub struct Chunked;
 
 impl TreeContents for Chunked {
     type Inner = ChunkedRun;
-    type StrayClose = CloseBracket;
+    type StrayClose = StrayClose;
 }
 
 /// One run, chunked into alternating chunks and separators, built with no two adjacent
