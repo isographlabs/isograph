@@ -1,0 +1,195 @@
+# The close-bracket node
+
+A close bracket becomes a node, `CloseBracket`, with its own resolution leaf. A position on a stray close and a position on a group's real close both answer `CloseBracket`; which of the two it is gets read off the path, because the parent is an enum of the positions a close can sit in. The bracket query's leaves are then `Inner`, `OpenBracket`, and `CloseBracket`, with `Bracketed` and the root answering whitespace.
+
+A group's closing becomes `Option<WithSpan<CloseBracket>>`: `Some` is the close the author typed, `None` is a group that never got its close and was forced to end. The macro already walks `Option<WithSpan<T>>` fields, so no macro emission changes here; the one prerequisite is resolve-position-parent-conversion.md, which lets the one `CloseBracket` type sit in both positions.
+
+1. Change 1: `CloseBracket` replaces `UnmatchedClose`. Ships alone.
+2. resolve-position-parent-conversion.md ships.
+3. Change 2: the closing becomes optional and resolves.
+4. Change 3: the cases doc.
+
+## Change 1: `CloseBracket` replaces `UnmatchedClose`
+
+In `matched_brackets.rs`, a pure rename; strays answer the new leaf, and a position on a real close keeps answering the group until Change 2.
+
+Before:
+
+```rust
+/// A close bracket no open of its kind was waiting for; it is an invalid section one token
+/// wide.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct UnmatchedClose(pub BracketKind);
+```
+
+After:
+
+```rust
+/// A close bracket token.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct CloseBracket(pub BracketKind);
+```
+
+Every appearance follows the rename:
+
+- `BracketsMatched`'s slot: `type StrayClose = CloseBracket;`, and the `TreeContents<StrayClose = UnmatchedClose, ...>` bounds follow (here and where chunking.md quotes them).
+- The error: `UnexpectedClose(WithSpan<CloseBracket>)`.
+- The matcher: `BracketItem::StrayClose(CloseBracket(kind))`.
+- The resolved-node enum variant and its alias: `CloseBracket(CloseBracketPath<'a>)`, `pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;`, replacing `UnmatchedClose`/`UnmatchedClosePath`.
+- The tests' `unmatched_close` helper becomes `close_bracket`, matching `ResolvedBracketNode::CloseBracket`; the stray assertions keep their shape.
+
+## Change 2: the closing becomes optional and resolves
+
+In `matched_brackets.rs`. The `Closing` enum and the `SyntheticClose` slot come out; the closing field is the option itself, and it carries `#[resolve_field]`.
+
+Before:
+
+```rust
+pub trait TreeContents {
+    type Inner: fmt::Debug + PartialEq + Eq;
+    type StrayClose: fmt::Debug + PartialEq + Eq;
+    type SyntheticClose: fmt::Debug + PartialEq + Eq;
+}
+
+pub struct Bracketed<TContents: TreeContents> {
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
+    /// A real closing's span is its close token; a synthetic closing's span is zero-width
+    /// where the close should have been.
+    pub closing: WithSpan<Closing<TContents>>,
+    #[resolve_field]
+    pub children: Vec<WithSpan<BracketItem<TContents>>>,
+}
+
+pub enum Closing<TContents: TreeContents> {
+    Real,
+    Synthetic(TContents::SyntheticClose),
+}
+```
+
+After:
+
+```rust
+pub trait TreeContents {
+    type Inner: fmt::Debug + PartialEq + Eq;
+    type StrayClose: fmt::Debug + PartialEq + Eq;
+}
+
+pub struct Bracketed<TContents: TreeContents> {
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
+    /// The close the author typed, or `None` for a group that never got its close and was
+    /// forced to end: at the close bracket an enclosing group owns, or at the end of the
+    /// tokens. A `None` group is an invalid section.
+    #[resolve_field]
+    pub closing: Option<WithSpan<CloseBracket>>,
+    #[resolve_field]
+    pub children: Vec<WithSpan<BracketItem<TContents>>>,
+}
+```
+
+`CloseBracket`'s parent becomes the enum of its two positions, and the derive follows:
+
+```rust
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = CloseBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct CloseBracket(pub BracketKind);
+
+/// The two positions a close bracket can sit in.
+#[derive(Debug)]
+pub enum CloseBracketParent<'a> {
+    /// The real closing of this group.
+    Bracketed(BracketedPath<'a>),
+    /// A stray item, wherever items sit.
+    Stray(BracketItemParent<'a>),
+}
+
+/// The conversion `BracketItem`'s `StrayClose` arm delegates through.
+impl<'a> From<BracketItemParent<'a>> for CloseBracketParent<'a> {
+    fn from(parent: BracketItemParent<'a>) -> Self {
+        CloseBracketParent::Stray(parent)
+    }
+}
+
+pub type CloseBracketPath<'a> =
+    PositionResolutionPath<&'a CloseBracket, CloseBracketParent<'a>>;
+```
+
+The macro's existing `Option` field case emits, inside `Bracketed`'s derived resolve, between the `opening` and `children` checks (field order):
+
+```rust
+for item in self.closing.iter() {
+    if item.location.contains(position) {
+        let new_parent = <CloseBracket as ::resolve_position::ResolvePosition>::Parent::Bracketed(self.path(parent).into());
+        return item.item.resolve(new_parent, position);
+    }
+}
+```
+
+`CloseBracketParent::Bracketed` is the variant that emission names (the containing struct), with the `BracketedPath` payload unboxed so the `.into()` is the reflexive `From` on the path.
+
+The matcher's closing computation:
+
+Before:
+
+```rust
+    let closing = match tokens.peek() {
+        Some(&token)
+            if SplitToken::from(token.item)
+                == SplitToken::Bracket(BracketToken::Close(opening.item.0)) =>
+        {
+            tokens.next();
+            WithSpan::new(Closing::Real, token.location)
+        }
+        _ => {
+            let end = children
+                .last()
+                .map_or(opening.location.end, |last| last.location.end);
+            WithSpan::new(Closing::Synthetic(()), Span::new(end, end))
+        }
+    };
+
+    let span = Span::new(opening.location.start, closing.location.end);
+```
+
+After:
+
+```rust
+    let (closing, end) = match tokens.peek() {
+        Some(&token)
+            if SplitToken::from(token.item)
+                == SplitToken::Bracket(BracketToken::Close(opening.item.0)) =>
+        {
+            tokens.next();
+            (
+                Some(WithSpan::new(CloseBracket(opening.item.0), token.location)),
+                token.location.end,
+            )
+        }
+        // The group was forced to end: at a close an enclosing group owns, or at the end
+        // of the tokens. It ends after its last child, or right after the opening when
+        // there is none.
+        _ => (
+            None,
+            children
+                .last()
+                .map_or(opening.location.end, |last| last.location.end),
+        ),
+    };
+
+    let span = Span::new(opening.location.start, end);
+```
+
+The rest follows the shape change:
+
+- `errors()`: the unclosed check `matches!(bracketed.closing.item, Closing::Synthetic(()))` becomes `bracketed.closing.is_none()`.
+- `try_map` loses `map_synthetic_close`; the closing moves over untouched, and the `Bracketed` arm maps opening, closing, and children directly. The refine tests keep `StrayClose = Infallible` and drop the unclosed-paren case; a refined tree still carries optional closings, and making unclosed-ness unrepresentable returns with the `!` refinement work later.
+- The tests' `assert_balanced`/`assert_unbalanced` check `closing.is_some()`/`closing.is_none()`.
+- A position on a real close answers `CloseBracket` with `CloseBracketParent::Bracketed(group)`: `the_close_pairs_with_the_nearest_open` asserts the close leaf and the balanced group in its path instead of the group leaf. The stray tests unwrap `CloseBracketParent::Stray` to reach the item position.
+- chunking.md follows: `SelectionSet.closing` is `Option<WithSpan<CloseBracket>>`, the collectors check `is_none()`, and the bounds read `TreeContents<StrayClose = CloseBracket>`.
+
+## Change 3: the cases doc
+
+`bracket-matching-cases.md`'s resolution paragraph replaces "a position on a group's real close ... resolves to the group" and its unmatched-close leaf with: any close bracket resolves to `CloseBracket`; the path says whether it is a group's closing or a stray item; interior whitespace still resolves to the group. Its synthetic-closing vocabulary becomes the `None` closing.

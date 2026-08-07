@@ -2,7 +2,7 @@
 
 The pass after bracket matching. It takes `MatchedBrackets<BracketsMatched>`, assumes the literal is a selection set, and regroups every selection-set level (the root, and each brace group's interior, recursively) into an alternation of chunks (one per selection) and separator boundaries. Paren and square groups are not chunked at this stage: they are carried through unchanged as `Bracketed`, and this stage is cleanly separable from whatever chunks them later. Chunking is infallible: it validates nothing, emits no errors, and every token that survived the bracket pass lands in some chunk or separator. Each chunk is parsed independently by later passes.
 
-The chunked tree has its own path enum, `ResolvedChunkedSelectionSetNode`, fully separate from `ResolvedBracketNode`. Resolving a position against the bracket tree answers at token granularity (a run of `Vec<WithSpan<NonBracketTokenKind>>`, an opening, a stray close); resolving the same position against the chunked tree answers at chunk granularity (which chunk, which separator, which selection set). Two trees, two independent queries; nothing in `matched_brackets.rs`'s path family changes.
+The chunked tree has its own path enum, `ResolvedChunkedSelectionSetNode`, fully separate from `ResolvedBracketNode`. Resolving a position against the bracket tree answers at token granularity (a run of `Vec<WithSpan<NonBracketTokenKind>>`, an opening, a close); resolving the same position against the chunked tree answers at chunk granularity (which chunk, which separator, which selection set). Two trees, two independent queries; nothing in `matched_brackets.rs`'s path family changes.
 
 ## Behavior
 
@@ -51,11 +51,11 @@ The chunk query:
 - on the line break after `baz`: the trailing `Separator`
 - on `}`: the selection set
 
-The bracket query on the same text answers `Inner` on `foo`, `bar`, `baz`, the comma, and the line breaks (they are run tokens there), `OpenBracket` on `{`, and the group on `}` (the matched-close leaf once resolve-option-like-enums.md lands).
+The bracket query on the same text answers `Inner` on `foo`, `bar`, `baz`, the comma, and the line breaks (they are run tokens there), `OpenBracket` on `{`, and `CloseBracket` on `}` (close-bracket-node.md).
 
 ## Ordered changes
 
-1. The mixed-enum derive in resolve-option-like-enums.md (its Change 1, revised there to let a marked payload variant delegate). `ChunkItem`'s derive needs it; it ships first, in that doc.
+1. The mixed-enum derive in resolve-option-like-enums.md, which itself requires resolve-position-parent-conversion.md. `ChunkItem`'s derive needs it; it ships first, in those docs.
 2. Change 1 below: extract `collect_group_errors` in matched_brackets.rs. Independently shippable.
 3. Change 2 below: the chunk module and its tests.
 
@@ -67,7 +67,7 @@ Before:
 
 ```rust
             BracketItem::Bracketed(bracketed) => {
-                if matches!(bracketed.closing.item, Closing::Synthetic(())) {
+                if bracketed.closing.is_none() {
                     errors.push(BracketError::Unclosed(WithSpan::new(
                         UnclosedGroup(bracketed.opening),
                         item.location,
@@ -93,9 +93,9 @@ pub(crate) fn collect_group_errors<TContents>(
     group_span: Span,
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
+    TContents: TreeContents<StrayClose = CloseBracket>,
 {
-    if matches!(bracketed.closing.item, Closing::Synthetic(())) {
+    if bracketed.closing.is_none() {
         errors.push(BracketError::Unclosed(WithSpan::new(
             UnclosedGroup(bracketed.opening),
             group_span,
@@ -119,7 +119,7 @@ pub use chunk::*;
 pub use matched_brackets::*;
 ```
 
-There is no new stage marker. The chunked tree holds the same contents as the bracket tree (`Inner` runs, `UnmatchedClose` strays, `()` synthetic closings); what changes is the shape, so the chunk types are generic over the same `TreeContents` and their derives instantiate at `BracketsMatched` via `self_type_generics`. `Bracketed` moves into the chunk tree wholesale for paren and square groups, and closings move over untouched.
+There is no new stage marker. The chunked tree holds the same contents as the bracket tree (`Inner` runs, `CloseBracket` strays, optional closings); what changes is the shape, so the chunk types are generic over the same `TreeContents` and their derives instantiate at `BracketsMatched` via `self_type_generics`. `Bracketed` moves into the chunk tree wholesale for paren and square groups, and closings move over untouched.
 
 ### Tree types
 
@@ -210,9 +210,9 @@ pub enum ChunkItem<TContents: TreeContents> {
 )]
 pub struct SelectionSet<TContents: TreeContents> {
     pub opening: WithSpan<OpenBracket>,
-    /// A real closing's span is its close token; a synthetic closing's span is zero-width
-    /// where the close should have been.
-    pub closing: WithSpan<Closing<TContents>>,
+    /// The close the author typed, or `None` for a group that never got its close and
+    /// was forced to end.
+    pub closing: Option<WithSpan<CloseBracket>>,
     #[resolve_field]
     pub children: Vec<WithSpan<SelectionSetItem<TContents>>>,
 }
@@ -417,7 +417,7 @@ The pipeline tip still answers the errors query. A stray close rides in its chun
 ```rust
 impl<TContents> Chunks<TContents>
 where
-    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
+    TContents: TreeContents<StrayClose = CloseBracket>,
 {
     /// Every bracket error under this tree, in source order of the position each error
     /// starts at.
@@ -432,7 +432,7 @@ fn collect_chunk_errors<TContents>(
     level: &[WithSpan<SelectionSetItem<TContents>>],
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
+    TContents: TreeContents<StrayClose = CloseBracket>,
 {
     for level_item in level {
         let SelectionSetItem::Chunk(chunk) = &level_item.item else {
@@ -448,7 +448,7 @@ fn collect_chunk_errors<TContents>(
                     )));
                 }
                 ChunkItem::SelectionSet(selection_set) => {
-                    if matches!(selection_set.closing.item, Closing::Synthetic(())) {
+                    if selection_set.closing.is_none() {
                         errors.push(BracketError::Unclosed(WithSpan::new(
                             UnclosedGroup(selection_set.opening),
                             item.location,
@@ -480,7 +480,7 @@ fn a_position_resolves_to_its_chunk() {
     let bar_chunk = chunk_leaf(tree.resolve((), span_of(text, "asdf")));
     assert_eq!(bar_chunk.inner.0.len(), 2);
     let selection_set = set_of(bar_chunk.parent);
-    assert!(matches!(selection_set.inner.closing.item, Closing::Real));
+    assert!(selection_set.inner.closing.is_some());
     let foo_chunk = chunk_of(selection_set.parent);
     assert_eq!(foo_chunk.inner.0.len(), 2);
     assert_root(foo_chunk.parent);
@@ -502,5 +502,5 @@ The full suite:
 - The worked example from Behavior, position by position: `foo` answers its chunk, the space before `{` answers the same chunk, `{` and `}` answer the selection set, each line break and the comma answer their `Separator` (the comma and the line break after it the same one), the indent whitespace answers the selection set, `bar` and `baz` answer their chunks.
 - `foo, bar`: the comma's `Separator` has the root as its parent.
 - `a ) b`: one chunk; the `)` resolves to that `Chunk` (the chunk query does not descend into strays); `errors()` reports the one stray close at `span_of(text, ")")`.
-- `foo { bar`: the selection set's closing is `Closing::Synthetic(())`; `errors()` reports the one unclosed brace.
-- `foo(a`: the carried-through paren group's closing is synthetic; `errors()` reports the one unclosed paren, through the shared `collect_group_errors`.
+- `foo { bar`: the selection set's closing is `None`; `errors()` reports the one unclosed brace.
+- `foo(a`: the carried-through paren group's closing is `None`; `errors()` reports the one unclosed paren, through the shared `collect_group_errors`.
