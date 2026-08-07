@@ -609,8 +609,8 @@ impl ::resolve_position::ResolvePosition for Bracketed {
 
 `BracketItem`'s arms carry the `parent.into()` of the revived parent-conversion doc; both conversions are reflexive there, since `RawToken` and `Bracketed` declare `BracketItemParent` themselves. `RawToken` is where the revived macro capabilities do real work:
 
-- resolve-position-parent-conversion.md: delegation arms call `inner.resolve(parent.into(), position)`, so a marked variant's payload may have its own parent enum one total `From` away.
-- resolve-option-like-enums.md: an enum with marked variants delegates those and answers a declared `fallback` for the unmarked rest.
+- resolve-position-parent-conversion.md: both parent-construction sites go through `From` — delegation arms call `inner.resolve(parent.into(), position)`, field emissions call `Parent::from(self.path(parent))` — so a payload's parent may be its own enum or a plain alias.
+- resolve-option-like-enums.md: `#[resolve_into]` variants continue into their payload's resolution, and unmarked variants answer the declared `fallback`.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -622,9 +622,9 @@ impl ::resolve_position::ResolvePosition for Bracketed {
 )]
 pub enum RawToken {
     NonBracket(NonBracketTokenKind),
-    #[resolve_field]
+    #[resolve_into]
     Open(OpenBracket),
-    #[resolve_field]
+    #[resolve_into]
     Close(CloseBracket),
 }
 ```
