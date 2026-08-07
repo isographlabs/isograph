@@ -104,7 +104,7 @@ for item in self.closing.iter() {
 }
 ```
 
-`BracketItemParent::Bracketed` is the variant that emission names (the containing struct), and its `Box<BracketedPath>` payload is what the `.into()` produces from the path.
+The macro always names the parent variant after the struct the field lives on, so this emission constructs `BracketItemParent::Bracketed`. `self.path(parent)` builds the `BracketedPath`, and the `.into()` boxes it to match the variant's `Box<BracketedPath>` payload.
 
 The matcher's closing computation:
 
