@@ -16,6 +16,7 @@ This section is extremely important. A frequent source of frustration is deviati
 - Move a `refactors/pending` doc to `refactors/past` when we will not work on it in the future.
 - Each doc must, at all times that we are actively working on it, conform to several standards:
   - It should describe what we are building. Do not discuss how we came to a conclusion, or what we are not building. Do not narrate your thought process. Do not discuss what has already landed.
+  - All big changes must be discussed, either in the document or with the user in chat. Any big change that surprises the user is an automatic reason to not proceed. YOU MUST RUN ALL BIG CHANGES BY THE USER, especially those that relate to "inner" or "core" or "reusable" code, or code that should exemplify best practices.
   - It should have enough information for a new agent, with no context, to completely implement the feature **without making any important decisions.** All decisions are made as part of the planning document. Do not take shortcuts.
   - Stubs, hand-waving, and "sketch this later" are disallowed. The planning document must be comprehensive: write out the real types, functions, call sites, and before/after snippets. If we do not actually write the stuff out, it is impossible to know whether the implementation is real or just fantasy.
   - Every struct, enum, and other data type must be written out in full. The data layout is the most important thing to review; a prose description of the shape is not a substitute for the actual fields and variants.
