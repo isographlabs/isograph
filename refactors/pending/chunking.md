@@ -1,6 +1,6 @@
 # Chunking
 
-The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible. It validates nothing and emits no errors; every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
+The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>` through `map`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible. It validates nothing and emits no errors; every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
 
 A group is not part of any chunk. In `foo { bar }` the top level is a chunked run holding the chunk `foo`, followed by the brace group as its sibling item; that a selection is a chunk plus the group after it is an adjacency the chunk-parsing pass reads off the level when it assembles selections.
 
@@ -28,65 +28,7 @@ has one chunk, `a`: each group's interior run is a lone separator, and the top l
 
 `foo { bar(a: }) }` chunks whatever the bracket pass produced, strays included: the top level keeps the strays `)` and `}` as items, untouched, and `a :` becomes the one chunk of the parenthesis group's interior.
 
-## Change 1 (prefactor): `map`
-
-`MatchedBrackets` gains the infallible counterpart of `try_map`, for passes that cannot refuse; without it, an infallible pass through `try_map` would unwrap a `Result` that cannot fail. In `matched_brackets.rs`, beside `try_map`:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
-    /// Cross the tree to another stage, mapping every slot. The shape is unchanged.
-    pub fn map<TTo: TreeContents>(
-        self,
-        map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
-        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
-    ) -> MatchedBrackets<TTo> {
-        MatchedBrackets(map_items(self.0, map_inner, map_stray_close))
-    }
-}
-
-fn map_items<TFrom, TTo>(
-    items: Vec<WithSpan<BracketItem<TFrom>>>,
-    map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> TTo::Inner,
-    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> TTo::StrayClose,
-) -> Vec<WithSpan<BracketItem<TTo>>>
-where
-    TFrom: TreeContents,
-    TTo: TreeContents,
-{
-    items
-        .into_iter()
-        .map(|with_span| {
-            let WithSpan {
-                item,
-                location: span,
-            } = with_span;
-            let item = match item {
-                BracketItem::Inner(inner) => {
-                    BracketItem::Inner(map_inner(WithSpan::new(inner, span)))
-                }
-                BracketItem::StrayClose(stray) => {
-                    BracketItem::StrayClose(map_stray_close(WithSpan::new(stray, span)))
-                }
-                BracketItem::Bracketed(Bracketed {
-                    opening,
-                    children,
-                    closing,
-                }) => BracketItem::Bracketed(Bracketed {
-                    opening,
-                    children: map_items(children, map_inner, map_stray_close),
-                    closing,
-                }),
-            };
-            WithSpan::new(item, span)
-        })
-        .collect()
-}
-```
-
-Independently shippable; `try_map` is untouched.
-
-## Change 2: the chunk stage
+## The change
 
 New module `crates/isograph_parser/src/chunk.rs`, registered in lib.rs alongside the existing modules:
 
@@ -141,7 +83,7 @@ pub enum SeparatorToken {
 }
 ```
 
-The pass:
+The pass. `chunk_run` consumes each run through a peekable, the discipline the matcher already uses: each outer iteration emits exactly one complete node, so the alternation invariant holds by loop structure, with no accumulators crossing function boundaries.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -163,60 +105,41 @@ fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
 /// Split one token run at separator tokens; consecutive separator tokens collapse into
 /// one boundary.
 fn chunk_run(Inner(tokens): Inner) -> ChunkedRun {
+    let mut tokens = tokens.into_iter().peekable();
     let mut items = Vec::new();
-    let mut chunk: Vec<WithSpan<NonBracketTokenKind>> = Vec::new();
-    let mut boundary: Vec<WithSpan<SeparatorToken>> = Vec::new();
-    for token in tokens {
-        match separator_token(token.item) {
-            Some(separator) => {
-                flush_chunk(&mut items, &mut chunk);
+    while let Some(&first) = tokens.peek() {
+        if separator_token(first.item).is_some() {
+            let mut span = first.location;
+            let mut boundary = Vec::new();
+            while let Some(&token) = tokens.peek() {
+                let Some(separator) = separator_token(token.item) else {
+                    break;
+                };
+                tokens.next();
+                span = Span::join(span, token.location);
                 boundary.push(WithSpan::new(separator, token.location));
             }
-            None => {
-                flush_separator(&mut items, &mut boundary);
+            items.push(WithSpan::new(
+                ChunkedRunItem::Separator(Separator(boundary)),
+                span,
+            ));
+        } else {
+            let mut span = first.location;
+            let mut chunk = Vec::new();
+            while let Some(&token) = tokens.peek() {
+                if separator_token(token.item).is_some() {
+                    break;
+                }
+                tokens.next();
+                span = Span::join(span, token.location);
                 chunk.push(token);
             }
+            items.push(WithSpan::new(ChunkedRunItem::Chunk(Chunk(chunk)), span));
         }
     }
-    flush_chunk(&mut items, &mut chunk);
-    flush_separator(&mut items, &mut boundary);
     ChunkedRun(items)
 }
-
-/// End the chunk in progress, if any, spanning its first token's start to its last
-/// token's end.
-fn flush_chunk(
-    items: &mut Vec<WithSpan<ChunkedRunItem>>,
-    chunk: &mut Vec<WithSpan<NonBracketTokenKind>>,
-) {
-    let span = match (chunk.first(), chunk.last()) {
-        (Some(first), Some(last)) => Span::join(first.location, last.location),
-        _ => return,
-    };
-    items.push(WithSpan::new(
-        ChunkedRunItem::Chunk(Chunk(std::mem::take(chunk))),
-        span,
-    ));
-}
-
-/// End the boundary in progress, if any, spanning its first token's start to its last
-/// token's end.
-fn flush_separator(
-    items: &mut Vec<WithSpan<ChunkedRunItem>>,
-    boundary: &mut Vec<WithSpan<SeparatorToken>>,
-) {
-    let span = match (boundary.first(), boundary.last()) {
-        (Some(first), Some(last)) => Span::join(first.location, last.location),
-        _ => return,
-    };
-    items.push(WithSpan::new(
-        ChunkedRunItem::Separator(Separator(std::mem::take(boundary))),
-        span,
-    ));
-}
 ```
-
-A chunk in progress flushes when a separator token arrives and a boundary in progress flushes when a chunk token arrives, so a run comes out as chunks and separators alternating, with a boundary allowed first and last.
 
 `errors()` needs nothing: its bound is `TreeContents<StrayClose = CloseBracket>`, which `Chunked` satisfies, so `MatchedBrackets<Chunked>` answers the errors query as-is.
 
