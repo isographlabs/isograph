@@ -4,6 +4,99 @@
 
 Two changes: the macro emits generic impls with leaf modes, and the test extractors become derived.
 
+## The enclosing group's validity
+
+Every path segment declares the validity of what it passes through: a stray declares itself through `CloseBracketParent::Stray`, and an enclosing group that was forced shut declares itself through its own parent variant, so a consumer reads "invalid section" off a path by matching variants alone.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// Everything a `BracketItem` can sit inside.
+#[derive(Debug)]
+pub enum BracketItemParent<'a, TContents: TreeContents = BracketsMatched> {
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
+    Bracketed(Box<BracketedPath<'a, TContents>>),
+}
+
+/// The conversion the leaf emissions build parents through.
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for BracketItemParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        BracketItemParent::Bracketed(Box::new(path))
+    }
+}
+
+/// The one place an opening bracket can sit: its group.
+#[derive(Debug)]
+pub enum OpenBracketParent<'a, TContents: TreeContents = BracketsMatched> {
+    Bracketed(Box<BracketedPath<'a, TContents>>),
+}
+
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for OpenBracketParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        OpenBracketParent::Bracketed(Box::new(path))
+    }
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// Everything a `BracketItem` can sit inside.
+#[derive(Debug)]
+pub enum BracketItemParent<'a, TContents: TreeContents = BracketsMatched> {
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
+    /// Inside a group that genuinely closed.
+    Bracketed(Box<BracketedPath<'a, TContents>>),
+    /// Inside a group that never got its close and was forced to end: an invalid section.
+    UnclosedBracketed(Box<BracketedPath<'a, TContents>>),
+}
+
+/// The conversion the emissions build parents through; the group's closing decides the
+/// variant.
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for BracketItemParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        if path.inner.closing.is_some() {
+            BracketItemParent::Bracketed(Box::new(path))
+        } else {
+            BracketItemParent::UnclosedBracketed(Box::new(path))
+        }
+    }
+}
+
+/// The two groups an opening bracket can sit in.
+#[derive(Debug)]
+pub enum OpenBracketParent<'a, TContents: TreeContents = BracketsMatched> {
+    /// The group genuinely closed.
+    Bracketed(Box<BracketedPath<'a, TContents>>),
+    /// The group never got its close and was forced to end: an invalid section.
+    UnclosedBracketed(Box<BracketedPath<'a, TContents>>),
+}
+
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for OpenBracketParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        if path.inner.closing.is_some() {
+            OpenBracketParent::Bracketed(Box::new(path))
+        } else {
+            OpenBracketParent::UnclosedBracketed(Box::new(path))
+        }
+    }
+}
+```
+
+`CloseBracketParent::Closing` needs no split: only a genuinely closed group has a closing token to resolve. The macro emissions are untouched — the branch lives in the `From`. Unlike `Stray`, these variants' payloads are not slot-typed, so they stay inhabited at every stage; their voiding arrives when the never-type refinement makes forced-shut groups unrepresentable in the tree.
+
+Test updates in the existing suite: the extractors split along the variants — `enclosing_group` matches `Bracketed` and a new `unclosed_enclosing_group` matches `UnclosedBracketed` — and each test walking into a forced-shut group (`the_close_pairs_with_the_nearest_open`, `wrong_kind_opens_close_synthetically_and_nest`, `content_after_an_unclosed_open_sits_inside_the_unbalanced_group`, the crossing and wrong-kind cases) uses the matching extractor, with `assert_balanced`/`assert_unbalanced` keeping their closing checks as consistency assertions.
+
 ## The close bracket's parent
 
 A close bracket sits in one of two positions, and its parent enum says which:
