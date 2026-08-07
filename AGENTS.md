@@ -34,6 +34,7 @@ This section is extremely important. A frequent source of frustration is deviati
 - When a doc is not being actively worked on, it may become stale. That is okay. It should be updated to not be stale when we start working on it in the future. In other words, if we are working on `A`, and `B` depends on `A`, we do not need to keep `B` up to date unless it's part of the discussion.
 - If a refactor is too large and should be broken up into smaller steps, let the user know, and do so. The files should be "conceptually different".
 - While we are iterating on a pending doc, stay in the doc. Start implementing only when the user gives explicit permission to implement. "Looks good," edits to the doc, "go on," "continue," or further planning discussion are not permission. If there is any ambiguity about whether implementation has been authorized, do not start implementing.
+- If, due to iteration or requirements changing, a previous requirement or goal becomes unachievable, RAISE THIS WITH THE USER.
 
 ## Implementing a refactor doc
 
