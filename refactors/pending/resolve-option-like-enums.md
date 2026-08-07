@@ -7,6 +7,7 @@
 `ResolvePositionArgs` gains one optional ident:
 
 ```rust
+// crates/resolve_position_macros/src/resolve_position_macro.rs
 #[derive(deluxe::ExtractAttributes)]
 #[deluxe(attributes(resolve_position))]
 struct ResolvePositionArgs {

@@ -66,6 +66,7 @@ The group arm of the existing error collector becomes a `pub(crate)` function, s
 Before:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
             BracketItem::Bracketed(bracketed) => {
                 if bracketed.closing.is_none() {
                     errors.push(BracketError::Unclosed(WithSpan::new(
@@ -80,12 +81,14 @@ Before:
 After:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
             BracketItem::Bracketed(bracketed) => {
                 collect_group_errors(bracketed, item.location, errors);
             }
 ```
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
 /// The errors of one group and its subtree: its own synthetic closing, if any, then its
 /// children's errors.
 pub(crate) fn collect_group_errors<TContents>(

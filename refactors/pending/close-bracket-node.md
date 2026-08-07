@@ -1,6 +1,6 @@
 # The close-bracket node
 
-A close bracket becomes a node, `CloseBracket`, with its own resolution leaf. A position on a stray close and a position on a group's real close both answer `CloseBracket`, with `BracketItemParent` as the parent either way; whether the close is a group's own is not this level's business. The bracket query's leaves are then `Inner`, `OpenBracket`, and `CloseBracket`, with `Bracketed` and the root answering whitespace.
+A close bracket becomes a node, `CloseBracket`, with its own resolution leaf: one type for every close bracket token, wherever it sits. A group's real closing holds a `CloseBracket` (Change 2), and a stray close is a `CloseBracket` in the `StrayClose` slot — the type names its content, a close token with its kind, and the diagnosis stays where the position is: `StrayClose`, `BracketError::UnexpectedClose`. That sharing is why the stray type cannot keep the name `UnmatchedClose`: after Change 2 it also sits on every well-formed group. Both positions resolve with `BracketItemParent` as the parent; whether the close is a group's own is not this level's business. The bracket query's leaves are then `Inner`, `OpenBracket`, and `CloseBracket`, with `Bracketed` and the root answering whitespace.
 
 A group's closing becomes `Option<WithSpan<CloseBracket>>`: `Some` is the close the author typed, `None` is a group that never got its close and was forced to end. The macro already walks `Option<WithSpan<T>>` fields, so there are no macro changes.
 
@@ -10,11 +10,12 @@ A group's closing becomes `Option<WithSpan<CloseBracket>>`: `Some` is the close 
 
 ## Change 1: `CloseBracket` replaces `UnmatchedClose`
 
-In `matched_brackets.rs`, a pure rename; strays answer the new leaf, and a position on a real close keeps answering the group until Change 2.
+In `matched_brackets.rs`, the rename Change 2 requires, landed first so the `ResolvedBracketNode` reshape ships alone. Strays answer the new leaf immediately; a position on a real close keeps answering the group until Change 2.
 
 Before:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
 /// A close bracket no open of its kind was waiting for; it is an invalid section one token
 /// wide.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -25,6 +26,7 @@ pub struct UnmatchedClose(pub BracketKind);
 After:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
 /// A close bracket token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
@@ -47,6 +49,7 @@ In `matched_brackets.rs`. The `Closing` enum and the `SyntheticClose` slot come 
 Before:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
 pub trait TreeContents {
     type Inner: fmt::Debug + PartialEq + Eq;
     type StrayClose: fmt::Debug + PartialEq + Eq;
@@ -72,6 +75,7 @@ pub enum Closing<TContents: TreeContents> {
 After:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
 pub trait TreeContents {
     type Inner: fmt::Debug + PartialEq + Eq;
     type StrayClose: fmt::Debug + PartialEq + Eq;
@@ -111,6 +115,7 @@ The matcher's closing computation:
 Before:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
     let closing = match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
@@ -133,6 +138,7 @@ Before:
 After:
 
 ```rust
+// crates/isograph_parser/src/matched_brackets.rs
     let (closing, end) = match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
