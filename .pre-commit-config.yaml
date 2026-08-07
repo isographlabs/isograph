@@ -14,3 +14,13 @@ repos:
       - id: end-of-file-fixer
       - id: mixed-line-ending
       - id: trailing-whitespace
+  - repo: local
+    hooks:
+      # Stricter than ci.yml's clippy job: any warning blocks the commit. pico is kept
+      # from upstream unchanged, so its warnings are not ours to fix and it is excluded.
+      - id: cargo-clippy
+        name: cargo clippy
+        entry: cargo clippy --workspace --exclude pico --all-targets -- -D warnings
+        language: system
+        types: [rust]
+        pass_filenames: false
