@@ -43,7 +43,9 @@ pub struct Bracketed {
 }
 ```
 
-`OpenBracket(pub BracketKind)` and `CloseBracket(pub BracketKind)` are unchanged.
+`OpenBracket(pub BracketKind)` and `CloseBracket(pub BracketKind)` keep their shapes.
+
+Change 1 removes the resolution machinery along with the old tree shape: the landed path family and `ResolvedBracketNode` reference `TreeContents` and the deleted types, so the `ResolvePosition` derives, the parent enums, the path aliases, the resolved enum, and the resolution tests all come out here, and Change 2 rebuilds every one of them over the new tree. Between the two changes the crate parses and reports errors but answers no positions — which is why the derive lines in this change's types are the plain ones.
 
 ### The matcher
 
