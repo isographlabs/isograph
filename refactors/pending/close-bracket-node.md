@@ -33,7 +33,8 @@ pub struct CloseBracket(pub BracketKind);
 
 Every appearance follows the rename:
 
-- `BracketsMatched`'s slot: `type StrayClose = CloseBracket;`, and the `TreeContents<StrayClose = UnmatchedClose, ...>` bounds follow (here and where chunking.md quotes them).
+- The slot impl: `type StrayClose = UnmatchedClose;` becomes `type StrayClose = CloseBracket;` on `BracketsMatched`.
+- Every bound `TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>` becomes `TreeContents<StrayClose = CloseBracket, SyntheticClose = ()>`: on `errors()`, `collect_errors`, and nothing else in matched_brackets.rs, plus the collector snippets chunking.md quotes.
 - The error: `UnexpectedClose(WithSpan<CloseBracket>)`.
 - The matcher: `BracketItem::StrayClose(CloseBracket(kind))`.
 - The resolved-node enum variant and its alias: `CloseBracket(CloseBracketPath<'a>)`, `pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;`, replacing `UnmatchedClose`/`UnmatchedClosePath`.
