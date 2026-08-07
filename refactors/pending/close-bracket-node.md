@@ -15,7 +15,7 @@ In `matched_brackets.rs`, the rename Change 2 requires, landed first so the `Res
 Before:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
 /// A close bracket no open of its kind was waiting for; it is an invalid section one token
 /// wide.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -26,7 +26,7 @@ pub struct UnmatchedClose(pub BracketKind);
 After:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
 /// A close bracket token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
@@ -39,8 +39,41 @@ Every appearance follows the rename:
 - Every bound `TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>` becomes `TreeContents<StrayClose = CloseBracket, SyntheticClose = ()>`: on `errors()`, `collect_errors`, and nothing else in matched_brackets.rs, plus the collector snippets chunking.md quotes.
 - The error: `UnexpectedClose(WithSpan<CloseBracket>)`.
 - The matcher: `BracketItem::StrayClose(CloseBracket(kind))`.
-- The resolved-node enum variant and its alias: `CloseBracket(CloseBracketPath<'a>)`, `pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;`, replacing `UnmatchedClose`/`UnmatchedClosePath`.
 - The tests' `unmatched_close` helper becomes `close_bracket`, matching `ResolvedBracketNode::CloseBracket`; the stray assertions keep their shape.
+
+The resolved-node enum and the path alias:
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+pub enum ResolvedBracketNode<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+    Bracketed(BracketedPath<'a>),
+    Inner(InnerPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    UnmatchedClose(UnmatchedClosePath<'a>),
+}
+
+pub type UnmatchedClosePath<'a> =
+    PositionResolutionPath<&'a UnmatchedClose, BracketItemParent<'a>>;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+pub enum ResolvedBracketNode<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+    Bracketed(BracketedPath<'a>),
+    Inner(InnerPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
+}
+
+pub type CloseBracketPath<'a> =
+    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;
+```
 
 ## Change 2: the closing becomes optional and resolves
 
@@ -49,7 +82,7 @@ In `matched_brackets.rs`. The `Closing` enum and the `SyntheticClose` slot come 
 Before:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
 pub trait TreeContents {
     type Inner: fmt::Debug + PartialEq + Eq;
     type StrayClose: fmt::Debug + PartialEq + Eq;
@@ -75,7 +108,7 @@ pub enum Closing<TContents: TreeContents> {
 After:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
 pub trait TreeContents {
     type Inner: fmt::Debug + PartialEq + Eq;
     type StrayClose: fmt::Debug + PartialEq + Eq;
@@ -115,7 +148,7 @@ The matcher's closing computation:
 Before:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
     let closing = match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
@@ -138,7 +171,7 @@ Before:
 After:
 
 ```rust
-// crates/isograph_parser/src/matched_brackets.rs
+// from crates/isograph_parser/src/matched_brackets.rs
     let (closing, end) = match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
