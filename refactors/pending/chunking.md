@@ -55,7 +55,7 @@ The bracket query on the same text answers `Inner` on `foo`, `bar`, `baz`, the c
 
 ## Ordered changes
 
-1. The mixed-enum derive in resolve-option-like-enums.md, which itself requires resolve-position-parent-conversion.md. `ChunkItem`'s derive needs it; it ships first, in those docs.
+1. The mixed-enum derive in resolve-option-like-enums.md. `ChunkItem`'s derive needs it; it ships first, in that doc.
 2. Change 1 below: extract `collect_group_errors` in matched_brackets.rs. Independently shippable.
 3. Change 2 below: the chunk module and its tests.
 

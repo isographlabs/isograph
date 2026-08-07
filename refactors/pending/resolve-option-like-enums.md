@@ -1,8 +1,6 @@
 # resolve_position: mixed enums
 
-`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out mixed enums, where only some variants continue into the same resolved-node family: chunking.md's `ChunkItem`, whose `SelectionSet` variant descends in the chunk query while its other variants answer the enclosing chunk. This doc adds variant-level marking to the macro's enum derive: `#[resolve_field]` on a variant marks it as delegating, and unmarked variants answer a declared fallback.
-
-Requires resolve-position-parent-conversion.md, whose call shape the delegating arms use.
+`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out mixed enums, where only some variants continue into the same resolved-node family: chunking.md's `ChunkItem`, whose `SelectionSet` variant descends in the chunk query while its other variants answer the enclosing chunk. This doc adds variant-level marking to the macro's enum derive: `#[resolve_field]` on a variant marks it as delegating, and unmarked variants answer a declared fallback. A delegating variant's payload shares the enum's `Parent` type, as in the all-delegate emission.
 
 ## The change
 
@@ -34,7 +32,7 @@ impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
         position: ::span::Span
     ) -> Self::ResolvedNode<'a> {
         match self {
-            #(#enum_name::#marked_variant(inner) => inner.resolve(parent.into(), position),)*
+            #(#enum_name::#marked_variant(inner) => inner.resolve(parent, position),)*
             _ => Self::ResolvedNode::#fallback(parent.into()),
         }
     }
