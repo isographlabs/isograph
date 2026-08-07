@@ -1,12 +1,12 @@
 # resolve_position: option-like enums
 
-`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out option-like enums — enums where only some variants mean something is there — and the cost is visible today: `Bracketed.closing` is not a `#[resolve_field]`, so a position on a group's real close resolves to the group instead of to the close. This doc adds variant-level marking to the macro's enum derive and uses it to give `Closing` a derived resolve, adding the matched-close leaf.
+`#[derive(ResolvePosition)]` on an enum currently requires every variant to delegate. That shuts out two enum shapes: option-like enums, where only some variants mean something is there (`Bracketed.closing` is not a `#[resolve_field]` today, so a position on a group's real close resolves to the group instead of to the close), and mixed enums, where only some variants continue into the same resolved-node family (chunking.md's `ChunkItem`, whose `SelectionSet` variant descends in the chunk query while its other variants answer the enclosing chunk). This doc adds variant-level marking to the macro's enum derive and uses it to give `Closing` a derived resolve, adding the matched-close leaf.
 
 `closing` is already `WithSpan<Closing<TContents>>` with a real span on a real close and a zero-width span where a synthetic close should have been, so the field itself is walkable by the existing `WithSpan` field case: the wrapper's span gates entry, and a zero-width span admits no one-token-wide position. What is missing is only `Closing: ResolvePosition`. Its two variants want different answers: `Real` is a leaf (the matched close), and `Synthetic` occupies nothing, so a resolve that reaches it — possible only for an empty position sitting exactly on the zero-width span — answers with the enclosing group, the same answer the struct fallback convention gives.
 
 ## Change 1: the macro's mixed-enum derive
 
-`ResolvePositionArgs` gains two optional idents, required together iff the enum has both marked and unmarked variants:
+`ResolvePositionArgs` gains two optional idents:
 
 ```rust
 #[derive(deluxe::ExtractAttributes)]
@@ -15,8 +15,8 @@ struct ResolvePositionArgs {
     parent_type: syn::Type,
     resolved_node: syn::Type,
     self_type_generics: Option<syn::AngleBracketedGenericArguments>,
-    /// For a mixed enum: the `ResolvedNode` variant a marked variant answers with, holding
-    /// the enum's own path.
+    /// For a mixed enum: the `ResolvedNode` variant a marked unit variant answers with,
+    /// holding the enum's own path.
     leaf: Option<syn::Ident>,
     /// For a mixed enum: the `ResolvedNode` variant an unmarked variant answers with,
     /// holding what the parent converts into.
@@ -24,7 +24,11 @@ struct ResolvePositionArgs {
 }
 ```
 
-`handle_data_enum` scans variants for `#[resolve_field]`. All-unmarked keeps today's emission (every variant delegates), so existing derives are untouched. Mixed emission — marked variants are the enum's own leaf, unmarked ones answer the fallback:
+`handle_data_enum` scans variants for `#[resolve_field]`. An enum with no marks keeps today's emission (every variant delegates), so existing derives are untouched. An enum with at least one mark uses the mixed emission, with three arm kinds:
+
+- A marked variant with a single unnamed field delegates: the position continues into the payload, which resolves in the same resolved-node family.
+- A marked unit variant is a leaf: it answers the `leaf` variant with the enum's own path.
+- An unmarked variant answers the `fallback` variant with `parent.into()`.
 
 ```rust
 impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
@@ -37,7 +41,8 @@ impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
         position: ::span::Span
     ) -> Self::ResolvedNode<'a> {
         match self {
-            #(#marked_variant_pattern => {
+            #(#enum_name::#marked_payload_variant(inner) => inner.resolve(parent, position),)*
+            #(#enum_name::#marked_unit_variant => {
                 Self::ResolvedNode::#leaf(self.path(parent).into())
             })*
             _ => Self::ResolvedNode::#fallback(parent.into()),
@@ -46,11 +51,9 @@ impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
 }
 ```
 
-A marked variant's pattern follows its field shape: `#enum_name::#variant` for a unit variant, `#enum_name::#variant(..)` for a tuple variant, `#enum_name::#variant { .. }` for a struct variant — a marked variant is a leaf, so its payload is never bound.
-
 The fallback arm's `parent.into()` asks the caller's world for one conversion: `From<Parent>` into the fallback variant's payload. For a single-variant parent enum that is a five-line unwrap, written where the parent enum lives.
 
-An enum that is all-marked is rejected with an error naming the fix (derive the struct form instead: every variant being its own leaf means the type wants to be separate structs), and `leaf`/`fallback` on an all-unmarked enum is likewise an error.
+`leaf` is required iff some marked variant is a unit variant, and `fallback` is required iff some variant is unmarked; either given without its trigger is an error. A marked variant with named fields or multiple unnamed fields is an error, as today. An enum whose every variant is marked with a payload is the all-delegate emission spelled redundantly, and is rejected with an error saying to drop the marks; an enum whose every variant is a marked unit is rejected with an error naming the fix (derive the struct form instead: every variant being its own leaf means the type wants to be separate structs).
 
 ## Change 2: `Closing` resolves
 
