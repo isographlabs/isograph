@@ -75,9 +75,7 @@ impl From<IsographLangTokenKind> for SplitToken {
             IsographLangTokenKind::CloseBracket => {
                 SplitToken::Bracket(BracketToken::Close(BracketKind::Bracket))
             }
-            IsographLangTokenKind::Error => {
-                SplitToken::NonBracket(NonBracketTokenKind::Error)
-            }
+            IsographLangTokenKind::Error => SplitToken::NonBracket(NonBracketTokenKind::Error),
             IsographLangTokenKind::ErrorUnterminatedString => {
                 SplitToken::NonBracket(NonBracketTokenKind::ErrorUnterminatedString)
             }

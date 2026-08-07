@@ -15,7 +15,7 @@ pub trait TreeContents {
     /// What a run between brackets is: the `Inner` run of lexed tokens out of the matcher,
     /// parsed nodes later.
     type Inner: fmt::Debug + PartialEq + Eq;
-    /// What a stray close carries: `UnmatchedClose` while bracket errors are representable,
+    /// What a stray close carries: `CloseBracket` while bracket errors are representable,
     /// `Infallible` once refined.
     type StrayClose: fmt::Debug + PartialEq + Eq;
     /// What a synthetic closing carries: `()` while bracket errors are representable,
@@ -30,7 +30,7 @@ pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
     type Inner = Inner;
-    type StrayClose = UnmatchedClose;
+    type StrayClose = CloseBracket;
     type SyntheticClose = ();
 }
 
@@ -44,11 +44,10 @@ pub struct Inner(pub Vec<WithSpan<NonBracketTokenKind>>);
 #[resolve_position(parent_type = OpenBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
-/// A close bracket no open of its kind was waiting for; it is an invalid section one token
-/// wide.
+/// A close bracket token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct UnmatchedClose(pub BracketKind);
+pub struct CloseBracket(pub BracketKind);
 
 /// One isograph literal with its brackets matched. Spans live on the `WithSpan` wrapping
 /// each item.
@@ -113,11 +112,10 @@ pub enum ResolvedBracketNode<'a> {
     Bracketed(BracketedPath<'a>),
     Inner(InnerPath<'a>),
     OpenBracket(OpenBracketPath<'a>),
-    UnmatchedClose(UnmatchedClosePath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
 }
 
-pub type MatchedBracketsPath<'a> =
-    PositionResolutionPath<&'a MatchedBrackets<BracketsMatched>, ()>;
+pub type MatchedBracketsPath<'a> = PositionResolutionPath<&'a MatchedBrackets<BracketsMatched>, ()>;
 
 /// Everything a `BracketItem` can sit inside.
 #[derive(Debug)]
@@ -137,13 +135,12 @@ pub enum OpenBracketParent<'a> {
 }
 
 pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
-pub type UnmatchedClosePath<'a> =
-    PositionResolutionPath<&'a UnmatchedClose, BracketItemParent<'a>>;
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
     /// A close bracket no open of its kind was waiting for.
-    UnexpectedClose(WithSpan<UnmatchedClose>),
+    UnexpectedClose(WithSpan<CloseBracket>),
     /// A group whose close was synthesized.
     Unclosed(WithSpan<UnclosedGroup>),
 }
@@ -155,7 +152,7 @@ pub struct UnclosedGroup(pub WithSpan<OpenBracket>);
 
 impl<TContents> MatchedBrackets<TContents>
 where
-    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
+    TContents: TreeContents<StrayClose = CloseBracket, SyntheticClose = ()>,
 {
     /// Every error the pass produced, in source order of the position each error starts at.
     /// The list is empty iff every bracket matched.
@@ -170,7 +167,7 @@ fn collect_errors<TContents>(
     items: &[WithSpan<BracketItem<TContents>>],
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
+    TContents: TreeContents<StrayClose = CloseBracket, SyntheticClose = ()>,
 {
     for item in items {
         match &item.item {
@@ -240,7 +237,7 @@ fn parse_items(
                 flush_run(&mut items, &mut run);
                 tokens.next();
                 items.push(WithSpan::new(
-                    BracketItem::StrayClose(UnmatchedClose(kind)),
+                    BracketItem::StrayClose(CloseBracket(kind)),
                     token.location,
                 ));
             }
@@ -322,7 +319,13 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
         ) -> Result<TTo::SyntheticClose, TError>,
     ) -> Result<MatchedBrackets<TTo>, Vec<TError>> {
         let mut errors = Vec::new();
-        let items = try_map_items(self.0, &mut errors, map_inner, map_stray_close, map_synthetic_close);
+        let items = try_map_items(
+            self.0,
+            &mut errors,
+            map_inner,
+            map_stray_close,
+            map_synthetic_close,
+        );
         if errors.is_empty() {
             Ok(MatchedBrackets(items))
         } else {
@@ -366,16 +369,13 @@ where
                 children,
             }) => {
                 let closing = match closing.item {
-                    Closing::Real => {
-                        Some(WithSpan::new(Closing::Real, closing.location))
-                    }
+                    Closing::Real => Some(WithSpan::new(Closing::Real, closing.location)),
                     Closing::Synthetic(payload) => {
                         let group = WithSpan::new(UnclosedGroup(opening), span);
                         match map_synthetic_close(payload, group) {
-                            Ok(payload) => Some(WithSpan::new(
-                                Closing::Synthetic(payload),
-                                closing.location,
-                            )),
+                            Ok(payload) => {
+                                Some(WithSpan::new(Closing::Synthetic(payload), closing.location))
+                            }
                             Err(e) => {
                                 errors.push(e);
                                 None
@@ -383,7 +383,13 @@ where
                         }
                     }
                 };
-                let children = try_map_items(children, errors, map_inner, map_stray_close, map_synthetic_close);
+                let children = try_map_items(
+                    children,
+                    errors,
+                    map_inner,
+                    map_stray_close,
+                    map_synthetic_close,
+                );
                 if let Some(closing) = closing {
                     mapped.push(WithSpan::new(
                         BracketItem::Bracketed(Bracketed {
@@ -450,10 +456,10 @@ mod tests {
         }
     }
 
-    fn unmatched_close(node: ResolvedBracketNode<'_>) -> UnmatchedClosePath<'_> {
+    fn close_bracket(node: ResolvedBracketNode<'_>) -> CloseBracketPath<'_> {
         match node {
-            ResolvedBracketNode::UnmatchedClose(close) => close,
-            node => panic!("expected an unmatched close, got {node:?}"),
+            ResolvedBracketNode::CloseBracket(close) => close,
+            node => panic!("expected a close bracket, got {node:?}"),
         }
     }
 
@@ -560,7 +566,10 @@ mod tests {
         assert_balanced(&outer_group, Brace);
         assert_root(outer_group.parent);
         match tree.errors().as_slice() {
-            [BracketError::Unclosed(paren), BracketError::Unclosed(square)] => {
+            [
+                BracketError::Unclosed(paren),
+                BracketError::Unclosed(square),
+            ] => {
                 assert_eq!(paren.item.0.location, span_of(text, "("));
                 assert_eq!(square.item.0.location, span_of(text, "["));
                 // The paren group reaches its last child, the `[` group.
@@ -581,7 +590,7 @@ mod tests {
             &enclosing_group(run(resolved(&tree, text, "foo")).parent),
             Brace,
         );
-        let stray = unmatched_close(resolved(&tree, text, ")"));
+        let stray = close_bracket(resolved(&tree, text, ")"));
         assert_eq!(stray.inner.0, Paren);
         let brace_group = enclosing_group(stray.parent);
         assert_balanced(&brace_group, Brace);
@@ -608,7 +617,7 @@ mod tests {
             open_bracket(resolved(&tree, text, "(")).parent;
         assert_balanced(&paren_group, Paren);
         assert_root(paren_group.parent);
-        let stray = unmatched_close(resolved(&tree, text, "}"));
+        let stray = close_bracket(resolved(&tree, text, "}"));
         assert_eq!(stray.inner.0, Brace);
         assert_balanced(&enclosing_group(stray.parent), Paren);
         match tree.errors().as_slice() {
@@ -634,11 +643,14 @@ mod tests {
         assert_balanced(&enclosing_group(brace_group.parent), Paren);
         // The trailing `}` is a stray brace close at the top level: its `{` was consumed
         // inside the paren group.
-        let stray = unmatched_close(resolved(&tree, text, "}"));
+        let stray = close_bracket(resolved(&tree, text, "}"));
         assert_eq!(stray.inner.0, Brace);
         assert_root(stray.parent);
         match tree.errors().as_slice() {
-            [BracketError::Unclosed(brace), BracketError::UnexpectedClose(stray)] => {
+            [
+                BracketError::Unclosed(brace),
+                BracketError::UnexpectedClose(stray),
+            ] => {
                 assert_eq!(brace.item.0.location, span_of(text, "{"));
                 assert_eq!(stray.location, span_of(text, "}"));
             }
@@ -715,7 +727,7 @@ mod tests {
         let text = "a }";
         let tree = tree(text);
         assert_root(run(resolved(&tree, text, "a")).parent);
-        let stray = unmatched_close(resolved(&tree, text, "}"));
+        let stray = close_bracket(resolved(&tree, text, "}"));
         assert_eq!(stray.inner.0, Brace);
         assert_root(stray.parent);
         match tree.errors().as_slice() {
