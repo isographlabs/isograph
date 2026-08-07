@@ -241,7 +241,7 @@ jobs:
           toolchain: stable
           components: clippy
       - name: Run cargo clippy
-        run: cargo clippy
+        run: cargo clippy --workspace --exclude pico --all-targets -- -D warnings
 
   cargo-test:
     name: Run cargo test (excluding relay tests)
