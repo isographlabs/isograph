@@ -17,10 +17,10 @@ pub trait TreeContents {
     type Inner: fmt::Debug + PartialEq + Eq;
     /// What a stray close carries: `UnmatchedClose` while bracket errors are representable,
     /// `Infallible` once refined.
-    type Stray: fmt::Debug + PartialEq + Eq;
+    type StrayClose: fmt::Debug + PartialEq + Eq;
     /// What a synthetic closing carries: `()` while bracket errors are representable,
     /// `Infallible` once refined.
-    type Unclosed: fmt::Debug + PartialEq + Eq;
+    type SyntheticClose: fmt::Debug + PartialEq + Eq;
 }
 
 /// The stage `match_brackets` produces: its runs hold lexed tokens, and the tree can carry
@@ -30,8 +30,8 @@ pub struct BracketsMatched;
 
 impl TreeContents for BracketsMatched {
     type Inner = Inner;
-    type Stray = UnmatchedClose;
-    type Unclosed = ();
+    type StrayClose = UnmatchedClose;
+    type SyntheticClose = ();
 }
 
 /// A maximal run of non-bracket tokens between brackets.
@@ -71,7 +71,7 @@ pub struct MatchedBrackets<TContents: TreeContents>(
 pub enum BracketItem<TContents: TreeContents> {
     Inner(TContents::Inner),
     Bracketed(Bracketed<TContents>),
-    StrayClose(TContents::Stray),
+    StrayClose(TContents::StrayClose),
 }
 
 /// An open bracket, everything up to its close, and the close, which is always present, so
@@ -101,7 +101,7 @@ pub enum Closing<TContents: TreeContents> {
     /// The group never got its close and was forced to end: at the close bracket an
     /// enclosing group owns, or at the end of the tokens. A group closed this way is an
     /// invalid section.
-    Synthetic(TContents::Unclosed),
+    Synthetic(TContents::SyntheticClose),
 }
 
 /// Every node a position can resolve to while only brackets are matched. Once later passes
@@ -155,7 +155,7 @@ pub struct UnclosedGroup(pub WithSpan<OpenBracket>);
 
 impl<TContents> MatchedBrackets<TContents>
 where
-    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
+    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
 {
     /// Every error the pass produced, in source order of the position each error starts at.
     /// The list is empty iff every bracket matched.
@@ -170,7 +170,7 @@ fn collect_errors<TContents>(
     items: &[WithSpan<BracketItem<TContents>>],
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
+    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
 {
     for item in items {
         match &item.item {
@@ -315,14 +315,14 @@ impl<TFrom: TreeContents> MatchedBrackets<TFrom> {
     pub fn try_map<TTo: TreeContents, TError>(
         self,
         map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> Result<TTo::Inner, TError>,
-        map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
-        map_unclosed: &mut impl FnMut(
-            TFrom::Unclosed,
+        map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> Result<TTo::StrayClose, TError>,
+        map_synthetic_close: &mut impl FnMut(
+            TFrom::SyntheticClose,
             WithSpan<UnclosedGroup>,
-        ) -> Result<TTo::Unclosed, TError>,
+        ) -> Result<TTo::SyntheticClose, TError>,
     ) -> Result<MatchedBrackets<TTo>, Vec<TError>> {
         let mut errors = Vec::new();
-        let items = try_map_items(self.0, &mut errors, map_inner, map_stray, map_unclosed);
+        let items = try_map_items(self.0, &mut errors, map_inner, map_stray_close, map_synthetic_close);
         if errors.is_empty() {
             Ok(MatchedBrackets(items))
         } else {
@@ -335,11 +335,11 @@ fn try_map_items<TFrom, TTo, TError>(
     items: Vec<WithSpan<BracketItem<TFrom>>>,
     errors: &mut Vec<TError>,
     map_inner: &mut impl FnMut(WithSpan<TFrom::Inner>) -> Result<TTo::Inner, TError>,
-    map_stray: &mut impl FnMut(WithSpan<TFrom::Stray>) -> Result<TTo::Stray, TError>,
-    map_unclosed: &mut impl FnMut(
-        TFrom::Unclosed,
+    map_stray_close: &mut impl FnMut(WithSpan<TFrom::StrayClose>) -> Result<TTo::StrayClose, TError>,
+    map_synthetic_close: &mut impl FnMut(
+        TFrom::SyntheticClose,
         WithSpan<UnclosedGroup>,
-    ) -> Result<TTo::Unclosed, TError>,
+    ) -> Result<TTo::SyntheticClose, TError>,
 ) -> Vec<WithSpan<BracketItem<TTo>>>
 where
     TFrom: TreeContents,
@@ -356,7 +356,7 @@ where
                 Ok(inner) => mapped.push(WithSpan::new(BracketItem::Inner(inner), span)),
                 Err(e) => errors.push(e),
             },
-            BracketItem::StrayClose(stray) => match map_stray(WithSpan::new(stray, span)) {
+            BracketItem::StrayClose(stray) => match map_stray_close(WithSpan::new(stray, span)) {
                 Ok(stray) => mapped.push(WithSpan::new(BracketItem::StrayClose(stray), span)),
                 Err(e) => errors.push(e),
             },
@@ -371,7 +371,7 @@ where
                     }
                     Closing::Synthetic(payload) => {
                         let group = WithSpan::new(UnclosedGroup(opening), span);
-                        match map_unclosed(payload, group) {
+                        match map_synthetic_close(payload, group) {
                             Ok(payload) => Some(WithSpan::new(
                                 Closing::Synthetic(payload),
                                 closing.location,
@@ -383,7 +383,7 @@ where
                         }
                     }
                 };
-                let children = try_map_items(children, errors, map_inner, map_stray, map_unclosed);
+                let children = try_map_items(children, errors, map_inner, map_stray_close, map_synthetic_close);
                 if let Some(closing) = closing {
                     mapped.push(WithSpan::new(
                         BracketItem::Bracketed(Bracketed {
@@ -732,8 +732,8 @@ mod tests {
 
     impl TreeContents for BracketsMatchedNoErrors {
         type Inner = Inner;
-        type Stray = Infallible;
-        type Unclosed = Infallible;
+        type StrayClose = Infallible;
+        type SyntheticClose = Infallible;
     }
 
     fn refine(

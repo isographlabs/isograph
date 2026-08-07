@@ -75,7 +75,7 @@ pub enum Closing<TContents: TreeContents> {
     /// The group never got its close and was forced to end: at the close bracket an
     /// enclosing group owns, or at the end of the tokens. A group closed this way is an
     /// invalid section.
-    Synthetic(TContents::Unclosed),
+    Synthetic(TContents::SyntheticClose),
 }
 
 /// The one place a closing can sit: its group.

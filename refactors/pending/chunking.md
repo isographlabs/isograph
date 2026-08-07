@@ -93,7 +93,7 @@ pub(crate) fn collect_group_errors<TContents>(
     group_span: Span,
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
+    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
 {
     if matches!(bracketed.closing.item, Closing::Synthetic(())) {
         errors.push(BracketError::Unclosed(WithSpan::new(
@@ -195,7 +195,7 @@ pub enum ChunkItem<TContents: TreeContents> {
     #[resolve_field]
     SelectionSet(SelectionSet<TContents>),
     Bracketed(Bracketed<TContents>),
-    StrayClose(TContents::Stray),
+    StrayClose(TContents::StrayClose),
 }
 
 /// A brace group whose interior is chunked. Built only from brace groups; paren and square
@@ -417,7 +417,7 @@ The pipeline tip still answers the errors query. A stray close rides in its chun
 ```rust
 impl<TContents> Chunks<TContents>
 where
-    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
+    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
 {
     /// Every bracket error under this tree, in source order of the position each error
     /// starts at.
@@ -432,7 +432,7 @@ fn collect_chunk_errors<TContents>(
     level: &[WithSpan<SelectionSetItem<TContents>>],
     errors: &mut Vec<BracketError>,
 ) where
-    TContents: TreeContents<Stray = UnmatchedClose, Unclosed = ()>,
+    TContents: TreeContents<StrayClose = UnmatchedClose, SyntheticClose = ()>,
 {
     for level_item in level {
         let SelectionSetItem::Chunk(chunk) = &level_item.item else {
