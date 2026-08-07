@@ -1,6 +1,6 @@
 # Raw items
 
-A level is a flat sequence of individual items, each raw or grouped: what can be grouped is grouped, and everything else is raw. The bracket tree keeps only matched pairs as structure. A close bracket with no open of its kind is a raw item where it stands. When a group never gets its close, the group is taken apart: its opening becomes a raw item, and its children move into the enclosing level, matched groups among them surviving. Every `Bracketed` has a real opening and a real closing, required fields, and a group's interior is the same type as the root, so no level is special. The chunk-parsing pass reports leftover bracket tokens it finds inside chunks.
+A level is a flat sequence of individual items, each raw or grouped: what can be grouped is grouped, and everything else is raw. The bracket tree keeps only matched pairs as structure. A close bracket with no open of its kind is a raw item where it stands. When a group never gets its close, the group is taken apart: its opening becomes a raw item, and its children move into the enclosing level, matched groups among them surviving. Every `Bracketed` has a real opening and a real closing, required fields, and a group's interior is the same type as the root — `WithSpan<MatchedBrackets>` in both positions, the root's span being the whole literal — so no level is special. The chunk-parsing pass reports leftover bracket tokens it finds inside chunks.
 
 With one stage shape left, `TreeContents`, `BracketsMatched`, `Inner`, and `map` have no callers and are deleted; every tree type is concrete.
 
@@ -51,10 +51,18 @@ The control flow keeps the landed rules — nearest open of the kind, a close ow
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-pub fn match_brackets(tokens: Vec<WithSpan<IsographLangTokenKind>>) -> MatchedBrackets {
+/// The root's span is the whole literal, leading and trailing whitespace included, which
+/// the tokens alone do not record; hence the length parameter.
+pub fn match_brackets(
+    tokens: Vec<WithSpan<IsographLangTokenKind>>,
+    literal_length: u32,
+) -> WithSpan<MatchedBrackets> {
     let mut tokens = tokens.into_iter().peekable();
     let mut enclosing = Vec::new();
-    MatchedBrackets(parse_items(&mut tokens, &mut enclosing))
+    WithSpan::new(
+        MatchedBrackets(parse_items(&mut tokens, &mut enclosing)),
+        Span::new(0, literal_length),
+    )
 }
 
 /// What parsing a group produced: the group closed for real, or it never got its close,
@@ -201,7 +209,7 @@ fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
 
 ### The cases, restated as tests
 
-The structural half of the suite rewrites to these shapes; resolution assertions move to Change 2.
+The structural half of the suite rewrites to these shapes, with the helper building `match_brackets(tokenize(text), text.len() as u32)` and walking `.item`; resolution assertions move to Change 2.
 
 - `field Query.Foo`: four raw items, no errors.
 - `field Query.Foo { bar(arg: [1, 2]) { id } }`: groups nested as typed, every closing real, no errors.
