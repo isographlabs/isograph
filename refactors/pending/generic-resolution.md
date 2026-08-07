@@ -52,7 +52,7 @@ After:
 /// for a position in a run; a stage whose run type has interior structure answers the
 /// finer question with a second resolve on the run, parented by the `InnerPath`.
 #[derive(Debug)]
-pub enum ResolvedBracketNode<'a, TContents: TreeContents> {
+pub enum ResolvedBracketNode<'a, TContents: TreeContents = BracketsMatched> {
     MatchedBrackets(MatchedBracketsPath<'a, TContents>),
     Bracketed(BracketedPath<'a, TContents>),
     Inner(InnerPath<'a, TContents>),
@@ -65,7 +65,7 @@ pub type MatchedBracketsPath<'a, TContents = BracketsMatched> =
 
 /// Everything a `BracketItem` can sit inside.
 #[derive(Debug)]
-pub enum BracketItemParent<'a, TContents: TreeContents> {
+pub enum BracketItemParent<'a, TContents: TreeContents = BracketsMatched> {
     MatchedBrackets(MatchedBracketsPath<'a, TContents>),
     Bracketed(Box<BracketedPath<'a, TContents>>),
 }
@@ -88,7 +88,7 @@ pub type InnerPath<'a, TContents = BracketsMatched> = PositionResolutionPath<
 
 /// The one place an opening bracket can sit: its group.
 #[derive(Debug)]
-pub enum OpenBracketParent<'a, TContents: TreeContents> {
+pub enum OpenBracketParent<'a, TContents: TreeContents = BracketsMatched> {
     Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
@@ -106,7 +106,7 @@ pub type CloseBracketPath<'a, TContents = BracketsMatched> =
     PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
 ```
 
-`InnerPath<'a>` now means `InnerPath<'a, BracketsMatched>`, whose inner is `&Inner` as before, so the tests' helper signatures and assertions are untouched. `ResolvedBracketNode<'a>` in the pinned derives becomes `ResolvedBracketNode<'a, BracketsMatched>` at their attribute sites. `TContents::StrayClose` at every stage is `CloseBracket` or a future refined type; the stray's path is `CloseBracketPath` today, and a stage that changes the slot writes its own alias then.
+`InnerPath<'a>` now means `InnerPath<'a, BracketsMatched>`, whose inner is `&Inner` as before, and the enums carry the same default, so the tests' helper signatures, the pinned derives' attribute sites, and every assertion are untouched. `TContents::StrayClose` at every stage is `CloseBracket` or a future refined type; the stray's path is `CloseBracketPath` today, and a stage that changes the slot writes its own alias then.
 
 ## Change 2: the macro emits generic impls with leaf modes
 

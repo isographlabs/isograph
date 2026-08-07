@@ -90,39 +90,63 @@ pub struct Bracketed<TContents: TreeContents> {
     pub closing: Option<WithSpan<CloseBracket>>,
 }
 
-/// Every node a position can resolve to while only brackets are matched. Once later passes
-/// add their nodes, the full isograph path enum replaces this one. A position on whitespace
-/// inside a group resolves to the group.
+/// Every node a position can resolve to, at any stage. `Inner` is the tree-level answer
+/// for a position in a run; a stage whose run type has interior structure answers the
+/// finer question with a second resolve on the run, parented by the `InnerPath`. A
+/// position on whitespace inside a group resolves to the group.
 #[derive(Debug)]
-pub enum ResolvedBracketNode<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    Bracketed(BracketedPath<'a>),
-    Inner(InnerPath<'a>),
-    OpenBracket(OpenBracketPath<'a>),
-    CloseBracket(CloseBracketPath<'a>),
+pub enum ResolvedBracketNode<'a, TContents: TreeContents = BracketsMatched> {
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
+    Bracketed(BracketedPath<'a, TContents>),
+    Inner(InnerPath<'a, TContents>),
+    OpenBracket(OpenBracketPath<'a, TContents>),
+    CloseBracket(CloseBracketPath<'a, TContents>),
 }
 
-pub type MatchedBracketsPath<'a> = PositionResolutionPath<&'a MatchedBrackets<BracketsMatched>, ()>;
+pub type MatchedBracketsPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a MatchedBrackets<TContents>, ()>;
 
 /// Everything a `BracketItem` can sit inside.
 #[derive(Debug)]
-pub enum BracketItemParent<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    Bracketed(Box<BracketedPath<'a>>),
+pub enum BracketItemParent<'a, TContents: TreeContents = BracketsMatched> {
+    MatchedBrackets(MatchedBracketsPath<'a, TContents>),
+    Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
-pub type BracketedPath<'a> =
-    PositionResolutionPath<&'a Bracketed<BracketsMatched>, BracketItemParent<'a>>;
-pub type InnerPath<'a> = PositionResolutionPath<&'a Inner, BracketItemParent<'a>>;
+/// The conversion the leaf emissions build parents through.
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for BracketItemParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        BracketItemParent::Bracketed(Box::new(path))
+    }
+}
+
+pub type BracketedPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a Bracketed<TContents>, BracketItemParent<'a, TContents>>;
+pub type InnerPath<'a, TContents = BracketsMatched> = PositionResolutionPath<
+    &'a <TContents as TreeContents>::Inner,
+    BracketItemParent<'a, TContents>,
+>;
 
 /// The one place an opening bracket can sit: its group.
 #[derive(Debug)]
-pub enum OpenBracketParent<'a> {
-    Bracketed(Box<BracketedPath<'a>>),
+pub enum OpenBracketParent<'a, TContents: TreeContents = BracketsMatched> {
+    Bracketed(Box<BracketedPath<'a, TContents>>),
 }
 
-pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
-pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a>>;
+impl<'a, TContents: TreeContents> From<BracketedPath<'a, TContents>>
+    for OpenBracketParent<'a, TContents>
+{
+    fn from(path: BracketedPath<'a, TContents>) -> Self {
+        OpenBracketParent::Bracketed(Box::new(path))
+    }
+}
+
+pub type OpenBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a, TContents>>;
+pub type CloseBracketPath<'a, TContents = BracketsMatched> =
+    PositionResolutionPath<&'a CloseBracket, BracketItemParent<'a, TContents>>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
