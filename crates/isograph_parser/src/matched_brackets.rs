@@ -4,22 +4,25 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use scoped_stack::Stack;
 use span::{Span, WithSpan};
 
-use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKind, SplitToken};
+use crate::{
+    BracketKind, BracketToken, IsographLangTokenKind, IsographResolutionNode, NonBracketTokenKind,
+    SplitToken,
+};
 
 /// One level: the whole literal at the root, a group's interior below.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum BracketItem {
     Raw(RawToken),
     Bracketed(Bracketed),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Bracketed {
     #[resolve_field(parent_variant = Matched)]
     pub opening: WithSpan<OpenBracket>,
@@ -33,7 +36,7 @@ pub struct Bracketed {
 /// A token that is not part of any structure; matched brackets are structure, never
 /// raw, so a bracket token here is unmatched.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum RawToken {
     NonBracket(NonBracketToken),
     Open(#[resolve_field(parent_variant = Unmatched)] OpenBracket),
@@ -41,32 +44,20 @@ pub enum RawToken {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
 /// An opening bracket; its parent says whether it is a group's own opening or
 /// unmatched in a level.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
 /// A closing bracket; its parent says whether it is a group's own closing or
 /// unmatched in a level.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
-
-#[derive(Debug)]
-pub enum ResolvedBracketNode<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    /// This will be resolved for spans that contains one of the opening/closing brace
-    /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
-    /// will never resolve to this.
-    Bracketed(BracketedPath<'a>),
-    NonBracketToken(NonBracketTokenPath<'a>),
-    OpenBracket(OpenBracketPath<'a>),
-    CloseBracket(CloseBracketPath<'a>),
-}
 
 #[derive(Debug)]
 pub enum MatchedBracketsParent<'a> {
@@ -476,7 +467,7 @@ mod tests {
         let text = "foo { ( }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "(")) {
-            ResolvedBracketNode::OpenBracket(open) => {
+            IsographResolutionNode::OpenBracket(open) => {
                 assert_eq!(open.inner.0, Parenthesis);
                 match open.parent {
                     BracketTokenParent::Unmatched(level) => {
@@ -497,7 +488,7 @@ mod tests {
         let text = "a }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
-            ResolvedBracketNode::CloseBracket(close) => {
+            IsographResolutionNode::CloseBracket(close) => {
                 assert_eq!(close.inner.0, Brace);
                 match close.parent {
                     BracketTokenParent::Unmatched(level) => {
@@ -515,7 +506,7 @@ mod tests {
         let text = "foo { bar }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "{")) {
-            ResolvedBracketNode::OpenBracket(open) => match open.parent {
+            IsographResolutionNode::OpenBracket(open) => match open.parent {
                 BracketTokenParent::Matched(group) => {
                     assert_eq!(group.inner.closing.item.0, Brace);
                 }
@@ -524,7 +515,7 @@ mod tests {
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
-            ResolvedBracketNode::CloseBracket(close) => match close.parent {
+            IsographResolutionNode::CloseBracket(close) => match close.parent {
                 BracketTokenParent::Matched(group) => {
                     assert_eq!(group.inner.opening.item.0, Brace);
                 }
@@ -540,7 +531,7 @@ mod tests {
         let tree = tree(text);
         let straddle = Span::new(span_of(text, "{").start, span_of(text, "bar").end);
         match tree.resolve(MatchedBracketsParent::Root, straddle) {
-            ResolvedBracketNode::Bracketed(group) => {
+            IsographResolutionNode::Bracketed(group) => {
                 assert_eq!(group.inner.opening.item.0, Brace);
             }
             node => panic!("expected the group leaf, got {node:?}"),
@@ -552,7 +543,7 @@ mod tests {
         let text = "foo { bar }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "bar")) {
-            ResolvedBracketNode::NonBracketToken(token) => {
+            IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
                 assert!(matches!(
                     token.parent.parent,
@@ -569,7 +560,7 @@ mod tests {
         let tree = tree(text);
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "{").start);
         match tree.resolve(MatchedBracketsParent::Root, gap) {
-            ResolvedBracketNode::MatchedBrackets(level) => {
+            IsographResolutionNode::MatchedBrackets(level) => {
                 assert!(matches!(level.parent, MatchedBracketsParent::Root));
             }
             node => panic!("expected the root level, got {node:?}"),
