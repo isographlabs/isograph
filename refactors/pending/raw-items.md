@@ -104,7 +104,7 @@ There are no `From` impls: the derived field emissions name their parent variant
 
 ## The matcher
 
-The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart. The enclosing stack is a `scoped_stack::Stack<BracketKind>` (the prefactor in scoped-stack.md); the parse functions receive a `Frame`, `with` holds the kind for the recursion, and `all().contains(..)` classifies a close:
+The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart. The enclosing stack is a `scoped_stack::Stack<BracketKind>` (the prefactor in scoped-stack.md): `with_pushed` holds the kind for the recursion, and `all().contains(..)` classifies a close:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -122,9 +122,8 @@ pub fn match_brackets(
     // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
     // token, while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
-    let mut enclosing_frame = enclosing_stack.frame();
     WithSpan::new(
-        MatchedBrackets(parse_items(&mut tokens, &mut enclosing_frame)),
+        MatchedBrackets(parse_items(&mut tokens, &mut enclosing_stack)),
         Span::new(0, literal_length),
     )
 }
@@ -144,7 +143,7 @@ struct UnclosedGroup {
 
 fn parse_items(
     tokens: &mut TokenStream,
-    enclosing_frame: &mut Frame<'_, BracketKind>,
+    enclosing_stack: &mut Stack<BracketKind>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     while let Some(&token) = tokens.peek() {
@@ -159,7 +158,7 @@ fn parse_items(
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 tokens.next();
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
-                match parse_bracketed(tokens, enclosing_frame, opening) {
+                match parse_bracketed(tokens, enclosing_stack, opening) {
                     ParsedGroup::Closed(group) => {
                         let span = Span::new(
                             group.opening.location.start,
@@ -177,7 +176,7 @@ fn parse_items(
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
-                if enclosing_frame.all().contains(&kind) {
+                if enclosing_stack.all().contains(&kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
                     // takes apart every group between here and its owner.
                     break;
@@ -197,11 +196,11 @@ fn parse_items(
 /// close an enclosing group owns, or at the end of the tokens, it never closes.
 fn parse_bracketed(
     tokens: &mut TokenStream,
-    enclosing_frame: &mut Frame<'_, BracketKind>,
+    enclosing_stack: &mut Stack<BracketKind>,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
-    let children = enclosing_frame.with(opening.item.0, |enclosing_frame| {
-        parse_items(tokens, enclosing_frame)
+    let children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
+        parse_items(tokens, enclosing_stack)
     });
 
     match tokens.peek() {

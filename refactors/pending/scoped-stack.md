@@ -1,6 +1,6 @@
 # Scoped stack
 
-A new crate, `scoped_stack`, holds a stack whose entries come off by scope, not by hand. Callers never touch the stack directly: they hold a `Frame`, a borrow of the stack with a restore point, and the frame's `Drop` truncates back to that point. There is no `pop`. Pushing is either scoped to a closure (`with`) or plain (`push`), and a plain push comes off when the pushing frame's scope ends. A callee therefore cannot disturb what its caller pushed: the only reachable mutations sit above the callee's own restore point.
+A new crate, `scoped_stack`, holds a stack whose only mutation is a scoped push, so everything pushed is popped by construction. `temp_push` pushes an item and returns a guard; the guard is the only usable handle to the stack while it lives, and its `Drop` pops the item. `with_pushed` is the closure form of the same thing: the item is on the stack exactly for the duration of the closure. There is no bare `push` and no `pop`; the point of the structure is to add items for a scope, and the scope's end is the only way they come off.
 
 This is a prefactor for raw-items.md, whose matcher is the first consumer, and it generalizes iso1's recursion-with-a-path pattern, surveyed below.
 
@@ -10,57 +10,10 @@ The whole crate:
 
 ```rust
 // from crates/scoped_stack/src/lib.rs
-/// A borrow of the stack that a function walks with: `all` reads every entry, the
-/// caller's frames included, and the mutations are `push` and the scoped `with`.
-/// There is no `pop`; entries come off when the frame that pushed them drops.
+/// A stack whose only mutation is a scoped push: [`temp_push`](Stack::temp_push)
+/// returns a guard that pops on drop, and [`with_pushed`](Stack::with_pushed) scopes
+/// the push to a closure. Everything pushed is popped when its scope ends.
 #[derive(Debug)]
-pub struct Frame<'a, T> {
-    stack: &'a mut Vec<T>,
-    /// Drop truncates to this, so everything this frame pushed comes off however
-    /// the scope exits, a panic included.
-    restore: usize,
-}
-
-impl<T> Drop for Frame<'_, T> {
-    fn drop(&mut self) {
-        self.stack.truncate(self.restore);
-    }
-}
-
-impl<T> Frame<'_, T> {
-    /// Every entry on the stack, the caller's entries included, innermost last.
-    pub fn all(&self) -> &[T] {
-        self.stack
-    }
-
-    /// The entry stays for the rest of this frame's scope.
-    pub fn push(&mut self, value: T) {
-        self.stack.push(value);
-    }
-
-    /// A restore point without a push: whatever the closure pushes comes off when
-    /// the child frame drops.
-    pub fn scope<R>(&mut self, do_stuff: impl FnOnce(&mut Frame<'_, T>) -> R) -> R {
-        let mut child = Frame {
-            restore: self.stack.len(),
-            stack: &mut *self.stack,
-        };
-        do_stuff(&mut child)
-    }
-
-    /// The `with_` bracketing pattern from iso1's peekable lexer: the value is on
-    /// the stack exactly for the duration of the closure.
-    pub fn with<R>(&mut self, value: T, do_stuff: impl FnOnce(&mut Frame<'_, T>) -> R) -> R {
-        self.scope(|frame| {
-            frame.push(value);
-            do_stuff(frame)
-        })
-    }
-}
-
-/// The owner. It exists to mint the root frame; every read and write goes through a
-/// [`Frame`].
-#[derive(Debug, Default)]
 pub struct Stack<T>(Vec<T>);
 
 impl<T> Stack<T> {
@@ -68,11 +21,57 @@ impl<T> Stack<T> {
         Stack(Vec::new())
     }
 
-    pub fn frame(&mut self) -> Frame<'_, T> {
-        Frame {
-            restore: self.0.len(),
-            stack: &mut self.0,
-        }
+    /// Every item on the stack, the callers' items included, innermost last.
+    pub fn all(&self) -> &[T] {
+        &self.0
+    }
+
+    /// The item stays until the returned guard drops. The guard borrows the stack, so
+    /// it is the only usable handle while it lives, and it derefs to [`Stack`], so a
+    /// callee takes `&mut Stack<T>` whether or not its caller holds a guard.
+    pub fn temp_push(&mut self, item: T) -> Pushed<'_, T> {
+        self.0.push(item);
+        Pushed { stack: self }
+    }
+
+    /// The `with_` bracketing pattern from iso1's peekable lexer: the item is on the
+    /// stack exactly for the duration of the closure.
+    pub fn with_pushed<R>(&mut self, item: T, do_stuff: impl FnOnce(&mut Stack<T>) -> R) -> R {
+        let mut pushed = self.temp_push(item);
+        do_stuff(&mut pushed)
+    }
+}
+
+impl<T> Default for Stack<T> {
+    fn default() -> Self {
+        Stack::new()
+    }
+}
+
+/// The guard for one pushed item. Drop pops that item, however the scope exits, a
+/// panic included.
+#[derive(Debug)]
+pub struct Pushed<'a, T> {
+    stack: &'a mut Stack<T>,
+}
+
+impl<T> Drop for Pushed<'_, T> {
+    fn drop(&mut self) {
+        self.stack.0.pop();
+    }
+}
+
+impl<T> std::ops::Deref for Pushed<'_, T> {
+    type Target = Stack<T>;
+
+    fn deref(&self) -> &Stack<T> {
+        self.stack
+    }
+}
+
+impl<T> std::ops::DerefMut for Pushed<'_, T> {
+    fn deref_mut(&mut self) -> &mut Stack<T> {
+        self.stack
     }
 }
 ```
@@ -91,19 +90,17 @@ license = { workspace = true }
 workspace = true
 ```
 
-No slice type can replace `Frame`: `&mut [T]` permits overwriting existing entries but cannot grow past a possible reallocation, and the permission set we need is the inverse — grow freely, never touch what sits below. Hence a wrapper that exposes only the operations it is willing to allow. `Frame` has no `DerefMut`, no `IndexMut`, and no accessor handing out `&mut Vec`, so the entries below `restore` are unreachable for mutation, and nesting works through the reborrow in `scope`.
+The soundness argument is small. A guard pops exactly the item it pushed: while it lives it holds the one `&mut` to the stack, so nothing else can push or pop underneath it, and nested guards release in reverse order because each borrows the one before. `DerefMut` hands out `&mut Stack<T>`, but the field is private and `Stack`'s own surface is only `all`, `temp_push`, and `with_pushed`, so the deref grants nothing unscoped. The enforcement is `Drop`, so `mem::forget(pushed)` would leak the item past its scope; nothing calls `forget`, and doing so requires doing it deliberately.
 
 ## The use cases
 
 The API is sized against every stack-shaped push/pop site in iso1 plus the i2 matcher.
 
-- The i2 matcher (raw-items.md): `parse_bracketed` holds a `BracketKind` on the stack for the duration of the recursion into `parse_items`, and close-bracket classification reads the whole stack. `with` and `all().contains(..)` cover it.
-- iso1 `reader_ast.rs` (`generate_reader_ast_with_path` and `refetched_paths_with_path`, four sites): each pushes a `NormalizationKey`, recurses, and pops, with whole-path reads via `path.clone()` inside the recursion. Each site is a `with`; the clone is `frame.all().to_vec()`.
-- iso1 `create_merged_selection_set.rs` (`traversal_path`): the pushes live in callees — `merge_server_object_field` pushes the inline-fragment or linked-field key, `insert_client_object_selectable_into_refetch_paths` pushes the client-pointer key — and the one pop lives in the caller's object-selection arm. No closure wraps the pair, so `with` alone cannot express it; `scope` plus `push` can: the caller wraps the arm in `scope`, the callee pushes onto the frame it receives, and the arm's end restores. The restore also does not care how many entries the callee pushed.
+- The i2 matcher (raw-items.md): `parse_bracketed` holds a `BracketKind` on the stack for the duration of the recursion into `parse_items`, and close-bracket classification reads the whole stack. `with_pushed` and `all().contains(..)` cover it.
+- iso1 `reader_ast.rs` (`generate_reader_ast_with_path` and `refetched_paths_with_path`, four sites): each pushes a `NormalizationKey`, recurses, and pops, with whole-path reads via `path.clone()` inside the recursion. Each site is a `with_pushed`; the clone is `stack.all().to_vec()`.
+- iso1 `create_merged_selection_set.rs` (`traversal_path`): the pushes live in callees — `merge_server_object_field` pushes the inline-fragment or linked-field key, `insert_client_object_selectable_into_refetch_paths` pushes the client-pointer key — and the one pop lives in the caller's object-selection arm. Nothing reads the stack between the callee's return and that pop, so the item only needs to live for the rest of the callee's own body, and `temp_push` expresses that: the callee computes the key partway through, pushes it, and keeps the guard for the remainder, where a closure would force everything after the push inward.
 
 Two stack-adjacent sites in iso1 are not use cases, and the API deliberately does not stretch to them. pico's `DependencyStack` registers dependencies from arbitrary call depth through `&Database`, so it needs shared mutation via `RefCell` rather than a threaded `&mut`, and its `leave` returns the popped value; it keeps its own guard. The peekable lexer's `semantic_tokens.pop()` removes an entry another function pushed as a side effect — an accumulator with a corrective pop, not scope discipline.
-
-There is no `pop` because no surveyed caller needs one once scope ends do the popping, and `pop` is the one operation that could cross a frame boundary, which would drag in a floor index to police it. If a future caller needs the popped value, that is the point to add both.
 
 ## Tests
 
@@ -111,100 +108,84 @@ There is no `pop` because no surveyed caller needs one once scope ends do the po
 // from crates/scoped_stack/src/lib.rs
 #[cfg(test)]
 mod test {
-    use crate::{Frame, Stack};
+    use crate::Stack;
 
     #[test]
-    fn with_holds_the_value_for_the_closure() {
+    fn with_pushed_holds_the_item_for_the_closure() {
         let mut stack = Stack::new();
-        let mut frame = stack.frame();
 
-        frame.with(1, |frame| {
-            assert_eq!(frame.all(), &[1]);
+        stack.with_pushed(1, |stack| {
+            assert_eq!(stack.all(), &[1]);
         });
 
-        assert!(frame.all().is_empty());
+        assert!(stack.all().is_empty());
     }
 
     #[test]
-    fn nested_frames_see_outer_entries() {
+    fn nested_closures_see_outer_items() {
         let mut stack = Stack::new();
-        let mut frame = stack.frame();
 
-        frame.with(1, |frame| {
-            frame.with(2, |frame| {
-                assert_eq!(frame.all(), &[1, 2]);
+        stack.with_pushed(1, |stack| {
+            stack.with_pushed(2, |stack| {
+                assert_eq!(stack.all(), &[1, 2]);
             });
-            assert_eq!(frame.all(), &[1]);
+            assert_eq!(stack.all(), &[1]);
         });
     }
 
     #[test]
-    fn scope_removes_what_the_closure_pushed() {
-        let mut stack = Stack::new();
-        let mut frame = stack.frame();
-
-        frame.with(1, |frame| {
-            frame.scope(|frame| {
-                frame.push(2);
-                frame.push(3);
-                assert_eq!(frame.all(), &[1, 2, 3]);
-            });
-            assert_eq!(frame.all(), &[1]);
-        });
-    }
-
-    #[test]
-    fn a_callee_push_lasts_until_the_caller_scope_ends() {
-        fn callee(frame: &mut Frame<'_, i32>) {
-            frame.push(2);
-        }
-
-        let mut stack = Stack::new();
-        let mut frame = stack.frame();
-        frame.push(1);
-
-        frame.scope(|frame| {
-            callee(frame);
-            assert_eq!(frame.all(), &[1, 2]);
-        });
-
-        assert_eq!(frame.all(), &[1]);
-    }
-
-    #[test]
-    fn pushes_come_off_when_the_frame_drops() {
+    fn temp_push_pops_when_the_guard_drops() {
         let mut stack = Stack::new();
 
         {
-            let mut frame = stack.frame();
-            frame.push(1);
+            let mut pushed = stack.temp_push(1);
+            assert_eq!(pushed.all(), &[1]);
+
+            let pushed_again = pushed.temp_push(2);
+            assert_eq!(pushed_again.all(), &[1, 2]);
         }
 
-        assert!(stack.0.is_empty());
+        assert!(stack.all().is_empty());
     }
 
     #[test]
-    fn with_returns_the_closure_result() {
-        let mut stack = Stack::new();
-        let mut frame = stack.frame();
+    fn a_callee_pushes_for_the_rest_of_its_body() {
+        fn callee(stack: &mut Stack<i32>) {
+            let mut stack = stack.temp_push(2);
+            recurse(&mut stack);
+            assert_eq!(stack.all(), &[1, 2]);
+        }
 
-        let result = frame.with(1, |frame| frame.all().len());
+        fn recurse(stack: &mut Stack<i32>) {
+            assert_eq!(stack.all(), &[1, 2]);
+        }
+
+        let mut stack = Stack::new();
+        stack.with_pushed(1, |stack| {
+            callee(stack);
+            assert_eq!(stack.all(), &[1]);
+        });
+    }
+
+    #[test]
+    fn with_pushed_returns_the_closure_result() {
+        let mut stack = Stack::new();
+
+        let result = stack.with_pushed(1, |stack| stack.all().len());
 
         assert_eq!(result, 1);
     }
 
     #[test]
-    fn a_panic_still_restores() {
+    fn a_panic_still_pops() {
         let mut stack = Stack::new();
-        let mut frame = stack.frame();
-        frame.push(1);
 
         let panicked = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            frame.with(2, |_frame| panic!("unwind out of the closure"));
+            stack.with_pushed(1, |_stack| panic!("unwind out of the closure"));
         }));
 
         assert!(panicked.is_err());
-        assert_eq!(frame.all(), &[1]);
+        assert!(stack.all().is_empty());
     }
 }
 ```
@@ -215,7 +196,7 @@ One change: create the crate as printed, with its tests. The workspace member gl
 
 ## Consequences
 
-- raw-items.md's matcher loses its bespoke `EnclosingStack`/`EnclosingFrame` and uses `scoped_stack::{Stack, Frame}`; that doc is updated alongside this one.
+- raw-items.md's matcher threads `&mut Stack<BracketKind>` through the parse functions and holds each group's kind with `with_pushed`; that doc is updated alongside this one.
 - iso1's `reader_ast.rs` and `create_merged_selection_set.rs` patterns have a home when their i2 equivalents get written; nothing rewrites iso1 itself.
 
 ## Landing checklist
