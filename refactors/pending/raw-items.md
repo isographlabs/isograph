@@ -108,40 +108,7 @@ pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTo
 pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
 ```
 
-The conversions the emissions construct through, written out. The fallback's `parent.into()` is the reflexive `From`, since `BracketItemParent` is the level path itself; the bracket parents convert from both of their positions:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-impl<'a> From<BracketItemParent<'a>> for OpenBracketParent<'a> {
-    fn from(level: BracketItemParent<'a>) -> Self {
-        OpenBracketParent::MatchedBrackets(level)
-    }
-}
-
-impl<'a> From<BracketItemParent<'a>> for CloseBracketParent<'a> {
-    fn from(level: BracketItemParent<'a>) -> Self {
-        CloseBracketParent::MatchedBrackets(level)
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for OpenBracketParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        OpenBracketParent::Bracketed(Box::new(group))
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for CloseBracketParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        CloseBracketParent::Bracketed(Box::new(group))
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for MatchedBracketsParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        MatchedBracketsParent::Bracketed(Box::new(group))
-    }
-}
-```
+There are no `From` impls: the derived field emissions name their parent variants as the landed macro always has, and the two hand-written impls construct their parents directly.
 
 ## The matcher
 
