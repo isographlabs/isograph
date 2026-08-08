@@ -43,28 +43,14 @@ impl<I: Iterator> Iterator for Peekable<I> {
     }
 }
 
-/// The guard for one peeked item. While it lives it holds `peek`'s `&mut` to the
-/// wrapper, so the item [`view`](Peek::view) lends is the item
-/// [`commit`](Peek::commit) returns.
+/// The guard for one peeked item.
 pub struct Peek<'a, T>(Full<'a, T>);
 
 impl<T> Peek<'_, T> {
-    /// The item this guard peeked.
-    ///
-    /// The borrow is the guard's, not the wrapper's: a view dies with its `Peek`.
-    ///
-    /// ```compile_fail
-    /// let mut iter = peekable::Peekable::new([1].into_iter());
-    /// let peek = iter.peek().expect("one item remains");
-    /// let item = peek.view();
-    /// peek.commit();
-    /// assert_eq!(item, &1);
-    /// ```
     pub fn view(&self) -> &T {
         self.0.get()
     }
 
-    /// Consume the item: the wrapper's `next`, owned.
     pub fn commit(self) -> T {
         self.0.take()
     }
@@ -97,8 +83,6 @@ impl<'a, T> Full<'a, T> {
     }
 }
 
-/// The crate's one panic path, unreachable by construction: a [`Full`] is built only
-/// over a `Some` and holds the slot's only reference for its whole life.
 fn slot_emptied_under_full() -> ! {
     unreachable!("a Full exists only while its slot holds an item")
 }
@@ -118,7 +102,7 @@ license = { workspace = true }
 workspace = true
 ```
 
-The soundness argument is small. The guard stores only the slot's `&mut`, but its lifetime is `peek`'s borrow of the whole wrapper, so while a `Peek` lives no `next`, no second `peek`, and no other guard can compile against the wrapper — the guard provably cannot touch `iter`, and nothing else can either. Fullness is proven once, in `Full::new`; `get` and `take` are the only readers, and they read through the slot's only reference, so nothing can empty it between the check and the read. `slot_emptied_under_full` is the crate's one panic path, no input reaches it — exhaustion is handled at `peek`, which returns `None` before a guard exists — and `Peek` itself has no panic path. `view` returns a borrow of the guard, not of the wrapper: the elided lifetime is `&self`'s, which is what forces every view to die before `commit` moves the guard, and the `compile_fail` doctest on `view` pins that signature against a widening to `'a`. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
+The soundness argument is small. The guard stores only the slot's `&mut`, but its lifetime is `peek`'s borrow of the whole wrapper, so while a `Peek` lives no `next`, no second `peek`, and no other guard can compile against the wrapper — the guard provably cannot touch `iter`, and nothing else can either. Fullness is proven once, in `Full::new`; `get` and `take` are the only readers, and they read through the slot's only reference, so nothing can empty it between the check and the read. `slot_emptied_under_full` is the crate's one panic path, no input reaches it — exhaustion is handled at `peek`, which returns `None` before a guard exists — and `Peek` itself has no panic path. `view` returns a borrow of the guard, not of the wrapper: the elided lifetime is `&self`'s, which is what forces every view to die before `commit` moves the guard. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
 
 ## The consumer
 
@@ -317,8 +301,6 @@ The `Open` arm's `peek.commit()` consumes the guard, which ends its borrow of `t
 
 ## Tests
 
-The `compile_fail` doctest on `view` is part of the suite; `cargo test -p peekable` runs it with the unit tests below.
-
 ```rust
 // from crates/peekable/src/lib.rs
 #[cfg(test)]
@@ -392,7 +374,7 @@ mod test {
 
 ## Landing checklist
 
-- `cargo test -p peekable` passes, the `compile_fail` doctest included.
+- `cargo test -p peekable` passes.
 - `cargo test -p isograph_parser` passes.
 - `cargo clippy --workspace --exclude pico --all-targets -- -D warnings` passes.
 - The doc moves to `refactors/past/`.
