@@ -1,55 +1,117 @@
 use std::iter::Peekable;
 
+use resolve_position::PositionResolutionPath;
+use resolve_position_macros::ResolvePosition;
 use scoped_stack::Stack;
 use span::{Span, WithSpan};
 
 use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKind, SplitToken};
 
 /// One level: the whole literal at the root, a group's interior below.
-#[derive(Debug, PartialEq, Eq)]
-pub struct MatchedBrackets(pub Vec<WithSpan<BracketItem>>);
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum BracketItem {
     Raw(RawToken),
     Bracketed(Bracketed),
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Bracketed {
+    #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
+    #[resolve_field]
     pub children: WithSpan<MatchedBrackets>,
+    #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
 }
 
 /// A token that is not part of any structure; matched brackets are structure, never
 /// raw, so the bracket tokens here are the unmatched types.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum RawToken {
     NonBracket(NonBracketToken),
     Open(UnmatchedOpen),
     Close(UnmatchedClose),
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
 /// A group's own opening; an open whose group never closed is an [`UnmatchedOpen`].
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
 /// A group's own closing; a close no open was waiting for is an [`UnmatchedClose`].
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
 
 /// An open bracket whose group never closed.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct UnmatchedOpen(pub BracketKind);
 
 /// A close bracket no open of its kind was waiting for.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct UnmatchedClose(pub BracketKind);
+
+#[derive(Debug)]
+pub enum ResolvedBracketNode<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+    /// This will be resolved for spans that contains one of the opening/closing brace
+    /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
+    /// will never resolve to this.
+    Bracketed(BracketedPath<'a>),
+    NonBracketToken(NonBracketTokenPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
+    UnmatchedOpen(UnmatchedOpenPath<'a>),
+    UnmatchedClose(UnmatchedClosePath<'a>),
+}
+
+#[derive(Debug)]
+pub enum MatchedBracketsParent<'a> {
+    Root,
+    Bracketed(Box<BracketedPath<'a>>),
+}
+
+pub type MatchedBracketsPath<'a> =
+    PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
+
+#[derive(Debug)]
+pub enum BracketItemParent<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+}
+
+pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
+
+pub type NonBracketTokenPath<'a> =
+    PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
+
+/// Shared by `OpenBracket` and `CloseBracket`, which appear only as a group's own
+/// opening and closing.
+#[derive(Debug)]
+pub enum BracketTokenParent<'a> {
+    Bracketed(Box<BracketedPath<'a>>),
+}
+
+pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTokenParent<'a>>;
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
+
+pub type UnmatchedOpenPath<'a> =
+    PositionResolutionPath<&'a UnmatchedOpen, BracketItemParent<'a>>;
+pub type UnmatchedClosePath<'a> =
+    PositionResolutionPath<&'a UnmatchedClose, BracketItemParent<'a>>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
@@ -208,6 +270,8 @@ fn parse_bracketed(
 
 #[cfg(test)]
 mod tests {
+    use resolve_position::ResolvePosition;
+
     use super::*;
     use crate::tokenize;
     use BracketKind::{Brace, Parenthesis};
@@ -423,5 +487,96 @@ mod tests {
             brace.children.location,
             Span::new(span_of(text, "{").end, span_of(text, "}").start)
         );
+    }
+
+    #[test]
+    fn an_unmatched_open_resolves_with_the_level_as_parent() {
+        let text = "foo { ( }";
+        let tree = tree(text);
+        match tree.resolve(MatchedBracketsParent::Root, span_of(text, "(")) {
+            ResolvedBracketNode::UnmatchedOpen(open) => {
+                assert_eq!(open.inner.0, Parenthesis);
+                let BracketItemParent::MatchedBrackets(level) = open.parent;
+                assert!(matches!(
+                    level.parent,
+                    MatchedBracketsParent::Bracketed(_)
+                ));
+            }
+            node => panic!("expected the unmatched open leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn an_unmatched_close_at_the_root_resolves_with_the_root_level() {
+        let text = "a }";
+        let tree = tree(text);
+        match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
+            ResolvedBracketNode::UnmatchedClose(close) => {
+                assert_eq!(close.inner.0, Brace);
+                let BracketItemParent::MatchedBrackets(level) = close.parent;
+                assert!(matches!(level.parent, MatchedBracketsParent::Root));
+            }
+            node => panic!("expected the unmatched close leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_matched_pair_resolves_with_its_group_as_parent() {
+        let text = "foo { bar }";
+        let tree = tree(text);
+        match tree.resolve(MatchedBracketsParent::Root, span_of(text, "{")) {
+            ResolvedBracketNode::OpenBracket(open) => {
+                let BracketTokenParent::Bracketed(group) = open.parent;
+                assert_eq!(group.inner.closing.item.0, Brace);
+            }
+            node => panic!("expected the open bracket leaf, got {node:?}"),
+        }
+        match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
+            ResolvedBracketNode::CloseBracket(close) => {
+                let BracketTokenParent::Bracketed(group) = close.parent;
+                assert_eq!(group.inner.opening.item.0, Brace);
+            }
+            node => panic!("expected the close bracket leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_span_straddling_a_groups_own_parts_resolves_to_the_group() {
+        let text = "foo { bar }";
+        let tree = tree(text);
+        let straddle = Span::new(span_of(text, "{").start, span_of(text, "bar").end);
+        match tree.resolve(MatchedBracketsParent::Root, straddle) {
+            ResolvedBracketNode::Bracketed(group) => {
+                assert_eq!(group.inner.opening.item.0, Brace);
+            }
+            node => panic!("expected the group leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn an_ordinary_token_resolves_to_its_own_leaf() {
+        let text = "foo { bar }";
+        let tree = tree(text);
+        match tree.resolve(MatchedBracketsParent::Root, span_of(text, "bar")) {
+            ResolvedBracketNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                let BracketItemParent::MatchedBrackets(level) = token.parent;
+                assert!(matches!(level.parent, MatchedBracketsParent::Bracketed(_)));
+            }
+            node => panic!("expected the token leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn whitespace_resolves_to_its_level() {
+        let text = "foo { bar }";
+        let tree = tree(text);
+        let gap = Span::new(span_of(text, "foo").end, span_of(text, "{").start);
+        match tree.resolve(MatchedBracketsParent::Root, gap) {
+            ResolvedBracketNode::MatchedBrackets(level) => {
+                assert!(matches!(level.parent, MatchedBracketsParent::Root));
+            }
+            node => panic!("expected the root level, got {node:?}"),
+        }
     }
 }
