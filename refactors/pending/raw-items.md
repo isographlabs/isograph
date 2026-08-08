@@ -6,13 +6,14 @@ With one stage shape left, `TreeContents`, `BracketsMatched`, `Inner`, and `map`
 
 ## The shape
 
-The five tree types, with their finished derives:
+The tree types, all deriving `ResolvePosition`:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
 /// One level: the whole literal at the root, a group's interior below.
-#[derive(Debug, PartialEq, Eq)]
-pub struct MatchedBrackets(pub Vec<WithSpan<BracketItem>>);
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
@@ -33,43 +34,61 @@ pub struct Bracketed {
     pub closing: WithSpan<CloseBracket>,
 }
 
-/// A token that is not part of any structure: bracket kinds here are the unmatched ones;
-/// matched brackets are structure, never raw.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// A token that is not part of any structure; matched brackets are structure, never
+/// raw, so the bracket tokens here are the unmatched types.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum RawToken {
     NonBracket(NonBracketToken),
-    Open(OpenBracket),
-    Close(CloseBracket),
+    Open(UnmatchedOpen),
+    Close(UnmatchedClose),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
+/// A group's own opening; an open whose group never closed is an [`UnmatchedOpen`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
+/// A group's own closing; a close no open was waiting for is an [`UnmatchedClose`].
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
+
+/// An open bracket whose group never closed.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct UnmatchedOpen(pub BracketKind);
+
+/// A close bracket no open of its kind was waiting for.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct UnmatchedClose(pub BracketKind);
 ```
 
-No macro changes anywhere: where the derive's shape does not fit — `RawToken`'s bracket arms construct a different parent type, and `MatchedBrackets`'s item parent is a path alias with no variant to name — the impl is hand-written, the way iso1 hand-writes `Selection`'s in base_types.rs. `RawToken` and `MatchedBrackets` therefore carry no `ResolvePosition` derive; their impls are under Generated impls, marked as hand-written.
+No macro changes and no hand-written impls. The two structural positions a bracket token can occupy are two types — iso1's wrapper pattern, where `ClientScalarSelectableNameWrapper` and `ClientObjectSelectableNameWrapper` both wrap `SelectableName` — so every enum arm passes its parent through unchanged, and every parent enum variant is named after a container, which is the one shape the derive emits.
 
 ## The result of resolving
 
-A position on whitespace answers the level; a position on any token answers that token's leaf — the ordinary token's own node, or a bracket leaf whose parent says matched or raw.
+A position on whitespace answers the level; a position on any token answers that token's leaf. The leaf type says matched or unmatched, and each parent enum holds exactly the containers its leaf can sit in.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
 #[derive(Debug)]
 pub enum ResolvedBracketNode<'a> {
     MatchedBrackets(MatchedBracketsPath<'a>),
+    /// This will be resolved for spans that contains one of the opening/closing brace
+    /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
+    /// will never resolve to this.
     Bracketed(BracketedPath<'a>),
     NonBracketToken(NonBracketTokenPath<'a>),
     OpenBracket(OpenBracketPath<'a>),
     CloseBracket(CloseBracketPath<'a>),
+    UnmatchedOpen(UnmatchedOpenPath<'a>),
+    UnmatchedClose(UnmatchedClosePath<'a>),
 }
 
 #[derive(Debug)]
@@ -81,26 +100,33 @@ pub enum MatchedBracketsParent<'a> {
 pub type MatchedBracketsPath<'a> =
     PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
 
-pub type BracketItemParent<'a> = MatchedBracketsPath<'a>;
+#[derive(Debug)]
+pub enum BracketItemParent<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+}
 
 pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
 
 pub type NonBracketTokenPath<'a> =
     PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
 
-/// Shared by `OpenBracket` and `CloseBracket`; the leaf type says which token it is.
+/// Shared by `OpenBracket` and `CloseBracket`, which appear only as a group's own
+/// opening and closing.
 #[derive(Debug)]
 pub enum BracketTokenParent<'a> {
     Bracketed(Box<BracketedPath<'a>>),
-    /// A raw item in this level: the token is unmatched.
-    MatchedBrackets(MatchedBracketsPath<'a>),
 }
 
 pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTokenParent<'a>>;
 pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
+
+pub type UnmatchedOpenPath<'a> =
+    PositionResolutionPath<&'a UnmatchedOpen, BracketItemParent<'a>>;
+pub type UnmatchedClosePath<'a> =
+    PositionResolutionPath<&'a UnmatchedClose, BracketItemParent<'a>>;
 ```
 
-There are no `From` impls: the derived field emissions name their parent variants as the landed macro always has, and the two hand-written impls construct their parents directly.
+There are no `From` impls: every field emission names a variant of the leaf's parent enum, as the landed macro always has, and every enum arm passes its parent through unchanged.
 
 ## The matcher
 
@@ -168,7 +194,7 @@ fn parse_items(
                     }
                     ParsedGroup::Unclosed(UnclosedGroup { opening, children }) => {
                         items.push(WithSpan::new(
-                            BracketItem::Raw(RawToken::Open(opening.item)),
+                            BracketItem::Raw(RawToken::Open(UnmatchedOpen(opening.item.0))),
                             opening.location,
                         ));
                         items.extend(children);
@@ -183,7 +209,7 @@ fn parse_items(
                 }
                 tokens.next();
                 items.push(WithSpan::new(
-                    BracketItem::Raw(RawToken::Close(CloseBracket(kind))),
+                    BracketItem::Raw(RawToken::Close(UnmatchedClose(kind))),
                     token.location,
                 ));
             }
@@ -232,10 +258,8 @@ fn parse_bracketed(
 // from crates/isograph_parser/src/matched_brackets.rs
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
-    /// An open bracket whose group never closed.
-    UnmatchedOpen(WithSpan<OpenBracket>),
-    /// A close bracket no open of its kind was waiting for.
-    UnmatchedClose(WithSpan<CloseBracket>),
+    UnmatchedOpen(WithSpan<UnmatchedOpen>),
+    UnmatchedClose(WithSpan<UnmatchedClose>),
 }
 
 impl MatchedBrackets {
@@ -273,59 +297,31 @@ fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
 
 The root is entered on the `WithSpan<MatchedBrackets>` the matcher returned, through the `WithSpan` blanket impl: `tree.resolve(MatchedBracketsParent::Root, position)`.
 
-The two hand-written impls, with iso1's `Selection` as the precedent for hand-writing where the derive's shape does not fit:
+The impls the landed macro generates, written out — `MatchedBrackets` walks its items, `RawToken` delegates, `Bracketed` dispatches to its three fields, and `NonBracketToken` is a leaf:
 
 ```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-/// Hand-written: an item's parent is the level path itself, and the derive can only
-/// construct named variants of a parent enum.
-impl ResolvePosition for MatchedBrackets {
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl ::resolve_position::ResolvePosition for MatchedBrackets {
     type Parent<'a> = MatchedBracketsParent<'a>;
     type ResolvedNode<'a> = ResolvedBracketNode<'a>;
 
     fn resolve<'a>(
         &'a self,
         parent: Self::Parent<'a>,
-        position: Span,
+        position: ::span::Span,
     ) -> Self::ResolvedNode<'a> {
         for item in self.0.iter() {
             if item.location.contains(position) {
-                return item.item.resolve(self.path(parent), position);
+                let new_parent = <BracketItem as ::resolve_position::ResolvePosition>::Parent::MatchedBrackets(self.path(parent).into());
+                return item.item.resolve(new_parent, position);
             }
         }
-        ResolvedBracketNode::MatchedBrackets(self.path(parent))
+
+        return Self::ResolvedNode::MatchedBrackets(self.path(parent).into());
     }
 }
 
-/// Hand-written: the bracket arms hand their leaves a different parent type than the
-/// enum's own, which the derive's delegation cannot express.
-impl ResolvePosition for RawToken {
-    type Parent<'a> = BracketItemParent<'a>;
-    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: Span,
-    ) -> Self::ResolvedNode<'a> {
-        match self {
-            RawToken::NonBracket(inner) => inner.resolve(parent, position),
-            RawToken::Open(inner) => {
-                inner.resolve(BracketTokenParent::MatchedBrackets(parent), position)
-            }
-            RawToken::Close(inner) => {
-                inner.resolve(BracketTokenParent::MatchedBrackets(parent), position)
-            }
-        }
-    }
-}
-```
-
-The derived impls, generated by the landed macro unchanged:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for BracketItem {
+impl ::resolve_position::ResolvePosition for RawToken {
     type Parent<'a> = BracketItemParent<'a>;
     type ResolvedNode<'a> = ResolvedBracketNode<'a>;
 
@@ -335,8 +331,9 @@ impl ::resolve_position::ResolvePosition for BracketItem {
         position: ::span::Span,
     ) -> Self::ResolvedNode<'a> {
         match self {
-            BracketItem::Raw(inner) => inner.resolve(parent, position),
-            BracketItem::Bracketed(inner) => inner.resolve(parent, position),
+            RawToken::NonBracket(inner) => inner.resolve(parent, position),
+            RawToken::Open(inner) => inner.resolve(parent, position),
+            RawToken::Close(inner) => inner.resolve(parent, position),
         }
     }
 }
@@ -380,7 +377,7 @@ impl ::resolve_position::ResolvePosition for NonBracketToken {
 }
 ```
 
-`OpenBracket` and `CloseBracket` generate the same leaf shape as `NonBracketToken`, over their own parent enums. Every `.into()` above is the reflexive `From` or the standard boxing `From`; the `Bracketed` field emissions construct the `Bracketed` variant of each leaf's parent enum by name, as the landed macro always has.
+`BracketItem` generates the same all-delegating shape as `RawToken`; `OpenBracket`, `CloseBracket`, `UnmatchedOpen`, and `UnmatchedClose` generate the same leaf shape as `NonBracketToken`, each over its own parent type. Every `.into()` above is the reflexive `From` or the standard boxing `From`; every field emission names a variant of the leaf's parent enum, as the landed macro always has.
 
 ## Tests
 
@@ -461,7 +458,7 @@ mod tests {
         let brace = group(&tree.item.0, 1);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::Close(CloseBracket(Parenthesis))
+            RawToken::Close(UnmatchedClose(Parenthesis))
         );
         match tree.item.errors().as_slice() {
             [BracketError::UnmatchedClose(close)] => {
@@ -478,7 +475,7 @@ mod tests {
         let brace = group(&tree.item.0, 1);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            RawToken::Open(UnmatchedOpen(Parenthesis))
         );
         match tree.item.errors().as_slice() {
             [BracketError::UnmatchedOpen(open)] => {
@@ -496,10 +493,10 @@ mod tests {
         let brace = group(&tree.item.0, 1);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            RawToken::Open(UnmatchedOpen(Parenthesis))
         );
-        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(CloseBracket(Parenthesis)));
-        assert_eq!(raw(&tree.item.0, 3), RawToken::Close(CloseBracket(Brace)));
+        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(UnmatchedClose(Parenthesis)));
+        assert_eq!(raw(&tree.item.0, 3), RawToken::Close(UnmatchedClose(Brace)));
         match tree.item.errors().as_slice() {
             [
                 BracketError::UnmatchedOpen(open),
@@ -523,9 +520,9 @@ mod tests {
         let brace = group(&tree.item.0, 1);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            RawToken::Open(UnmatchedOpen(Parenthesis))
         );
-        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(CloseBracket(Brace)));
+        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(UnmatchedClose(Brace)));
     }
 
     #[test]
@@ -533,9 +530,9 @@ mod tests {
         let text = "foo { bar(a: }";
         let tree = tree(text);
         assert_eq!(tree.item.0.len(), 7);
-        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
-        assert_eq!(raw(&tree.item.0, 3), RawToken::Open(OpenBracket(Parenthesis)));
-        assert_eq!(raw(&tree.item.0, 6), RawToken::Close(CloseBracket(Brace)));
+        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(UnmatchedOpen(Brace)));
+        assert_eq!(raw(&tree.item.0, 3), RawToken::Open(UnmatchedOpen(Parenthesis)));
+        assert_eq!(raw(&tree.item.0, 6), RawToken::Close(UnmatchedClose(Brace)));
         match tree.item.errors().as_slice() {
             [
                 BracketError::UnmatchedOpen(brace),
@@ -555,7 +552,7 @@ mod tests {
         let text = "a { b { c }";
         let tree = tree(text);
         assert_eq!(tree.item.0.len(), 4);
-        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
+        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(UnmatchedOpen(Brace)));
         let inner = group(&tree.item.0, 3);
         assert!(matches!(
             raw(&inner.children.item.0, 0),
@@ -588,7 +585,7 @@ mod tests {
         let parenthesis = group(&tree.item.0, 0);
         assert_eq!(
             raw(&parenthesis.children.item.0, 0),
-            RawToken::Close(CloseBracket(Brace))
+            RawToken::Close(UnmatchedClose(Brace))
         );
         match tree.item.errors().as_slice() {
             [BracketError::UnmatchedClose(close)] => {
@@ -621,17 +618,15 @@ The resolution tests, in the same module:
         let text = "foo { ( }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "(")) {
-            ResolvedBracketNode::OpenBracket(open) => {
+            ResolvedBracketNode::UnmatchedOpen(open) => {
                 assert_eq!(open.inner.0, Parenthesis);
-                let BracketTokenParent::MatchedBrackets(level) = open.parent else {
-                    panic!("expected the level parent");
-                };
+                let BracketItemParent::MatchedBrackets(level) = open.parent;
                 assert!(matches!(
                     level.parent,
                     MatchedBracketsParent::Bracketed(_)
                 ));
             }
-            node => panic!("expected the open bracket leaf, got {node:?}"),
+            node => panic!("expected the unmatched open leaf, got {node:?}"),
         }
     }
 
@@ -640,14 +635,12 @@ The resolution tests, in the same module:
         let text = "a }";
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
-            ResolvedBracketNode::CloseBracket(close) => {
+            ResolvedBracketNode::UnmatchedClose(close) => {
                 assert_eq!(close.inner.0, Brace);
-                let BracketTokenParent::MatchedBrackets(level) = close.parent else {
-                    panic!("expected the level parent");
-                };
+                let BracketItemParent::MatchedBrackets(level) = close.parent;
                 assert!(matches!(level.parent, MatchedBracketsParent::Root));
             }
-            node => panic!("expected the close bracket leaf, got {node:?}"),
+            node => panic!("expected the unmatched close leaf, got {node:?}"),
         }
     }
 
@@ -657,13 +650,15 @@ The resolution tests, in the same module:
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "{")) {
             ResolvedBracketNode::OpenBracket(open) => {
-                assert!(matches!(open.parent, BracketTokenParent::Bracketed(_)));
+                let BracketTokenParent::Bracketed(group) = open.parent;
+                assert_eq!(group.inner.closing.item.0, Brace);
             }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
             ResolvedBracketNode::CloseBracket(close) => {
-                assert!(matches!(close.parent, BracketTokenParent::Bracketed(_)));
+                let BracketTokenParent::Bracketed(group) = close.parent;
+                assert_eq!(group.inner.opening.item.0, Brace);
             }
             node => panic!("expected the close bracket leaf, got {node:?}"),
         }
@@ -676,10 +671,8 @@ The resolution tests, in the same module:
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "bar")) {
             ResolvedBracketNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                assert!(matches!(
-                    token.parent.parent,
-                    MatchedBracketsParent::Bracketed(_)
-                ));
+                let BracketItemParent::MatchedBrackets(level) = token.parent;
+                assert!(matches!(level.parent, MatchedBracketsParent::Bracketed(_)));
             }
             node => panic!("expected the token leaf, got {node:?}"),
         }
@@ -702,12 +695,12 @@ The resolution tests, in the same module:
 ## Shipping order
 
 1. Change 1: the tree, the matcher, and the errors land with the resolution machinery removed — the landed path family and derives reference `TreeContents` and the deleted types, so the parent enums, `ResolvedBracketNode`, the `ResolvePosition` attributes, and the resolution tests come out with them, and the types land with plain derives. The structural tests and the bracket-matching-cases.md rewrite land here: taking unclosed groups apart replaces forcing them shut, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes, since content after an unmatched open sits in the enclosing level. Between the changes the crate parses and reports errors but answers no positions.
-2. Change 2: everything in "The shape", "The result of resolving", and "Generated impls" as printed — the derives, the two hand-written impls, and the resolution tests. No macro work exists anywhere in this doc.
+2. Change 2: everything in "The shape", "The result of resolving", and "Generated impls" as printed — the derives and the resolution tests. No macro work exists anywhere in this doc.
 
 ## Consequences elsewhere
 
 - generic-resolution.md, close-bracket-parent.md, and parent-validity.md move to refactors/past: the trait they generalize and the positions they distinguish no longer exist.
-- Both macro docs sit in refactors/past with no consumer: the two places the derive does not fit are hand-written, per iso1's own practice.
+- Both macro docs sit in refactors/past with no consumer: every type derives, and the one emission shape the landed macro has covers the whole tree. The one-variant parent enums this costs, and the macro changes that would remove the need for them, are one-variant-parent-enums.md.
 - chunking.md is stale until rewritten: chunking becomes a bespoke recursive pass over levels, producing a v1-shaped chunk tree where a chunk holds its tokens and its trailing group (`bar { baz }` is one chunk), and raw bracket tokens ride inside chunks as content for the chunk parser to report.
 
 ## Landing checklist
