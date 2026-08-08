@@ -21,7 +21,6 @@ pub enum BracketItem {
     Bracketed(Bracketed),
 }
 
-/// A matched pair: the opening, the interior level, the closing.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Bracketed {
@@ -34,9 +33,8 @@ pub struct Bracketed {
     pub closing: WithSpan<CloseBracket>,
 }
 
-/// A token that is not part of any structure. Bracket kinds here are the unmatched ones;
-/// matched brackets are structure, never raw. Every variant resolves into its token's
-/// leaf.
+/// A token that is not part of any structure: bracket kinds here are the unmatched ones;
+/// matched brackets are structure, never raw.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum RawToken {
     NonBracket(NonBracketToken),
@@ -44,17 +42,14 @@ pub enum RawToken {
     Close(CloseBracket),
 }
 
-/// An ordinary token: the leaf a position on it resolves to.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
-/// A group's opening bracket.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
-/// A close bracket token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
@@ -86,12 +81,10 @@ pub enum MatchedBracketsParent<'a> {
 pub type MatchedBracketsPath<'a> =
     PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
 
-/// The one place an item can sit: its level, so the parent is the path directly.
 pub type BracketItemParent<'a> = MatchedBracketsPath<'a>;
 
 pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
 
-/// The one place an ordinary token can sit: its level, so the parent is the path directly.
 pub type NonBracketTokenPath<'a> =
     PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
 
@@ -136,7 +129,6 @@ enum ParsedGroup {
     Unclosed(UnclosedGroup),
 }
 
-/// A group that never got its close: its opening, and the children it had parsed.
 struct UnclosedGroup {
     opening: WithSpan<OpenBracket>,
     children: Vec<WithSpan<BracketItem>>,
