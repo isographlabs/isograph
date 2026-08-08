@@ -51,12 +51,12 @@ pub struct Bracketed {
 
 /// A group's opening bracket.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = OpenBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
 /// A close bracket token.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = CloseBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
 ```
 
@@ -96,26 +96,16 @@ pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemPa
 pub type NonBracketTokenPath<'a> =
     PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
 
-/// The two positions an open bracket can sit in.
+/// The two positions a bracket token can sit in: a matched group's opening or closing,
+/// or an unmatched token in the level it sits in. Which token it is, the leaf says.
 #[derive(Debug)]
-pub enum OpenBracketParent<'a> {
-    /// A matched group's opening.
+pub enum BracketTokenParent<'a> {
     Bracketed(Box<BracketedPath<'a>>),
-    /// An unmatched token, in the level it sits in.
     MatchedBrackets(MatchedBracketsPath<'a>),
 }
 
-/// The two positions a close bracket can sit in.
-#[derive(Debug)]
-pub enum CloseBracketParent<'a> {
-    /// A matched group's closing.
-    Bracketed(Box<BracketedPath<'a>>),
-    /// An unmatched token, in the level it sits in.
-    MatchedBrackets(MatchedBracketsPath<'a>),
-}
-
-pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
-pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, CloseBracketParent<'a>>;
+pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTokenParent<'a>>;
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
 ```
 
 The conversions the emissions construct through, written out. The fallback's `parent.into()` is the reflexive `From`, since `BracketItemParent` is the level path itself; the bracket parents convert from both of their positions:
@@ -357,10 +347,10 @@ impl ResolvePosition for RawToken {
         match self {
             RawToken::NonBracket(inner) => inner.resolve(parent, position),
             RawToken::Open(inner) => {
-                inner.resolve(OpenBracketParent::MatchedBrackets(parent), position)
+                inner.resolve(BracketTokenParent::MatchedBrackets(parent), position)
             }
             RawToken::Close(inner) => {
-                inner.resolve(CloseBracketParent::MatchedBrackets(parent), position)
+                inner.resolve(BracketTokenParent::MatchedBrackets(parent), position)
             }
         }
     }
@@ -669,7 +659,7 @@ The resolution tests, in the same module:
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "(")) {
             ResolvedBracketNode::OpenBracket(open) => {
                 assert_eq!(open.inner.0, Parenthesis);
-                let OpenBracketParent::MatchedBrackets(level) = open.parent else {
+                let BracketTokenParent::MatchedBrackets(level) = open.parent else {
                     panic!("expected the level parent");
                 };
                 assert!(matches!(
@@ -688,7 +678,7 @@ The resolution tests, in the same module:
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
             ResolvedBracketNode::CloseBracket(close) => {
                 assert_eq!(close.inner.0, Brace);
-                let CloseBracketParent::MatchedBrackets(level) = close.parent else {
+                let BracketTokenParent::MatchedBrackets(level) = close.parent else {
                     panic!("expected the level parent");
                 };
                 assert!(matches!(level.parent, MatchedBracketsParent::Root));
@@ -703,13 +693,13 @@ The resolution tests, in the same module:
         let tree = tree(text);
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "{")) {
             ResolvedBracketNode::OpenBracket(open) => {
-                assert!(matches!(open.parent, OpenBracketParent::Bracketed(_)));
+                assert!(matches!(open.parent, BracketTokenParent::Bracketed(_)));
             }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
             ResolvedBracketNode::CloseBracket(close) => {
-                assert!(matches!(close.parent, CloseBracketParent::Bracketed(_)));
+                assert!(matches!(close.parent, BracketTokenParent::Bracketed(_)));
             }
             node => panic!("expected the close bracket leaf, got {node:?}"),
         }
