@@ -183,6 +183,9 @@ fn parse_items(
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 tokens.next();
+                // The OpenBracket type means a matched opening, which is not yet known
+                // here; if the group never closes, the Unclosed arm below demotes this
+                // token to UnmatchedOpen.
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing_stack, opening) {
                     ParsedGroup::Closed(group) => {
