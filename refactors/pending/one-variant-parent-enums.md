@@ -43,7 +43,7 @@ pub struct Bracketed {
     #[resolve_field(parent_variant = Matched)]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field(parent_variant = Bracketed)]
+    #[resolve_field(parent_variant = Interior)]
     pub children: WithSpan<MatchedBrackets>,
     #[resolve_field(parent_variant = Matched)]
     pub closing: WithSpan<CloseBracket>,
@@ -67,7 +67,7 @@ pub enum RawToken {
 
 An unannotated payload delegates with the parent unchanged, which requires the payload's `Parent` type to equal the enum's. An annotated payload wraps the enum's parent in the named variant of the payload's parent enum as it delegates. Bare `#[resolve_field]` on a payload is a compile error from the macro: a payload always resolves, so the only thing the attribute can state there is a parent variant.
 
-Misuse fails to compile inside the generated impl, at the derive site. Bare `#[resolve_field]` on a struct field whose child's parent is an enum is a mismatched-types error (expected the enum, found `PositionResolutionPath<..>`); `parent_variant` where the child's parent is a path is "no variant or associated item named `V`". When a child with a path parent later gains a second container, its parent type becomes an enum, and each bare site for that child stops compiling until it names a variant. Any other argument form (`#[resolve_field(foo)]`, `#[resolve_field = ..]`) is a compile error naming the accepted forms.
+Misuse fails to compile inside the generated impl, at the derive site. Bare `#[resolve_field]` on a struct field whose child's parent is an enum is a mismatched-types error (expected the enum, found `PositionResolutionPath<..>`); `parent_variant` where the child's parent is a path is "no variant or associated item named `V`". When a child with a path parent later gains a second container, its parent type becomes an enum, and each bare site for that child stops compiling until it names a variant. Any other argument form (`#[resolve_field(foo)]`, `#[resolve_field = ..]`) is a compile error naming the accepted forms, and a second `#[resolve_field]` on the same field or payload is a compile error rather than a silent first-wins.
 
 ## Macro changes
 
@@ -77,11 +77,7 @@ All in `crates/resolve_position_macros/src/resolve_position_macro.rs`. The parse
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
 /// How an emission builds the value it passes as the child's parent.
 enum ParentConstruction {
-    /// Bare `#[resolve_field]`: the child's `Parent` type is the container's own
-    /// path, and `self.path(parent)` is passed unwrapped.
     ContainerPath,
-    /// `#[resolve_field(parent_variant = V)]`: the child's `Parent` type is an
-    /// enum, and the parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
 }
 
@@ -98,6 +94,20 @@ Shared by both positions. Bare (`syn::Meta::Path`) is `ContainerPath`; a parenth
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn find_resolve_field_attr(
+    attrs: &[syn::Attribute],
+) -> Result<Option<&syn::Attribute>, proc_macro2::TokenStream> {
+    let mut matching = attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("resolve_field"));
+    match (matching.next(), matching.next()) {
+        (first, None) => Ok(first),
+        (_, Some(duplicate)) => Error::new_spanned(duplicate, "duplicate #[resolve_field]")
+            .to_compile_error()
+            .wrap_err(),
+    }
+}
+
 fn parse_parent_construction(
     attr: &syn::Attribute,
 ) -> Result<ParentConstruction, proc_macro2::TokenStream> {
@@ -184,11 +194,7 @@ fn get_resolve_field_info(
     index: usize,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
-    let Some(attr) = field
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("resolve_field"))
-    else {
+    let Some(attr) = find_resolve_field_attr(&field.attrs)? else {
         return Ok(None);
     };
 
@@ -296,8 +302,6 @@ fn generate_resolve_code(
     generate_resolve_code_recursive(wrapper, parent_construction, quote!(self.#field_accessor))
 }
 
-/// The expression passed as the child's parent. `self.path(parent)` is the
-/// container's own path in both arms; the variant wrapping is the only difference.
 fn new_parent_expr(
     parent_construction: &ParentConstruction,
     inner_type: &syn::Type,
@@ -463,14 +467,11 @@ fn generate_enum_arm(
     variant_name: &syn::Ident,
     payload: &syn::Field,
 ) -> proc_macro2::TokenStream {
-    let attr = payload
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("resolve_field"));
+    let attr = match find_resolve_field_attr(&payload.attrs) {
+        Ok(attr) => attr,
+        Err(e) => return e,
+    };
 
-    // An unannotated payload delegates with the parent unchanged, which requires the
-    // payload's Parent type to equal the enum's. The payload implements ResolvePosition
-    // itself; a located wrapper delegates through the blanket impl in resolve_position.
     let Some(attr) = attr else {
         return quote! {
             #enum_name::#variant_name(inner) => inner.resolve(parent, position)
@@ -537,7 +538,7 @@ pub struct UnmatchedOpen(pub BracketKind);
 pub struct UnmatchedClose(pub BracketKind);
 ```
 
-After, the full type listing. `BracketItemParent`, `UnmatchedOpen`, `UnmatchedClose`, and the `UnmatchedOpenPath`/`UnmatchedClosePath` aliases are deleted; `MatchedBracketsParent` stays a real two-variant enum, its `Bracketed` variant keeping the `Box` that breaks the type-level recursion; `BracketTokenParent` becomes the two-variant enum whose variants say what the position means:
+After, the full type listing. `BracketItemParent`, `UnmatchedOpen`, `UnmatchedClose`, and the `UnmatchedOpenPath`/`UnmatchedClosePath` aliases are deleted; `MatchedBracketsParent` stays a real two-variant enum, renamed to say what the positions mean (`Bracketed` becomes `Interior`), its `Interior` variant keeping the `Box` that breaks the type-level recursion; `BracketTokenParent` becomes the two-variant enum whose variants do the same:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -556,7 +557,7 @@ pub enum ResolvedBracketNode<'a> {
 #[derive(Debug)]
 pub enum MatchedBracketsParent<'a> {
     Root,
-    Bracketed(Box<BracketedPath<'a>>),
+    Interior(Box<BracketedPath<'a>>),
 }
 
 pub type MatchedBracketsPath<'a> =
@@ -601,7 +602,7 @@ pub struct Bracketed {
     #[resolve_field(parent_variant = Matched)]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field(parent_variant = Bracketed)]
+    #[resolve_field(parent_variant = Interior)]
     pub children: WithSpan<MatchedBrackets>,
     #[resolve_field(parent_variant = Matched)]
     pub closing: WithSpan<CloseBracket>,
@@ -638,7 +639,7 @@ The root is entered as before: `tree.resolve(MatchedBracketsParent::Root, positi
 
 ## Generated impls
 
-The three types whose generated code exercises the new emissions. `MatchedBrackets` descends with the direct emission through the `Vec` wrapper; `Bracketed` wraps its tokens' parents in `Matched` and its interior's parent in `MatchedBracketsParent::Bracketed`; `RawToken` passes through for `NonBracket` and wraps into `Unmatched` for the bracket arms.
+The three types whose generated code exercises the new emissions. `MatchedBrackets` descends with the direct emission through the `Vec` wrapper; `Bracketed` wraps its tokens' parents in `Matched` and its interior's parent in `MatchedBracketsParent::Interior`; `RawToken` passes through for `NonBracket` and wraps into `Unmatched` for the bracket arms.
 
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
@@ -676,7 +677,7 @@ impl ::resolve_position::ResolvePosition for Bracketed {
             return self.opening.item.resolve(new_parent, position);
         }
         if self.children.location.contains(position) {
-            let new_parent = <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::Bracketed(self.path(parent).into());
+            let new_parent = <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::Interior(self.path(parent).into());
             return self.children.item.resolve(new_parent, position);
         }
         if self.closing.location.contains(position) {
@@ -711,7 +712,7 @@ impl ::resolve_position::ResolvePosition for RawToken {
 }
 ```
 
-In `MatchedBrackets::resolve`, `self.path(parent)` is `MatchedBracketsPath`, which is `BracketItem`'s `Parent`; the reflexive `From` inside `path` is the only conversion. In `Bracketed::resolve`, the `Matched` lines build a `BracketedPath` (reflexive `From`) and the `Bracketed` line boxes (`From<T> for Box<T>`). In `RawToken::resolve`, `parent.into()` is the reflexive `From` into `Unmatched`'s `MatchedBracketsPath` payload. `BracketItem` generates the same all-delegating shape with no annotated payloads; `NonBracketToken`, `OpenBracket`, and `CloseBracket` generate the leaf shape over their parent types as printed above.
+In `MatchedBrackets::resolve`, `self.path(parent)` is `MatchedBracketsPath`, which is `BracketItem`'s `Parent`; the reflexive `From` inside `path` is the only conversion. In `Bracketed::resolve`, the `Matched` lines build a `BracketedPath` (reflexive `From`) and the `Interior` line boxes (`From<T> for Box<T>`). In `RawToken::resolve`, `parent.into()` is the reflexive `From` into `Unmatched`'s `MatchedBracketsPath` payload. `BracketItem` generates the same all-delegating shape with no annotated payloads; `NonBracketToken`, `OpenBracket`, and `CloseBracket` generate the leaf shape over their parent types as printed above.
 
 ## The matcher and errors
 
@@ -762,7 +763,25 @@ After:
                 }
 ```
 
-and in the close arm, `RawToken::Close(UnmatchedClose(kind))` becomes `RawToken::Close(CloseBracket(kind))`.
+In the close arm, before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+                items.push(WithSpan::new(
+                    BracketItem::Raw(RawToken::Close(UnmatchedClose(kind))),
+                    token.location,
+                ));
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+                items.push(WithSpan::new(
+                    BracketItem::Raw(RawToken::Close(CloseBracket(kind))),
+                    token.location,
+                ));
+```
 
 The error type holds the merged token types; a bracket token stored raw in a level is unmatched by construction, and `collect_errors` is unchanged apart from the payload types:
 
@@ -804,7 +823,7 @@ In the resolution tests, the unmatched leaves are now `OpenBracket`/`CloseBracke
                     BracketTokenParent::Unmatched(level) => {
                         assert!(matches!(
                             level.parent,
-                            MatchedBracketsParent::Bracketed(_)
+                            MatchedBracketsParent::Interior(_)
                         ));
                     }
                     parent => panic!("expected an unmatched open, got {parent:?}"),
@@ -865,7 +884,7 @@ In the resolution tests, the unmatched leaves are now `OpenBracket`/`CloseBracke
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
                 assert!(matches!(
                     token.parent.parent,
-                    MatchedBracketsParent::Bracketed(_)
+                    MatchedBracketsParent::Interior(_)
                 ));
             }
             node => panic!("expected the token leaf, got {node:?}"),
@@ -873,11 +892,11 @@ In the resolution tests, the unmatched leaves are now `OpenBracket`/`CloseBracke
     }
 ```
 
-The straddle and whitespace tests are unchanged. The suite covers every emission: the ordinary-token and unmatched tests exercise the direct field emission and the `Unmatched` payload wrap, the matched-pair test exercises the `Matched` field wrap, and the straddle and whitespace tests exercise the `Bracketed` field wrap.
+The straddle and whitespace tests are unchanged. The suite covers every emission: the ordinary-token and unmatched tests exercise the direct field emission and the `Unmatched` payload wrap, the matched-pair test exercises the `Matched` field wrap, and the straddle and whitespace tests exercise the `Interior` field wrap.
 
 ## Shipping order
 
-1. The struct-field macro change, with every field site in matched_brackets.rs naming its variant explicitly against the enums as they stand. The generated code is identical to today's, so this is a pure prefactor; `cargo test` green. The four attribute lines in this state:
+1. The struct-field macro change, with every field site in matched_brackets.rs naming its variant explicitly against the enums as they stand. The macro and the annotations land in one commit: bare `#[resolve_field]`'s meaning flips to the direct emission, so a site left bare would stop compiling. The generated code is identical to today's, so this is a pure prefactor; `cargo test` green. The four attribute lines in this state:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -894,6 +913,42 @@ pub struct MatchedBrackets(
 ```
 
 2. The enum-payload macro change. No payload in the tree is annotated yet, so every enum generates the same delegating arms as today; `cargo test` green.
-3. Level parents become direct: `BracketItemParent` is deleted, its users' `parent_type` becomes `MatchedBracketsPath<'a>` (`BracketItem`, `Bracketed`, `RawToken`, `NonBracketToken`, `UnmatchedOpen`, `UnmatchedClose`), the `MatchedBrackets` field drops to bare `#[resolve_field]`, and the `BracketItemParent` destructures in the tests become direct uses of `.parent`; `cargo test` green.
-4. The token merge: `UnmatchedOpen`, `UnmatchedClose`, their path aliases, and their `ResolvedBracketNode` variants are deleted; `BracketTokenParent` becomes `Matched`/`Unmatched` as printed; `RawToken` carries the annotated `OpenBracket`/`CloseBracket` payloads; `Bracketed`'s token fields wrap into `Matched`; the matcher, `BracketError`, and the tests change as printed; `cargo test` green. bracket-matching-cases.md updates in the same change: its type listing takes the merged shape, its case narration renames the raw items (`UnmatchedOpen(kind)` becomes a raw `OpenBracket(kind)`, `UnmatchedClose(kind)` a raw `CloseBracket(kind)`), and its `BracketError` names stay, with the payload types as printed above.
+3. Level parents become direct, and the level's parent enum takes its final names: `BracketItemParent` is deleted, its users' `parent_type` becomes `MatchedBracketsPath<'a>` (`BracketItem`, `Bracketed`, `RawToken`, `NonBracketToken`, `UnmatchedOpen`, `UnmatchedClose`), the `MatchedBrackets` field drops to bare `#[resolve_field]`, `MatchedBracketsParent::Bracketed` is renamed to `Interior`, and the `children` annotation follows it to `parent_variant = Interior`; `cargo test` green. In the tests, the `BracketItemParent` destructures become direct uses of `.parent`, while the `UnmatchedOpen`/`UnmatchedClose` leaves and the `BracketTokenParent::Bracketed` destructure still stand. The changed match arms in this state:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs, after change 3
+            ResolvedBracketNode::UnmatchedOpen(open) => {
+                assert_eq!(open.inner.0, Parenthesis);
+                assert!(matches!(
+                    open.parent.parent,
+                    MatchedBracketsParent::Interior(_)
+                ));
+            }
+
+            ResolvedBracketNode::UnmatchedClose(close) => {
+                assert_eq!(close.inner.0, Brace);
+                assert!(matches!(close.parent.parent, MatchedBracketsParent::Root));
+            }
+
+            ResolvedBracketNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                assert!(matches!(
+                    token.parent.parent,
+                    MatchedBracketsParent::Interior(_)
+                ));
+            }
+```
+4. The token merge: `UnmatchedOpen`, `UnmatchedClose`, their path aliases, and their `ResolvedBracketNode` variants are deleted; `BracketTokenParent` becomes `Matched`/`Unmatched` as printed; `RawToken` carries the annotated `OpenBracket`/`CloseBracket` payloads; the matcher, `BracketError`, and the tests change as printed; `cargo test` green. `Bracketed`'s token fields flip from `parent_variant = Bracketed` to `parent_variant = Matched`, with `children` unchanged since change 3:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+    #[resolve_field(parent_variant = Matched)]
+    pub opening: WithSpan<OpenBracket>,
+    #[resolve_field(parent_variant = Interior)]
+    pub children: WithSpan<MatchedBrackets>,
+    #[resolve_field(parent_variant = Matched)]
+    pub closing: WithSpan<CloseBracket>,
+```
+
+bracket-matching-cases.md updates in the same change: its type listing takes the merged shape, its case narration renames the raw items (`UnmatchedOpen(kind)` becomes a raw `OpenBracket(kind)`, `UnmatchedClose(kind)` a raw `CloseBracket(kind)`), and its `BracketError` names stay, with the payload types as printed above.
 5. Move this doc to refactors/past.
