@@ -91,7 +91,9 @@ pub type NonBracketTokenPath<'a> =
 /// Shared by `OpenBracket` and `CloseBracket`; the leaf type says which token it is.
 #[derive(Debug)]
 pub enum BracketTokenParent<'a> {
+    /// A matched group's own opening or closing.
     Bracketed(Box<BracketedPath<'a>>),
+    /// A raw item in this level: the token is unmatched.
     MatchedBrackets(MatchedBracketsPath<'a>),
 }
 
