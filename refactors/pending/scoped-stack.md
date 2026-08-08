@@ -27,8 +27,9 @@ impl<T> Stack<T> {
     }
 
     /// The item stays until the returned guard drops. The guard borrows the stack, so
-    /// it is the only usable handle while it lives, and it derefs to [`Stack`], so a
-    /// callee takes `&mut Stack<T>` whether or not its caller holds a guard.
+    /// it is the only usable handle while it lives; [`stack`](Pushed::stack) hands the
+    /// stack back, so a callee still takes `&mut Stack<T>` whether or not its caller
+    /// holds a guard.
     pub fn pushed(&mut self, item: T) -> Pushed<'_, T> {
         self.0.push(item);
         Pushed { stack: self }
@@ -38,7 +39,7 @@ impl<T> Stack<T> {
     /// stack exactly for the duration of the closure.
     pub fn with_pushed<R>(&mut self, item: T, do_stuff: impl FnOnce(&mut Stack<T>) -> R) -> R {
         let mut pushed = self.pushed(item);
-        do_stuff(&mut pushed)
+        do_stuff(pushed.stack())
     }
 }
 
@@ -55,23 +56,20 @@ pub struct Pushed<'a, T> {
     stack: &'a mut Stack<T>,
 }
 
+impl<T> Pushed<'_, T> {
+    pub fn all(&self) -> &[T] {
+        self.stack.all()
+    }
+
+    /// The stack, with this guard's item on it.
+    pub fn stack(&mut self) -> &mut Stack<T> {
+        self.stack
+    }
+}
+
 impl<T> Drop for Pushed<'_, T> {
     fn drop(&mut self) {
         self.stack.0.pop();
-    }
-}
-
-impl<T> std::ops::Deref for Pushed<'_, T> {
-    type Target = Stack<T>;
-
-    fn deref(&self) -> &Stack<T> {
-        self.stack
-    }
-}
-
-impl<T> std::ops::DerefMut for Pushed<'_, T> {
-    fn deref_mut(&mut self) -> &mut Stack<T> {
-        self.stack
     }
 }
 ```
@@ -90,7 +88,7 @@ license = { workspace = true }
 workspace = true
 ```
 
-The soundness argument is small. A guard pops exactly the item it pushed: while it lives it holds the one `&mut` to the stack, so nothing else can push or pop underneath it, and nested guards release in reverse order because each borrows the one before. `DerefMut` hands out `&mut Stack<T>`, but the field is private and `Stack`'s own surface is only `all`, `pushed`, and `with_pushed`, so the deref grants nothing unscoped. The enforcement is `Drop`, so `mem::forget(pushed)` would leak the item past its scope; nothing calls `forget`, and doing so requires doing it deliberately. A `pop` on `Stack` can never be added compatibly: `Pushed`'s `Drop` pops the top item on the assumption that the top item is its own, and a manual pop under a live guard would hand that `Drop` someone else's entry.
+The soundness argument is small. A guard pops exactly the item it pushed: while it lives it holds the one `&mut` to the stack, so nothing else can push or pop underneath it, and nested guards release in reverse order because each borrows the one before. The guard exposes the stack only through `stack()`, an explicit reborrow, and `Stack`'s own surface is only `all`, `pushed`, and `with_pushed`, so a callee gets no unscoped push or pop. The enforcement is `Drop`, so `mem::forget(pushed)` would leak the item past its scope; nothing calls `forget`, and doing so requires doing it deliberately. A `pop` on `Stack` can never be added compatibly: `Pushed`'s `Drop` pops the top item on the assumption that the top item is its own, and a manual pop under a live guard would hand that `Drop` someone else's entry.
 
 The structural competitor is a cons list on the call stack — `struct Path<'a, T> { head: T, tail: Option<&'a Path<'a, T>> }` — where a pushed item dies with the stack frame that holds it, no guard and no `Drop` involved, and the callers' items sit behind a shared reference, unreachable for mutation by construction. Every surveyed use case fits it, since none needs an item to outlive the function that pushed it. The `Vec` wins on reads and signatures: `all()` hands back a slice, outermost first, where the cons list walks links innermost-first and reader_ast's whole-path clone becomes a collect-and-reverse; the parameter type is `&mut Stack<T>` everywhere, where the cons list threads `Option<&Path<'_, T>>` through every function; and a loop can push any number of items before recursing, where cons cells need one named local each. No surveyed site loop-pushes, so that last difference is headroom, not need.
 
@@ -143,7 +141,7 @@ mod test {
             let mut pushed = stack.pushed(1);
             assert_eq!(pushed.all(), &[1]);
 
-            let pushed_again = pushed.pushed(2);
+            let pushed_again = pushed.stack().pushed(2);
             assert_eq!(pushed_again.all(), &[1, 2]);
         }
 
@@ -153,9 +151,9 @@ mod test {
     #[test]
     fn a_callee_pushes_for_the_rest_of_its_body() {
         fn callee(stack: &mut Stack<i32>) {
-            let mut stack = stack.pushed(2);
-            recurse(&mut stack);
-            assert_eq!(stack.all(), &[1, 2]);
+            let mut pushed = stack.pushed(2);
+            recurse(pushed.stack());
+            assert_eq!(pushed.all(), &[1, 2]);
         }
 
         fn recurse(stack: &mut Stack<i32>) {
