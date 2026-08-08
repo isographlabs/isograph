@@ -67,8 +67,9 @@ fn handle_data_struct(
                 |ResolveFieldInfo {
                      field_accessor,
                      field_type,
+                     parent_construction,
                  }| {
-                    generate_resolve_code(&field_accessor, &field_type, &struct_name)
+                    generate_resolve_code(&field_accessor, &field_type, &parent_construction)
                 },
             )
             .collect::<Vec<_>>(),
@@ -171,9 +172,51 @@ enum ResolveFieldInfoTypeWrapper {
     IteratorWrapper(Box<ResolveFieldInfoTypeWrapper>),
 }
 
+/// How an emission builds the value it passes as the child's parent.
+enum ParentConstruction {
+    /// Bare `#[resolve_field]`: the child's `Parent` type is the container's own
+    /// path, and `self.path(parent)` is passed unwrapped.
+    ContainerPath,
+    /// `#[resolve_field(parent_variant = V)]`: the child's `Parent` type is an
+    /// enum, and the parent value is wrapped in its variant `V`.
+    EnumVariant(syn::Ident),
+}
+
 struct ResolveFieldInfo {
     field_accessor: proc_macro2::TokenStream,
     field_type: ResolveFieldInfoTypeWrapper,
+    parent_construction: ParentConstruction,
+}
+
+fn parse_parent_construction(
+    attr: &syn::Attribute,
+) -> Result<ParentConstruction, proc_macro2::TokenStream> {
+    match &attr.meta {
+        syn::Meta::Path(_) => ParentConstruction::ContainerPath.wrap_ok(),
+        syn::Meta::List(_) => {
+            let name_value = attr
+                .parse_args::<syn::MetaNameValue>()
+                .map_err(|e| e.to_compile_error())?;
+            if let syn::Expr::Path(value) = &name_value.value
+                && name_value.path.is_ident("parent_variant")
+                && let Some(variant) = value.path.get_ident()
+            {
+                return ParentConstruction::EnumVariant(variant.clone()).wrap_ok();
+            }
+            Error::new_spanned(
+                &attr.meta,
+                "expected `#[resolve_field(parent_variant = SomeVariant)]`",
+            )
+            .to_compile_error()
+            .wrap_err()
+        }
+        syn::Meta::NameValue(name_value) => Error::new_spanned(
+            name_value,
+            "expected `#[resolve_field]` or `#[resolve_field(parent_variant = SomeVariant)]`",
+        )
+        .to_compile_error()
+        .wrap_err(),
+    }
 }
 
 // Attempts to extract the single generic type from angle bracketed path arguments, e.g. X<Inner>
@@ -282,14 +325,15 @@ fn get_resolve_field_info(
     index: usize,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
-    let has_resolve = field
+    let Some(attr) = field
         .attrs
         .iter()
-        .any(|attr| attr.path().is_ident("resolve_field"));
-
-    if !has_resolve {
+        .find(|attr| attr.path().is_ident("resolve_field"))
+    else {
         return Ok(None);
-    }
+    };
+
+    let parent_construction = parse_parent_construction(attr)?;
 
     // A named field is accessed by name, a tuple field by index.
     let field_accessor = match &field.ident {
@@ -305,6 +349,7 @@ fn get_resolve_field_info(
             Ok(field_type) => ResolveFieldInfo {
                 field_accessor,
                 field_type,
+                parent_construction,
             }
             .wrap_some()
             .wrap_ok(),
@@ -320,48 +365,75 @@ fn get_resolve_field_info(
 fn generate_resolve_code(
     field_accessor: &proc_macro2::TokenStream,
     wrapper: &ResolveFieldInfoTypeWrapper,
-    struct_name: &syn::Ident,
+    parent_construction: &ParentConstruction,
 ) -> proc_macro2::TokenStream {
-    generate_resolve_code_recursive(wrapper, struct_name, quote!(self.#field_accessor))
+    generate_resolve_code_recursive(wrapper, parent_construction, quote!(self.#field_accessor))
+}
+
+/// The expression passed as the child's parent. `self.path(parent)` is the
+/// container's own path in both arms; the variant wrapping is the only difference.
+fn new_parent_expr(
+    parent_construction: &ParentConstruction,
+    inner_type: &syn::Type,
+) -> proc_macro2::TokenStream {
+    match parent_construction {
+        ParentConstruction::ContainerPath => quote!(self.path(parent)),
+        ParentConstruction::EnumVariant(variant) => quote!(
+            <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
+        ),
+    }
 }
 
 fn generate_resolve_code_recursive(
     wrapper: &ResolveFieldInfoTypeWrapper,
-    struct_name: &syn::Ident,
+    parent_construction: &ParentConstruction,
     field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     match wrapper {
         ResolveFieldInfoTypeWrapper::None(inner) => match &**inner {
-            ResolveFieldInfoType::WithSpan(inner_type) => quote! {
-                if #field_expr.location.contains(position) {
-                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                    return #field_expr.item.resolve(new_parent, position);
-                }
-            },
-            ResolveFieldInfoType::WithLocation(inner_type) => quote! {
-                if let Some(span) = #field_expr.location.span() {
-                    if span.contains(position) {
-                        let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
+            ResolveFieldInfoType::WithSpan(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if #field_expr.location.contains(position) {
+                        let new_parent = #new_parent;
                         return #field_expr.item.resolve(new_parent, position);
                     }
                 }
-            },
-            ResolveFieldInfoType::WithEmbeddedLocation(inner_type) => quote! {
-                if #field_expr.location.span.contains(position) {
-                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                    return #field_expr.item.resolve(new_parent, position);
+            }
+            ResolveFieldInfoType::WithLocation(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if let Some(span) = #field_expr.location.span() {
+                        if span.contains(position) {
+                            let new_parent = #new_parent;
+                            return #field_expr.item.resolve(new_parent, position);
+                        }
+                    }
                 }
-            },
-            ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => quote! {
-                if #field_expr.span().contains(position) {
-                    let new_parent = <#inner_type as ::resolve_position::ResolvePosition>::Parent::#struct_name(self.path(parent).into());
-                    return #field_expr.inner().resolve(new_parent, position);
+            }
+            ResolveFieldInfoType::WithEmbeddedLocation(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if #field_expr.location.span.contains(position) {
+                        let new_parent = #new_parent;
+                        return #field_expr.item.resolve(new_parent, position);
+                    }
                 }
-            },
+            }
+            ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => {
+                let new_parent = new_parent_expr(parent_construction, inner_type);
+                quote! {
+                    if #field_expr.span().contains(position) {
+                        let new_parent = #new_parent;
+                        return #field_expr.inner().resolve(new_parent, position);
+                    }
+                }
+            }
         },
 
         ResolveFieldInfoTypeWrapper::IteratorWrapper(inner) => {
-            let inner_code = generate_resolve_code_recursive(inner, struct_name, quote!(item));
+            let inner_code =
+                generate_resolve_code_recursive(inner, parent_construction, quote!(item));
 
             quote! {
                 for item in #field_expr.iter() {

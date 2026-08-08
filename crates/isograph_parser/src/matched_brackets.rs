@@ -9,7 +9,9 @@ use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKin
 /// One level: the whole literal at the root, a group's interior below.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
+pub struct MatchedBrackets(
+    #[resolve_field(parent_variant = MatchedBrackets)] pub Vec<WithSpan<BracketItem>>,
+);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
@@ -21,12 +23,12 @@ pub enum BracketItem {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Bracketed {
-    #[resolve_field]
+    #[resolve_field(parent_variant = Bracketed)]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field]
+    #[resolve_field(parent_variant = Bracketed)]
     pub children: WithSpan<MatchedBrackets>,
-    #[resolve_field]
+    #[resolve_field(parent_variant = Bracketed)]
     pub closing: WithSpan<CloseBracket>,
 }
 
