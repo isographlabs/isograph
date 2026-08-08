@@ -110,6 +110,24 @@ The control flow keeps the landed rules — nearest open of the kind, a close ow
 // from crates/isograph_parser/src/matched_brackets.rs
 type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
+/// The kind of every group the level being parsed sits inside, innermost last.
+struct EnclosingStack(Vec<BracketKind>);
+
+impl EnclosingStack {
+    fn contains(&self, kind: BracketKind) -> bool {
+        self.0.contains(&kind)
+    }
+
+    /// The `with_` bracketing pattern from iso1's peekable lexer: the kind is on the
+    /// stack exactly for the duration of the closure.
+    fn with_kind<T>(&mut self, kind: BracketKind, do_stuff: impl FnOnce(&mut Self) -> T) -> T {
+        self.0.push(kind);
+        let result = do_stuff(self);
+        self.0.pop();
+        result
+    }
+}
+
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
 pub fn match_brackets(
@@ -117,7 +135,7 @@ pub fn match_brackets(
     literal_length: u32,
 ) -> WithSpan<MatchedBrackets> {
     let mut tokens = tokens.into_iter().peekable();
-    let mut enclosing_stack = Vec::new();
+    let mut enclosing_stack = EnclosingStack(Vec::new());
     WithSpan::new(
         MatchedBrackets(parse_items(&mut tokens, &mut enclosing_stack)),
         Span::new(0, literal_length),
@@ -139,7 +157,7 @@ struct UnclosedGroup {
 
 fn parse_items(
     tokens: &mut TokenStream,
-    enclosing_stack: &mut Vec<BracketKind>,
+    enclosing_stack: &mut EnclosingStack,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     while let Some(&token) = tokens.peek() {
@@ -172,7 +190,7 @@ fn parse_items(
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
-                if enclosing_stack.contains(&kind) {
+                if enclosing_stack.contains(kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
                     // takes apart every group between here and its owner.
                     break;
@@ -192,12 +210,12 @@ fn parse_items(
 /// close an enclosing group owns, or at the end of the tokens, it never closes.
 fn parse_bracketed(
     tokens: &mut TokenStream,
-    enclosing_stack: &mut Vec<BracketKind>,
+    enclosing_stack: &mut EnclosingStack,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
-    enclosing_stack.push(opening.item.0);
-    let children = parse_items(tokens, enclosing_stack);
-    enclosing_stack.pop();
+    let children = enclosing_stack.with_kind(opening.item.0, |enclosing_stack| {
+        parse_items(tokens, enclosing_stack)
+    });
 
     match tokens.peek() {
         Some(&token)
