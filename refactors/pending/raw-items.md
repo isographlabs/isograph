@@ -186,10 +186,8 @@ fn parse_items(
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing_stack, opening) {
                     ParsedGroup::Closed(group) => {
-                        let span = Span::new(
-                            group.opening.location.start,
-                            group.closing.location.end,
-                        );
+                        let span =
+                            Span::join(group.opening.location, group.closing.location);
                         items.push(WithSpan::new(BracketItem::Bracketed(group), span));
                     }
                     ParsedGroup::Unclosed(UnclosedGroup { opening, children }) => {
@@ -236,7 +234,7 @@ fn parse_bracketed(
         {
             tokens.next();
             let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
-            let interior = Span::new(opening.location.end, closing.location.start);
+            let interior = Span::between(opening.location, closing.location);
             ParsedGroup::Closed(Bracketed {
                 opening,
                 children: WithSpan::new(MatchedBrackets(children), interior),

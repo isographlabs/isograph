@@ -62,11 +62,10 @@ impl Span {
         self.end - self.start
     }
 
-    pub fn span_between(&self, other: Span) -> Span {
-        Span {
-            start: self.end,
-            end: other.start,
-        }
+    /// Creates a new Span starting at left.end and ending at right.start: the gap
+    /// between the two, the counterpart of [`Span::join`].
+    pub fn between(left: Span, right: Span) -> Self {
+        Span::new(left.end, right.start)
     }
 
     pub fn contains(&self, other: Span) -> bool {
