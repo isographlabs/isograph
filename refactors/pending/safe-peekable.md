@@ -1,97 +1,92 @@
-# Peekable with a guarded peek
+# Safe peekable
 
-A new crate, `peekable`, holds an iterator wrapper whose `peek` returns a guard. `view` lends the peeked item as `&I::Item`, `commit` consumes the item and returns it owned, and dropping the guard leaves the iterator exactly where `peek` found it — the same non-consuming peek semantics as `std::iter::Peekable`, so repeated peeks see the same item. The guard's lifetime is `peek`'s `&mut` borrow of the wrapper, so while a guard lives nothing can call `next` underneath it: "peek, then decide" is the only shape the API admits, and the peek-then-`next` pairs in the matcher become a single `commit` on the item that was actually viewed.
+A new crate, `safe_peekable`, holds an iterator wrapper whose `peek` returns a guard; `.safe_peekable()` is the adapter that builds it, in `std`'s `.peekable()` spelling. `view` lends the peeked item as `&I::Item`, `commit` consumes the item and returns it owned, and dropping the guard leaves the iterator exactly where `peek` found it — the same non-consuming peek semantics as `std::iter::Peekable`, so repeated peeks see the same item. The guard's lifetime is `peek`'s `&mut` borrow of the wrapper, so while a guard lives nothing can call `next` underneath it: "peek, then decide" is the only shape the API admits, and the peek-then-`next` pairs in the matcher become a single `commit` on the item that was actually viewed.
 
 ## The API
 
 The whole crate:
 
 ```rust
-// from crates/peekable/src/lib.rs
-/// An iterator wrapper whose peek is scoped: [`peek`](Peekable::peek) returns a guard
-/// holding the next item, [`view`](Peek::view) lends that item,
+// from crates/safe_peekable/src/lib.rs
+/// An iterator wrapper whose peek is scoped: [`peek`](SafePeekable::peek) returns a
+/// guard holding the next item, [`view`](Peek::view) lends that item,
 /// [`commit`](Peek::commit) consumes and returns it, and dropping the guard leaves the
 /// iterator where `peek` found it. The guard's lifetime is `peek`'s borrow of the
 /// wrapper, so it is the only handle that can advance the iterator while it lives.
-pub struct Peekable<I: Iterator> {
+pub struct SafePeekable<I: Iterator> {
     iter: I,
     /// The item `peek` pulled out of `iter` and no guard has committed: the next item,
     /// ahead of everything still in `iter`.
     peeked: Option<I::Item>,
 }
 
-impl<I: Iterator> Peekable<I> {
-    pub fn new(iter: I) -> Self {
-        Peekable { iter, peeked: None }
-    }
+/// The adapter that builds a [`SafePeekable`], in `std`'s `.peekable()` spelling.
+pub trait IntoSafePeekable: Iterator + Sized {
+    fn safe_peekable(self) -> SafePeekable<Self>;
+}
 
+impl<I: Iterator> IntoSafePeekable for I {
+    fn safe_peekable(self) -> SafePeekable<I> {
+        SafePeekable {
+            iter: self,
+            peeked: None,
+        }
+    }
+}
+
+impl<I: Iterator> SafePeekable<I> {
     /// The next item, in a guard. Dropping the guard leaves the item as the next item;
     /// [`commit`](Peek::commit) consumes it.
     pub fn peek(&mut self) -> Option<Peek<'_, I::Item>> {
         if self.peeked.is_none() {
             self.peeked = self.iter.next();
         }
-        Full::new(&mut self.peeked).map(Peek)
+        match self.peeked {
+            Some(_) => Some(Peek(&mut self.peeked)),
+            None => None,
+        }
     }
 }
 
-impl<I: Iterator> Iterator for Peekable<I> {
+impl<I: Iterator> Iterator for SafePeekable<I> {
     type Item = I::Item;
 
     fn next(&mut self) -> Option<I::Item> {
         self.peeked.take().or_else(|| self.iter.next())
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let buffered = usize::from(self.peeked.is_some());
+        let (lower, upper) = self.iter.size_hint();
+        (
+            lower.saturating_add(buffered),
+            upper.and_then(|upper| upper.checked_add(buffered)),
+        )
+    }
 }
 
 /// The guard for one peeked item.
-pub struct Peek<'a, T>(Full<'a, T>);
+pub struct Peek<'a, T>(&'a mut Option<T>);
 
 impl<T> Peek<'_, T> {
     pub fn view(&self) -> &T {
-        self.0.get()
+        self.0
+            .as_ref()
+            .expect("a Peek exists only while the slot holds an item")
     }
 
     pub fn commit(self) -> T {
-        self.0.take()
+        self.0
+            .take()
+            .expect("a Peek exists only while the slot holds an item")
     }
-}
-
-/// A slot proven full. The constructor is the one place that checks, and a `Full`
-/// holds the slot's only reference, so nothing can empty it while the `Full` lives.
-struct Full<'a, T>(&'a mut Option<T>);
-
-impl<'a, T> Full<'a, T> {
-    fn new(slot: &'a mut Option<T>) -> Option<Full<'a, T>> {
-        match slot {
-            Some(_) => Some(Full(slot)),
-            None => None,
-        }
-    }
-
-    fn get(&self) -> &T {
-        match &*self.0 {
-            Some(item) => item,
-            None => slot_emptied_under_full(),
-        }
-    }
-
-    fn take(self) -> T {
-        match self.0.take() {
-            Some(item) => item,
-            None => slot_emptied_under_full(),
-        }
-    }
-}
-
-fn slot_emptied_under_full() -> ! {
-    unreachable!("a Full exists only while its slot holds an item")
 }
 ```
 
 ```toml
-# from crates/peekable/Cargo.toml
+# from crates/safe_peekable/Cargo.toml
 [package]
-name = "peekable"
+name = "safe_peekable"
 version = { workspace = true }
 edition = { workspace = true }
 license = { workspace = true }
@@ -102,19 +97,19 @@ license = { workspace = true }
 workspace = true
 ```
 
-The soundness argument is small. The guard stores only the slot's `&mut`, but its lifetime is `peek`'s borrow of the whole wrapper, so while a `Peek` lives no `next`, no second `peek`, and no other guard can compile against the wrapper — the guard provably cannot touch `iter`, and nothing else can either. Fullness is proven once, in `Full::new`; `get` and `take` are the only readers, and they read through the slot's only reference, so nothing can empty it between the check and the read. `slot_emptied_under_full` is the crate's one panic path, no input reaches it — exhaustion is handled at `peek`, which returns `None` before a guard exists — and `Peek` itself has no panic path. `view` returns a borrow of the guard, not of the wrapper: the elided lifetime is `&self`'s, which is what forces every view to die before `commit` moves the guard. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
+The soundness argument is small. The guard stores only the slot's `&mut`, but its lifetime is `peek`'s borrow of the whole wrapper, so while a `Peek` lives no `next`, no second `peek`, and no other guard can compile against the wrapper — the guard provably cannot touch `iter`, and nothing else can either. `peek` constructs a guard only over a full slot, and `view` and `commit` read through the slot's only reference, so nothing can empty it between the check and the read; their two `expect`s are the crate's only panic paths, and no input reaches them — exhaustion is handled at `peek`, which returns `None` before a guard exists. `view` returns a borrow of the guard, not of the wrapper: the elided lifetime is `&self`'s, which is what forces every view to die before `commit` moves the guard. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
 
 ## The consumer
 
-`crates/isograph_parser/src/matched_brackets.rs` swaps `std::iter::Peekable` for this crate. The `TokenStream` alias keeps its exact text; only the import behind it changes, and every `tokens.peek()`/`tokens.next()` pair becomes a guard.
+`crates/isograph_parser/src/matched_brackets.rs` swaps `std::iter::Peekable` for this crate. The `TokenStream` alias changes type name, and every `tokens.peek()`/`tokens.next()` pair becomes a guard.
 
 ```toml
 # from crates/isograph_parser/Cargo.toml
 [dependencies]
 logos = { workspace = true }
-peekable = { path = "../peekable" }
 resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
+safe_peekable = { path = "../safe_peekable" }
 span = { path = "../span" }
 ```
 
@@ -141,14 +136,14 @@ pub fn match_brackets(
 // from crates/isograph_parser/src/matched_brackets.rs (after)
 use std::fmt;
 
-use peekable::Peekable;
+use safe_peekable::{IntoSafePeekable, SafePeekable};
 
-type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
+type TokenStream = SafePeekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
 pub fn match_brackets(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
 ) -> MatchedBrackets<BracketsMatched> {
-    let mut tokens = Peekable::new(tokens.into_iter());
+    let mut tokens = tokens.into_iter().safe_peekable();
     let mut enclosing = Vec::new();
     let items = parse_items(&mut tokens, &mut enclosing);
     MatchedBrackets(items)
@@ -302,14 +297,14 @@ The `Open` arm's `peek.commit()` consumes the guard, which ends its borrow of `t
 ## Tests
 
 ```rust
-// from crates/peekable/src/lib.rs
+// from crates/safe_peekable/src/lib.rs
 #[cfg(test)]
 mod test {
-    use crate::Peekable;
+    use crate::IntoSafePeekable;
 
     #[test]
     fn a_dropped_peek_leaves_the_item_as_the_next_item() {
-        let mut iter = Peekable::new([1, 2].into_iter());
+        let mut iter = [1, 2].into_iter().safe_peekable();
 
         let peek = iter.peek().expect("two items remain");
         assert_eq!(peek.view(), &1);
@@ -321,7 +316,7 @@ mod test {
 
     #[test]
     fn commit_returns_the_viewed_item_and_consumes_it() {
-        let mut iter = Peekable::new([1, 2].into_iter());
+        let mut iter = [1, 2].into_iter().safe_peekable();
 
         assert_eq!(iter.peek().expect("two items remain").commit(), 1);
 
@@ -331,7 +326,7 @@ mod test {
 
     #[test]
     fn a_non_copy_item_moves_out_through_commit() {
-        let mut iter = Peekable::new(vec![String::from("a")].into_iter());
+        let mut iter = vec![String::from("a")].into_iter().safe_peekable();
 
         let peek = iter.peek().expect("one item remains");
         assert_eq!(*peek.view(), "a");
@@ -340,14 +335,14 @@ mod test {
 
     #[test]
     fn peek_on_an_exhausted_iterator_is_none() {
-        let mut iter = Peekable::new(std::iter::empty::<i32>());
+        let mut iter = std::iter::empty::<i32>().safe_peekable();
 
         assert!(iter.peek().is_none());
     }
 
     #[test]
     fn committing_the_last_item_exhausts_the_iterator() {
-        let mut iter = Peekable::new([1].into_iter());
+        let mut iter = [1].into_iter().safe_peekable();
 
         assert_eq!(iter.peek().expect("one item remains").commit(), 1);
 
@@ -355,8 +350,20 @@ mod test {
     }
 
     #[test]
+    fn size_hint_counts_the_buffered_item() {
+        let mut iter = [1, 2].into_iter().safe_peekable();
+        assert_eq!(iter.size_hint(), (2, Some(2)));
+
+        drop(iter.peek().expect("two items remain"));
+        assert_eq!(iter.size_hint(), (2, Some(2)));
+
+        iter.peek().expect("two items remain").commit();
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+    }
+
+    #[test]
     fn next_returns_the_item_a_dropped_peek_left() {
-        let mut iter = Peekable::new([1, 2].into_iter());
+        let mut iter = [1, 2].into_iter().safe_peekable();
 
         drop(iter.peek().expect("two items remain"));
 
@@ -369,12 +376,12 @@ mod test {
 
 ## Shipping order
 
-1. Create `crates/peekable` as printed, with its tests. The workspace member glob picks it up; no other file changes.
-2. Adopt it in `crates/isograph_parser/src/matched_brackets.rs`: the dependency line, the import, `match_brackets`, `parse_items`, and `parse_bracketed`, exactly as printed. The existing matcher tests cover the change; no test changes.
+1. Create `crates/safe_peekable` as printed, with its tests. The workspace member glob picks it up; no other file changes.
+2. Adopt it in `crates/isograph_parser/src/matched_brackets.rs`: the dependency line, the import, the `TokenStream` alias, `match_brackets`, `parse_items`, and `parse_bracketed`, exactly as printed. The existing matcher tests cover the change; no test changes.
 
 ## Landing checklist
 
-- `cargo test -p peekable` passes.
+- `cargo test -p safe_peekable` passes.
 - `cargo test -p isograph_parser` passes.
 - `cargo clippy --workspace --exclude pico --all-targets -- -D warnings` passes.
 - The doc moves to `refactors/past/`.
