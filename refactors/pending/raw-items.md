@@ -104,65 +104,11 @@ There are no `From` impls: the derived field emissions name their parent variant
 
 ## The matcher
 
-The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart:
+The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart. The enclosing stack is a `scoped_stack::Stack<BracketKind>` (the prefactor in scoped-stack.md); the parse functions receive a `Frame`, `with` holds the kind for the recursion, and `all().contains(..)` classifies a close:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
 type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
-
-/// The kind of every group the level being parsed sits inside, innermost last. The
-/// stack exists to classify a close that does not close the innermost group: in
-/// `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
-/// token, while a brace is on the stack, so the `}` closes the group.
-struct EnclosingStack(Vec<BracketKind>);
-
-impl EnclosingStack {
-    fn frame(&mut self) -> EnclosingFrame<'_> {
-        EnclosingFrame {
-            restore: self.0.len(),
-            stack: &mut self.0,
-        }
-    }
-}
-
-/// The parse functions never see the stack itself, only a frame: a borrow whose one
-/// mutation is `with_kind`, whose push is scoped to a closure. The entries pushed
-/// before the frame was created are unreachable for mutation, so a callee cannot
-/// unwind its caller's brackets.
-struct EnclosingFrame<'a> {
-    stack: &'a mut Vec<BracketKind>,
-    /// Drop truncates to this, so the pushed kind comes off however the closure
-    /// exits, a panic included.
-    restore: usize,
-}
-
-impl Drop for EnclosingFrame<'_> {
-    fn drop(&mut self) {
-        self.stack.truncate(self.restore);
-    }
-}
-
-impl EnclosingFrame<'_> {
-    fn contains(&self, kind: BracketKind) -> bool {
-        self.stack.contains(&kind)
-    }
-
-    /// The `with_` bracketing pattern from iso1's peekable lexer: the kind is on the
-    /// stack exactly for the duration of the closure.
-    fn with_kind<T>(
-        &mut self,
-        kind: BracketKind,
-        do_stuff: impl FnOnce(&mut EnclosingFrame<'_>) -> T,
-    ) -> T {
-        let restore = self.stack.len();
-        self.stack.push(kind);
-        let mut child = EnclosingFrame {
-            restore,
-            stack: &mut *self.stack,
-        };
-        do_stuff(&mut child)
-    }
-}
 
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
@@ -171,7 +117,11 @@ pub fn match_brackets(
     literal_length: u32,
 ) -> WithSpan<MatchedBrackets> {
     let mut tokens = tokens.into_iter().peekable();
-    let mut enclosing_stack = EnclosingStack(Vec::new());
+    // The kind of every group the level being parsed sits inside, innermost last. The
+    // stack exists to classify a close that does not close the innermost group: in
+    // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
+    // token, while a brace is on the stack, so the `}` closes the group.
+    let mut enclosing_stack = Stack::new();
     let mut enclosing_frame = enclosing_stack.frame();
     WithSpan::new(
         MatchedBrackets(parse_items(&mut tokens, &mut enclosing_frame)),
@@ -194,7 +144,7 @@ struct UnclosedGroup {
 
 fn parse_items(
     tokens: &mut TokenStream,
-    enclosing_frame: &mut EnclosingFrame<'_>,
+    enclosing_frame: &mut Frame<'_, BracketKind>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     while let Some(&token) = tokens.peek() {
@@ -227,7 +177,7 @@ fn parse_items(
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
-                if enclosing_frame.contains(kind) {
+                if enclosing_frame.all().contains(&kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
                     // takes apart every group between here and its owner.
                     break;
@@ -247,10 +197,10 @@ fn parse_items(
 /// close an enclosing group owns, or at the end of the tokens, it never closes.
 fn parse_bracketed(
     tokens: &mut TokenStream,
-    enclosing_frame: &mut EnclosingFrame<'_>,
+    enclosing_frame: &mut Frame<'_, BracketKind>,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
-    let children = enclosing_frame.with_kind(opening.item.0, |enclosing_frame| {
+    let children = enclosing_frame.with(opening.item.0, |enclosing_frame| {
         parse_items(tokens, enclosing_frame)
     });
 
