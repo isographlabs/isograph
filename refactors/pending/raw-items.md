@@ -227,6 +227,11 @@ fn parse_bracketed(
         parse_items(tokens, enclosing_stack)
     });
 
+    // parse_items stopped at this group's own close, at a close an enclosing group
+    // owns, or at the end of the tokens; only the first is consumed. In `foo { ( }`,
+    // the paren's items stop at the `}` because the brace owns it, and the paren
+    // refusing it here leaves it in the stream for the brace, which consumes it one
+    // level up as its own. A close is consumed only by the group it closes.
     match tokens.peek() {
         Some(&token)
             if SplitToken::from(token.item)
