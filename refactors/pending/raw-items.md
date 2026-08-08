@@ -108,6 +108,8 @@ The control flow keeps the landed rules — nearest open of the kind, a close ow
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
+type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
+
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
 pub fn match_brackets(
