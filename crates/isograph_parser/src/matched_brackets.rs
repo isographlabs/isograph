@@ -1,7 +1,6 @@
-use std::iter::Peekable;
-
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
+use safe_peekable::{IntoSafePeekable, SafePeekable};
 use scoped_stack::Stack;
 use span::{Span, WithSpan};
 
@@ -149,7 +148,7 @@ fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
     }
 }
 
-type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
+type TokenStream = SafePeekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
@@ -157,7 +156,7 @@ pub fn match_brackets(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
     literal_length: u32,
 ) -> WithSpan<MatchedBrackets> {
-    let mut tokens = tokens.into_iter().peekable();
+    let mut tokens = tokens.into_iter().safe_peekable();
     // The kind of every group the level being parsed sits inside, innermost last. The
     // stack exists to classify a close that does not close the innermost group: in
     // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
@@ -187,17 +186,18 @@ fn parse_items(
     enclosing_stack: &mut Stack<BracketKind>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
-    while let Some(&token) = tokens.peek() {
+    while let Some(peek) = tokens.peek() {
+        let token = *peek.view();
         match SplitToken::from(token.item) {
             SplitToken::NonBracket(kind) => {
-                tokens.next();
+                peek.commit();
                 items.push(WithSpan::new(
                     BracketItem::Raw(RawToken::NonBracket(NonBracketToken(kind))),
                     token.location,
                 ));
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
-                tokens.next();
+                peek.commit();
                 // The OpenBracket type means a matched opening, which is not yet known
                 // here; if the group never closes, the Unclosed arm below demotes this
                 // token to UnmatchedOpen.
@@ -219,11 +219,12 @@ fn parse_items(
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
                 if enclosing_stack.all().contains(&kind) {
-                    // Some enclosing group owns this close. Leaving it unconsumed is what
-                    // takes apart every group between here and its owner.
+                    // Some enclosing group owns this close. Dropping the peek leaves it
+                    // unconsumed, which is what takes apart every group between here and
+                    // its owner.
                     break;
                 }
-                tokens.next();
+                peek.commit();
                 items.push(WithSpan::new(
                     BracketItem::Raw(RawToken::Close(UnmatchedClose(kind))),
                     token.location,
@@ -249,13 +250,14 @@ fn parse_bracketed(
     // owns, or at the end of the tokens; only the first is consumed. In `foo { ( }`,
     // the paren's items stop at the `}` because the brace owns it, and the paren
     // refusing it here leaves it in the stream for the brace, which consumes it one
-    // level up as its own. A close is consumed only by the group it closes.
+    // level up as its own. A close is consumed only by the group it closes. Dropping
+    // the peek leaves the stopping close for its owner.
     match tokens.peek() {
-        Some(&token)
-            if SplitToken::from(token.item)
+        Some(peek)
+            if SplitToken::from(peek.view().item)
                 == SplitToken::Bracket(BracketToken::Close(opening.item.0)) =>
         {
-            tokens.next();
+            let token = peek.commit();
             let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
             let interior = Span::between(opening.location, closing.location);
             ParsedGroup::Closed(Bracketed {
