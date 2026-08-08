@@ -21,15 +21,7 @@ impl<T> Stack<T> {
         Stack(Vec::new())
     }
 
-    /// Every item on the stack, the callers' items included, innermost last. The
-    /// slice is read-only:
-    ///
-    /// ```compile_fail
-    /// let mut stack = scoped_stack::Stack::new();
-    /// stack.with_pushed(1, |stack| {
-    ///     stack.all()[0] = 2;
-    /// });
-    /// ```
+    /// Every item on the stack, the callers' items included, innermost last.
     pub fn all(&self) -> &[T] {
         &self.0
     }
