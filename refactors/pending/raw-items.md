@@ -2,52 +2,156 @@
 
 A level is a flat sequence of individual items, each raw or grouped: what can be grouped is grouped, and everything else is raw. The bracket tree keeps only matched pairs as structure. A close bracket with no open of its kind is a raw item where it stands. When a group never gets its close, the group is taken apart: its opening becomes a raw item, and its children move into the enclosing level, matched groups among them surviving. Every `Bracketed` has a real opening and a real closing, required fields, and a group's interior is the same type as the root — `WithSpan<MatchedBrackets>` in both positions, the root's span being the whole literal — so no level is special. The chunk-parsing pass reports leftover bracket tokens it finds inside chunks.
 
-With one stage shape left, `TreeContents`, `BracketsMatched`, `Inner`, and `map` have no callers and are deleted; every tree type is concrete.
+With one stage shape left, `TreeContents`, `BracketsMatched`, `Inner`, and `map` have no callers and are deleted; every type below is concrete. The shipping order is at the end; everything before it is the finished state.
 
-Two changes: the tree and matcher reshape, then resolution over the new shape.
+## The shape
 
-## Change 1: the tree, the matcher, the errors
-
-### Tree types
+The five tree types, with their finished derives:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
 /// One level: the whole literal at the root, a group's interior below.
-#[derive(Debug, PartialEq, Eq)]
-pub struct MatchedBrackets(pub Vec<WithSpan<BracketItem>>);
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum BracketItem {
     Raw(RawToken),
     Bracketed(Bracketed),
 }
 
 /// A token that is not part of any structure. Bracket kinds here are the unmatched ones;
-/// matched brackets are structure, never raw.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+/// matched brackets are structure, never raw. The bracket variants resolve into their
+/// leaves; an ordinary token answers the level it sits in.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = BracketItemParent<'a>,
+    resolved_node = ResolvedBracketNode<'a>,
+    fallback = MatchedBrackets
+)]
 pub enum RawToken {
     NonBracket(NonBracketTokenKind),
-    /// An open bracket whose group never closed and was taken apart.
+    #[resolve_into]
     Open(OpenBracket),
-    /// A close bracket no open of its kind was waiting for.
+    #[resolve_into]
     Close(CloseBracket),
 }
 
 /// A matched pair: the opening, the interior level, the closing.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Bracketed {
+    #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
+    #[resolve_field]
     pub children: WithSpan<MatchedBrackets>,
+    #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
+}
+
+/// A group's opening bracket.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = OpenBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct OpenBracket(pub BracketKind);
+
+/// A close bracket token.
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = CloseBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct CloseBracket(pub BracketKind);
+```
+
+`#[resolve_into]` and `fallback` are resolve-option-like-enums.md's additions; the `From`-constructed parents are resolve-position-parent-conversion.md's.
+
+## The result of resolving
+
+A position on whitespace answers the level; a position on an ordinary raw token answers the level too (finer answers are the chunk stage's business); a position on any bracket token answers its bracket leaf, whose parent says matched or raw.
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+#[derive(Debug)]
+pub enum ResolvedBracketNode<'a> {
+    MatchedBrackets(MatchedBracketsPath<'a>),
+    Bracketed(BracketedPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
+}
+
+/// The two positions a level can sit in.
+#[derive(Debug)]
+pub enum MatchedBracketsParent<'a> {
+    Root,
+    Bracketed(Box<BracketedPath<'a>>),
+}
+
+pub type MatchedBracketsPath<'a> =
+    PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
+
+/// The one place an item can sit: its level, so the parent is the path directly.
+pub type BracketItemParent<'a> = MatchedBracketsPath<'a>;
+
+pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
+
+/// The two positions an open bracket can sit in.
+#[derive(Debug)]
+pub enum OpenBracketParent<'a> {
+    /// A matched group's opening.
+    Bracketed(Box<BracketedPath<'a>>),
+    /// An unmatched token, in the level it sits in.
+    MatchedBrackets(MatchedBracketsPath<'a>),
+}
+
+/// The two positions a close bracket can sit in.
+#[derive(Debug)]
+pub enum CloseBracketParent<'a> {
+    /// A matched group's closing.
+    Bracketed(Box<BracketedPath<'a>>),
+    /// An unmatched token, in the level it sits in.
+    MatchedBrackets(MatchedBracketsPath<'a>),
+}
+
+pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, CloseBracketParent<'a>>;
+```
+
+The conversions the emissions construct through, written out. The fallback's `parent.into()` is the reflexive `From`, since `BracketItemParent` is the level path itself; the bracket parents convert from both of their positions:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+impl<'a> From<BracketItemParent<'a>> for OpenBracketParent<'a> {
+    fn from(level: BracketItemParent<'a>) -> Self {
+        OpenBracketParent::MatchedBrackets(level)
+    }
+}
+
+impl<'a> From<BracketItemParent<'a>> for CloseBracketParent<'a> {
+    fn from(level: BracketItemParent<'a>) -> Self {
+        CloseBracketParent::MatchedBrackets(level)
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for OpenBracketParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        OpenBracketParent::Bracketed(Box::new(group))
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for CloseBracketParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        CloseBracketParent::Bracketed(Box::new(group))
+    }
+}
+
+impl<'a> From<BracketedPath<'a>> for MatchedBracketsParent<'a> {
+    fn from(group: BracketedPath<'a>) -> Self {
+        MatchedBracketsParent::Bracketed(Box::new(group))
+    }
 }
 ```
 
-`OpenBracket(pub BracketKind)` and `CloseBracket(pub BracketKind)` keep their shapes.
-
-Change 1 removes the resolution machinery along with the old tree shape: the landed path family and `ResolvedBracketNode` reference `TreeContents` and the deleted types, so the `ResolvePosition` derives, the parent enums, the path aliases, the resolved enum, and the resolution tests all come out here, and Change 2 rebuilds every one of them over the new tree. Between the two changes the crate parses and reports errors but answers no positions — which is why the derive lines in this change's types are the plain ones.
-
-### The matcher
+## The matcher
 
 The control flow keeps the landed rules — nearest open of the kind, a close owned by an enclosing group ends every group between here and its owner — and a group that never gets its close is taken apart:
 
@@ -164,7 +268,7 @@ fn parse_bracketed(
 
 `flush_run` and the run merging logic are deleted with `Inner`. The caller stores an unclosed group's pieces with one push and `items.extend`, and inner unclosed groups have already flattened by the time an outer one comes apart.
 
-### Errors
+## Errors
 
 `UnclosedGroup` is deleted; both errors are unmatched tokens, found where they sit:
 
@@ -209,9 +313,110 @@ fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
 }
 ```
 
-### The cases, restated as tests
+## Generated impls
 
-The structural half of the suite, written out in full; resolution assertions move to Change 2.
+The root is entered through the `WithSpan` blanket impl — `tree.resolve(MatchedBracketsParent::Root, position)` on the `WithSpan<MatchedBrackets>` the matcher returned.
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl ::resolve_position::ResolvePosition for MatchedBrackets {
+    type Parent<'a> = MatchedBracketsParent<'a>;
+    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        for item in self.0.iter() {
+            if item.location.contains(position) {
+                let new_parent =
+                    <BracketItem as ::resolve_position::ResolvePosition>::Parent::from(
+                        self.path(parent),
+                    );
+                return item.item.resolve(new_parent, position);
+            }
+        }
+        return Self::ResolvedNode::MatchedBrackets(self.path(parent).into());
+    }
+}
+
+impl ::resolve_position::ResolvePosition for BracketItem {
+    type Parent<'a> = BracketItemParent<'a>;
+    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        match self {
+            BracketItem::Raw(inner) => inner.resolve(parent.into(), position),
+            BracketItem::Bracketed(inner) => inner.resolve(parent.into(), position),
+        }
+    }
+}
+
+impl ::resolve_position::ResolvePosition for Bracketed {
+    type Parent<'a> = BracketItemParent<'a>;
+    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        if self.opening.location.contains(position) {
+            let new_parent =
+                <OpenBracket as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
+                );
+            return self.opening.item.resolve(new_parent, position);
+        }
+        if self.children.location.contains(position) {
+            let new_parent =
+                <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
+                );
+            return self.children.item.resolve(new_parent, position);
+        }
+        if self.closing.location.contains(position) {
+            let new_parent =
+                <CloseBracket as ::resolve_position::ResolvePosition>::Parent::from(
+                    self.path(parent),
+                );
+            return self.closing.item.resolve(new_parent, position);
+        }
+        return Self::ResolvedNode::Bracketed(self.path(parent).into());
+    }
+}
+```
+
+`BracketItem`'s arms carry the `parent.into()` of the parent-conversion doc; both conversions are reflexive there, since `RawToken` and `Bracketed` declare `BracketItemParent` themselves. `RawToken`'s marked variants continue into the bracket leaves and its fallback answers the level:
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl ::resolve_position::ResolvePosition for RawToken {
+    type Parent<'a> = BracketItemParent<'a>;
+    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        match self {
+            RawToken::NonBracket(_) => Self::ResolvedNode::MatchedBrackets(parent.into()),
+            RawToken::Open(inner) => inner.resolve(parent.into(), position),
+            RawToken::Close(inner) => inner.resolve(parent.into(), position),
+        }
+    }
+}
+```
+
+## Tests
+
+The structural half of the suite, written out in full:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -439,256 +644,7 @@ mod tests {
 }
 ```
 
-bracket-matching-cases.md is rewritten against these shapes as part of this change: taking unclosed groups apart replaces forcing them shut, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes — content after an unmatched open sits in the enclosing level, so nothing is trapped inside an invalid group while typing.
-
-## Change 2: resolution
-
-The path family, all concrete. A position on whitespace answers the level; a position on an ordinary raw token answers the level too (finer answers are the chunk stage's business); a position on any bracket token answers its bracket leaf, whose parent says matched or raw.
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Debug)]
-pub enum ResolvedBracketNode<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-    Bracketed(BracketedPath<'a>),
-    OpenBracket(OpenBracketPath<'a>),
-    CloseBracket(CloseBracketPath<'a>),
-}
-
-/// The two positions a level can sit in.
-#[derive(Debug)]
-pub enum MatchedBracketsParent<'a> {
-    Root,
-    Bracketed(Box<BracketedPath<'a>>),
-}
-
-pub type MatchedBracketsPath<'a> =
-    PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
-
-/// The one place an item can sit: its level, so the parent is the path directly.
-pub type BracketItemParent<'a> = MatchedBracketsPath<'a>;
-
-pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
-
-/// The two positions an open bracket can sit in.
-#[derive(Debug)]
-pub enum OpenBracketParent<'a> {
-    /// A matched group's opening.
-    Bracketed(Box<BracketedPath<'a>>),
-    /// An unmatched token, in the level it sits in.
-    MatchedBrackets(MatchedBracketsPath<'a>),
-}
-
-/// The two positions a close bracket can sit in.
-#[derive(Debug)]
-pub enum CloseBracketParent<'a> {
-    /// A matched group's closing.
-    Bracketed(Box<BracketedPath<'a>>),
-    /// An unmatched token, in the level it sits in.
-    MatchedBrackets(MatchedBracketsPath<'a>),
-}
-
-pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, OpenBracketParent<'a>>;
-pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, CloseBracketParent<'a>>;
-```
-
-`OpenBracket` and `CloseBracket` keep plain derives — their fallbacks answer their own leaves, and both parent variants are constructed outside them:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = OpenBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct OpenBracket(pub BracketKind);
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = CloseBracketParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct CloseBracket(pub BracketKind);
-```
-
-The tree types' derive sites, in full:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub enum BracketItem {
-    Raw(RawToken),
-    Bracketed(Bracketed),
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct Bracketed {
-    #[resolve_field]
-    pub opening: WithSpan<OpenBracket>,
-    #[resolve_field]
-    pub children: WithSpan<MatchedBrackets>,
-    #[resolve_field]
-    pub closing: WithSpan<CloseBracket>,
-}
-```
-
-and their generated impls. The root is entered through the `WithSpan` blanket impl — `tree.resolve(MatchedBracketsParent::Root, position)` on the `WithSpan<MatchedBrackets>` the matcher returned.
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for MatchedBrackets {
-    type Parent<'a> = MatchedBracketsParent<'a>;
-    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        for item in self.0.iter() {
-            if item.location.contains(position) {
-                let new_parent =
-                    <BracketItem as ::resolve_position::ResolvePosition>::Parent::from(
-                        self.path(parent),
-                    );
-                return item.item.resolve(new_parent, position);
-            }
-        }
-        return Self::ResolvedNode::MatchedBrackets(self.path(parent).into());
-    }
-}
-
-impl ::resolve_position::ResolvePosition for BracketItem {
-    type Parent<'a> = BracketItemParent<'a>;
-    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        match self {
-            BracketItem::Raw(inner) => inner.resolve(parent.into(), position),
-            BracketItem::Bracketed(inner) => inner.resolve(parent.into(), position),
-        }
-    }
-}
-
-impl ::resolve_position::ResolvePosition for Bracketed {
-    type Parent<'a> = BracketItemParent<'a>;
-    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        if self.opening.location.contains(position) {
-            let new_parent =
-                <OpenBracket as ::resolve_position::ResolvePosition>::Parent::from(
-                    self.path(parent),
-                );
-            return self.opening.item.resolve(new_parent, position);
-        }
-        if self.children.location.contains(position) {
-            let new_parent =
-                <MatchedBrackets as ::resolve_position::ResolvePosition>::Parent::from(
-                    self.path(parent),
-                );
-            return self.children.item.resolve(new_parent, position);
-        }
-        if self.closing.location.contains(position) {
-            let new_parent =
-                <CloseBracket as ::resolve_position::ResolvePosition>::Parent::from(
-                    self.path(parent),
-                );
-            return self.closing.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::Bracketed(self.path(parent).into());
-    }
-}
-```
-
-`BracketItem`'s arms carry the `parent.into()` of the revived parent-conversion doc; both conversions are reflexive there, since `RawToken` and `Bracketed` declare `BracketItemParent` themselves. `RawToken` is where the revived macro capabilities do real work:
-
-- resolve-position-parent-conversion.md: both parent-construction sites go through `From` — delegation arms call `inner.resolve(parent.into(), position)`, field emissions call `Parent::from(self.path(parent))` — so a payload's parent may be its own enum or a plain alias.
-- resolve-option-like-enums.md: `#[resolve_into]` variants continue into their payload's resolution, and unmarked variants answer the declared `fallback`.
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = BracketItemParent<'a>,
-    resolved_node = ResolvedBracketNode<'a>,
-    fallback = MatchedBrackets
-)]
-pub enum RawToken {
-    NonBracket(NonBracketTokenKind),
-    #[resolve_into]
-    Open(OpenBracket),
-    #[resolve_into]
-    Close(CloseBracket),
-}
-```
-
-with the generated impl:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for RawToken {
-    type Parent<'a> = BracketItemParent<'a>;
-    type ResolvedNode<'a> = ResolvedBracketNode<'a>;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        match self {
-            RawToken::NonBracket(_) => Self::ResolvedNode::MatchedBrackets(parent.into()),
-            RawToken::Open(inner) => inner.resolve(parent.into(), position),
-            RawToken::Close(inner) => inner.resolve(parent.into(), position),
-        }
-    }
-}
-```
-
-and the conversions, written out. The fallback's `parent.into()` is the reflexive `From`, since `BracketItemParent` is the level path itself; the bracket parents convert from both of their positions:
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-impl<'a> From<BracketItemParent<'a>> for OpenBracketParent<'a> {
-    fn from(level: BracketItemParent<'a>) -> Self {
-        OpenBracketParent::MatchedBrackets(level)
-    }
-}
-
-impl<'a> From<BracketItemParent<'a>> for CloseBracketParent<'a> {
-    fn from(level: BracketItemParent<'a>) -> Self {
-        CloseBracketParent::MatchedBrackets(level)
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for OpenBracketParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        OpenBracketParent::Bracketed(Box::new(group))
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for CloseBracketParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        CloseBracketParent::Bracketed(Box::new(group))
-    }
-}
-
-impl<'a> From<BracketedPath<'a>> for MatchedBracketsParent<'a> {
-    fn from(group: BracketedPath<'a>) -> Self {
-        MatchedBracketsParent::Bracketed(Box::new(group))
-    }
-}
-```
-
-The resolution tests, added to the same module:
+The resolution tests, in the same module:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -766,6 +722,12 @@ The resolution tests, added to the same module:
         }
     }
 ```
+
+## Shipping order
+
+1. Change 1: the tree, the matcher, and the errors land with the resolution machinery removed — the landed path family and derives reference `TreeContents` and the deleted types, so the parent enums, `ResolvedBracketNode`, the `ResolvePosition` attributes, and the resolution tests come out with them, and the types land with plain derives. The structural tests and the bracket-matching-cases.md rewrite land here: taking unclosed groups apart replaces forcing them shut, "invalid section" becomes "unmatched token", and the end-of-tokens open question closes, since content after an unmatched open sits in the enclosing level. Between the changes the crate parses and reports errors but answers no positions.
+2. resolve-position-parent-conversion.md and resolve-option-like-enums.md land.
+3. Change 2: everything in "The shape" and "The result of resolving" as printed — the attributes, the parent enums, the conversions, and the resolution tests.
 
 ## Consequences elsewhere
 
