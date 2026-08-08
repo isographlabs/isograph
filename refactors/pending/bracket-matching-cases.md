@@ -8,9 +8,9 @@ The rule:
 
 - `()`, `{}`, and `[]` are all matched.
 - An open bracket begins a group. The group's children are parsed until the tokens end or a close bracket that this group or an enclosing one owns appears.
-- The group consumes that close if it is its own: a real `CloseBracket`. Otherwise the group never closed: its opening becomes a raw `UnmatchedOpen` at the enclosing level, and its children move into that level as siblings.
+- The group consumes that close if it is its own: a real `CloseBracket` on the group. Otherwise the group never closed: its opening becomes a raw `OpenBracket` at the enclosing level, and its children move into that level as siblings.
 - Seen from the close's side, the same rule reads: a close bracket pairs with the nearest open bracket of its kind, and open brackets of other kinds above that one come apart before it, innermost first.
-- A close bracket whose kind is open nowhere is a raw `UnmatchedClose` where it stands. It consumes nothing.
+- A close bracket whose kind is open nowhere is a raw `CloseBracket` where it stands. It consumes nothing.
 - Unmatchedness never spreads outward: not to siblings, not to the enclosing group. An unmatched token is the token itself, one item wide.
 - Non-bracket tokens outside any structure are raw items by themselves.
 
@@ -36,21 +36,19 @@ pub struct Bracketed {
 }
 
 /// A token that is not part of any structure; matched brackets are structure, never
-/// raw, so the bracket tokens here are the unmatched types.
+/// raw, so a bracket token here is unmatched.
 pub enum RawToken {
     NonBracket(NonBracketToken),
-    Open(UnmatchedOpen),
-    Close(UnmatchedClose),
+    Open(OpenBracket),
+    Close(CloseBracket),
 }
 
 pub struct NonBracketToken(pub NonBracketTokenKind);
 pub struct OpenBracket(pub BracketKind);
 pub struct CloseBracket(pub BracketKind);
-pub struct UnmatchedOpen(pub BracketKind);
-pub struct UnmatchedClose(pub BracketKind);
 ```
 
-Every `Bracketed` has a real opening and a real closing, required fields. A group's interior is the same type as the root — `WithSpan<MatchedBrackets>` in both positions, the root's span being the whole literal — so no level is special. Matched brackets are structure; unmatched brackets are raw items of a different type, so the leaf type says matched or unmatched without reading the path.
+Every `Bracketed` has a real opening and a real closing, required fields. A group's interior is the same type as the root — `WithSpan<MatchedBrackets>` in both positions, the root's span being the whole literal — so no level is special. Matched brackets are structure; unmatched brackets are the same token types sitting raw in a level, so a consumer reads matched or unmatched from the path (or from whether the token is raw vs a group's own opening/closing).
 
 The matcher's errors are derived from the tree, in source order:
 
@@ -58,8 +56,8 @@ The matcher's errors are derived from the tree, in source order:
 // from crates/isograph_parser/src/matched_brackets.rs
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
-    UnmatchedOpen(WithSpan<UnmatchedOpen>),
-    UnmatchedClose(WithSpan<UnmatchedClose>),
+    UnmatchedOpen(WithSpan<OpenBracket>),
+    UnmatchedClose(WithSpan<CloseBracket>),
 }
 
 impl MatchedBrackets {
@@ -68,7 +66,7 @@ impl MatchedBrackets {
 }
 ```
 
-Positions marked below use `^` under the character. A position is on an unmatched token when the node it resolves to is an `UnmatchedOpen` or `UnmatchedClose`; the pass ships no collapsed answer, so a consumer reads this off the leaf. A position on whitespace the tokenizer skipped resolves to the enclosing level.
+Positions marked below use `^` under the character. A position is on an unmatched token when the node it resolves to is an `OpenBracket` or `CloseBracket` whose parent is `Unmatched`; the pass ships no collapsed answer, so a consumer reads this off the path. A position on whitespace the tokenizer skipped resolves to the enclosing level.
 
 ## Case: text outside any bracket
 
@@ -99,7 +97,7 @@ field Query.Foo { bar( }
                      ^ unmatched open (the `(` alone, demoted to raw)
 ```
 
-Generates: the brace group with its real closing; among its children, a raw `UnmatchedOpen(Parenthesis)` for the `(`. One error: `UnmatchedOpen` for the parenthesis.
+Generates: the brace group with its real closing; among its children, a raw `OpenBracket(Parenthesis)` for the `(`. One error: `UnmatchedOpen` for the parenthesis.
 
 Reason: the `}` is strong evidence the author considers the brace section finished. Blaming the one bracket that provably never got its partner confines the damage to it, so hover, completion, and later passes keep working everywhere else in the group. Taking the group apart (rather than forcing it shut with a `None` closing) means content after the open sits at the enclosing level, not inside an unbalanced group that never closed.
 
@@ -111,7 +109,7 @@ Reason: the `}` is strong evidence the author considers the brace section finish
     ^ unmatched open
 ```
 
-Generates: the brace group with its real closing; inside it two raw `UnmatchedOpen` items for `(` and `[`, in source order. Two `UnmatchedOpen` errors.
+Generates: the brace group with its real closing; inside it two raw `OpenBracket` items for `(` and `[`, in source order. Two `UnmatchedOpen` errors.
 
 Same reason as above, applied twice. Groups that never closed do not nest as unbalanced structure; they come apart into raw opens at the level that owns the close.
 
@@ -122,7 +120,7 @@ Same reason as above, applied twice. Groups that never closed do not nest as unb
       ^ unmatched close (the `)` alone)
 ```
 
-Generates: the brace group with its real closing, whose children are raw non-bracket items around a raw `UnmatchedClose(Parenthesis)`. One error: `UnmatchedClose`.
+Generates: the brace group with its real closing, whose children are raw non-bracket items around a raw `CloseBracket(Parenthesis)`. One error: `UnmatchedClose`.
 
 The `)` does not end the `{` group and does not consume anything.
 
@@ -134,7 +132,7 @@ Reason: consuming an open of a different kind would destroy a pair that may stil
   ^ unmatched close (the `}` alone)
 ```
 
-Generates: the parenthesis group with its real closing, holding a raw `UnmatchedClose(Brace)`. One error: `UnmatchedClose`.
+Generates: the parenthesis group with its real closing, holding a raw `CloseBracket(Brace)`. One error: `UnmatchedClose`.
 
 If the `}` had ended the `(` group, the `)` that was coming would have become a second error. One typo, one unmatched token.
 
@@ -146,7 +144,7 @@ If the `}` had ended the `(` group, the `)` that was coming would have become a 
       ^ unmatched close (the trailing `}`, whose `{` was already demoted)
 ```
 
-Generates: the parenthesis group with its real closing, holding a raw `UnmatchedOpen(Brace)` for the `{`; after the parenthesis group, a top-level raw `UnmatchedClose(Brace)`. Two errors: `UnmatchedOpen` for the brace open, then `UnmatchedClose` for the trailing `}`.
+Generates: the parenthesis group with its real closing, holding a raw `OpenBracket(Brace)` for the `{`; after the parenthesis group, a top-level raw `CloseBracket(Brace)`. Two errors: `UnmatchedOpen` for the brace open, then `UnmatchedClose` for the trailing `}`.
 
 One crossing produces two unmatched tokens even though a smarter matcher could have paired `{` with `}`.
 
@@ -167,7 +165,7 @@ foo { (}) }
 a { b { c }
 ```
 
-Generates: b's brace group with its real closing, holding the raw token `c`; a's open becomes a raw `UnmatchedOpen` at the top level, with `b` as a sibling raw token between the two opens. One error: `UnmatchedOpen` for a's group.
+Generates: b's brace group with its real closing, holding the raw token `c`; a's open becomes a raw `OpenBracket` at the top level, with `b` as a sibling raw token between the two opens. One error: `UnmatchedOpen` for a's group.
 
 The `}` pairs with the nearest `{` (b's), because same-kind matching is always nearest-first: nesting is the common intent, and "nearest of its kind" is the rule everywhere else. Content after an unmatched open sits in the enclosing level; there is no unbalanced group left in the tree.
 
@@ -185,7 +183,7 @@ A malformed string lexes as whatever the tokenizer produces for it (an `Error` r
 
 ## End of the tokens
 
-Every group still open at the end of the tokens comes apart: each opening becomes a raw `UnmatchedOpen` at the enclosing level, and children move up. There is no open question about validity of content after an unmatched open: that content sits in the enclosing level as ordinary siblings, and the unmatched open is the one error token.
+Every group still open at the end of the tokens comes apart: each opening becomes a raw `OpenBracket` at the enclosing level, and children move up. There is no open question about validity of content after an unmatched open: that content sits in the enclosing level as ordinary siblings, and the unmatched open is the one error token.
 
 When a close is present that an outer group owns, only the inner unclosed groups come apart; the outer group matches as usual:
 
@@ -195,4 +193,4 @@ foo { bar(a: }
              ^ this closes the brace group
 ```
 
-Generates: the brace group with its real closing; among its children, raw `bar`, a raw `UnmatchedOpen(Parenthesis)`, then raw `a` and `:`. One error: `UnmatchedOpen` for the parenthesis.
+Generates: the brace group with its real closing; among its children, raw `bar`, a raw `OpenBracket(Parenthesis)`, then raw `a` and `:`. One error: `UnmatchedOpen` for the parenthesis.

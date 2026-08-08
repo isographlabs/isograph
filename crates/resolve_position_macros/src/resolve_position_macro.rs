@@ -151,10 +151,10 @@ fn generate_enum_arm(
     variant_name: &syn::Ident,
     payload: &syn::Field,
 ) -> proc_macro2::TokenStream {
-    let attr = payload
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("resolve_field"));
+    let attr = match find_resolve_field_attr(&payload.attrs) {
+        Ok(attr) => attr,
+        Err(e) => return e,
+    };
 
     // An unannotated payload delegates with the parent unchanged, which requires the
     // payload's Parent type to equal the enum's. The payload implements ResolvePosition
@@ -227,6 +227,20 @@ struct ResolveFieldInfo {
     field_accessor: proc_macro2::TokenStream,
     field_type: ResolveFieldInfoTypeWrapper,
     parent_construction: ParentConstruction,
+}
+
+fn find_resolve_field_attr(
+    attrs: &[syn::Attribute],
+) -> Result<Option<&syn::Attribute>, proc_macro2::TokenStream> {
+    let mut matching = attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("resolve_field"));
+    match (matching.next(), matching.next()) {
+        (first, None) => Ok(first),
+        (_, Some(duplicate)) => Error::new_spanned(duplicate, "duplicate #[resolve_field]")
+            .to_compile_error()
+            .wrap_err(),
+    }
 }
 
 fn parse_parent_construction(
@@ -366,11 +380,7 @@ fn get_resolve_field_info(
     index: usize,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
-    let Some(attr) = field
-        .attrs
-        .iter()
-        .find(|attr| attr.path().is_ident("resolve_field"))
-    else {
+    let Some(attr) = find_resolve_field_attr(&field.attrs)? else {
         return Ok(None);
     };
 

@@ -24,7 +24,7 @@ pub struct Bracketed {
     #[resolve_field(parent_variant = Matched)]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field(parent_variant = Bracketed)]
+    #[resolve_field(parent_variant = Interior)]
     pub children: WithSpan<MatchedBrackets>,
     #[resolve_field(parent_variant = Matched)]
     pub closing: WithSpan<CloseBracket>,
@@ -71,7 +71,7 @@ pub enum ResolvedBracketNode<'a> {
 #[derive(Debug)]
 pub enum MatchedBracketsParent<'a> {
     Root,
-    Bracketed(Box<BracketedPath<'a>>),
+    Interior(Box<BracketedPath<'a>>),
 }
 
 pub type MatchedBracketsPath<'a> =
@@ -482,7 +482,7 @@ mod tests {
                     BracketTokenParent::Unmatched(level) => {
                         assert!(matches!(
                             level.parent,
-                            MatchedBracketsParent::Bracketed(_)
+                            MatchedBracketsParent::Interior(_)
                         ));
                     }
                     parent => panic!("expected an unmatched open, got {parent:?}"),
@@ -556,7 +556,7 @@ mod tests {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
                 assert!(matches!(
                     token.parent.parent,
-                    MatchedBracketsParent::Bracketed(_)
+                    MatchedBracketsParent::Interior(_)
                 ));
             }
             node => panic!("expected the token leaf, got {node:?}"),
