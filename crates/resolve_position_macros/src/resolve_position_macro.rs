@@ -113,22 +113,16 @@ fn handle_data_enum(
         let variant_name = &variant.ident;
 
         match &variant.fields {
-            syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
-                // Single unnamed field - delegate to it. The payload implements
-                // ResolvePosition itself; a located wrapper delegates through the blanket
-                // impl in resolve_position.
-                quote! {
-                    #enum_name::#variant_name(inner) => inner.resolve(parent, position)
+            syn::Fields::Unnamed(fields) => {
+                let mut payloads = fields.unnamed.iter();
+                match (payloads.next(), payloads.next()) {
+                    (Some(payload), None) => {
+                        generate_enum_arm(&enum_name, variant_name, payload)
+                    }
+                    _ => single_payload_error(variant),
                 }
             }
-            _ => {
-                // Named fields or multiple unnamed fields - error or handle differently
-                Error::new_spanned(
-                    variant,
-                    "ResolvePosition only supports enum variants with a single unnamed field",
-                )
-                .to_compile_error()
-            }
+            _ => single_payload_error(variant),
         }
     });
 
@@ -150,6 +144,53 @@ fn handle_data_enum(
     };
 
     output.into()
+}
+
+fn generate_enum_arm(
+    enum_name: &syn::Ident,
+    variant_name: &syn::Ident,
+    payload: &syn::Field,
+) -> proc_macro2::TokenStream {
+    let attr = payload
+        .attrs
+        .iter()
+        .find(|attr| attr.path().is_ident("resolve_field"));
+
+    // An unannotated payload delegates with the parent unchanged, which requires the
+    // payload's Parent type to equal the enum's. The payload implements ResolvePosition
+    // itself; a located wrapper delegates through the blanket impl in resolve_position.
+    let Some(attr) = attr else {
+        return quote! {
+            #enum_name::#variant_name(inner) => inner.resolve(parent, position)
+        };
+    };
+
+    match parse_parent_construction(attr) {
+        Ok(ParentConstruction::EnumVariant(parent_variant)) => {
+            let payload_type = &payload.ty;
+            quote! {
+                #enum_name::#variant_name(inner) => inner.resolve(
+                    <#payload_type as ::resolve_position::ResolvePosition>::Parent::#parent_variant(parent.into()),
+                    position,
+                )
+            }
+        }
+        Ok(ParentConstruction::ContainerPath) => Error::new_spanned(
+            attr,
+            "an enum payload always resolves and passes the parent through; annotate \
+            only to wrap it: #[resolve_field(parent_variant = SomeVariant)]",
+        )
+        .to_compile_error(),
+        Err(e) => e,
+    }
+}
+
+fn single_payload_error(variant: &syn::Variant) -> proc_macro2::TokenStream {
+    Error::new_spanned(
+        variant,
+        "ResolvePosition only supports enum variants with a single unnamed field",
+    )
+    .to_compile_error()
 }
 
 #[derive(deluxe::ExtractAttributes)]
