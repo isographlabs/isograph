@@ -1,6 +1,6 @@
 # Peekable with a guarded peek
 
-A new crate, `peekable`, holds an iterator wrapper whose `peek` returns a guard. `view` lends the peeked item as `&I::Item`, `commit` consumes the item and returns it owned, and dropping the guard leaves the iterator exactly where `peek` found it — the same non-consuming peek semantics as `std::iter::Peekable`, so repeated peeks see the same item. The guard holds the one `&mut` to the wrapper, so while it lives nothing can call `next` underneath it: "peek, then decide" is the only shape the API admits, and the peek-then-`next` pairs in the matcher become a single `commit` on the item that was actually viewed.
+A new crate, `peekable`, holds an iterator wrapper whose `peek` returns a guard. `view` lends the peeked item as `&I::Item`, `commit` consumes the item and returns it owned, and dropping the guard leaves the iterator exactly where `peek` found it — the same non-consuming peek semantics as `std::iter::Peekable`, so repeated peeks see the same item. The guard's lifetime is `peek`'s `&mut` borrow of the wrapper, so while a guard lives nothing can call `next` underneath it: "peek, then decide" is the only shape the API admits, and the peek-then-`next` pairs in the matcher become a single `commit` on the item that was actually viewed.
 
 ## The API
 
@@ -11,8 +11,8 @@ The whole crate:
 /// An iterator wrapper whose peek is scoped: [`peek`](Peekable::peek) returns a guard
 /// holding the next item, [`view`](Peek::view) lends that item,
 /// [`commit`](Peek::commit) consumes and returns it, and dropping the guard leaves the
-/// iterator where `peek` found it. The guard borrows the wrapper, so it is the only
-/// handle that can advance the iterator while it lives.
+/// iterator where `peek` found it. The guard's lifetime is `peek`'s borrow of the
+/// wrapper, so it is the only handle that can advance the iterator while it lives.
 pub struct Peekable<I: Iterator> {
     iter: I,
     /// The item `peek` pulled out of `iter` and no guard has committed: the next item,
@@ -27,14 +27,11 @@ impl<I: Iterator> Peekable<I> {
 
     /// The next item, in a guard. Dropping the guard leaves the item as the next item;
     /// [`commit`](Peek::commit) consumes it.
-    pub fn peek(&mut self) -> Option<Peek<'_, I>> {
+    pub fn peek(&mut self) -> Option<Peek<'_, I::Item>> {
         if self.peeked.is_none() {
             self.peeked = self.iter.next();
         }
-        match self.peeked {
-            Some(_) => Some(Peek { owner: self }),
-            None => None,
-        }
+        Full::new(&mut self.peeked).map(Peek)
     }
 }
 
@@ -46,28 +43,64 @@ impl<I: Iterator> Iterator for Peekable<I> {
     }
 }
 
-/// The guard for one peeked item. While it lives it holds the one `&mut` to the
+/// The guard for one peeked item. While it lives it holds `peek`'s `&mut` to the
 /// wrapper, so the item [`view`](Peek::view) lends is the item
 /// [`commit`](Peek::commit) returns.
-pub struct Peek<'a, I: Iterator> {
-    owner: &'a mut Peekable<I>,
-}
+pub struct Peek<'a, T>(Full<'a, T>);
 
-impl<I: Iterator> Peek<'_, I> {
+impl<T> Peek<'_, T> {
     /// The item this guard peeked.
-    pub fn view(&self) -> &I::Item {
-        self.owner
-            .peeked
-            .as_ref()
-            .expect("a Peek exists only while the slot holds an item")
+    ///
+    /// The borrow is the guard's, not the wrapper's: a view dies with its `Peek`.
+    ///
+    /// ```compile_fail
+    /// let mut iter = peekable::Peekable::new([1].into_iter());
+    /// let peek = iter.peek().expect("one item remains");
+    /// let item = peek.view();
+    /// peek.commit();
+    /// assert_eq!(item, &1);
+    /// ```
+    pub fn view(&self) -> &T {
+        self.0.get()
     }
 
     /// Consume the item: the wrapper's `next`, owned.
-    pub fn commit(self) -> I::Item {
-        self.owner
-            .next()
-            .expect("a Peek exists only while the slot holds an item")
+    pub fn commit(self) -> T {
+        self.0.take()
     }
+}
+
+/// A slot proven full. The constructor is the one place that checks, and a `Full`
+/// holds the slot's only reference, so nothing can empty it while the `Full` lives.
+struct Full<'a, T>(&'a mut Option<T>);
+
+impl<'a, T> Full<'a, T> {
+    fn new(slot: &'a mut Option<T>) -> Option<Full<'a, T>> {
+        match slot {
+            Some(_) => Some(Full(slot)),
+            None => None,
+        }
+    }
+
+    fn get(&self) -> &T {
+        match &*self.0 {
+            Some(item) => item,
+            None => slot_emptied_under_full(),
+        }
+    }
+
+    fn take(self) -> T {
+        match self.0.take() {
+            Some(item) => item,
+            None => slot_emptied_under_full(),
+        }
+    }
+}
+
+/// The crate's one panic path, unreachable by construction: a [`Full`] is built only
+/// over a `Some` and holds the slot's only reference for its whole life.
+fn slot_emptied_under_full() -> ! {
+    unreachable!("a Full exists only while its slot holds an item")
 }
 ```
 
@@ -85,7 +118,7 @@ license = { workspace = true }
 workspace = true
 ```
 
-The soundness argument is small. `peek` constructs a guard only after filling the slot, and the guard holds the one `&mut` to the wrapper for its whole life: no `next`, no second `peek`, and no other guard can run while it lives, so the slot cannot drain under it. That borrow discipline is the invariant the two `expect`s state; the type system cannot carry the slot's `Some`-ness through the guard's reborrow, so `view` and `commit` assert it. They are the crate's only panic paths, and no input reaches them: exhaustion is handled at `peek`, which returns `None` before a guard exists. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
+The soundness argument is small. The guard stores only the slot's `&mut`, but its lifetime is `peek`'s borrow of the whole wrapper, so while a `Peek` lives no `next`, no second `peek`, and no other guard can compile against the wrapper — the guard provably cannot touch `iter`, and nothing else can either. Fullness is proven once, in `Full::new`; `get` and `take` are the only readers, and they read through the slot's only reference, so nothing can empty it between the check and the read. `slot_emptied_under_full` is the crate's one panic path, no input reaches it — exhaustion is handled at `peek`, which returns `None` before a guard exists — and `Peek` itself has no panic path. `view` returns a borrow of the guard, not of the wrapper: the elided lifetime is `&self`'s, which is what forces every view to die before `commit` moves the guard, and the `compile_fail` doctest on `view` pins that signature against a widening to `'a`. Dropping the guard runs no code — there is no `Drop` impl — and the item stays in the slot as the next item, so restore-on-drop does not depend on a destructor running; even a `mem::forget` of the guard changes nothing.
 
 ## The consumer
 
@@ -284,6 +317,8 @@ The `Open` arm's `peek.commit()` consumes the guard, which ends its borrow of `t
 
 ## Tests
 
+The `compile_fail` doctest on `view` is part of the suite; `cargo test -p peekable` runs it with the unit tests below.
+
 ```rust
 // from crates/peekable/src/lib.rs
 #[cfg(test)]
@@ -357,7 +392,7 @@ mod test {
 
 ## Landing checklist
 
-- `cargo test -p peekable` passes.
+- `cargo test -p peekable` passes, the `compile_fail` doctest included.
 - `cargo test -p isograph_parser` passes.
 - `cargo clippy --workspace --exclude pico --all-targets -- -D warnings` passes.
 - The doc moves to `refactors/past/`.
