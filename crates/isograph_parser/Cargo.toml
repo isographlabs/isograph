@@ -8,6 +8,7 @@ license = { workspace = true }
 logos = { workspace = true }
 resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
+scoped_stack = { path = "../scoped_stack" }
 span = { path = "../span" }
 
 [lints]

@@ -532,24 +532,21 @@ mod tests {
     }
 
     #[test]
-    fn everything_unclosed_at_the_end_of_tokens_comes_apart() {
+    fn an_unclosed_open_inside_a_matched_brace_is_the_only_error() {
         let text = "foo { bar(a: }";
         let tree = tree(text);
-        assert_eq!(tree.item.0.len(), 7);
-        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(UnmatchedOpen(Brace)));
-        assert_eq!(raw(&tree.item.0, 3), RawToken::Open(UnmatchedOpen(Parenthesis)));
-        assert_eq!(raw(&tree.item.0, 6), RawToken::Close(UnmatchedClose(Brace)));
+        assert_eq!(tree.item.0.len(), 2);
+        let brace = group(&tree.item.0, 1);
+        assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(
+            raw(&brace.children.item.0, 1),
+            RawToken::Open(UnmatchedOpen(Parenthesis))
+        );
         match tree.item.errors().as_slice() {
-            [
-                BracketError::UnmatchedOpen(brace),
-                BracketError::UnmatchedOpen(parenthesis),
-                BracketError::UnmatchedClose(close),
-            ] => {
-                assert_eq!(brace.location, span_of(text, "{"));
-                assert_eq!(parenthesis.location, span_of(text, "("));
-                assert_eq!(close.location, span_of(text, "}"));
+            [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.location, span_of(text, "("));
             }
-            errors => panic!("expected two opens and the close, got {errors:?}"),
+            errors => panic!("expected exactly the unmatched open, got {errors:?}"),
         }
     }
 

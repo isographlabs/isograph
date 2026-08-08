@@ -951,6 +951,7 @@ dependencies = [
  "logos",
  "resolve_position",
  "resolve_position_macros",
+ "scoped_stack",
  "span",
 ]
 
