@@ -1,24 +1,24 @@
 # Chunking
 
-Requires generic-resolution.md, which is what makes `MatchedBrackets<Chunked>` resolvable at the tree level; the resolution section below adds the run-interior step on top of it.
+Requires raw-items.md. The pass after bracket matching: a bespoke recursive walk over each `MatchedBrackets` level. There is no `TreeContents` and no `map`. The output is a chunk tree of its own shape, not a re-labeled bracket tree. Chunking is infallible. It validates nothing and emits no errors; every raw token of every level lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later. Bracket matching's unmatched tokens ride inside chunks as content, and the chunk-parsing pass reports leftover bracket tokens it finds there. The bracket tree's `errors()` stays available on the input; the chunk tree does not re-derive them.
 
-The pass after bracket matching. Chunking maps `MatchedBrackets<BracketsMatched>` to `MatchedBrackets<Chunked>` through `map`: the tree keeps its shape — the same groups, nesting, and strays — and every token run is replaced by its chunked form, an alternation of chunks (separator-free token runs) and separators (the comma and line-break tokens between them). Chunking is infallible. It validates nothing and emits no errors; every token of every run lands in a chunk or a separator. A chunk is parsed independently by the chunk-parsing pass later, and the bracket errors stay derivable from the chunked tree unchanged.
-
-A group is not part of any chunk. In `foo { bar }` the top level is a chunked run holding the chunk `foo`, followed by the brace group as its sibling item; that a selection is a chunk plus the group after it is an adjacency the chunk-parsing pass reads off the level when it assembles selections.
+A chunk holds its non-separator tokens and its trailing group, when one follows. In `bar { baz }`, one chunk carries the tokens `bar` and the brace group; the selection is not an adjacency the later pass has to reassemble from siblings. A raw unmatched open or close is content inside a chunk, not a tree item of its own kind.
 
 ## Behavior
 
-- Commas and line breaks are the separators, equivalent. Any nonempty mix of consecutive separators is one boundary, held as one `Separator`. A run never produces an empty chunk: separators at a run's start or end are just boundary nodes there.
+- Commas and line breaks are the separators, equivalent. Any nonempty mix of consecutive separators is one boundary, held as one `Separator`. A level never produces an empty chunk: separators at a level's start or end are just boundary nodes there.
 - Separators are required between fields, so `baz watttt` is one chunk, and it is that chunk's own parse that later fails ("expected a comma or line break"). Chunking never splits on token shape.
-- A separator splits only its own run. Runs end at brackets, so a chunk never spans a group, and the separators inside a group's interior runs never affect the level outside the group.
-- A chunk's span runs from its first token's start to its last token's end; a separator's span likewise. Whitespace between tokens belongs to no node.
+- A separator splits only its own level. Groups nest inside the chunk that owns them, so a chunk never spans a sibling group, and the separators inside a group's interior never affect the level outside the group.
+- A chunk's span runs from its first token's start to the end of its trailing group when it has one, or to its last token's end otherwise; a separator's span likewise. Whitespace between tokens belongs to no node.
+- A `BracketItem::Bracketed` attaches to the chunk in progress as that chunk's trailing group. A level that opens with a group (no preceding non-separator tokens) starts a chunk whose token list is empty and whose trailing group is that group.
+- A `BracketItem::Raw` token — non-bracket, unmatched open, or unmatched close — is content of the chunk in progress. Unmatched brackets are not structure at this stage; the chunk-parsing pass is the one that reports them when they survive inside a chunk.
 
 ```
 foo { bar, baz
 qux }
 ```
 
-chunks as: the top-level run becomes the one chunk `foo`; the brace group's interior run becomes chunk `bar`, separator `,`, chunk `baz`, separator (the line break), chunk `qux`.
+chunks as: one top-level chunk whose tokens are `foo` and whose trailing group is the brace; the brace group's interior is chunk `bar`, separator `,`, chunk `baz`, separator (the line break), chunk `qux`.
 
 ```
 a(
@@ -26,11 +26,11 @@ a(
 }
 ```
 
-has one chunk, `a`: each group's interior run is a lone separator, and the top level has no separator anywhere. `foo\n{ bar }` chunks as chunk `foo`, then a separator, then the brace group — that separator between the chunk and the group is what the chunk-parsing pass rejects when it assembles selections, so a selection set's brace still has to open on its field's line.
+has one top-level chunk, `a`, whose trailing group is the parenthesis (empty interior: a lone separator), and a following chunk whose tokens are empty and whose trailing group is the brace (empty interior: a lone separator). `foo\n{ bar }` chunks as chunk `foo`, then a separator, then a chunk with empty tokens and the brace as trailing group — that separator between the two chunks is what the chunk-parsing pass rejects when it assembles selections, so a selection set's brace still has to open on its field's line.
 
-`foo { bar(a: }) }` chunks whatever the bracket pass produced, strays included: the top level keeps the strays `)` and `}` as items, untouched, and `a :` becomes the one chunk of the parenthesis group's interior.
+`foo { bar(a: }) }` chunks whatever the bracket pass produced: the paren open that never closed is a raw item on the brace level, so it rides inside a chunk as content; the leftover closes that raw-items left at the top ride inside top-level chunks the same way.
 
-## The change
+## The shape
 
 New module `crates/isograph_parser/src/chunk.rs`, registered in lib.rs alongside the existing modules:
 
@@ -43,41 +43,51 @@ pub use chunk::*;
 pub use matched_brackets::*;
 ```
 
-The stage and its run type:
-
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 use span::{Span, WithSpan};
 
 use crate::{
-    BracketsMatched, Inner, MatchedBrackets, NonBracketTokenKind, StrayClose, TreeContents,
+    Bracketed, BracketItem, MatchedBrackets, NonBracketTokenKind, RawToken,
 };
 
-/// The stage `chunk` produces. The tree keeps the bracket tree's shape, with every run chunked.
+/// One level of the chunk tree: the whole literal at the root, a group's interior below.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Chunked;
-
-impl TreeContents for Chunked {
-    type Inner = ChunkedRun;
-    type StrayClose = StrayClose;
-}
-
-/// One run, chunked into alternating chunks and separators, built with no two adjacent
-/// separators (one boundary absorbs consecutive separator tokens) and no empty chunks.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ChunkedRun(pub Vec<WithSpan<ChunkedRunItem>>);
+pub struct ChunkedLevel(pub Vec<WithSpan<ChunkedLevelItem>>);
 
 #[derive(Debug, PartialEq, Eq)]
-pub enum ChunkedRunItem {
+pub enum ChunkedLevelItem {
     Chunk(Chunk),
     Separator(Separator),
 }
 
-/// A maximal separator-free run of tokens; the chunk-parsing pass consumes it as one
-/// unit. The wrapping `WithSpan`'s span runs from the first token's start to the last
-/// token's end.
+/// A maximal separator-free run of raw tokens, plus the group that follows it when one
+/// does. The chunk-parsing pass consumes it as one unit. The wrapping `WithSpan`'s span
+/// runs from the first token's start (or the group's start when there are no tokens) to
+/// the end of the trailing group when present, otherwise the last token's end.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Chunk(pub Vec<WithSpan<NonBracketTokenKind>>);
+pub struct Chunk {
+    pub tokens: Vec<WithSpan<ChunkToken>>,
+    pub trailing_group: Option<WithSpan<ChunkedGroup>>,
+}
+
+/// A matched group re-chunked: the bracket tree's opening and closing are kept, and the
+/// interior is a `ChunkedLevel`.
+#[derive(Debug, PartialEq, Eq)]
+pub struct ChunkedGroup {
+    pub opening: WithSpan<crate::OpenBracket>,
+    pub children: WithSpan<ChunkedLevel>,
+    pub closing: WithSpan<crate::CloseBracket>,
+}
+
+/// What a chunk can hold as flat content: every non-separator raw token from the bracket
+/// tree, unmatched brackets included.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum ChunkToken {
+    NonBracket(NonBracketTokenKind),
+    UnmatchedOpen(crate::BracketKind),
+    UnmatchedClose(crate::BracketKind),
+}
 
 /// One boundary between chunks, holding every comma and line-break token it absorbed, in order.
 #[derive(Debug, PartialEq, Eq)]
@@ -91,17 +101,35 @@ pub enum SeparatorToken {
 }
 ```
 
-The pass. `chunk_run` consumes each run through a peekable, the discipline the matcher already uses: each outer iteration emits exactly one complete node, so the alternation invariant holds by loop structure, with no accumulators crossing function boundaries.
+## The pass
+
+`chunk` walks each level left to right. The level is a flat mix of raw tokens and groups; the walk folds non-separator raws and the next group into one chunk, and folds consecutive separators into one boundary. Each outer iteration of `chunk_level` consumes at least the item `next` returned, so the helpers never see an empty stream.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-/// Chunk every run of a matched-brackets tree. The pass is infallible. Every token
-/// lands in a chunk or a separator, and no grammar is checked.
-pub fn chunk(tree: MatchedBrackets<BracketsMatched>) -> MatchedBrackets<Chunked> {
-    tree.map(&mut |run| chunk_run(run.item), &mut |stray| stray.item)
+use std::iter::Peekable;
+use std::slice::Iter;
+
+type LevelItems<'a> = Peekable<Iter<'a, WithSpan<BracketItem>>>;
+
+/// Chunk a matched-brackets tree. The pass is infallible. Every raw token lands in a
+/// chunk or a separator, and no grammar is checked.
+pub fn chunk(tree: WithSpan<MatchedBrackets>) -> WithSpan<ChunkedLevel> {
+    tree.map(|level| chunk_level(&level))
 }
 
-/// The separator kind of a token, or `None` for a token that belongs in a chunk.
+fn chunk_level(level: &MatchedBrackets) -> ChunkedLevel {
+    let mut items = level.0.iter().peekable();
+    let mut out = Vec::new();
+    while let Some(first) = items.next() {
+        match separator_of(first) {
+            Some(first_separator) => out.push(absorb_separator(first_separator, first.location, &mut items)),
+            None => out.push(absorb_chunk(first, &mut items)),
+        }
+    }
+    ChunkedLevel(out)
+}
+
 fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
     match kind {
         NonBracketTokenKind::Comma => Some(SeparatorToken::Comma),
@@ -110,416 +138,123 @@ fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
     }
 }
 
-/// Split one token run at separator tokens; consecutive separator tokens collapse into
-/// one boundary.
-fn chunk_run(Inner(tokens): Inner) -> ChunkedRun {
-    let mut tokens = tokens.into_iter().peekable();
-    let mut items = Vec::new();
-    while let Some(&first) = tokens.peek() {
-        if separator_token(first.item).is_some() {
+fn separator_of(item: &WithSpan<BracketItem>) -> Option<SeparatorToken> {
+    match &item.item {
+        BracketItem::Raw(RawToken::NonBracket(token)) => separator_token(token.0),
+        _ => None,
+    }
+}
+
+fn chunk_token(raw: RawToken) -> Option<ChunkToken> {
+    match raw {
+        RawToken::NonBracket(token) if separator_token(token.0).is_some() => None,
+        RawToken::NonBracket(token) => Some(ChunkToken::NonBracket(token.0)),
+        RawToken::Open(open) => Some(ChunkToken::UnmatchedOpen(open.0)),
+        RawToken::Close(close) => Some(ChunkToken::UnmatchedClose(close.0)),
+    }
+}
+
+fn absorb_separator(
+    first: SeparatorToken,
+    first_location: Span,
+    items: &mut LevelItems<'_>,
+) -> WithSpan<ChunkedLevelItem> {
+    let mut span = first_location;
+    let mut boundary = vec![WithSpan::new(first, first_location)];
+    while let Some(item) = items.peek() {
+        let Some(separator) = separator_of(item) else {
+            break;
+        };
+        let Some(item) = items.next() else {
+            break;
+        };
+        span = Span::join(span, item.location);
+        boundary.push(WithSpan::new(separator, item.location));
+    }
+    WithSpan::new(ChunkedLevelItem::Separator(Separator(boundary)), span)
+}
+
+fn absorb_chunk(
+    first: &WithSpan<BracketItem>,
+    items: &mut LevelItems<'_>,
+) -> WithSpan<ChunkedLevelItem> {
+    match &first.item {
+        BracketItem::Bracketed(group) => WithSpan::new(
+            ChunkedLevelItem::Chunk(Chunk {
+                tokens: Vec::new(),
+                trailing_group: Some(WithSpan::new(chunk_group(group), first.location)),
+            }),
+            first.location,
+        ),
+        BracketItem::Raw(raw) => {
+            let mut tokens = Vec::new();
             let mut span = first.location;
-            let mut boundary = Vec::new();
-            while let Some(&token) = tokens.peek() {
-                let Some(separator) = separator_token(token.item) else {
-                    break;
-                };
-                tokens.next();
-                span = Span::join(span, token.location);
-                boundary.push(WithSpan::new(separator, token.location));
+            if let Some(token) = chunk_token(*raw) {
+                tokens.push(WithSpan::new(token, first.location));
             }
-            items.push(WithSpan::new(
-                ChunkedRunItem::Separator(Separator(boundary)),
-                span,
-            ));
-        } else {
-            let mut span = first.location;
-            let mut chunk = Vec::new();
-            while let Some(&token) = tokens.peek() {
-                if separator_token(token.item).is_some() {
-                    break;
+            let mut trailing_group = None;
+            while let Some(item) = items.peek() {
+                match &item.item {
+                    BracketItem::Raw(raw) => {
+                        let Some(token) = chunk_token(*raw) else {
+                            break;
+                        };
+                        let Some(item) = items.next() else {
+                            break;
+                        };
+                        span = Span::join(span, item.location);
+                        tokens.push(WithSpan::new(token, item.location));
+                    }
+                    BracketItem::Bracketed(group) => {
+                        let Some(item) = items.next() else {
+                            break;
+                        };
+                        span = Span::join(span, item.location);
+                        trailing_group = Some(WithSpan::new(chunk_group(group), item.location));
+                        break;
+                    }
                 }
-                tokens.next();
-                span = Span::join(span, token.location);
-                chunk.push(token);
             }
-            items.push(WithSpan::new(ChunkedRunItem::Chunk(Chunk(chunk)), span));
+            WithSpan::new(
+                ChunkedLevelItem::Chunk(Chunk {
+                    tokens,
+                    trailing_group,
+                }),
+                span,
+            )
         }
     }
-    ChunkedRun(items)
-}
-```
-
-`errors()` needs nothing: its bound is `TreeContents<StrayClose = CloseBracket>`, which `Chunked` satisfies, so `MatchedBrackets<Chunked>` answers the errors query as-is.
-
-### Resolution
-
-The tree query needs nothing from this doc: generic-resolution.md makes `MatchedBrackets<Chunked>` resolve as-is, with a position in a run answering `ResolvedBracketNode::Inner(InnerPath<'a, Chunked>)` — a path to the `ChunkedRun` with its full ancestry. The chunk-level question is the second step: `ChunkedRun` resolves its own interior, parented by that `InnerPath`, so a chunk's path chains run, group, root.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-/// Every node a position can resolve to inside one chunked run: the run itself (a
-/// position on whitespace between its items), a chunk, or a separator.
-#[derive(Debug)]
-#[cfg_attr(test, derive(derive_more::Unwrap))]
-pub enum ResolvedChunkedRunNode<'a> {
-    ChunkedRun(ChunkedRunPath<'a>),
-    Chunk(ChunkPath<'a>),
-    Separator(SeparatorPath<'a>),
 }
 
-pub type ChunkedRunPath<'a> =
-    PositionResolutionPath<&'a ChunkedRun, InnerPath<'a, Chunked>>;
-
-/// The one place a `ChunkedRunItem` can sit: its run.
-#[derive(Debug)]
-pub enum ChunkedRunItemParent<'a> {
-    ChunkedRun(ChunkedRunPath<'a>),
-}
-
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedRunItemParent<'a>>;
-pub type SeparatorPath<'a> = PositionResolutionPath<&'a Separator, ChunkedRunItemParent<'a>>;
-```
-
-The derives, replacing the plain derive lines shown above — `ChunkedRun` delegates into its items, and the items are leaves; `Chunk` and `Separator` implement nothing:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = InnerPath<'a, Chunked>,
-    resolved_node = ResolvedChunkedRunNode<'a>
-)]
-pub struct ChunkedRun(#[resolve_field] pub Vec<WithSpan<ChunkedRunItem>>);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = ChunkedRunItemParent<'a>,
-    resolved_node = ResolvedChunkedRunNode<'a>
-)]
-pub enum ChunkedRunItem {
-    #[resolve_field(leaf = Chunk)]
-    Chunk(Chunk),
-    #[resolve_field(leaf = Separator)]
-    Separator(Separator),
-}
-```
-
-with the one `From` the delegation needs:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl<'a> From<ChunkedRunPath<'a>> for ChunkedRunItemParent<'a> {
-    fn from(path: ChunkedRunPath<'a>) -> Self {
-        ChunkedRunItemParent::ChunkedRun(path)
+fn chunk_group(group: &Bracketed) -> ChunkedGroup {
+    ChunkedGroup {
+        opening: group.opening,
+        children: group.children.as_ref().map(|level| chunk_level(level)),
+        closing: group.closing,
     }
 }
 ```
 
-The two-step query, as a consumer writes it: resolve the tree, and when the answer is `Inner`, resolve the run with that path as the parent.
+`WithSpan::map` and `as_ref` already exist on the span crate.
 
-```rust
-// from crates/isograph_parser/src/chunk.rs (tests)
-let run_path = tree.resolve((), position).unwrap_inner();
-let node = run_path.inner.resolve(run_path, position);
-```
+## Resolution
 
-### Tests
+The chunk tree derives `ResolvePosition` on its own types. A position on a bracket-tree unmatched token that rides inside a chunk answers the chunk (or, once chunk tokens become leaves, the token); a position on a group's opening or closing answers those leaves through `ChunkedGroup`. Parent enums and the resolved-node enum are written out when this pass is implemented; they are not a second stage of the bracket tree's `ResolvedBracketNode`.
 
-`#[cfg(test)]` in chunk.rs, written out in full. `span_of` is the same anchor helper the bracket tests use; the extractors panic with the mismatch when a walk hits the wrong item kind, as the bracket tests' extractors do.
+## Tests
 
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{BracketItem, Bracketed, match_brackets, tokenize};
+Structural facts only: which chunks and separators a level holds, which tokens and trailing group a chunk holds, that unmatched brackets land inside chunks, that separators collapse, that spans are tight. No snapshot of the whole tree. Written out fully when the pass is implemented; the cases below are the ones the suite must cover.
 
-    fn chunked(literal: &str) -> MatchedBrackets<Chunked> {
-        chunk(match_brackets(tokenize(literal)))
-    }
+- `foo { bar, baz\nqux }` — top is one chunk (`foo` + brace); interior is five items alternating chunks and separators.
+- `a, b` and `a\nb` separate identically; `a,\n\n,b` is one separator holding four separator tokens.
+- `\n, a, b,\n` has separators first and last, no empty chunks.
+- `bar, baz watttt, qux` keeps `baz watttt` as one chunk.
+- `foo\n{ bar }` is chunk, separator, chunk(empty tokens + brace).
+- `a ) b` puts the unmatched close inside a chunk between `a` and `b` (or as its own chunk of one token when separators bound it); `errors()` on the input bracket tree still reports the unmatched close.
+- `foo { bar` — the brace never closed, so raw-items demoted the open; chunking sees a raw unmatched open and the following tokens at the top level, not an unbalanced group.
 
-    /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
-    /// cannot silently shift, and one that fails loudly when it stops being unique.
-    fn span_of(text: &str, pattern: &str) -> Span {
-        let mut occurrences = text.match_indices(pattern);
-        let (offset, _) = occurrences
-            .next()
-            .expect("the pattern the test anchors on occurs in the literal");
-        assert!(
-            occurrences.next().is_none(),
-            "the pattern the test anchors on occurs exactly once in the literal"
-        );
-        Span::from_usize(offset, offset + pattern.len())
-    }
+## Landing checklist
 
-    fn run(items: &[WithSpan<BracketItem<Chunked>>], index: usize) -> &ChunkedRun {
-        match &items[index].item {
-            BracketItem::Inner(run) => run,
-            item => panic!("expected a chunked run at {index}, got {item:?}"),
-        }
-    }
-
-    fn group(items: &[WithSpan<BracketItem<Chunked>>], index: usize) -> &Bracketed<Chunked> {
-        match &items[index].item {
-            BracketItem::Bracketed(group) => group,
-            item => panic!("expected a group at {index}, got {item:?}"),
-        }
-    }
-
-    fn chunk_at(run: &ChunkedRun, index: usize) -> &WithSpan<ChunkedRunItem> {
-        let item = &run.0[index];
-        assert!(
-            matches!(item.item, ChunkedRunItem::Chunk(_)),
-            "expected a chunk at {index}, got {item:?}"
-        );
-        item
-    }
-
-    fn separator_at(run: &ChunkedRun, index: usize) -> &WithSpan<ChunkedRunItem> {
-        let item = &run.0[index];
-        assert!(
-            matches!(item.item, ChunkedRunItem::Separator(_)),
-            "expected a separator at {index}, got {item:?}"
-        );
-        item
-    }
-
-    /// The token kinds of the chunk at `index`.
-    fn chunk_kinds(run: &ChunkedRun, index: usize) -> Vec<NonBracketTokenKind> {
-        match &chunk_at(run, index).item {
-            ChunkedRunItem::Chunk(Chunk(tokens)) => {
-                tokens.iter().map(|token| token.item).collect()
-            }
-            item => panic!("expected a chunk at {index}, got {item:?}"),
-        }
-    }
-
-    /// The separator kinds of the boundary at `index`.
-    fn separator_kinds(run: &ChunkedRun, index: usize) -> Vec<SeparatorToken> {
-        match &separator_at(run, index).item {
-            ChunkedRunItem::Separator(Separator(tokens)) => {
-                tokens.iter().map(|token| token.item).collect()
-            }
-            item => panic!("expected a separator at {index}, got {item:?}"),
-        }
-    }
-
-    #[test]
-    fn a_selection_set_chunks_by_separator() {
-        let tree = chunked("foo { bar, baz\nqux }");
-        assert_eq!(tree.0.len(), 2);
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 1);
-        assert_eq!(chunk_kinds(top, 0), vec![NonBracketTokenKind::Identifier]);
-        let brace = group(&tree.0, 1);
-        assert_eq!(brace.children.len(), 1);
-        let interior = run(&brace.children, 0);
-        assert_eq!(interior.0.len(), 5);
-        assert_eq!(chunk_kinds(interior, 0), vec![NonBracketTokenKind::Identifier]);
-        assert_eq!(separator_kinds(interior, 1), vec![SeparatorToken::Comma]);
-        assert_eq!(chunk_kinds(interior, 2), vec![NonBracketTokenKind::Identifier]);
-        assert_eq!(separator_kinds(interior, 3), vec![SeparatorToken::LineBreak]);
-        assert_eq!(chunk_kinds(interior, 4), vec![NonBracketTokenKind::Identifier]);
-        assert_eq!(tree.errors(), vec![]);
-    }
-
-    #[test]
-    fn a_comma_a_line_break_and_a_mix_separate_identically() {
-        for text in ["a, b", "a\nb"] {
-            let tree = chunked(text);
-            let top = run(&tree.0, 0);
-            assert_eq!(top.0.len(), 3, "for {text:?}");
-            chunk_at(top, 0);
-            separator_at(top, 1);
-            chunk_at(top, 2);
-        }
-        let tree = chunked("a,\n\n,b");
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 3);
-        assert_eq!(
-            separator_kinds(top, 1),
-            vec![
-                SeparatorToken::Comma,
-                SeparatorToken::LineBreak,
-                SeparatorToken::LineBreak,
-                SeparatorToken::Comma,
-            ]
-        );
-    }
-
-    #[test]
-    fn boundaries_sit_first_and_last_with_no_empty_chunks() {
-        let tree = chunked("\n, a, b,\n");
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 5);
-        separator_at(top, 0);
-        chunk_at(top, 1);
-        separator_at(top, 2);
-        chunk_at(top, 3);
-        separator_at(top, 4);
-    }
-
-    #[test]
-    fn garbage_between_separators_is_one_chunk() {
-        let tree = chunked("bar, baz watttt, qux");
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 5);
-        assert_eq!(
-            chunk_kinds(top, 2),
-            vec![
-                NonBracketTokenKind::Identifier,
-                NonBracketTokenKind::Identifier,
-            ]
-        );
-    }
-
-    #[test]
-    fn a_group_sits_between_the_runs_it_splits() {
-        let tree = chunked("bar(abc), qux");
-        assert_eq!(tree.0.len(), 3);
-        let before = run(&tree.0, 0);
-        assert_eq!(before.0.len(), 1);
-        assert_eq!(chunk_kinds(before, 0), vec![NonBracketTokenKind::Identifier]);
-        let parenthesis = group(&tree.0, 1);
-        let interior = run(&parenthesis.children, 0);
-        assert_eq!(interior.0.len(), 1);
-        assert_eq!(chunk_kinds(interior, 0), vec![NonBracketTokenKind::Identifier]);
-        let after = run(&tree.0, 2);
-        assert_eq!(after.0.len(), 2);
-        separator_at(after, 0);
-        assert_eq!(chunk_kinds(after, 1), vec![NonBracketTokenKind::Identifier]);
-    }
-
-    #[test]
-    fn a_line_break_before_the_brace_is_a_boundary() {
-        let tree = chunked("foo\n{ bar }");
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 2);
-        chunk_at(top, 0);
-        separator_at(top, 1);
-        group(&tree.0, 1);
-    }
-
-    #[test]
-    fn separators_inside_groups_do_not_reach_the_outer_level() {
-        let tree = chunked("a(\n) {\n}");
-        assert_eq!(tree.0.len(), 3);
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 1);
-        assert_eq!(chunk_kinds(top, 0), vec![NonBracketTokenKind::Identifier]);
-        let parenthesis = group(&tree.0, 1);
-        assert_eq!(separator_kinds(run(&parenthesis.children, 0), 0), vec![SeparatorToken::LineBreak]);
-        let brace = group(&tree.0, 2);
-        assert_eq!(separator_kinds(run(&brace.children, 0), 0), vec![SeparatorToken::LineBreak]);
-    }
-
-    #[test]
-    fn empty_trees_stay_empty() {
-        let tree = chunked("foo {}");
-        assert!(group(&tree.0, 1).children.is_empty());
-        assert!(chunked("").0.is_empty());
-        let tree = chunked(" \n , \n ");
-        let top = run(&tree.0, 0);
-        assert_eq!(top.0.len(), 1);
-        assert_eq!(
-            separator_kinds(top, 0),
-            vec![
-                SeparatorToken::LineBreak,
-                SeparatorToken::Comma,
-                SeparatorToken::LineBreak,
-            ]
-        );
-    }
-
-    #[test]
-    fn chunk_and_separator_spans_are_tight() {
-        let text = "foo , bar";
-        let tree = chunked(text);
-        let top = run(&tree.0, 0);
-        assert_eq!(chunk_at(top, 0).location, span_of(text, "foo"));
-        assert_eq!(separator_at(top, 1).location, span_of(text, ","));
-        assert_eq!(chunk_at(top, 2).location, span_of(text, "bar"));
-    }
-
-    #[test]
-    fn a_stray_close_carries_through_between_runs() {
-        let text = "a ) b";
-        let tree = chunked(text);
-        assert_eq!(tree.0.len(), 3);
-        assert!(matches!(
-            tree.0[1].item,
-            BracketItem::StrayClose(CloseBracket(crate::BracketKind::Parenthesis))
-        ));
-        match tree.errors().as_slice() {
-            [crate::BracketError::UnexpectedClose(stray)] => {
-                assert_eq!(stray.location, span_of(text, ")"));
-            }
-            errors => panic!("expected exactly the stray close, got {errors:?}"),
-        }
-    }
-
-    /// The two-step query: the tree answers the run, the run answers its interior.
-    fn resolve_within_run(
-        tree: &MatchedBrackets<Chunked>,
-        position: Span,
-    ) -> ResolvedChunkedRunNode<'_> {
-        let run_path = tree.resolve((), position).unwrap_inner();
-        run_path.inner.resolve(run_path, position)
-    }
-
-    #[test]
-    fn a_chunk_resolves_with_its_full_ancestry() {
-        let text = "foo { bar, baz }";
-        let tree = chunked(text);
-        let baz = resolve_within_run(&tree, span_of(text, "baz")).unwrap_chunk();
-        let ChunkedRunItemParent::ChunkedRun(interior) = baz.parent;
-        match interior.parent.parent {
-            BracketItemParent::Bracketed(brace) => {
-                assert!(brace.inner.closing.is_some());
-                assert!(matches!(
-                    brace.parent,
-                    BracketItemParent::MatchedBrackets(_)
-                ));
-            }
-            parent => panic!("expected the brace group, got {parent:?}"),
-        }
-    }
-
-    #[test]
-    fn a_separator_and_a_brace_resolve_to_their_nodes() {
-        let text = "foo { bar, baz }";
-        let tree = chunked(text);
-        let comma = resolve_within_run(&tree, span_of(text, ",")).unwrap_separator();
-        let ChunkedRunItemParent::ChunkedRun(interior) = comma.parent;
-        assert!(matches!(
-            interior.parent.parent,
-            BracketItemParent::Bracketed(_)
-        ));
-        assert!(matches!(
-            tree.resolve((), span_of(text, "{")),
-            ResolvedBracketNode::OpenBracket(_)
-        ));
-    }
-
-    #[test]
-    fn an_unclosed_group_keeps_its_none_closing() {
-        let text = "foo { bar";
-        let tree = chunked(text);
-        let brace = group(&tree.0, 1);
-        assert!(brace.closing.is_none());
-        assert_eq!(chunk_kinds(run(&brace.children, 0), 0), vec![NonBracketTokenKind::Identifier]);
-        match tree.errors().as_slice() {
-            [crate::BracketError::Unclosed(unclosed)] => {
-                assert_eq!(unclosed.item.0.location, span_of(text, "{"));
-            }
-            errors => panic!("expected exactly the unclosed brace, got {errors:?}"),
-        }
-    }
-}
-```
-
-### Landing checklist
-
-1. Add chunk.rs with the types, the pass, and the test module above; register `mod chunk;` and `pub use chunk::*;` in lib.rs.
+1. Add chunk.rs with the types, the pass, and the structural tests; register `mod chunk;` and `pub use chunk::*;` in lib.rs.
 2. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.
