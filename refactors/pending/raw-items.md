@@ -21,6 +21,19 @@ pub enum BracketItem {
     Bracketed(Bracketed),
 }
 
+/// A matched pair: the opening, the interior level, the closing.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+pub struct Bracketed {
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
+    /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
+    #[resolve_field]
+    pub children: WithSpan<MatchedBrackets>,
+    #[resolve_field]
+    pub closing: WithSpan<CloseBracket>,
+}
+
 /// A token that is not part of any structure. Bracket kinds here are the unmatched ones;
 /// matched brackets are structure, never raw. Every variant resolves into its token's
 /// leaf.
@@ -35,19 +48,6 @@ pub enum RawToken {
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
-
-/// A matched pair: the opening, the interior level, the closing.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct Bracketed {
-    #[resolve_field]
-    pub opening: WithSpan<OpenBracket>,
-    /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field]
-    pub children: WithSpan<MatchedBrackets>,
-    #[resolve_field]
-    pub closing: WithSpan<CloseBracket>,
-}
 
 /// A group's opening bracket.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
