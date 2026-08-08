@@ -21,7 +21,15 @@ impl<T> Stack<T> {
         Stack(Vec::new())
     }
 
-    /// Every item on the stack, the callers' items included, innermost last.
+    /// Every item on the stack, the callers' items included, innermost last. The
+    /// slice is read-only:
+    ///
+    /// ```compile_fail
+    /// let mut stack = scoped_stack::Stack::new();
+    /// stack.with_pushed(1, |stack| {
+    ///     stack.all()[0] = 2;
+    /// });
+    /// ```
     pub fn all(&self) -> &[T] {
         &self.0
     }
@@ -90,7 +98,9 @@ license = { workspace = true }
 workspace = true
 ```
 
-The soundness argument is small. A guard pops exactly the item it pushed: while it lives it holds the one `&mut` to the stack, so nothing else can push or pop underneath it, and nested guards release in reverse order because each borrows the one before. `DerefMut` hands out `&mut Stack<T>`, but the field is private and `Stack`'s own surface is only `all`, `temp_push`, and `with_pushed`, so the deref grants nothing unscoped. The enforcement is `Drop`, so `mem::forget(pushed)` would leak the item past its scope; nothing calls `forget`, and doing so requires doing it deliberately.
+The soundness argument is small. A guard pops exactly the item it pushed: while it lives it holds the one `&mut` to the stack, so nothing else can push or pop underneath it, and nested guards release in reverse order because each borrows the one before. `DerefMut` hands out `&mut Stack<T>`, but the field is private and `Stack`'s own surface is only `all`, `temp_push`, and `with_pushed`, so the deref grants nothing unscoped. The enforcement is `Drop`, so `mem::forget(pushed)` would leak the item past its scope; nothing calls `forget`, and doing so requires doing it deliberately. A `pop` on `Stack` can never be added compatibly: `Pushed`'s `Drop` pops the top item on the assumption that the top item is its own, and a manual pop under a live guard would hand that `Drop` someone else's entry.
+
+The structural competitor is a cons list on the call stack — `struct Path<'a, T> { head: T, tail: Option<&'a Path<'a, T>> }` — where a pushed item dies with the stack frame that holds it, no guard and no `Drop` involved, and the callers' items sit behind a shared reference, unreachable for mutation by construction. Every surveyed use case fits it, since none needs an item to outlive the function that pushed it. The `Vec` wins on reads and signatures: `all()` hands back a slice, outermost first, where the cons list walks links innermost-first and reader_ast's whole-path clone becomes a collect-and-reverse; the parameter type is `&mut Stack<T>` everywhere, where the cons list threads `Option<&Path<'_, T>>` through every function; and a loop can push any number of items before recursing, where cons cells need one named local each. No surveyed site loop-pushes, so that last difference is headroom, not need.
 
 ## The use cases
 
