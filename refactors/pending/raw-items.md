@@ -91,7 +91,6 @@ pub type NonBracketTokenPath<'a> =
 /// Shared by `OpenBracket` and `CloseBracket`; the leaf type says which token it is.
 #[derive(Debug)]
 pub enum BracketTokenParent<'a> {
-    /// A matched group's own opening or closing.
     Bracketed(Box<BracketedPath<'a>>),
     /// A raw item in this level: the token is unmatched.
     MatchedBrackets(MatchedBracketsPath<'a>),
@@ -116,9 +115,9 @@ pub fn match_brackets(
     literal_length: u32,
 ) -> WithSpan<MatchedBrackets> {
     let mut tokens = tokens.into_iter().peekable();
-    let mut enclosing = Vec::new();
+    let mut enclosing_stack = Vec::new();
     WithSpan::new(
-        MatchedBrackets(parse_items(&mut tokens, &mut enclosing)),
+        MatchedBrackets(parse_items(&mut tokens, &mut enclosing_stack)),
         Span::new(0, literal_length),
     )
 }
@@ -138,7 +137,7 @@ struct UnclosedGroup {
 
 fn parse_items(
     tokens: &mut TokenStream,
-    enclosing: &mut Vec<BracketKind>,
+    enclosing_stack: &mut Vec<BracketKind>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     while let Some(&token) = tokens.peek() {
@@ -153,7 +152,7 @@ fn parse_items(
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 tokens.next();
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
-                match parse_bracketed(tokens, enclosing, opening) {
+                match parse_bracketed(tokens, enclosing_stack, opening) {
                     ParsedGroup::Closed(group) => {
                         let span = Span::new(
                             group.opening.location.start,
@@ -171,7 +170,7 @@ fn parse_items(
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
-                if enclosing.contains(&kind) {
+                if enclosing_stack.contains(&kind) {
                     // Some enclosing group owns this close. Leaving it unconsumed is what
                     // takes apart every group between here and its owner.
                     break;
@@ -191,12 +190,12 @@ fn parse_items(
 /// close an enclosing group owns, or at the end of the tokens, it never closes.
 fn parse_bracketed(
     tokens: &mut TokenStream,
-    enclosing: &mut Vec<BracketKind>,
+    enclosing_stack: &mut Vec<BracketKind>,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
-    enclosing.push(opening.item.0);
-    let children = parse_items(tokens, enclosing);
-    enclosing.pop();
+    enclosing_stack.push(opening.item.0);
+    let children = parse_items(tokens, enclosing_stack);
+    enclosing_stack.pop();
 
     match tokens.peek() {
         Some(&token)
