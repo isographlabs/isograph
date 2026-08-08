@@ -110,7 +110,10 @@ The control flow keeps the landed rules — nearest open of the kind, a close ow
 // from crates/isograph_parser/src/matched_brackets.rs
 type TokenStream = Peekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
-/// The kind of every group the level being parsed sits inside, innermost last.
+/// The kind of every group the level being parsed sits inside, innermost last. The
+/// stack exists to classify a close that does not close the innermost group: in
+/// `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
+/// token, while a brace is on the stack, so the `}` closes the group.
 struct EnclosingStack(Vec<BracketKind>);
 
 impl EnclosingStack {
@@ -120,10 +123,17 @@ impl EnclosingStack {
 
     /// The `with_` bracketing pattern from iso1's peekable lexer: the kind is on the
     /// stack exactly for the duration of the closure.
+    ///
+    /// `&mut Self` lets the closure rewrite the whole stack, not just work above the
+    /// caller's entry, so the asserts check the balance after the fact. The right data
+    /// structure is a mutable reference to the tail — each frame borrowing the frame
+    /// below it — which would make an unbalanced closure unrepresentable.
     fn with_kind<T>(&mut self, kind: BracketKind, do_stuff: impl FnOnce(&mut Self) -> T) -> T {
+        let depth = self.0.len();
         self.0.push(kind);
         let result = do_stuff(self);
-        self.0.pop();
+        assert_eq!(self.0.len(), depth + 1);
+        assert_eq!(self.0.pop(), Some(kind));
         result
     }
 }
