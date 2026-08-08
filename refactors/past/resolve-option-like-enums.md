@@ -46,7 +46,7 @@ impl ::resolve_position::ResolvePosition for #enum_name {
 
 ## The consumer
 
-raw-items.md's `RawToken` is the first mixed enum; its derive site and generated impl are written out there. Its bracket variants continue into the `OpenBracket` and `CloseBracket` leaves through `From<BracketItemParent> for OpenBracketParent` and `From<BracketItemParent> for CloseBracketParent`, and its `NonBracket` fallback answers `ResolvedNode::MatchedBrackets(parent.into())`, where the conversion is reflexive because `BracketItemParent` is the level path itself.
+No current design needs it: raw-items.md's `RawToken` was the candidate consumer until every one of its variants became a delegating node, leaving no fallback. Parked until an enum genuinely mixes continuing and inert variants.
 
 ## Landing checklist
 
