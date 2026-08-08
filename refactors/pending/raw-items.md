@@ -665,6 +665,19 @@ The resolution tests, in the same module:
     }
 
     #[test]
+    fn a_span_straddling_a_groups_own_parts_resolves_to_the_group() {
+        let text = "foo { bar }";
+        let tree = tree(text);
+        let straddle = Span::new(span_of(text, "{").start, span_of(text, "bar").end);
+        match tree.resolve(MatchedBracketsParent::Root, straddle) {
+            ResolvedBracketNode::Bracketed(group) => {
+                assert_eq!(group.inner.opening.item.0, Brace);
+            }
+            node => panic!("expected the group leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
     fn an_ordinary_token_resolves_to_its_own_leaf() {
         let text = "foo { bar }";
         let tree = tree(text);
