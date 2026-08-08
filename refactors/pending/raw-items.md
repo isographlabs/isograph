@@ -77,7 +77,6 @@ pub enum ResolvedBracketNode<'a> {
     CloseBracket(CloseBracketPath<'a>),
 }
 
-/// The two positions a level can sit in.
 #[derive(Debug)]
 pub enum MatchedBracketsParent<'a> {
     Root,
@@ -96,8 +95,7 @@ pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemPa
 pub type NonBracketTokenPath<'a> =
     PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
 
-/// The two positions a bracket token can sit in: a matched group's opening or closing,
-/// or an unmatched token in the level it sits in. Which token it is, the leaf says.
+/// Shared by `OpenBracket` and `CloseBracket`; the leaf type says which token it is.
 #[derive(Debug)]
 pub enum BracketTokenParent<'a> {
     Bracketed(Box<BracketedPath<'a>>),
