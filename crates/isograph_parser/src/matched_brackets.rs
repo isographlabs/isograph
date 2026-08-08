@@ -9,19 +9,17 @@ use crate::{BracketKind, BracketToken, IsographLangTokenKind, NonBracketTokenKin
 /// One level: the whole literal at the root, a group's interior below.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = MatchedBracketsParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
-pub struct MatchedBrackets(
-    #[resolve_field(parent_variant = MatchedBrackets)] pub Vec<WithSpan<BracketItem>>,
-);
+pub struct MatchedBrackets(#[resolve_field] pub Vec<WithSpan<BracketItem>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum BracketItem {
     Raw(RawToken),
     Bracketed(Bracketed),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct Bracketed {
     #[resolve_field(parent_variant = Bracketed)]
     pub opening: WithSpan<OpenBracket>,
@@ -35,7 +33,7 @@ pub struct Bracketed {
 /// A token that is not part of any structure; matched brackets are structure, never
 /// raw, so the bracket tokens here are the unmatched types.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub enum RawToken {
     NonBracket(NonBracketToken),
     Open(UnmatchedOpen),
@@ -43,7 +41,7 @@ pub enum RawToken {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
 /// A group's own opening; an open whose group never closed is an [`UnmatchedOpen`].
@@ -58,12 +56,12 @@ pub struct CloseBracket(pub BracketKind);
 
 /// An open bracket whose group never closed.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct UnmatchedOpen(pub BracketKind);
 
 /// A close bracket no open of its kind was waiting for.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketItemParent<'a>, resolved_node = ResolvedBracketNode<'a>)]
+#[resolve_position(parent_type = MatchedBracketsPath<'a>, resolved_node = ResolvedBracketNode<'a>)]
 pub struct UnmatchedClose(pub BracketKind);
 
 #[derive(Debug)]
@@ -89,15 +87,10 @@ pub enum MatchedBracketsParent<'a> {
 pub type MatchedBracketsPath<'a> =
     PositionResolutionPath<&'a MatchedBrackets, MatchedBracketsParent<'a>>;
 
-#[derive(Debug)]
-pub enum BracketItemParent<'a> {
-    MatchedBrackets(MatchedBracketsPath<'a>),
-}
-
-pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, BracketItemParent<'a>>;
+pub type BracketedPath<'a> = PositionResolutionPath<&'a Bracketed, MatchedBracketsPath<'a>>;
 
 pub type NonBracketTokenPath<'a> =
-    PositionResolutionPath<&'a NonBracketToken, BracketItemParent<'a>>;
+    PositionResolutionPath<&'a NonBracketToken, MatchedBracketsPath<'a>>;
 
 /// Shared by `OpenBracket` and `CloseBracket`, which appear only as a group's own
 /// opening and closing.
@@ -110,9 +103,9 @@ pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTo
 pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
 
 pub type UnmatchedOpenPath<'a> =
-    PositionResolutionPath<&'a UnmatchedOpen, BracketItemParent<'a>>;
+    PositionResolutionPath<&'a UnmatchedOpen, MatchedBracketsPath<'a>>;
 pub type UnmatchedClosePath<'a> =
-    PositionResolutionPath<&'a UnmatchedClose, BracketItemParent<'a>>;
+    PositionResolutionPath<&'a UnmatchedClose, MatchedBracketsPath<'a>>;
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
@@ -500,9 +493,8 @@ mod tests {
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "(")) {
             ResolvedBracketNode::UnmatchedOpen(open) => {
                 assert_eq!(open.inner.0, Parenthesis);
-                let BracketItemParent::MatchedBrackets(level) = open.parent;
                 assert!(matches!(
-                    level.parent,
+                    open.parent.parent,
                     MatchedBracketsParent::Bracketed(_)
                 ));
             }
@@ -517,8 +509,7 @@ mod tests {
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "}")) {
             ResolvedBracketNode::UnmatchedClose(close) => {
                 assert_eq!(close.inner.0, Brace);
-                let BracketItemParent::MatchedBrackets(level) = close.parent;
-                assert!(matches!(level.parent, MatchedBracketsParent::Root));
+                assert!(matches!(close.parent.parent, MatchedBracketsParent::Root));
             }
             node => panic!("expected the unmatched close leaf, got {node:?}"),
         }
@@ -564,8 +555,10 @@ mod tests {
         match tree.resolve(MatchedBracketsParent::Root, span_of(text, "bar")) {
             ResolvedBracketNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                let BracketItemParent::MatchedBrackets(level) = token.parent;
-                assert!(matches!(level.parent, MatchedBracketsParent::Bracketed(_)));
+                assert!(matches!(
+                    token.parent.parent,
+                    MatchedBracketsParent::Bracketed(_)
+                ));
             }
             node => panic!("expected the token leaf, got {node:?}"),
         }
