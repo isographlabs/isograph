@@ -13,7 +13,7 @@ A chunk holds every non-separator item between two boundaries — tokens, groups
 - Every chunk except a level's last carries a trailing separator, by construction: a new chunk only ever starts after a boundary ends. The last chunk's separator is present exactly when the level ends in separators.
 - A level that starts with separators gets a leading first chunk with no items, holding only that boundary. That is the one shape of chunk with empty items.
 - A separator ends only its own level's chunk. Group interiors are chunked recursively, and the separators inside a group's interior never affect the level outside the group.
-- A chunk's span runs from its first part's start to its last part's end, the parts being its items and then its trailing separator. Whitespace between tokens belongs to no node.
+- A chunk's span runs from its first part's start to its last part's end, the parts being its items and then its trailing separator. Spaces the tokenizer skipped sit in whichever node whose span covers them: a gap between a chunk's own parts answers that chunk; a gap no chunk covers answers the level's parent (the group when the level is a group's interior, the root level at the top of the literal).
 - A `BracketItem::Raw` token — non-bracket, unmatched open, or unmatched close — is content of the chunk in progress. Unmatched brackets are not structure at this stage; the chunk-parsing pass is the one that reports them when they survive inside a chunk.
 
 ```
@@ -50,7 +50,7 @@ pub use matched_brackets::*;
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-use resolve_position::PositionResolutionPath;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
 use resolve_position_macros::ResolvePosition;
 use span::{Span, WithSpan};
 
@@ -63,9 +63,13 @@ use crate::{
 /// below. Its chunks, in order, and nothing else. A level that opens with separators
 /// holds them in a first chunk with no items: an admittedly suboptimal encoding,
 /// accepted as the price of a level being a plain vec of one uniform chunk shape.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
+///
+/// Resolution is hand-written: a position no chunk covers answers the level's parent
+/// rather than the level, so inter-chunk whitespace inside `{ a, b }` answers the
+/// group. Only the root level answers as itself for uncovered positions (leading and
+/// trailing whitespace of the literal, and gaps between top-level chunks).
+#[derive(Debug, PartialEq, Eq)]
+pub struct ChunkedLevel(pub Vec<WithSpan<Chunk>>);
 
 /// A maximal separator-free run of a level's items — tokens, groups, unmatched
 /// brackets, anything — plus the separator run that ended it when one did. The
@@ -125,6 +129,8 @@ pub enum SeparatorToken {
 
 Positions resolve against the chunk tree, from `tree.resolve(ChunkedLevelParent::Root, position)`. The parent and path types live beside the chunk types. Every child of a chunk — its items and its trailing separator — has the chunk's path as its parent directly, per one-variant-parent-enums.md; the level's only children are chunks, whose parent is the level's path; a group's parent is the chunk that holds it.
 
+`ChunkedLevel` does not use the derive. The derive would answer the level for any position no chunk covers; instead, uncovered positions answer the level's parent — the group when the level is an interior, the root level only when the parent is `Root`. Everything else (`Chunk`, `ChunkItem`, `ChunkedGroup`, `ChunkSeparator`, the token leaves) still derives.
+
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 #[derive(Debug)]
@@ -158,6 +164,29 @@ pub type OpenBracketPath<'a> =
     PositionResolutionPath<&'a OpenBracket, BracketTokenParent<'a>>;
 pub type CloseBracketPath<'a> =
     PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
+
+impl ResolvePosition for ChunkedLevel {
+    type Parent<'a> = ChunkedLevelParent<'a>;
+    type ResolvedNode<'a> = IsographResolutionNode<'a>;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: Span,
+    ) -> Self::ResolvedNode<'a> {
+        for chunk in &self.0 {
+            if chunk.location.contains(position) {
+                return chunk.item.resolve(self.path(parent), position);
+            }
+        }
+        match parent {
+            ChunkedLevelParent::Root => {
+                IsographResolutionNode::ChunkedLevel(self.path(ChunkedLevelParent::Root))
+            }
+            ChunkedLevelParent::Interior(group) => IsographResolutionNode::ChunkedGroup(*group),
+        }
+    }
+}
 ```
 
 `IsographResolutionNode` is modified in place: `MatchedBrackets` and `Bracketed` come out, the chunk tree's four node kinds go in, and the three token variants stay under their names with chunk-hosted paths.
@@ -207,7 +236,7 @@ pub struct OpenBracket(pub BracketKind);
 pub struct CloseBracket(pub BracketKind);
 ```
 
-No macro changes: unmarked delegation, `parent_variant` wrapping, and the reflexive and `Box` `From` conversions cover every site above.
+No macro changes: unmarked delegation, `parent_variant` wrapping, and the reflexive and `Box` `From` conversions cover every derive site above. `ChunkedLevel` is the one hand-written `ResolvePosition` impl.
 
 ## The pass
 
@@ -362,7 +391,7 @@ The bracket tree's structural tests and error tests are untouched. Its six resol
 - the matched-pair test (`foo { bar }`): `{` and `}` answer `Matched`, and the group's parent is the chunk whose first item is `foo`.
 - the straddling-span test: "{ ba" answers `ChunkedGroup`.
 - the ordinary-token test: `bar` answers `NonBracketToken` hosted by its chunk.
-- the whitespace test changes answer: chunk spans now cover the gaps between their parts (including around separators), so those gaps answer `Chunk`, and only whitespace outside every chunk — the literal's leading and trailing whitespace — answers `ChunkedLevel`.
+- the whitespace test changes answer: the space between `foo` and `{` sits inside the top-level chunk's span, so it answers `Chunk`. A gap no chunk covers answers the level's parent: at the root that is `ChunkedLevel` with `Root`; inside a group that is the group.
 
 ### Resolution
 
@@ -372,6 +401,7 @@ The assertions navigate the resolved path and check ancestry against source text
 - the position of `{` answers `OpenBracket` with `Matched`, and the group's holding chunk renders as `foo { bar, baz }`.
 - the position of `,` answers `ChunkSeparator`, and its parent is the chunk whose item is `bar`.
 - the space between `foo` and `{` answers `Chunk`, the chunk rendering as `foo { bar, baz }`.
+- the space between the interior chunks (after `bar,`, before `baz`) answers `ChunkedGroup` — the brace group — not the interior level.
 - the literal's leading whitespace answers `ChunkedLevel` with `Root` as parent.
 
 And on `a ) b`: the position of `)` answers `CloseBracket` with `Unmatched`, and the host chunk renders as `a ) b`.
