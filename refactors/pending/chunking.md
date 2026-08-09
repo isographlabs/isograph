@@ -374,7 +374,8 @@ fn chunk_group(group: &Bracketed) -> ChunkedGroup {
 Structural facts only: which chunks a level holds, which items and trailing separator a chunk holds, that unmatched brackets land inside chunks, that separators collapse into one trailing boundary, that spans are tight, and that every non-final chunk carries a trailing separator. No snapshot of the whole tree. Written out fully when the pass is implemented; the cases below are the ones the suite must cover.
 
 - `foo { bar, baz\nqux }` — top is one chunk whose items are `foo` and the brace group; the interior is three chunks, the first two with one separator token trailing each.
-- `foo { } { }` — one chunk, three items, two of them groups.
+- `foo { } { }` — one chunk, three items, two of them groups; each brace interior is an empty `ChunkedLevel` (zero chunks), not a chunk with empty items.
+- `{}` — top is one chunk whose only item is the brace group; the interior is an empty `ChunkedLevel`.
 - `a, b` and `a\nb` chunk identically apart from the separator token kind; `a,\n\n,b` is chunk `a` with four tokens in its trailing separator, then chunk `b`.
 - `\n, a, b,\n` — the first chunk has no items and holds the leading boundary; `b`'s trailing separator holds `,` and the line break; no chunk follows `b`.
 - `bar, baz watttt, qux` keeps `baz watttt` as one chunk.
@@ -403,6 +404,8 @@ The assertions navigate the resolved path and check ancestry against source text
 - the space between `foo` and `{` answers `Chunk`, the chunk rendering as `foo { bar, baz }`.
 - the space between the interior chunks (after `bar,`, before `baz`) answers `ChunkedGroup` — the brace group — not the interior level.
 - the literal's leading whitespace answers `ChunkedLevel` with `Root` as parent.
+
+On `foo {}`: a position in the empty interior (between `{` and `}`) answers `ChunkedGroup` — zero chunks, so the level defers to its parent group. Same answer for a space inside `foo { }`.
 
 And on `a ) b`: the position of `)` answers `CloseBracket` with `Unmatched`, and the host chunk renders as `a ) b`.
 
