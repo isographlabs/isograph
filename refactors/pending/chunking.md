@@ -81,7 +81,7 @@ pub struct ChunkedLevel(pub Vec<WithSpan<Chunk>>);
 #[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
-    pub items: Vec<WithSpan<ChunkItem>>,
+    pub items: Vec<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     pub trailing_separator: Option<WithSpan<ChunkSeparator>>,
 }
@@ -89,7 +89,7 @@ pub struct Chunk {
 /// What a chunk holds: every non-separator item of its level, groups included.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ChunkItem {
+pub enum ChunkContentItem {
     NonBracket(NonBracketToken),
     UnmatchedOpen(#[resolve_field(parent_variant = Unmatched)] OpenBracket),
     UnmatchedClose(#[resolve_field(parent_variant = Unmatched)] CloseBracket),
@@ -129,7 +129,7 @@ pub enum SeparatorToken {
 
 Positions resolve against the chunk tree, from `tree.resolve(ChunkedLevelParent::Root, position)`. The parent and path types live beside the chunk types. Every child of a chunk — its items and its trailing separator — has the chunk's path as its parent directly, per one-variant-parent-enums.md; the level's only children are chunks, whose parent is the level's path; a group's parent is the chunk that holds it.
 
-`ChunkedLevel` does not use the derive. The derive would answer the level for any position no chunk covers; instead, uncovered positions answer the level's parent — the group when the level is an interior, the root level only when the parent is `Root`. Everything else (`Chunk`, `ChunkItem`, `ChunkedGroup`, `ChunkSeparator`, the token leaves) still derives.
+`ChunkedLevel` does not use the derive. The derive would answer the level for any position no chunk covers; instead, uncovered positions answer the level's parent — the group when the level is an interior, the root level only when the parent is `Root`. Everything else (`Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`, the token leaves) still derives.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -278,19 +278,21 @@ fn separator_of(item: &WithSpan<BracketItem>) -> Option<SeparatorToken> {
     }
 }
 
-/// The chunk item a level item becomes, or `None` for a separator. Group interiors
+/// The content item a level item becomes, or `None` for a separator. Group interiors
 /// recurse here.
-fn chunk_item_of(item: &BracketItem) -> Option<ChunkItem> {
+fn chunk_content_item_of(item: &BracketItem) -> Option<ChunkContentItem> {
     match item {
         BracketItem::Raw(RawToken::NonBracket(token))
             if separator_token(token.0).is_some() =>
         {
             None
         }
-        BracketItem::Raw(RawToken::NonBracket(token)) => Some(ChunkItem::NonBracket(*token)),
-        BracketItem::Raw(RawToken::Open(open)) => Some(ChunkItem::UnmatchedOpen(*open)),
-        BracketItem::Raw(RawToken::Close(close)) => Some(ChunkItem::UnmatchedClose(*close)),
-        BracketItem::Bracketed(group) => Some(ChunkItem::Group(chunk_group(group))),
+        BracketItem::Raw(RawToken::NonBracket(token)) => {
+            Some(ChunkContentItem::NonBracket(*token))
+        }
+        BracketItem::Raw(RawToken::Open(open)) => Some(ChunkContentItem::UnmatchedOpen(*open)),
+        BracketItem::Raw(RawToken::Close(close)) => Some(ChunkContentItem::UnmatchedClose(*close)),
+        BracketItem::Bracketed(group) => Some(ChunkContentItem::Group(chunk_group(group))),
     }
 }
 
@@ -299,16 +301,16 @@ fn chunk_item_of(item: &BracketItem) -> Option<ChunkItem> {
 /// produces a chunk. Whichever phase matches the first item consumes it.
 fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
     let mut span = None;
-    let mut chunk_items = Vec::new();
+    let mut content_items = Vec::new();
     while let Some(peek) = items.peek() {
         let item = *peek.view();
-        let Some(chunk_item) = chunk_item_of(&item.item) else {
+        let Some(content_item) = chunk_content_item_of(&item.item) else {
             // A separator ends the content phase.
             break;
         };
         peek.commit();
         span = Span::join_optional(span, item.location);
-        chunk_items.push(WithSpan::new(chunk_item, item.location));
+        content_items.push(WithSpan::new(content_item, item.location));
     }
 
     let mut separator_span = None;
@@ -331,7 +333,7 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
     if let Some(span) = span {
         Some(WithSpan::new(
             Chunk {
-                items: chunk_items,
+                items: content_items,
                 trailing_separator,
             },
             span,
