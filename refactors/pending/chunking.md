@@ -4,16 +4,16 @@ Requires isograph-resolution-node.md. The pass after bracket matching: each leve
 
 Resolution moves with the newest tree: after this refactor, positions resolve against the chunk tree, `IsographResolutionNode`'s variants become the chunk tree's leaves, and the bracket tree parses and reports errors but answers no positions (the same intermediate state raw-items.md shipped through). The token leaf types are shared between the trees and keep their one `ResolvePosition` impl each, re-pointed at chunk-tree parents.
 
-A chunk holds every non-separator item between two boundaries — tokens, groups, unmatched brackets, anything, in source order — plus the separator run that ended it. A chunk can contain multiple groups: `foo { } { }` is one chunk, and `a() { }` is one chunk whose items are `a`, the argument list, and the selection set, which is exactly the unit the chunk-parsing pass wants to consume as one field. There is no distinction between the first n chunks and the final one: every chunk's trailing separator is simply optional, so a trailing delimiter at a level's end is nothing special.
+A chunk holds every non-separator item between two boundaries — tokens, groups, unmatched brackets, anything, in source order — plus the separator run that ended it. A chunk can contain multiple groups: `foo { } { }` is one chunk, and `a() { }` is one chunk whose contents are `a`, the argument list, and the selection set, which is exactly the unit the chunk-parsing pass wants to consume as one field. There is no distinction between the first n chunks and the final one: every chunk's trailing separator is simply optional, so a trailing delimiter at a level's end is nothing special.
 
 ## Behavior
 
 - Commas and line breaks are the separators, equivalent. Any nonempty run of consecutive separators is one boundary, held as one `ChunkSeparator` in the trailing slot of the chunk it ends, so `foo,,,, bar` is two chunks, the first of which holds four commas in its trailing separator.
 - Separators are the only thing chunking splits on. Everything between two boundaries is one chunk, whatever it is: `baz watttt` is one chunk, and it is that chunk's own parse that later fails ("expected a comma or line break").
 - Every chunk except a level's last carries a trailing separator, by construction: a new chunk only ever starts after a boundary ends. The last chunk's separator is present exactly when the level ends in separators.
-- A level that starts with separators gets a leading first chunk with no items, holding only that boundary. That is the one shape of chunk with empty items.
+- A level that starts with separators gets a leading first chunk with no contents, holding only that boundary. That is the one shape of chunk with empty contents.
 - A separator ends only its own level's chunk. Group interiors are chunked recursively, and the separators inside a group's interior never affect the level outside the group.
-- A chunk's span runs from its first part's start to its last part's end, the parts being its items and then its trailing separator. Spaces the tokenizer skipped sit in whichever node whose span covers them: a gap between a chunk's own parts answers that chunk; a gap no chunk covers answers the level's parent (the group when the level is a group's interior, the root level at the top of the literal).
+- A chunk's span runs from its first part's start to its last part's end, the parts being its contents and then its trailing separator. Spaces the tokenizer skipped sit in whichever node whose span covers them: a gap between a chunk's own parts answers that chunk; a gap no chunk covers answers the level's parent (the group when the level is a group's interior, the root level at the top of the literal).
 - A `BracketItem::Raw` token — non-bracket, unmatched open, or unmatched close — is content of the chunk in progress. Unmatched brackets are not structure at this stage; the chunk-parsing pass is the one that reports them when they survive inside a chunk.
 
 ```
@@ -21,7 +21,7 @@ foo { bar, baz
 qux }
 ```
 
-chunks as: one top-level chunk whose items are `foo` and the brace group; the brace group's interior is chunk `bar` (a comma trailing), chunk `baz` (a line break trailing), chunk `qux` (nothing trailing).
+chunks as: one top-level chunk whose contents are `foo` and the brace group; the brace group's interior is chunk `bar` (a comma trailing), chunk `baz` (a line break trailing), chunk `qux` (nothing trailing).
 
 ```
 a(
@@ -29,7 +29,7 @@ a(
 }
 ```
 
-is one top-level chunk whose items are `a`, the parenthesis group, and the brace group — no separator sits between `)` and `{`, so nothing splits them; each group's interior is a single chunk holding only a separator. `foo\n{ bar }` chunks differently: chunk `foo` with the line break as its trailing separator, then a chunk whose only item is the brace group — the brace riding in a chunk of its own is what the chunk-parsing pass rejects when it assembles selections, so a selection set's brace still has to open on its field's line.
+is one top-level chunk whose contents are `a`, the parenthesis group, and the brace group — no separator sits between `)` and `{`, so nothing splits them; each group's interior is a single chunk holding only a separator. `foo\n{ bar }` chunks differently: chunk `foo` with the line break as its trailing separator, then a chunk whose only content is the brace group — the brace riding in a chunk of its own is what the chunk-parsing pass rejects when it assembles selections, so a selection set's brace still has to open on its field's line.
 
 `foo { bar(a: }) }` chunks whatever the bracket pass produced: the paren open that never closed is a raw item on the brace level, so it rides inside a chunk as content; the leftover closes that raw-items left at the top ride inside top-level chunks the same way.
 
@@ -61,7 +61,7 @@ use crate::{
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
 /// below. Its chunks, in order, and nothing else. A level that opens with separators
-/// holds them in a first chunk with no items: an admittedly suboptimal encoding,
+/// holds them in a first chunk with no contents: an admittedly suboptimal encoding,
 /// accepted as the price of a level being a plain vec of one uniform chunk shape.
 ///
 /// Resolution is hand-written: a position no chunk covers answers the level's parent
@@ -81,7 +81,7 @@ pub struct ChunkedLevel(pub Vec<WithSpan<Chunk>>);
 #[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
-    pub items: Vec<WithSpan<ChunkContentItem>>,
+    pub contents: Vec<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     pub trailing_separator: Option<WithSpan<ChunkSeparator>>,
 }
@@ -127,7 +127,7 @@ pub enum SeparatorToken {
 
 ## Resolution
 
-Positions resolve against the chunk tree, from `tree.resolve(ChunkedLevelParent::Root, position)`. The parent and path types live beside the chunk types. Every child of a chunk — its items and its trailing separator — has the chunk's path as its parent directly, per one-variant-parent-enums.md; the level's only children are chunks, whose parent is the level's path; a group's parent is the chunk that holds it.
+Positions resolve against the chunk tree, from `tree.resolve(ChunkedLevelParent::Root, position)`. The parent and path types live beside the chunk types. Every child of a chunk — its contents and its trailing separator — has the chunk's path as its parent directly, per one-variant-parent-enums.md; the level's only children are chunks, whose parent is the level's path; a group's parent is the chunk that holds it.
 
 `ChunkedLevel` does not use the derive. The derive would answer the level for any position no chunk covers; instead, uncovered positions answer the level's parent — the group when the level is an interior, the root level only when the parent is `Root`. Everything else (`Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`, the token leaves) still derives.
 
@@ -301,7 +301,7 @@ fn chunk_content_item_of(item: &BracketItem) -> Option<ChunkContentItem> {
 /// produces a chunk. Whichever phase matches the first item consumes it.
 fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
     let mut span = None;
-    let mut content_items = Vec::new();
+    let mut contents = Vec::new();
     while let Some(peek) = items.peek() {
         let item = *peek.view();
         let Some(content_item) = chunk_content_item_of(&item.item) else {
@@ -310,7 +310,7 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
         };
         peek.commit();
         span = Span::join_optional(span, item.location);
-        content_items.push(WithSpan::new(content_item, item.location));
+        contents.push(WithSpan::new(content_item, item.location));
     }
 
     let mut separator_span = None;
@@ -333,7 +333,7 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
     if let Some(span) = span {
         Some(WithSpan::new(
             Chunk {
-                items: content_items,
+                contents,
                 trailing_separator,
             },
             span,
@@ -373,15 +373,15 @@ fn chunk_group(group: &Bracketed) -> ChunkedGroup {
 
 ### Structural
 
-Structural facts only: which chunks a level holds, which items and trailing separator a chunk holds, that unmatched brackets land inside chunks, that separators collapse into one trailing boundary, that spans are tight, and that every non-final chunk carries a trailing separator. No snapshot of the whole tree. Written out fully when the pass is implemented; the cases below are the ones the suite must cover.
+Structural facts only: which chunks a level holds, which contents and trailing separator a chunk holds, that unmatched brackets land inside chunks, that separators collapse into one trailing boundary, that spans are tight, and that every non-final chunk carries a trailing separator. No snapshot of the whole tree. Written out fully when the pass is implemented; the cases below are the ones the suite must cover.
 
-- `foo { bar, baz\nqux }` — top is one chunk whose items are `foo` and the brace group; the interior is three chunks, the first two with one separator token trailing each.
-- `foo { } { }` — one chunk, three items, two of them groups; each brace interior is an empty `ChunkedLevel` (zero chunks), not a chunk with empty items.
-- `{}` — top is one chunk whose only item is the brace group; the interior is an empty `ChunkedLevel`.
+- `foo { bar, baz\nqux }` — top is one chunk whose contents are `foo` and the brace group; the interior is three chunks, the first two with one separator token trailing each.
+- `foo { } { }` — one chunk, three contents, two of them groups; each brace interior is an empty `ChunkedLevel` (zero chunks), not a chunk with empty contents.
+- `{}` — top is one chunk whose only content is the brace group; the interior is an empty `ChunkedLevel`.
 - `a, b` and `a\nb` chunk identically apart from the separator token kind; `a,\n\n,b` is chunk `a` with four tokens in its trailing separator, then chunk `b`.
-- `\n, a, b,\n` — the first chunk has no items and holds the leading boundary; `b`'s trailing separator holds `,` and the line break; no chunk follows `b`.
+- `\n, a, b,\n` — the first chunk has no contents and holds the leading boundary; `b`'s trailing separator holds `,` and the line break; no chunk follows `b`.
 - `bar, baz watttt, qux` keeps `baz watttt` as one chunk.
-- `foo\n{ bar }` is chunk `foo` (line break trailing), then a chunk whose only item is the brace group.
+- `foo\n{ bar }` is chunk `foo` (line break trailing), then a chunk whose only content is the brace group.
 - `a ) b` puts the unmatched close inside a chunk between `a` and `b`; `errors()` on the input bracket tree still reports the unmatched close.
 - `foo { bar` — the brace never closed, so the matcher demoted the open; chunking sees a raw unmatched open and the following tokens at the top level, not an unbalanced group.
 
@@ -391,7 +391,7 @@ The bracket tree's structural tests and error tests are untouched. Its six resol
 
 - the unmatched-open test (`foo { ( }`): `(` answers `OpenBracket` with `BracketTokenParent::Unmatched`, and the host chunk sits in the brace's interior level.
 - the root unmatched-close test (`a }`): `}` answers `CloseBracket` with `Unmatched`, and the host chunk's level has `ChunkedLevelParent::Root`.
-- the matched-pair test (`foo { bar }`): `{` and `}` answer `Matched`, and the group's parent is the chunk whose first item is `foo`.
+- the matched-pair test (`foo { bar }`): `{` and `}` answer `Matched`, and the group's parent is the chunk whose first content is `foo`.
 - the straddling-span test: "{ ba" answers `ChunkedGroup`.
 - the ordinary-token test: `bar` answers `NonBracketToken` hosted by its chunk.
 - the whitespace test changes answer: the space between `foo` and `{` sits inside the top-level chunk's span, so it answers `Chunk`. A gap no chunk covers answers the level's parent: at the root that is `ChunkedLevel` with `Root`; inside a group that is the group.
@@ -402,7 +402,7 @@ The assertions navigate the resolved path and check ancestry against source text
 
 - the position of `bar` answers `NonBracketToken(Identifier)`; its host chunk renders as `bar,`; walking up, the interior level's parent group belongs to the chunk that renders as `foo { bar, baz }`.
 - the position of `{` answers `OpenBracket` with `Matched`, and the group's holding chunk renders as `foo { bar, baz }`.
-- the position of `,` answers `ChunkSeparator`, and its parent is the chunk whose item is `bar`.
+- the position of `,` answers `ChunkSeparator`, and its parent is the chunk whose content is `bar`.
 - the space between `foo` and `{` answers `Chunk`, the chunk rendering as `foo { bar, baz }`.
 - the space between the interior chunks (after `bar,`, before `baz`) answers `ChunkedGroup` — the brace group — not the interior level.
 - the literal's leading whitespace answers `ChunkedLevel` with `Root` as parent.
