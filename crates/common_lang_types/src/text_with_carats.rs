@@ -1,193 +1,184 @@
-use std::num::NonZeroU32;
+use std::{num::NonZeroU32, ops::Range};
 
 use colored::Colorize;
 
 use span::Span;
 
-enum SpanState {
-    /// We have not yet reached the start of the span
-    Before,
-    /// We have reached the start of the span, but not the end
-    Inside,
-    /// We have passed the end of the span
-    After,
-}
-
-static LINE_COUNT_BUFFER: usize = 2;
-
-pub fn text_with_carats(
-    file_text: &str,
-    outer_span: Option<Span>,
-    inner_span: Span,
-    color: bool,
-) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
-    text_with_carats_and_line_count_buffer_and_line_numbers(
-        file_text,
-        outer_span,
-        inner_span,
-        LINE_COUNT_BUFFER,
-        color,
-    )
-}
+const LINE_COUNT_BUFFER: usize = 2;
 
 /// The row number, 1-indexed. Because VSCode!
 pub struct OneIndexedRowNumber(pub NonZeroU32);
 /// The col number, 1-indexed. Because VSCode!
 pub struct OneIndexedColNumber(pub NonZeroU32);
 
-/// For a given string and span, return a string with
-/// the span underlined with carats and LINE_COUNT_BUFFER previous and following
-/// lines.
-fn text_with_carats_and_line_count_buffer_and_line_numbers(
+/// Whether the highlighted text and the carats under it are wrapped in
+/// terminal color codes.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum CaratColor {
+    Colored,
+    Plain,
+}
+
+/// The lines of `file_text` that `span` covers, the spanned text underlined
+/// with carats, with [`LINE_COUNT_BUFFER`] context lines above and below; and
+/// the row and column of the span's start.
+pub fn text_with_carats(
     file_text: &str,
-    outer_span: Option<Span>,
-    inner_span: Span,
-    line_count_buffer: usize,
-    colorize_carats: bool,
+    span: Span,
+    color: CaratColor,
 ) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
-    // Major hack alert
-    if inner_span.is_empty() {
-        return ("".to_string(), None);
+    text_with_carats_and_line_count_buffer(file_text, span, LINE_COUNT_BUFFER, color)
+}
+
+fn text_with_carats_and_line_count_buffer(
+    file_text: &str,
+    span: Span,
+    line_count_buffer: usize,
+    color: CaratColor,
+) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
+    if span.is_empty() {
+        return (String::new(), None);
     }
-
-    // Another major hack
-    let outer_span_start = outer_span.map(|x| x.start).unwrap_or(0);
-    let actual_span = Span::new(
-        outer_span_start + inner_span.start,
-        outer_span_start + inner_span.end,
-    );
-
-    let mut output_lines = vec![];
-    let mut cur_index = 0;
-
-    // index of the line (in output_lines) of **source text** in which the span starts
-    let mut first_line_with_span = usize::MAX;
-    // index of the line (in output_lines) of **carat text** in which the span ends
-    let mut last_line_with_span = 0;
-
-    let mut line_row = None;
-
-    let mut span_state = SpanState::Before;
-    for (line_index, line_content) in file_text.split('\n').enumerate() {
-        let start_of_line = cur_index;
-
-        // +1 is accounting for \n, though presumably we should handle other line endings
-        cur_index += line_content.len() + 1;
-
-        let end_of_line = cur_index;
-
-        let should_print_carats = match span_state {
-            SpanState::Before => {
-                if end_of_line > actual_span.end as usize {
-                    line_row = Some((
-                        OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
-                        OneIndexedColNumber(
-                            (actual_span.start - (start_of_line as u32) + 1)
-                                .try_into()
-                                .expect("Expected col index to be positive"),
-                        ),
-                    ));
-                    span_state = SpanState::After;
-                    true
-                } else if end_of_line > actual_span.start as usize {
-                    line_row = Some((
-                        OneIndexedRowNumber((line_index as u32 + 1).try_into().unwrap()),
-                        OneIndexedColNumber(
-                            (actual_span.start - (start_of_line as u32) + 1)
-                                .try_into()
-                                .expect("Expected col index to be positive"),
-                        ),
-                    ));
-                    span_state = SpanState::Inside;
-                    true
-                } else {
-                    false
-                }
-            }
-            SpanState::Inside => {
-                if end_of_line > actual_span.end as usize {
-                    span_state = SpanState::After;
-                }
-                true
-            }
-            SpanState::After => false,
-        };
-
-        if should_print_carats {
-            let line_len = line_content.len();
-            let start_of_carats = (actual_span.start as usize).saturating_sub(start_of_line);
-
-            let end_of_carats = std::cmp::min(
-                (actual_span.end as usize).saturating_sub(start_of_line),
-                line_len,
-            );
-
-            let prefix = &line_content[0..start_of_carats];
-            let highlighted = &line_content[start_of_carats..end_of_carats];
-            let suffix = &line_content[end_of_carats..];
-            let colored_source = format!(
-                "{}{}{}",
-                prefix,
-                if colorize_carats {
-                    highlighted.bright_red()
-                } else {
-                    highlighted.normal()
-                },
-                suffix
-            );
-            output_lines.push(colored_source);
-            // a line may be entirely empty, due to containing only a \n. We probably want to avoid
-            // printing an empty line underneath. This is weird and probably buggy!
-
-            if start_of_carats != line_len && end_of_carats != 0 {
-                first_line_with_span = std::cmp::min(first_line_with_span, output_lines.len());
-                last_line_with_span = output_lines.len() + 1;
-
-                let mut carats = String::new();
-                for _ in 0..start_of_carats {
-                    carats.push(' ');
-                }
-                for _ in start_of_carats..end_of_carats {
-                    carats.push_str(&format!(
-                        "{}",
-                        if colorize_carats {
-                            "^".bright_red()
-                        } else {
-                            "^".normal()
-                        }
-                    ));
-                }
-                for _ in end_of_carats..line_len {
-                    carats.push(' ');
-                }
-
-                output_lines.push(carats);
-            }
-        } else {
-            output_lines.push(line_content.to_string());
+    let span = span.as_usize_range();
+    match locate(file_text, &span) {
+        LocatedSpan::OutsideText => (String::new(), None),
+        LocatedSpan::OnLineBreaksOnly(row_col) => (String::new(), Some(row_col)),
+        LocatedSpan::Highlighting(highlighted) => {
+            let rendered =
+                render_window(file_text, &span, &highlighted, line_count_buffer, color);
+            (rendered, Some(highlighted.row_col))
         }
     }
+}
 
-    // This is indicative of a bug. If we are passed a span that encompasses
-    // only a line break, we never set first_line_with_span, so the range would
-    // have a start > end, causing a panic. See the test bug_span_on_line_break
-    //
-    // This case also happens if the span.start > text.len()
-    if first_line_with_span == usize::MAX {
-        return ("".to_string(), line_row);
+/// Where a non-empty span sits in a file's line structure.
+enum LocatedSpan {
+    /// The span starts past the end of the text.
+    OutsideText,
+    /// The span covers only line breaks: it has a position, but no line has
+    /// anything to underline.
+    OnLineBreaksOnly((OneIndexedRowNumber, OneIndexedColNumber)),
+    Highlighting(HighlightedLines),
+}
+
+struct HighlightedLines {
+    row_col: (OneIndexedRowNumber, OneIndexedColNumber),
+    /// The 0-based index of the first line on which the span highlights at
+    /// least one character.
+    first_line: usize,
+    /// The 0-based index of the last such line.
+    last_line: usize,
+}
+
+fn locate(file_text: &str, span: &Range<usize>) -> LocatedSpan {
+    let mut row_col = None;
+    let mut highlighted_lines = None;
+    for (index, (line, line_range)) in lines_with_ranges(file_text).enumerate() {
+        if line_range.start > span.end {
+            break;
+        }
+        if row_col.is_none() && line_range.end > span.start {
+            let col = span.start - line_range.start;
+            row_col = Some((
+                OneIndexedRowNumber(one_indexed(index)),
+                OneIndexedColNumber(one_indexed(col)),
+            ));
+        }
+        if !highlight_on_line(span, &line_range, line.len()).is_empty() {
+            highlighted_lines = match highlighted_lines {
+                None => Some((index, index)),
+                Some((first_line, _)) => Some((first_line, index)),
+            };
+        }
     }
+    match (row_col, highlighted_lines) {
+        // A line with a non-empty highlight always sets row_col at or before
+        // itself, so highlighted lines without a position cannot occur.
+        (None, _) => LocatedSpan::OutsideText,
+        (Some(row_col), None) => LocatedSpan::OnLineBreaksOnly(row_col),
+        (Some(row_col), Some((first_line, last_line))) => {
+            LocatedSpan::Highlighting(HighlightedLines {
+                row_col,
+                first_line,
+                last_line,
+            })
+        }
+    }
+}
 
-    // Which output lines do we care about? We would like:
-    // - the source line containing the start of the span and LINE_COUNT_BUFFER earlier lines
-    // - the carat line containing the end of the span and LINE_COUNT_BUFFER later lines
-    // - everything in between
+/// Each line of the text with the byte range it occupies. The trailing line
+/// break is excluded from the text and included in the range, so the ranges
+/// tile the file; the final line's range ends one past the end of the text,
+/// where its break would sit.
+fn lines_with_ranges(file_text: &str) -> impl Iterator<Item = (&str, Range<usize>)> {
+    let mut start = 0;
+    file_text.split('\n').map(move |line| {
+        let range = start..start + line.len() + 1;
+        start = range.end;
+        (line, range)
+    })
+}
 
-    (
-        output_lines[(first_line_with_span.saturating_sub(line_count_buffer + 1))
-            ..(std::cmp::min(last_line_with_span + line_count_buffer, output_lines.len()))]
-            .join("\n"),
-        line_row,
-    )
+/// The columns of a line that the span highlights: empty for a line the span
+/// misses, and for one whose only spanned byte is the line break.
+fn highlight_on_line(
+    span: &Range<usize>,
+    line_range: &Range<usize>,
+    line_len: usize,
+) -> Range<usize> {
+    let start = span.start.saturating_sub(line_range.start).min(line_len);
+    let end = span.end.saturating_sub(line_range.start).min(line_len);
+    start..end
+}
+
+fn render_window(
+    file_text: &str,
+    span: &Range<usize>,
+    highlighted: &HighlightedLines,
+    line_count_buffer: usize,
+    color: CaratColor,
+) -> String {
+    let first_printed = highlighted.first_line.saturating_sub(line_count_buffer);
+    let last_printed = highlighted.last_line + line_count_buffer;
+
+    let mut output_lines = Vec::new();
+    for (line, line_range) in lines_with_ranges(file_text)
+        .skip(first_printed)
+        .take(last_printed - first_printed + 1)
+    {
+        let highlight = highlight_on_line(span, &line_range, line.len());
+        if highlight.is_empty() {
+            output_lines.push(line.to_string());
+            continue;
+        }
+        output_lines.push(format!(
+            "{}{}{}",
+            &line[..highlight.start],
+            colorize(&line[highlight.clone()], color),
+            &line[highlight.end..],
+        ));
+        output_lines.push(format!(
+            "{}{}{}",
+            " ".repeat(highlight.start),
+            colorize(&"^".repeat(highlight.len()), color),
+            " ".repeat(line.len() - highlight.end),
+        ));
+    }
+    output_lines.join("\n")
+}
+
+fn colorize(text: &str, color: CaratColor) -> String {
+    match color {
+        CaratColor::Colored => text.bright_red().to_string(),
+        CaratColor::Plain => text.to_string(),
+    }
+}
+
+/// Converts to 1-indexed, saturating past `u32::MAX`. Callers pass values
+/// bounded by a position in a `Span`, which is a `u32`, so the saturation is
+/// unreachable.
+fn one_indexed(zero_indexed: usize) -> NonZeroU32 {
+    NonZeroU32::MIN.saturating_add(u32::try_from(zero_indexed).unwrap_or(u32::MAX))
 }
 
 #[cfg(test)]
@@ -200,29 +191,23 @@ mod test {
     use span::Span;
 
     use crate::{
-        OneIndexedColNumber, OneIndexedRowNumber,
-        text_with_carats::text_with_carats_and_line_count_buffer_and_line_numbers,
+        CaratColor, OneIndexedColNumber, OneIndexedRowNumber,
+        text_with_carats::text_with_carats_and_line_count_buffer,
     };
 
     static RUN_SERIALLY: LazyLock<Mutex<()>> = LazyLock::new(Mutex::default);
 
     fn text_with_carats_for_test(
         file_text: &str,
-        outer_span: Option<Span>,
-        inner_span: Span,
+        span: Span,
         line_count_buffer: usize,
-        colorize_carats: bool,
+        color: CaratColor,
     ) -> (String, Option<(OneIndexedRowNumber, OneIndexedColNumber)>) {
         // https://github.com/colored-rs/colored/issues/201
         let _serial_lock = RUN_SERIALLY.lock();
         colored::control::set_override(true);
-        let text_with_carats = text_with_carats_and_line_count_buffer_and_line_numbers(
-            file_text,
-            outer_span,
-            inner_span,
-            line_count_buffer,
-            colorize_carats,
-        );
+        let text_with_carats =
+            text_with_carats_and_line_count_buffer(file_text, span, line_count_buffer, color);
         colored::control::unset_override();
         text_with_carats
     }
@@ -274,7 +259,8 @@ mod test {
     #[test]
     fn empty_span() {
         let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 0), 3, false).0;
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 0), 3, CaratColor::Plain)
+                .0;
         assert_eq!(output, "");
     }
 
@@ -282,21 +268,24 @@ mod test {
     fn empty_span_but_not_zero() {
         // This is weird behavior, and maybe we should print no output here.
         let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(1, 1), 3, false).0;
+            text_with_carats_for_test(&input_with_lines(10), Span::new(1, 1), 3, CaratColor::Plain)
+                .0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn bug_span_on_line_break() {
         let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(9, 10), 3, false).0;
+            text_with_carats_for_test(&input_with_lines(10), Span::new(9, 10), 3, CaratColor::Plain)
+                .0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn one_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 1), 3, false).0,
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 1), 3, CaratColor::Plain)
+                .0,
         );
         assert_eq!(
             output,
@@ -312,7 +301,8 @@ mod test {
     #[test]
     fn multi_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 3), 3, false).0,
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 3), 3, CaratColor::Plain)
+                .0,
         );
         assert_eq!(
             output,
@@ -334,7 +324,8 @@ mod test {
         // Note that spans do not include the final character (i.e. it is a range
         // of the form [start, end).)
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 9), 3, false).0,
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 9), 3, CaratColor::Plain)
+                .0,
         );
         assert_eq!(
             output,
@@ -350,7 +341,8 @@ mod test {
     #[test]
     fn multi_leading_char_full_first_line_span_2() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 10), 3, false).0,
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 10), 3, CaratColor::Plain)
+                .0,
         );
         assert_eq!(
             output,
@@ -366,7 +358,13 @@ mod test {
     #[test]
     fn multi_char_mid_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(31, 33),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -385,7 +383,13 @@ mod test {
     #[test]
     fn multi_char_multi_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 43), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(31, 43),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -406,7 +410,13 @@ mod test {
     #[test]
     fn multi_char_multi_line_span_2() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 53), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(31, 53),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -429,7 +439,13 @@ mod test {
     #[test]
     fn multi_line_start_on_beginning_of_line() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(30, 42), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(30, 42),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -451,7 +467,13 @@ mod test {
     fn multi_line_start_on_line_break() {
         // char 29 is the line break character...
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(29, 42), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(29, 42),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -472,7 +494,13 @@ mod test {
     #[test]
     fn span_ends_on_final_line() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(90, 100), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(90, 100),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -491,7 +519,13 @@ mod test {
         // Maybe this should panic! But it doesn't.
 
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(90, 105), 3, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(90, 105),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -509,15 +543,26 @@ mod test {
     fn span_outside_text() {
         // Maybe this should panic! But it doesn't.
 
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(105, 110), 3, false).0;
+        let output = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(105, 110),
+            3,
+            CaratColor::Plain,
+        )
+        .0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn line_count_buffer_0() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 0, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(31, 33),
+                0,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -530,7 +575,13 @@ mod test {
     #[test]
     fn line_count_buffer_1() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 1, false).0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(31, 33),
+                1,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -545,49 +596,42 @@ mod test {
     #[test]
     fn the_row_and_col_locate_the_spans_start() {
         let (_, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 1), 3, false);
+            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 1), 3, CaratColor::Plain);
         assert_eq!(u32_row_col(row_col), Some((1, 1)));
 
-        let (_, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false);
+        let (_, row_col) = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(31, 33),
+            3,
+            CaratColor::Plain,
+        );
         assert_eq!(u32_row_col(row_col), Some((4, 2)));
     }
 
     #[test]
     fn a_span_on_a_line_break_has_a_position_but_no_output() {
         let (output, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(9, 10), 3, false);
+            text_with_carats_for_test(&input_with_lines(10), Span::new(9, 10), 3, CaratColor::Plain);
         assert_eq!(output, "");
         assert_eq!(u32_row_col(row_col), Some((1, 10)));
     }
 
     #[test]
     fn a_span_past_the_text_has_no_position() {
-        let (output, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(105, 110), 3, false);
+        let (output, row_col) = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(105, 110),
+            3,
+            CaratColor::Plain,
+        );
         assert_eq!(output, "");
         assert_eq!(u32_row_col(row_col), None);
     }
 
     #[test]
-    fn an_outer_span_shifts_the_inner_span_by_its_start() {
-        let with_outer = text_with_carats_for_test(
-            &input_with_lines(10),
-            Some(Span::new(20, 80)),
-            Span::new(11, 13),
-            3,
-            false,
-        );
-        let absolute =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false);
-        assert_eq!(with_outer.0, absolute.0);
-        assert_eq!(u32_row_col(with_outer.1), u32_row_col(absolute.1));
-    }
-
-    #[test]
     fn an_empty_line_inside_the_span_gets_no_carat_line() {
         let text = "ab\n\ncd";
-        let output = text_with_carats_for_test(text, None, Span::new(0, 6), 0, false).0;
+        let output = text_with_carats_for_test(text, Span::new(0, 6), 0, CaratColor::Plain).0;
         assert_eq!(output, "ab\n^^\n\ncd\n^^");
     }
 
@@ -595,20 +639,30 @@ mod test {
     fn colored_output_reads_the_same_as_plain_output() {
         for span in [Span::new(31, 33), Span::new(8, 12)] {
             let colored =
-                text_with_carats_for_test(&input_with_lines(10), None, span, 3, true).0;
+                text_with_carats_for_test(&input_with_lines(10), span, 3, CaratColor::Colored).0;
             let plain =
-                text_with_carats_for_test(&input_with_lines(10), None, span, 3, false).0;
+                text_with_carats_for_test(&input_with_lines(10), span, 3, CaratColor::Plain).0;
             assert_eq!(stripped(&colored), plain);
         }
     }
 
     #[test]
     fn colored_output_highlights_in_bright_red_and_plain_output_has_no_escapes() {
-        let colored =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, true).0;
+        let colored = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(31, 33),
+            3,
+            CaratColor::Colored,
+        )
+        .0;
         assert!(colored.contains("\u{1b}[91m"));
-        let plain =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false).0;
+        let plain = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(31, 33),
+            3,
+            CaratColor::Plain,
+        )
+        .0;
         assert!(!plain.contains('\u{1b}'));
     }
 }
