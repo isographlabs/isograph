@@ -161,17 +161,16 @@ fn parse_items(
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
     while let Some(peek) = tokens.peek() {
-        let token = *peek.view();
-        match SplitToken::from(token.item) {
+        match SplitToken::from(peek.view().item) {
             SplitToken::NonBracket(kind) => {
-                peek.commit();
+                let token = peek.commit();
                 items.push(WithSpan::new(
                     BracketItem::Raw(RawToken::NonBracket(NonBracketToken(kind))),
                     token.location,
                 ));
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
-                peek.commit();
+                let token = peek.commit();
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing_stack, opening) {
                     ParsedGroup::Closed(group) => {
@@ -195,7 +194,7 @@ fn parse_items(
                     // its owner.
                     break;
                 }
-                peek.commit();
+                let token = peek.commit();
                 items.push(WithSpan::new(
                     BracketItem::Raw(RawToken::Close(CloseBracket(kind))),
                     token.location,

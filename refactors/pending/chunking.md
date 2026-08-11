@@ -212,7 +212,7 @@ No macro changes: unmarked delegation, `parent_variant` wrapping, and the reflex
 
 ## The pass
 
-`chunk` walks each level left to right; each iteration absorbs exactly one chunk, in two phases: content — every item up to the next separator — and then the boundary, the separator run that follows. When the level's next item is a separator, the content phase absorbs nothing and the chunk is a leading boundary holder. Group interiors recurse as their groups are absorbed. The stream is a `SafePeekable` over the level's slice (refactors/past/safe-peekable.md): the phases peek and commit exactly the items they absorb, so an item a phase refuses stays as the next item. The iterator's items are `&WithSpan<BracketItem>` and `Copy`, so `*peek.view()` detaches the reference from the guard before the guard is committed or dropped.
+`chunk` walks each level left to right. `chunk_level`'s loop absorbs one chunk per iteration while the stream is nonempty; that check is the only emptiness test, so `absorb_chunk` runs with a nonempty stream, always produces a chunk, and computes the chunk's span from the parts it collected. Each chunk is absorbed in two phases: content — every item up to the next separator — and then the boundary, the separator run that follows. When the level's next item is a separator, the content phase absorbs nothing and the chunk is a leading boundary holder. Group interiors recurse as their groups are absorbed. The stream is a `SafePeekable` over the level's slice (refactors/past/safe-peekable.md): the phases peek and commit exactly the items they absorb, so an item a phase refuses stays as the next item. A phase decides from `peek.view()` and takes the item from `peek.commit()`, which returns it; the item is never copied out of the guard's view.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -229,8 +229,8 @@ pub fn chunk(tree: &WithSpan<MatchedBrackets>) -> WithSpan<ChunkedLevel> {
 fn chunk_level(level: &MatchedBrackets) -> ChunkedLevel {
     let mut items = level.0.iter().safe_peekable();
     let mut out = Vec::new();
-    while let Some(chunk) = absorb_chunk(&mut items) {
-        out.push(chunk);
+    while items.peek().is_some() {
+        out.push(absorb_chunk(&mut items));
     }
     ChunkedLevel(out)
 }
@@ -250,69 +250,58 @@ fn separator_of(item: &WithSpan<BracketItem>) -> Option<SeparatorToken> {
     }
 }
 
-/// The content item a level item becomes, or `None` for a separator. Group interiors
-/// recurse here.
-fn chunk_content_item_of(item: &BracketItem) -> Option<ChunkContentItem> {
-    match item {
-        BracketItem::Raw(RawToken::NonBracket(token))
-            if separator_token(token.0).is_some() =>
-        {
-            None
-        }
-        BracketItem::Raw(RawToken::NonBracket(token)) => {
-            Some(ChunkContentItem::NonBracket(*token))
-        }
-        BracketItem::Raw(RawToken::Open(open)) => Some(ChunkContentItem::UnmatchedOpen(*open)),
-        BracketItem::Raw(RawToken::Close(close)) => Some(ChunkContentItem::UnmatchedClose(*close)),
-        BracketItem::Bracketed(group) => Some(ChunkContentItem::Group(chunk_group(group))),
-    }
-}
-
-/// One chunk: the content phase, then the boundary phase. `None` when the stream is
-/// empty — every item is either content or a separator, so a nonempty stream always
-/// produces a chunk. Whichever phase matches the first item consumes it.
-fn absorb_chunk(items: &mut LevelItems<'_>) -> Option<WithSpan<Chunk>> {
-    let mut span = None;
+/// One chunk from a nonempty stream: the content phase, then the boundary phase.
+/// Whichever phase matches the first item consumes it — every item is either content
+/// or a separator — so the chunk has at least one part and its span exists. Group
+/// interiors recurse in the content phase's `Bracketed` arm.
+fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
     let mut contents = Vec::new();
     while let Some(peek) = items.peek() {
-        let item = *peek.view();
-        let Some(content_item) = chunk_content_item_of(&item.item) else {
-            // A separator ends the content phase.
-            break;
+        let content_item = match &peek.view().item {
+            BracketItem::Raw(RawToken::NonBracket(token))
+                if separator_token(token.0).is_some() =>
+            {
+                // A separator ends the content phase.
+                break;
+            }
+            BracketItem::Raw(RawToken::NonBracket(token)) => {
+                ChunkContentItem::NonBracket(*token)
+            }
+            BracketItem::Raw(RawToken::Open(open)) => ChunkContentItem::UnmatchedOpen(*open),
+            BracketItem::Raw(RawToken::Close(close)) => {
+                ChunkContentItem::UnmatchedClose(*close)
+            }
+            BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group)),
         };
-        peek.commit();
-        span = Span::join_optional(span, item.location);
+        let item = peek.commit();
         contents.push(WithSpan::new(content_item, item.location));
     }
 
-    let mut separator_span = None;
     let mut separators = Vec::new();
     while let Some(peek) = items.peek() {
-        let item = *peek.view();
-        let Some(separator) = separator_of(item) else {
+        let Some(separator) = separator_of(peek.view()) else {
             break;
         };
-        peek.commit();
-        separator_span = Span::join_optional(separator_span, item.location);
+        let item = peek.commit();
         separators.push(WithSpan::new(separator, item.location));
     }
-    if let Some(separator_span) = separator_span {
-        span = Span::join_optional(span, separator_span);
-    }
-    let trailing_separator =
-        separator_span.map(|location| WithSpan::new(ChunkSeparator(separators), location));
 
-    if let Some(span) = span {
-        Some(WithSpan::new(
-            Chunk {
-                contents,
-                trailing_separator,
-            },
-            span,
-        ))
-    } else {
-        None
-    }
+    let separator_location = separators.iter().map(|s| s.location).reduce(Span::join);
+    let span = contents
+        .iter()
+        .map(|c| c.location)
+        .chain(separator_location)
+        .reduce(Span::join)
+        .expect("absorb_chunk requires a nonempty stream");
+    let trailing_separator =
+        separator_location.map(|location| WithSpan::new(ChunkSeparator(separators), location));
+    WithSpan::new(
+        Chunk {
+            contents,
+            trailing_separator,
+        },
+        span,
+    )
 }
 
 fn chunk_group(group: &Bracketed) -> ChunkedGroup {
@@ -325,20 +314,6 @@ fn chunk_group(group: &Bracketed) -> ChunkedGroup {
         closing: group.closing,
     }
 }
-```
-
-`Span::join_optional` is new on the span crate, beside `join` and `between`:
-
-```rust
-// from crates/span/src/lib.rs
-    /// The running-fold form of [`Span::join`]: the first span seeds the accumulator,
-    /// each later one extends it.
-    pub fn join_optional(joined: Option<Span>, next: Span) -> Option<Span> {
-        Some(match joined {
-            Some(joined) => Span::join(joined, next),
-            None => next,
-        })
-    }
 ```
 
 ## Tests
@@ -385,7 +360,7 @@ And on `a ) b`: the position of `)` answers `CloseBracket` with `Unmatched`, and
 
 ## Landing checklist
 
-1. Add `Span::join_optional` to the span crate, and chunk.rs: the types, the parent and path types, the pass; register `mod chunk;` and `pub use chunk::*;` in lib.rs.
+1. chunk.rs: the types, the parent and path types, the pass; register `mod chunk;` and `pub use chunk::*;` in lib.rs.
 2. Modify isograph_resolution_node.rs to the chunk-stage variant set.
 3. Strip matched_brackets.rs's resolution: derives off the four structure types, the old parent and path types deleted, the token leaf types re-pointed at chunk parents, the six resolution tests removed.
 4. The structural and resolution tests in chunk.rs.
