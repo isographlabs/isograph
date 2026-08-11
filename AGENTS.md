@@ -103,4 +103,4 @@ When told to audit, the deliverable is the whole class fixed everywhere, not the
 
 ## Invariants - do not work around these
 
-- No manual impl's of `ResolvePosition`, ever. If there is a genuine need for a manual impl, then that implies a missing feature in the `resolve_position` crate, and we should do a prefactor to add that first.
+- No manual impl's of `ResolvePosition`, ever. Most likely, this implies that we are modeling our state incorrectly or misunderstanding the crate. If there is a genuine need for a manual impl, then that implies a missing feature in the `resolve_position` crate, and we should do a prefactor to add that first.
