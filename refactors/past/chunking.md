@@ -345,7 +345,7 @@ The bracket tree's structural tests and error tests are untouched. Its six resol
 
 ### Resolution
 
-The assertions navigate the resolved path and check ancestry against source text, per the shape "the chunk this token is part of renders as ...". A test helper renders a node back to text by slicing the literal at its span (for a chunk, derived from its parts); whether that becomes a general token serializer is a test implementation detail. On `foo { bar, baz }`:
+The assertions navigate the resolved path and check ancestry against source text, per the shape "the chunk this token is part of renders as ...". A test helper renders a node back to text by slicing the literal at the node's span. The path cannot supply that span: `PositionResolutionPath` is `inner` plus `parent`, and each descent peels the `WithSpan` wrapper before calling `resolve`, so the helper recomputes the span from the node's own parts — a chunk from its first content to its trailing separator, a group from its opening and closing — all of which sit `WithSpan`-wrapped inside the node. Whether that becomes a general token serializer is a test implementation detail. On `foo { bar, baz }`:
 
 - the position of `bar` answers `NonBracketToken(Identifier)`; its host chunk renders as `bar,`; walking up, the interior level's parent group belongs to the chunk that renders as `foo { bar, baz }`.
 - the position of `{` answers `OpenBracket` with `Matched`, and the group's holding chunk renders as `foo { bar, baz }`.
@@ -354,7 +354,9 @@ The assertions navigate the resolved path and check ancestry against source text
 - the space between the interior chunks (after `bar,`, before `baz`) answers `ChunkedLevel` with `Interior` parent — the brace group's interior level.
 - the literal's leading whitespace answers `ChunkedLevel` with `Root` as parent.
 
-On `foo {}`: a position in the empty interior (between `{` and `}`) answers `ChunkedLevel` with `Interior` parent — zero chunks, so the level answers itself. Same answer for a space inside `foo { }`.
+On `foo { }`: a position on the space between the braces answers `ChunkedLevel` with `Interior` parent — zero chunks, so the level answers itself. A zero-width interior (`foo {}`) has no position that is not also the opening's end under `Span::contains`, so that case is not a separate resolution leaf.
+
+On `"   "` (whitespace only): any position answers `ChunkedLevel` with `Root` parent — the level has zero chunks, so no field claims the position and the level answers itself. On `""` the same holds for the one position there is, the empty span at 0, which the root's empty span contains.
 
 And on `a ) b`: the position of `)` answers `CloseBracket` with `Unmatched`, and the host chunk renders as `a ) b`.
 
