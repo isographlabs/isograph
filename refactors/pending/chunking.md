@@ -173,6 +173,7 @@ use crate::{
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
 /// modifies these variants in place; today they are the chunk tree's.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
     ChunkedLevel(ChunkedLevelPath<'a>),
     /// This will be resolved for spans that contain one of the opening/closing brackets
@@ -258,13 +259,11 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
     let mut contents = Vec::new();
     while let Some(peek) = items.peek() {
         let content_item = match &peek.view().item {
-            BracketItem::Raw(RawToken::NonBracket(token))
-                if separator_token(token.0).is_some() =>
-            {
-                // A separator ends the content phase.
-                break;
-            }
             BracketItem::Raw(RawToken::NonBracket(token)) => {
+                if separator_token(token.0).is_some() {
+                    // A separator ends the content phase.
+                    break;
+                }
                 ChunkContentItem::NonBracket(*token)
             }
             BracketItem::Raw(RawToken::Open(open)) => ChunkContentItem::UnmatchedOpen(*open),
@@ -331,6 +330,7 @@ Structural facts only: which chunks a level holds, which contents and trailing s
 - `foo\n{ bar }` is chunk `foo` (line break trailing), then a chunk whose only content is the brace group.
 - `a ) b` puts the unmatched close inside a chunk between `a` and `b`; `errors()` on the input bracket tree still reports the unmatched close.
 - `foo { bar` — the brace never closed, so the matcher demoted the open; chunking sees a raw unmatched open and the following tokens at the top level, not an unbalanced group.
+- `"   "` (whitespace only) and `""` — empty `ChunkedLevel` (zero chunks); the root span is still the full literal.
 
 ### Modifications to the existing unit tests
 
