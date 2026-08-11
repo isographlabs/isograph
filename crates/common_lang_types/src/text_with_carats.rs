@@ -248,6 +248,29 @@ mod test {
         format!("\n{text}")
     }
 
+    fn u32_row_col(
+        row_col: Option<(OneIndexedRowNumber, OneIndexedColNumber)>,
+    ) -> Option<(u32, u32)> {
+        row_col.map(|(row, col)| (row.0.get(), col.0.get()))
+    }
+
+    /// The text with every ANSI escape sequence removed: everything from an escape
+    /// character through the terminating `m`.
+    fn stripped(text: &str) -> String {
+        let mut result = String::new();
+        let mut rest = text;
+        while let Some(escape_start) = rest.find('\u{1b}') {
+            result.push_str(&rest[..escape_start]);
+            let after_escape = &rest[escape_start..];
+            match after_escape.find('m') {
+                Some(m_index) => rest = &after_escape[m_index + 1..],
+                None => return result,
+            }
+        }
+        result.push_str(rest);
+        result
+    }
+
     #[test]
     fn empty_span() {
         let output =
@@ -279,7 +302,7 @@ mod test {
             output,
             r"
 012345678
-^        
+^
 012345678
 012345678
 012345678"
@@ -295,7 +318,7 @@ mod test {
             output,
             r"
 012345678
-^^^      
+^^^
 012345678
 012345678
 012345678"
@@ -352,7 +375,7 @@ mod test {
 012345678
 012345678
 012345678
- ^^      
+ ^^
 012345678
 012345678
 012345678"
@@ -373,7 +396,7 @@ mod test {
 012345678
  ^^^^^^^^
 012345678
-^^^      
+^^^
 012345678
 012345678
 012345678"
@@ -396,7 +419,7 @@ mod test {
 012345678
 ^^^^^^^^^
 012345678
-^^^      
+^^^
 012345678
 012345678
 012345678"
@@ -417,7 +440,7 @@ mod test {
 012345678
 ^^^^^^^^^
 012345678
-^^       
+^^
 012345678
 012345678
 012345678"
@@ -439,7 +462,7 @@ mod test {
 012345678
 ^^^^^^^^^
 012345678
-^^       
+^^
 012345678
 012345678
 012345678"
@@ -514,30 +537,78 @@ mod test {
             r"
 012345678
 012345678
- ^^      
+ ^^
 012345678"
         );
     }
-    #[test]
-    fn text_with_carats() {
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, true).0;
 
-        let expected = "012345678\n012345678\n012345678\n0\
-        \u{1b}[91m12\u{1b}[0m345678\n \
-        \u{1b}[91m^\u{1b}[0m\u{1b}[91m^\u{1b}[0m      \
-        \n012345678\n012345678\n012345678";
-        assert_eq!(output, expected);
+    #[test]
+    fn the_row_and_col_locate_the_spans_start() {
+        let (_, row_col) =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(0, 1), 3, false);
+        assert_eq!(u32_row_col(row_col), Some((1, 1)));
+
+        let (_, row_col) =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false);
+        assert_eq!(u32_row_col(row_col), Some((4, 2)));
     }
+
     #[test]
-    fn text_with_carats_multiline() {
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), None, Span::new(8, 12), 3, true).0;
+    fn a_span_on_a_line_break_has_a_position_but_no_output() {
+        let (output, row_col) =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(9, 10), 3, false);
+        assert_eq!(output, "");
+        assert_eq!(u32_row_col(row_col), Some((1, 10)));
+    }
 
-        let expected = "01234567\u{1b}[91m8\u{1b}[0m\n        \u{1b}[91m^\u{1b}[0m\n\
-        \u{1b}[91m01\u{1b}[0m2345678\n\u{1b}[91m^\u{1b}[0m\u{1b}[91m^\
-        \u{1b}[0m       \n012345678\n012345678\n012345678";
+    #[test]
+    fn a_span_past_the_text_has_no_position() {
+        let (output, row_col) =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(105, 110), 3, false);
+        assert_eq!(output, "");
+        assert_eq!(u32_row_col(row_col), None);
+    }
 
-        assert_eq!(output, expected);
+    #[test]
+    fn an_outer_span_shifts_the_inner_span_by_its_start() {
+        let with_outer = text_with_carats_for_test(
+            &input_with_lines(10),
+            Some(Span::new(20, 80)),
+            Span::new(11, 13),
+            3,
+            false,
+        );
+        let absolute =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false);
+        assert_eq!(with_outer.0, absolute.0);
+        assert_eq!(u32_row_col(with_outer.1), u32_row_col(absolute.1));
+    }
+
+    #[test]
+    fn an_empty_line_inside_the_span_gets_no_carat_line() {
+        let text = "ab\n\ncd";
+        let output = text_with_carats_for_test(text, None, Span::new(0, 6), 0, false).0;
+        assert_eq!(output, "ab\n^^\n\ncd\n^^");
+    }
+
+    #[test]
+    fn colored_output_reads_the_same_as_plain_output() {
+        for span in [Span::new(31, 33), Span::new(8, 12)] {
+            let colored =
+                text_with_carats_for_test(&input_with_lines(10), None, span, 3, true).0;
+            let plain =
+                text_with_carats_for_test(&input_with_lines(10), None, span, 3, false).0;
+            assert_eq!(stripped(&colored), plain);
+        }
+    }
+
+    #[test]
+    fn colored_output_highlights_in_bright_red_and_plain_output_has_no_escapes() {
+        let colored =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, true).0;
+        assert!(colored.contains("\u{1b}[91m"));
+        let plain =
+            text_with_carats_for_test(&input_with_lines(10), None, Span::new(31, 33), 3, false).0;
+        assert!(!plain.contains('\u{1b}'));
     }
 }
