@@ -2101,7 +2101,6 @@ dependencies = [
 name = "swc_isograph_plugin"
 version = "0.5.3"
 dependencies = [
- "anyhow",
  "isograph_config",
  "once_cell",
  "pathdiff",

@@ -1,4 +1,3 @@
-use anyhow::{Result, bail};
 use isograph_config::{ConfigFileJavascriptModule, ISOGRAPH_FOLDER, IsographProjectConfig};
 use once_cell::sync::Lazy;
 use prelude::Postfix;
@@ -106,13 +105,10 @@ enum IsographTransformError {
     SubstitutionsNotAllowedInIsoFragments,
 }
 
-fn show_error(span: Span, err: &IsographTransformError) -> Result<(), anyhow::Error> {
-    let msg = IsographTransformError::to_string(err);
-
+fn show_error(span: Span, err: &IsographTransformError) {
     HANDLER.with(|handler| {
-        handler.struct_span_err(span, &msg).emit();
+        handler.struct_span_err(span, &err.to_string()).emit();
     });
-    bail!(msg)
 }
 
 #[derive(Debug, Clone)]
@@ -226,7 +222,7 @@ impl ValidIsographTemplateLiteral {
         real_filepath: &Path,
         config: &IsographProjectConfig,
         root_dir: &Path,
-    ) -> Result<PathBuf, IsographTransformError> {
+    ) -> PathBuf {
         let folder = PathBuf::from(real_filepath.parent().unwrap());
         let cwd = PathBuf::from(root_dir);
 
@@ -264,7 +260,7 @@ impl ValidIsographTemplateLiteral {
             file_to_artifact = PathBuf::from(format!("./{}", file_to_artifact.display()));
         }
 
-        Ok(file_to_artifact)
+        file_to_artifact
     }
 }
 
@@ -310,9 +306,8 @@ impl IsoLiteralCompilerVisitor<'_> {
         &mut self,
         iso_template_literal: ValidIsographTemplateLiteral,
     ) -> Expr {
-        let file_to_artifact = iso_template_literal
-            .path_for_artifact(self.filepath, self.config, self.root_dir)
-            .expect("Failed to get path for artifact.");
+        let file_to_artifact =
+            iso_template_literal.path_for_artifact(self.filepath, self.config, self.root_dir);
 
         match self.config.options.module {
             ConfigFileJavascriptModule::CommonJs => {
@@ -398,7 +393,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
                                 return build_expr;
                             }
                             Err(err) => {
-                                let _ = show_error(*span, &err);
+                                show_error(*span, &err);
                                 // On error, we keep the same expression and fail showing the error
                                 return expr;
                             }
@@ -421,7 +416,7 @@ impl Fold for IsoLiteralCompilerVisitor<'_> {
                                 return build_expr;
                             }
                             Err(err) => {
-                                let _ = show_error(*child_span, &err);
+                                show_error(*child_span, &err);
                                 // On error, we keep the same expression and fail showing the error
                                 return expr;
                             }
