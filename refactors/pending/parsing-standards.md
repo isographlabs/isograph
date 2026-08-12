@@ -52,12 +52,51 @@ impl<'a> ChunkStream<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
+    /// The next item, committed, or the end of the chunk: the value a dispatch
+    /// position matches on. Total, so every match handles the end; the end's span is
+    /// empty at `previous_end`.
+    pub(crate) fn take_next(&mut self) -> WithSpan<Taken<'a>>;
+
     /// Nothing further may exist. The first leftover item is the error.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
 }
+
+/// What a dispatch position sees: the committed next item, its payload carried into
+/// the match arm, or the chunk's end. `Found` converts from it for error arms.
+pub(crate) enum Taken<'a> {
+    Token(NonBracketTokenKind),
+    Group(&'a ChunkedGroup),
+    UnmatchedOpen(BracketKind),
+    UnmatchedClose(BracketKind),
+    EndOfChunk,
+}
 ```
 
-What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: alternatives are distinguished by which `consume_*` succeeds, and an item commits only when a method accepted it. Later feature docs add methods as they need them (value dispatch in parse-arguments.md is the known case), each addition an amendment reviewed here.
+What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
+
+### Dispatch is a match
+
+A position where the grammar allows one of several forms is written as one `match` on `take_next()`, never as a chain of `consume_*_if` attempts. The discriminating item is committed up front, which is sound because every arm uses it: the accepting arms continue from it, and the rejecting arm reports it as the `found`. The match is exhaustive over `Taken`, so handling the chunk's end cannot be forgotten, and a separator can never appear in an arm, because chunks are separator-free: "a separator comes next" is the `EndOfChunk` variant. Sketched on a value:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs (shape, not the final listing)
+let taken = stream.take_next();
+match taken.item {
+    Taken::Token(NonBracketTokenKind::Dollar) => { /* the variable's name follows */ }
+    Taken::Token(NonBracketTokenKind::StringLiteral) => { /* done */ }
+    Taken::Token(NonBracketTokenKind::IntegerLiteral) => { /* convert via LiteralText */ }
+    Taken::Token(NonBracketTokenKind::Identifier) => { /* match LiteralText::value_word */ }
+    Taken::Group(group) if /* brace */ => { /* object literal */ }
+    taken => return Err(WithSpan::new(
+        ParseError::expected(Expectation::Value, Found::from(&taken)),
+        /* taken's span */,
+    )),
+}
+```
+
+Dispatch on an identifier's text is the same shape one level down: `require_token(Identifier, ...)` then a `match` on `LiteralText::keyword` (or `value_word`), so `entrypoint` versus `field` versus `pointer` is a match on the `Keyword` enum, not string comparisons scattered through arms.
+
+The `consume_*_if` shape is not a dispatch tool. It exists for one case: a composition boundary, where a sub-parser meets an item that is not its own and must decline without consuming what belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=` or the chunk's end). Inside a production that owns all the alternatives at a position, reaching for a `consume_*_if` chain instead of a `take_next` match is the anti-pattern.
 
 ### `LevelEntry`: the only access to a level's chunks
 
