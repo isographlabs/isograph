@@ -157,14 +157,12 @@ impl fmt::Display for ArtifactType {
     }
 }
 
-impl From<&str> for ArtifactType {
-    fn from(s: &str) -> Self {
-        match s {
-            "entrypoint" => Self::Entrypoint,
-            "field" | "pointer" => Self::Field,
-            _ => {
-                panic!("Regex will not produce this case. This is indicative of a bug in Isograph.")
-            }
+impl ArtifactType {
+    fn from_keyword(keyword: &str) -> Option<ArtifactType> {
+        match keyword {
+            "entrypoint" => Some(ArtifactType::Entrypoint),
+            "field" | "pointer" => Some(ArtifactType::Field),
+            _ => None,
         }
     }
 }
@@ -289,13 +287,14 @@ impl IsoLiteralCompilerVisitor<'_> {
             return OPERATION_REGEX
                 .captures_iter(first.raw.trim())
                 .next()
-                .map(|capture_group| {
+                .and_then(|capture_group| {
                     debug!("capture_group {:?}", capture_group);
-                    ValidIsographTemplateLiteral {
-                        artifact_type: ArtifactType::from(&capture_group[1]),
+                    let artifact_type = ArtifactType::from_keyword(&capture_group[1])?;
+                    Some(ValidIsographTemplateLiteral {
+                        artifact_type,
                         field_type: capture_group[2].to_string(),
                         field_name: capture_group[3].to_string(),
-                    }
+                    })
                 })
                 .ok_or(IsographTransformError::InvalidIsoKeyword);
         }
