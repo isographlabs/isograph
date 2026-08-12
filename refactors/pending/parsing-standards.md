@@ -144,6 +144,8 @@ Dispatch on an identifier's text is the same shape one level down: `require_toke
 
 The `consume_*_if` shape is not a dispatch tool. It exists for one case: a composition boundary, where a sub-parser meets an item that is not its own and must decline without consuming what belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=` or the chunk's end). Inside a production that owns all the alternatives at a position, reaching for a `consume_*_if` chain instead of a `take_next` match is the anti-pattern.
 
+An opener-marked composite, one that is optional as a whole but required once its opener appears, is a dispatch arm, never a consume chain: the opener commits in the match and the remainder is `require_*`. The variable use is the existing instance (`$` commits, the name is required), and a future directive (`@ name (args)`) is the same shape, looping its position's match for repetition. Such a composite's span starts at the already-committed opener, which plain `spanning` cannot cover; `spanning_from(start, parse)`, anchored at a caller-supplied span, is the anticipated sibling, landing with its first caller.
+
 ### `LevelEntry`: the only access to a level's chunks
 
 `ChunkedLevel`'s field becomes private to chunk.rs, and the one accessor classifies:
