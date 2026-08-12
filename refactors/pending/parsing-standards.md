@@ -60,7 +60,9 @@ impl<'a> ChunkStream<'a> {
     /// Runs a sub-parse and wraps its result in the span it consumed: from the start
     /// of the first item the closure accepts to the end of its last, empty at
     /// `previous_end` when it accepts none. The only source of a composite node's
-    /// span; a parser never joins spans by hand.
+    /// span; a parser never joins spans by hand. Sibling variants for `Option`- or
+    /// plainly-returning closures are anticipated amendments, added when their first
+    /// caller appears, never generically.
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
