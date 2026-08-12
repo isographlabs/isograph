@@ -10,7 +10,7 @@ use std::{
 use swc_atoms::Atom;
 use swc_core::{
     common::{
-        DUMMY_SP, Mark, Span, SyntaxContext, errors::HANDLER,
+        DUMMY_SP, Span, SyntaxContext, errors::HANDLER,
         plugin::metadata::TransformPluginMetadataContextKind,
     },
     ecma::{
@@ -66,7 +66,7 @@ fn isograph_plugin_transform(
         &config,
         path,
         root_dir.as_path(),
-        Some(metadata.unresolved_mark),
+        SyntaxContext::empty().apply_mark(metadata.unresolved_mark),
     );
 
     program.apply(isograph)
@@ -76,12 +76,12 @@ pub fn compile_iso_literal_visitor<'a>(
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
     root_dir: &'a Path,
-    unresolved_mark: Option<Mark>,
+    unresolved_ctxt: SyntaxContext,
 ) -> impl Pass + 'a {
     fold_pass(IsoLiteralCompilerVisitor {
         config,
         filepath,
-        unresolved_mark,
+        unresolved_ctxt,
         imports: vec![],
         root_dir,
     })
@@ -115,7 +115,7 @@ fn show_error(span: Span, err: &IsographTransformError) {
 struct IsographImport {
     path: Atom,
     item: Atom,
-    unresolved_mark: Option<Mark>,
+    unresolved_ctxt: SyntaxContext,
 }
 
 impl IsographImport {
@@ -125,10 +125,7 @@ impl IsographImport {
             specifiers: vec![ImportSpecifier::Default(ImportDefaultSpecifier {
                 span: Default::default(),
                 local: Ident {
-                    ctxt: self
-                        .unresolved_mark
-                        .map(|m| SyntaxContext::empty().apply_mark(m))
-                        .unwrap_or_default(),
+                    ctxt: self.unresolved_ctxt,
                     span: DUMMY_SP,
                     sym: self.item.clone(),
                     optional: false,
@@ -167,14 +164,15 @@ impl ArtifactType {
     }
 }
 
-fn build_ident_expr_for_hoisted_import(ident_name: &str, unresolved_mark: Option<Mark>) -> Expr {
+fn build_ident_expr_for_hoisted_import(
+    ident_name: &str,
+    unresolved_ctxt: SyntaxContext,
+) -> Expr {
     Expr::Ident(Ident {
         span: DUMMY_SP,
         sym: ident_name.into(),
         optional: false,
-        ctxt: unresolved_mark
-            .map(|m| SyntaxContext::empty().apply_mark(m))
-            .unwrap_or_default(),
+        ctxt: unresolved_ctxt,
     })
 }
 
@@ -186,17 +184,12 @@ struct ValidIsographTemplateLiteral {
 }
 
 impl ValidIsographTemplateLiteral {
-    fn build_require_expr_from_path(path: &str, mark: Option<Mark>) -> Expr {
+    fn build_require_expr_from_path(path: &str, unresolved_ctxt: SyntaxContext) -> Expr {
         Expr::Member(MemberExpr {
             span: DUMMY_SP,
             obj: Box::new(Expr::Call(CallExpr {
                 span: DUMMY_SP,
-                callee: quote_ident!(
-                    mark.map(|m| SyntaxContext::empty().apply_mark(m))
-                        .unwrap_or_default(),
-                    "require"
-                )
-                .as_callee(),
+                callee: quote_ident!(unresolved_ctxt, "require").as_callee(),
                 args: vec![
                     Lit::Str(Str {
                         span: Default::default(),
@@ -268,7 +261,7 @@ struct IsoLiteralCompilerVisitor<'a> {
     config: &'a IsographProjectConfig,
     filepath: &'a Path,
     imports: Vec<IsographImport>,
-    unresolved_mark: Option<Mark>,
+    unresolved_ctxt: SyntaxContext,
 }
 
 #[swc_trace]
@@ -312,7 +305,7 @@ impl IsoLiteralCompilerVisitor<'_> {
             ConfigFileJavascriptModule::CommonJs => {
                 ValidIsographTemplateLiteral::build_require_expr_from_path(
                     &file_to_artifact.display().to_string(),
-                    self.unresolved_mark,
+                    self.unresolved_ctxt,
                 )
             }
             ConfigFileJavascriptModule::EsModule => {
@@ -326,10 +319,10 @@ impl IsoLiteralCompilerVisitor<'_> {
                 self.imports.push(IsographImport {
                     path: file_to_artifact.display().to_string().into(),
                     item: ident_name.clone().into(),
-                    unresolved_mark: self.unresolved_mark,
+                    unresolved_ctxt: self.unresolved_ctxt,
                 });
 
-                build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_mark)
+                build_ident_expr_for_hoisted_import(&ident_name, self.unresolved_ctxt)
             }
         }
     }

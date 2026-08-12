@@ -3,6 +3,7 @@ use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
 };
+use swc_core::common::SyntaxContext;
 use swc_ecma_parser::{EsSyntax, Syntax};
 use swc_ecma_transforms_testing::{FixtureTestConfig, test_fixture};
 use swc_isograph_plugin::compile_iso_literal_visitor;
@@ -21,7 +22,14 @@ fn run(input: PathBuf) {
             jsx: true,
             ..Default::default()
         }),
-        &|_| compile_iso_literal_visitor(&config, Path::new(&filename), Path::new(root_dir), None),
+        &|_| {
+            compile_iso_literal_visitor(
+                &config,
+                Path::new(&filename),
+                Path::new(root_dir),
+                SyntaxContext::empty(),
+            )
+        },
         &input,
         &output,
         FixtureTestConfig {
@@ -45,7 +53,14 @@ fn isograph_errors(input: PathBuf) {
             jsx: true,
             ..Default::default()
         }),
-        &|_| compile_iso_literal_visitor(&config, Path::new(&filename), Path::new(root_dir), None),
+        &|_| {
+            compile_iso_literal_visitor(
+                &config,
+                Path::new(&filename),
+                Path::new(root_dir),
+                SyntaxContext::empty(),
+            )
+        },
         &input,
         &output,
         FixtureTestConfig {
