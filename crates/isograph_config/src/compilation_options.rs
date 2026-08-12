@@ -141,17 +141,12 @@ pub fn create_config(
     config_location: &PathBuf,
     current_working_directory: CurrentWorkingDirectory,
 ) -> CompilerConfig {
-    let config_contents = match std::fs::read_to_string(config_location) {
-        Ok(contents) => contents,
-        Err(_) => match config_location.to_str() {
-            Some(loc) => {
-                panic!("Expected config to be found at {loc}")
-            }
-            None => {
-                panic!("Expected config to be found.")
-            }
-        },
-    };
+    let config_contents = std::fs::read_to_string(config_location).unwrap_or_else(|_| {
+        panic!(
+            "Expected config to be found at {}",
+            config_location.display()
+        )
+    });
 
     let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {e}"));
