@@ -10,7 +10,7 @@ A literal parses when its root level holds exactly one chunk with contents and t
 entrypoint <Identifier> . <Identifier>
 ```
 
-with nothing after the second identifier. Line breaks around the declaration and a single trailing comma are insignificant; a comma before the declaration is an error, like any comma no item precedes. The normal literal style parses:
+with nothing after the second identifier. The declaration is the root level's first chunk and its only one: leading line breaks are captured by the literal's start, and no comma is valid anywhere at the root level, before or after the declaration, because the root is not a list. The normal literal style parses:
 
 ```
 iso(`
@@ -169,7 +169,7 @@ use span::{Span, WithSpan};
 
 use crate::{
     Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found, IsographResolutionNode,
-    NonBracketTokenKind, ParseError,
+    NonBracketTokenKind, ParseError, SeparatorToken,
 };
 
 /// The parse of one literal. The wrapping `WithSpan`'s span is the whole literal.
@@ -264,52 +264,68 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
     }
 }
 
-/// The declaration chunk parses before the extra-chunk check so that an incomplete
-/// declaration split across a line break reports its own precise error, and only a
-/// complete declaration followed by more content reports `MultipleDeclarations`.
+/// The declaration chunk parses before the structural complaints, so an incomplete
+/// declaration split across a line break reports its own precise error; only after a
+/// complete parse do a comma in the declaration's boundary (the root is not a list, so
+/// no comma is meaningful there) and any further content report.
 fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralParse, WithSpan<ParseError>> {
     let (declaration, extra) = declaration_chunk(root)?;
     let parse = parse_declaration_chunk(text, declaration)?;
+    if let Some(comma) = boundary_comma(declaration) {
+        return Err(WithSpan::new(
+            ParseError::expected(Expectation::EndOfDeclaration, Found::Token(NonBracketTokenKind::Comma)),
+            comma,
+        ));
+    }
     if let Some(extra) = extra {
         return Err(WithSpan::new(ParseError::MultipleDeclarations, extra));
     }
     Ok(parse)
 }
 
-/// The root level's one chunk with contents, plus the joined span of any further
-/// contentful chunks. The literal's leading line breaks are captured before any chunk
-/// exists; an empty chunk is a comma no item precedes (one-comma-per-boundary.md) and
-/// is always an error, at that comma.
+/// The root's first chunk, which is the declaration, plus the joined span of any
+/// further contentful chunks. The literal's leading line breaks are captured before any
+/// chunk exists, so the declaration can sit nowhere else; an empty chunk is a comma no
+/// item precedes (one-comma-per-boundary.md) and is always an error, at that comma.
 fn declaration_chunk(
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<(&WithSpan<Chunk>, Option<Span>), WithSpan<ParseError>> {
-    let mut declaration = None;
+    let mut chunks = root.item.0.iter();
+    let Some(declaration) = chunks.next() else {
+        return Err(WithSpan::new(ParseError::EmptyLiteral, root.location));
+    };
+    if declaration.item.contents.is_empty() {
+        return Err(WithSpan::new(
+            ParseError::expected(Expectation::DeclarationKeyword, Found::Token(NonBracketTokenKind::Comma)),
+            empty_chunk_comma_span(declaration),
+        ));
+    }
     let mut extra = None;
-    for chunk in &root.item.0 {
+    for chunk in chunks {
         if chunk.item.contents.is_empty() {
-            let expected = match declaration {
-                None => Expectation::DeclarationKeyword,
-                Some(_) => Expectation::EndOfDeclaration,
-            };
             return Err(WithSpan::new(
-                ParseError::expected(expected, Found::Token(NonBracketTokenKind::Comma)),
+                ParseError::expected(Expectation::EndOfDeclaration, Found::Token(NonBracketTokenKind::Comma)),
                 empty_chunk_comma_span(chunk),
             ));
         }
-        match declaration {
-            None => declaration = Some(chunk),
-            Some(_) => {
-                extra = Some(match extra {
-                    None => chunk.location,
-                    Some(span) => Span::join(span, chunk.location),
-                });
-            }
-        }
+        extra = Some(match extra {
+            None => chunk.location,
+            Some(span) => Span::join(span, chunk.location),
+        });
     }
-    let Some(declaration) = declaration else {
-        return Err(WithSpan::new(ParseError::EmptyLiteral, root.location));
-    };
     Ok((declaration, extra))
+}
+
+/// The comma in a chunk's trailing boundary, when one exists. Only a list level gives a
+/// boundary comma meaning; the callers sit in one-item contexts, where it is an error.
+pub(crate) fn boundary_comma(chunk: &WithSpan<Chunk>) -> Option<Span> {
+    let separator = chunk.item.trailing_separator.as_ref()?;
+    separator
+        .item
+        .0
+        .iter()
+        .find(|token| token.item == SeparatorToken::Comma)
+        .map(|token| token.location)
 }
 
 /// The span of the comma that opened an empty chunk: an empty chunk's boundary starts
@@ -726,19 +742,28 @@ mod tests {
     }
 
     #[test]
-    fn surrounding_separators_and_interior_spaces_are_insignificant() {
+    fn surrounding_line_breaks_and_interior_spaces_are_insignificant() {
         for text in [
             "\n  entrypoint Query.foo\n",
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
-            "entrypoint Query.foo,",
-            "\nentrypoint Query.foo,\n",
         ] {
             let parse = parsed(text);
             let declaration = as_entrypoint(&parse);
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
+        }
+    }
+
+    #[test]
+    fn a_trailing_comma_at_the_root_is_an_error() {
+        for text in ["entrypoint Query.foo,", "\nentrypoint Query.foo,\n"] {
+            assert_unparsed(
+                text,
+                expected(EndOfDeclaration, Found::Token(Comma)),
+                span_of(text, ","),
+            );
         }
     }
 

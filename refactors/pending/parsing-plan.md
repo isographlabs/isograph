@@ -24,11 +24,12 @@ Composite items own groups within their chunk: `foo(arg: 1) { bar }` is one sele
 
 ## Boundary rules
 
-A boundary is a chunk's trailing separator run: any number of line breaks and at most one comma. The rule of the language is that a comma must follow an item; line breaks are free.
+A boundary is a chunk's trailing separator run. The model: line breaks are swallowed by whatever precedes them, and commas are swallowed by nothing. An opening bracket, or the literal's start, swallows the line breaks at its level's start as it is parsed; an item swallows the line breaks after it. A comma is meaningful only as a delimiter between the items of a list.
 
-- A trailing comma is fine everywhere a boundary sits, the root level and the interior of a `[...]` type included. A comma before a level's first item is an error, as is a second comma in one boundary.
+- In a list (a selection set, a paren list, an object literal), a boundary carries at most one comma, and a trailing comma before the closing bracket is fine: `{ bar, }` parses.
+- In a one-item context (the root level, the interior of a `[...]` type), no comma is valid at all: `entrypoint Query.foo,`, `field Query.Foo { },`, and `[Pet,]` are errors at the comma.
 - No chunk requires a trailing boundary: `{ bar }` on one line parses, where upstream demanded a comma or line break after every selection, the last included. `{}` and `{\n}` are empty selection sets.
-- The earlier passes make the rule structural (one-comma-per-boundary.md, a prefactor to this series): the bracket matcher consumes the line breaks directly after an opening bracket as it parses the opening (and at the literal's start for the root level), and the chunking pass's boundary phase stops before a second comma, so an empty chunk exists exactly when a comma has no item before it, holding that comma as its boundary's first token. The grammar stage reports every empty chunk as a missing item, `Expected(<the level's item>, found ',')` at the comma, and never inspects a contentful chunk's boundary. An error-free parse contains no empty chunk.
+- The earlier passes make the comma rule structural (one-comma-per-boundary.md, a prefactor to this series): the bracket matcher swallows the line breaks after an opening as it parses it (and at the literal's start for the root level), and the chunking pass's boundary phase stops before a second comma, so an empty chunk exists exactly when a comma has no item before it, holding that comma as its boundary's first token. The grammar stage reports every empty chunk as a missing item, `Expected(<the level's item>, found ',')` at the comma; the only contentful boundary it inspects is a one-item context's, for the comma no list gives meaning there. An error-free parse contains no empty chunk.
 
 ## Language changes relative to upstream
 
@@ -48,7 +49,7 @@ A boundary is a chunk's trailing separator run: any number of line breaks and at
    !]               <- upstream: one list type; now: an error
    ```
 
-2. Separator placement loosens, on the trailing side only. A single trailing comma is valid everywhere a boundary sits, the root level and `[...]` interiors included, and no trailing separator is ever required, so `{ bar }` on one line parses. Upstream rejected those. Leading and doubled commas stay errors, as upstream.
+2. No trailing separator is ever required: `{ bar }` on one line parses, where upstream demanded a comma or line break after every selection, the last included. Comma placement otherwise matches upstream: trailing commas in lists parse, and a comma at the root, inside `[...]`, before a list's first item, or doubled is an error.
 
 3. Directives are deferred. Upstream parsed `@name(args)` on declarations and on selections; this series does not, and a later series adds them back. Until then an `@` is an ordinary unexpected token: `field Query.Foo @component { ... }` reports `Expected(<a selection set>, found '@')`.
 
