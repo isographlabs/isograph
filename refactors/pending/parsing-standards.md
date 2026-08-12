@@ -57,6 +57,15 @@ impl<'a> ChunkStream<'a> {
     /// empty at `previous_end`.
     pub(crate) fn take_next(&mut self) -> WithSpan<Taken<'a>>;
 
+    /// Runs a sub-parse and wraps its result in the span it consumed: from the start
+    /// of the first item the closure accepts to the end of its last, empty at
+    /// `previous_end` when it accepts none. The only source of a composite node's
+    /// span; a parser never joins spans by hand.
+    pub(crate) fn spanning<T>(
+        &mut self,
+        parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
+    ) -> Result<WithSpan<T>, WithSpan<ParseError>>;
+
     /// Nothing further may exist. The first leftover item is the error.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
 }
@@ -73,6 +82,8 @@ pub(crate) enum Taken<'a> {
 ```
 
 What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
+
+Spans follow the same rule as positions: a leaf's span is what `require_token` returned, an item's span is its `contents_span`, and a composite's span comes from `spanning`, upstream's `with_embedded_location_result` reborn without the location baggage. A hand-written `Span::join` in a parser is the anti-pattern; if a node's span cannot come from one of those three sources, that is a missing `ChunkStream` capability and an amendment here. Construction stays the landed passes' style, `WithSpan::new` and plain `Ok`/`Some`; upstream's postfix sugar (`wrap_ok`, `with_span`) is not adopted.
 
 ### Dispatch is a match
 
@@ -179,6 +190,14 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 - A list level is walked only by `parse_level_items`. It consumes `entries()`, turns `CommaWithoutItem` into the missing-item unparsed item, runs `parse_item` on a fresh `stream()`, and itself calls `require_end(Expectation::Separator)` after a successful item, so an item parser cannot forget the leftover check: item parsers parse their production and stop, and exhaustion is the walker's job.
 - A one-item context (the root level, a `[...]` interior) has its own walker (`declaration_chunk`, `parse_bracket_interior_type`), which enforces exactly one `Item`, errors on `CommaWithoutItem`, and rejects `boundary_comma` per no-final-comma.md. The end-of-chunk check is likewise the walker's, with its context's expectation (`EndOfDeclaration`, `EndOfType`).
 
+## Failure isolation
+
+A chunk fails without affecting any other chunk, held by three mechanisms:
+
+- A `ChunkStream` is built from one chunk and cannot read past it: separators and sibling chunks are not in it. There is no shared cursor to leave in a bad state, which is upstream's resynchronization problem (one `PeekableLexer` over the whole literal, so a failed production leaves the lexer wherever it stopped and everything after is suspect). Chunking pre-cut the input, so the recovery points are structural, not searched for.
+- `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`. The signature is the enforcement: an item parser's `Err` has nowhere to go but the walker's `unparsed` conversion, so a `?` cannot leak one chunk's failure into its siblings or its level. Errors escape only the one-item walkers, where the failed item is the whole context, and the stated granularity applies: the literal at the root, the containing item for a `[...]` inside a variable declaration.
+- Every `LevelEntry` yields exactly one output item: `Item` parses or degrades to unparsed, `CommaWithoutItem` degrades to unparsed. The output length equals the entry count, so a failure cannot shift a sibling's position, and the failed slot still resolves through its retained chunk.
+
 ## Errors
 
 - An error is a `WithSpan<ParseError>`, and the workhorse is `Expected(ExpectedFound { expected, found })`. The span covers the offending item, or is empty at the position the missing item belonged, which `ChunkStream` computes.
@@ -207,7 +226,7 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 
 Each standard above has a counterpart in upstream isograph's `isograph_lang_parser` (`parse_iso_literal.rs`, `peekable_lexer.rs`), where the constraint exists as convention or comment; here it is a rule, held by a type where one can hold it.
 
-- Function shapes. Upstream has one primitive, `parse_token_of_kind`, serving both the required and the optional case: callers write `...?` for the first and `if ....is_ok()` for the second, so the failure contract lives at each call site. The `require_*` / `consume_*` split puts that contract in the signature; `parse_delimited_list` is the ancestor of `parse_level_items`, and `PeekableLexer` the ancestor of `ChunkStream`.
+- Function shapes. Upstream has one primitive, `parse_token_of_kind`, serving both the required and the optional case: callers write `...?` for the first and `if ....is_ok()` for the second, so the failure contract lives at each call site. The `require_*` / `consume_*` split puts that contract in the signature; `parse_delimited_list` is the ancestor of `parse_level_items`, `PeekableLexer` the ancestor of `ChunkStream`, and `with_embedded_location_result` the ancestor of `spanning`, minus the `TextSource` it had to thread.
 - Backtracking. Upstream dispatches alternatives through `to_control_flow` chains that stay safe only while every alternative fails on its first, unconsumed token; the code cannot enforce that, and `parse_type_annotation` carries the comment admitting it: adding a case after the open bracket has been eaten "will leave the parser in an inconsistent state". Here `ChunkStream` offers no rewind and no raw peek, so that parser is unwritable.
 - Totality. Upstream is fail-fast (`DiagnosticResult`, first error aborts the literal) and panics on inputs it did not expect: `number.parse().expect(...)` on integer overflow, `unreachable!()` in the block-string lexer. Here every input yields a tree, degradation is local, and panics are banned.
 - Errors. Upstream errors are prose `String`s built inline throughout the parser, some with `Span::todo_generated()` where no span was threaded ("TODO get a span"). Here errors are structured (`Expected`/`Found`), a span is present by construction, and prose exists only in `Display`.
