@@ -5,7 +5,7 @@ use span::{Span, WithSpan};
 
 use crate::{
     BracketItem, Bracketed, CloseBracket, IsographResolutionNode, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, OpenBracket, RawToken,
+    NonBracketTokenKind, OpenBracket,
 };
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
@@ -18,11 +18,11 @@ use crate::{
 #[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 
-/// A maximal separator-free run of a level's items — tokens, groups, unmatched
-/// brackets, anything — plus the boundary that ended it when one did: line breaks and
-/// at most one comma, a second comma ending the boundary as well. The chunk-parsing
-/// pass consumes it as one unit. Every chunk but a level's last has a trailing
-/// separator by construction; the last's is the optional trailing delimiter.
+/// A maximal separator-free run of a level's items — tokens and groups — plus the
+/// boundary that ended it when one did: line breaks and at most one comma, a second
+/// comma ending the boundary as well. The chunk-parsing pass consumes it as one unit.
+/// Every chunk but a level's last has a trailing separator by construction; the last's
+/// is the optional trailing delimiter.
 /// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
 /// end.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -39,8 +39,6 @@ pub struct Chunk {
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ChunkContentItem {
     NonBracket(NonBracketToken),
-    UnmatchedOpen(#[resolve_field(parent_variant = Unmatched)] OpenBracket),
-    UnmatchedClose(#[resolve_field(parent_variant = Unmatched)] CloseBracket),
     Group(ChunkedGroup),
 }
 
@@ -49,12 +47,12 @@ pub enum ChunkContentItem {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedGroup {
-    #[resolve_field(parent_variant = Matched)]
+    #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
     #[resolve_field(parent_variant = Interior)]
     pub children: WithSpan<ChunkedLevel>,
-    #[resolve_field(parent_variant = Matched)]
+    #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
 }
 
@@ -88,16 +86,8 @@ pub type ChunkSeparatorPath<'a> = PositionResolutionPath<&'a ChunkSeparator, Chu
 
 pub type NonBracketTokenPath<'a> = PositionResolutionPath<&'a NonBracketToken, ChunkPath<'a>>;
 
-/// Shared by `OpenBracket` and `CloseBracket`: a bracket token is a group's own
-/// opening or closing, or unmatched content of a chunk.
-#[derive(Debug)]
-pub enum BracketTokenParent<'a> {
-    Matched(ChunkedGroupPath<'a>),
-    Unmatched(ChunkPath<'a>),
-}
-
-pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, BracketTokenParent<'a>>;
-pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, BracketTokenParent<'a>>;
+pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, ChunkedGroupPath<'a>>;
+pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, ChunkedGroupPath<'a>>;
 
 type LevelItems<'a> = SafePeekable<std::slice::Iter<'a, WithSpan<BracketItem>>>;
 
@@ -126,7 +116,7 @@ fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
 
 fn separator_of(item: &WithSpan<BracketItem>) -> Option<SeparatorToken> {
     match &item.item {
-        BracketItem::Raw(RawToken::NonBracket(token)) => separator_token(token.0),
+        BracketItem::Raw(token) => separator_token(token.0),
         _ => None,
     }
 }
@@ -141,15 +131,13 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
     let mut contents = Vec::new();
     while let Some(peek) = items.peek() {
         let content_item = match &peek.view().item {
-            BracketItem::Raw(RawToken::NonBracket(token)) => {
+            BracketItem::Raw(token) => {
                 if separator_token(token.0).is_some() {
                     // A separator ends the content phase.
                     break;
                 }
                 ChunkContentItem::NonBracket(*token)
             }
-            BracketItem::Raw(RawToken::Open(open)) => ChunkContentItem::UnmatchedOpen(*open),
-            BracketItem::Raw(RawToken::Close(close)) => ChunkContentItem::UnmatchedClose(*close),
             BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group)),
         };
         let item = peek.commit();
@@ -202,18 +190,17 @@ mod tests {
     use resolve_position::ResolvePosition;
 
     use super::*;
-    use crate::{
-        match_brackets, tokenize, BracketError, BracketKind, NonBracketTokenKind, OpenBracket,
-        CloseBracket,
-    };
-    use BracketKind::{Brace, Parenthesis};
+    use crate::{BracketError, BracketKind, NonBracketTokenKind, match_brackets, tokenize};
+    use BracketKind::Brace;
 
-    fn tree(literal: &str) -> WithSpan<MatchedBrackets> {
+    fn tree(literal: &str) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
         match_brackets(tokenize(literal), literal.len() as u32)
     }
 
     fn chunked(literal: &str) -> WithSpan<ChunkedLevel> {
-        chunk(&tree(literal))
+        let (tree, errors) = tree(literal);
+        assert_eq!(errors, vec![]);
+        chunk(&tree)
     }
 
     /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
@@ -260,20 +247,6 @@ mod tests {
         match item {
             ChunkContentItem::NonBracket(token) => *token,
             other => panic!("expected a non-bracket token, got {other:?}"),
-        }
-    }
-
-    fn as_unmatched_open(item: &ChunkContentItem) -> OpenBracket {
-        match item {
-            ChunkContentItem::UnmatchedOpen(open) => *open,
-            other => panic!("expected an unmatched open, got {other:?}"),
-        }
-    }
-
-    fn as_unmatched_close(item: &ChunkContentItem) -> CloseBracket {
-        match item {
-            ChunkContentItem::UnmatchedClose(close) => *close,
-            other => panic!("expected an unmatched close, got {other:?}"),
         }
     }
 
@@ -436,15 +409,6 @@ mod tests {
     }
 
     #[test]
-    fn a_demoted_brace_leaves_its_line_break_as_a_boundary() {
-        let text = "foo {\n bar";
-        let tree = chunked(text);
-        assert_eq!(tree.item.0.len(), 2);
-        assert_eq!(render_chunk(text, &tree.item.0[0].item), "foo {\n");
-        assert_eq!(render_chunk(text, &tree.item.0[1].item), "bar");
-    }
-
-    #[test]
     fn a_captured_line_break_resolves_to_its_level() {
         let text = "\nfoo {\n bar }";
         let tree = chunked(text);
@@ -493,17 +457,20 @@ mod tests {
     #[test]
     fn an_unmatched_close_rides_inside_a_chunk_and_errors_stay_on_the_bracket_tree() {
         let text = "a ) b";
-        let brackets = tree(text);
+        let (brackets, errors) = tree(text);
         let tree = chunk(&brackets);
         assert_eq!(tree.item.0.len(), 1);
         let top = &tree.item.0[0].item;
-        assert_eq!(top.contents.len(), 3);
+        assert_eq!(top.contents.len(), 1);
         assert_eq!(
-            as_unmatched_close(content_item(top, 1)),
-            CloseBracket(Parenthesis)
+            as_non_bracket(content_item(top, 0)).0,
+            NonBracketTokenKind::Identifier
         );
-        match brackets.item.errors().as_slice() {
+        assert_eq!(top.contents[0].location, span_of(text, "a"));
+        assert_eq!(render_chunk(text, top), "a");
+        match errors.as_slice() {
             [BracketError::UnmatchedClose(close)] => {
+                assert_eq!(close.item.0, BracketKind::Parenthesis);
                 assert_eq!(close.location, span_of(text, ")"));
             }
             errors => panic!("expected exactly the unmatched close, got {errors:?}"),
@@ -513,22 +480,24 @@ mod tests {
     #[test]
     fn an_unclosed_brace_demotes_to_raw_items_at_the_top() {
         let text = "foo { bar";
-        let tree = chunked(text);
+        let (brackets, errors) = tree(text);
+        let tree = chunk(&brackets);
         assert_eq!(tree.item.0.len(), 1);
         let top = &tree.item.0[0].item;
-        assert_eq!(top.contents.len(), 3);
+        assert_eq!(top.contents.len(), 1);
         assert_eq!(
             as_non_bracket(content_item(top, 0)).0,
             NonBracketTokenKind::Identifier
         );
-        assert_eq!(
-            as_unmatched_open(content_item(top, 1)),
-            OpenBracket(Brace)
-        );
-        assert_eq!(
-            as_non_bracket(content_item(top, 2)).0,
-            NonBracketTokenKind::Identifier
-        );
+        assert_eq!(top.contents[0].location, span_of(text, "foo"));
+        assert_eq!(render_chunk(text, top), "foo");
+        match errors.as_slice() {
+            [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.item.0, Brace);
+                assert_eq!(open.location, span_of(text, "{"));
+            }
+            errors => panic!("expected exactly the unmatched open, got {errors:?}"),
+        }
     }
 
     #[test]
@@ -559,68 +528,20 @@ mod tests {
     }
 
     #[test]
-    fn an_unmatched_open_resolves_with_the_host_chunk_as_parent() {
-        let text = "foo { ( }";
-        let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "(")) {
-            IsographResolutionNode::OpenBracket(open) => {
-                assert_eq!(open.inner.0, Parenthesis);
-                match open.parent {
-                    BracketTokenParent::Unmatched(chunk_path) => {
-                        assert!(matches!(
-                            chunk_path.parent.parent,
-                            ChunkedLevelParent::Interior(_)
-                        ));
-                    }
-                    parent => panic!("expected an unmatched open, got {parent:?}"),
-                }
-            }
-            node => panic!("expected the open bracket leaf, got {node:?}"),
-        }
-    }
-
-    #[test]
-    fn an_unmatched_close_at_the_root_resolves_with_the_root_level() {
-        let text = "a }";
-        let tree = chunked(text);
-        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "}")) {
-            IsographResolutionNode::CloseBracket(close) => {
-                assert_eq!(close.inner.0, Brace);
-                match close.parent {
-                    BracketTokenParent::Unmatched(chunk_path) => {
-                        assert!(matches!(
-                            chunk_path.parent.parent,
-                            ChunkedLevelParent::Root
-                        ));
-                    }
-                    parent => panic!("expected an unmatched close, got {parent:?}"),
-                }
-            }
-            node => panic!("expected the close bracket leaf, got {node:?}"),
-        }
-    }
-
-    #[test]
     fn a_matched_pair_resolves_with_its_group_as_parent() {
         let text = "foo { bar }";
         let tree = chunked(text);
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
-            IsographResolutionNode::OpenBracket(open) => match open.parent {
-                BracketTokenParent::Matched(group) => {
-                    assert_eq!(group.inner.closing.item.0, Brace);
-                    assert_eq!(render_chunk(text, group.parent.inner), "foo { bar }");
-                }
-                parent => panic!("expected a matched open, got {parent:?}"),
-            },
+            IsographResolutionNode::OpenBracket(open) => {
+                assert_eq!(open.parent.inner.closing.item.0, Brace);
+                assert_eq!(render_chunk(text, open.parent.parent.inner), "foo { bar }");
+            }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "}")) {
-            IsographResolutionNode::CloseBracket(close) => match close.parent {
-                BracketTokenParent::Matched(group) => {
-                    assert_eq!(group.inner.opening.item.0, Brace);
-                }
-                parent => panic!("expected a matched close, got {parent:?}"),
-            },
+            IsographResolutionNode::CloseBracket(close) => {
+                assert_eq!(close.parent.inner.opening.item.0, Brace);
+            }
             node => panic!("expected the close bracket leaf, got {node:?}"),
         }
     }
@@ -687,12 +608,12 @@ mod tests {
         }
 
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
-            IsographResolutionNode::OpenBracket(open) => match open.parent {
-                BracketTokenParent::Matched(group) => {
-                    assert_eq!(render_chunk(text, group.parent.inner), "foo { bar, baz }");
-                }
-                parent => panic!("expected a matched open, got {parent:?}"),
-            },
+            IsographResolutionNode::OpenBracket(open) => {
+                assert_eq!(
+                    render_chunk(text, open.parent.parent.inner),
+                    "foo { bar, baz }"
+                );
+            }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
 
@@ -770,17 +691,46 @@ mod tests {
     }
 
     #[test]
-    fn an_unmatched_close_resolves_inside_its_host_chunk() {
+    fn a_dropped_close_and_the_text_after_it_resolve_to_the_root_level() {
         let text = "a ) b";
-        let tree = chunked(text);
+        let (brackets, errors) = tree(text);
+        match errors.as_slice() {
+            [BracketError::UnmatchedClose(close)] => {
+                assert_eq!(close.location, span_of(text, ")"));
+            }
+            errors => panic!("expected exactly the unmatched close, got {errors:?}"),
+        }
+        let tree = chunk(&brackets);
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, ")")) {
-            IsographResolutionNode::CloseBracket(close) => match close.parent {
-                BracketTokenParent::Unmatched(chunk_path) => {
-                    assert_eq!(render_chunk(text, chunk_path.inner), "a ) b");
-                }
-                parent => panic!("expected an unmatched close, got {parent:?}"),
-            },
-            node => panic!("expected the close bracket leaf, got {node:?}"),
+            IsographResolutionNode::ChunkedLevel(level) => {
+                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+            }
+            node => panic!("expected the root level, got {node:?}"),
+        }
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "b")) {
+            IsographResolutionNode::ChunkedLevel(level) => {
+                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+            }
+            node => panic!("expected the root level, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_dropped_open_inside_a_matched_brace_resolves_to_the_interior_level() {
+        let text = "foo { ( }";
+        let (brackets, errors) = tree(text);
+        match errors.as_slice() {
+            [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.location, span_of(text, "("));
+            }
+            errors => panic!("expected exactly the unmatched open, got {errors:?}"),
+        }
+        let tree = chunk(&brackets);
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "(")) {
+            IsographResolutionNode::ChunkedLevel(level) => {
+                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+            }
+            node => panic!("expected the interior level, got {node:?}"),
         }
     }
 }

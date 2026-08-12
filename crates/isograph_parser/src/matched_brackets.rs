@@ -4,7 +4,7 @@ use scoped_stack::Stack;
 use span::{Span, WithSpan};
 
 use crate::{
-    BracketKind, BracketToken, BracketTokenParent, ChunkPath, IsographLangTokenKind,
+    BracketKind, BracketToken, ChunkPath, ChunkedGroupPath, IsographLangTokenKind,
     IsographResolutionNode, NonBracketTokenKind, SplitToken,
 };
 
@@ -14,7 +14,7 @@ pub struct MatchedBrackets(pub Vec<WithSpan<BracketItem>>);
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketItem {
-    Raw(RawToken),
+    Raw(NonBracketToken),
     Bracketed(Bracketed),
 }
 
@@ -26,85 +26,43 @@ pub struct Bracketed {
     pub closing: WithSpan<CloseBracket>,
 }
 
-/// A token that is not part of any structure; matched brackets are structure, never
-/// raw, so a bracket token here is unmatched.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub enum RawToken {
-    NonBracket(NonBracketToken),
-    Open(OpenBracket),
-    Close(CloseBracket),
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
-/// An opening bracket; its parent says whether it is a group's own opening or
-/// unmatched content of a chunk.
+/// An opening bracket: a group's own opening.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkedGroupPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct OpenBracket(pub BracketKind);
 
-/// A closing bracket; its parent says whether it is a group's own closing or
-/// unmatched content of a chunk.
+/// A closing bracket: a group's own closing.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = BracketTokenParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkedGroupPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct CloseBracket(pub BracketKind);
 
+/// The matcher's errors, returned beside the tree, in source order. The tree cannot
+/// represent them: each cut its level at its position.
 #[derive(Debug, PartialEq, Eq)]
 pub enum BracketError {
-    /// An open bracket that sits raw in a level: its group never closed.
+    /// An open bracket whose close never came.
     UnmatchedOpen(WithSpan<OpenBracket>),
-    /// A close bracket that sits raw in a level: no open of its kind was waiting.
+    /// A close bracket no enclosing group owns.
     UnmatchedClose(WithSpan<CloseBracket>),
-}
-
-impl MatchedBrackets {
-    /// Every unmatched bracket under this level, in source order.
-    pub fn errors(&self) -> Vec<BracketError> {
-        let mut errors = Vec::new();
-        collect_errors(self, &mut errors);
-        errors
-    }
-}
-
-fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
-    for item in &level.0 {
-        match &item.item {
-            BracketItem::Raw(RawToken::NonBracket(_)) => {}
-            BracketItem::Raw(RawToken::Open(open)) => {
-                errors.push(BracketError::UnmatchedOpen(WithSpan::new(
-                    *open,
-                    item.location,
-                )));
-            }
-            BracketItem::Raw(RawToken::Close(close)) => {
-                errors.push(BracketError::UnmatchedClose(WithSpan::new(
-                    *close,
-                    item.location,
-                )));
-            }
-            BracketItem::Bracketed(group) => collect_errors(&group.children.item, errors),
-        }
-    }
 }
 
 type TokenStream = SafePeekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
 /// Line breaks at the start of the items an opening leads are captured by that opening:
 /// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
-/// literal's start always leads its items; a group's opening leads them only once the
-/// group closes, so a demoted opening captures nothing and its line breaks return to
-/// the parent level as ordinary tokens.
+/// literal's start always leads its items, and a group's opening leads them once the
+/// group closes; an unclosed group yields nothing, so no other case exists.
 fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
     let captured = items
         .iter()
         .position(|item| {
             !matches!(
                 item.item,
-                BracketItem::Raw(RawToken::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::LineBreak
-                )))
+                BracketItem::Raw(NonBracketToken(NonBracketTokenKind::LineBreak))
             )
         })
         .unwrap_or(items.len());
@@ -116,75 +74,87 @@ fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
 pub fn match_brackets(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
     literal_length: u32,
-) -> WithSpan<MatchedBrackets> {
+) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
     let mut tokens = tokens.into_iter().safe_peekable();
     // The kind of every group the level being parsed sits inside, innermost last. The
     // stack exists to classify a close that does not close the innermost group: in
-    // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
-    // token, while a brace is on the stack, so the `}` closes the group.
+    // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is unmatched,
+    // while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
-    let mut items = parse_items(&mut tokens, &mut enclosing_stack);
+    let mut errors = Vec::new();
+    let mut items = parse_items(&mut tokens, &mut enclosing_stack, &mut errors);
     strip_captured_line_breaks(&mut items);
-    WithSpan::new(MatchedBrackets(items), Span::new(0, literal_length))
+    errors.sort_by_key(|error| match error {
+        BracketError::UnmatchedOpen(open) => open.location.start,
+        BracketError::UnmatchedClose(close) => close.location.start,
+    });
+    (
+        WithSpan::new(MatchedBrackets(items), Span::new(0, literal_length)),
+        errors,
+    )
 }
 
-/// What parsing a group produced: the group closed for real, or it never got its close,
-/// in which case the caller stores the opening as a raw item and the children as its
-/// siblings.
+/// What parsing a group produced. An unclosed group records its error inside
+/// `parse_bracketed` and yields nothing: its opening and everything it would have
+/// contained are the cut of the caller's level.
 enum ParsedGroup {
     Closed(Bracketed),
-    Unclosed(UnclosedGroup),
+    Unclosed,
 }
 
-struct UnclosedGroup {
-    opening: WithSpan<OpenBracket>,
-    children: Vec<WithSpan<BracketItem>>,
+/// Whether a level is still emitting items, or was cut at its first unmatched bracket:
+/// from `Cut` on, tokens are consumed and diagnosed but produce nothing.
+enum Emission {
+    Emitting,
+    Cut,
 }
 
 fn parse_items(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
+    errors: &mut Vec<BracketError>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
+    let mut emission = Emission::Emitting;
     while let Some(peek) = tokens.peek() {
         match SplitToken::from(peek.view().item) {
             SplitToken::NonBracket(kind) => {
                 let token = peek.commit();
-                items.push(WithSpan::new(
-                    BracketItem::Raw(RawToken::NonBracket(NonBracketToken(kind))),
-                    token.location,
-                ));
+                if let Emission::Emitting = emission {
+                    items.push(WithSpan::new(
+                        BracketItem::Raw(NonBracketToken(kind)),
+                        token.location,
+                    ));
+                }
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 let token = peek.commit();
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
-                match parse_bracketed(tokens, enclosing_stack, opening) {
+                match parse_bracketed(tokens, enclosing_stack, errors, opening) {
                     ParsedGroup::Closed(group) => {
-                        let span =
-                            Span::join(group.opening.location, group.closing.location);
-                        items.push(WithSpan::new(BracketItem::Bracketed(group), span));
+                        if let Emission::Emitting = emission {
+                            let span = Span::join(group.opening.location, group.closing.location);
+                            items.push(WithSpan::new(BracketItem::Bracketed(group), span));
+                        }
                     }
-                    ParsedGroup::Unclosed(UnclosedGroup { opening, children }) => {
-                        items.push(WithSpan::new(
-                            BracketItem::Raw(RawToken::Open(opening.item)),
-                            opening.location,
-                        ));
-                        items.extend(children);
+                    ParsedGroup::Unclosed => {
+                        emission = Emission::Cut;
                     }
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
                 if enclosing_stack.all().contains(&kind) {
                     // Some enclosing group owns this close. Dropping the peek leaves it
-                    // unconsumed, which is what takes apart every group between here and
-                    // its owner.
+                    // unconsumed for its owner; every group between here and the owner
+                    // reports unclosed.
                     break;
                 }
                 let token = peek.commit();
-                items.push(WithSpan::new(
-                    BracketItem::Raw(RawToken::Close(CloseBracket(kind))),
+                errors.push(BracketError::UnmatchedClose(WithSpan::new(
+                    CloseBracket(kind),
                     token.location,
-                ));
+                )));
+                emission = Emission::Cut;
             }
         }
     }
@@ -192,22 +162,17 @@ fn parse_items(
 }
 
 /// One group, whose opening the caller already consumed. Its own close closes it; at a
-/// close an enclosing group owns, or at the end of the tokens, it never closes.
+/// close an enclosing group owns, or at the end of the tokens, it never closes, and it
+/// yields nothing but its error.
 fn parse_bracketed(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
+    errors: &mut Vec<BracketError>,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
     let mut children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
-        parse_items(tokens, enclosing_stack)
+        parse_items(tokens, enclosing_stack, errors)
     });
-
-    // parse_items stopped at this group's own close, at a close an enclosing group
-    // owns, or at the end of the tokens; only the first is consumed. In `foo { ( }`,
-    // the paren's items stop at the `}` because the brace owns it, and the paren
-    // refusing it here leaves it in the stream for the brace, which consumes it one
-    // level up as its own. A close is consumed only by the group it closes. Dropping
-    // the peek leaves the stopping close for its owner.
     match tokens.peek() {
         Some(peek)
             if SplitToken::from(peek.view().item)
@@ -223,7 +188,10 @@ fn parse_bracketed(
                 closing,
             })
         }
-        _ => ParsedGroup::Unclosed(UnclosedGroup { opening, children }),
+        _ => {
+            errors.push(BracketError::UnmatchedOpen(opening));
+            ParsedGroup::Unclosed
+        }
     }
 }
 
@@ -233,8 +201,16 @@ mod tests {
     use crate::tokenize;
     use BracketKind::{Brace, Parenthesis};
 
-    fn tree(literal: &str) -> WithSpan<MatchedBrackets> {
+    fn tree(literal: &str) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
         match_brackets(tokenize(literal), literal.len() as u32)
+    }
+
+    /// The tree of a fixture that must produce no bracket errors; failing loudly here
+    /// keeps a well-formed test from silently exercising a cut tree.
+    fn well_formed(literal: &str) -> WithSpan<MatchedBrackets> {
+        let (tree, errors) = tree(literal);
+        assert_eq!(errors, vec![]);
+        tree
     }
 
     /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
@@ -251,7 +227,7 @@ mod tests {
         Span::from_usize(offset, offset + pattern.len())
     }
 
-    fn raw(items: &[WithSpan<BracketItem>], index: usize) -> RawToken {
+    fn raw(items: &[WithSpan<BracketItem>], index: usize) -> NonBracketToken {
         match &items[index].item {
             BracketItem::Raw(token) => *token,
             item => panic!("expected a raw token at {index}, got {item:?}"),
@@ -267,18 +243,17 @@ mod tests {
 
     #[test]
     fn text_outside_any_bracket_is_raw_items() {
-        let tree = tree("field Query.Foo");
+        let tree = well_formed("field Query.Foo");
         assert_eq!(tree.item.0.len(), 4);
         for index in 0..4 {
-            assert!(matches!(raw(&tree.item.0, index), RawToken::NonBracket(_)));
+            raw(&tree.item.0, index);
         }
-        assert_eq!(tree.item.errors(), vec![]);
     }
 
     #[test]
     fn balanced_input_nests_as_typed() {
         let text = "field Query.Foo { bar(arg: [1, 2]) { id } }";
-        let tree = tree(text);
+        let tree = well_formed(text);
         let brace = group(&tree.item.0, 4);
         assert_eq!(brace.opening.item.0, Brace);
         let brace_anchor = span_of(text, "{ bar");
@@ -290,20 +265,37 @@ mod tests {
         assert_eq!(parenthesis.opening.item.0, Parenthesis);
         let square = group(&parenthesis.children.item.0, 2);
         assert_eq!(square.opening.item.0, BracketKind::Bracket);
-        assert_eq!(tree.item.errors(), vec![]);
     }
 
     #[test]
     fn a_stray_close_is_a_raw_item_inside_the_brace() {
-        let text = "foo { ) }";
-        let tree = tree(text);
-        let brace = group(&tree.item.0, 1);
+        let text = "{ foo, bar) }";
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 1);
+        let brace = group(&tree.item.0, 0);
+        assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(brace.opening.location, span_of(text, "{"));
+        assert_eq!(brace.closing.item.0, Brace);
+        assert_eq!(brace.closing.location, span_of(text, "}"));
+        assert_eq!(brace.children.item.0.len(), 3);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::Close(CloseBracket(Parenthesis))
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
-        match tree.item.errors().as_slice() {
+        assert_eq!(brace.children.item.0[0].location, span_of(text, "foo"));
+        assert_eq!(
+            raw(&brace.children.item.0, 1),
+            NonBracketToken(NonBracketTokenKind::Comma)
+        );
+        assert_eq!(brace.children.item.0[1].location, span_of(text, ","));
+        assert_eq!(
+            raw(&brace.children.item.0, 2),
+            NonBracketToken(NonBracketTokenKind::Identifier)
+        );
+        assert_eq!(brace.children.item.0[2].location, span_of(text, "bar"));
+        match errors.as_slice() {
             [BracketError::UnmatchedClose(close)] => {
+                assert_eq!(close.item.0, Parenthesis);
                 assert_eq!(close.location, span_of(text, ")"));
             }
             errors => panic!("expected exactly the unmatched close, got {errors:?}"),
@@ -313,14 +305,22 @@ mod tests {
     #[test]
     fn an_unclosed_open_is_a_raw_item_inside_the_brace() {
         let text = "foo { ( }";
-        let tree = tree(text);
-        let brace = group(&tree.item.0, 1);
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            raw(&tree.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
-        match tree.item.errors().as_slice() {
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
+        let brace = group(&tree.item.0, 1);
+        assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(brace.opening.location, span_of(text, "{"));
+        assert_eq!(brace.closing.item.0, Brace);
+        assert_eq!(brace.closing.location, span_of(text, "}"));
+        assert_eq!(brace.children.item.0.len(), 0);
+        match errors.as_slice() {
             [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.item.0, Parenthesis);
                 assert_eq!(open.location, span_of(text, "("));
             }
             errors => panic!("expected exactly the unmatched open, got {errors:?}"),
@@ -329,57 +329,80 @@ mod tests {
 
     #[test]
     fn crossing_junk_leaks_past_the_early_close() {
-        let text = "foo { (}) }";
-        let tree = tree(text);
-        assert_eq!(tree.item.0.len(), 4);
-        let brace = group(&tree.item.0, 1);
+        let text = "foo { (} )";
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            raw(&tree.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
-        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(CloseBracket(Parenthesis)));
-        assert_eq!(raw(&tree.item.0, 3), RawToken::Close(CloseBracket(Brace)));
-        match tree.item.errors().as_slice() {
-            [
-                BracketError::UnmatchedOpen(open),
-                BracketError::UnmatchedClose(parenthesis),
-                BracketError::UnmatchedClose(brace_close),
-            ] => {
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
+        let brace = group(&tree.item.0, 1);
+        assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(brace.opening.location, span_of(text, "{"));
+        assert_eq!(brace.closing.item.0, Brace);
+        assert_eq!(brace.closing.location, span_of(text, "}"));
+        assert_eq!(brace.children.item.0.len(), 0);
+        match errors.as_slice() {
+            [BracketError::UnmatchedOpen(open), BracketError::UnmatchedClose(close)] => {
+                assert_eq!(open.item.0, Parenthesis);
                 assert_eq!(open.location, span_of(text, "("));
-                assert_eq!(parenthesis.location, span_of(text, ")"));
-                let tail = span_of(text, ") }");
-                assert_eq!(brace_close.location, Span::new(tail.end - 1, tail.end));
+                assert_eq!(close.item.0, Parenthesis);
+                assert_eq!(close.location, span_of(text, ")"));
             }
-            errors => panic!("expected three unmatched brackets, got {errors:?}"),
+            errors => panic!("expected unmatched open then unmatched close, got {errors:?}"),
         }
     }
 
     #[test]
     fn an_extra_close_after_the_balanced_brace_is_raw_at_the_top() {
         let text = "foo { ( } }";
-        let tree = tree(text);
-        assert_eq!(tree.item.0.len(), 3);
-        let brace = group(&tree.item.0, 1);
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
-            RawToken::Open(OpenBracket(Parenthesis))
+            raw(&tree.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
-        assert_eq!(raw(&tree.item.0, 2), RawToken::Close(CloseBracket(Brace)));
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
+        let brace = group(&tree.item.0, 1);
+        assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(brace.children.item.0.len(), 0);
+        match errors.as_slice() {
+            [BracketError::UnmatchedOpen(open), BracketError::UnmatchedClose(close)] => {
+                assert_eq!(open.item.0, Parenthesis);
+                assert_eq!(open.location, span_of(text, "("));
+                assert_eq!(close.item.0, Brace);
+                let tail = span_of(text, "} }");
+                assert_eq!(close.location, Span::new(tail.end - 1, tail.end));
+            }
+            errors => panic!("expected unmatched open then unmatched close, got {errors:?}"),
+        }
     }
 
     #[test]
     fn an_unclosed_open_inside_a_matched_brace_is_the_only_error() {
         let text = "foo { bar(a: }";
-        let tree = tree(text);
+        let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 2);
+        assert_eq!(
+            raw(&tree.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
+        );
+        assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
         let brace = group(&tree.item.0, 1);
         assert_eq!(brace.opening.item.0, Brace);
+        assert_eq!(brace.opening.location, span_of(text, "{"));
+        assert_eq!(brace.closing.item.0, Brace);
+        assert_eq!(brace.closing.location, span_of(text, "}"));
+        assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
-            raw(&brace.children.item.0, 1),
-            RawToken::Open(OpenBracket(Parenthesis))
+            raw(&brace.children.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
-        match tree.item.errors().as_slice() {
+        assert_eq!(brace.children.item.0[0].location, span_of(text, "bar"));
+        match errors.as_slice() {
             [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.item.0, Parenthesis);
                 assert_eq!(open.location, span_of(text, "("));
             }
             errors => panic!("expected exactly the unmatched open, got {errors:?}"),
@@ -389,16 +412,16 @@ mod tests {
     #[test]
     fn the_close_pairs_with_the_nearest_open() {
         let text = "a { b { c }";
-        let tree = tree(text);
-        assert_eq!(tree.item.0.len(), 4);
-        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
-        let inner = group(&tree.item.0, 3);
-        assert!(matches!(
-            raw(&inner.children.item.0, 0),
-            RawToken::NonBracket(_)
-        ));
-        match tree.item.errors().as_slice() {
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 1);
+        assert_eq!(
+            raw(&tree.item.0, 0),
+            NonBracketToken(NonBracketTokenKind::Identifier)
+        );
+        assert_eq!(tree.item.0[0].location, span_of(text, "a"));
+        match errors.as_slice() {
             [BracketError::UnmatchedOpen(open)] => {
+                assert_eq!(open.item.0, Brace);
                 let open_anchor = span_of(text, "{ b");
                 assert_eq!(
                     open.location,
@@ -411,23 +434,25 @@ mod tests {
 
     #[test]
     fn brackets_inside_strings_are_not_structural() {
-        let tree = tree("{ name: \"a}\" }");
+        let tree = well_formed("{ name: \"a}\" }");
         let brace = group(&tree.item.0, 0);
         assert_eq!(brace.children.item.0.len(), 3);
-        assert_eq!(tree.item.errors(), vec![]);
     }
 
     #[test]
     fn a_wrong_kind_close_inside_a_matched_pair_is_raw() {
         let text = "( } )";
-        let tree = tree(text);
+        let (tree, errors) = tree(text);
+        assert_eq!(tree.item.0.len(), 1);
         let parenthesis = group(&tree.item.0, 0);
-        assert_eq!(
-            raw(&parenthesis.children.item.0, 0),
-            RawToken::Close(CloseBracket(Brace))
-        );
-        match tree.item.errors().as_slice() {
+        assert_eq!(parenthesis.opening.item.0, Parenthesis);
+        assert_eq!(parenthesis.opening.location, span_of(text, "("));
+        assert_eq!(parenthesis.closing.item.0, Parenthesis);
+        assert_eq!(parenthesis.closing.location, span_of(text, ")"));
+        assert_eq!(parenthesis.children.item.0.len(), 0);
+        match errors.as_slice() {
             [BracketError::UnmatchedClose(close)] => {
+                assert_eq!(close.item.0, Brace);
                 assert_eq!(close.location, span_of(text, "}"));
             }
             errors => panic!("expected exactly the unmatched close, got {errors:?}"),
@@ -437,7 +462,7 @@ mod tests {
     #[test]
     fn spans_cover_the_literal_and_each_interior() {
         let text = "  { a }  ";
-        let tree = tree(text);
+        let tree = well_formed(text);
         assert_eq!(tree.location, Span::from_usize(0, text.len()));
         let brace = group(&tree.item.0, 0);
         assert_eq!(
@@ -449,39 +474,27 @@ mod tests {
     #[test]
     fn a_closed_groups_opening_captures_the_line_breaks_after_it() {
         let text = "foo {\n\n bar\n}";
-        let tree = tree(text);
+        let tree = well_formed(text);
         let brace = group(&tree.item.0, 1);
         assert_eq!(brace.children.item.0.len(), 2);
         assert_eq!(
             raw(&brace.children.item.0, 0),
-            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(
             raw(&brace.children.item.0, 1),
-            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
-        );
-    }
-
-    #[test]
-    fn a_demoted_opening_captures_nothing() {
-        let text = "foo {\n bar";
-        let tree = tree(text);
-        assert_eq!(tree.item.0.len(), 4);
-        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
-        assert_eq!(
-            raw(&tree.item.0, 2),
-            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
+            NonBracketToken(NonBracketTokenKind::LineBreak)
         );
     }
 
     #[test]
     fn the_literal_start_captures_its_line_breaks() {
         let text = "\n\nfoo";
-        let tree = tree(text);
+        let tree = well_formed(text);
         assert_eq!(tree.item.0.len(), 1);
         assert_eq!(
             raw(&tree.item.0, 0),
-            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+            NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.location, Span::from_usize(0, text.len()));
     }
