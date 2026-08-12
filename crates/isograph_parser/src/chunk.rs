@@ -150,7 +150,9 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
             break;
         };
         if separator == SeparatorToken::Comma
-            && separators.iter().any(|absorbed| absorbed.item == SeparatorToken::Comma)
+            && separators
+                .iter()
+                .any(|absorbed| absorbed.item == SeparatorToken::Comma)
         {
             // The second comma opens the next chunk's boundary.
             break;
@@ -329,12 +331,24 @@ mod tests {
         assert_eq!(comma.item.0.len(), 2);
         assert_eq!(linebreak.item.0.len(), 2);
         assert_eq!(
-            separator_kinds(&comma.item.0[0].item.trailing_separator.as_ref().unwrap().item),
+            separator_kinds(
+                &comma.item.0[0]
+                    .item
+                    .trailing_separator
+                    .as_ref()
+                    .unwrap()
+                    .item
+            ),
             vec![SeparatorToken::Comma]
         );
         assert_eq!(
             separator_kinds(
-                &linebreak.item.0[0].item.trailing_separator.as_ref().unwrap().item
+                &linebreak.item.0[0]
+                    .item
+                    .trailing_separator
+                    .as_ref()
+                    .unwrap()
+                    .item
             ),
             vec![SeparatorToken::LineBreak]
         );
@@ -354,7 +368,10 @@ mod tests {
         let tree = chunked(interior);
         let brace = as_group(content_item(&tree.item.0[0].item, 1));
         assert_eq!(brace.children.item.0.len(), 1);
-        assert_eq!(render_chunk(interior, &brace.children.item.0[0].item), "bar\n");
+        assert_eq!(
+            render_chunk(interior, &brace.children.item.0[0].item),
+            "bar\n"
+        );
     }
 
     #[test]
@@ -394,7 +411,10 @@ mod tests {
             vec![SeparatorToken::Comma]
         );
         let second_comma = span_of(text, ",b");
-        assert_eq!(middle.location, Span::new(second_comma.start, second_comma.start + 1));
+        assert_eq!(
+            middle.location,
+            Span::new(second_comma.start, second_comma.start + 1)
+        );
         assert_eq!(render_chunk(text, &tree.item.0[2].item), "b");
     }
 
@@ -419,7 +439,10 @@ mod tests {
             node => panic!("expected the root level, got {node:?}"),
         }
         let opening = span_of(text, "{\n");
-        match tree.resolve(ChunkedLevelParent::Root, Span::new(opening.start + 1, opening.end)) {
+        match tree.resolve(
+            ChunkedLevelParent::Root,
+            Span::new(opening.start + 1, opening.end),
+        ) {
             IsographResolutionNode::ChunkedLevel(level) => {
                 assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
             }

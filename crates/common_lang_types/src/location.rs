@@ -2,8 +2,8 @@ use intern::string_key::{Intern, Lookup};
 use prelude::Postfix;
 use std::path::PathBuf;
 
-pub use span::WithGenericLocation;
 use span::Span;
+pub use span::WithGenericLocation;
 
 use crate::{CurrentWorkingDirectory, RelativePathToSourceFile};
 

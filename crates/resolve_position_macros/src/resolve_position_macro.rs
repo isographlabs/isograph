@@ -116,9 +116,7 @@ fn handle_data_enum(
             syn::Fields::Unnamed(fields) => {
                 let mut payloads = fields.unnamed.iter();
                 match (payloads.next(), payloads.next()) {
-                    (Some(payload), None) => {
-                        generate_enum_arm(&enum_name, variant_name, payload)
-                    }
+                    (Some(payload), None) => generate_enum_arm(&enum_name, variant_name, payload),
                     _ => single_payload_error(variant),
                 }
             }

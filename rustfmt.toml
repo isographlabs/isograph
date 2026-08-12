@@ -1,7 +1,9 @@
-edition = "2021"
+# rust-analyzer passes --edition from Cargo.toml; that flag also sets style_edition.
+# Pin both here so cargo fmt and the editor format the same way.
+edition = "2024"
+style_edition = "2024"
 # group_imports = "StdExternalCrate"
 # imports_granularity = "Item"
 merge_derives = true
 use_field_init_shorthand = true
 newline_style = "Unix"
-# version = "Two"

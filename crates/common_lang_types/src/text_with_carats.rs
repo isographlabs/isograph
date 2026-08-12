@@ -44,8 +44,7 @@ fn text_with_carats_and_line_count_buffer(
         LocatedSpan::OutsideText => (String::new(), None),
         LocatedSpan::OnLineBreaksOnly(row_col) => (String::new(), Some(row_col)),
         LocatedSpan::Highlighting(highlighted) => {
-            let rendered =
-                render_window(file_text, &span, &highlighted, line_count_buffer, color);
+            let rendered = render_window(file_text, &span, &highlighted, line_count_buffer, color);
             (rendered, Some(highlighted.row_col))
         }
     }
@@ -275,9 +274,13 @@ mod test {
 
     #[test]
     fn bug_span_on_line_break() {
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), Span::new(9, 10), 3, CaratColor::Plain)
-                .0;
+        let output = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(9, 10),
+            3,
+            CaratColor::Plain,
+        )
+        .0;
         assert_eq!(output, "");
     }
 
@@ -341,8 +344,13 @@ mod test {
     #[test]
     fn multi_leading_char_full_first_line_span_2() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 10), 3, CaratColor::Plain)
-                .0,
+            text_with_carats_for_test(
+                &input_with_lines(10),
+                Span::new(0, 10),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -610,8 +618,12 @@ mod test {
 
     #[test]
     fn a_span_on_a_line_break_has_a_position_but_no_output() {
-        let (output, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), Span::new(9, 10), 3, CaratColor::Plain);
+        let (output, row_col) = text_with_carats_for_test(
+            &input_with_lines(10),
+            Span::new(9, 10),
+            3,
+            CaratColor::Plain,
+        );
         assert_eq!(output, "");
         assert_eq!(u32_row_col(row_col), Some((1, 10)));
     }

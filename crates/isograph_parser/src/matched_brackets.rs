@@ -344,7 +344,10 @@ mod tests {
         assert_eq!(brace.closing.location, span_of(text, "}"));
         assert_eq!(brace.children.item.0.len(), 0);
         match errors.as_slice() {
-            [BracketError::UnmatchedOpen(open), BracketError::UnmatchedClose(close)] => {
+            [
+                BracketError::UnmatchedOpen(open),
+                BracketError::UnmatchedClose(close),
+            ] => {
                 assert_eq!(open.item.0, Parenthesis);
                 assert_eq!(open.location, span_of(text, "("));
                 assert_eq!(close.item.0, Parenthesis);
@@ -368,7 +371,10 @@ mod tests {
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.children.item.0.len(), 0);
         match errors.as_slice() {
-            [BracketError::UnmatchedOpen(open), BracketError::UnmatchedClose(close)] => {
+            [
+                BracketError::UnmatchedOpen(open),
+                BracketError::UnmatchedClose(close),
+            ] => {
                 assert_eq!(open.item.0, Parenthesis);
                 assert_eq!(open.location, span_of(text, "("));
                 assert_eq!(close.item.0, Brace);

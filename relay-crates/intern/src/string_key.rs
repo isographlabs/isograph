@@ -18,11 +18,11 @@ use serde::Deserializer;
 use serde::Serialize;
 use serde::Serializer;
 
+pub use crate::Lookup;
 use crate::idhasher::BuildIdHasher;
 use crate::string;
 use crate::string::IntoUtf8Bytes;
 use crate::string::StringId;
-pub use crate::Lookup;
 
 // StringKey is a small impedence matcher around StringId.
 // NOTE in particular that it does NOT do de-duplicating serde.
