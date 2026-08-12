@@ -13,7 +13,7 @@ The stage parses the same language as upstream isograph's `parse_iso_literal`, w
 
 ## The golden rule: one chunk, one item
 
-A chunk parses to exactly one grammar item, and an item never continues past a separator into the next chunk:
+A chunk parses to exactly one grammar item, in its entirety and always independently, and the item is a result: the parsed item, or an unparsed item holding the reason and the chunk. An item never continues past a separator into the next chunk:
 
 - the declaration is one root-level chunk;
 - a selection is one chunk of its brace group's interior level;

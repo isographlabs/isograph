@@ -192,7 +192,7 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 
 ## Failure isolation
 
-A chunk fails without affecting any other chunk, held by three mechanisms:
+One chunk to one item, and the item is a result: every chunk parses in its entirety (the walker requires exhaustion), always independently (its own stream), to exactly one output slot, holding the parsed item or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
 
 - A `ChunkStream` is built from one chunk and cannot read past it: separators and sibling chunks are not in it. There is no shared cursor to leave in a bad state, which is upstream's resynchronization problem (one `PeekableLexer` over the whole literal, so a failed production leaves the lexer wherever it stopped and everything after is suspect). Chunking pre-cut the input, so the recovery points are structural, not searched for.
 - `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`. The signature is the enforcement: an item parser's `Err` has nowhere to go but the walker's `unparsed` conversion, so a `?` cannot leak one chunk's failure into its siblings or its level. Errors escape only the one-item walkers, where the failed item is the whole context, and the stated granularity applies: the literal at the root, the containing item for a `[...]` inside a variable declaration.
