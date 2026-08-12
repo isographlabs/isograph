@@ -130,20 +130,20 @@ impl Chunk {
 /// unavailable outside this impl.
 pub(crate) struct LiteralText<'a>(&'a str);
 
-/// The identifiers the grammar gives keyword meaning.
-pub(crate) enum Keyword {
+/// The identifiers that open a declaration. Reads are per grammar position, so no
+/// caller receives a keyword its position must always reject.
+pub(crate) enum DeclarationKeyword {
     Entrypoint,
     Field,
     Pointer,
-    To,
 }
 
 impl<'a> LiteralText<'a> {
-    pub(crate) fn keyword(&self, span: Span) -> Option<Keyword>;
+    pub(crate) fn declaration_keyword(&self, span: Span) -> Option<DeclarationKeyword>;
 }
 ```
 
-- The complete set of text reads is this impl block. parse-arguments.md amends it with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range).
+- The complete set of text reads is this impl block. parse-arguments.md amends it with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); parse-pointers.md with the `to` read.
 - Anticipated `ChunkStream` amendments, each landing with its first caller: `spanning_from(start, parse)` for opener-anchored composites; a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener.
 
 ## Dispatch
@@ -173,7 +173,7 @@ match stream.take_next() {
 }
 ```
 
-- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::keyword` or `value_word`.
+- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::declaration_keyword` or `value_word`, whose `None` is the one reject arm.
 - `consume_*_if` is not a dispatch tool. It exists for the composition boundary: a sub-parser declining an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`). A `consume_*_if` chain where one production owns all the alternatives is banned.
 - An opener-marked composite (optional as a whole, required past its opener: `$name`, a future `@ name (args)`) is a dispatch arm; the opener commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
 - Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its opener and is fallible from its second item on (`@@` errors at the second `@`). Commit-and-reinterpret (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consume-and-decline does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.
