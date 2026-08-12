@@ -59,14 +59,23 @@ impl<'a> ChunkStream<'a> {
 
     /// Runs a sub-parse and wraps its result in the span it consumed: from the start
     /// of the first item the closure accepts to the end of its last, empty at
-    /// `previous_end` when it accepts none. The only source of a composite node's
-    /// span; a parser never joins spans by hand. Sibling variants for `Option`- or
-    /// plainly-returning closures are anticipated amendments, added when their first
+    /// `previous_end` when it accepts none. With its optional sibling below, the only
+    /// source of a composite node's span; a parser never joins spans by hand. A
+    /// plainly-returning sibling is an anticipated amendment, added when its first
     /// caller appears, never generically.
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
     ) -> Result<WithSpan<T>, WithSpan<ParseError>>;
+
+    /// `spanning` for an optional composite: the `consume_*` of the pair. `Some` wraps
+    /// in the consumed span (an optional selection set's span is its brace group's,
+    /// with no caller-side wrapping); a `None` closure must have consumed nothing, the
+    /// consume contract, which no rewind can repair if broken.
+    pub(crate) fn spanning_optional<T>(
+        &mut self,
+        parse: impl FnOnce(&mut Self) -> Option<T>,
+    ) -> Option<WithSpan<T>>;
 
     /// Nothing further may exist. The first leftover item is the error.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
