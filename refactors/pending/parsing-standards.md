@@ -16,10 +16,12 @@ Shared parsing structure is expressed as higher-order functions parameterized by
 
 By the time the grammar stage runs, three passes have shaped the input: tokens, matched groups, chunks. A parser here never sees characters, raw brackets, or separators; it sees a chunk's items, and that changes how everything below works.
 
+The unit of parsing is the chunk, recursively. The literal is itself one chunk, the root level's only one, and a chunk's groups hold levels of further chunks. Every parser operates within exactly one chunk, through exactly one stream, one `SafePeekable` per chunk behind its `ChunkStream`, and each sub-chunk parses independently of every other. Nothing in the stage ever holds a cursor over more than one chunk; the recursion is "a chunk parses, and hands each interior chunk to its own parse."
+
 - A group is one item. Consuming it consumes its whole `{ ... }` extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands "inside" a group it did not open.
 - Structured items arrive pre-spanned. A group's `location` was computed when the matcher closed it, opening through closing; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
 - Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket never reaches a parser at all: the stream skips it, because the bracket stage already recorded its error (the unmatched rule under `ChunkStream`).
-- Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `Taken::EndOfChunk`.
+- Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `take_next` returning `None`.
 
 ## The enforcement structures
 
@@ -61,11 +63,11 @@ impl<'a> ChunkStream<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
-    /// The next item, committed, or the end of the chunk: the value a dispatch
-    /// position matches on. Total and exhaustive, so every match handles the end; no
-    /// match handles an unmatched bracket, because the stream skips them — see the
-    /// unmatched rule below.
-    pub(crate) fn take_next(&mut self) -> Taken<'a>;
+    /// The next item, committed, or `None` at the chunk's end: the value a dispatch
+    /// position matches on. The exhaustive match forces the `None` arm, so handling
+    /// the end cannot be forgotten; no arm handles an unmatched bracket, because the
+    /// stream skips them — see the unmatched rule below.
+    pub(crate) fn take_next(&mut self) -> Option<Taken<'a>>;
 
     /// The empty span at `previous_end`: where a missing item belongs, for error arms
     /// that found `EndOfChunk`.
@@ -95,17 +97,17 @@ impl<'a> ChunkStream<'a> {
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
 }
 
-/// What a dispatch position sees: the committed next item, carrying its span, or the
-/// chunk's end, which is a position rather than an item and so carries none
-/// (`end_span` supplies it to error arms). `Found` converts from it. Not a taxonomy of
-/// its own: one variant per grammar-possible `ChunkContentItem` variant, flattened for
-/// matching, plus the end; the unmatched-bracket variants are absent because the
-/// stream skips those items. A change to what a chunk holds changes this, and `Found`,
-/// together.
+/// What a dispatch position sees: the committed next item, carrying its span. The
+/// chunk's end is a position rather than an item, so it is `take_next`'s `None`, with
+/// `end_span` supplying error arms their span. `Found` converts from a `Taken`. Not a
+/// taxonomy of its own: one variant per grammar-possible `ChunkContentItem` variant,
+/// flattened for matching; the unmatched-bracket variants are absent because the
+/// stream skips those items, so `Option<Taken>` is literally the image of
+/// `Option<&ChunkContentItem>` under the grammar. A change to what a chunk holds
+/// changes this, and `Found`, together.
 pub(crate) enum Taken<'a> {
     Token(WithSpan<NonBracketTokenKind>),
     Group(WithSpan<&'a ChunkedGroup>),
-    EndOfChunk,
 }
 ```
 
@@ -117,12 +119,12 @@ Spans follow the same rule as positions: a leaf's span is what `require_token` r
 
 ### Dispatch is a match
 
-A position where the grammar allows one of several forms is written as one `match` on `take_next()`, never as a chain of `consume_*_if` attempts. The discriminating item is committed up front, which is sound because every arm uses it: the accepting arms continue from it, and the rejecting arm reports it as the `found`. The match is exhaustive over `Taken`, so handling the chunk's end cannot be forgotten, and a separator can never appear in an arm, because chunks are separator-free: "a separator comes next" is the `EndOfChunk` variant. Sketched on a value:
+A position where the grammar allows one of several forms is written as one `match` on `take_next()`, never as a chain of `consume_*_if` attempts. The discriminating item is committed up front, which is sound because every arm uses it: the accepting arms continue from it, and the rejecting arm reports it as the `found`. The match is exhaustive over `Option<Taken>`, so handling the chunk's end cannot be forgotten, and a separator can never appear in an arm, because chunks are separator-free: "a separator comes next" is the `None`. Sketched on a value:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs (shape, not the final listing)
 match stream.take_next() {
-    Taken::Token(token) => match token.item {
+    Some(Taken::Token(token)) => match token.item {
         NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
         NonBracketTokenKind::StringLiteral => { /* done; token.location is the span */ }
         NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
@@ -132,8 +134,8 @@ match stream.take_next() {
             token.location,
         )),
     },
-    Taken::Group(group) => { /* brace: object literal; other kinds: the same error shape */ }
-    Taken::EndOfChunk => return Err(WithSpan::new(
+    Some(Taken::Group(group)) => { /* brace: object literal; other kinds: the same error shape */ }
+    None => return Err(WithSpan::new(
         ParseError::expected(Expectation::Value, Found::EndOfChunk),
         stream.end_span(),
     )),
