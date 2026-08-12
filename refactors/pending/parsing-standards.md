@@ -148,6 +148,8 @@ The `consume_*_if` shape is not a dispatch tool. It exists for one case: a compo
 
 An opener-marked composite, one that is optional as a whole but required once its opener appears, is a dispatch arm, never a consume chain: the opener commits in the match and the remainder is `require_*`. The variable use is the existing instance (`$` commits, the name is required), and a future directive (`@ name (args)`) is the same shape, looping its position's match for repetition. Such a composite's span starts at the already-committed opener, which plain `spanning` cannot cover; `spanning_from(start, parse)`, anchored at a caller-supplied span, is the anticipated sibling, landing with its first caller.
 
+The law under both shapes is no-rewind stated as grammar design: an optional construct is decided by its first item. A single optional item (a token, a group) is a `consume_*_if`, infallible; a multi-item optional commits its opener and is fallible from its second item on (`@@` errors at the second `@`). The one other legal shape is commit-and-reinterpret, the alias's colon deciding what the committed identifier was, and it is legal only because every continuation uses everything committed. Consume-and-decline does not exist, so a future grammar addition whose optionality needs more than one item of lookahead is not writable here, by construction.
+
 ### `LevelEntry`: the only access to a level's chunks
 
 `ChunkedLevel`'s field becomes private to chunk.rs, and the one accessor classifies:
