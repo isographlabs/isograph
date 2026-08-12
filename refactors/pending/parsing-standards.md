@@ -18,7 +18,7 @@ By the time the grammar stage runs, three passes have shaped the input: tokens, 
 
 - A group is one item. Consuming it consumes its whole `{ ... }` extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands "inside" a group it did not open.
 - Structured items arrive pre-spanned. A group's `location` was computed when the matcher closed it, opening through closing; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
-- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket arrives as its own item kind (`UnmatchedOpen`, `UnmatchedClose`) to dispatch on, not as a state to recover from mid-production.
+- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket never reaches a parser at all: the stream skips it, because the bracket stage already recorded its error (the unmatched rule under `ChunkStream`).
 - Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `Taken::EndOfChunk`.
 
 ## The enforcement structures
@@ -62,9 +62,14 @@ impl<'a> ChunkStream<'a> {
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
     /// The next item, committed, or the end of the chunk: the value a dispatch
-    /// position matches on. Total, so every match handles the end; the end's span is
-    /// empty at `previous_end`.
-    pub(crate) fn take_next(&mut self) -> WithSpan<Taken<'a>>;
+    /// position matches on. Total and exhaustive, so every match handles the end; no
+    /// match handles an unmatched bracket, because the stream skips them — see the
+    /// unmatched rule below.
+    pub(crate) fn take_next(&mut self) -> Taken<'a>;
+
+    /// The empty span at `previous_end`: where a missing item belongs, for error arms
+    /// that found `EndOfChunk`.
+    pub(crate) fn end_span(&self) -> Span;
 
     /// Runs a sub-parse and wraps its result in the span it consumed: from the start
     /// of the first item the closure accepts to the end of its last, empty at
@@ -90,20 +95,21 @@ impl<'a> ChunkStream<'a> {
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
 }
 
-/// What a dispatch position sees: the committed next item, its payload carried into
-/// the match arm, or the chunk's end. `Found` converts from it for error arms. Not a
-/// taxonomy of its own: one variant per `ChunkContentItem` variant, flattened for
-/// matching (the token's kind, the group by reference), plus the end — the image of
-/// `Option<&ChunkContentItem>`. A change to what a chunk holds changes both, and
-/// `Found`, together.
+/// What a dispatch position sees: the committed next item, carrying its span, or the
+/// chunk's end, which is a position rather than an item and so carries none
+/// (`end_span` supplies it to error arms). `Found` converts from it. Not a taxonomy of
+/// its own: one variant per grammar-possible `ChunkContentItem` variant, flattened for
+/// matching, plus the end; the unmatched-bracket variants are absent because the
+/// stream skips those items. A change to what a chunk holds changes this, and `Found`,
+/// together.
 pub(crate) enum Taken<'a> {
-    Token(NonBracketTokenKind),
-    Group(&'a ChunkedGroup),
-    UnmatchedOpen(BracketKind),
-    UnmatchedClose(BracketKind),
+    Token(WithSpan<NonBracketTokenKind>),
+    Group(WithSpan<&'a ChunkedGroup>),
     EndOfChunk,
 }
 ```
+
+The unmatched rule: no grammar production contains a bare bracket, and the bracket stage already recorded the error at that span, so the grammar stage neither sees nor re-reports it. Every stream method skips `UnmatchedOpen` and `UnmatchedClose` items as it advances, exactly as the lexer skipped spaces; there is no `ParseError` variant for them and no `Found` variant to name them. The consequences are what the LSP wants: `foo (` parses as exactly `foo`, a selection set containing a stray `)` still parses every selection, and a chunk degrades only when its grammar-visible items are wrong. The stray bracket's positions still resolve, through the chunk tree the grammar tree retains for whitespace and degraded regions, and the error still surfaces, from the bracket stage's own `errors()` in the combined diagnostics, which is the final sweep: an error-free literal is one where both stages report nothing.
 
 What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
 
@@ -115,16 +121,21 @@ A position where the grammar allows one of several forms is written as one `matc
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs (shape, not the final listing)
-let taken = stream.take_next();
-match taken.item {
-    Taken::Token(NonBracketTokenKind::Dollar) => { /* the variable's name follows */ }
-    Taken::Token(NonBracketTokenKind::StringLiteral) => { /* done */ }
-    Taken::Token(NonBracketTokenKind::IntegerLiteral) => { /* convert via LiteralText */ }
-    Taken::Token(NonBracketTokenKind::Identifier) => { /* match LiteralText::value_word */ }
-    Taken::Group(group) if /* brace */ => { /* object literal */ }
-    taken => return Err(WithSpan::new(
-        ParseError::expected(Expectation::Value, Found::from(&taken)),
-        /* taken's span */,
+match stream.take_next() {
+    Taken::Token(token) => match token.item {
+        NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
+        NonBracketTokenKind::StringLiteral => { /* done; token.location is the span */ }
+        NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
+        NonBracketTokenKind::Identifier => { /* match LiteralText::value_word */ }
+        kind => return Err(WithSpan::new(
+            ParseError::expected(Expectation::Value, Found::Token(kind)),
+            token.location,
+        )),
+    },
+    Taken::Group(group) => { /* brace: object literal; other kinds: the same error shape */ }
+    Taken::EndOfChunk => return Err(WithSpan::new(
+        ParseError::expected(Expectation::Value, Found::EndOfChunk),
+        stream.end_span(),
     )),
 }
 ```
@@ -228,6 +239,7 @@ One chunk to one item, and the item is a result: every chunk parses in its entir
 - Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`), and `errors()` derives the list from the tree in source order. There is no error list beside the tree.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone and its siblings parse; a failed declaration header degrades the literal. One error per degraded region; nothing inside a degraded region reports separately.
 - The parser carries no prose. Messages are `Display` impls on the error types; contextual suggestions belong to the rendering stage, keyed off the `(expected, found)` pair.
+- An unmatched bracket is not the grammar's error at all. The stream skips the item, the bracket stage's error stands as the one report, and no `ParseError` variant names brackets; the combined diagnostics, both stages' `errors()`, are the final sweep.
 
 ## Totality
 
