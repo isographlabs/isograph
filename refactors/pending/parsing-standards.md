@@ -12,6 +12,15 @@ Every parser function is one of three shapes, and its prefix states its contract
 
 Shared parsing structure is expressed as higher-order functions parameterized by the item parser, in the style upstream's `parse_delimited_list` set: `parse_level_items` takes `parse_item` and the unparsed-variant constructor, and every list reuses the one walk rather than restating it. When two productions share a shape, the shape becomes a higher-order function and the productions become its arguments; duplicating a walk or a wrapper by hand is the anti-pattern.
 
+## The input is already structure
+
+By the time the grammar stage runs, three passes have shaped the input: tokens, matched groups, chunks. A parser here never sees characters, raw brackets, or separators; it sees a chunk's items, and that changes how everything below works.
+
+- A group is one item. Consuming it consumes its whole `{ ... }` extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands "inside" a group it did not open.
+- Structured items arrive pre-spanned. A group's `location` was computed when the matcher closed it, opening through closing; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
+- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket arrives as its own item kind (`UnmatchedOpen`, `UnmatchedClose`) to dispatch on, not as a state to recover from mid-production.
+- Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `Taken::EndOfChunk`.
+
 ## The enforcement structures
 
 Four types carry the invariants. Everything a parser can do is a method on one of them, so their impl blocks are the complete, reviewable surface, and extending the language's mechanics means amending them, visibly, rather than writing a local helper.
