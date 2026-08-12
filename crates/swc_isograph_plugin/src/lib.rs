@@ -164,10 +164,7 @@ impl ArtifactType {
     }
 }
 
-fn build_ident_expr_for_hoisted_import(
-    ident_name: &str,
-    unresolved_ctxt: SyntaxContext,
-) -> Expr {
+fn build_ident_expr_for_hoisted_import(ident_name: &str, unresolved_ctxt: SyntaxContext) -> Expr {
     Expr::Ident(Ident {
         span: DUMMY_SP,
         sym: ident_name.into(),
@@ -364,59 +361,69 @@ impl IsoLiteralCompilerVisitor<'_> {
     }
 }
 
+/// An `iso` invocation as it appears in the tree: `iso(iso_args)` bare, or
+/// `iso(iso_args)(fn_args)` immediately called.
+struct IsoCall<'a> {
+    iso_args: &'a [ExprOrSpread],
+    fn_args: Option<&'a [ExprOrSpread]>,
+    /// The span of the `iso(...)` call itself, where errors are reported.
+    span: Span,
+}
+
+fn iso_call(expr: &Expr) -> Option<IsoCall<'_>> {
+    let Expr::Call(CallExpr {
+        callee: Callee::Expr(callee),
+        args,
+        span,
+        ..
+    }) = expr
+    else {
+        return None;
+    };
+    match &**callee {
+        Expr::Ident(ident) if ident.sym == "iso" => Some(IsoCall {
+            iso_args: args,
+            fn_args: None,
+            span: *span,
+        }),
+        Expr::Call(CallExpr {
+            callee: Callee::Expr(inner_callee),
+            args: iso_args,
+            span: iso_span,
+            ..
+        }) => match &**inner_callee {
+            Expr::Ident(ident) if ident.sym == "iso" => Some(IsoCall {
+                iso_args,
+                fn_args: Some(args),
+                span: *iso_span,
+            }),
+            _ => None,
+        },
+        _ => None,
+    }
+}
+
 impl Fold for IsoLiteralCompilerVisitor<'_> {
     noop_fold_type!();
 
     fn fold_expr(&mut self, expr: Expr) -> Expr {
-        if let Expr::Call(CallExpr {
-            callee: Callee::Expr(callee),
-            args,
+        if let Some(IsoCall {
+            iso_args,
+            fn_args,
             span,
-            ..
-        }) = &expr
+        }) = iso_call(&expr)
         {
-            match &**callee {
-                Expr::Ident(ident) => {
-                    if ident.sym == "iso" {
-                        match self.compile_iso_call_statement(args, None) {
-                            Ok(build_expr) => {
-                                // might have `iso` functions inside the build expr
-                                let build_expr = build_expr.fold_children_with(self);
-                                return build_expr;
-                            }
-                            Err(err) => {
-                                show_error(*span, &err);
-                                // On error, we keep the same expression and fail showing the error
-                                return expr;
-                            }
-                        }
-                    }
+            return match self.compile_iso_call_statement(iso_args, fn_args) {
+                Ok(build_expr) => {
+                    // might have `iso` functions inside the build expr
+                    build_expr.fold_children_with(self)
                 }
-                Expr::Call(CallExpr {
-                    callee: Callee::Expr(child_callee),
-                    args: child_args,
-                    span: child_span,
-                    ..
-                }) => {
-                    if let Expr::Ident(ident) = &**child_callee
-                        && ident.sym == "iso"
-                    {
-                        match self.compile_iso_call_statement(child_args, Some(args)) {
-                            Ok(build_expr) => {
-                                // might have `iso` functions inside the build expr
-                                let build_expr = build_expr.fold_children_with(self);
-                                return build_expr;
-                            }
-                            Err(err) => {
-                                show_error(*child_span, &err);
-                                // On error, we keep the same expression and fail showing the error
-                                return expr;
-                            }
-                        }
-                    }
+                Err(err) => {
+                    show_error(span, &err);
+                    // On error, we keep the same expression and fail showing the error
+                    expr
                 }
-                _ => {}
-            }
+            };
         }
 
         expr.fold_children_with(self)
