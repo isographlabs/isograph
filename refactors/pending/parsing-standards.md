@@ -22,6 +22,8 @@ fn parse_x(...) -> Result<X, WithSpan<ParseError>>
 
 The primitive set is closed: `expect_token`, `consume_token_if`, `expect_chunk_end`, `token_text`, `empty_chunk_comma_span`, `boundary_comma`, and `parse_level_items`. A new primitive is an amendment to this doc, not a local helper.
 
+Shared parsing structure is expressed as higher-order functions parameterized by the item parser, in the style upstream's `parse_delimited_list` set: `parse_level_items` takes `parse_item` and the unparsed-variant constructor, and every list reuses the one walk rather than restating it. When two productions share a shape, the shape becomes a higher-order function and the productions become its arguments; duplicating a walk or a wrapper by hand is the anti-pattern.
+
 ## Consumption discipline
 
 - Parsers read a chunk's items through `SafePeekable` (`ChunkContents`), and only through it. `SafePeekable` has no rewind, and that is the enforcement: a committed item can never be un-consumed, so a backtracking parser cannot be written against it. Re-creating an iterator over items already walked is banned.
@@ -63,6 +65,18 @@ The primitive set is closed: `expect_token`, `consume_token_if`, `expect_chunk_e
 - One pass. Each chunk's items are walked once, by reference; the output tree copies only spans and `Copy` tokens. Cloning happens only when a region degrades, so allocation beyond the output vecs is proportional to the error count, and an error-free parse allocates nothing but the tree.
 - No backtracking, by the consumption discipline above; parse time is linear in the token count with no reparse of any region.
 - The stage stays pico-free and interning-free: plain functions over `&str` and the chunk tree, per the crate's standing assumption that parsing one literal is trivially cheap.
+
+## Relation to the upstream parser
+
+Each standard above has a counterpart in upstream isograph's `isograph_lang_parser` (`parse_iso_literal.rs`, `peekable_lexer.rs`), where the constraint exists as convention or comment; here it is a rule, enforced by a type where one can.
+
+- Function shapes. Upstream has one primitive, `parse_token_of_kind`, serving both the required and the optional case: callers write `...?` for the first and `if ....is_ok()` for the second, so the failure contract lives at each call site. The `expect_*` / `consume_*` split puts that contract in the signature; `parse_delimited_list` is the ancestor of `parse_level_items`.
+- Backtracking. Upstream dispatches alternatives through `to_control_flow` chains that stay safe only while every alternative fails on its first, unconsumed token; the code cannot enforce that, and `parse_type_annotation` carries the comment admitting it: adding a case after the open bracket has been eaten "will leave the parser in an inconsistent state". Here `SafePeekable`'s missing rewind makes that parser unwritable, and one-peek-decides is the stated rule.
+- Totality. Upstream is fail-fast (`DiagnosticResult`, first error aborts the literal) and panics on inputs it did not expect: `number.parse().expect(...)` on integer overflow, `unreachable!()` in the block-string lexer. Here every input yields a tree, degradation is local, and panics are banned.
+- Errors. Upstream errors are prose `String`s built inline throughout the parser, some with `Span::todo_generated()` where no span was threaded ("TODO get a span"). Here errors are structured (`Expected`/`Found`), a span is present by construction, and prose exists only in `Display`.
+- Locations and inputs. Upstream threads `TextSource` and extraction context through the parse, with its own comment noting the cost ("we break memoization, due to this parameter"), and interns names as it goes. Here the parse is a function of the literal's text and its chunk tree, spans only, no interning, extraction elsewhere.
+- Separators. Upstream's lexer skips line breaks as whitespace and recovers them by inspecting the skipped text (`parse_line_break` reads `white_space_span`), and each list re-implements its delimiter policy via `parse_comma_or_line_break`. Here line breaks are tokens, separator policy lives once in the chunking pass, and the grammar stage consumes structure.
+- Semantic tokens. Upstream accumulates them inside the lexer, one legend constant per parse call. Here they are absent from parsing and derivable from the finished tree.
 
 ## Amending
 
