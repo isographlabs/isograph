@@ -212,6 +212,8 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 - Upstream re-derives separator policy per list (`parse_comma_or_line_break`, `white_space_span` inspection) and meets bracket mistakes wherever a token check trips; here separators live in chunking, brackets in the matcher.
 - Upstream accumulates semantic tokens during parsing; here they are derivable later from the tree.
 
-## Amending
+## Shipping and amending
 
-A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent.
+Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `LiteralText::identifier`, and `ChunkedLevel`'s privacy with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+
+A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
