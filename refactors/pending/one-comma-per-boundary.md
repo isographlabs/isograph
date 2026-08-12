@@ -2,7 +2,7 @@
 
 A prefactor to the series parsing-plan.md orders. One change to the bracket matcher and one to the chunking pass establish one invariant: an empty chunk exists exactly when a comma has no item before it, and its boundary starts with that comma. An empty chunk is therefore unambiguously a parse error to the grammar stage, with no boundary inspection and no first-chunk special case.
 
-1. Grouping captures line breaks with the opening bracket: after the matcher consumes an opening, it also consumes the line breaks directly after it, and the literal's start gets the same treatment for the root level. Captured line breaks are consumed like the spaces the tokenizer already drops; they appear in no level, so `foo {\n}` and a literal opening with a line break produce no separator at all, and a position on one resolves to the interior level exactly as a space there does. The opening's span stays the bare bracket.
+1. Grouping captures line breaks with the opening bracket that leads them: when a group closes, the line breaks at its interior's start are dropped, like the spaces the tokenizer already skips, and the literal's start does the same for the root level. A demoted opening captures nothing: `foo {\n bar` keeps its line break, which chunks the demoted items as `foo {` and `bar`. Captured line breaks appear in no level, so `foo {\n}` and a literal opening with a line break produce no separator at all, and a position on one resolves to the interior level exactly as a space there does. The opening's span stays the bare bracket.
 2. The chunking pass's boundary phase stops before a second comma, so every `ChunkSeparator` holds any number of line breaks and at most one comma: the boundary grammar is `line-break+` or `line-break* comma line-break*`. The refused comma opens the next chunk, which is empty when nothing sits between the commas.
 
 A leading comma (`{, bar }`, `{,}`) also opens an empty chunk: capture consumes only line breaks, so a comma with no item before it always lands as the first boundary token of an empty chunk, whether at a level's start or between two commas.
@@ -11,39 +11,53 @@ Both passes stay infallible, and `MatchedBrackets`, `ChunkedLevel`, and `ChunkSe
 
 ## The bracket matcher's capture
 
+Whether a group closes is unknown while its opening is being consumed, so the matcher strips the line breaks from the parsed interior at the moment the close arrives, and leaves them in place when it never does:
+
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-/// Line breaks directly after an opening bracket, or at the literal's start, are
-/// captured: consumed with the bracket as insignificant whitespace, like the spaces the
-/// tokenizer drops. Line breaks anywhere else remain ordinary tokens.
-fn capture_line_breaks(tokens: &mut TokenStream) {
-    while let Some(peek) = tokens.peek() {
-        if peek.view().item != IsographLangTokenKind::LineBreak {
-            break;
-        }
-        peek.commit();
-    }
+/// Line breaks at the start of the items an opening leads are captured by that opening:
+/// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
+/// literal's start always leads its items; a group's opening leads them only once the
+/// group closes, so a demoted opening captures nothing and its line breaks return to
+/// the parent level as ordinary tokens.
+fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
+    let captured = items
+        .iter()
+        .position(|item| {
+            !matches!(
+                item.item,
+                BracketItem::Raw(RawToken::NonBracket(NonBracketToken(
+                    NonBracketTokenKind::LineBreak
+                )))
+            )
+        })
+        .unwrap_or(items.len());
+    items.drain(..captured);
 }
 ```
 
-`match_brackets` captures at the literal's start. Before:
+`match_brackets` strips the root level's items. Before:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-    let mut tokens = tokens.into_iter().safe_peekable();
-    // The kind of every group the level being parsed sits inside, innermost last. The
+    let mut enclosing_stack = Stack::new();
+    WithSpan::new(
+        MatchedBrackets(parse_items(&mut tokens, &mut enclosing_stack)),
+        Span::new(0, literal_length),
+    )
 ```
 
 After:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-    let mut tokens = tokens.into_iter().safe_peekable();
-    capture_line_breaks(&mut tokens);
-    // The kind of every group the level being parsed sits inside, innermost last. The
+    let mut enclosing_stack = Stack::new();
+    let mut items = parse_items(&mut tokens, &mut enclosing_stack);
+    strip_captured_line_breaks(&mut items);
+    WithSpan::new(MatchedBrackets(items), Span::new(0, literal_length))
 ```
 
-`parse_bracketed` captures right after the opening its caller consumed. Before:
+`parse_bracketed` strips in the closed arm only. Before:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -52,17 +66,41 @@ After:
     });
 ```
 
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+            let token = peek.commit();
+            let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
+            let interior = Span::between(opening.location, closing.location);
+            ParsedGroup::Closed(Bracketed {
+                opening,
+                children: WithSpan::new(MatchedBrackets(children), interior),
+                closing,
+            })
+```
+
 After:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
-    capture_line_breaks(tokens);
-    let children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
+    let mut children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
         parse_items(tokens, enclosing_stack)
     });
 ```
 
-Capture survives demotion: in `foo {\nbar`, the brace captures the line break before the group turns out unclosed, so the demoted items are `foo`, `{`, `bar` with no separator between them. The captured line break belongs to the opening either way.
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+            let token = peek.commit();
+            let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
+            let interior = Span::between(opening.location, closing.location);
+            strip_captured_line_breaks(&mut children);
+            ParsedGroup::Closed(Bracketed {
+                opening,
+                children: WithSpan::new(MatchedBrackets(children), interior),
+                closing,
+            })
+```
+
+The unclosed arm passes `children` through untouched, so a demoted opening's line breaks reach the parent level intact.
 
 ## The chunking pass's boundary phase
 
@@ -119,8 +157,8 @@ After:
 // from crates/isograph_parser/src/tokenize.rs
 /// Tokenize one literal: every token with its span, in order, ending at the end of the input
 /// rather than with an `EndOfFile` token. The tokenizer skips spaces (line breaks are
-/// tokens; the bracket matcher captures the ones after an opening bracket), so
-/// consecutive tokens' spans need not touch.
+/// tokens; the bracket matcher captures the ones at the literal's start and at a closed
+/// group's interior's start), so consecutive tokens' spans need not touch.
 ```
 
 `ChunkedLevel`, before:
@@ -218,19 +256,31 @@ New matched_brackets.rs tests pin the capture at both call sites:
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
     #[test]
-    fn an_opening_bracket_captures_the_line_breaks_after_it() {
+    fn a_closed_groups_opening_captures_the_line_breaks_after_it() {
         let text = "foo {\n\n bar\n}";
         let tree = tree(text);
         let brace = group(&tree.item.0, 1);
         assert_eq!(brace.children.item.0.len(), 2);
-        assert!(matches!(
+        assert_eq!(
             raw(&brace.children.item.0, 0),
             RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
-        ));
-        assert!(matches!(
+        );
+        assert_eq!(
             raw(&brace.children.item.0, 1),
             RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
-        ));
+        );
+    }
+
+    #[test]
+    fn a_demoted_opening_captures_nothing() {
+        let text = "foo {\n bar";
+        let tree = tree(text);
+        assert_eq!(tree.item.0.len(), 4);
+        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
+        assert_eq!(
+            raw(&tree.item.0, 2),
+            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
+        );
     }
 
     #[test]
@@ -238,10 +288,10 @@ New matched_brackets.rs tests pin the capture at both call sites:
         let text = "\n\nfoo";
         let tree = tree(text);
         assert_eq!(tree.item.0.len(), 1);
-        assert!(matches!(
+        assert_eq!(
             raw(&tree.item.0, 0),
             RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
-        ));
+        );
         assert_eq!(tree.location, Span::from_usize(0, text.len()));
     }
 ```
@@ -339,6 +389,15 @@ In chunk.rs, the multi-separator tail of `commas_and_line_breaks_are_equivalent_
         assert!(tree.item.0[0].item.contents.is_empty());
         assert!(tree.item.0[1].item.contents.is_empty());
         assert_eq!(render_chunk(text, &tree.item.0[2].item), "a");
+    }
+
+    #[test]
+    fn a_demoted_brace_leaves_its_line_break_as_a_boundary() {
+        let text = "foo {\n bar";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 2);
+        assert_eq!(render_chunk(text, &tree.item.0[0].item), "foo {\n");
+        assert_eq!(render_chunk(text, &tree.item.0[1].item), "bar");
     }
 
     #[test]
