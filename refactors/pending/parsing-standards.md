@@ -2,7 +2,7 @@
 
 Rules for all grammar-stage code. The feature docs define the grammar; this doc defines how parsers are written. An implementation need this doc forbids is resolved by amending this doc or fixing the code, in the same review, never by shipping the deviation.
 
-This doc assumes cut-at-unmatched.md: grouping returns `(WithSpan<MatchedBrackets>, Vec<BracketError>)`, an unmatched bracket and everything after it in its level are absent from the tree, and no type downstream of the matcher represents a bracket problem.
+This doc assumes cut-at-unmatched.md and no-empty-chunks.md: grouping returns `(WithSpan<MatchedBrackets>, Vec<BracketError>)` with unmatched brackets and their levels' tails absent from the tree, and chunking returns `(WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>)` with empty chunks absent. No type downstream represents a bracket problem or an empty chunk; every chunk a parser sees has contents.
 
 ## Input shape
 
@@ -80,28 +80,17 @@ impl<'a> ChunkStream<'a> {
 - Span sources, exhaustively: a leaf's span is what `require_token` returned; an item's span is what its parse consumed (a degraded slot's is its chunk's `contents_span`); a composite's span comes from `spanning`. `Span::join` in a parser is banned; a span no source provides is a missing method here.
 - Construction is `WithSpan::new` and plain `Ok`/`Some`; the upstream postfix helpers (`wrap_ok`, `with_span`) are not used.
 
-### `LevelEntry`
+### `ChunkedLevel`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    /// The only access to a level's chunks.
-    pub fn entries(&self) -> impl Iterator<Item = LevelEntry<'_>>;
-}
-
-pub enum LevelEntry<'a> {
-    /// A chunk with contents: one grammar item.
-    Item(&'a WithSpan<Chunk>),
-    /// An empty chunk: a comma no item precedes, always an error at `comma`.
-    CommaWithoutItem {
-        comma: Span,
-        chunk: &'a WithSpan<Chunk>,
-    },
+    /// The only access to a level's chunks, each with contents (no-empty-chunks.md).
+    pub fn chunks(&self) -> impl Iterator<Item = &WithSpan<Chunk>>;
 }
 ```
 
-- `ChunkedLevel`'s field is private to chunk.rs; a walker cannot see chunks without handling `CommaWithoutItem`, and the comma's span is computed once.
-- Callers are `parse_level_items` and the one-item walkers, and no others.
+- `ChunkedLevel`'s field is private to chunk.rs. Callers are `parse_level_items` and the one-item walkers, and no others.
 
 ### `Chunk`
 
@@ -111,8 +100,9 @@ impl Chunk {
     /// The stream a parser reads this chunk through.
     pub fn stream(&self) -> ChunkStream<'_>;
 
-    /// The span of the contents, without the boundary: a degraded slot's span.
-    pub fn contents_span(&self) -> Option<Span>;
+    /// The span of the contents, without the boundary: a degraded slot's span. Total,
+    /// because every chunk has contents.
+    pub fn contents_span(&self) -> Span;
 
     /// The comma in the trailing boundary, when one exists; one-item contexts reject
     /// it (no-final-comma.md).
@@ -174,10 +164,10 @@ match stream.take_next() {
 
 ## Level walks
 
-- A list level is walked only by `parse_level_items`: it consumes `entries()`, turns `CommaWithoutItem` into the missing-item unparsed item, runs `parse_item` on a fresh `stream()`, and itself calls `require_end(Expectation::Separator)` after a successful item. Item parsers parse their production and stop; exhaustion is the walker's.
+- A list level is walked only by `parse_level_items`: it runs `parse_item` on a fresh `stream()` per chunk and itself calls `require_end(Expectation::Separator)` after a successful item. Item parsers parse their production and stop; exhaustion is the walker's.
 - Trailing junk does not void a completed item: on `require_end` failure after success, the walker keeps the item and records the junk as the slot's trailing error. `foo bar` is the selection `foo` plus an error at `bar`; go-to-definition, find-references, and completion see `foo` as if the junk were absent. The item's span excludes the junk, so junk positions answer the containing level.
 - Junk is always the suffix; nothing after the first leftover is reattached. `foo bar { baz }` is the scalar `foo` with junk from `bar` on; `baz` is not in the tree.
-- A one-item context (the root level, a `[...]` interior) has its own walker (`declaration_chunk`, `parse_bracket_interior_type`): exactly one `Item`, error on `CommaWithoutItem`, `boundary_comma` rejected per no-final-comma.md, and the end check with its own expectation (`EndOfDeclaration`, `EndOfType`).
+- A one-item context (the root level, a `[...]` interior) has its own walker (`declaration_chunk`, `parse_bracket_interior_type`): exactly one chunk, `boundary_comma` rejected per no-final-comma.md, and the end check with its own expectation (`EndOfDeclaration`, `EndOfType`).
 
 ## Failure isolation
 
@@ -185,13 +175,13 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 - A `ChunkStream` cannot read past its chunk; there is no shared cursor to corrupt.
 - `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`: an item parser's `Err` has nowhere to go but the `unparsed` conversion, so `?` cannot leak a chunk's failure to its siblings. Errors escape only the one-item walkers, whose failed item is the whole context.
-- Output length equals entry count; a failure shifts no sibling, and a degraded slot resolves through its retained chunk.
+- Output length equals chunk count; a failure shifts no sibling, and a degraded slot resolves through its retained chunk.
 
 ## Errors
 
 - An error is `WithSpan<ParseError>`; the workhorse is `Expected(ExpectedFound { expected, found })`. The span covers the offending item or is empty where the missing item belonged.
 - Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`, the trailing-junk slot); `errors()` derives the list in source order. No error list exists beside the grammar tree.
-- Bracket errors are the matcher's, returned beside its tree (cut-at-unmatched.md); no `ParseError` variant names a bracket. The final sweep is both lists: an error-free literal has an empty vec from the matcher and an empty `errors()` from the grammar.
+- Bracket and comma errors are the earlier passes', returned beside their trees (cut-at-unmatched.md, no-empty-chunks.md); no `ParseError` variant names either. The final sweep is all three lists: an error-free literal has empty vecs from the matcher and chunking and an empty `errors()` from the grammar.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone; a failed declaration header degrades the literal. One error per degraded region.
 - No prose in the parser. Messages are `Display` impls; contextual suggestions belong to rendering, keyed off the `(expected, found)` pair.
 

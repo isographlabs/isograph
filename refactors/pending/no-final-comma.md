@@ -1,6 +1,6 @@
 # no-final-comma: one-item contexts reject a trailing comma
 
-A doc of the series parsing-plan.md orders, after the grammar feature docs. It lands the last piece of the comma rule: a comma is meaningful only inside a list, between two items or after the last one, so a context that holds exactly one item is not a list and admits no comma at all. The landed chunking invariant already surfaces a comma with no item before it as an empty chunk, which the grammar stage reports everywhere; the one case chunking cannot distinguish is a final comma, which sits in a contentful chunk's trailing boundary like any legal list delimiter. This doc adds the one inspection that catches it.
+A doc of the series parsing-plan.md orders, after the grammar feature docs. It lands the last piece of the comma rule: a comma is meaningful only inside a list, between two items or after the last one, so a context that holds exactly one item is not a list and admits no comma at all. Chunking already emits the leading and doubled comma errors itself (no-empty-chunks.md); the one case it cannot distinguish is a final comma, which sits in a contentful chunk's trailing boundary like any legal list delimiter. This doc adds the one inspection that catches it.
 
 The two one-item contexts and what becomes an error:
 
