@@ -16,6 +16,12 @@ repos:
       - id: trailing-whitespace
   - repo: local
     hooks:
+      - id: cargo-fmt
+        name: cargo fmt
+        entry: ./scripts/check-rustfmt.sh
+        language: system
+        types: [rust]
+        pass_filenames: false
       # Stricter than ci.yml's clippy job: any warning blocks the commit. pico is kept
       # from upstream unchanged, so its warnings are not ours to fix and it is excluded.
       - id: cargo-clippy

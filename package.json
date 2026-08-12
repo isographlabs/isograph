@@ -42,7 +42,7 @@
     "build-vite-demo": "turbo iso --filter=vite-demo",
     "format": "pnpm run format-prettier && pnpm run format-rust",
     "format-prettier": "prettier --experimental-cli --cache --config-path ./.prettierrc.json --write .",
-    "format-rust": "cargo fmt",
+    "format-rust": "cargo fmt && cargo fmt --manifest-path crates/isograph_cli/Cargo.toml",
     "test": "vitest --run",
     "tsc": "pnpm -r --parallel --aggregate-output tsc",
     "test-watch": "vitest",

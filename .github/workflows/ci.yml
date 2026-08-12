@@ -225,10 +225,8 @@ jobs:
         with:
           toolchain: stable
           components: rustfmt
-      - name: Run cargo fmt
-        run: cargo fmt
-      - name: 'Check working directory status'
-        run: './scripts/check-git-status.sh'
+      - name: Run cargo fmt --check
+        run: ./scripts/check-rustfmt.sh
 
   cargo-clippy:
     name: cargo clippy
