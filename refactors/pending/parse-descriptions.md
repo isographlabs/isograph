@@ -1,6 +1,6 @@
 # parse-descriptions: descriptions on declarations
 
-Sixth doc of the series parsing-plan.md orders, after parse-variables.md. A field declaration may carry a description between its variable definitions and its selection set; parse-pointers.md reuses the slot. Entrypoints carry none, as upstream.
+Fifth doc of the series parsing-plan.md orders, after parse-variables.md. A field declaration may carry a description between its variable definitions and its selection set; parse-pointers.md reuses the slot. Entrypoints carry none, as upstream.
 
 ## The grammar this doc accepts
 

@@ -1,6 +1,6 @@
 # parse-arguments: argument lists and values
 
-Fourth doc of the series parsing-plan.md orders, after parse-fields.md. Selections gain argument lists, and the value grammar arrives: variables, strings, integers, booleans, null, and object literals. parse-variables.md reuses the value grammar for defaults.
+Third doc of the series parsing-plan.md orders, after parse-fields.md. Selections gain argument lists, and the value grammar arrives: variables, strings, integers, booleans, null, and object literals. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
 

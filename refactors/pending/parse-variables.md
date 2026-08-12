@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Fifth doc of the series parsing-plan.md orders, after parse-arguments.md. Field declarations gain variable-declaration lists, and the type-annotation grammar arrives; parse-pointers.md reuses it for `to` targets. Defaults reuse parse-arguments.md's value grammar with variables rejected.
+Fourth doc of the series parsing-plan.md orders, after parse-arguments.md. Field declarations gain variable-declaration lists, and the type-annotation grammar arrives; parse-pointers.md reuses it for `to` targets. Defaults reuse parse-arguments.md's value grammar with variables rejected.
 
 ## The grammar this doc accepts
 

@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-Second doc of the series parsing-plan.md orders, atop the invariant one-comma-per-boundary.md lands: every boundary holds at most one comma, and a doubled comma surfaces as an empty chunk. This doc lands `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
+First doc of the series parsing-plan.md orders, atop the landed chunking invariant (refactors/past/one-comma-per-boundary.md): every boundary holds at most one comma, and a comma no item precedes surfaces as an empty chunk whose boundary starts with that comma. This doc lands `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
 
 ## The grammar this doc accepts
 
@@ -286,7 +286,7 @@ fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralPars
 /// The root's first chunk, which is the declaration, plus the joined span of any
 /// further contentful chunks. The literal's leading line breaks are captured before any
 /// chunk exists, so the declaration can sit nowhere else; an empty chunk is a comma no
-/// item precedes (one-comma-per-boundary.md) and is always an error, at that comma.
+/// item precedes (refactors/past/one-comma-per-boundary.md) and is always an error, at that comma.
 fn declaration_chunk(
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<(&WithSpan<Chunk>, Option<Span>), WithSpan<ParseError>> {
@@ -329,7 +329,7 @@ pub(crate) fn boundary_comma(chunk: &WithSpan<Chunk>) -> Option<Span> {
 }
 
 /// The span of the comma that opened an empty chunk: an empty chunk's boundary starts
-/// with its comma (one-comma-per-boundary.md). Falls back to the chunk's own span
+/// with its comma (refactors/past/one-comma-per-boundary.md). Falls back to the chunk's own span
 /// rather than assuming the invariant.
 pub(crate) fn empty_chunk_comma_span(chunk: &WithSpan<Chunk>) -> Span {
     chunk

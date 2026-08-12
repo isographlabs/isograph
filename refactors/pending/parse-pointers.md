@@ -1,6 +1,6 @@
 # parse-pointers: pointer declarations
 
-Seventh and last doc of the series parsing-plan.md orders, after parse-descriptions.md. It lands `pointer Type.name to Type { ... }` and removes `UnsupportedDeclarationType`: every declaration keyword now parses.
+Sixth and last doc of the series parsing-plan.md orders, after parse-descriptions.md. It lands `pointer Type.name to Type { ... }` and removes `UnsupportedDeclarationType`: every declaration keyword now parses.
 
 ## The grammar this doc accepts
 

@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-Third doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `UnparsedItem`, and the parent-enum conversions that second parents force. Arguments are not parsed until parse-arguments.md: a paren group inside a selection is that selection's unparsed reason.
+Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `UnparsedItem`, and the parent-enum conversions that second parents force. Arguments are not parsed until parse-arguments.md: a paren group inside a selection is that selection's unparsed reason.
 
 ## The grammar this doc accepts
 
@@ -442,7 +442,7 @@ pub(crate) fn consume_token_if(
 
 /// Every contentful chunk of a level parses to one item via `parse_item`; a chunk that
 /// fails becomes `unparsed` holding the reason and a clone of the chunk. Every empty
-/// chunk is a comma no item precedes (one-comma-per-boundary.md) and becomes an
+/// chunk is a comma no item precedes (refactors/past/one-comma-per-boundary.md) and becomes an
 /// unparsed item at that comma; line breaks at a level's start are captured by the
 /// opening bracket and never reach this walk. A parsed item's span covers the chunk's
 /// contents, without its boundary.
