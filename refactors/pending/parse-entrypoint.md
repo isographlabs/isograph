@@ -1,16 +1,16 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders. It lands `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
+Second doc of the series parsing-plan.md orders, atop the invariant one-comma-per-boundary.md lands: every boundary holds at most one comma, and a doubled comma surfaces as an empty chunk. This doc lands `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
 
 ## The grammar this doc accepts
 
-A literal parses when its root level holds exactly one chunk with contents, every root boundary is line-break-only, and that chunk is:
+A literal parses when its root level holds exactly one chunk with contents and that chunk is:
 
 ```
 entrypoint <Identifier> . <Identifier>
 ```
 
-with nothing after the second identifier. Leading and trailing line breaks around the declaration are the normal literal style and parse fine:
+with nothing after the second identifier. Leading and trailing separators around the declaration are insignificant, a single comma included; the normal literal style parses:
 
 ```
 iso(`
@@ -24,38 +24,137 @@ Everything else produces an `UnparsedLiteral` holding one reason and the entire 
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+use std::fmt;
+
+use crate::{BracketKind, ChunkContentItem, NonBracketTokenKind};
 
 /// Why a region failed to parse, positioned by a wrapping `WithSpan` that covers the
-/// offending tokens, or is empty at the position where a missing item was expected.
-/// Message rendering happens outside this crate; each variant's doc comment states the
-/// message it will render to.
+/// offending item, or is empty at the position where a missing item was expected.
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum ParseError {
-    /// "Expected a declaration. An isograph literal cannot be empty."
+    Expected(ExpectedFound),
     EmptyLiteral,
-    /// "Unexpected comma. Commas only separate items inside a list."
-    CommaAtLiteralRoot,
-    /// "Expected nothing after the declaration. Each literal holds exactly one declaration."
     MultipleDeclarations,
-    /// "Expected `entrypoint`, `field`, or `pointer`."
-    ExpectedDeclarationKeyword,
-    /// "Unknown declaration type `{text}`. Expected `entrypoint`, `field`, or `pointer`."
-    UnknownDeclarationKeyword,
-    /// "`{text}` declarations are not supported yet."
     /// Temporary: parse-fields.md and parse-pointers.md remove this variant.
     UnsupportedDeclarationType,
-    /// "Expected the name of a type, like `Query` or `Pet`."
-    ExpectedEntityName,
-    /// "Expected a `.` between the type and the field name, like `Query.PetDetailRoute`."
-    ExpectedDot,
-    /// "Expected a field name after the `.`."
-    ExpectedClientFieldName,
-    /// "Directives like `@component` are not part of the language."
-    DirectivesUnsupported,
-    /// "Expected nothing after the field name."
-    LeftoverTokens,
+}
+
+/// What the grammar wanted at a position and what sat there instead.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct ExpectedFound {
+    pub expected: Expectation,
+    pub found: Found,
+}
+
+/// What the grammar wanted at the error's position.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Expectation {
+    /// A specific token, e.g. an identifier or a `.`.
+    Token(NonBracketTokenKind),
+    /// `entrypoint`, `field`, or `pointer`, as the declaration's first token.
+    DeclarationKeyword,
+    /// Nothing further: the declaration is complete.
+    EndOfDeclaration,
+}
+
+/// What sat at the error's position.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Found {
+    Token(NonBracketTokenKind),
+    /// A matched group, named by its opening bracket.
+    Group(BracketKind),
+    UnmatchedOpen(BracketKind),
+    UnmatchedClose(BracketKind),
+    /// The chunk ended; there was nothing at the position.
+    EndOfChunk,
+}
+
+impl ParseError {
+    pub fn expected(expected: Expectation, found: Found) -> Self {
+        ParseError::Expected(ExpectedFound { expected, found })
+    }
+}
+
+impl From<&ChunkContentItem> for Found {
+    fn from(item: &ChunkContentItem) -> Self {
+        match item {
+            ChunkContentItem::NonBracket(token) => Found::Token(token.0),
+            ChunkContentItem::Group(group) => Found::Group(group.opening.item.0),
+            ChunkContentItem::UnmatchedOpen(open) => Found::UnmatchedOpen(open.0),
+            ChunkContentItem::UnmatchedClose(close) => Found::UnmatchedClose(close.0),
+        }
+    }
+}
+
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ParseError::Expected(expected_found) => expected_found.fmt(f),
+            ParseError::EmptyLiteral => {
+                write!(f, "Expected a declaration. An isograph literal cannot be empty.")
+            }
+            ParseError::MultipleDeclarations => {
+                write!(f, "Expected nothing after the declaration. Each literal holds exactly one declaration.")
+            }
+            ParseError::UnsupportedDeclarationType => {
+                write!(f, "This declaration type is not supported yet.")
+            }
+        }
+    }
+}
+
+impl fmt::Display for ExpectedFound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Expected {}, found {}.", self.expected, self.found)
+    }
+}
+
+impl fmt::Display for Expectation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Expectation::Token(kind) => kind.fmt(f),
+            Expectation::DeclarationKeyword => {
+                write!(f, "one of `entrypoint`, `field`, or `pointer`")
+            }
+            Expectation::EndOfDeclaration => write!(f, "the end of the declaration"),
+        }
+    }
+}
+
+impl fmt::Display for Found {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Found::Token(kind) => kind.fmt(f),
+            Found::Group(kind) => write!(f, "a group opened by {}", opening_bracket_text(*kind)),
+            Found::UnmatchedOpen(kind) => {
+                write!(f, "an unmatched {}", opening_bracket_text(*kind))
+            }
+            Found::UnmatchedClose(kind) => {
+                write!(f, "an unmatched {}", closing_bracket_text(*kind))
+            }
+            Found::EndOfChunk => write!(f, "nothing more"),
+        }
+    }
+}
+
+fn opening_bracket_text(kind: BracketKind) -> &'static str {
+    match kind {
+        BracketKind::Parenthesis => "'('",
+        BracketKind::Brace => "'{'",
+        BracketKind::Bracket => "'['",
+    }
+}
+
+fn closing_bracket_text(kind: BracketKind) -> &'static str {
+    match kind {
+        BracketKind::Parenthesis => "')'",
+        BracketKind::Brace => "'}'",
+        BracketKind::Bracket => "']'",
+    }
 }
 ```
+
+Contextual suggestions (directive migration on a found `@`, and the like) are the rendering stage's concern, keyed off the `(expected, found)` pair; this crate carries only the structural facts.
 
 ## New module: parse_iso_literal.rs
 
@@ -69,8 +168,8 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan};
 
 use crate::{
-    Chunk, ChunkContentItem, ChunkedLevel, IsographResolutionNode, NonBracketToken,
-    NonBracketTokenKind, ParseError, SeparatorToken,
+    Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found, IsographResolutionNode,
+    NonBracketTokenKind, ParseError,
 };
 
 /// The parse of one literal. The wrapping `WithSpan`'s span is the whole literal.
@@ -150,7 +249,7 @@ impl IsoLiteralParse {
 
 ## The parser
 
-Validation runs by reference; the root moves into the output exactly once, at the end, into `UnparsedLiteral` on failure or dropped on success (a parsed declaration copies only spans and `Copy` tokens out of it).
+Validation runs by reference; the root moves into the output exactly once, at the end, into `UnparsedLiteral` on failure or dropped on success (a parsed declaration copies only spans out of it).
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -178,27 +277,42 @@ fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralPars
 }
 
 /// The root level's one chunk with contents, plus the joined span of any further
-/// contentful chunks. Root boundaries are line-break-only: a comma has no meaning
-/// outside a list.
+/// contentful chunks. A first chunk with no contents holds the literal's leading
+/// separators; an empty chunk anywhere else is a doubled comma
+/// (one-comma-per-boundary.md), and its span is that comma plus the line breaks it
+/// absorbed.
 fn declaration_chunk(
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<(&WithSpan<Chunk>, Option<Span>), WithSpan<ParseError>> {
-    for chunk in &root.item.0 {
-        if let Some(separator) = &chunk.item.trailing_separator
-            && let Some(comma) = separator
-                .item
-                .0
-                .iter()
-                .find(|token| token.item == SeparatorToken::Comma)
-        {
-            return Err(WithSpan::new(ParseError::CommaAtLiteralRoot, comma.location));
+    let mut declaration = None;
+    let mut extra = None;
+    for (index, chunk) in root.item.0.iter().enumerate() {
+        if chunk.item.contents.is_empty() {
+            if index == 0 {
+                continue;
+            }
+            let expected = match declaration {
+                None => Expectation::DeclarationKeyword,
+                Some(_) => Expectation::EndOfDeclaration,
+            };
+            return Err(WithSpan::new(
+                ParseError::expected(expected, Found::Token(NonBracketTokenKind::Comma)),
+                chunk.location,
+            ));
+        }
+        match declaration {
+            None => declaration = Some(chunk),
+            Some(_) => {
+                extra = Some(match extra {
+                    None => chunk.location,
+                    Some(span) => Span::join(span, chunk.location),
+                });
+            }
         }
     }
-    let mut contentful = root.item.0.iter().filter(|chunk| !chunk.item.contents.is_empty());
-    let Some(declaration) = contentful.next() else {
+    let Some(declaration) = declaration else {
         return Err(WithSpan::new(ParseError::EmptyLiteral, root.location));
     };
-    let extra = contentful.map(|chunk| chunk.location).reduce(Span::join);
     Ok((declaration, extra))
 }
 
@@ -212,13 +326,19 @@ fn parse_declaration_chunk(
     let keyword = expect_token(
         &mut items,
         NonBracketTokenKind::Identifier,
-        ParseError::ExpectedDeclarationKeyword,
+        Expectation::DeclarationKeyword,
         chunk.location.start,
     )?;
     match token_text(text, keyword) {
         "entrypoint" => Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, &mut items)?)),
         "field" | "pointer" => Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword)),
-        _ => Err(WithSpan::new(ParseError::UnknownDeclarationKeyword, keyword)),
+        _ => Err(WithSpan::new(
+            ParseError::expected(
+                Expectation::DeclarationKeyword,
+                Found::Token(NonBracketTokenKind::Identifier),
+            ),
+            keyword,
+        )),
     }
 }
 
@@ -229,17 +349,22 @@ fn parse_entrypoint(
     let parent_type = expect_token(
         items,
         NonBracketTokenKind::Identifier,
-        ParseError::ExpectedEntityName,
+        Expectation::Token(NonBracketTokenKind::Identifier),
         keyword.end,
     )?;
-    let dot = expect_token(items, NonBracketTokenKind::Period, ParseError::ExpectedDot, parent_type.end)?;
+    let dot = expect_token(
+        items,
+        NonBracketTokenKind::Period,
+        Expectation::Token(NonBracketTokenKind::Period),
+        parent_type.end,
+    )?;
     let client_field_name = expect_token(
         items,
         NonBracketTokenKind::Identifier,
-        ParseError::ExpectedClientFieldName,
+        Expectation::Token(NonBracketTokenKind::Identifier),
         dot.end,
     )?;
-    expect_chunk_end(items)?;
+    expect_chunk_end(items, Expectation::EndOfDeclaration)?;
     Ok(EntrypointDeclaration {
         entrypoint_keyword: WithSpan::new(EntrypointKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
@@ -253,11 +378,14 @@ fn parse_entrypoint(
 fn expect_token(
     items: &mut ChunkContents<'_>,
     kind: NonBracketTokenKind,
-    error: ParseError,
+    expected: Expectation,
     missing_at: u32,
 ) -> Result<Span, WithSpan<ParseError>> {
     let Some(peek) = items.peek() else {
-        return Err(WithSpan::new(error, Span::new(missing_at, missing_at)));
+        return Err(WithSpan::new(
+            ParseError::expected(expected, Found::EndOfChunk),
+            Span::new(missing_at, missing_at),
+        ));
     };
     let item = peek.view();
     match &item.item {
@@ -266,28 +394,26 @@ fn expect_token(
             peek.commit();
             Ok(span)
         }
-        _ => Err(WithSpan::new(error, item.location)),
+        other => Err(WithSpan::new(
+            ParseError::expected(expected, Found::from(other)),
+            item.location,
+        )),
     }
 }
 
-/// The chunk must have no items left. Leftovers are one error covering all of them, with
-/// a dedicated kind when they open with `@`, since a directive is the likeliest source.
-fn expect_chunk_end(items: &mut ChunkContents<'_>) -> Result<(), WithSpan<ParseError>> {
+/// The chunk must have no items left; the first leftover is the error.
+fn expect_chunk_end(
+    items: &mut ChunkContents<'_>,
+    expected: Expectation,
+) -> Result<(), WithSpan<ParseError>> {
     let Some(peek) = items.peek() else {
         return Ok(());
     };
-    let first = peek.commit();
-    let error = match &first.item {
-        ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::At)) => {
-            ParseError::DirectivesUnsupported
-        }
-        _ => ParseError::LeftoverTokens,
-    };
-    let mut span = first.location;
-    while let Some(peek) = items.peek() {
-        span = Span::join(span, peek.commit().location);
-    }
-    Err(WithSpan::new(error, span))
+    let item = peek.view();
+    Err(WithSpan::new(
+        ParseError::expected(expected, Found::from(&item.item)),
+        item.location,
+    ))
 }
 
 /// The literal text a span covers. The parser reads it only to recognize keywords.
@@ -296,7 +422,7 @@ fn token_text(text: &str, span: Span) -> &str {
 }
 ```
 
-An empty declaration chunk cannot reach `parse_declaration_chunk` (only a level's first chunk can be empty, and `declaration_chunk` filters empties), but no code relies on that: `expect_token`'s ran-out arm answers `ExpectedDeclarationKeyword` at the chunk's start.
+An empty declaration chunk cannot reach `parse_declaration_chunk` (`declaration_chunk` filters empties), but no code relies on that: `expect_token`'s ran-out arm answers `Expected(DeclarationKeyword, EndOfChunk)` at the chunk's start.
 
 ## lib.rs
 
@@ -525,11 +651,21 @@ mod tests {
     use resolve_position::ResolvePosition;
 
     use super::*;
-    use crate::{chunk, match_brackets, tokenize, ChunkedLevelParent};
+    use crate::{chunk, match_brackets, tokenize, BracketKind, ChunkedLevelParent};
+    use Expectation::{DeclarationKeyword, EndOfDeclaration};
+    use NonBracketTokenKind::{At, Comma, Identifier, IntegerLiteral, Period};
 
     fn parsed(text: &str) -> WithSpan<IsoLiteralParse> {
         let tree = chunk(&match_brackets(tokenize(text), text.len() as u32));
         parse_iso_literal(text, tree)
+    }
+
+    fn expected(expectation: Expectation, found: Found) -> ParseError {
+        ParseError::expected(expectation, found)
+    }
+
+    fn token(kind: NonBracketTokenKind) -> Expectation {
+        Expectation::Token(kind)
     }
 
     /// The span of `pattern`, which must occur exactly once in `text`: an anchor an edit
@@ -553,14 +689,14 @@ mod tests {
         }
     }
 
-    /// The literal must be unparsed for `expected` at `expected_span`, and `errors()`
-    /// must report exactly that reason.
-    fn assert_unparsed(text: &str, expected: ParseError, expected_span: Span) {
+    /// The literal must be unparsed for `reason` at `reason_span`, and `errors()` must
+    /// report exactly that reason.
+    fn assert_unparsed(text: &str, reason: ParseError, reason_span: Span) {
         let parse = parsed(text);
         match &parse.item {
             IsoLiteralParse::Unparsed(unparsed) => {
-                assert_eq!(unparsed.reason.item, expected, "for literal {text:?}");
-                assert_eq!(unparsed.reason.location, expected_span, "for literal {text:?}");
+                assert_eq!(unparsed.reason.item, reason, "for literal {text:?}");
+                assert_eq!(unparsed.reason.location, reason_span, "for literal {text:?}");
                 assert_eq!(parse.item.errors(), vec![unparsed.reason]);
             }
             parse => panic!("expected an unparsed literal for {text:?}, got {parse:?}"),
@@ -581,36 +717,50 @@ mod tests {
     }
 
     #[test]
-    fn surrounding_line_breaks_and_interior_spaces_are_insignificant() {
+    fn surrounding_separators_and_interior_spaces_are_insignificant() {
         for text in [
             "\n  entrypoint Query.foo\n",
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
+            "entrypoint Query.foo,",
+            ",entrypoint Query.foo",
+            "\nentrypoint Query.foo,\n",
         ] {
             let parse = parsed(text);
             let declaration = as_entrypoint(&parse);
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
+            assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
         }
     }
 
     #[test]
     fn empty_and_whitespace_only_literals_are_empty_literal_errors() {
-        for text in ["", "   ", "\n\n"] {
+        for text in ["", "   ", "\n\n", ","] {
             assert_unparsed(text, ParseError::EmptyLiteral, Span::from_usize(0, text.len()));
         }
     }
 
     #[test]
-    fn a_trailing_comma_at_the_root_is_an_error() {
-        let text = "entrypoint Query.foo,";
-        assert_unparsed(text, ParseError::CommaAtLiteralRoot, span_of(text, ","));
+    fn a_doubled_comma_after_the_declaration_is_an_error_on_the_empty_chunk() {
+        let text = "entrypoint Query.foo,,";
+        let commas = span_of(text, ",,");
+        assert_unparsed(
+            text,
+            expected(EndOfDeclaration, Found::Token(Comma)),
+            Span::new(commas.start + 1, commas.end),
+        );
     }
 
     #[test]
-    fn a_leading_comma_at_the_root_is_an_error() {
-        let text = ",entrypoint Query.foo";
-        assert_unparsed(text, ParseError::CommaAtLiteralRoot, span_of(text, ","));
+    fn a_doubled_comma_before_the_declaration_is_an_error_on_the_empty_chunk() {
+        let text = ",,entrypoint Query.foo";
+        let commas = span_of(text, ",,");
+        assert_unparsed(
+            text,
+            expected(DeclarationKeyword, Found::Token(Comma)),
+            Span::new(commas.start + 1, commas.end),
+        );
     }
 
     #[test]
@@ -623,19 +773,31 @@ mod tests {
     fn an_incomplete_declaration_reports_its_own_error_before_the_extra_chunk() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
-        assert_unparsed(text, ParseError::ExpectedEntityName, Span::new(keyword_end, keyword_end));
+        assert_unparsed(
+            text,
+            expected(token(Identifier), Found::EndOfChunk),
+            Span::new(keyword_end, keyword_end),
+        );
     }
 
     #[test]
     fn an_unknown_keyword_is_an_error_at_the_keyword() {
         let text = "fieldd Query.foo { bar }";
-        assert_unparsed(text, ParseError::UnknownDeclarationKeyword, span_of(text, "fieldd"));
+        assert_unparsed(
+            text,
+            expected(DeclarationKeyword, Found::Token(Identifier)),
+            span_of(text, "fieldd"),
+        );
     }
 
     #[test]
     fn a_literal_opening_with_a_group_expects_a_keyword() {
         let text = "{ bar }";
-        assert_unparsed(text, ParseError::ExpectedDeclarationKeyword, span_of(text, "{ bar }"));
+        assert_unparsed(
+            text,
+            expected(DeclarationKeyword, Found::Group(BracketKind::Brace)),
+            span_of(text, "{ bar }"),
+        );
     }
 
     #[test]
@@ -650,41 +812,73 @@ mod tests {
     fn each_missing_entrypoint_part_reports_at_its_position() {
         let bare = "entrypoint";
         let keyword_end = span_of(bare, "entrypoint").end;
-        assert_unparsed(bare, ParseError::ExpectedEntityName, Span::new(keyword_end, keyword_end));
+        assert_unparsed(
+            bare,
+            expected(token(Identifier), Found::EndOfChunk),
+            Span::new(keyword_end, keyword_end),
+        );
 
         let numeric = "entrypoint 42.foo";
-        assert_unparsed(numeric, ParseError::ExpectedEntityName, span_of(numeric, "42"));
+        assert_unparsed(
+            numeric,
+            expected(token(Identifier), Found::Token(IntegerLiteral)),
+            span_of(numeric, "42"),
+        );
 
         let dotless = "entrypoint Query foo";
-        assert_unparsed(dotless, ParseError::ExpectedDot, span_of(dotless, "foo"));
+        assert_unparsed(
+            dotless,
+            expected(token(Period), Found::Token(Identifier)),
+            span_of(dotless, "foo"),
+        );
 
         let nameless = "entrypoint Query.";
         let dot_end = span_of(nameless, ".").end;
-        assert_unparsed(nameless, ParseError::ExpectedClientFieldName, Span::new(dot_end, dot_end));
+        assert_unparsed(
+            nameless,
+            expected(token(Identifier), Found::EndOfChunk),
+            Span::new(dot_end, dot_end),
+        );
     }
 
     #[test]
     fn tokens_after_a_complete_entrypoint_are_leftover() {
         let text = "entrypoint Query.foo bar";
-        assert_unparsed(text, ParseError::LeftoverTokens, span_of(text, "bar"));
+        assert_unparsed(
+            text,
+            expected(EndOfDeclaration, Found::Token(Identifier)),
+            span_of(text, "bar"),
+        );
     }
 
     #[test]
     fn a_selection_set_on_an_entrypoint_is_leftover() {
         let text = "entrypoint Query.foo { bar }";
-        assert_unparsed(text, ParseError::LeftoverTokens, span_of(text, "{ bar }"));
+        assert_unparsed(
+            text,
+            expected(EndOfDeclaration, Found::Group(BracketKind::Brace)),
+            span_of(text, "{ bar }"),
+        );
     }
 
     #[test]
     fn an_unmatched_bracket_after_an_entrypoint_is_leftover() {
         let text = "entrypoint Query.foo)";
-        assert_unparsed(text, ParseError::LeftoverTokens, span_of(text, ")"));
+        assert_unparsed(
+            text,
+            expected(EndOfDeclaration, Found::UnmatchedClose(BracketKind::Parenthesis)),
+            span_of(text, ")"),
+        );
     }
 
     #[test]
-    fn a_directive_gets_the_dedicated_error_covering_it() {
+    fn a_directive_is_an_ordinary_unexpected_token() {
         let text = "entrypoint Query.foo @lazy";
-        assert_unparsed(text, ParseError::DirectivesUnsupported, span_of(text, "@lazy"));
+        assert_unparsed(
+            text,
+            expected(EndOfDeclaration, Found::Token(At)),
+            span_of(text, "@"),
+        );
     }
 
     #[test]
@@ -726,7 +920,10 @@ mod tests {
                 };
                 match &interior_level.parent.parent.parent {
                     ChunkedLevelParent::UnparsedLiteral(unparsed) => {
-                        assert_eq!(unparsed.inner.reason.item, ParseError::UnknownDeclarationKeyword);
+                        assert_eq!(
+                            unparsed.inner.reason.item,
+                            expected(DeclarationKeyword, Found::Token(Identifier))
+                        );
                     }
                     parent => panic!("expected the unparsed literal at the top, got {parent:?}"),
                 }
