@@ -46,20 +46,18 @@ Three changes, all listed here because parse code and resolution depend on them.
 
    No box: `UnparsedItemPath` reaches `ChunkPath` only through `SelectionSetParent::Object`, which is already boxed.
 
-3. `ChunkedLevel`'s `chunks` field wraps the parent in the new variant. Before:
+3. `ChunkedLevel`'s field wraps the parent in the new variant. Before:
 
    ```rust
    // from crates/isograph_parser/src/chunk.rs
-    #[resolve_field]
-    pub chunks: Vec<WithSpan<Chunk>>,
+   pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
    ```
 
    After:
 
    ```rust
    // from crates/isograph_parser/src/chunk.rs
-    #[resolve_field(parent_variant = Level)]
-    pub chunks: Vec<WithSpan<Chunk>>,
+   pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpan<Chunk>>);
    ```
 
 Every other derive site names `ChunkPath` through the alias and is untouched. The chunk.rs and parse_iso_literal.rs tests that walked `chunk_path.parent.parent` now pattern through `ChunkParent::Level`; the test modules gain one helper and the affected matches respell:
@@ -445,9 +443,9 @@ pub(crate) fn consume_token_if(
 /// Every contentful chunk of a level parses to one item via `parse_item`; a chunk that
 /// fails becomes `unparsed` holding the reason and a clone of the chunk. Every empty
 /// chunk is a comma no item precedes (one-comma-per-boundary.md) and becomes an
-/// unparsed item at that comma; a level's leading line breaks live in the level's own
-/// slot and never reach this walk. A parsed item's span covers the chunk's contents,
-/// without its boundary.
+/// unparsed item at that comma; line breaks at a level's start are captured by the
+/// opening bracket and never reach this walk. A parsed item's span covers the chunk's
+/// contents, without its boundary.
 pub(crate) fn parse_level_items<T>(
     level: &ChunkedLevel,
     item_expectation: Expectation,
@@ -455,7 +453,7 @@ pub(crate) fn parse_level_items<T>(
     unparsed: impl Fn(UnparsedItem) -> T,
 ) -> Vec<WithSpan<T>> {
     let mut parsed = Vec::new();
-    for chunk in level.chunks.iter() {
+    for chunk in level.0.iter() {
         if chunk.item.contents.is_empty() {
             let reason = WithSpan::new(
                 ParseError::expected(item_expectation, Found::Token(NonBracketTokenKind::Comma)),

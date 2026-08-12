@@ -337,14 +337,14 @@ pub(crate) fn parse_type_annotation(
 }
 
 /// The one type a `[ ... ]` interior holds. The interior is a level like any other:
-/// its leading line breaks sit in the level's slot, an empty chunk is a comma no item
+/// the bracket captures the line breaks after it, an empty chunk is a comma no item
 /// precedes and errors at that comma, and exactly one contentful chunk may exist,
 /// holding the type and nothing else.
 fn parse_bracket_interior_type(
     level: &WithSpan<ChunkedLevel>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     let mut annotation = None;
-    for chunk in level.item.chunks.iter() {
+    for chunk in level.item.0.iter() {
         if chunk.item.contents.is_empty() {
             return Err(WithSpan::new(
                 ParseError::expected(

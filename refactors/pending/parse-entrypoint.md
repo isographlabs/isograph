@@ -277,15 +277,15 @@ fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralPars
 }
 
 /// The root level's one chunk with contents, plus the joined span of any further
-/// contentful chunks. The level's leading line breaks live in its own slot and are
-/// insignificant; an empty chunk is a comma no item precedes
-/// (one-comma-per-boundary.md) and is always an error, at that comma.
+/// contentful chunks. The literal's leading line breaks are captured before any chunk
+/// exists; an empty chunk is a comma no item precedes (one-comma-per-boundary.md) and
+/// is always an error, at that comma.
 fn declaration_chunk(
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<(&WithSpan<Chunk>, Option<Span>), WithSpan<ParseError>> {
     let mut declaration = None;
     let mut extra = None;
-    for chunk in &root.item.chunks {
+    for chunk in &root.item.0 {
         if chunk.item.contents.is_empty() {
             let expected = match declaration {
                 None => Expectation::DeclarationKeyword,
