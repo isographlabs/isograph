@@ -10,7 +10,7 @@ A literal parses when its root level holds exactly one chunk with contents and t
 entrypoint <Identifier> . <Identifier>
 ```
 
-with nothing after the second identifier. Leading and trailing separators around the declaration are insignificant, a single comma included; the normal literal style parses:
+with nothing after the second identifier. Line breaks around the declaration and a single trailing comma are insignificant; a comma before the declaration is an error, like any comma no item precedes. The normal literal style parses:
 
 ```
 iso(`
@@ -277,27 +277,23 @@ fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralPars
 }
 
 /// The root level's one chunk with contents, plus the joined span of any further
-/// contentful chunks. A first chunk with no contents holds the literal's leading
-/// separators; an empty chunk anywhere else is a doubled comma
-/// (one-comma-per-boundary.md), and its span is that comma plus the line breaks it
-/// absorbed.
+/// contentful chunks. The level's leading line breaks live in its own slot and are
+/// insignificant; an empty chunk is a comma no item precedes
+/// (one-comma-per-boundary.md) and is always an error, at that comma.
 fn declaration_chunk(
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<(&WithSpan<Chunk>, Option<Span>), WithSpan<ParseError>> {
     let mut declaration = None;
     let mut extra = None;
-    for (index, chunk) in root.item.0.iter().enumerate() {
+    for chunk in &root.item.chunks {
         if chunk.item.contents.is_empty() {
-            if index == 0 {
-                continue;
-            }
             let expected = match declaration {
                 None => Expectation::DeclarationKeyword,
                 Some(_) => Expectation::EndOfDeclaration,
             };
             return Err(WithSpan::new(
                 ParseError::expected(expected, Found::Token(NonBracketTokenKind::Comma)),
-                chunk.location,
+                empty_chunk_comma_span(chunk),
             ));
         }
         match declaration {
@@ -314,6 +310,19 @@ fn declaration_chunk(
         return Err(WithSpan::new(ParseError::EmptyLiteral, root.location));
     };
     Ok((declaration, extra))
+}
+
+/// The span of the comma that opened an empty chunk: an empty chunk's boundary starts
+/// with its comma (one-comma-per-boundary.md). Falls back to the chunk's own span
+/// rather than assuming the invariant.
+pub(crate) fn empty_chunk_comma_span(chunk: &WithSpan<Chunk>) -> Span {
+    chunk
+        .item
+        .trailing_separator
+        .as_ref()
+        .and_then(|separator| separator.item.0.first())
+        .map(|token| token.location)
+        .unwrap_or(chunk.location)
 }
 
 type ChunkContents<'a> = SafePeekable<std::slice::Iter<'a, WithSpan<ChunkContentItem>>>;
@@ -422,7 +431,7 @@ fn token_text(text: &str, span: Span) -> &str {
 }
 ```
 
-An empty declaration chunk cannot reach `parse_declaration_chunk` (`declaration_chunk` filters empties), but no code relies on that: `expect_token`'s ran-out arm answers `Expected(DeclarationKeyword, EndOfChunk)` at the chunk's start.
+An empty declaration chunk cannot reach `parse_declaration_chunk` (`declaration_chunk` errors on empties), but no code relies on that: `expect_token`'s ran-out arm answers `Expected(DeclarationKeyword, EndOfChunk)` at the chunk's start.
 
 ## lib.rs
 
@@ -723,7 +732,6 @@ mod tests {
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
             "entrypoint Query.foo,",
-            ",entrypoint Query.foo",
             "\nentrypoint Query.foo,\n",
         ] {
             let parse = parsed(text);
@@ -736,8 +744,19 @@ mod tests {
 
     #[test]
     fn empty_and_whitespace_only_literals_are_empty_literal_errors() {
-        for text in ["", "   ", "\n\n", ","] {
+        for text in ["", "   ", "\n\n"] {
             assert_unparsed(text, ParseError::EmptyLiteral, Span::from_usize(0, text.len()));
+        }
+    }
+
+    #[test]
+    fn a_comma_before_the_declaration_is_an_error() {
+        for text in [",entrypoint Query.foo", ",", "\n,\nentrypoint Query.foo"] {
+            assert_unparsed(
+                text,
+                expected(DeclarationKeyword, Found::Token(Comma)),
+                span_of(text, ","),
+            );
         }
     }
 
@@ -753,13 +772,13 @@ mod tests {
     }
 
     #[test]
-    fn a_doubled_comma_before_the_declaration_is_an_error_on_the_empty_chunk() {
+    fn doubled_commas_before_the_declaration_report_the_first() {
         let text = ",,entrypoint Query.foo";
         let commas = span_of(text, ",,");
         assert_unparsed(
             text,
             expected(DeclarationKeyword, Found::Token(Comma)),
-            Span::new(commas.start + 1, commas.end),
+            Span::new(commas.start, commas.start + 1),
         );
     }
 

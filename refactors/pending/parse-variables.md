@@ -90,10 +90,10 @@ use safe_peekable::IntoSafePeekable;
 use span::{Span, WithSpan};
 
 use crate::{
-    consume_token_if, expect_chunk_end, expect_token, parse_level_items, parse_value, BracketKind,
-    Chunk, ChunkContentItem, ChunkContents, ChunkedLevel, ClientFieldDeclarationPath, Dollar,
-    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue,
-    ObjectEntry, ParseError, UnparsedItem, VariableName,
+    consume_token_if, empty_chunk_comma_span, expect_chunk_end, expect_token, parse_level_items,
+    parse_value, BracketKind, Chunk, ChunkContentItem, ChunkContents, ChunkedLevel,
+    ClientFieldDeclarationPath, Dollar, Expectation, Found, IsographResolutionNode,
+    NonBracketTokenKind, NonConstantValue, ObjectEntry, ParseError, UnparsedItem, VariableName,
 };
 
 /// The variable declarations a header's `( ... )` group holds, one per contentful chunk
@@ -336,24 +336,22 @@ pub(crate) fn parse_type_annotation(
     }
 }
 
-/// The one type a `[ ... ]` interior holds. The interior is a level like any other, so
-/// leading separators sit in an empty first chunk; exactly one contentful chunk may
-/// follow, holding the type and nothing else.
+/// The one type a `[ ... ]` interior holds. The interior is a level like any other:
+/// its leading line breaks sit in the level's slot, an empty chunk is a comma no item
+/// precedes and errors at that comma, and exactly one contentful chunk may exist,
+/// holding the type and nothing else.
 fn parse_bracket_interior_type(
     level: &WithSpan<ChunkedLevel>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     let mut annotation = None;
-    for (index, chunk) in level.item.0.iter().enumerate() {
+    for chunk in level.item.chunks.iter() {
         if chunk.item.contents.is_empty() {
-            if index == 0 {
-                continue;
-            }
             return Err(WithSpan::new(
                 ParseError::expected(
                     Expectation::TypeAnnotation,
                     Found::Token(NonBracketTokenKind::Comma),
                 ),
-                chunk.location,
+                empty_chunk_comma_span(chunk),
             ));
         }
         if annotation.is_some() {

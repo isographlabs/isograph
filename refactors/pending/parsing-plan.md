@@ -24,11 +24,11 @@ Composite items own groups within their chunk: `foo(arg: 1) { bar }` is one sele
 
 ## Boundary rules
 
-A boundary is a chunk's trailing separator run: any number of line breaks and at most one comma. The chunking pass enforces the shape (one-comma-per-boundary.md, a prefactor to this series): a second comma ends the boundary and opens the next chunk's, so a doubled comma surfaces structurally, as an empty chunk sitting between the two commas. The grammar stage therefore never inspects a boundary's tokens:
+A boundary is a chunk's trailing separator run: any number of line breaks and at most one comma. The rule of the language is that a comma must follow an item; line breaks are free.
 
-- A comma is as good as a line break in every boundary, the root level and the interior of a `[...]` type included, and a leading or trailing boundary is insignificant at every level.
-- No chunk requires a trailing boundary: `{ bar }` on one line parses, where upstream demanded a comma or line break after every selection, the last included.
-- An empty chunk that is not holding a level's leading separators is a doubled comma, and parses to an unparsed item whose reason is `Expected(<the level's item>, found ',')`. Its siblings parse normally.
+- A trailing comma is fine everywhere a boundary sits, the root level and the interior of a `[...]` type included. A comma before a level's first item is an error, as is a second comma in one boundary.
+- No chunk requires a trailing boundary: `{ bar }` on one line parses, where upstream demanded a comma or line break after every selection, the last included. `{}` and `{\n}` are empty selection sets.
+- The chunking pass makes the rule structural (one-comma-per-boundary.md, a prefactor to this series): a level's leading line breaks sit in a slot on the level, not in a chunk, and the boundary phase stops before a second comma, so an empty chunk exists exactly when a comma has no item before it, holding that comma as its boundary's first token. The grammar stage reports every empty chunk as a missing item, `Expected(<the level's item>, found ',')` at the comma, and never inspects a contentful chunk's boundary. An error-free parse contains no empty chunk.
 
 ## Language changes relative to upstream
 
@@ -48,7 +48,7 @@ A boundary is a chunk's trailing separator run: any number of line breaks and at
    !]               <- upstream: one list type; now: an error
    ```
 
-2. Separator placement loosens. A single comma is a valid boundary anywhere one sits and no trailing separator is ever required, so `{ bar }` on one line parses, as do a comma at the root level, a comma before a list's first item, and a comma inside `[...]`. Upstream rejected all of these.
+2. Separator placement loosens, on the trailing side only. A single trailing comma is valid everywhere a boundary sits, the root level and `[...]` interiors included, and no trailing separator is ever required, so `{ bar }` on one line parses. Upstream rejected those. Leading and doubled commas stay errors, as upstream.
 
 3. Directives are deferred. Upstream parsed `@name(args)` on declarations and on selections; this series does not, and a later series adds them back. Until then an `@` is an ordinary unexpected token: `field Query.Foo @component { ... }` reports `Expected(<a selection set>, found '@')`.
 
@@ -105,8 +105,8 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 
 Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `one-comma-per-boundary.md`. The chunking prefactor: the boundary phase stops before a second comma, an empty chunk can therefore sit anywhere in a level, and `ChunkSeparator` invariantly holds at most one comma.
-2. `parse-entrypoint.md`. The skeleton everything else extends: `parse_iso_literal`, the root-level rules (one contentful chunk; empty chunks as leading separators or doubled commas), keyword dispatch, `ParseError` with its `Display` impls, `UnparsedLiteral` with its resolution fallback, and the complete `entrypoint Type.field` declaration. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
+1. `one-comma-per-boundary.md`. The chunking prefactor: a level's leading line breaks move into a slot on the level, the boundary phase stops before a second comma, and an empty chunk therefore exists exactly when a comma has no item before it. `ChunkSeparator` invariantly holds at most one comma.
+2. `parse-entrypoint.md`. The skeleton everything else extends: `parse_iso_literal`, the root-level rules (one contentful chunk; every empty chunk an error at its comma), keyword dispatch, `ParseError` with its `Display` impls, `UnparsedLiteral` with its resolution fallback, and the complete `entrypoint Type.field` declaration. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
 3. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections with nested selection sets, `UnparsedItem` and the shared level-walking helper, and the parent-enum conversions second parents force (`EntityName`, `ClientFieldName`, `Chunk`). Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group inside a selection is that selection's unparsed reason until the next doc.
 4. `parse-arguments.md`. Argument lists on selections, `name: value` pairs, and values: variable, string, integer (with the `i64` conversion and `IntegerOutOfRange`), boolean, null, and object literals with their entry chunks.
 5. `parse-variables.md`. Variable-declaration lists on field declarations, `$name: Type = default`, type annotations (named, `!`, and `[...]` with its one-chunk interior), the constant-value restriction on defaults, and the `Box` delegation impl the recursion needs in `resolve_position`.

@@ -46,18 +46,20 @@ Three changes, all listed here because parse code and resolution depend on them.
 
    No box: `UnparsedItemPath` reaches `ChunkPath` only through `SelectionSetParent::Object`, which is already boxed.
 
-3. `ChunkedLevel`'s field wraps the parent in the new variant. Before:
+3. `ChunkedLevel`'s `chunks` field wraps the parent in the new variant. Before:
 
    ```rust
    // from crates/isograph_parser/src/chunk.rs
-   pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
+    #[resolve_field]
+    pub chunks: Vec<WithSpan<Chunk>>,
    ```
 
    After:
 
    ```rust
    // from crates/isograph_parser/src/chunk.rs
-   pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpan<Chunk>>);
+    #[resolve_field(parent_variant = Level)]
+    pub chunks: Vec<WithSpan<Chunk>>,
    ```
 
 Every other derive site names `ChunkPath` through the alias and is untouched. The chunk.rs and parse_iso_literal.rs tests that walked `chunk_path.parent.parent` now pattern through `ChunkParent::Level`; the test modules gain one helper and the affected matches respell:
@@ -238,9 +240,9 @@ use safe_peekable::IntoSafePeekable;
 use span::{Span, WithSpan};
 
 use crate::{
-    expect_chunk_end, expect_token, BracketKind, Chunk, ChunkContentItem, ChunkContents,
-    ChunkedLevel, ClientFieldDeclarationPath, Expectation, ExpectedFound, Found,
-    IsographResolutionNode, NonBracketTokenKind, ParseError,
+    empty_chunk_comma_span, expect_chunk_end, expect_token, BracketKind, Chunk,
+    ChunkContentItem, ChunkContents, ChunkedLevel, ClientFieldDeclarationPath, Expectation,
+    ExpectedFound, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
 };
 
 /// The selections a `{ ... }` group holds, one per contentful chunk of its interior.
@@ -441,10 +443,11 @@ pub(crate) fn consume_token_if(
 }
 
 /// Every contentful chunk of a level parses to one item via `parse_item`; a chunk that
-/// fails becomes `unparsed` holding the reason and a clone of the chunk. An empty first
-/// chunk holds the level's leading separators; an empty chunk anywhere else is a doubled
-/// comma (one-comma-per-boundary.md) and becomes an unparsed item whose found is the
-/// comma. A parsed item's span covers the chunk's contents, without its boundary.
+/// fails becomes `unparsed` holding the reason and a clone of the chunk. Every empty
+/// chunk is a comma no item precedes (one-comma-per-boundary.md) and becomes an
+/// unparsed item at that comma; a level's leading line breaks live in the level's own
+/// slot and never reach this walk. A parsed item's span covers the chunk's contents,
+/// without its boundary.
 pub(crate) fn parse_level_items<T>(
     level: &ChunkedLevel,
     item_expectation: Expectation,
@@ -452,14 +455,11 @@ pub(crate) fn parse_level_items<T>(
     unparsed: impl Fn(UnparsedItem) -> T,
 ) -> Vec<WithSpan<T>> {
     let mut parsed = Vec::new();
-    for (index, chunk) in level.0.iter().enumerate() {
+    for chunk in level.chunks.iter() {
         if chunk.item.contents.is_empty() {
-            if index == 0 {
-                continue;
-            }
             let reason = WithSpan::new(
                 ParseError::expected(item_expectation, Found::Token(NonBracketTokenKind::Comma)),
-                chunk.location,
+                empty_chunk_comma_span(chunk),
             );
             parsed.push(WithSpan::new(
                 unparsed(UnparsedItem { reason, chunk: chunk.clone() }),
@@ -699,11 +699,38 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 
     #[test]
     fn empty_selection_sets_hold_zero_selections() {
-        for text in ["field Query.Foo {}", "field Query.Foo { }"] {
+        for text in [
+            "field Query.Foo {}",
+            "field Query.Foo { }",
+            "field Query.Foo {\n}",
+        ] {
             let parse = parsed(text);
             assert_eq!(selections(&as_field(&parse).selection_set).len(), 0, "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
         }
+    }
+
+    #[test]
+    fn a_comma_before_the_first_selection_is_an_unparsed_item() {
+        let text = "field Query.Foo {, bar }";
+        let parse = parsed(text);
+        let items = selections(&as_field(&parse).selection_set);
+        assert_eq!(items.len(), 2);
+        let unparsed = as_unparsed_item(&items[0].item);
+        assert_eq!(
+            unparsed.reason.item,
+            expected(Expectation::Selection, Found::Token(Comma))
+        );
+        assert_eq!(unparsed.reason.location, span_of(text, ","));
+        assert_eq!(as_scalar(&items[1].item).name.location, span_of(text, "bar"));
+
+        let lone = "field Query.Foo {,}";
+        let parse = parsed(lone);
+        let items = selections(&as_field(&parse).selection_set);
+        assert_eq!(items.len(), 1);
+        let unparsed = as_unparsed_item(&items[0].item);
+        assert_eq!(unparsed.reason.location, span_of(lone, ","));
+        assert_eq!(parse.item.errors(), vec![unparsed.reason]);
     }
 
     #[test]
