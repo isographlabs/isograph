@@ -20,7 +20,7 @@ The unit of parsing is the chunk, recursively. A chunk is a vec of chunked and m
 
 - A group is one item. Consuming it consumes its whole `{ ... }` extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands "inside" a group it did not open.
 - Structured items arrive pre-spanned. A group's `location` was computed when the matcher closed it, opening through closing; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
-- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket never reaches a parser at all: the stream skips it, because the bracket stage already recorded its error (the unmatched rule under `ChunkStream`).
+- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket never reaches a parser at all: the stream stops at it, the bracket stage having already recorded its error (the unmatched rule under `ChunkStream`).
 - Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `take_next` returning `None`.
 
 ## The enforcement structures
@@ -63,12 +63,12 @@ impl<'a> ChunkStream<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
-    /// The next grammar-visible item, committed, or `None` when none remain: the value
-    /// a dispatch position matches on. Total: no error case exists here; errors are
-    /// the caller's to construct. The exhaustive match forces the `None` arm, so
-    /// handling the end cannot be forgotten. `None` covers a genuine end and a tail of
-    /// skipped unmatched brackets alike, which is the unmatched rule's erasure: the
-    /// chunk and the bracket stage still know, the stream's view does not.
+    /// The next reachable item, committed, or `None` when none remain: the value a
+    /// dispatch position matches on. Total: no error case exists here; errors are the
+    /// caller's to construct. The exhaustive match forces the `None` arm, so handling
+    /// the end cannot be forgotten. `None` covers the chunk's end and the stop at an
+    /// unmatched item alike (the unmatched rule); the chunk and the bracket stage
+    /// still know which, the stream's view does not.
     pub(crate) fn take_next(&mut self) -> Option<Taken<'a>>;
 
     /// The empty span at `previous_end`: where a missing item belongs, for error arms
@@ -93,8 +93,7 @@ impl<'a> ChunkStream<'a> {
 /// `end_span` supplying error arms their span. `Found` converts from a `Taken`. Not a
 /// taxonomy of its own: one variant per grammar-possible `ChunkContentItem` variant,
 /// flattened for matching; the unmatched-bracket variants are absent because the
-/// stream skips those items, so `Option<Taken>` is literally the image of
-/// `Option<&ChunkContentItem>` under the grammar. A change to what a chunk holds
+/// stream stops at those items and never yields them. A change to what a chunk holds
 /// changes this, and `Found`, together.
 pub(crate) enum Taken<'a> {
     Token(WithSpan<NonBracketTokenKind>),
@@ -102,7 +101,7 @@ pub(crate) enum Taken<'a> {
 }
 ```
 
-The unmatched rule: no grammar production contains a bare bracket, and the bracket stage already recorded the error at that span, so the grammar stage neither sees nor re-reports it. Every stream method skips `UnmatchedOpen` and `UnmatchedClose` items as it advances, exactly as the lexer skipped spaces; there is no `ParseError` variant for them and no `Found` variant to name them. The consequences are what the LSP wants: `foo (` parses as exactly `foo`, a selection set containing a stray `)` still parses every selection, and a chunk degrades only when its grammar-visible items are wrong. The stray bracket's positions still resolve, through the chunk tree the grammar tree retains for whitespace and degraded regions, and the error still surfaces, from the bracket stage's own `errors()` in the combined diagnostics, which is the final sweep: an error-free literal is one where both stages report nothing.
+The unmatched rule: no grammar production contains a bare bracket, and the bracket stage already recorded the error at that span, so the grammar stage neither parses past one nor re-reports it. Every stream method stops at an `UnmatchedOpen` or `UnmatchedClose` item: the item and everything after it are unreachable, as if the chunk ended there, and the stop is permanent. There is no `ParseError` variant for them and no `Found` variant to name them. The consequences: `foo (` parses as exactly `foo`, the completed item meeting what looks like the chunk's end, so no trailing-junk error; `foo ( bar` is the same, `bar` unreachable rather than a misleading follow-on error; `( foo` parses nothing and its slot degrades, the bracket error standing beside it; a stray `)` in a selection set costs only its own chunk's suffix. The poisoned region is always a suffix, like junk. Unreachable positions still resolve, to their containing level or through the retained chunk when the slot degraded, and the error still surfaces, from the bracket stage's own `errors()` in the combined diagnostics, which is the final sweep: an error-free literal is one where both stages report nothing.
 
 What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
 
@@ -217,12 +216,12 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 
 - A list level is walked only by `parse_level_items`. It consumes `entries()`, turns `CommaWithoutItem` into the missing-item unparsed item, runs `parse_item` on a fresh `stream()`, and itself calls `require_end(Expectation::Separator)` after a successful item, so an item parser cannot forget the leftover check: item parsers parse their production and stop, and exhaustion is the walker's job.
 - Trailing junk does not void a completed item. When `parse_item` succeeds and `require_end` then fails, the walker keeps the parsed item and records the junk as the slot's trailing error: `foo bar` is the selection `foo` plus an error at `bar`, and the LSP's go-to-definition, find-references, and completion see `foo` exactly as if the junk were absent. The item's span covers only what its parse consumed, so the junk's positions answer the containing level. A chunk degrades to unparsed only when its production fails before completing.
-- Junk is always the suffix. Nothing after the first leftover is reattached, since that would mean skipping items, which the stream does for unmatched brackets alone: `foo bar { baz }` is the scalar `foo` with junk from `bar` to the chunk's end, never an object selection, and `baz` is not in the grammar tree.
+- Junk is always the suffix. Nothing after the first leftover is reattached, since nothing is ever skipped: `foo bar { baz }` is the scalar `foo` with junk from `bar` to the chunk's end, never an object selection, and `baz` is not in the grammar tree.
 - A one-item context (the root level, a `[...]` interior) has its own walker (`declaration_chunk`, `parse_bracket_interior_type`), which enforces exactly one `Item`, errors on `CommaWithoutItem`, and rejects `boundary_comma` per no-final-comma.md. The end-of-chunk check is likewise the walker's, with its context's expectation (`EndOfDeclaration`, `EndOfType`).
 
 ## Failure isolation
 
-One chunk to one item, and the item is a result: every chunk parses in its entirety (the walker requires exhaustion), always independently (its own stream), to exactly one output slot, holding the parsed item, beside any trailing-junk error, or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
+One chunk to one item, and the item is a result: every chunk parses in its entirety up to any unmatched item (the walker requires exhaustion of what is reachable), always independently (its own stream), to exactly one output slot, holding the parsed item, beside any trailing-junk error, or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
 
 - A `ChunkStream` is built from one chunk and cannot read past it: separators and sibling chunks are not in it. There is no shared cursor to leave in a bad state, which is upstream's resynchronization problem (one `PeekableLexer` over the whole literal, so a failed production leaves the lexer wherever it stopped and everything after is suspect). Chunking pre-cut the input, so the recovery points are structural, not searched for.
 - `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`. The signature is the enforcement: an item parser's `Err` has nowhere to go but the walker's `unparsed` conversion, so a `?` cannot leak one chunk's failure into its siblings or its level. Errors escape only the one-item walkers, where the failed item is the whole context, and the stated granularity applies: the literal at the root, the containing item for a `[...]` inside a variable declaration.
@@ -234,7 +233,7 @@ One chunk to one item, and the item is a result: every chunk parses in its entir
 - Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`), and `errors()` derives the list from the tree in source order. There is no error list beside the tree.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone and its siblings parse; a failed declaration header degrades the literal. One error per degraded region; nothing inside a degraded region reports separately.
 - The parser carries no prose. Messages are `Display` impls on the error types; contextual suggestions belong to the rendering stage, keyed off the `(expected, found)` pair.
-- An unmatched bracket is not the grammar's error at all. The stream skips the item, the bracket stage's error stands as the one report, and no `ParseError` variant names brackets; the combined diagnostics, both stages' `errors()`, are the final sweep.
+- An unmatched bracket is not the grammar's error at all. The stream stops at the item, the bracket stage's error stands as the one report, and no `ParseError` variant names brackets; the combined diagnostics, both stages' `errors()`, are the final sweep.
 
 ## Totality
 

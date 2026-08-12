@@ -4,7 +4,7 @@ How the pipeline behaves while a group is unclosed, which is the LSP's steady st
 
 ## The problem
 
-The bracket matcher demotes an unclosed group: the opening becomes a raw (unmatched) token and the would-be children return to the parent level. The grammar stage then skips unmatched tokens (parsing-standards.md's unmatched rule), so the tokens parse as if the bracket were never typed. For a stray close bracket this is exactly right: `{ foo, bar) }` parses every selection, and the bracket stage's one error tells the truth. For an unclosed open bracket it is not:
+The bracket matcher demotes an unclosed group: the opening becomes a raw (unmatched) token and the would-be children return to the parent level. The grammar stage then stops at unmatched tokens (parsing-standards.md's unmatched rule), so everything from the unclosed `{` to its chunk's end is unreachable. For a stray close bracket this is exactly right: `{ foo, bar) }` parses every selection, and the bracket stage's one error tells the truth. For an unclosed open bracket it is not:
 
 ```
 field Query.Foo {
