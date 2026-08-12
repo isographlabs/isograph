@@ -91,6 +91,26 @@ fn collect_errors(level: &MatchedBrackets, errors: &mut Vec<BracketError>) {
 
 type TokenStream = SafePeekable<std::vec::IntoIter<WithSpan<IsographLangTokenKind>>>;
 
+/// Line breaks at the start of the items an opening leads are captured by that opening:
+/// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
+/// literal's start always leads its items; a group's opening leads them only once the
+/// group closes, so a demoted opening captures nothing and its line breaks return to
+/// the parent level as ordinary tokens.
+fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
+    let captured = items
+        .iter()
+        .position(|item| {
+            !matches!(
+                item.item,
+                BracketItem::Raw(RawToken::NonBracket(NonBracketToken(
+                    NonBracketTokenKind::LineBreak
+                )))
+            )
+        })
+        .unwrap_or(items.len());
+    items.drain(..captured);
+}
+
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
 pub fn match_brackets(
@@ -103,10 +123,9 @@ pub fn match_brackets(
     // `foo { bar ) }`, no enclosing group is a parenthesis, so the `)` is a stray raw
     // token, while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
-    WithSpan::new(
-        MatchedBrackets(parse_items(&mut tokens, &mut enclosing_stack)),
-        Span::new(0, literal_length),
-    )
+    let mut items = parse_items(&mut tokens, &mut enclosing_stack);
+    strip_captured_line_breaks(&mut items);
+    WithSpan::new(MatchedBrackets(items), Span::new(0, literal_length))
 }
 
 /// What parsing a group produced: the group closed for real, or it never got its close,
@@ -179,7 +198,7 @@ fn parse_bracketed(
     enclosing_stack: &mut Stack<BracketKind>,
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
-    let children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
+    let mut children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
         parse_items(tokens, enclosing_stack)
     });
 
@@ -197,6 +216,7 @@ fn parse_bracketed(
             let token = peek.commit();
             let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
             let interior = Span::between(opening.location, closing.location);
+            strip_captured_line_breaks(&mut children);
             ParsedGroup::Closed(Bracketed {
                 opening,
                 children: WithSpan::new(MatchedBrackets(children), interior),
@@ -424,5 +444,45 @@ mod tests {
             brace.children.location,
             Span::new(span_of(text, "{").end, span_of(text, "}").start)
         );
+    }
+
+    #[test]
+    fn a_closed_groups_opening_captures_the_line_breaks_after_it() {
+        let text = "foo {\n\n bar\n}";
+        let tree = tree(text);
+        let brace = group(&tree.item.0, 1);
+        assert_eq!(brace.children.item.0.len(), 2);
+        assert_eq!(
+            raw(&brace.children.item.0, 0),
+            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+        );
+        assert_eq!(
+            raw(&brace.children.item.0, 1),
+            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
+        );
+    }
+
+    #[test]
+    fn a_demoted_opening_captures_nothing() {
+        let text = "foo {\n bar";
+        let tree = tree(text);
+        assert_eq!(tree.item.0.len(), 4);
+        assert_eq!(raw(&tree.item.0, 1), RawToken::Open(OpenBracket(Brace)));
+        assert_eq!(
+            raw(&tree.item.0, 2),
+            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::LineBreak))
+        );
+    }
+
+    #[test]
+    fn the_literal_start_captures_its_line_breaks() {
+        let text = "\n\nfoo";
+        let tree = tree(text);
+        assert_eq!(tree.item.0.len(), 1);
+        assert_eq!(
+            raw(&tree.item.0, 0),
+            RawToken::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+        );
+        assert_eq!(tree.location, Span::from_usize(0, text.len()));
     }
 }

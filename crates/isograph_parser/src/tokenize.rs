@@ -5,7 +5,8 @@ use crate::IsographLangTokenKind;
 
 /// Tokenize one literal: every token with its span, in order, ending at the end of the input
 /// rather than with an `EndOfFile` token. The tokenizer skips spaces (line breaks are
-/// tokens), so consecutive tokens' spans need not touch.
+/// tokens; the bracket matcher captures the ones at the literal's start and at a closed
+/// group's interior's start), so consecutive tokens' spans need not touch.
 pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
     let mut lexer = IsographLangTokenKind::lexer(literal);
     let mut tokens = Vec::new();

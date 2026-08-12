@@ -10,17 +10,19 @@ use crate::{
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
 /// below — the same role `MatchedBrackets` has on the bracket tree. Its chunks, in
-/// order, and nothing else. A level that opens with separators holds them in a first
-/// chunk with no contents: an admittedly suboptimal encoding, accepted as the price of
-/// a level being a plain vec of one uniform chunk shape.
+/// order, and nothing else. Line breaks at a level's start were captured by the opening
+/// bracket (or the literal's start) and never arrive here, so a chunk with no contents
+/// is always a comma no item precedes, holding that comma as its boundary's first
+/// token.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 
 /// A maximal separator-free run of a level's items — tokens, groups, unmatched
-/// brackets, anything — plus the separator run that ended it when one did. The
-/// chunk-parsing pass consumes it as one unit. Every chunk but a level's last has a
-/// trailing separator by construction; the last's is the optional trailing delimiter.
+/// brackets, anything — plus the boundary that ended it when one did: line breaks and
+/// at most one comma, a second comma ending the boundary as well. The chunk-parsing
+/// pass consumes it as one unit. Every chunk but a level's last has a trailing
+/// separator by construction; the last's is the optional trailing delimiter.
 /// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
 /// end.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -56,9 +58,9 @@ pub struct ChunkedGroup {
     pub closing: WithSpan<CloseBracket>,
 }
 
-/// The boundary that ended its chunk, holding every comma and line-break token it
-/// absorbed, in order. Its tokens are not resolution leaves; a position on any of them
-/// answers the separator.
+/// The boundary that ended its chunk: its line-break tokens and at most one comma, in
+/// order. A second comma is never absorbed; it opens the next chunk's boundary. Its
+/// tokens are not resolution leaves; a position on any of them answers the separator.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkSeparator(pub Vec<WithSpan<SeparatorToken>>);
@@ -131,8 +133,10 @@ fn separator_of(item: &WithSpan<BracketItem>) -> Option<SeparatorToken> {
 
 /// One chunk from a nonempty stream: the content phase, then the boundary phase.
 /// Whichever phase matches the first item consumes it — every item is either content
-/// or a separator — so the chunk has at least one part and its span exists. Group
-/// interiors recurse in the content phase's `Bracketed` arm.
+/// or a separator — so the chunk has at least one part and its span exists; the
+/// boundary phase stops before a second comma, and absorbs at least the comma it
+/// starts at when the chunk opens on one. Group interiors recurse in the content
+/// phase's `Bracketed` arm.
 fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
     let mut contents = Vec::new();
     while let Some(peek) = items.peek() {
@@ -152,11 +156,17 @@ fn absorb_chunk(items: &mut LevelItems<'_>) -> WithSpan<Chunk> {
         contents.push(WithSpan::new(content_item, item.location));
     }
 
-    let mut separators = Vec::new();
+    let mut separators: Vec<WithSpan<SeparatorToken>> = Vec::new();
     while let Some(peek) = items.peek() {
         let Some(separator) = separator_of(peek.view()) else {
             break;
         };
+        if separator == SeparatorToken::Comma
+            && separators.iter().any(|absorbed| absorbed.item == SeparatorToken::Comma)
+        {
+            // The second comma opens the next chunk's boundary.
+            break;
+        }
         let item = peek.commit();
         separators.push(WithSpan::new(separator, item.location));
     }
@@ -357,40 +367,100 @@ mod tests {
         );
         assert!(comma.item.0[1].item.trailing_separator.is_none());
         assert!(linebreak.item.0[1].item.trailing_separator.is_none());
+    }
 
-        let multi = chunked("a,\n\n,b");
-        assert_eq!(multi.item.0.len(), 2);
+    #[test]
+    fn captured_line_breaks_make_no_chunk() {
+        let text = "\n\na, b\n";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 2);
+        assert_eq!(render_chunk(text, &tree.item.0[0].item), "a,");
+        assert_eq!(tree.location, Span::from_usize(0, text.len()));
+
+        let interior = "foo {\n bar\n}";
+        let tree = chunked(interior);
+        let brace = as_group(content_item(&tree.item.0[0].item, 1));
+        assert_eq!(brace.children.item.0.len(), 1);
+        assert_eq!(render_chunk(interior, &brace.children.item.0[0].item), "bar\n");
+    }
+
+    #[test]
+    fn a_comma_before_the_first_item_opens_an_empty_chunk() {
+        let text = "\n, a";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 2);
+        let empty = &tree.item.0[0];
+        assert!(empty.item.contents.is_empty());
         assert_eq!(
-            separator_kinds(&multi.item.0[0].item.trailing_separator.as_ref().unwrap().item),
+            separator_kinds(&empty.item.trailing_separator.as_ref().unwrap().item),
+            vec![SeparatorToken::Comma]
+        );
+        assert_eq!(empty.location, span_of(text, ","));
+        assert_eq!(render_chunk(text, &tree.item.0[1].item), "a");
+    }
+
+    #[test]
+    fn a_second_comma_ends_the_boundary_and_leaves_an_empty_chunk() {
+        let text = "a,\n\n,b";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 3);
+        let first = &tree.item.0[0].item;
+        assert_eq!(render_chunk(text, first), "a,\n\n");
+        assert_eq!(
+            separator_kinds(&first.trailing_separator.as_ref().unwrap().item),
             vec![
                 SeparatorToken::Comma,
                 SeparatorToken::LineBreak,
                 SeparatorToken::LineBreak,
-                SeparatorToken::Comma,
             ]
         );
+        let middle = &tree.item.0[1];
+        assert!(middle.item.contents.is_empty());
+        assert_eq!(
+            separator_kinds(&middle.item.trailing_separator.as_ref().unwrap().item),
+            vec![SeparatorToken::Comma]
+        );
+        let second_comma = span_of(text, ",b");
+        assert_eq!(middle.location, Span::new(second_comma.start, second_comma.start + 1));
+        assert_eq!(render_chunk(text, &tree.item.0[2].item), "b");
     }
 
     #[test]
-    fn leading_separators_make_an_empty_first_chunk() {
-        let text = "\n, a, b,\n";
+    fn doubled_leading_commas_leave_two_empty_chunks() {
+        let text = ",,a";
         let tree = chunked(text);
         assert_eq!(tree.item.0.len(), 3);
-        let first = &tree.item.0[0].item;
-        assert!(first.contents.is_empty());
-        assert_eq!(
-            separator_kinds(&first.trailing_separator.as_ref().unwrap().item),
-            vec![SeparatorToken::LineBreak, SeparatorToken::Comma]
-        );
-        let last = &tree.item.0[2].item;
-        assert_eq!(
-            as_non_bracket(content_item(last, 0)).0,
-            NonBracketTokenKind::Identifier
-        );
-        assert_eq!(
-            separator_kinds(&last.trailing_separator.as_ref().unwrap().item),
-            vec![SeparatorToken::Comma, SeparatorToken::LineBreak]
-        );
+        assert!(tree.item.0[0].item.contents.is_empty());
+        assert!(tree.item.0[1].item.contents.is_empty());
+        assert_eq!(render_chunk(text, &tree.item.0[2].item), "a");
+    }
+
+    #[test]
+    fn a_demoted_brace_leaves_its_line_break_as_a_boundary() {
+        let text = "foo {\n bar";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 2);
+        assert_eq!(render_chunk(text, &tree.item.0[0].item), "foo {\n");
+        assert_eq!(render_chunk(text, &tree.item.0[1].item), "bar");
+    }
+
+    #[test]
+    fn a_captured_line_break_resolves_to_its_level() {
+        let text = "\nfoo {\n bar }";
+        let tree = chunked(text);
+        match tree.resolve(ChunkedLevelParent::Root, Span::new(0, 1)) {
+            IsographResolutionNode::ChunkedLevel(level) => {
+                assert!(matches!(level.parent, ChunkedLevelParent::Root));
+            }
+            node => panic!("expected the root level, got {node:?}"),
+        }
+        let opening = span_of(text, "{\n");
+        match tree.resolve(ChunkedLevelParent::Root, Span::new(opening.start + 1, opening.end)) {
+            IsographResolutionNode::ChunkedLevel(level) => {
+                assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+            }
+            node => panic!("expected the interior level, got {node:?}"),
+        }
     }
 
     #[test]
@@ -463,7 +533,7 @@ mod tests {
 
     #[test]
     fn whitespace_only_and_empty_literals_are_empty_levels() {
-        for text in ["   ", ""] {
+        for text in ["   ", "", "\n\n"] {
             let tree = chunked(text);
             assert_eq!(tree.item.0.len(), 0);
             assert_eq!(tree.location, Span::from_usize(0, text.len()));
