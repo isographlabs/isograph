@@ -209,3 +209,7 @@ The tail's input moves to a new test with the new expectations, anchored on the 
 
 1. The absorption change, the comment updates, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past. parse-entrypoint.md builds on the invariant this doc lands.
+
+## Notes
+
+- In later stages, empty chunks become parse errors, and this should be unambiguous

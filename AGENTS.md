@@ -90,6 +90,7 @@ This is distinct from total handling of values the outside world owns. A parse o
 - Never rely on discipline what we can enforce with newtypes.
 - Custom traits are generally to be avoided. Prefer a concrete type, an enum, a plain function, or a standard-library trait (`From`/`Into`, `Default`, the iterator traits) over introducing a trait of our own. A trait earns its place when several types genuinely implement it or it marks a real abstraction boundary; a trait with one implementor, reached for to make a generic infer or to fold a single call site's boilerplate, is the case to avoid. When a design introduces a trait, say what it buys over a concrete type, and default to the version without it.
 - If a function does not return every variant of an enum, e.g. only a Some, it should not return a value whose type is that enum. Return something narrower instead, e.g. a different enum or T. In some cases, for example when propagating errors, we can return the final type instead of dealing with many intermediate narrower enums. However, even in situations like this, this pattern is an anti-pattern.
+- Always test degenerate cases.
 
 ## Audits
 
