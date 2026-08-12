@@ -180,6 +180,7 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 ## Errors
 
 - An error is `WithSpan<ParseError>`; the workhorse is `Expected(ExpectedFound { expected, found })`. The span covers the offending item or is empty where the missing item belonged.
+- Open, to be decided at the entrypoint review: whether `Expectation` stays one global enum, becomes per-logical-group enums, or the error becomes a rendered `Diagnostic`. The `(expected, found)` keying for rendering hints rides on the outcome.
 - Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`, the trailing-junk slot); `errors()` derives the list in source order. No error list exists beside the grammar tree.
 - Bracket and comma errors are the earlier passes', returned beside their trees (cut-at-unmatched.md, no-empty-chunks.md); no `ParseError` variant names either. The final sweep is all three lists: an error-free literal has empty vecs from the matcher and chunking and an empty `errors()` from the grammar.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone; a failed declaration header degrades the literal. One error per degraded region.
