@@ -6,7 +6,7 @@ macro_rules! u64_newtype {
 
         impl std::fmt::Display for $named {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                f.write_fmt(format_args!("$named({})", self.0))
+                f.write_fmt(format_args!("{}({})", stringify!($named), self.0))
             }
         }
 
@@ -66,4 +66,15 @@ macro_rules! u64_conversion {
             }
         }
     };
+}
+
+#[cfg(test)]
+#[allow(dead_code)] // macro expands methods (e.g. as_usize) this Display test does not call
+mod test {
+    crate::u64_newtype!(ExampleId);
+
+    #[test]
+    fn display_prints_the_type_name_and_value() {
+        assert_eq!(ExampleId(42).to_string(), "ExampleId(42)");
+    }
 }
