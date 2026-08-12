@@ -861,16 +861,6 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     }
 
     #[test]
-    fn a_trailing_comma_after_the_declaration_is_an_error() {
-        let text = "field Query.Foo { bar },";
-        assert_unparsed(
-            text,
-            expected(Expectation::EndOfDeclaration, Found::Token(Comma)),
-            span_of(text, ","),
-        );
-    }
-
-    #[test]
     fn errors_collect_in_source_order_across_nesting() {
         let text = "field Query.Foo {\n  a b\n  pet { c d }\n  e f\n}";
         let parse = parsed(text);

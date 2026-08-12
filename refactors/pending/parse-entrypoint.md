@@ -10,7 +10,7 @@ A literal parses when its root level holds exactly one chunk with contents and t
 entrypoint <Identifier> . <Identifier>
 ```
 
-with nothing after the second identifier. The declaration is the root level's first chunk and its only one: leading line breaks are captured by the literal's start, and no comma is valid anywhere at the root level, before or after the declaration, because the root is not a list. The normal literal style parses:
+with nothing after the second identifier. The declaration is the root level's first chunk and its only one: leading line breaks are captured by the literal's start, and a comma before the declaration is an empty chunk and errors. A trailing boundary after the declaration is insignificant in this doc, comma included; no-final-comma.md rejects the comma there once every declaration form exists. The normal literal style parses:
 
 ```
 iso(`
@@ -169,7 +169,7 @@ use span::{Span, WithSpan};
 
 use crate::{
     Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found, IsographResolutionNode,
-    NonBracketTokenKind, ParseError, SeparatorToken,
+    NonBracketTokenKind, ParseError,
 };
 
 /// The parse of one literal. The wrapping `WithSpan`'s span is the whole literal.
@@ -264,19 +264,12 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
     }
 }
 
-/// The declaration chunk parses before the structural complaints, so an incomplete
-/// declaration split across a line break reports its own precise error; only after a
-/// complete parse do a comma in the declaration's boundary (the root is not a list, so
-/// no comma is meaningful there) and any further content report.
+/// The declaration chunk parses before the extra-chunk check, so an incomplete
+/// declaration split across a line break reports its own precise error, and only a
+/// complete declaration followed by more content reports `MultipleDeclarations`.
 fn try_parse(text: &str, root: &WithSpan<ChunkedLevel>) -> Result<IsoLiteralParse, WithSpan<ParseError>> {
     let (declaration, extra) = declaration_chunk(root)?;
     let parse = parse_declaration_chunk(text, declaration)?;
-    if let Some(comma) = boundary_comma(declaration) {
-        return Err(WithSpan::new(
-            ParseError::expected(Expectation::EndOfDeclaration, Found::Token(NonBracketTokenKind::Comma)),
-            comma,
-        ));
-    }
     if let Some(extra) = extra {
         return Err(WithSpan::new(ParseError::MultipleDeclarations, extra));
     }
@@ -314,18 +307,6 @@ fn declaration_chunk(
         });
     }
     Ok((declaration, extra))
-}
-
-/// The comma in a chunk's trailing boundary, when one exists. Only a list level gives a
-/// boundary comma meaning; the callers sit in one-item contexts, where it is an error.
-pub(crate) fn boundary_comma(chunk: &WithSpan<Chunk>) -> Option<Span> {
-    let separator = chunk.item.trailing_separator.as_ref()?;
-    separator
-        .item
-        .0
-        .iter()
-        .find(|token| token.item == SeparatorToken::Comma)
-        .map(|token| token.location)
 }
 
 /// The span of the comma that opened an empty chunk: an empty chunk's boundary starts
@@ -747,23 +728,14 @@ mod tests {
             "\n  entrypoint Query.foo\n",
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
+            "entrypoint Query.foo,",
+            "\nentrypoint Query.foo,\n",
         ] {
             let parse = parsed(text);
             let declaration = as_entrypoint(&parse);
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
-        }
-    }
-
-    #[test]
-    fn a_trailing_comma_at_the_root_is_an_error() {
-        for text in ["entrypoint Query.foo,", "\nentrypoint Query.foo,\n"] {
-            assert_unparsed(
-                text,
-                expected(EndOfDeclaration, Found::Token(Comma)),
-                span_of(text, ","),
-            );
         }
     }
 

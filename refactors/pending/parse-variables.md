@@ -90,11 +90,10 @@ use safe_peekable::IntoSafePeekable;
 use span::{Span, WithSpan};
 
 use crate::{
-    boundary_comma, consume_token_if, empty_chunk_comma_span, expect_chunk_end, expect_token,
-    parse_level_items, parse_value, BracketKind, Chunk, ChunkContentItem, ChunkContents,
-    ChunkedLevel, ClientFieldDeclarationPath, Dollar, Expectation, Found,
-    IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ObjectEntry, ParseError,
-    UnparsedItem, VariableName,
+    consume_token_if, empty_chunk_comma_span, expect_chunk_end, expect_token, parse_level_items,
+    parse_value, BracketKind, Chunk, ChunkContentItem, ChunkContents, ChunkedLevel,
+    ClientFieldDeclarationPath, Dollar, Expectation, Found, IsographResolutionNode,
+    NonBracketTokenKind, NonConstantValue, ObjectEntry, ParseError, UnparsedItem, VariableName,
 };
 
 /// The variable declarations a header's `( ... )` group holds, one per contentful chunk
@@ -337,10 +336,10 @@ pub(crate) fn parse_type_annotation(
     }
 }
 
-/// The one type a `[ ... ]` interior holds. The interior is a one-item context: the
-/// bracket swallows the line breaks after it, an empty chunk is a comma no item
-/// precedes and errors at that comma, exactly one contentful chunk may exist, holding
-/// the type and nothing else, and no comma is valid in its boundary.
+/// The one type a `[ ... ]` interior holds. The interior is a level like any other:
+/// the bracket swallows the line breaks after it, an empty chunk is a comma no item
+/// precedes and errors at that comma, and exactly one contentful chunk may exist,
+/// holding the type and nothing else.
 fn parse_bracket_interior_type(
     level: &WithSpan<ChunkedLevel>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
@@ -370,15 +369,6 @@ fn parse_bracket_interior_type(
         let mut items = chunk.item.contents.iter().safe_peekable();
         let parsed = parse_type_annotation(&mut items, chunk.location.start)?;
         expect_chunk_end(&mut items, Expectation::EndOfType)?;
-        if let Some(comma) = boundary_comma(chunk) {
-            return Err(WithSpan::new(
-                ParseError::expected(
-                    Expectation::EndOfType,
-                    Found::Token(NonBracketTokenKind::Comma),
-                ),
-                comma,
-            ));
-        }
         annotation = Some(parsed);
     }
     annotation.ok_or_else(|| {
@@ -622,21 +612,6 @@ Extending the parse_iso_literal.rs test module.
         );
         as_declared(&variables.item.0[3].item);
         assert_eq!(parse.item.errors().len(), 3);
-    }
-
-    #[test]
-    fn a_trailing_comma_inside_a_list_type_degrades_that_declaration() {
-        let text = "field Query.Foo($pets: [Pet,]) { bar }";
-        let parse = parsed(text);
-        let unparsed = match &variables_of(&parse).item.0[0].item {
-            VariableDeclaration::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(
-            unparsed.item,
-            expected(Expectation::EndOfType, Found::Token(NonBracketTokenKind::Comma))
-        );
-        assert_eq!(unparsed.location, span_of(text, ","));
     }
 
     #[test]
