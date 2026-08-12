@@ -100,7 +100,7 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 - Semantic tokens. The finished tree plus spans determines them, so a separate walk derives them when the LSP needs them; upstream interleaved them with parsing.
 - Extraction context. `const_export_name`, the definition file path, and the "must be exported" check belong to the stage that extracts literals from files. This stage sees only the text between the backticks, and a missing export is not a malformed literal.
 - Diagnostics rendering: turning `WithSpan<ParseError>` plus the literal text into printed messages, including the contextual suggestions keyed off `(expected, found)` pairs.
-- Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set. The series builds the minimal correct version first.
+- Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set; the unclosed-group case has its own open doc, unclosed-group-recovery.md. The series builds the minimal correct version first.
 - Span-slot genericity: this series builds `Span`-only trees. refactors/pending/spanless-parsing.md said to decide the `TSpan` parameter together with this stage; the decision here is to not adopt it now, and adopting it later is the mechanical change that doc describes.
 
 ## The docs, in order

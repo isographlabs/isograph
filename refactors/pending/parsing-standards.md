@@ -115,7 +115,7 @@ The unmatched rule: no grammar production contains a bare bracket, and the brack
 
 What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
 
-Spans follow the same rule as positions: a leaf's span is what `require_token` returned, an item's span is its `contents_span`, and a composite's span comes from `spanning`, upstream's `with_embedded_location_result` reborn without the location baggage. A hand-written `Span::join` in a parser is the anti-pattern; if a node's span cannot come from one of those three sources, that is a missing `ChunkStream` capability and an amendment here. Construction stays the landed passes' style, `WithSpan::new` and plain `Ok`/`Some`; upstream's postfix sugar (`wrap_ok`, `with_span`) is not adopted.
+Spans follow the same rule as positions: a leaf's span is what `require_token` returned, an item's span is the extent its parse consumed (a degraded slot's is its chunk's `contents_span`), and a composite's span comes from `spanning`, upstream's `with_embedded_location_result` reborn without the location baggage. A hand-written `Span::join` in a parser is the anti-pattern; if a node's span cannot come from one of those three sources, that is a missing `ChunkStream` capability and an amendment here. Construction stays the landed passes' style, `WithSpan::new` and plain `Ok`/`Some`; upstream's postfix sugar (`wrap_ok`, `with_span`) is not adopted.
 
 ### Dispatch is a match
 
@@ -184,7 +184,7 @@ impl Chunk {
     /// The stream a parser reads this chunk through.
     pub fn stream(&self) -> ChunkStream<'_>;
 
-    /// The span of the contents, without the boundary: an item's span.
+    /// The span of the contents, without the boundary: a degraded slot's span.
     pub fn contents_span(&self) -> Option<Span>;
 
     /// The comma in the trailing boundary, when one exists. Only a list gives a
@@ -227,11 +227,12 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 ## Level walks
 
 - A list level is walked only by `parse_level_items`. It consumes `entries()`, turns `CommaWithoutItem` into the missing-item unparsed item, runs `parse_item` on a fresh `stream()`, and itself calls `require_end(Expectation::Separator)` after a successful item, so an item parser cannot forget the leftover check: item parsers parse their production and stop, and exhaustion is the walker's job.
+- Trailing junk does not void a completed item. When `parse_item` succeeds and `require_end` then fails, the walker keeps the parsed item and records the junk as the slot's trailing error: `foo bar` is the selection `foo` plus an error at `bar`, and the LSP's go-to-definition, find-references, and completion see `foo` exactly as if the junk were absent. The item's span covers only what its parse consumed, so the junk's positions answer the containing level. A chunk degrades to unparsed only when its production fails before completing.
 - A one-item context (the root level, a `[...]` interior) has its own walker (`declaration_chunk`, `parse_bracket_interior_type`), which enforces exactly one `Item`, errors on `CommaWithoutItem`, and rejects `boundary_comma` per no-final-comma.md. The end-of-chunk check is likewise the walker's, with its context's expectation (`EndOfDeclaration`, `EndOfType`).
 
 ## Failure isolation
 
-One chunk to one item, and the item is a result: every chunk parses in its entirety (the walker requires exhaustion), always independently (its own stream), to exactly one output slot, holding the parsed item or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
+One chunk to one item, and the item is a result: every chunk parses in its entirety (the walker requires exhaustion), always independently (its own stream), to exactly one output slot, holding the parsed item, beside any trailing-junk error, or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
 
 - A `ChunkStream` is built from one chunk and cannot read past it: separators and sibling chunks are not in it. There is no shared cursor to leave in a bad state, which is upstream's resynchronization problem (one `PeekableLexer` over the whole literal, so a failed production leaves the lexer wherever it stopped and everything after is suspect). Chunking pre-cut the input, so the recovery points are structural, not searched for.
 - `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`. The signature is the enforcement: an item parser's `Err` has nowhere to go but the walker's `unparsed` conversion, so a `?` cannot leak one chunk's failure into its siblings or its level. Errors escape only the one-item walkers, where the failed item is the whole context, and the stated granularity applies: the literal at the root, the containing item for a `[...]` inside a variable declaration.
