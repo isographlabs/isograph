@@ -73,7 +73,11 @@ impl<'a> ChunkStream<'a> {
 }
 
 /// What a dispatch position sees: the committed next item, its payload carried into
-/// the match arm, or the chunk's end. `Found` converts from it for error arms.
+/// the match arm, or the chunk's end. `Found` converts from it for error arms. Not a
+/// taxonomy of its own: one variant per `ChunkContentItem` variant, flattened for
+/// matching (the token's kind, the group by reference), plus the end — the image of
+/// `Option<&ChunkContentItem>`. A change to what a chunk holds changes both, and
+/// `Found`, together.
 pub(crate) enum Taken<'a> {
     Token(NonBracketTokenKind),
     Group(&'a ChunkedGroup),
