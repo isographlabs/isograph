@@ -63,10 +63,12 @@ impl<'a> ChunkStream<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
-    /// The next item, committed, or `None` at the chunk's end: the value a dispatch
-    /// position matches on. The exhaustive match forces the `None` arm, so handling
-    /// the end cannot be forgotten; no arm handles an unmatched bracket, because the
-    /// stream skips them — see the unmatched rule below.
+    /// The next grammar-visible item, committed, or `None` when none remain: the value
+    /// a dispatch position matches on. Total: no error case exists here; errors are
+    /// the caller's to construct. The exhaustive match forces the `None` arm, so
+    /// handling the end cannot be forgotten. `None` covers a genuine end and a tail of
+    /// skipped unmatched brackets alike, which is the unmatched rule's erasure: the
+    /// chunk and the bracket stage still know, the stream's view does not.
     pub(crate) fn take_next(&mut self) -> Option<Taken<'a>>;
 
     /// The empty span at `previous_end`: where a missing item belongs, for error arms
