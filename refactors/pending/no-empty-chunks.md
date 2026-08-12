@@ -75,8 +75,8 @@ impl<T> NonEmptyVec<T> {
         1 + self.rest.len()
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &T> {
-        once(&self.first).chain(self.rest.iter())
+    pub fn iter(&self) -> Iter<'_, T> {
+        Iter(once(&self.first).chain(self.rest.iter()))
     }
 
     pub fn get(&self, index: usize) -> Option<&T> {
@@ -96,6 +96,18 @@ impl<T> Index<usize> for NonEmptyVec<T> {
             0 => &self.first,
             index => &self.rest[index - 1],
         }
+    }
+}
+
+/// The iterator over a `NonEmptyVec`, named so callers can store it: the first-plus-rest
+/// representation has no slice to iterate.
+pub struct Iter<'a, T>(std::iter::Chain<std::iter::Once<&'a T>, std::slice::Iter<'a, T>>);
+
+impl<'a, T> Iterator for Iter<'a, T> {
+    type Item = &'a T;
+
+    fn next(&mut self) -> Option<&'a T> {
+        self.0.next()
     }
 }
 ```

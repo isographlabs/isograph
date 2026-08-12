@@ -6,10 +6,10 @@ This doc assumes cut-at-unmatched.md and no-empty-chunks.md: grouping returns `(
 
 ## Input shape
 
-- The unit of parsing is the chunk: a vec of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The literal is the root level's one chunk; a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
+- The unit of parsing is the chunk: a `NonEmptyVec` of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that exactly one holds the declaration is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
 - A group is one item, consumed whole, always really closed. Its interior re-enters parsing only as fresh levels.
 - Items arrive pre-spanned. Parsers compute a span only for a multi-item composite, via `spanning`.
-- Separators were absorbed into boundaries by chunking: "a separator comes next" is `take_next()` returning `None`. Brackets were resolved by the matcher: no bracket state reaches a parser.
+- Separators were absorbed into boundaries by chunking: "a separator comes next" is `take_next()` returning `None`. An unmatched bracket and its level's tail never left the matcher, and a comma no item precedes never left chunking: no bracket or empty-chunk state reaches a parser.
 
 ## Function shapes
 
@@ -29,7 +29,7 @@ Every operation a parser can perform is a method on one of four types. A new ope
 /// The only reader of a chunk's contents. No rewind and no raw peek exist: a committed
 /// item is committed, and a decision is made on at most the next item.
 pub(crate) struct ChunkStream<'a> {
-    items: SafePeekable<std::slice::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<non_empty_vec::Iter<'a, WithSpan<ChunkContentItem>>>,
     /// The end of the last accepted item (the chunk's start before any): where an
     /// `Expected(_, EndOfChunk)` error points.
     previous_end: u32,
@@ -77,8 +77,9 @@ impl<'a> ChunkStream<'a> {
 ```
 
 - Peek-commit, unconsumed offenders, and `previous_end` anchoring live here once, not per parser.
-- Span sources, exhaustively: a leaf's span is what `require_token` returned; an item's span is what its parse consumed (a degraded slot's is its chunk's `contents_span`); a composite's span comes from `spanning`. `Span::join` in a parser is banned; a span no source provides is a missing method here.
+- Span sources, exhaustively: a leaf's span is what a stream method returned (`require_token`, `consume_token_if`) or the wrapper a consumed item carried (`consume_group_if`, `take_next`); an item's span is what its parse consumed (a degraded slot's is its chunk's `contents_span`); a composite's span comes from `spanning`. `Span::join` in a parser is banned; a span no source provides is a missing method here.
 - Construction is `WithSpan::new` and plain `Ok`/`Some`; the upstream postfix helpers (`wrap_ok`, `with_span`) are not used.
+- Anticipated amendments, each landing with its first caller: `spanning_from(start, parse)` for opener-anchored composites; a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener.
 
 ### `ChunkedLevel`
 
@@ -127,8 +128,7 @@ impl<'a> LiteralText<'a> {
 }
 ```
 
-- The complete set of text reads is this impl block: identifier text (keywords, `to`, `true`/`false`/`null`, all matched as strings at their one dispatch site each) and, when parse-arguments.md amends it, `integer` (`None` on out of range). String-literal contents and every other span stay unreadable.
-- Anticipated `ChunkStream` amendments, each landing with its first caller: `spanning_from(start, parse)` for opener-anchored composites; a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener.
+- The complete set of text reads is this impl block: identifier text (the declaration keywords, `to`, `true`/`false`/`null`, all matched as strings at their one dispatch site each) and, when parse-arguments.md amends it, `integer` (`None` on out of range). String-literal contents and every other span stay unreadable.
 
 ## Dispatch
 
@@ -142,7 +142,7 @@ match stream.take_next() {
             NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
             NonBracketTokenKind::StringLiteral => { /* done; item.location is the span */ }
             NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
-            NonBracketTokenKind::Identifier => { /* match LiteralText::value_word */ }
+            NonBracketTokenKind::Identifier => { /* match LiteralText::identifier: true/false/null */ }
             kind => return Err(WithSpan::new(
                 ParseError::expected(Expectation::Value, Found::Token(kind)),
                 item.location,
@@ -189,7 +189,7 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 ## Totality
 
 - No panics, on any input: `unwrap`, `expect`, `unreachable!`, and type-level infallibility claims are banned. A real but compiler-invisible invariant gets a graceful fallback and a doc comment stating the invariant.
-- Every input yields a tree; every position resolves: parsed regions to grammar leaves, degraded regions through retained chunks, everything else (whitespace, junk, the matcher's dropped regions) to the nearest container.
+- Every input yields a tree; every position resolves: parsed regions to grammar leaves, degraded regions through retained chunks, everything else (whitespace, junk, the matcher's dropped regions, chunking's dropped commas) to the nearest container.
 - The resolution path is context, never a retargeting mechanism. An identity-bearing action (find-references, rename, go-to-definition) acts only when the resolved leaf is itself a name leaf; it never walks the path to a nearest actionable ancestor, so a container answer, and therefore junk, can never borrow a parent's identity: in `foo { bar baz }`, the caret on `baz` finds nothing, not `foo`'s references. Context features (hover, completion) are the ones that read ancestry.
 
 ## Trees and spans
@@ -216,6 +216,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `LiteralText::identifier`, and `ChunkedLevel`'s privacy with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, `LiteralText::identifier`, and `ChunkedLevel`'s privacy with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
