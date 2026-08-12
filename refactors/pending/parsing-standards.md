@@ -188,7 +188,8 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 ## Totality
 
 - No panics, on any input: `unwrap`, `expect`, `unreachable!`, and type-level infallibility claims are banned. A real but compiler-invisible invariant gets a graceful fallback and a doc comment stating the invariant.
-- Every input yields a tree; every position resolves: parsed regions to grammar leaves, degraded regions through retained chunks, everything else (whitespace, the matcher's dropped regions) to the nearest container.
+- Every input yields a tree; every position resolves: parsed regions to grammar leaves, degraded regions through retained chunks, everything else (whitespace, junk, the matcher's dropped regions) to the nearest container.
+- The resolution path is context, never a retargeting mechanism. An identity-bearing action (find-references, rename, go-to-definition) acts only when the resolved leaf is itself a name leaf; it never walks the path to a nearest actionable ancestor, so a container answer, and therefore junk, can never borrow a parent's identity: in `foo { bar baz }`, the caret on `baz` finds nothing, not `foo`'s references. Context features (hover, completion) are the ones that read ancestry.
 
 ## Trees and spans
 
