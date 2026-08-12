@@ -76,9 +76,7 @@ impl<'a> ChunkStream<'a> {
     /// Runs a sub-parse and wraps its result in the span it consumed: from the start
     /// of the first item the closure accepts to the end of its last, empty at
     /// `previous_end` when it accepts none. With its optional sibling below, the only
-    /// source of a composite node's span; a parser never joins spans by hand. A
-    /// plainly-returning sibling is an anticipated amendment, added when its first
-    /// caller appears, never generically.
+    /// source of a composite node's span; a parser never joins spans by hand.
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
@@ -215,14 +213,10 @@ pub(crate) enum Keyword {
 
 impl<'a> LiteralText<'a> {
     pub(crate) fn keyword(&self, span: Span) -> Option<Keyword>;
-
-    // parse-arguments.md adds, as amendments here:
-    // fn value_word(&self, span: Span) -> Option<ValueWord>;   // true / false / null
-    // fn integer(&self, span: Span) -> Option<i64>;            // None: out of range
 }
 ```
 
-What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text.
+What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text. parse-arguments.md amends this block with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); a plainly-returning `spanning` sibling and `spanning_from` likewise wait for their first callers. Anticipated amendments live here in the doc, never as comments in the code.
 
 ## Level walks
 
