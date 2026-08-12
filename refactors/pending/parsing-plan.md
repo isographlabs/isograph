@@ -79,7 +79,7 @@ pub struct ExpectedFound {
 }
 ```
 
-`Expectation` names what the grammar wanted (a specific token, a selection, a value, a type, the end of the declaration, ...) and grows a few variants per doc; `Found` names what sat there (a token kind, a group, an unmatched bracket, or `EndOfChunk` when the chunk ran out, so a missing trailing piece is `Expected(<x>, found nothing more)`). All messages live in `Display` impls in the parser crate. Contextual suggestions (a fragment-spread hint on `Expected(<a selection>, found '.')`, a directive-migration hint on a found `@`, a "perhaps you meant to remove this line break" hint on an orphaned group) belong to the rendering stage, keyed off the `(expected, found)` pair; the parser never carries prose.
+`Expectation` names what the grammar wanted (a specific token, a selection, a value, a type, the end of the declaration, ...) and grows a few variants per doc; `Found` names what sat there (a token kind, a group, or `EndOfChunk` when the chunk ran out, so a missing trailing piece is `Expected(<x>, found nothing more)`). Bracket errors never appear here: the matcher returned them beside its tree (synthetic-closing.md), and no `ParseError` variant names a bracket. All messages live in `Display` impls in the parser crate. Contextual suggestions (a fragment-spread hint on `Expected(<a selection>, found '.')`, a directive-migration hint on a found `@`, a "perhaps you meant to remove this line break" hint on an orphaned group) belong to the rendering stage, keyed off the `(expected, found)` pair; the parser never carries prose.
 
 A reason is a `WithSpan<ParseError>`; the span points at the offending item, or is an empty span at the position where a missing item was expected.
 
@@ -100,12 +100,12 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 - Semantic tokens. The finished tree plus spans determines them, so a separate walk derives them when the LSP needs them; upstream interleaved them with parsing.
 - Extraction context. `const_export_name`, the definition file path, and the "must be exported" check belong to the stage that extracts literals from files. This stage sees only the text between the backticks, and a missing export is not a malformed literal.
 - Diagnostics rendering: turning `WithSpan<ParseError>` plus the literal text into printed messages, including the contextual suggestions keyed off `(expected, found)` pairs.
-- Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set; the unclosed-group case has its own open doc, unclosed-group-recovery.md. The series builds the minimal correct version first.
+- Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set. The unclosed-group case is decided: synthetic closing, per the prefactor synthetic-closing.md (deliberated in refactors/past/unclosed-group-recovery.md). The series builds the minimal correct version first.
 - Span-slot genericity: this series builds `Span`-only trees. refactors/pending/spanless-parsing.md said to decide the `TSpan` parameter together with this stage; the decision here is to not adopt it now, and adopting it later is the mechanical change that doc describes.
 
 ## The docs, in order
 
-Each doc is independently shippable and lands with its tests before the next begins.
+synthetic-closing.md lands first: it is a prefactor to the matcher and chunking that the whole series assumes (no unmatched-bracket state exists downstream of the matcher), and parsing-standards.md governs how every implementation below is written. Then, each doc independently shippable and landing with its tests before the next begins:
 
 1. `parse-entrypoint.md`. The skeleton everything else extends: `parse_iso_literal`, the root-level rules (the declaration is the first chunk and the only one; every empty chunk an error at its comma), keyword dispatch, `ParseError` with its `Display` impls, `UnparsedLiteral` with its resolution fallback, and the complete `entrypoint Type.field` declaration. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
 2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections with nested selection sets, `UnparsedItem` and the shared level-walking helper, and the parent-enum conversions second parents force (`EntityName`, `ClientFieldName`, `Chunk`). Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group inside a selection is that selection's unparsed reason until the next doc.

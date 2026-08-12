@@ -1,8 +1,21 @@
 # Parsing standards
 
-The rules every parser in the grammar stage follows, and the data structures that enforce them. The feature docs (parse-entrypoint.md through no-final-comma.md) define what parses; this doc defines how parsing code is written, what it may and may not do, and which types make violations unwritable rather than merely disallowed. The intent is to concentrate review here: the enforcement structures below each have one impl block, reviewed once, and a feature parser built from them has few ways to be wrong. Each feature implementation is reviewed against this doc when it lands, and a deviation is resolved by amending this doc first or fixing the code, never by shipping the deviation silently.
+The rules every parser in the grammar stage follows, and the data structures that enforce them. The feature docs define what parses; this doc defines how parsing code is written, what it may and may not do, and which types make violations unwritable rather than merely disallowed. The intent is to concentrate review here: the enforcement structures each have one impl block, reviewed once, and a feature parser built from them has few ways to be wrong. Each feature implementation is reviewed against this doc when it lands, and a deviation is resolved by amending this doc first or fixing the code, never by shipping the deviation silently.
 
-## The three function shapes
+This doc assumes synthetic-closing.md's world: the bracket matcher returns its tree beside its errors, every open bracket forms a group (really or synthetically closed), and stray closes are extracted, so no unmatched-bracket state exists anywhere downstream of the matcher.
+
+## The input is already structure
+
+By the time the grammar stage runs, three passes have shaped the input: tokens, groups, chunks. A parser here never sees characters, brackets, or separators; it sees a chunk's items, and that changes how everything below works.
+
+The unit of parsing is the chunk, recursively. A chunk is a vec of chunked and matched items, its tokens and its groups, and each such vec is read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The literal is itself one chunk, the root level's only one, and a chunk's groups hold levels of further chunks, each parsed independently of every other. Nothing in the stage ever holds a cursor over more than one vec; the recursion is "a chunk parses, and hands each interior chunk to its own parse."
+
+- A group is one item. Consuming it consumes its whole extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands inside a group it did not open. Whether the group's close was real or synthetic is invisible here; a group is a group.
+- Structured items arrive pre-spanned. A group's span was computed when the matcher closed it; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
+- Brackets are not a parsing concern, in any form. The matcher resolved every one: matched and synthetic opens are groups, stray closes were extracted with their errors riding beside the tree. No item kind for a bracket problem exists for a parser to meet.
+- Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `take_next` returning `None`.
+
+## The function shapes
 
 Every parser function is one of three shapes, and its prefix states its contract:
 
@@ -11,17 +24,6 @@ Every parser function is one of three shapes, and its prefix states its contract
 - `parse_*`: a composite production, built from the other two. Errors propagate from the first failing piece.
 
 Shared parsing structure is expressed as higher-order functions parameterized by the item parser, in the style upstream's `parse_delimited_list` set: `parse_level_items` takes `parse_item` and the unparsed-variant constructor, and every list reuses the one walk rather than restating it. When two productions share a shape, the shape becomes a higher-order function and the productions become its arguments; duplicating a walk or a wrapper by hand is the anti-pattern.
-
-## The input is already structure
-
-By the time the grammar stage runs, three passes have shaped the input: tokens, matched groups, chunks. A parser here never sees characters, raw brackets, or separators; it sees a chunk's items, and that changes how everything below works.
-
-The unit of parsing is the chunk, recursively. A chunk is a vec of chunked and matched items, its tokens and its groups, and each such vec is read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The literal is itself one chunk, the root level's only one, and a chunk's groups hold levels of further chunks, each parsed independently of every other. Nothing in the stage ever holds a cursor over more than one vec; the recursion is "a chunk parses, and hands each interior chunk to its own parse."
-
-- A group is one item. Consuming it consumes its whole `{ ... }` extent in a single step, interior included, and the interior re-enters parsing only as fresh levels, each chunk behind its own stream. No cursor ever stands "inside" a group it did not open.
-- Structured items arrive pre-spanned. A group's `location` was computed when the matcher closed it, opening through closing; a token's span came from the lexer. Parse code therefore computes spans only for multi-item composites, which is all `spanning` exists for; everything else carries the span it already has.
-- Bracket balance is not a parsing concern. A matched group cannot be half-open, and an unmatched bracket never reaches a parser at all: the stream stops at it, the bracket stage having already recorded its error (the unmatched rule under `ChunkStream`).
-- Separators do not exist here. Chunking absorbed them into boundaries, so "a separator comes next" is the chunk simply ending: `take_next` returning `None`.
 
 ## The enforcement structures
 
@@ -56,20 +58,18 @@ impl<'a> ChunkStream<'a> {
     /// `None`, nothing consumed, otherwise.
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span>;
 
-    /// The next item, consumed, when it is a matched group opened by `kind`; `None`,
-    /// nothing consumed, otherwise.
+    /// The next item, consumed, when it is a group opened by `kind`; `None`, nothing
+    /// consumed, otherwise.
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>>;
 
-    /// The next reachable item, committed, or `None` when none remain: the value a
-    /// dispatch position matches on. Total: no error case exists here; errors are the
-    /// caller's to construct. The exhaustive match forces the `None` arm, so handling
-    /// the end cannot be forgotten. `None` covers the chunk's end and the stop at an
-    /// unmatched item alike (the unmatched rule); the chunk and the bracket stage
-    /// still know which, the stream's view does not.
-    pub(crate) fn take_next(&mut self) -> Option<Taken<'a>>;
+    /// The next item, committed, or `None` at the chunk's end: the value a dispatch
+    /// position matches on. Total: no error case exists here; errors are the caller's
+    /// to construct. The exhaustive match forces the `None` arm, so handling the end
+    /// cannot be forgotten.
+    pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>>;
 
     /// The empty span at `previous_end`: where a missing item belongs, for error arms
     /// that found `EndOfChunk`.
@@ -87,58 +87,11 @@ impl<'a> ChunkStream<'a> {
     /// Nothing further may exist. The first leftover item is the error.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
 }
-
-/// What a dispatch position sees: the committed next item, carrying its span. The
-/// chunk's end is a position rather than an item, so it is `take_next`'s `None`, with
-/// `end_span` supplying error arms their span. `Found` converts from a `Taken`. Not a
-/// taxonomy of its own: one variant per grammar-possible `ChunkContentItem` variant,
-/// flattened for matching; the unmatched-bracket variants are absent because the
-/// stream stops at those items and never yields them. A change to what a chunk holds
-/// changes this, and `Found`, together.
-pub(crate) enum Taken<'a> {
-    Token(WithSpan<NonBracketTokenKind>),
-    Group(WithSpan<&'a ChunkedGroup>),
-}
 ```
 
-The unmatched rule: no grammar production contains a bare bracket, and the bracket stage already recorded the error at that span, so the grammar stage neither parses past one nor re-reports it. Every stream method stops at an `UnmatchedOpen` or `UnmatchedClose` item: the item and everything after it are unreachable, as if the chunk ended there, and the stop is permanent. There is no `ParseError` variant for them and no `Found` variant to name them. The consequences: `foo (` parses as exactly `foo`, the completed item meeting what looks like the chunk's end, so no trailing-junk error; `foo ( bar` is the same, `bar` unreachable rather than a misleading follow-on error; `( foo` parses nothing and its slot degrades, the bracket error standing beside it; a stray `)` in a selection set costs only its own chunk's suffix. The poisoned region is always a suffix, like junk. Unreachable positions still resolve, to their containing level or through the retained chunk when the slot degraded, and the error still surfaces, from the bracket stage's own `errors()` in the combined diagnostics, which is the final sweep: an error-free literal is one where both stages report nothing.
+What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser, and `previous_end` anchors every missing-item error, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it. `take_next` yields the chunk's own item type; no shadow taxonomy stands between the tree and the parser.
 
-What this discharges: consumption discipline (peek-commit, failure leaves the offender in place, errors carry the right span) is written once here instead of once per parser; the `missing_at` threading that every `require_*` call previously carried by hand disappears into `previous_end`, so a wrong anchor cannot be written. `SafePeekable` underneath has no rewind, and `ChunkStream` exposes no raw peek, so one-peek-decides holds structurally: an item commits only when a method accepted it.
-
-Spans follow the same rule as positions: a leaf's span is what `require_token` returned, an item's span is the extent its parse consumed (a degraded slot's is its chunk's `contents_span`), and a composite's span comes from `spanning`, upstream's `with_embedded_location_result` reborn without the location baggage. A hand-written `Span::join` in a parser is the anti-pattern; if a node's span cannot come from one of those three sources, that is a missing `ChunkStream` capability and an amendment here. Construction stays the landed passes' style, `WithSpan::new` and plain `Ok`/`Some`; upstream's postfix sugar (`wrap_ok`, `with_span`) is not adopted.
-
-### Dispatch is a match
-
-A position where the grammar allows one of several forms is written as one `match` on `take_next()`, never as a chain of `consume_*_if` attempts. The discriminating item is committed up front, which is sound because every arm uses it: the accepting arms continue from it, and the rejecting arm reports it as the `found`. The match is exhaustive over `Option<Taken>`, so handling the chunk's end cannot be forgotten, and a separator can never appear in an arm, because chunks are separator-free: "a separator comes next" is the `None`. Sketched on a value:
-
-```rust
-// from crates/isograph_parser/src/arguments.rs (shape, not the final listing)
-match stream.take_next() {
-    Some(Taken::Token(token)) => match token.item {
-        NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
-        NonBracketTokenKind::StringLiteral => { /* done; token.location is the span */ }
-        NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
-        NonBracketTokenKind::Identifier => { /* match LiteralText::value_word */ }
-        kind => return Err(WithSpan::new(
-            ParseError::expected(Expectation::Value, Found::Token(kind)),
-            token.location,
-        )),
-    },
-    Some(Taken::Group(group)) => { /* brace: object literal; other kinds: the same error shape */ }
-    None => return Err(WithSpan::new(
-        ParseError::expected(Expectation::Value, Found::EndOfChunk),
-        stream.end_span(),
-    )),
-}
-```
-
-Dispatch on an identifier's text is the same shape one level down: `require_token(Identifier, ...)` then a `match` on `LiteralText::keyword` (or `value_word`), so `entrypoint` versus `field` versus `pointer` is a match on the `Keyword` enum, not string comparisons scattered through arms.
-
-The `consume_*_if` shape is not a dispatch tool. It exists for one case: a composition boundary, where a sub-parser meets an item that is not its own and must decline without consuming what belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=` or the chunk's end). Inside a production that owns all the alternatives at a position, reaching for a `consume_*_if` chain instead of a `take_next` match is the anti-pattern.
-
-An opener-marked composite, one that is optional as a whole but required once its opener appears, is a dispatch arm, never a consume chain: the opener commits in the match and the remainder is `require_*`. The variable use is the existing instance (`$` commits, the name is required), and a future directive (`@ name (args)`) is the same shape, looping its position's match for repetition. Such a composite's span starts at the already-committed opener, which plain `spanning` cannot cover; `spanning_from(start, parse)`, anchored at a caller-supplied span, is the anticipated sibling, landing with its first caller.
-
-The law under both shapes is no-rewind stated as grammar design: an optional construct is decided by its first item. A single optional item (a token, a group) is a `consume_*_if`, infallible; a multi-item optional commits its opener and is fallible from its second item on (`@@` errors at the second `@`). The one other legal shape is commit-and-reinterpret, the alias's colon deciding what the committed identifier was, and it is legal only because every continuation uses everything committed. Consume-and-decline does not exist, so a future grammar addition whose optionality needs more than one item of lookahead is not writable here, by construction.
+Spans follow the same rule as positions: a leaf's span is what `require_token` returned, an item's span is the extent its parse consumed (a degraded slot's is its chunk's `contents_span`), and a composite's span comes from `spanning`, upstream's `with_embedded_location_result` reborn without the location baggage. A hand-written `Span::join` in a parser is the anti-pattern; if a node's span cannot come from one of those sources, that is a missing `ChunkStream` capability and an amendment here. Construction stays the landed passes' style, `WithSpan::new` and plain `Ok`/`Some`; upstream's postfix sugar (`wrap_ok`, `with_span`) is not adopted.
 
 ### `LevelEntry`: the only access to a level's chunks
 
@@ -164,7 +117,7 @@ pub enum LevelEntry<'a> {
 }
 ```
 
-What this discharges: the empty-chunk-is-an-error rule cannot be skipped, because a walker cannot see chunks without matching `CommaWithoutItem`, and the comma's span is computed once in chunk.rs rather than re-derived per site (`empty_chunk_comma_span` ceases to exist). `parse_level_items` and the one-item walkers are the only intended callers; a new walker is at least forced through the classification.
+What this discharges: the empty-chunk-is-an-error rule cannot be skipped, because a walker cannot see chunks without matching `CommaWithoutItem`, and the comma's span is computed once in chunk.rs rather than re-derived per site. `parse_level_items` and the one-item walkers are the only intended callers; a new walker is at least forced through the classification.
 
 ### `Chunk`'s narrowed surface
 
@@ -186,7 +139,7 @@ impl Chunk {
 }
 ```
 
-What this discharges: no code outside chunk.rs can index a chunk's items, read its separator tokens, or invent a third boundary inspection. The two sanctioned boundary reads are these methods' bodies.
+What this discharges: no code outside chunk.rs can index a chunk's items, read its separator tokens, or invent a boundary inspection beyond the sanctioned two, which are these methods' bodies.
 
 ### `LiteralText`: the only reader of the text
 
@@ -210,7 +163,42 @@ impl<'a> LiteralText<'a> {
 }
 ```
 
-What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text. parse-arguments.md amends this block with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); `spanning`'s siblings (`spanning_from`, an optional or plainly-returning form) likewise wait for their first callers, and under the first-item-decides law the optional form has none: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener. Anticipated amendments live here in the doc, never as comments in the code.
+What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text. parse-arguments.md amends this block with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); `spanning`'s siblings (`spanning_from` for opener-anchored composites, an optional or plainly-returning form) wait for their first callers, and under the first-item-decides law the optional form has none: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener. Anticipated amendments live here in the doc, never as comments in the code.
+
+## Dispatch is a match
+
+A position where the grammar allows one of several forms is written as one `match` on `take_next()`, never as a chain of `consume_*_if` attempts. The discriminating item is committed up front, which is sound because every arm uses it: the accepting arms continue from it, and the rejecting arm reports it as the `found`. The match is exhaustive, so handling the chunk's end cannot be forgotten, and a separator can never appear in an arm, because chunks are separator-free: "a separator comes next" is the `None`. Sketched on a value:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs (shape, not the final listing)
+match stream.take_next() {
+    Some(item) => match &item.item {
+        ChunkContentItem::NonBracket(token) => match token.0 {
+            NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
+            NonBracketTokenKind::StringLiteral => { /* done; item.location is the span */ }
+            NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
+            NonBracketTokenKind::Identifier => { /* match LiteralText::value_word */ }
+            kind => return Err(WithSpan::new(
+                ParseError::expected(Expectation::Value, Found::Token(kind)),
+                item.location,
+            )),
+        },
+        ChunkContentItem::Group(group) => { /* brace: object literal; other kinds: the same error shape */ }
+    },
+    None => return Err(WithSpan::new(
+        ParseError::expected(Expectation::Value, Found::EndOfChunk),
+        stream.end_span(),
+    )),
+}
+```
+
+Dispatch on an identifier's text is the same shape one level down: `require_token(Identifier, ...)` then a `match` on `LiteralText::keyword` (or `value_word`), so `entrypoint` versus `field` versus `pointer` is a match on the `Keyword` enum, not string comparisons scattered through arms.
+
+The `consume_*_if` shape is not a dispatch tool. It exists for one case: a composition boundary, where a sub-parser meets an item that is not its own and must decline without consuming what belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=` or the chunk's end). Inside a production that owns all the alternatives at a position, reaching for a `consume_*_if` chain instead of a `take_next` match is the anti-pattern.
+
+An opener-marked composite, one that is optional as a whole but required once its opener appears, is a dispatch arm, never a consume chain: the opener commits in the match and the remainder is `require_*`. The variable use is the existing instance (`$` commits, the name is required), and a future directive (`@ name (args)`) is the same shape, looping its position's match for repetition. Such a composite's span starts at the already-committed opener, which plain `spanning` cannot cover; that is `spanning_from`'s waiting caller.
+
+The law under these shapes is no-rewind stated as grammar design: an optional construct is decided by its first item. A single optional item (a token, a group) is a `consume_*_if`, infallible; a multi-item optional commits its opener and is fallible from its second item on (`@@` errors at the second `@`). The one other legal shape is commit-and-reinterpret, the alias's colon deciding what the committed identifier was, and it is legal only because every continuation uses everything committed. Consume-and-decline does not exist, so a future grammar addition whose optionality needs more than one item of lookahead is not writable here, by construction.
 
 ## Level walks
 
@@ -221,28 +209,28 @@ What this discharges: the exhaustive list of text reads is one impl block, keywo
 
 ## Failure isolation
 
-One chunk to one item, and the item is a result: every chunk parses in its entirety up to any unmatched item (the walker requires exhaustion of what is reachable), always independently (its own stream), to exactly one output slot, holding the parsed item, beside any trailing-junk error, or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
+One chunk to one item, and the item is a result: every chunk parses in its entirety (the walker requires exhaustion), always independently (its own stream), to exactly one output slot, holding the parsed item, beside any trailing-junk error, or the unparsed reason. A chunk therefore fails without affecting any other chunk, held by three mechanisms:
 
 - A `ChunkStream` is built from one chunk and cannot read past it: separators and sibling chunks are not in it. There is no shared cursor to leave in a bad state, which is upstream's resynchronization problem (one `PeekableLexer` over the whole literal, so a failed production leaves the lexer wherever it stopped and everything after is suspect). Chunking pre-cut the input, so the recovery points are structural, not searched for.
 - `parse_level_items` returns `Vec<WithSpan<T>>`, not `Result`. The signature is the enforcement: an item parser's `Err` has nowhere to go but the walker's `unparsed` conversion, so a `?` cannot leak one chunk's failure into its siblings or its level. Errors escape only the one-item walkers, where the failed item is the whole context, and the stated granularity applies: the literal at the root, the containing item for a `[...]` inside a variable declaration.
-- Every `LevelEntry` yields exactly one output item: `Item` parses or degrades to unparsed, `CommaWithoutItem` degrades to unparsed. The output length equals the entry count, so a failure cannot shift a sibling's position, and the failed slot still resolves through its retained chunk.
+- Every `LevelEntry` yields exactly one output item: `Item` parses (possibly beside a trailing-junk error) or degrades to unparsed, `CommaWithoutItem` degrades to unparsed. The output length equals the entry count, so a failure cannot shift a sibling's position, and a degraded slot still resolves through its retained chunk.
 
 ## Errors
 
 - An error is a `WithSpan<ParseError>`, and the workhorse is `Expected(ExpectedFound { expected, found })`. The span covers the offending item, or is empty at the position the missing item belonged, which `ChunkStream` computes.
-- Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`), and `errors()` derives the list from the tree in source order. There is no error list beside the tree.
+- Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`, the trailing-junk slot), and `errors()` derives the list from the tree in source order. There is no error list beside the grammar tree.
+- Bracket errors are not the grammar's errors at all. The matcher returned them beside its tree (synthetic-closing.md), the one report each; no `ParseError` variant names a bracket. The combined diagnostics, the matcher's vec plus the grammar's `errors()`, are the final sweep: an error-free literal is one where both are empty.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone and its siblings parse; a failed declaration header degrades the literal. One error per degraded region; nothing inside a degraded region reports separately.
 - The parser carries no prose. Messages are `Display` impls on the error types; contextual suggestions belong to the rendering stage, keyed off the `(expected, found)` pair.
-- An unmatched bracket is not the grammar's error at all. The stream stops at the item, the bracket stage's error stands as the one report, and no `ParseError` variant names brackets; the combined diagnostics, both stages' `errors()`, are the final sweep.
 
 ## Totality
 
 - The stage never panics, on any input. `unwrap`, `expect`, `unreachable!`, and type-level infallibility claims are banned in production code; where an invariant is real but unprovable to the compiler, the code takes the graceful fallback and the invariant is stated in the doc comment.
-- Every input yields a tree, and every position in the literal resolves to some node: parsed regions to grammar leaves, degraded regions through their retained chunks, uncovered whitespace to the nearest container.
+- Every input yields a tree, and every position in the literal resolves to some node: parsed regions to grammar leaves, degraded regions through their retained chunks, uncovered whitespace (and an extracted stray close's position) to the nearest container.
 
 ## Trees, spans, and resolution
 
-- Whether a type is span-carrying is decided at the type: a tree enum is wrapped in `WithSpan` once at its slot, variant payloads are bare, and every struct field carries its own `WithSpan`. Each wrapper's coverage is stated on the type (a selection set's span covers its braces; an item's span is its `contents_span`).
+- Whether a type is span-carrying is decided at the type: a tree enum is wrapped in `WithSpan` once at its slot, variant payloads are bare, and every struct field carries its own `WithSpan`. Each wrapper's coverage is stated on the type (a selection set's span covers its braces; an item's span is what its parse consumed).
 - Names are spans, held by fieldless marker structs, one per role: an alias is not a name, an argument name is not an object key. The tree stores no strings and interns nothing; the one derived scalar is the converted `i64`, kept because deferring the conversion moves the overflow failure away from its source. Punctuation and keywords that never resolve on their own (`Dot`, `Dollar`, `Exclamation`, the keyword markers) are unmarked fields and answer their container.
 - `ResolvePosition` is derive-only; a manual impl means a missing feature in the `resolve_position` crate and becomes a prefactor there. A type's parent is a direct path alias while it has one parent and becomes an enum at the second; unparsed nodes keep chunk-stage data reachable, so the chunk-stage variants of `IsographResolutionNode` stay alive inside degraded regions only.
 
@@ -261,7 +249,7 @@ Each standard above has a counterpart in upstream isograph's `isograph_lang_pars
 - Totality. Upstream is fail-fast (`DiagnosticResult`, first error aborts the literal) and panics on inputs it did not expect: `number.parse().expect(...)` on integer overflow, `unreachable!()` in the block-string lexer. Here every input yields a tree, degradation is local, and panics are banned.
 - Errors. Upstream errors are prose `String`s built inline throughout the parser, some with `Span::todo_generated()` where no span was threaded ("TODO get a span"). Here errors are structured (`Expected`/`Found`), a span is present by construction, and prose exists only in `Display`.
 - Locations and inputs. Upstream threads `TextSource` and extraction context through the parse, with its own comment noting the cost ("we break memoization, due to this parameter"), and interns names as it goes. Here the parse is a function of `LiteralText` and the chunk tree, spans only, no interning, extraction elsewhere.
-- Separators. Upstream's lexer skips line breaks as whitespace and recovers them by inspecting the skipped text (`parse_line_break` reads `white_space_span`), and each list re-implements its delimiter policy via `parse_comma_or_line_break`. Here line breaks are tokens, separator policy lives once in the chunking pass, and the grammar stage consumes structure through `LevelEntry`.
+- Separators and brackets. Upstream's lexer skips line breaks as whitespace and recovers them by inspecting the skipped text (`parse_line_break` reads `white_space_span`), each list re-implements its delimiter policy via `parse_comma_or_line_break`, and a bracket mistake surfaces wherever a `parse_token_of_kind` happens to trip over it. Here line breaks are tokens, separator policy lives once in the chunking pass, bracket policy lives once in the matcher, and the grammar stage consumes structure through `LevelEntry`.
 - Semantic tokens. Upstream accumulates them inside the lexer, one legend constant per parse call. Here they are absent from parsing and derivable from the finished tree.
 
 ## Amending
