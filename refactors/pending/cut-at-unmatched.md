@@ -50,7 +50,35 @@ pub enum BracketItem {
 }
 ```
 
-`Bracketed` and `BracketError` are unchanged. `MatchedBrackets::errors` and its helper are deleted, the vec being returned instead; before:
+`Bracketed` is unchanged. `BracketError` keeps its shape; its comments described demoted raw items and update. Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+#[derive(Debug, PartialEq, Eq)]
+pub enum BracketError {
+    /// An open bracket that sits raw in a level: its group never closed.
+    UnmatchedOpen(WithSpan<OpenBracket>),
+    /// A close bracket that sits raw in a level: no open of its kind was waiting.
+    UnmatchedClose(WithSpan<CloseBracket>),
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// The matcher's errors, returned beside the tree, in source order. The tree cannot
+/// represent them: each cut its level at its position.
+#[derive(Debug, PartialEq, Eq)]
+pub enum BracketError {
+    /// An open bracket whose close never came.
+    UnmatchedOpen(WithSpan<OpenBracket>),
+    /// A close bracket no enclosing group owns.
+    UnmatchedClose(WithSpan<CloseBracket>),
+}
+```
+
+`MatchedBrackets::errors` and its helper are deleted, the vec being returned instead; before:
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -252,20 +280,25 @@ After (from the level's first unmatched bracket on, the loop keeps consuming, so
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
+/// Whether a level is still emitting items, or was cut at its first unmatched bracket:
+/// from `Cut` on, tokens are consumed and diagnosed but produce nothing.
+enum Emission {
+    Emitting,
+    Cut,
+}
+
 fn parse_items(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
     errors: &mut Vec<BracketError>,
 ) -> Vec<WithSpan<BracketItem>> {
     let mut items = Vec::new();
-    // The span of this level's first unmatched bracket, when one was met: everything
-    // from it on is dropped, though still consumed and diagnosed.
-    let mut cut_at: Option<Span> = None;
+    let mut emission = Emission::Emitting;
     while let Some(peek) = tokens.peek() {
         match SplitToken::from(peek.view().item) {
             SplitToken::NonBracket(kind) => {
                 let token = peek.commit();
-                if cut_at.is_none() {
+                if let Emission::Emitting = emission {
                     items.push(WithSpan::new(
                         BracketItem::Raw(NonBracketToken(kind)),
                         token.location,
@@ -277,7 +310,7 @@ fn parse_items(
                 let opening = WithSpan::new(OpenBracket(kind), token.location);
                 match parse_bracketed(tokens, enclosing_stack, errors, opening) {
                     ParsedGroup::Closed(group) => {
-                        if cut_at.is_none() {
+                        if let Emission::Emitting = emission {
                             let span = Span::join(
                                 group.opening.location,
                                 group.closing.location,
@@ -286,7 +319,7 @@ fn parse_items(
                         }
                     }
                     ParsedGroup::Unclosed => {
-                        cut_at.get_or_insert(opening.location);
+                        emission = Emission::Cut;
                     }
                 }
             }
@@ -302,7 +335,7 @@ fn parse_items(
                     CloseBracket(kind),
                     token.location,
                 )));
-                cut_at.get_or_insert(token.location);
+                emission = Emission::Cut;
             }
         }
     }
@@ -383,9 +416,74 @@ fn parse_bracketed(
 }
 ```
 
-`strip_captured_line_breaks` and its call sites are unchanged: a really closed group strips its interior's leading line breaks, the root strips its own, and no other case exists once demotion is gone.
+`strip_captured_line_breaks` keeps its call sites; its pattern loses the `RawToken` layer and its comment loses the demotion sentence, which becomes false. Before:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// Line breaks at the start of the items an opening leads are captured by that opening:
+/// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
+/// literal's start always leads its items; a group's opening leads them only once the
+/// group closes, so a demoted opening captures nothing and its line breaks return to
+/// the parent level as ordinary tokens.
+fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
+    let captured = items
+        .iter()
+        .position(|item| {
+            !matches!(
+                item.item,
+                BracketItem::Raw(RawToken::NonBracket(NonBracketToken(
+                    NonBracketTokenKind::LineBreak
+                )))
+            )
+        })
+        .unwrap_or(items.len());
+    items.drain(..captured);
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+/// Line breaks at the start of the items an opening leads are captured by that opening:
+/// dropped as insignificant whitespace, like the spaces the tokenizer skips. The
+/// literal's start always leads its items, and a group's opening leads them once the
+/// group closes; an unclosed group yields nothing, so no other case exists.
+fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
+    let captured = items
+        .iter()
+        .position(|item| {
+            !matches!(
+                item.item,
+                BracketItem::Raw(NonBracketToken(NonBracketTokenKind::LineBreak))
+            )
+        })
+        .unwrap_or(items.len());
+    items.drain(..captured);
+}
+```
 
 ## chunk.rs: types
+
+`Chunk`'s doc comment names unmatched brackets among a chunk's items; the first sentence updates from
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+/// A maximal separator-free run of a level's items — tokens, groups, unmatched
+/// brackets, anything — plus the boundary that ended it when one did: line breaks and
+/// at most one comma, a second comma ending the boundary as well.
+```
+
+to
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+/// A maximal separator-free run of a level's items — tokens and groups — plus the
+/// boundary that ended it when one did: line breaks and at most one comma, a second
+/// comma ending the boundary as well.
+```
+
+with the rest of the comment unchanged.
 
 `ChunkContentItem`, before:
 
@@ -566,9 +664,11 @@ This is the pass where errors become a returned product, and every test accounts
     }
 ```
 
-Well-formed fixtures go through `well_formed` (chunk.rs's `chunked` helper wraps it); error fixtures destructure the pair and assert the exact vec, in source order.
+Well-formed fixtures go through `well_formed`; error fixtures destructure the pair and assert the exact vec, in source order. The helper is module-private, so chunk.rs's test module grows its own equivalent: its `chunked` helper destructures the pair and asserts the vec empty, and its error-fixture tests destructure locally.
 
-The error-case tests rewrite to the example table above: `a_stray_close_is_a_raw_item_inside_the_brace` becomes the `{ foo, bar) }` interior-tail cut; `an_unclosed_open_is_a_raw_item_inside_the_brace` becomes `foo { ( }` -> `foo {}`; `crossing_junk_leaks_past_the_early_close` becomes `foo { (} )` -> `foo {}` with both errors; `the_close_pairs_with_the_nearest_open` becomes `a { b { c }` -> `a`; `an_extra_close_after_the_balanced_brace_is_raw_at_the_top` and `a_wrong_kind_close_inside_a_matched_pair_is_raw` assert their cuts and vecs the same way; `an_unclosed_open_inside_a_matched_brace_is_the_only_error` becomes `foo { bar(a: }`, whose brace interior keeps `bar` and cuts at the `(`, with `[UnmatchedOpen(()]`. In chunk.rs, `an_unmatched_close_rides_inside_a_chunk_and_errors_stay_on_the_bracket_tree` becomes `a ) b` -> the single chunk `a` plus the error from the pair; `an_unclosed_brace_demotes_to_raw_items_at_the_top` becomes `foo { bar` -> the single chunk `foo`; the two unmatched resolution tests and `a_demoted_opening_captures_nothing` / `a_demoted_brace_leaves_its_line_break_as_a_boundary` are deleted with the states they resolved, replaced by one test that a position inside a dropped region resolves to its containing level. Each rewritten test also asserts spans via `span_of` anchors as today.
+The error-case tests rewrite to the example table above: `a_stray_close_is_a_raw_item_inside_the_brace` becomes the `{ foo, bar) }` interior-tail cut; `an_unclosed_open_is_a_raw_item_inside_the_brace` becomes `foo { ( }` -> `foo {}`; `crossing_junk_leaks_past_the_early_close` becomes `foo { (} )` -> `foo {}` with both errors; `the_close_pairs_with_the_nearest_open` becomes `a { b { c }` -> `a`; `an_extra_close_after_the_balanced_brace_is_raw_at_the_top` and `a_wrong_kind_close_inside_a_matched_pair_is_raw` assert their cuts and vecs the same way; `an_unclosed_open_inside_a_matched_brace_is_the_only_error` becomes `foo { bar(a: }`, whose brace interior keeps `bar` and cuts at the `(`, with `[UnmatchedOpen(()]`.
+
+In chunk.rs: `an_unmatched_close_rides_inside_a_chunk_and_errors_stay_on_the_bracket_tree` becomes `a ) b` -> the single chunk `a` plus the error from the pair; `an_unclosed_brace_demotes_to_raw_items_at_the_top` becomes `foo { bar` -> the single chunk `foo`. The three unmatched resolution tests (`an_unmatched_open_resolves_with_the_host_chunk_as_parent`, `an_unmatched_close_at_the_root_resolves_with_the_root_level`, `an_unmatched_close_resolves_inside_its_host_chunk`) and the two demotion capture tests (`a_demoted_opening_captures_nothing`, `a_demoted_brace_leaves_its_line_break_as_a_boundary`) are deleted with the states they exercised. `a_matched_pair_resolves_with_its_group_as_parent` and the `{` arm of `resolution_walks_ancestry_against_source_text` respell their `BracketTokenParent::Matched` matches to the direct group path. Two new resolution tests pin the Resolution section's outcomes: `a ) b` resolving `)` and `b` to the root level, and `foo { ( }` resolving `(` to the interior level. Each rewritten test also asserts spans via `span_of` anchors as today.
 
 ## Landing checklist
 
