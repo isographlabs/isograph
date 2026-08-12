@@ -77,21 +77,12 @@ impl<'a> ChunkStream<'a> {
 
     /// Runs a sub-parse and wraps its result in the span it consumed: from the start
     /// of the first item the closure accepts to the end of its last, empty at
-    /// `previous_end` when it accepts none. With its optional sibling below, the only
-    /// source of a composite node's span; a parser never joins spans by hand.
+    /// `previous_end` when it accepts none. The source of a composite node's span; a
+    /// parser never joins spans by hand.
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
     ) -> Result<WithSpan<T>, WithSpan<ParseError>>;
-
-    /// `spanning` for an optional composite: the `consume_*` of the pair. `Some` wraps
-    /// in the consumed span (an optional selection set's span is its brace group's,
-    /// with no caller-side wrapping); a `None` closure must have consumed nothing, the
-    /// consume contract, which no rewind can repair if broken.
-    pub(crate) fn spanning_optional<T>(
-        &mut self,
-        parse: impl FnOnce(&mut Self) -> Option<T>,
-    ) -> Option<WithSpan<T>>;
 
     /// Nothing further may exist. The first leftover item is the error.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>>;
@@ -220,7 +211,7 @@ impl<'a> LiteralText<'a> {
 }
 ```
 
-What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text. parse-arguments.md amends this block with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); a plainly-returning `spanning` sibling and `spanning_from` likewise wait for their first callers. Anticipated amendments live here in the doc, never as comments in the code.
+What this discharges: the exhaustive list of text reads is one impl block, keyword dispatch becomes a match on `Keyword` instead of string comparison at call sites, and a future parser cannot quietly start reading text. parse-arguments.md amends this block with `value_word` (`true`/`false`/`null`) and `integer` (`None` on out of range); `spanning`'s siblings (`spanning_from`, an optional or plainly-returning form) likewise wait for their first callers, and under the first-item-decides law the optional form has none: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener. Anticipated amendments live here in the doc, never as comments in the code.
 
 ## Level walks
 
