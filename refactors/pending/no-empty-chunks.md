@@ -150,6 +150,15 @@ pub struct CommaWithoutItem(pub Span);
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// A maximal separator-free run of a level's items — tokens and groups — plus the
+/// boundary that ended it when one did: line breaks and at most one comma, a second
+/// comma ending the boundary as well. The chunk-parsing pass consumes it as one unit.
+/// Every chunk but a level's last has a trailing separator by construction; the last's
+/// is the optional trailing delimiter.
+/// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
+/// end.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
     pub contents: Vec<WithSpan<ChunkContentItem>>,
@@ -160,13 +169,27 @@ pub struct Chunk {
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// The boundary that ended its chunk: its line-break tokens and at most one comma, in
+/// order. A second comma is never absorbed; it opens the next chunk's boundary. Its
+/// tokens are not resolution leaves; a position on any of them answers the separator.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkSeparator(pub Vec<WithSpan<SeparatorToken>>);
 ```
 
-After (doc comments unchanged except as listed below):
+After (struct comments unchanged):
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// A maximal separator-free run of a level's items — tokens and groups — plus the
+/// boundary that ended it when one did: line breaks and at most one comma, a second
+/// comma ending the boundary as well. The chunk-parsing pass consumes it as one unit.
+/// Every chunk but a level's last has a trailing separator by construction; the last's
+/// is the optional trailing delimiter.
+/// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
+/// end.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
     pub contents: NonEmptyVec<WithSpan<ChunkContentItem>>,
@@ -177,6 +200,11 @@ pub struct Chunk {
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// The boundary that ended its chunk: its line-break tokens and at most one comma, in
+/// order. A second comma is never absorbed; it opens the next chunk's boundary. Its
+/// tokens are not resolution leaves; a position on any of them answers the separator.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkSeparator(pub NonEmptyVec<WithSpan<SeparatorToken>>);
 ```
 
@@ -307,24 +335,34 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-/// One absorption, or `None` at the stream's end. A separator as the first item is the
-/// comma no item precedes: line breaks cannot lead (the matcher captured a level's
-/// leading line breaks) and a boundary stops only before a comma. Otherwise the content
-/// phase runs from the committed first item, then the boundary phase, which stops
-/// before a second comma. Group interiors recurse in the content phase's `Bracketed`
-/// arm.
+/// One absorption, or `None` at the stream's end. The first item is classified by
+/// kind: a comma is the error, its following line breaks drained; a line break is
+/// dropped and classification retries (the matcher already captured a level's leading
+/// line breaks; this arm names the other separator so a leak is not reported as
+/// `CommaWithoutItem`); otherwise the content phase runs from that item, then the
+/// boundary phase, which stops before a second comma. Group interiors recurse in the
+/// content phase's `Bracketed` arm.
 fn absorb_chunk(
     items: &mut LevelItems<'_>,
     errors: &mut Vec<CommaWithoutItem>,
 ) -> Option<Absorbed> {
-    let peek = items.peek()?;
-    let first = match as_content(peek.view(), errors) {
-        None => {
-            let comma = peek.commit().location;
-            drain_dropped_boundary(items);
-            return Some(Absorbed::CommaWithoutItem(comma));
+    let peek = loop {
+        let peek = items.peek()?;
+        match separator_of(peek.view()) {
+            Some(SeparatorToken::Comma) => {
+                let comma = peek.commit().location;
+                drain_dropped_boundary(items);
+                return Some(Absorbed::CommaWithoutItem(comma));
+            }
+            Some(SeparatorToken::LineBreak) => {
+                peek.commit();
+            }
+            None => break peek,
         }
-        Some(first) => first,
+    };
+    let first = match &peek.view().item {
+        BracketItem::Raw(token) => ChunkContentItem::NonBracket(*token),
+        BracketItem::Bracketed(group) => ChunkContentItem::Group(chunk_group(group, errors)),
     };
     let first_location = peek.commit().location;
     let mut span = first_location;
@@ -485,13 +523,15 @@ Chunking joins the passes whose errors are output; no fixture leaves the comma v
     }
 ```
 
-The four tests that consume matcher-error fixtures (`a ) b`, `foo { bar`, and the two dropped-region resolution tests) each add, after their existing bracket assertions:
+The four tests that consume matcher-error fixtures (`a ) b`, `foo { bar`, and the two dropped-region resolution tests) currently bind `let tree = chunk(&brackets)`. Replace that call (do not leave it and add a second) with:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs (test module)
-        let (chunked, comma_errors) = chunk(&brackets);
+        let (tree, comma_errors) = chunk(&brackets);
         assert_eq!(comma_errors, vec![]);
 ```
+
+The rest of each test keeps using `tree` for the chunked result.
 
 The empty-chunk tests are replaced:
 
@@ -584,6 +624,17 @@ The empty-chunk tests are replaced:
             }
             node => panic!("expected the interior level, got {node:?}"),
         }
+    }
+
+    #[test]
+    fn an_interior_comma_then_an_item_keeps_the_item() {
+        let text = "{, a }";
+        let (chunked, errors) = chunked_with_commas(text);
+        assert_eq!(errors, vec![CommaWithoutItem(span_of(text, ","))]);
+        assert_eq!(chunked.item.0.len(), 1);
+        let brace = as_group(content_item(&chunked.item.0[0].item, 0));
+        assert_eq!(brace.children.item.0.len(), 1);
+        assert_eq!(render_chunk(text, &brace.children.item.0[0].item), "a");
     }
 
     #[test]
