@@ -2,8 +2,6 @@
 
 Rules for all grammar-stage code. The feature docs define the grammar; this doc defines how parsers are written. An implementation need this doc forbids is resolved by amending this doc or fixing the code, in the same review, never by shipping the deviation.
 
-This doc assumes cut-at-unmatched.md and no-empty-chunks.md: grouping returns `(WithSpan<MatchedBrackets>, Vec<BracketError>)` with unmatched brackets and their levels' tails absent from the tree, and chunking returns `(WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>)` with empty chunks absent. No type downstream represents a bracket problem or an empty chunk; every chunk a parser sees has contents.
-
 ## Input shape
 
 - The unit of parsing is the chunk: a `NonEmptyVec` of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that exactly one holds the declaration is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
@@ -79,14 +77,15 @@ impl<'a> ChunkStream<'a> {
 - Peek-commit, unconsumed offenders, and `previous_end` anchoring live here once, not per parser.
 - Span sources, exhaustively: a leaf's span is what a stream method returned (`require_token`, `consume_token_if`) or the wrapper a consumed item carried (`consume_group_if`, `take_next`); an item's span is what its parse consumed (a degraded slot's is its chunk's `contents_span`); a composite's span comes from `spanning`. `Span::join` in a parser is banned; a span no source provides is a missing method here.
 - Construction is `WithSpan::new` and plain `Ok`/`Some`; the upstream postfix helpers (`wrap_ok`, `with_span`) are not used.
-- Anticipated amendments, each landing with its first caller: `spanning_from(start, parse)` for opener-anchored composites; a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and an opener-marked composite is require-flow past its opener.
+- Anticipated amendments, each landing with its first caller: `spanning_from(start, parse)`, for a composite whose first item a dispatch arm already committed, so plain `spanning` cannot start early enough; and a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and a composite that is required once its first item appears is `require_*` flow from there on.
 
 ### `ChunkedLevel`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    /// The only access to a level's chunks, each with contents (no-empty-chunks.md).
+    /// The only access to a level's chunks, each with contents
+    /// (refactors/past/no-empty-chunks.md).
     pub fn chunks(&self) -> impl Iterator<Item = &WithSpan<Chunk>>;
 }
 ```
@@ -159,8 +158,8 @@ match stream.take_next() {
 
 - Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::identifier`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
 - `consume_*_if` is not a dispatch tool. It exists for the composition boundary: a sub-parser declining an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`). A `consume_*_if` chain where one production owns all the alternatives is banned.
-- An opener-marked composite (optional as a whole, required past its opener: `$name`, a future `@ name (args)`) is a dispatch arm; the opener commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
-- Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its opener and is fallible from its second item on (`@@` errors at the second `@`). Commit-and-reinterpret (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consume-and-decline does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.
+- A construct that is optional as a whole but required once its first item appears (`$name`, a future `@ name (args)`) is a dispatch arm; the first item commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
+- Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its first item and is fallible from its second on (`@@` errors at the second `@`). Committing before knowing the interpretation (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consuming and then declining does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.
 
 ## Level walks
 
@@ -182,7 +181,7 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 - An error is `WithSpan<ParseError>`; the workhorse is `Expected(ExpectedFound { expected, found })`. The span covers the offending item or is empty where the missing item belonged.
 - Open, to be decided at the entrypoint review: whether `Expectation` stays one global enum, becomes per-logical-group enums, or the error becomes a rendered `Diagnostic`. The `(expected, found)` keying for rendering hints rides on the outcome.
 - Errors live in the tree (`UnparsedLiteral`, `UnparsedItem`, the trailing-junk slot); `errors()` derives the list in source order. No error list exists beside the grammar tree.
-- Bracket and comma errors are the earlier passes', returned beside their trees (cut-at-unmatched.md, no-empty-chunks.md); no `ParseError` variant names either. The final sweep is all three lists: an error-free literal has empty vecs from the matcher and chunking and an empty `errors()` from the grammar.
+- Bracket and comma errors are the earlier passes', returned beside their trees (landed: refactors/past/cut-at-unmatched.md, refactors/past/no-empty-chunks.md); no `ParseError` variant names either. The final sweep is all three lists: an error-free literal has empty vecs from the matcher and chunking and an empty `errors()` from the grammar.
 - Degradation is as local as the grammar allows: a failed list chunk degrades alone; a failed declaration header degrades the literal. One error per degraded region.
 - No prose in the parser. Messages are `Display` impls; contextual suggestions belong to rendering, keyed off the `(expected, found)` pair.
 
