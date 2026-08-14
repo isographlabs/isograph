@@ -92,7 +92,7 @@ use span::{Span, WithSpan};
 use crate::{
     parse_constant_value, parse_singleton, BracketKind, ChunkContentItem, ChunkedLevel,
     ClientFieldDeclarationPath, Dollar, Expectation, Found, IsographResolutionNode, ItemCursor,
-    LevelSlot, LiteralText, NonBracketTokenKind, ParseError, VariableName,
+    LevelSlot, NonBracketTokenKind, ParseError, VariableName,
 };
 
 /// The variable declarations a header's `( ... )` group holds, one per contentful chunk
@@ -300,7 +300,7 @@ pub(crate) fn parse_type_annotation(
 }
 
 fn parse_bracket_interior_type(
-    text: LiteralText<'_>,
+    text: &str,
     level: &WithSpan<ChunkedLevel>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     parse_singleton(

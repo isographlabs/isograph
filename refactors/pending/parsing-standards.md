@@ -11,7 +11,7 @@ Every call a parse function makes on a chunk is a method or free function listed
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse>
 ```
 
-`parse_iso_literal` takes one chunked literal. It wraps `text` as `LiteralText` once and passes that value down. Each chunk is passed to `Chunk::stream`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` or `ItemCursor` is built from one chunk.
+`parse_iso_literal` takes `text: &str` and the chunked literal. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` or `ItemCursor` is built from one chunk.
 
 A group is one item. `require_group` and `consume_group_if` return it in one call. The group is closed. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
@@ -30,8 +30,7 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan};
 
 use crate::{
-    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, LiteralText, NonBracketTokenKind,
-    ParseError, TokenText,
+    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind, ParseError,
 };
 
 /// Parameter of a parse function. No rewind. No `peek` method. No `require_end`.
@@ -43,7 +42,7 @@ pub(crate) struct ItemCursor<'a> {
     /// The end of the last item this cursor advanced past (the chunk's start before
     /// any). An `Expected(_, EndOfChunk)` error uses this offset.
     previous_end: u32,
-    text: LiteralText<'a>,
+    text: &'a str,
 }
 
 /// Returned by `Chunk::stream`. `parse_items` and `parse_singleton` call its methods.
@@ -52,7 +51,7 @@ pub(crate) struct ChunkStream<'a> {
 }
 
 impl<'a> ChunkStream<'a> {
-    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: LiteralText<'a>) -> Self {
+    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self {
         ChunkStream {
             cursor: ItemCursor {
                 previous_end: contents.first().location.start,
@@ -152,7 +151,7 @@ impl<'a> ItemCursor<'a> {
         match &item.item {
             ChunkContentItem::NonBracket(token)
                 if token.0 == NonBracketTokenKind::Identifier
-                    && self.text.at(item.location) == keyword =>
+                    && self.token_text(item.location) == keyword =>
             {
                 peek.commit();
                 self.previous_end = item.location.end;
@@ -223,7 +222,7 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn text(&self) -> LiteralText<'a> {
+    pub(crate) fn text(&self) -> &'a str {
         self.text
     }
 
@@ -240,12 +239,15 @@ impl<'a> ItemCursor<'a> {
         Span::new(self.previous_end, self.previous_end)
     }
 
-    pub(crate) fn token_text(&self, span: Span) -> TokenText<'a> {
-        self.text.at(span)
+    pub(crate) fn token_text(&self, span: Span) -> &'a str {
+        &self.text[span.as_usize_range()]
     }
 
     pub(crate) fn integer(&self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        self.text.at(span).integer(span)
+        match self.token_text(span).parse() {
+            Ok(value) => Ok(value),
+            Err(_) => Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
+        }
     }
 
     /// Calls `parse` and wraps `Ok` in a `WithSpan`. The span starts at the first
@@ -292,66 +294,12 @@ Construction is `WithSpan::new` and plain `Ok` / `Some`.
 
 A value made of several items is parsed by one `spanning` call. The closure passed to `spanning` calls `take_next` or the first `require_*`. If the caller already advanced past the first item, a later `spanning` does not include that item: the caller already has that item's span, and the remaining items are read with `require_*` / `consume_*`. If those items and the first item must share one span, they are all read inside the `spanning` that advanced past the first item. There is no `spanning_from` method.
 
-## `LiteralText`
-
-`parse_iso_literal` takes `text: &str` and passes `LiteralText::new(text)` into the rest of the stage. Later functions take `LiteralText` or call `ItemCursor::text`. They do not take `&str`. The text is compared to a keyword via `PartialEq` or converted with `TokenText::integer`.
-
-```rust
-// from crates/isograph_parser/src/literal_text.rs
-use span::{Span, WithSpan};
-
-use crate::ParseError;
-
-#[derive(Copy, Clone)]
-pub(crate) struct LiteralText<'a>(&'a str);
-
-#[derive(Copy, Clone)]
-pub(crate) struct TokenText<'a>(&'a str);
-
-impl<'a> LiteralText<'a> {
-    pub(crate) fn new(text: &'a str) -> Self {
-        LiteralText(text)
-    }
-
-    pub(crate) fn at(self, span: Span) -> TokenText<'a> {
-        match self.0.get(span.as_usize_range()) {
-            Some(text) => TokenText(text),
-            None => TokenText(""),
-        }
-    }
-}
-
-impl TokenText<'_> {
-    pub(crate) fn integer(self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        match self.0.parse() {
-            Ok(value) => Ok(value),
-            Err(_) => Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
-        }
-    }
-}
-
-impl PartialEq<str> for TokenText<'_> {
-    fn eq(&self, other: &str) -> bool {
-        self.0 == other
-    }
-}
-
-impl PartialEq<&str> for TokenText<'_> {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
-    }
-}
-```
-
-`at` on a span that is not a slice of this literal yields the empty `TokenText`. The invariant (every span passed here came from a token of this literal) is compiler-invisible; the fallback is the empty read, not a panic.
-
-`TokenText` has no method that yields `&str` or `String`. A name in the output is a span. The one parsed scalar is the `i64`.
+`ItemCursor` stores the same `&str` `parse_iso_literal` received. `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. That span came from a token of this literal. Names in the tree are spans; the only converted scalar is the `i64`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
-    let text = LiteralText::new(text);
     match try_parse(text, &root) {
         Ok(parse) => WithSpan::new(parse, location),
         Err(reason) => WithSpan::new(
@@ -368,7 +316,7 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
     /// A `ChunkStream` over this chunk.
-    pub(crate) fn stream<'a>(&'a self, text: LiteralText<'a>) -> ChunkStream<'a> {
+    pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
         ChunkStream::new(&self.contents, text)
     }
 
@@ -417,7 +365,7 @@ use resolve_position_macros::ResolvePosition;
 use span::{Span, WithSpan};
 
 use crate::{
-    Chunk, ChunkStream, Expectation, Found, ItemCursor, LiteralText, NonBracketTokenKind, ParseError,
+    Chunk, ChunkStream, Expectation, Found, ItemCursor, NonBracketTokenKind, ParseError,
 };
 
 /// One chunk's outcome in a list. The wrapping `WithSpan`'s span is the parsed
@@ -453,7 +401,7 @@ impl ChunkedLevel {
     /// calls `require_end`.
     pub(crate) fn parse_items<'a, P>(
         &'a self,
-        text: LiteralText<'a>,
+        text: &'a str,
         parse_item: impl Fn(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
     ) -> Vec<WithSpan<LevelSlot<P>>> {
         self.0
@@ -496,7 +444,7 @@ impl ChunkedLevel {
 /// then `Err` if `boundary_comma` is `Some`, then `Err` if a second chunk exists.
 pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
-    text: LiteralText<'a>,
+    text: &'a str,
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
@@ -644,7 +592,7 @@ pub(crate) fn require_selection_set(
 }
 ```
 
-`ItemCursor::text` returns the `LiteralText` passed to `Chunk::stream`. The caller of `parse_items` on a group's interior passes `cursor.text()`.
+`ItemCursor::text` returns the `&str` passed to `Chunk::stream`. The caller of `parse_items` on a group's interior passes `cursor.text()`.
 
 ## Dispatch
 
@@ -915,7 +863,7 @@ One pass, by reference; the output copies spans and `Copy` tokens. Cloning happe
 
 No backtracking exists (no rewind), so parse time is linear in the token count.
 
-No pico, no interning: plain functions over `LiteralText` and the chunk tree.
+No pico, no interning: plain functions over `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
@@ -946,11 +894,11 @@ Every grammar-stage task is one row. A task that is not here is a missing method
 
 Each structure and each method lands with the feature doc of its first caller. A method with no caller yet exists only in this doc.
 
-- parse-entrypoint.md: `LiteralText`, `TokenText`, `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
+- parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
 - parse-fields.md: `take_next` is not required yet; `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
 - parse-arguments.md: `take_next`, `spanning` around `parse_value`, `integer`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: `consume_token_if_any`
 - parse-pointers.md: `require_keyword`
 
-A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks (`ItemCursor`, `ChunkStream`), `parse_items`, `parse_singleton`, and `LiteralText`. If a feature adds a call that is not a method or function listed here, the review adds that method or function to this doc. This doc stays in `refactors/pending`.
+A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks (`ItemCursor`, `ChunkStream`), `parse_items`, and `parse_singleton`. If a feature adds a call that is not a method or function listed here, the review adds that method or function to this doc. This doc stays in `refactors/pending`.

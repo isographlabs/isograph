@@ -307,22 +307,13 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 }
 ```
 
-`parse_value` is the listing in parsing-standards.md (dispatch on `take_next` inside `spanning`, `cursor.integer`, `BooleanValue::True` / `False`).
+`parse_value` is the listing in parsing-standards.md (dispatch on `take_next` inside `spanning`, `cursor.integer`, `BooleanValue(Boolean::True)` / `False`).
 
 ```rust
-// from crates/isograph_parser/src/literal_text.rs
-impl TokenText<'_> {
-    pub(crate) fn integer(self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        match self.0.parse() {
-            Ok(value) => Ok(value),
-            Err(_) => Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
-        }
-    }
-}
-
+// from crates/isograph_parser/src/chunk_stream.rs
 impl<'a> ItemCursor<'a> {
     pub(crate) fn integer(&self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        self.text.at(span).integer(span)
+        /* parsing-standards.md: token_text(span).parse() */
     }
 
     pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>> { /* parsing-standards.md */ }

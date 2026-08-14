@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `LiteralText` / `TokenText`, `ItemCursor` / `ChunkStream`, `Chunk::stream`, `parse_singleton` (including `boundary_comma`), `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream`, `Chunk::stream`, `parse_singleton` (including `boundary_comma`), `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
 
 ## The grammar this doc accepts
 
@@ -20,56 +20,18 @@ iso(`
 
 Everything else produces an `UnparsedLiteral` holding one reason and the entire root level.
 
-## New module: literal_text.rs
-
-```rust
-// from crates/isograph_parser/src/literal_text.rs
-use span::Span;
-
-#[derive(Copy, Clone)]
-pub(crate) struct LiteralText<'a>(&'a str);
-
-#[derive(Copy, Clone)]
-pub(crate) struct TokenText<'a>(&'a str);
-
-impl<'a> LiteralText<'a> {
-    pub(crate) fn new(text: &'a str) -> Self {
-        LiteralText(text)
-    }
-
-    pub(crate) fn at(self, span: Span) -> TokenText<'a> {
-        match self.0.get(span.as_usize_range()) {
-            Some(text) => TokenText(text),
-            None => TokenText(""),
-        }
-    }
-}
-
-impl PartialEq<str> for TokenText<'_> {
-    fn eq(&self, other: &str) -> bool {
-        self.0 == other
-    }
-}
-
-impl PartialEq<&str> for TokenText<'_> {
-    fn eq(&self, other: &&str) -> bool {
-        self.0 == *other
-    }
-}
-```
-
 ## New module: chunk_stream.rs
 
 The enforcement structure parsing-standards.md specifies, at the subset this doc's grammar needs; later docs extend the `ItemCursor` impl. The module has no re-export: `ItemCursor` and `ChunkStream` are `pub(crate)` and never cross the crate boundary. The listings are the ones in parsing-standards.md for `ItemCursor` (`require_token`, `token_text`, `end_span`, `text`, `missing`) and `ChunkStream` (`new`, `cursor`, `require_end`). Methods this doc does not call (`consume_token_if`, `consume_token_if_any`, `require_keyword`, `consume_group_if`, `require_group`, `take_next`, `integer`, `spanning`) are absent from the impl until their first caller.
 
-`new` takes `NonEmpty<WithSpan<ChunkContentItem>>` (chunk contents) and `LiteralText`.
+`new` takes `NonEmpty<WithSpan<ChunkContentItem>>` (chunk contents) and `&str`.
 
 ## Changes to chunk.rs
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
-    pub(crate) fn stream<'a>(&'a self, text: LiteralText<'a>) -> ChunkStream<'a> {
+    pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
         ChunkStream::new(&self.contents, text)
     }
 
@@ -85,7 +47,7 @@ impl Chunk {
 
 pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
-    text: LiteralText<'a>,
+    text: &'a str,
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
@@ -268,8 +230,8 @@ use span::{Span, WithSpan};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkedLevel, Expectation, Found, IsographResolutionNode, LiteralText, NonBracketTokenKind,
-    ParseError, parse_singleton,
+    ChunkedLevel, Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
+    parse_singleton,
 };
 
 /// The parse of one literal. The wrapping `WithSpan`'s span is the whole literal.
@@ -355,7 +317,6 @@ Validation runs by reference; the root moves into the output exactly once, at th
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
-    let text = LiteralText::new(text);
     match try_parse(text, &root) {
         Ok(parse) => WithSpan::new(parse, location),
         Err(reason) => WithSpan::new(
@@ -366,7 +327,7 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 }
 
 fn try_parse(
-    text: LiteralText<'_>,
+    text: &str,
     root: &WithSpan<ChunkedLevel>,
 ) -> Result<IsoLiteralParse, WithSpan<ParseError>> {
     parse_singleton(
@@ -448,14 +409,13 @@ pub use token_kind::*;
 pub use tokenize::*;
 ```
 
-After (`chunk_stream` and `literal_text` have no re-export; `ItemCursor`, `ChunkStream`, and `LiteralText` are `pub(crate)`):
+After (`chunk_stream` has no re-export; `ItemCursor` and `ChunkStream` are `pub(crate)`):
 
 ```rust
 // from crates/isograph_parser/src/lib.rs
 mod chunk;
 mod chunk_stream;
 mod isograph_resolution_node;
-mod literal_text;
 mod matched_brackets;
 mod non_bracket_token;
 mod parse_error;
@@ -941,5 +901,5 @@ mod tests {
 
 ## Landing checklist
 
-1. literal_text.rs, chunk_stream.rs (`ItemCursor` / `ChunkStream` subset), `Chunk::stream`, `boundary_comma`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode` and `ChunkedLevelParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. chunk_stream.rs (`ItemCursor` / `ChunkStream` subset), `Chunk::stream`, `boundary_comma`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode` and `ChunkedLevelParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
