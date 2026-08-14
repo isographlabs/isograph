@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `require_token`, `text`, `token_text`, `end_span`, `missing`), `Chunk::stream`, `boundary_comma`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
 
 ## The grammar
 
@@ -179,7 +179,7 @@ fn parse_entrypoint(
 
 ## `ItemCursor` and `ChunkStream`
 
-Extracted from parsing-standards.md. Delta: this impl is `new`, `cursor`, `require_end`, `require_token`, `text`, `token_text`, `end_span`, `missing`. `ItemCursor` and `ChunkStream` are `pub(crate)` and are not re-exported.
+Extracted from parsing-standards.md. Delta: this impl is `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`. Group methods and `spanning` land in parse-fields.md. `ItemCursor` and `ChunkStream` are `pub(crate)` and are not re-exported.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -219,39 +219,52 @@ impl<'a> ChunkStream<'a> {
     }
 
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>> {
-        match self.cursor.items.peek() {
-            None => Ok(()),
-            Some(peek) => {
-                let item = *peek.view();
-                Err(WithSpan::new(
-                    ParseError::expected(expected, Found::from(&item.item)),
-                    item.location,
-                ))
-            }
+        if self.cursor.items.peek().is_none() {
+            Ok(())
+        } else {
+            Err(self.cursor.expected(expected))
         }
     }
 }
 
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn require_token(
-        &mut self,
-        kind: NonBracketTokenKind,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> {
-        let Some(peek) = self.items.peek() else {
-            return Err(self.missing(expected));
-        };
+    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
+        let peek = self.items.peek()?;
         let item = *peek.view();
         match &item.item {
             ChunkContentItem::NonBracket(token) if token.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                Ok(item.location)
+                Some(item.location)
             }
-            other => Err(WithSpan::new(
-                ParseError::expected(expected, Found::from(other)),
-                item.location,
-            )),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
+        match self.items.peek() {
+            None => WithSpan::new(
+                ParseError::expected(expected, Found::EndOfChunk),
+                self.end_span(),
+            ),
+            Some(peek) => {
+                let item = *peek.view();
+                WithSpan::new(
+                    ParseError::expected(expected, Found::from(&item.item)),
+                    item.location,
+                )
+            }
+        }
+    }
+
+    pub(crate) fn require_token(
+        &mut self,
+        kind: NonBracketTokenKind,
+        expected: Expectation,
+    ) -> Result<Span, WithSpan<ParseError>> {
+        match self.consume_token_if(kind) {
+            Some(span) => Ok(span),
+            None => Err(self.expected(expected)),
         }
     }
 
@@ -263,15 +276,8 @@ impl<'a> ItemCursor<'a> {
         &self.text[span.as_usize_range()]
     }
 
-    pub(crate) fn end_span(&self) -> Span {
+    fn end_span(&self) -> Span {
         Span::new(self.previous_end, self.previous_end)
-    }
-
-    fn missing(&self, expected: Expectation) -> WithSpan<ParseError> {
-        WithSpan::new(
-            ParseError::expected(expected, Found::EndOfChunk),
-            self.end_span(),
-        )
     }
 }
 ```

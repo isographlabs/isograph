@@ -264,38 +264,27 @@ fn parse_variable_declaration(
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
-    cursor.spanning(|cursor| match cursor.take_next() {
-        Some(item) => match &item.item {
-            ChunkContentItem::NonBracket(token)
-                if token.0 == NonBracketTokenKind::Identifier =>
-            {
-                let exclamation = cursor
-                    .consume_token_if(NonBracketTokenKind::Exclamation)
-                    .map(|span| WithSpan::new(Exclamation, span));
-                Ok(TypeAnnotation::Named(NamedTypeAnnotation {
-                    name: WithSpan::new(TypeName, item.location),
-                    exclamation,
-                }))
-            }
-            ChunkContentItem::Group(group) if group.opening.item.0 == BracketKind::Bracket => {
-                let inner = parse_bracket_interior_type(cursor.text(), &group.children)?;
-                let exclamation = cursor
-                    .consume_token_if(NonBracketTokenKind::Exclamation)
-                    .map(|span| WithSpan::new(Exclamation, span));
-                Ok(TypeAnnotation::List(ListTypeAnnotation {
-                    inner: WithSpan::new(Box::new(inner.item), item.location),
-                    exclamation,
-                }))
-            }
-            other => Err(WithSpan::new(
-                ParseError::expected(Expectation::TypeAnnotation, Found::from(other)),
-                item.location,
-            )),
-        },
-        None => Err(WithSpan::new(
-            ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk),
-            cursor.end_span(),
-        )),
+    cursor.spanning(|cursor| {
+        if let Some(name) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
+            let exclamation = cursor
+                .consume_token_if(NonBracketTokenKind::Exclamation)
+                .map(|span| WithSpan::new(Exclamation, span));
+            return Ok(TypeAnnotation::Named(NamedTypeAnnotation {
+                name: WithSpan::new(TypeName, name),
+                exclamation,
+            }));
+        }
+        if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
+            let inner = parse_bracket_interior_type(cursor.text(), &group.item.children)?;
+            let exclamation = cursor
+                .consume_token_if(NonBracketTokenKind::Exclamation)
+                .map(|span| WithSpan::new(Exclamation, span));
+            return Ok(TypeAnnotation::List(ListTypeAnnotation {
+                inner: WithSpan::new(Box::new(inner.item), group.location),
+                exclamation,
+            }));
+        }
+        Err(cursor.expected(Expectation::TypeAnnotation))
     })
 }
 

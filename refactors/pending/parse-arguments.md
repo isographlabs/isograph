@@ -41,9 +41,8 @@ pub enum ParseError {
     MultipleDeclarations,
     /// Temporary: parse-pointers.md removes this variant.
     UnsupportedDeclarationType,
-    /// The token is a well-formed integer literal, so the conversion fails only on
-    /// overflow.
-    IntegerOutOfRange,
+    /// `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) failed.
+    IntegerDoesNotFitI64,
 }
 ```
 
@@ -64,7 +63,7 @@ The new `Display` arms:
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-            ParseError::IntegerOutOfRange => {
+            ParseError::IntegerDoesNotFitI64 => {
                 write!(f, "This integer does not fit in a 64-bit signed integer.")
             }
 ```
@@ -307,17 +306,11 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 }
 ```
 
-`parse_value` is the listing in parsing-standards.md (dispatch on `take_next` inside `spanning`, `cursor.integer`, `BooleanValue(Boolean::True)` / `False`).
+`parse_value` is the listing in parsing-standards.md (`consume_*` ladder inside `spanning`, `token_text(span).parse()` on the `IntegerLiteral` span, `BooleanValue(Boolean::True)` / `False`).
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn integer(&self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        /* parsing-standards.md: token_text(span).parse() */
-    }
-
-    pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>> { /* parsing-standards.md */ }
-
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
@@ -602,7 +595,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
             LevelSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
-        assert_eq!(unparsed.reason.item, ParseError::IntegerOutOfRange);
+        assert_eq!(unparsed.reason.item, ParseError::IntegerDoesNotFitI64);
         assert_eq!(unparsed.reason.location, span_of(text, "99999999999999999999"));
         as_named_argument(&arguments.item.0[1].item);
         assert_eq!(parse.item.errors(), vec![unparsed.reason]);

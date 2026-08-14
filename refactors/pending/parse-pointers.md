@@ -12,7 +12,7 @@ The `to` keyword is an identifier whose text is `to`. The target type is a type 
 
 ## Changes to parse_error.rs
 
-`UnsupportedDeclarationType` and its `Display` arm are deleted; the enum's remaining structural variants are `Expected`, `EmptyLiteral`, `MultipleDeclarations`, and `IntegerOutOfRange`. `Expectation` gains one variant:
+`UnsupportedDeclarationType` and its `Display` arm are deleted; the enum's remaining structural variants are `Expected`, `EmptyLiteral`, `MultipleDeclarations`, and `IntegerDoesNotFitI64`. `Expectation` gains one variant:
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -117,17 +117,6 @@ pub type ClientPointerNamePath<'a> =
 ```
 
 ```rust
-// from crates/isograph_parser/src/chunk_stream.rs
-impl<'a> ItemCursor<'a> {
-    pub(crate) fn require_keyword(
-        &mut self,
-        keyword: &'static str,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> { /* parsing-standards.md */ }
-}
-```
-
-```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_pointer(
     keyword: Span,
@@ -146,7 +135,19 @@ fn parse_pointer(
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
     let variable_definitions = consume_variable_declaration_list(cursor);
-    let to_keyword = cursor.require_keyword("to", Expectation::ToKeyword)?;
+    let to_keyword = cursor.require_token(
+        NonBracketTokenKind::Identifier,
+        Expectation::ToKeyword,
+    )?;
+    if cursor.token_text(to_keyword) != "to" {
+        return Err(WithSpan::new(
+            ParseError::expected(
+                Expectation::ToKeyword,
+                Found::Token(NonBracketTokenKind::Identifier),
+            ),
+            to_keyword,
+        ));
+    }
     let target_type = parse_type_annotation(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;

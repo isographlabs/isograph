@@ -15,7 +15,7 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 
 A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
-Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `take_next` returning `None` means the chunk has no remaining item.
+Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `expected` on an exhausted cursor is `Expected(_, EndOfChunk)` at `end_span`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -28,7 +28,8 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan};
 
 use crate::{
-    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind, ParseError,
+    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
+    ParseError,
 };
 
 /// Sequential reader of one chunk. Parameter of a parse function.
@@ -61,42 +62,15 @@ impl<'a> ChunkStream<'a> {
     }
 
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>> {
-        match self.cursor.items.peek() {
-            None => Ok(()),
-            Some(peek) => {
-                let item = *peek.view();
-                Err(WithSpan::new(
-                    ParseError::expected(expected, Found::from(&item.item)),
-                    item.location,
-                ))
-            }
+        if self.cursor.items.peek().is_none() {
+            Ok(())
+        } else {
+            Err(self.cursor.expected(expected))
         }
     }
 }
 
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn require_token(
-        &mut self,
-        kind: NonBracketTokenKind,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> {
-        let Some(peek) = self.items.peek() else {
-            return Err(self.missing(expected));
-        };
-        let item = *peek.view();
-        match &item.item {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                Ok(item.location)
-            }
-            other => Err(WithSpan::new(
-                ParseError::expected(expected, Found::from(other)),
-                item.location,
-            )),
-        }
-    }
-
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
         let item = *peek.view();
@@ -110,63 +84,47 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn consume_token_if_any(&mut self, kinds: &[NonBracketTokenKind]) -> Option<Span> {
-        let peek = self.items.peek()?;
-        let item = *peek.view();
-        match &item.item {
-            ChunkContentItem::NonBracket(token) if kinds.contains(&token.0) => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                Some(item.location)
-            }
-            _ => None,
-        }
-    }
-
-    pub(crate) fn require_keyword(
-        &mut self,
-        keyword: &'static str,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> {
-        let Some(peek) = self.items.peek() else {
-            return Err(self.missing(expected));
-        };
-        let item = *peek.view();
-        match &item.item {
-            ChunkContentItem::NonBracket(token)
-                if token.0 == NonBracketTokenKind::Identifier
-                    && self.token_text(item.location) == keyword =>
-            {
-                peek.commit();
-                self.previous_end = item.location.end;
-                Ok(item.location)
-            }
-            other => Err(WithSpan::new(
-                ParseError::expected(expected, Found::from(other)),
-                item.location,
-            )),
-        }
-    }
-
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
         let peek = self.items.peek()?;
-        let matches = matches!(
-            &peek.view().item,
-            ChunkContentItem::Group(group) if group.opening.item.0 == kind
-        );
-        if !matches {
-            return None;
-        }
-        let item = peek.commit();
+        let item = *peek.view();
         match &item.item {
-            ChunkContentItem::Group(group) => {
-                self.previous_end = item.location.end;
-                Some(WithSpan::new(group, item.location))
+            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
+                let location = item.location;
+                peek.commit();
+                self.previous_end = location.end;
+                Some(WithSpan::new(group, location))
             }
-            ChunkContentItem::NonBracket(_) => None,
+            _ => None,
+        }
+    }
+
+    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
+        match self.items.peek() {
+            None => WithSpan::new(
+                ParseError::expected(expected, Found::EndOfChunk),
+                self.end_span(),
+            ),
+            Some(peek) => {
+                let item = *peek.view();
+                WithSpan::new(
+                    ParseError::expected(expected, Found::from(&item.item)),
+                    item.location,
+                )
+            }
+        }
+    }
+
+    pub(crate) fn require_token(
+        &mut self,
+        kind: NonBracketTokenKind,
+        expected: Expectation,
+    ) -> Result<Span, WithSpan<ParseError>> {
+        match self.consume_token_if(kind) {
+            Some(span) => Ok(span),
+            None => Err(self.expected(expected)),
         }
     }
 
@@ -175,30 +133,9 @@ impl<'a> ItemCursor<'a> {
         kind: BracketKind,
         expected: Expectation,
     ) -> Result<WithSpan<&'a ChunkedGroup>, WithSpan<ParseError>> {
-        let Some(peek) = self.items.peek() else {
-            return Err(self.missing(expected));
-        };
-        let matches = matches!(
-            &peek.view().item,
-            ChunkContentItem::Group(group) if group.opening.item.0 == kind
-        );
-        if !matches {
-            let item = *peek.view();
-            return Err(WithSpan::new(
-                ParseError::expected(expected, Found::from(&item.item)),
-                item.location,
-            ));
-        }
-        let item = peek.commit();
-        match &item.item {
-            ChunkContentItem::Group(group) => {
-                self.previous_end = item.location.end;
-                Ok(WithSpan::new(group, item.location))
-            }
-            ChunkContentItem::NonBracket(token) => Err(WithSpan::new(
-                ParseError::expected(expected, Found::Token(token.0)),
-                item.location,
-            )),
+        match self.consume_group_if(kind) {
+            Some(group) => Ok(group),
+            None => Err(self.expected(expected)),
         }
     }
 
@@ -206,25 +143,8 @@ impl<'a> ItemCursor<'a> {
         self.text
     }
 
-    pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>> {
-        let item = self.items.next()?;
-        self.previous_end = item.location.end;
-        Some(item)
-    }
-
-    pub(crate) fn end_span(&self) -> Span {
-        Span::new(self.previous_end, self.previous_end)
-    }
-
     pub(crate) fn token_text(&self, span: Span) -> &'a str {
         &self.text[span.as_usize_range()]
-    }
-
-    pub(crate) fn integer(&self, span: Span) -> Result<i64, WithSpan<ParseError>> {
-        match self.token_text(span).parse() {
-            Ok(value) => Ok(value),
-            Err(_) => Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
-        }
     }
 
     pub(crate) fn spanning<T>(
@@ -245,23 +165,20 @@ impl<'a> ItemCursor<'a> {
         Ok(WithSpan::new(value, span))
     }
 
-    fn missing(&self, expected: Expectation) -> WithSpan<ParseError> {
-        WithSpan::new(
-            ParseError::expected(expected, Found::EndOfChunk),
-            self.end_span(),
-        )
+    fn end_span(&self) -> Span {
+        Span::new(self.previous_end, self.previous_end)
     }
 }
 ```
 
-`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `require_token` and `consume_token_if` copy that reference out of `view` and then `commit`. `consume_group_if` and `require_group` rematch after `commit` so the `&'a ChunkedGroup` is borrowed from the committed reference.
+`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_group_if` copies it, matches out the `&'a ChunkedGroup` from the chunk item, then `commit`s.
 
 ### Span sources
 
-- Leaf: the `Span` from `require_token`, `consume_token_if`, `consume_token_if_any`, `require_keyword`, or the `WithSpan` from `consume_group_if`, `require_group`, `take_next`.
+- Leaf: the `Span` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
 - Parsed list item: the span `spanning` returned.
 - `LevelSlot::Unparsed`: `contents_span`.
-- Value made of several items: one `spanning` call. The closure calls `take_next` or the first `require_*`. If the caller already advanced past the first item, those remaining items are read with `require_*` / `consume_*`; if they must share one span with the first item, they are all read inside that first `spanning`.
+- Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
 `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. Names in the tree are spans. The converted scalar is the `i64`.
 
@@ -503,8 +420,9 @@ Nested errors (arguments, nested selections) precede that slot's trailing error,
 
 ## Function shapes
 
-- `require_*`: `ItemCursor` method. Match: `commit` and return the item. Mismatch: `Err` on the next item, no `commit`. Empty: `Err` at `end_span`.
 - `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
+- `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
+- `require_*`: `consume_*` or `expected()`.
 - `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`.
 
 A group plus its interior:
@@ -534,73 +452,70 @@ pub(crate) fn require_selection_set(
 
 ## Dispatch
 
-When the next item may start several forms, the parse function calls `take_next()` and `match`es. If those arms are one value, the `match` is inside `spanning`. Arms that return `Ok` continue with `require_*` / `consume_*`. The `_` arm returns `Err` with that item as `found`.
+When the next item may start several forms, the parse function is a `consume_*` ladder. The last arm is `expected`. If those arms are one value, the ladder is inside `spanning`. An arm that has taken its first item continues with `require_*` / `consume_*`.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 pub(crate) fn parse_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
-    cursor.spanning(|cursor| match cursor.take_next() {
-        Some(item) => match &item.item {
-            ChunkContentItem::NonBracket(token) => match token.0 {
-                NonBracketTokenKind::Dollar => {
-                    let name = cursor.require_token(
-                        NonBracketTokenKind::Identifier,
-                        Expectation::Token(NonBracketTokenKind::Identifier),
-                    )?;
-                    Ok(NonConstantValue::Variable(VariableUse {
-                        dollar: WithSpan::new(Dollar, item.location),
-                        name: WithSpan::new(VariableName, name),
-                    }))
+    cursor.spanning(|cursor| {
+        if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar) {
+            let name = cursor.require_token(
+                NonBracketTokenKind::Identifier,
+                Expectation::Token(NonBracketTokenKind::Identifier),
+            )?;
+            return Ok(NonConstantValue::Variable(VariableUse {
+                dollar: WithSpan::new(Dollar, dollar),
+                name: WithSpan::new(VariableName, name),
+            }));
+        }
+        if cursor
+            .consume_token_if(NonBracketTokenKind::StringLiteral)
+            .is_some()
+        {
+            return Ok(NonConstantValue::String(StringValue));
+        }
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
+            let value = match cursor.token_text(span).parse() {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(WithSpan::new(ParseError::IntegerDoesNotFitI64, span));
                 }
-                NonBracketTokenKind::StringLiteral => Ok(NonConstantValue::String(StringValue)),
-                NonBracketTokenKind::IntegerLiteral => {
-                    let value = cursor.integer(item.location)?;
-                    Ok(NonConstantValue::Integer(IntegerValue(value)))
-                }
-                NonBracketTokenKind::Identifier => match cursor.token_text(item.location) {
-                    text if text == "true" => {
-                        Ok(NonConstantValue::Boolean(BooleanValue(Boolean::True)))
-                    }
-                    text if text == "false" => {
-                        Ok(NonConstantValue::Boolean(BooleanValue(Boolean::False)))
-                    }
-                    text if text == "null" => Ok(NonConstantValue::Null(NullValue)),
-                    _ => Err(WithSpan::new(
-                        ParseError::expected(
-                            Expectation::Value,
-                            Found::Token(NonBracketTokenKind::Identifier),
-                        ),
-                        item.location,
-                    )),
-                },
-                kind => Err(WithSpan::new(
-                    ParseError::expected(Expectation::Value, Found::Token(kind)),
-                    item.location,
+            };
+            return Ok(NonConstantValue::Integer(IntegerValue(value)));
+        }
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
+            return match cursor.token_text(span) {
+                "true" => Ok(NonConstantValue::Boolean(BooleanValue(Boolean::True))),
+                "false" => Ok(NonConstantValue::Boolean(BooleanValue(Boolean::False))),
+                "null" => Ok(NonConstantValue::Null(NullValue)),
+                _ => Err(WithSpan::new(
+                    ParseError::expected(
+                        Expectation::Value,
+                        Found::Token(NonBracketTokenKind::Identifier),
+                    ),
+                    span,
                 )),
-            },
-            ChunkContentItem::Group(group) if group.opening.item.0 == BracketKind::Brace => {
-                Ok(NonConstantValue::Object(ObjectLiteral(
-                    group.children.item.parse_items(cursor.text(), parse_object_entry),
-                )))
-            }
-            other => Err(WithSpan::new(
-                ParseError::expected(Expectation::Value, Found::from(other)),
-                item.location,
-            )),
-        },
-        None => Err(WithSpan::new(
-            ParseError::expected(Expectation::Value, Found::EndOfChunk),
-            cursor.end_span(),
-        )),
+            };
+        }
+        if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
+            return Ok(NonConstantValue::Object(ObjectLiteral(
+                group
+                    .item
+                    .children
+                    .item
+                    .parse_items(cursor.text(), parse_object_entry),
+            )));
+        }
+        Err(cursor.expected(Expectation::Value))
     })
 }
 ```
 
-Keyword text after `require_token(Identifier, ...)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`). One required keyword (`to`) is `require_keyword`.
+Keyword text after `require_token(Identifier, ...)` or `consume_token_if(Identifier)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
-One optional item is `consume_*`. Several kinds for one optional item is `consume_token_if_any`. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. A form that starts on its first item and is then required (`$name`) is a `take_next` arm; the rest is `require_*`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar)` then `require_token(Identifier)`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -696,30 +611,54 @@ pub struct NamedConstantObjectEntry {
 }
 ```
 
-`parse_value` and `parse_constant_value` share the scalar arms (string, integer, boolean, null) through a function that returns `ConstantValue`. `parse_value` wraps those as `NonConstantValue` and adds the `$` and non-constant object arms. `parse_constant_value` matches `$` and returns `Err` with `Expectation::ConstantValue`. It parses object entries by calling `parse_constant_object_entry`.
+`parse_constant_value` is the same ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. Object entries call `parse_constant_object_entry`. The integer arm is the same `token_text(span).parse()` match; that `span` is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-fn parse_constant_scalar(
+pub(crate) fn parse_constant_value(
     cursor: &mut ItemCursor<'_>,
-    item: &WithSpan<ChunkContentItem>,
-) -> Option<Result<ConstantValue, WithSpan<ParseError>>> {
-    match &item.item {
-        ChunkContentItem::NonBracket(token) => match token.0 {
-            NonBracketTokenKind::StringLiteral => Some(Ok(ConstantValue::String(StringValue))),
-            NonBracketTokenKind::IntegerLiteral => {
-                Some(cursor.integer(item.location).map(IntegerValue).map(ConstantValue::Integer))
-            }
-            NonBracketTokenKind::Identifier => match cursor.token_text(item.location) {
-                text if text == "true" => Some(Ok(ConstantValue::Boolean(BooleanValue(Boolean::True)))),
-                text if text == "false" => Some(Ok(ConstantValue::Boolean(BooleanValue(Boolean::False)))),
-                text if text == "null" => Some(Ok(ConstantValue::Null(NullValue))),
-                _ => None,
-            },
-            _ => None,
-        },
-        _ => None,
-    }
+) -> Result<WithSpan<ConstantValue>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        if cursor
+            .consume_token_if(NonBracketTokenKind::StringLiteral)
+            .is_some()
+        {
+            return Ok(ConstantValue::String(StringValue));
+        }
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
+            let value = match cursor.token_text(span).parse() {
+                Ok(value) => value,
+                Err(_) => {
+                    return Err(WithSpan::new(ParseError::IntegerDoesNotFitI64, span));
+                }
+            };
+            return Ok(ConstantValue::Integer(IntegerValue(value)));
+        }
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
+            return match cursor.token_text(span) {
+                "true" => Ok(ConstantValue::Boolean(BooleanValue(Boolean::True))),
+                "false" => Ok(ConstantValue::Boolean(BooleanValue(Boolean::False))),
+                "null" => Ok(ConstantValue::Null(NullValue)),
+                _ => Err(WithSpan::new(
+                    ParseError::expected(
+                        Expectation::ConstantValue,
+                        Found::Token(NonBracketTokenKind::Identifier),
+                    ),
+                    span,
+                )),
+            };
+        }
+        if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
+            return Ok(ConstantValue::Object(ConstantObjectLiteral(
+                group
+                    .item
+                    .children
+                    .item
+                    .parse_items(cursor.text(), parse_constant_object_entry),
+            )));
+        }
+        Err(cursor.expected(Expectation::ConstantValue))
+    })
 }
 ```
 
@@ -731,7 +670,7 @@ pub enum ParseError {
     Expected(ExpectedFound),
     EmptyLiteral,
     MultipleDeclarations,
-    IntegerOutOfRange,
+    IntegerDoesNotFitI64,
 }
 
 pub struct ExpectedFound {
@@ -763,7 +702,7 @@ pub enum Found {
 }
 ```
 
-One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go.
+One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
@@ -791,15 +730,13 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 
 - Required token: `ItemCursor::require_token`
 - Optional token: `ItemCursor::consume_token_if`
-- Optional token, several kinds: `ItemCursor::consume_token_if_any`
-- Required keyword: `ItemCursor::require_keyword`
 - Required group: `ItemCursor::require_group`
 - Optional group: `ItemCursor::consume_group_if`
-- Multi-form position: `take_next` inside `spanning`
+- Wrong or missing item: `ItemCursor::expected`
+- Multi-form position: `consume_*` ladder, last arm `expected`
 - Keyword / boolean / null text: `token_text` after an identifier
-- Integer conversion: `ItemCursor::integer`
+- Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Composite span: `ItemCursor::spanning`
-- Missing-item error span: `ItemCursor::end_span`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
 - One-item context: `parse_singleton`
 - First item of an extra chunk: `Chunk::first_item`
@@ -813,11 +750,11 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 
 Each method lands with the feature doc of its first caller.
 
-- parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
-- parse-fields.md: `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
-- parse-arguments.md: `take_next`, `spanning` around `parse_value`, `integer`, `BooleanValue(Boolean::{True, False})`
-- parse-variables.md: `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
-- parse-descriptions.md: `consume_token_if_any`
-- parse-pointers.md: `require_keyword`
+- parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `consume_token_if`, `require_token`, `expected`, `require_end`, `text`, `token_text`, `parse_singleton`, `boundary_comma`
+- parse-fields.md: `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
+- parse-arguments.md: `parse_value`, `spanning` around `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
+- parse-descriptions.md: description via two `consume_token_if`
+- parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_items`, and `parse_singleton`. This doc stays in `refactors/pending`.

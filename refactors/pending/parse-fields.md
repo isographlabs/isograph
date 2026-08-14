@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `LevelSlot` / `UnparsedItem`, `parse_items`, `require_group` / `consume_group_if` / `consume_token_if`, and the parent-enum conversions that second parents force. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
+Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `LevelSlot` / `UnparsedItem`, `parse_items`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
 
 ## The grammar this doc accepts
 
@@ -875,5 +875,5 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 ## Landing checklist
 
 1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `parse_items`, `contents_span`, the `LevelSlot` blanket, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
-2. selections.rs, the parse_iso_literal.rs and parse_error.rs changes, the `ItemCursor` methods this doc adds (`consume_token_if`, `consume_group_if`, `require_group`, `spanning`), the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. selections.rs, the parse_iso_literal.rs and parse_error.rs changes, the `ItemCursor` methods this doc adds (`consume_group_if`, `require_group`, `spanning`), the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

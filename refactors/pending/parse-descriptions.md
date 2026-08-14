@@ -46,21 +46,11 @@ pub struct ClientFieldDeclaration {
 ## The parser
 
 ```rust
-// from crates/isograph_parser/src/chunk_stream.rs
-impl<'a> ItemCursor<'a> {
-    pub(crate) fn consume_token_if_any(&mut self, kinds: &[NonBracketTokenKind]) -> Option<Span> {
-        /* parsing-standards.md */
-    }
-}
-```
-
-```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
-    let span = cursor.consume_token_if_any(&[
-        NonBracketTokenKind::StringLiteral,
-        NonBracketTokenKind::BlockStringLiteral,
-    ])?;
+    let span = cursor
+        .consume_token_if(NonBracketTokenKind::StringLiteral)
+        .or_else(|| cursor.consume_token_if(NonBracketTokenKind::BlockStringLiteral))?;
     Some(WithSpan::new(Description, span))
 }
 ```
