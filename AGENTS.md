@@ -38,6 +38,7 @@ This section is extremely important. A frequent source of frustration is deviati
 - If a refactor is too large and should be broken up into smaller steps, let the user know, and do so. The files should be "conceptually different".
 - While we are iterating on a pending doc, stay in the doc. Start implementing only when the user gives explicit permission to implement. "Looks good," edits to the doc, "go on," "continue," or further planning discussion are not permission. If there is any ambiguity about whether implementation has been authorized, do not start implementing.
 - If, due to iteration or requirements changing, a previous requirement or goal becomes unachievable, RAISE THIS WITH THE USER.
+- Do not modify files in refactors/past/.
 
 ## Implementing a refactor doc
 
