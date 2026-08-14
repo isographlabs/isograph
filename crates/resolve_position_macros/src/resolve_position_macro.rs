@@ -350,10 +350,8 @@ fn parse_resolve_field_type(
             _ => {}
         }
 
-        // Container types: Vec<T>, Option<T>, or NonEmptyVec<T>
-        if (last_segment.ident == "Vec"
-            || last_segment.ident == "Option"
-            || last_segment.ident == "NonEmptyVec")
+        // Container types: Vec<T> or Option<T>
+        if (last_segment.ident == "Vec" || last_segment.ident == "Option")
             && let Some(syn::Type::Path(syn::TypePath {
                 path: inner_path, ..
             })) = extract_single_generic_type(last_segment)
@@ -370,7 +368,7 @@ fn parse_resolve_field_type(
     Err(Error::new_spanned(
         path,
         "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, GraphQLTypeAnnotation, \
-        Vec<T>, Option<T>, or NonEmptyVec<T> where T is a valid resolve field type",
+        Vec<T>, or Option<T> where T is a valid resolve field type",
     )
     .to_compile_error())
 }
