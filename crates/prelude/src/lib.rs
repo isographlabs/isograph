@@ -1,5 +1,7 @@
+#[cfg(feature = "pico")]
 use std::hash::Hash;
 
+#[cfg(feature = "pico")]
 use pico::{Database, DynEq, MemoRef};
 
 pub trait Postfix
@@ -65,6 +67,7 @@ where
         self
     }
 
+    #[cfg(feature = "pico")]
     #[inline(always)]
     fn interned_value(self, db: &impl Database) -> MemoRef<Self>
     where
@@ -73,6 +76,7 @@ where
         db.intern_value(self)
     }
 
+    #[cfg(feature = "pico")]
     #[inline(always)]
     fn interned_ref(&self, db: &impl Database) -> MemoRef<Self>
     where
