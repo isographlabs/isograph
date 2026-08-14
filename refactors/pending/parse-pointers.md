@@ -164,7 +164,7 @@ fn parse_pointer(
 }
 ```
 
-`parse_pointer` does not call `require_end`. `parse_singleton` owns exhaustion, the boundary comma, and extra chunks.
+`parse_pointer` does not call `require_end`. `parse_singleton` calls `require_end`, checks `boundary_comma`, and returns `Err` on a second chunk.
 `errors()` gains the pointer arm, mirroring the field arm (the target type contributes nothing: a bad target fails the header, degrading the whole literal):
 
 ```rust

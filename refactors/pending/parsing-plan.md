@@ -85,7 +85,7 @@ A reason is a `WithSpan<ParseError>`; the span points at the offending item, or 
 
 Failure granularity starts coarse and refines:
 
-- parse-entrypoint.md degrades the whole literal: any failure produces `UnparsedLiteral`, holding the reason and the entire root `ChunkedLevel`. `parse_singleton` owns the empty-literal, extra-chunk, leftover, and trailing-comma errors.
+- parse-entrypoint.md: any failure produces `UnparsedLiteral`, which stores the reason and the entire root `ChunkedLevel`. `parse_singleton` returns those errors: empty literal, extra chunk, leftover, trailing comma.
 - parse-fields.md introduces per-item degradation with `LevelSlot`: a list chunk that fails to parse becomes `LevelSlot::Unparsed` holding its cloned chunk; leftover after a successful item is `ParsedSlot::trailing`. Siblings parse normally. Declaration-header errors keep degrading the whole literal.
 
 ## The resolution surface
