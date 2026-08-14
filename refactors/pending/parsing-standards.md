@@ -4,7 +4,7 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 
 ## Input shape
 
-- The unit of parsing is the chunk: a `NonEmptyVec` of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that the root holds exactly one chunk, the declaration, is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
+- The unit of parsing is the chunk: a `NonEmpty` (the `nonempty` crate; adopt-nonempty.md) of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that the root holds exactly one chunk, the declaration, is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
 - A group is one item, consumed whole, always really closed. Its interior re-enters parsing only as fresh levels.
 - Items arrive pre-spanned. Parsers compute a span only for a multi-item composite, via `spanning`.
 - Separators were absorbed into boundaries by chunking: "a separator comes next" is `take_next()` returning `None`. An unmatched bracket and its level's tail never left the matcher, and a comma no item precedes never left chunking: no bracket or empty-chunk state reaches a parser.
@@ -27,7 +27,7 @@ Every operation a parser can perform on a chunk is a method on one of two types.
 /// The only reader of a chunk's contents. No rewind and no raw peek exist: a committed
 /// item is committed, and a decision is made on at most the next item.
 pub(crate) struct ChunkStream<'a> {
-    items: SafePeekable<non_empty_vec::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     /// The end of the last accepted item (the chunk's start before any): where an
     /// `Expected(_, EndOfChunk)` error points.
     previous_end: u32,
@@ -185,6 +185,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Each structure and each method lands with the feature doc of its first production caller (`Chunk::stream`, `require_token`, `require_end`, `token_text`, and the named `non_empty_vec::Iter` struct that `NonEmptyVec::iter`'s `impl Iterator` return becomes — a struct field cannot name an `impl` return type — with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning`, `end_span`, and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Each structure and each method lands with the feature doc of its first production caller (`Chunk::stream`, `require_token`, `require_end`, and `token_text` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning`, `end_span`, and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks and the text-read free functions; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.

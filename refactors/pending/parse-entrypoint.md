@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md and the landed prefactors (refactors/past/cut-at-unmatched.md, no-empty-chunks.md, one-comma-per-boundary.md, non-empty-vec-iter.md, private-chunk-fields.md): no unmatched-bracket state and no empty chunk reach this stage, and `Chunk`'s fields are already private. This doc lands `ChunkStream`'s required-token core, `Chunk::stream`, `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, `token_text`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md and the landed prefactors (refactors/past/cut-at-unmatched.md, no-empty-chunks.md, one-comma-per-boundary.md, private-chunk-fields.md, adopt-nonempty.md): no unmatched-bracket state and no empty chunk reach this stage, and `Chunk`'s fields are already private. This doc lands `ChunkStream`'s required-token core, `Chunk::stream`, `parse_iso_literal`, the root-level rules, keyword dispatch, `ParseError`, `token_text`, the whole-literal failure fallback with its resolution path, and the complete `entrypoint Type.field` declaration. `field` and `pointer` are recognized keywords that dispatch to a temporary error variant; parse-fields.md and parse-pointers.md replace it.
 
 ## The grammar this doc accepts
 
@@ -26,7 +26,7 @@ The enforcement structure parsing-standards.md specifies, at the subset this doc
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-use non_empty_vec::NonEmptyVec;
+use nonempty::NonEmpty;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan};
 
@@ -35,7 +35,7 @@ use crate::{ChunkContentItem, Expectation, Found, NonBracketTokenKind, ParseErro
 /// The only reader of a chunk's contents. No rewind and no raw peek exist: a committed
 /// item is committed, and a decision is made on at most the next item.
 pub(crate) struct ChunkStream<'a> {
-    items: SafePeekable<non_empty_vec::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     /// The end of the last accepted item (the chunk's start before any): where an
     /// `Expected(_, EndOfChunk)` error points.
     previous_end: u32,
@@ -43,7 +43,7 @@ pub(crate) struct ChunkStream<'a> {
 
 impl<'a> ChunkStream<'a> {
     /// Only `Chunk::stream` constructs one, so a stream always reads a whole chunk.
-    pub(crate) fn new(contents: &'a NonEmptyVec<WithSpan<ChunkContentItem>>) -> Self {
+    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>) -> Self {
         ChunkStream {
             previous_end: contents.first().location.start,
             items: contents.iter().safe_peekable(),
