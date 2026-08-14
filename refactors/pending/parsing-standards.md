@@ -379,6 +379,12 @@ impl Chunk {
         )
     }
 
+    /// The first content item. Total: every chunk has contents. The one-item walker's
+    /// extra-chunk error reads this as `Found`.
+    pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
+        self.contents.first()
+    }
+
     /// The comma in the trailing boundary, when one exists. Only `parse_singleton`
     /// calls this.
     pub fn boundary_comma(&self) -> Option<Span> {
@@ -933,7 +939,7 @@ Each structure and each method lands with the feature doc of its first productio
 - parse-entrypoint.md: `LiteralText`, `TokenText`, `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
 - parse-fields.md: `take_next` is not required yet; `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
 - parse-arguments.md: `take_next`, `spanning` at a production (values), `integer`, `BooleanValue::{True, False}`
-- parse-variables.md: `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
+- parse-variables.md: `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: `consume_token_if_any`
 - parse-pointers.md: `require_keyword`
 
