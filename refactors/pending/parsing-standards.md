@@ -62,10 +62,7 @@ impl<'a> ChunkStream<'a> {
     }
 
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        match self.cursor.items.peek() {
-            None => Ok(()),
-            Some(_) => Err(()),
-        }
+        self.cursor.items.peek().map_or(Ok(()), |_| Err(()))
     }
 }
 
