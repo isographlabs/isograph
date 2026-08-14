@@ -328,7 +328,6 @@ pub struct ClientFieldDeclaration {
     pub field_keyword: WithSpan<FieldKeyword>,
     #[resolve_field(parent_variant = Field)]
     pub parent_type: WithSpan<EntityName>,
-    pub dot: WithSpan<Dot>,
     #[resolve_field(parent_variant = Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
     #[resolve_field]

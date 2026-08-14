@@ -82,7 +82,6 @@ pub struct ClientPointerDeclaration {
     pub pointer_keyword: WithSpan<PointerKeyword>,
     #[resolve_field(parent_variant = Pointer)]
     pub parent_type: WithSpan<EntityName>,
-    pub dot: WithSpan<Dot>,
     #[resolve_field]
     pub client_pointer_name: WithSpan<ClientPointerName>,
     #[resolve_field(parent_variant = Pointer)]
@@ -126,7 +125,7 @@ fn parse_pointer(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
-    let dot = cursor.require_token(
+    cursor.require_token(
         NonBracketTokenKind::Period,
         Expectation::Token(NonBracketTokenKind::Period),
     )?;
@@ -154,7 +153,6 @@ fn parse_pointer(
     Ok(ClientPointerDeclaration {
         pointer_keyword: WithSpan::new(PointerKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
-        dot: WithSpan::new(Dot, dot),
         client_pointer_name: WithSpan::new(ClientPointerName, client_pointer_name),
         variable_definitions,
         to_keyword: WithSpan::new(ToKeyword, to_keyword),

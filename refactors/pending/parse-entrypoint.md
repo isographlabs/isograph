@@ -47,7 +47,6 @@ pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
     #[resolve_field]
     pub parent_type: WithSpan<EntityName>,
-    pub dot: WithSpan<Dot>,
     #[resolve_field]
     pub client_field_name: WithSpan<ClientFieldName>,
 }
@@ -72,9 +71,6 @@ pub struct ClientFieldName;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Dot;
 
 pub type EntrypointDeclarationPath<'a> = PositionResolutionPath<&'a EntrypointDeclaration, ()>;
 
@@ -151,7 +147,7 @@ fn parse_entrypoint(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
-    let dot = cursor.require_token(
+    cursor.require_token(
         NonBracketTokenKind::Period,
         Expectation::Token(NonBracketTokenKind::Period),
     )?;
@@ -162,7 +158,6 @@ fn parse_entrypoint(
     Ok(EntrypointDeclaration {
         entrypoint_keyword: WithSpan::new(EntrypointKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
-        dot: WithSpan::new(Dot, dot),
         client_field_name: WithSpan::new(ClientFieldName, client_field_name),
     })
 }
@@ -674,7 +669,6 @@ mod tests {
         let declaration = as_entrypoint(&parse);
         assert_eq!(declaration.entrypoint_keyword.location, span_of(text, "entrypoint"));
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
-        assert_eq!(declaration.dot.location, span_of(text, "."));
         assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
         assert_eq!(parse.item.errors(), vec![]);
         assert_eq!(parse.location, Span::from_usize(0, text.len()));

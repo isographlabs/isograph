@@ -156,7 +156,6 @@ pub struct ClientFieldDeclaration {
     pub field_keyword: WithSpan<FieldKeyword>,
     #[resolve_field(parent_variant = Field)]
     pub parent_type: WithSpan<EntityName>,
-    pub dot: WithSpan<Dot>,
     #[resolve_field(parent_variant = Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
     #[resolve_field(parent_variant = Field)]
@@ -180,7 +179,7 @@ fn parse_field(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
-    let dot = cursor.require_token(
+    cursor.require_token(
         NonBracketTokenKind::Period,
         Expectation::Token(NonBracketTokenKind::Period),
     )?;
@@ -192,7 +191,6 @@ fn parse_field(
     Ok(ClientFieldDeclaration {
         field_keyword: WithSpan::new(FieldKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
-        dot: WithSpan::new(Dot, dot),
         client_field_name: WithSpan::new(ClientFieldName, client_field_name),
         selection_set,
     })
