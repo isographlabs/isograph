@@ -8,6 +8,10 @@ The parser does not use pico. The explicit assumption is that parsing a literal 
 
 Commit after every change, small and atomically, without being asked. Each logical change is its own commit.
 
+## Memory
+
+Do not use Claude's persistent memory feature in this project: write no memory files, and disregard any recalled memories. Everything that governs work here lives in this file and in `refactors/`.
+
 ## Refactor docs
 
 This section is extremely important. A frequent source of frustration is deviations from this protocol. Take it very seriously and frequently refresh your memory on how to write planning documents. 99% of our time is spent iterating on planning documents, so it is extremely important that you do this correctly.
