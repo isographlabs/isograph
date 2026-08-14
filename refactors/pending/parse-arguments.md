@@ -147,7 +147,11 @@ pub struct IntegerValue(pub i64);
 /// `true` or `false`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum BooleanValue {
+/// `true` or `false`. Positions on either keyword answer this leaf.
+pub struct BooleanValue(pub Boolean);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub enum Boolean {
     True,
     False,
 }
@@ -559,8 +563,8 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         assert!(matches!(values[1], NonConstantValue::String(_)));
         assert!(matches!(values[2], NonConstantValue::Integer(IntegerValue(42))));
         assert!(matches!(values[3], NonConstantValue::Integer(IntegerValue(-7))));
-        assert!(matches!(values[4], NonConstantValue::Boolean(BooleanValue::True)));
-        assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue::False)));
+        assert!(matches!(values[4], NonConstantValue::Boolean(BooleanValue(Boolean::True))));
+        assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue(Boolean::False))));
         assert!(matches!(values[6], NonConstantValue::Null(_)));
         assert_eq!(
             as_named_argument(&arguments.item.0[0].item).value.location,

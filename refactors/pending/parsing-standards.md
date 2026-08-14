@@ -671,8 +671,12 @@ pub(crate) fn parse_value(
                     Ok(NonConstantValue::Integer(IntegerValue(value)))
                 }
                 NonBracketTokenKind::Identifier => match cursor.token_text(item.location) {
-                    text if text == "true" => Ok(NonConstantValue::Boolean(BooleanValue::True)),
-                    text if text == "false" => Ok(NonConstantValue::Boolean(BooleanValue::False)),
+                    text if text == "true" => {
+                        Ok(NonConstantValue::Boolean(BooleanValue(Boolean::True)))
+                    }
+                    text if text == "false" => {
+                        Ok(NonConstantValue::Boolean(BooleanValue(Boolean::False)))
+                    }
                     text if text == "null" => Ok(NonConstantValue::Null(NullValue)),
                     _ => Err(WithSpan::new(
                         ParseError::expected(
@@ -773,7 +777,9 @@ pub enum ConstantValue {
     Object(ConstantObjectLiteral),
 }
 
-pub enum BooleanValue {
+pub struct BooleanValue(pub Boolean);
+
+pub enum Boolean {
     True,
     False,
 }
@@ -820,8 +826,8 @@ fn parse_constant_scalar(
                 Some(cursor.integer(item.location).map(IntegerValue).map(ConstantValue::Integer))
             }
             NonBracketTokenKind::Identifier => match cursor.token_text(item.location) {
-                text if text == "true" => Some(Ok(ConstantValue::Boolean(BooleanValue::True))),
-                text if text == "false" => Some(Ok(ConstantValue::Boolean(BooleanValue::False))),
+                text if text == "true" => Some(Ok(ConstantValue::Boolean(BooleanValue(Boolean::True)))),
+                text if text == "false" => Some(Ok(ConstantValue::Boolean(BooleanValue(Boolean::False)))),
                 text if text == "null" => Some(Ok(ConstantValue::Null(NullValue))),
                 _ => None,
             },
@@ -939,7 +945,7 @@ Each structure and each method lands with the feature doc of its first productio
 
 - parse-entrypoint.md: `LiteralText`, `TokenText`, `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
 - parse-fields.md: `take_next` is not required yet; `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
-- parse-arguments.md: `take_next`, `spanning` at a production (values), `integer`, `BooleanValue::{True, False}`
+- parse-arguments.md: `take_next`, `spanning` at a production (values), `integer`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: `consume_token_if_any`
 - parse-pointers.md: `require_keyword`
