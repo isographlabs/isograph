@@ -1,8 +1,8 @@
 # Parsing standards
 
-Rules for all grammar-stage code. The feature docs define the grammar: each form (a selection, a value, a type) and the items that make it up. This doc lists the functions that implement those forms. If an implementation disagrees with this doc, the same review either amends the doc or changes the code.
+Rules for grammar-stage code. Feature docs define each form (a selection, a value, a type) and the items that make it up. This doc lists the functions that implement those forms. If an implementation disagrees with this doc, the same review amends the doc or changes the code.
 
-Every call a parse function makes on a chunk is a method or free function listed here. A new call is a new listing here, not a local helper. Feature docs call this surface; they do not add parallel helpers.
+Every call a parse function makes on a chunk is a method or free function listed here. A new call is a new listing here.
 
 ## The unit of work
 
@@ -11,17 +11,15 @@ Every call a parse function makes on a chunk is a method or free function listed
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse>
 ```
 
-`parse_iso_literal` takes `text: &str` and the chunked literal. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` or `ItemCursor` is built from one chunk.
+`parse_iso_literal` takes `text: &str` and the chunked literal. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` is built from one chunk.
 
-A group is one item. `require_group` and `consume_group_if` return it in one call. The group is closed. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
+A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
-Each token and group already has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`.
-
-Chunking stored separators in boundaries. `take_next` returning `None` means the chunk has no remaining item. The matcher removed unmatched brackets and the tail after a cut. Chunking recorded a comma with no item as `CommaWithoutItem` and did not emit a chunk for it. A parse function's input does not include unmatched-bracket state or an empty chunk.
+Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `take_next` returning `None` means the chunk has no remaining item.
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_items` and `parse_singleton` call `Chunk::stream` and receive a `ChunkStream`. They pass `&mut ItemCursor` into the parse function by calling `stream.cursor()`. `require_end` is a method on `ChunkStream`, not on `ItemCursor`. A parse function's parameter is `&mut ItemCursor`, so that function cannot call `require_end`. The methods on the value a function receives are the operations that function can call. This is the same split as `SafePeekable`.
+`parse_items` and `parse_singleton` call `Chunk::stream`, then pass `stream.cursor()` (`&mut ItemCursor`) into the parse function, then call `stream.require_end`. `require_end` is a method on `ChunkStream`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -42,7 +40,7 @@ pub(crate) struct ItemCursor<'a> {
     text: &'a str,
 }
 
-/// Returned by `Chunk::stream`. `parse_items` and `parse_singleton` call its methods.
+/// Sequential reader of one chunk, plus `require_end`.
 pub(crate) struct ChunkStream<'a> {
     cursor: ItemCursor<'a>,
 }
@@ -62,7 +60,6 @@ impl<'a> ChunkStream<'a> {
         &mut self.cursor
     }
 
-    /// `Ok(())` when no item remains. If an item remains, `Err` on that item without `commit`.
     pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>> {
         match self.cursor.items.peek() {
             None => Ok(()),
@@ -78,9 +75,6 @@ impl<'a> ChunkStream<'a> {
 }
 
 impl<'a> ItemCursor<'a> {
-    /// The next item's span when it is a non-bracket token of `kind`; the error
-    /// otherwise, on the found item, unconsumed, or empty at `previous_end` when the
-    /// chunk ran out.
     pub(crate) fn require_token(
         &mut self,
         kind: NonBracketTokenKind,
@@ -103,8 +97,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// The next item's span, consumed, when it is a non-bracket token of `kind`;
-    /// `None`, nothing consumed, otherwise.
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
         let item = *peek.view();
@@ -118,9 +110,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// The next item's span, and `commit`, when it is a non-bracket token whose kind
-    /// is in `kinds`; `None` and no `commit` otherwise. One optional item, several
-    /// kinds (a description: string or block string).
     pub(crate) fn consume_token_if_any(&mut self, kinds: &[NonBracketTokenKind]) -> Option<Span> {
         let peek = self.items.peek()?;
         let item = *peek.view();
@@ -134,8 +123,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// The next item's span when it is the identifier whose text is `keyword`; the
-    /// error otherwise, on the found item, unconsumed, or empty at `previous_end`.
     pub(crate) fn require_keyword(
         &mut self,
         keyword: &'static str,
@@ -161,8 +148,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// The next item, consumed, when it is a group opened by `kind`; `None`, nothing
-    /// consumed, otherwise.
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
@@ -185,8 +170,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// The next item when it is a group opened by `kind`; the error otherwise, on the
-    /// found item, unconsumed, or empty at `previous_end`.
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
@@ -223,15 +206,12 @@ impl<'a> ItemCursor<'a> {
         self.text
     }
 
-    /// The next item after `next`, or `None` at the chunk's end. Total; the caller
-    /// builds any error.
     pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>> {
         let item = self.items.next()?;
         self.previous_end = item.location.end;
         Some(item)
     }
 
-    /// The empty span at `previous_end`, for error arms that found `EndOfChunk`.
     pub(crate) fn end_span(&self) -> Span {
         Span::new(self.previous_end, self.previous_end)
     }
@@ -247,9 +227,6 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    /// Calls `parse` and wraps `Ok` in a `WithSpan`. The span starts at the first
-    /// item `parse` advanced past and ends at `previous_end`. If `parse` does not
-    /// advance, the span is empty at `previous_end`. On `Err`, returns that error.
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
@@ -277,19 +254,16 @@ impl<'a> ItemCursor<'a> {
 }
 ```
 
-`take_next`'s iterator item is `&'a WithSpan<ChunkContentItem>` (`nonempty::Iter` yields references). `require_token` / `consume_token_if` copy that reference out of `view` (`I::Item` is `Copy`) and then `commit`. `consume_group_if` / `require_group` rematch after `commit` so the `&'a ChunkedGroup` is borrowed from the committed reference, not from the peek guard. The `NonBracket` arm after a successful `Group` view is the item-cannot-change-between-view-and-commit invariant; it is a typed error or `None`, not a panic.
-
-`ChunkStream::require_end` calls `peek` on the cursor's iterator. A parse function's parameter is `&mut ItemCursor`, which does not include `require_end`.
+`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `require_token` and `consume_token_if` copy that reference out of `view` and then `commit`. `consume_group_if` and `require_group` rematch after `commit` so the `&'a ChunkedGroup` is borrowed from the committed reference.
 
 ### Span sources
 
-A leaf's span is the `Span` returned by `require_token`, `consume_token_if`, `consume_token_if_any`, or `require_keyword`, or the `WithSpan` on the value returned by `consume_group_if`, `require_group`, or `take_next`. The span of a parsed list item is the span `spanning` returned. The span of `LevelSlot::Unparsed` is `contents_span`. The span of a value made of several items is the span `spanning` returned. A parse function does not call `Span::join`. If no listed method returns the needed span, add a method here.
+- Leaf: the `Span` from `require_token`, `consume_token_if`, `consume_token_if_any`, `require_keyword`, or the `WithSpan` from `consume_group_if`, `require_group`, `take_next`.
+- Parsed list item: the span `spanning` returned.
+- `LevelSlot::Unparsed`: `contents_span`.
+- Value made of several items: one `spanning` call. The closure calls `take_next` or the first `require_*`. If the caller already advanced past the first item, those remaining items are read with `require_*` / `consume_*`; if they must share one span with the first item, they are all read inside that first `spanning`.
 
-Construction is `WithSpan::new` and plain `Ok` / `Some`.
-
-A value made of several items is parsed by one `spanning` call. The closure passed to `spanning` calls `take_next` or the first `require_*`. If the caller already advanced past the first item, a later `spanning` starts at the next item: the caller already has that first item's span, and the remaining items are read with `require_*` / `consume_*`. If those items and the first item must share one span, they are all read inside the `spanning` that advanced past the first item.
-
-`ItemCursor` stores the same `&str` `parse_iso_literal` received. `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. That span came from a token of this literal. Names in the tree are spans; the only converted scalar is the `i64`.
+`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. Names in the tree are spans. The converted scalar is the `i64`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -310,13 +284,10 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
-    /// A `ChunkStream` over this chunk.
     pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
         ChunkStream::new(&self.contents, text)
     }
 
-    /// The span of the contents, without the boundary: a degraded slot's span. Total,
-    /// because every chunk has contents.
     pub fn contents_span(&self) -> Span {
         Span::join(
             self.contents.first().location,
@@ -324,14 +295,10 @@ impl Chunk {
         )
     }
 
-    /// The first content item. Total: every chunk has contents. `parse_singleton`'s
-    /// `extra` callback passes this to `Found::from`.
     pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
         self.contents.first()
     }
 
-    /// The comma in the trailing boundary, when one exists. Only `parse_singleton`
-    /// calls this.
     pub fn boundary_comma(&self) -> Option<Span> {
         let separator = self.trailing_separator.as_ref()?;
         separator
@@ -343,15 +310,11 @@ impl Chunk {
 }
 ```
 
-`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (the `nonempty` crate; chunk-contents-nonempty.md). These methods are the only item access and the only boundary read. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
-
-`contents_span` is allowed `Span::join`: it is a `Chunk` method, not a parser.
+`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`.
 
 ## Lists and one-item levels
 
-`ChunkedLevel`'s vec is private to the `chunk` module. The only functions that iterate it are `parse_items` and `parse_singleton`. A parse function does not iterate a `ChunkedLevel`. Tests that need the slice call `#[cfg(test)] ChunkedLevel::chunks`.
-
-`parse_items` is called on a list level (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is called on a one-item level (the root, a `[...]` interior).
+`ChunkedLevel`'s vec is private to the `chunk` module. `parse_items` iterates a list level (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` iterates a one-item level (the root, a `[...]` interior). Tests call `#[cfg(test)] ChunkedLevel::chunks`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -374,9 +337,6 @@ pub enum LevelSlot<T> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParsedSlot<T> {
     pub item: T,
-    /// Present when the parse function returned `Ok` and leftover items followed it. Unmarked
-    /// for resolution: the slot span excludes the leftover, so those positions answer
-    /// the containing level.
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
@@ -391,9 +351,6 @@ pub struct UnparsedItem {
 }
 
 impl ChunkedLevel {
-    /// One `LevelSlot` per chunk, same length as the level. Each chunk is a new
-    /// `ChunkStream`. The parse function receives `&mut ItemCursor`. This function
-    /// calls `require_end`.
     pub(crate) fn parse_items<'a, P>(
         &'a self,
         text: &'a str,
@@ -435,8 +392,6 @@ impl ChunkedLevel {
     }
 }
 
-/// Calls `parse` on the first chunk with `&mut ItemCursor`, then `require_end`,
-/// then `Err` if `boundary_comma` is `Some`, then `Err` if a second chunk exists.
 pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
@@ -465,19 +420,13 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`parse_items` returns `Vec<WithSpan<LevelSlot<P>>>`, not `Result`. If the parse function returns `Err`, the slot is `LevelSlot::Unparsed`. That `Err` is not returned from `parse_items`, so `?` in the parse function does not skip later chunks. The vec length equals the chunk count.
+`parse_items` returns `Vec<WithSpan<LevelSlot<P>>>`. Length equals chunk count. `Err` from the parse function is `LevelSlot::Unparsed`. `Ok` plus `require_end` `Err` is `ParsedSlot::trailing`. `foo bar` is the selection `foo` (span on `foo`) and a trailing error at `bar`. A position on `bar` resolves to the selection set. `foo bar { baz }` is the scalar `foo` and leftover from `bar` on.
 
-If the parse function returns `Ok` and `require_end` returns `Err`, the item is kept and the error is stored in `ParsedSlot::trailing`. `foo bar` is the selection `foo` and a trailing error at `bar`. Find-references, rename, and go-to-definition use the `foo` name leaf. The item's span does not cover `bar`, so a position on `bar` resolves to the selection set.
-
-The leftover is the suffix of the chunk after the last item the parse function advanced past. `foo bar { baz }` is the scalar `foo` and leftover starting at `bar`. `baz` is not a node in the tree.
-
-In `parse_singleton`, if `require_end` returns `Err`, that error is returned and the declaration or `[...]` type is not produced. The comma check uses the same `end_expectation` (`EndOfDeclaration`, `EndOfType`).
+`parse_singleton` returns the `require_end` `Err` (the declaration or `[...]` type is dropped). The comma uses the same `end_expectation`.
 
 ### `LevelSlot` and `ResolvePosition`
 
-`LevelSlot<T>` is a `ResolvePosition` wrapper, not a leaf. A position in a `Parsed` slot is resolved by `T::resolve`. A position in an `Unparsed` slot is resolved by `UnparsedItem::resolve`. `trailing` is not a `#[resolve_field]`, so resolution does not descend into it.
-
-This is a blanket `ResolvePosition` impl, like the `Box<T>` impl in parse-variables.md. It is in `chunk.rs` next to `LevelSlot` because it names `UnparsedItem` and `UnparsedItemParent`.
+A position in `Parsed` is resolved by `T::resolve`. A position in `Unparsed` is resolved by `UnparsedItem::resolve`. `trailing` has no `#[resolve_field]`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -517,8 +466,6 @@ impl<'a> From<SelectionSetPath<'a>> for UnparsedItemParent<'a> {
 
 The same `From` exists for `ArgumentListPath`, `ObjectLiteralPath`, and `VariableDeclarationListPath`, each landing with that list.
 
-A list in the tree is `Vec<WithSpan<LevelSlot<P>>>`. `P` has no `Unparsed` variant.
-
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<LevelSlot<Selection>>>);
@@ -528,8 +475,6 @@ pub enum Selection {
     Object(ObjectSelection),
 }
 ```
-
-The derive on `SelectionSet` generates a loop over `Vec<WithSpan<LevelSlot<Selection>>>` and calls `LevelSlot::resolve` on each element. That is the same generated shape as `Vec<WithSpan<Selection>>`, with `LevelSlot<Selection>` as the inner type.
 
 ### Errors from slots
 
@@ -558,11 +503,11 @@ Nested errors (arguments, nested selections) precede that slot's trailing error,
 
 ## Function shapes
 
-- `require_*`: methods on `ItemCursor` for a required item. On match they call `commit` and return that item. On mismatch they return `Err` on the next item without `commit`, or `Err` at `end_span` if there is no next item.
-- `consume_*`: methods on `ItemCursor` for one optional item. On match they call `commit` and return `Some`. Otherwise they return `None` and do not call `commit`. They do not return `Err`.
-- `parse_*`: a function that implements a grammar form made of several items. The parameter is `&mut ItemCursor`. The first `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`. A second loop over a level is not written.
+- `require_*`: `ItemCursor` method. Match: `commit` and return the item. Mismatch: `Err` on the next item, no `commit`. Empty: `Err` at `end_span`.
+- `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
+- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`.
 
-A parse function that reads a group and then calls `parse_items` or `parse_singleton` on the interior is named `parse_*` or `consume_*` and is built from `require_group` / `consume_group_if` plus that call:
+A group plus its interior:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -587,11 +532,9 @@ pub(crate) fn require_selection_set(
 }
 ```
 
-`ItemCursor::text` returns the `&str` passed to `Chunk::stream`. The caller of `parse_items` on a group's interior passes `cursor.text()`.
-
 ## Dispatch
 
-When the next item may start several forms, the parse function calls `take_next()` and `match`es on the result. If those arms together are one value, the `match` is inside `spanning`. `take_next` advances past the item. Arms that return `Ok` continue with `require_*` / `consume_*` on the same cursor. The `_` arm returns `Err` with that item as `found`.
+When the next item may start several forms, the parse function calls `take_next()` and `match`es. If those arms are one value, the `match` is inside `spanning`. Arms that return `Ok` continue with `require_*` / `consume_*`. The `_` arm returns `Err` with that item as `found`.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -655,13 +598,9 @@ pub(crate) fn parse_value(
 }
 ```
 
-Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`). The `_` arm is the one reject. A single required keyword (`to`) is `require_keyword`, not this match.
+Keyword text after `require_token(Identifier, ...)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`). One required keyword (`to`) is `require_keyword`.
 
-`consume_*` is not used to choose among alternatives of one form. It is used for one optional item. That includes the case where the next item may start the caller's next form: the optional `!` after a type name, after which the next item may be the caller's `=`. The type parse function does not `match` on `take_next` there, because `=` is not part of the type. Two `consume_*` calls in sequence that together implement the alternatives of one form are not written. Several token kinds for one optional item is `consume_token_if_any`.
-
-A form that is absent until its first item appears, then required (`$name`, later `@ name (args)`), is a `take_next` arm. After that item, the rest is `require_*`.
-
-Whether a form is present is determined by the next item. One optional item is `consume_*` and does not return `Err`. A form of several items that starts optionally advances past the first item in the `take_next` match and may return `Err` on the second (`@@` returns `Err` at the second `@`). After `require_token` on an identifier, `consume_token_if(Colon)` tells whether that identifier is an alias; both arms of that `match` use the identifier. Optionality uses one item of lookahead.
+One optional item is `consume_*`. Several kinds for one optional item is `consume_token_if_any`. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. A form that starts on its first item and is then required (`$name`) is a `take_next` arm; the rest is `require_*`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -698,11 +637,11 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
 }
 ```
 
-`parse_selection` does not call `require_end`. `parse_level_items` wraps it in `spanning` and then checks leftover.
+`parse_items` wraps `parse_selection` in `spanning` and then calls `require_end`.
 
 ## Narrower types for narrower grammars
 
-A grammar form that does not include a sub-form uses a type that does not have that variant. Variable defaults are `ConstantValue`. `parse_constant_value` returns `Err` at `$`. `DeclaredVariable::default_value` has type `Option<WithSpan<ConstantValue>>`.
+Variable defaults are `ConstantValue`. `parse_constant_value` returns `Err` at `$`. `DeclaredVariable::default_value` is `Option<WithSpan<ConstantValue>>`.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -824,41 +763,31 @@ pub enum Found {
 }
 ```
 
-One global `Expectation`. An error is `WithSpan<ParseError>`; the span covers the offending item or is empty where the missing item belonged.
+One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go.
 
-`UnsupportedDeclarationType` exists only between parse-entrypoint.md and parse-pointers.md.
+`UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-`ParseError` values are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSlot::trailing`). `errors()` collects them in source order. There is no separate error vec next to the tree.
+Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSlot::trailing`). `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
 
-Bracket errors are the matcher's return value. Comma-without-item errors are chunking's return value. `ParseError` has no variant for either. An error-free literal has an empty matcher vec, an empty chunking vec, and an empty `errors()`.
-
-A failed list chunk is `LevelSlot::Unparsed`; the other chunks of that level are parsed. A failed declaration is `UnparsedLiteral`. Each of those regions has one reason. `ParsedSlot::trailing` is an error on a parsed item, not one of those regions.
-
-Parse functions do not construct message strings. `Display` impls format `ParseError`. Suggestions are produced by the rendering stage from the `(expected, found)` pair.
+A failed list chunk is `LevelSlot::Unparsed`; sibling chunks are parsed. A failed declaration is `UnparsedLiteral`. One reason per those regions. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
-No panics on any input. Parse functions do not call `unwrap`, `expect`, `unreachable!`, or use `Infallible`. If an invariant is not in the types, the function returns a defined value and a comment on that function states the invariant.
+`parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in `UnparsedLiteral` or `UnparsedItem` resolves through the retained chunk. A position on whitespace, leftover, or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
 
-Every call to `parse_iso_literal` returns a tree. Every position resolves: a position in a parsed region resolves to a grammar leaf; a position in `UnparsedLiteral` or `UnparsedItem` resolves through the retained chunk; a position on whitespace, leftover, a region the matcher dropped, or a comma chunking dropped resolves to the nearest containing node.
-
-`resolve` returns the leaf at the position. Find-references, rename, and go-to-definition run only when that leaf is a name leaf. They do not look at ancestors for a name. A position that resolves to a container, including leftover, does not use a parent's name: in `foo { bar baz }`, a position on `baz` resolves to the selection set, and find-references returns no references. Hover and completion read the resolution path.
+Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar baz }`, a position on `baz` resolves to the selection set; find-references returns no references. Hover and completion read the resolution path.
 
 ## Trees and spans
 
-Whether a type carries a span is fixed on the type: a tree enum is wrapped in `WithSpan` at its slot, variant payloads are bare, each struct field that is a node is `WithSpan`, and the comment on the type states what the wrapper covers.
+A tree enum is wrapped in `WithSpan` at its slot. Variant payloads are bare. Each struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
 
-A name is a fieldless marker struct in a `WithSpan`. Each role is its own type (an alias is not a name; an argument name is not an object key). The name's text is the wrapper's span. The tree stores no `String` and does not intern. The only converted scalar is the `i64`. The tree has no nodes for the dot, `$`, `!`, or `to`. A position on those tokens resolves to the containing node.
-
-`ResolvePosition` is derive-only, except the two blanket delegations: `Box<T>` in `resolve_position` (parse-variables.md) and `LevelSlot<T>` next to `LevelSlot`. A third manual impl is a missing `resolve_position` feature and becomes a prefactor there. A parent is a direct path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants are reachable inside degraded regions only.
+`ResolvePosition` is derived. The two blanket delegations are `Box<T>` (parse-variables.md) and `LevelSlot<T>` above. A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedLiteral` and `UnparsedItem`.
 
 ## Performance
 
-One pass, by reference. The output copies spans and `Copy` tokens. Cloning happens when a region degrades: allocation beyond the output vecs is proportional to the error count. Each item is advanced past at most once, so parse time is linear in the token count. The functions take `&str` and the chunk tree.
+One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when a region becomes `UnparsedItem`: allocation beyond the output vecs is proportional to the error count. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
-
-Every grammar-stage task is one row. A task that is not here is a missing method or a missing function.
 
 - Required token: `ItemCursor::require_token`
 - Optional token: `ItemCursor::consume_token_if`
@@ -867,29 +796,28 @@ Every grammar-stage task is one row. A task that is not here is a missing method
 - Required group: `ItemCursor::require_group`
 - Optional group: `ItemCursor::consume_group_if`
 - Multi-form position: `take_next` inside `spanning`
-- Keyword / boolean / null text: `token_text` after an identifier was accepted
+- Keyword / boolean / null text: `token_text` after an identifier
 - Integer conversion: `ItemCursor::integer`
 - Composite span: `ItemCursor::spanning`
 - Missing-item error span: `ItemCursor::end_span`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
 - One-item context: `parse_singleton`
-- First item of a rejected extra chunk: `Chunk::first_item`
-- Trailing comma in a one-item context: `parse_singleton` (via `boundary_comma`)
+- First item of an extra chunk: `Chunk::first_item`
+- Trailing comma in a one-item context: `parse_singleton` via `boundary_comma`
 - Leftover after a list item: `ParsedSlot::trailing`
 - Leftover after a singleton: `parse_singleton`'s `require_end`
 - Group interior: `require_group` / `consume_group_if`, then `parse_items` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
-- Leftover after a parse function returns: `parse_items` or `parse_singleton` call `require_end`. The parse function does not.
 
 ## Shipping and amending
 
-Each structure and each method lands with the feature doc of its first caller. A method with no caller yet exists only in this doc.
+Each method lands with the feature doc of its first caller.
 
 - parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `require_token`, `require_end`, `token_text`, `end_span`, `parse_singleton`, `boundary_comma`
-- parse-fields.md: `take_next` is not required yet; `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
+- parse-fields.md: `consume_token_if`, `consume_group_if`, `require_group`, `spanning` (via `parse_items`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_items`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
 - parse-arguments.md: `take_next`, `spanning` around `parse_value`, `integer`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: `consume_token_if_any`
 - parse-pointers.md: `require_keyword`
 
-A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks (`ItemCursor`, `ChunkStream`), `parse_items`, and `parse_singleton`. If a feature adds a call that is not a method or function listed here, the review adds that method or function to this doc. This doc stays in `refactors/pending`.
+A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_items`, and `parse_singleton`. This doc stays in `refactors/pending`.
