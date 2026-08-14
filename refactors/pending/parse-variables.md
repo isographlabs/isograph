@@ -99,17 +99,32 @@ use crate::{
 /// of its interior. The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableDeclarationList(#[resolve_field] pub Vec<WithSpan<LevelSlot<VariableDeclaration>>>);
+pub struct VariableDeclarationList(#[resolve_field] pub Vec<WithSpan<VariableDeclarationSlot>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum VariableDeclarationSlot {
+    Parsed(ParsedVariableDeclaration),
+    Unparsed(#[resolve_field(parent_variant = VariableDeclarationList)] UnparsedItem),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ParsedVariableDeclaration {
+    #[resolve_field]
+    pub item: WithSpan<VariableDeclaration>,
+    pub trailing: Option<WithSpan<ParseError>>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum VariableDeclaration {
     Declaration(DeclaredVariable),
 }
 
 /// `$name: Type = default`. The dollar's position answers this node.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct DeclaredVariable {
     pub dollar: WithSpan<Dollar>,
     #[resolve_field(parent_variant = Declaration)]
@@ -164,8 +179,14 @@ pub enum TypeAnnotationParent<'a> {
 pub type VariableDeclarationListPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationList, ClientFieldDeclarationPath<'a>>;
 
+pub type VariableDeclarationSlotPath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationSlot, VariableDeclarationListPath<'a>>;
+
+pub type ParsedVariableDeclarationPath<'a> =
+    PositionResolutionPath<&'a ParsedVariableDeclaration, VariableDeclarationSlotPath<'a>>;
+
 pub type DeclaredVariablePath<'a> =
-    PositionResolutionPath<&'a DeclaredVariable, VariableDeclarationListPath<'a>>;
+    PositionResolutionPath<&'a DeclaredVariable, ParsedVariableDeclarationPath<'a>>;
 
 pub type NamedTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NamedTypeAnnotation, TypeAnnotationParent<'a>>;
@@ -208,15 +229,6 @@ pub enum ConstantValueParent<'a> {
 }
 ```
 
-```rust
-// from crates/isograph_parser/src/variables.rs
-impl<'a> From<VariableDeclarationListPath<'a>> for UnparsedItemParent<'a> {
-    fn from(path: VariableDeclarationListPath<'a>) -> Self {
-        UnparsedItemParent::VariableDeclarationList(path)
-    }
-}
-```
-
 The parse functions:
 
 ```rust
@@ -227,7 +239,14 @@ pub(crate) fn consume_variable_declaration_list(
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     Some(WithSpan::new(
         VariableDeclarationList(
-            group.item.children.item.parse_items_with_trailing(cursor.text(), parse_variable_declaration),
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_variable_declaration)
+                .into_iter()
+                .map(WithSpan::<VariableDeclarationSlot>::from)
+                .collect(),
         ),
         group.location,
     ))
@@ -366,15 +385,15 @@ pub(crate) fn collect_variable_errors(
     let Some(declarations) = declarations else {
         return;
     };
-    for declaration in &declarations.item.0 {
-        collect_slot_errors(&declarations.item.0, |declaration, errors| match declaration {
+    collect_variable_declaration_slot_errors(&declarations.item.0, |declaration, errors| {
+        match declaration {
             VariableDeclaration::Declaration(declared) => {
                 if let Some(default) = &declared.default_value {
                     crate::collect_constant_value_errors(&default.item, errors);
                 }
             }
-        }, errors);
-    }
+        }
+    }, errors);
 }
 ```
 
@@ -385,6 +404,7 @@ pub(crate) fn collect_variable_errors(
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     VariableDeclarationList(VariableDeclarationListPath<'a>),
+    ParsedVariableDeclaration(ParsedVariableDeclarationPath<'a>),
     DeclaredVariable(DeclaredVariablePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
@@ -426,9 +446,9 @@ Extending the parse_iso_literal.rs test module.
             .expect("the fixture's declaration carries variable definitions")
     }
 
-    fn as_declared(slot: &LevelSlot<VariableDeclaration>) -> &DeclaredVariable {
+    fn as_declared(slot: &VariableDeclarationSlot) -> &DeclaredVariable {
         match slot {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            VariableDeclarationSlot::Parsed(parsed) => match &parsed.item.item {
                 VariableDeclaration::Declaration(declared) => declared,
             },
             slot => panic!("expected a declared variable, got {slot:?}"),
@@ -487,7 +507,7 @@ Extending the parse_iso_literal.rs test module.
         let shallow = "field Query.Foo($limit: Int = $other) { bar }";
         let parse = parsed(shallow);
         let unparsed = match &variables_of(&parse).item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(
@@ -499,7 +519,7 @@ Extending the parse_iso_literal.rs test module.
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
         let parse = parsed(deep);
         let unparsed = match &variables_of(&parse).item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(unparsed.location, span_of(deep, "$pet"));
@@ -512,7 +532,7 @@ Extending the parse_iso_literal.rs test module.
         let variables = variables_of(&parse);
         assert_eq!(variables.item.0.len(), 4);
         let missing_colon = match &variables.item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(
@@ -521,7 +541,7 @@ Extending the parse_iso_literal.rs test module.
         );
         assert_eq!(missing_colon.location, span_of(text, "Int"));
         let missing_type = match &variables.item.0[1].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(
@@ -529,7 +549,7 @@ Extending the parse_iso_literal.rs test module.
             expected(Expectation::TypeAnnotation, Found::EndOfChunk)
         );
         let dollarless = match &variables.item.0[2].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(
@@ -545,7 +565,7 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo($pets: [Pet,]) { bar }";
         let parse = parsed(text);
         let unparsed = match &variables_of(&parse).item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(
@@ -560,7 +580,7 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
         let parse = parsed(text);
         let unparsed = match &variables_of(&parse).item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed.reason,
+            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
         assert_eq!(

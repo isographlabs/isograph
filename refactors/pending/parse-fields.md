@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `LevelSlot` / `UnparsedItem`, `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
+Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `SelectionSlot` / `UnparsedItem`, `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
 
 ## The grammar this doc accepts
 
@@ -16,7 +16,7 @@ The brace group is required and is the last item of the chunk. Each contentful c
 [<Identifier> :] <Identifier> [<brace group>]
 ```
 
-The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. A selection chunk that fails to parse becomes `LevelSlot::Unparsed`, holding the reason and its chunk; leftover after a successful selection is `ParsedSlot::trailing`. Sibling selections and the declaration parse normally. Declaration-header failures still degrade the whole literal, as in parse-entrypoint.md.
+The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. A selection chunk that fails to parse becomes `SelectionSlot::Unparsed`, holding the reason and its chunk; leftover after a successful selection is `ParsedSelection::trailing`. Sibling selections and the declaration parse normally. Declaration-header failures still degrade the whole literal, as in parse-entrypoint.md.
 
 ## Changes to chunk.rs
 
@@ -237,24 +237,40 @@ use span::{Span, WithSpan};
 
 use crate::{
     BracketKind, Chunk, ClientFieldDeclarationPath, Expectation, IsographResolutionNode,
-    ItemCursor, LevelSlot, NonBracketTokenKind, ParseError, UnparsedItem, UnparsedItemParent,
+    ItemCursor, LevelSlot, NonBracketTokenKind, ParseError, ParsedSlot, SelectionSlot,
+    UnparsedItem, UnparsedItemParent,
 };
 
 /// The selections a `{ ... }` group holds, one per chunk of its interior.
 /// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<LevelSlot<Selection>>>);
+pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum SelectionSlot {
+    Parsed(ParsedSelection),
+    Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ParsedSelection {
+    #[resolve_field]
+    pub item: WithSpan<Selection>,
+    pub trailing: Option<WithSpan<ParseError>>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
     Scalar(ScalarSelection),
     Object(ObjectSelection),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ScalarSelection {
     #[resolve_field(parent_variant = Scalar)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
@@ -263,7 +279,7 @@ pub struct ScalarSelection {
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectSelection {
     #[resolve_field(parent_variant = Object)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
@@ -304,9 +320,13 @@ pub enum SelectionAliasParent<'a> {
 
 pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, SelectionSetParent<'a>>;
 
-pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, SelectionSetPath<'a>>;
+pub type SelectionSlotPath<'a> = PositionResolutionPath<&'a SelectionSlot, SelectionSetPath<'a>>;
 
-pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, SelectionSetPath<'a>>;
+pub type ParsedSelectionPath<'a> = PositionResolutionPath<&'a ParsedSelection, SelectionSlotPath<'a>>;
+
+pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, ParsedSelectionPath<'a>>;
+
+pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, ParsedSelectionPath<'a>>;
 
 pub type UnparsedItemPath<'a> = PositionResolutionPath<&'a UnparsedItem, UnparsedItemParent<'a>>;
 
@@ -315,7 +335,7 @@ pub type SelectionNamePath<'a> = PositionResolutionPath<&'a SelectionName, Selec
 pub type SelectionAliasPath<'a> = PositionResolutionPath<&'a SelectionAlias, SelectionAliasParent<'a>>;
 ```
 
-`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, and the `LevelSlot` `ResolvePosition` blanket are the listings in parsing-standards.md; they land here.
+`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `SelectionSlot`, `ParsedSelection`, and the `From<WithSpan<LevelSlot<Selection>>>` conversion are the listings in parsing-standards.md; they land here.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -324,15 +344,6 @@ pub enum UnparsedItemParent<'a> {
     SelectionSet(SelectionSetPath<'a>),
     // parse-arguments.md adds ArgumentList and ObjectLiteral,
     // parse-variables.md adds VariableDeclarationList
-}
-```
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-impl<'a> From<SelectionSetPath<'a>> for UnparsedItemParent<'a> {
-    fn from(path: SelectionSetPath<'a>) -> Self {
-        UnparsedItemParent::SelectionSet(path)
-    }
 }
 ```
 
@@ -347,7 +358,16 @@ pub(crate) fn require_selection_set(
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
     Ok(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
+        SelectionSet(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .into_iter()
+                .map(WithSpan::<SelectionSlot>::from)
+                .collect(),
+        ),
         group.location,
     ))
 }
@@ -355,7 +375,16 @@ pub(crate) fn require_selection_set(
 fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
     Some(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
+        SelectionSet(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .into_iter()
+                .map(WithSpan::<SelectionSlot>::from)
+                .collect(),
+        ),
         group.location,
     ))
 }
@@ -387,7 +416,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
 }
 ```
 
-`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSlot::trailing`.
+`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSelection::trailing`.
 
 ## The errors
 
@@ -417,7 +446,7 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
-    collect_slot_errors(&selection_set.0, |selection, errors| match selection {
+    collect_selection_slot_errors(&selection_set.0, |selection, errors| match selection {
         Selection::Scalar(_) => {}
         Selection::Object(object) => {
             collect_selection_set_errors(&object.selection_set.item, errors)
@@ -439,18 +468,39 @@ pub(crate) fn collect_selection_set_errors(
     SelectionName(SelectionNamePath<'a>),
     SelectionAlias(SelectionAliasPath<'a>),
     UnparsedItem(UnparsedItemPath<'a>),
+    ParsedSelection(ParsedSelectionPath<'a>),
 ```
 
 Positions on a chunk's trailing separator inside a parsed selection set answer the `SelectionSet` leaf: a parsed item's span covers only its chunk's contents, so the separator falls through to the container. The chunk-stage `ChunkSeparator` leaf remains reachable only inside unparsed regions.
 
 ## Generated code
 
-The novel shapes, expanded. The enum delegates two variants and wraps the third's parent:
+The novel shapes, expanded. `SelectionSlot` delegates `Parsed` and wraps `Unparsed`'s parent:
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl ::resolve_position::ResolvePosition for SelectionSlot {
+    type Parent<'a> = SelectionSetPath<'a>;
+    type ResolvedNode<'a> = IsographResolutionNode<'a>;
+
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
+        match self {
+            SelectionSlot::Parsed(inner) => inner.resolve(parent, position),
+            SelectionSlot::Unparsed(inner) => inner.resolve(
+                <UnparsedItem as ::resolve_position::ResolvePosition>::Parent::SelectionSet(parent.into()),
+                position,
+            ),
+        }
+    }
+}
+```
+
+The enum delegates two variants:
 
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
 impl ::resolve_position::ResolvePosition for Selection {
-    type Parent<'a> = SelectionSetPath<'a>;
+    type Parent<'a> = ParsedSelectionPath<'a>;
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
@@ -505,7 +555,7 @@ The object selection's set field boxes on the way in:
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
 impl ::resolve_position::ResolvePosition for ObjectSelection {
-    type Parent<'a> = SelectionSetPath<'a>;
+    type Parent<'a> = ParsedSelectionPath<'a>;
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
@@ -543,13 +593,13 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         }
     }
 
-    fn selections(selection_set: &WithSpan<SelectionSet>) -> &[WithSpan<LevelSlot<Selection>>] {
+    fn selections(selection_set: &WithSpan<SelectionSet>) -> &[WithSpan<SelectionSlot>] {
         &selection_set.item.0
     }
 
-    fn as_scalar(slot: &LevelSlot<Selection>) -> &ScalarSelection {
+    fn as_scalar(slot: &SelectionSlot) -> &ScalarSelection {
         match slot {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
                 Selection::Scalar(scalar) => scalar,
                 selection => panic!("expected a scalar selection, got {selection:?}"),
             },
@@ -557,9 +607,9 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         }
     }
 
-    fn as_object(slot: &LevelSlot<Selection>) -> &ObjectSelection {
+    fn as_object(slot: &SelectionSlot) -> &ObjectSelection {
         match slot {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
                 Selection::Object(object) => object,
                 selection => panic!("expected an object selection, got {selection:?}"),
             },
@@ -567,16 +617,16 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         }
     }
 
-    fn as_unparsed_item(slot: &LevelSlot<Selection>) -> &UnparsedItem {
+    fn as_unparsed_item(slot: &SelectionSlot) -> &UnparsedItem {
         match slot {
-            LevelSlot::Unparsed(unparsed) => unparsed,
+            SelectionSlot::Unparsed(unparsed) => unparsed,
             slot => panic!("expected an unparsed item, got {slot:?}"),
         }
     }
 
-    fn trailing_of(slot: &LevelSlot<Selection>) -> WithSpan<ParseError> {
+    fn trailing_of(slot: &SelectionSlot) -> WithSpan<ParseError> {
         match slot {
-            LevelSlot::Parsed(parsed) => parsed
+            SelectionSlot::Parsed(parsed) => parsed
                 .trailing
                 .expect("the fixture's selection carries trailing leftover"),
             slot => panic!("expected a parsed slot with trailing, got {slot:?}"),
@@ -872,6 +922,6 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 
 ## Landing checklist
 
-1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, the `LevelSlot` blanket, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
+1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `ParsedSlot`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
 2. selections.rs, the parse_iso_literal.rs and parse_error.rs changes, the `ItemCursor` methods this doc adds (`consume_group_if`, `require_group`, `spanning`), the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

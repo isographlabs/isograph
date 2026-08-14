@@ -27,7 +27,7 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-An argument or entry chunk that fails becomes `LevelSlot::Unparsed`; leftover after a successful argument is `ParsedSlot::trailing`. Siblings parse normally.
+An argument or entry chunk that fails becomes `ArgumentSlot::Unparsed` or `ObjectEntrySlot::Unparsed`; leftover after a successful argument is `ParsedArgument::trailing`. Siblings parse normally.
 
 ## Changes to parse_error.rs
 
@@ -87,23 +87,39 @@ use span::{Span, WithSpan};
 
 use crate::{
     BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, ItemCursor,
-    LevelSlot, NonBracketTokenKind, ObjectSelectionPath, ParseError, ScalarSelectionPath,
+    ArgumentSlot, LevelSlot, NonBracketTokenKind, ObjectSelectionPath, ParseError,
+    ScalarSelectionPath, SelectionSlot,
 };
 
 /// The arguments a `( ... )` group holds, one per contentful chunk of its interior.
 /// The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<LevelSlot<Argument>>>);
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<ArgumentSlot>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ArgumentSlot {
+    Parsed(ParsedArgument),
+    Unparsed(#[resolve_field(parent_variant = ArgumentList)] UnparsedItem),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ParsedArgument {
+    #[resolve_field]
+    pub item: WithSpan<Argument>,
+    pub trailing: Option<WithSpan<ParseError>>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Argument {
     Named(NamedArgument),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedArgument {
     #[resolve_field]
     pub name: WithSpan<ArgumentName>,
@@ -164,16 +180,31 @@ pub struct NullValue;
 /// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<LevelSlot<ObjectEntry>>>);
+pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ObjectEntrySlot {
+    Parsed(ParsedObjectEntry),
+    Unparsed(#[resolve_field(parent_variant = ObjectLiteral)] UnparsedItem),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ParsedObjectEntry {
+    #[resolve_field]
+    pub item: WithSpan<ObjectEntry>,
+    pub trailing: Option<WithSpan<ParseError>>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ObjectEntry {
     Named(NamedObjectEntry),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedObjectEntry {
     #[resolve_field]
     pub name: WithSpan<ObjectEntryName>,
@@ -215,7 +246,11 @@ pub enum NonConstantValueParent<'a> {
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
-pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ArgumentListPath<'a>>;
+pub type ArgumentSlotPath<'a> = PositionResolutionPath<&'a ArgumentSlot, ArgumentListPath<'a>>;
+
+pub type ParsedArgumentPath<'a> = PositionResolutionPath<&'a ParsedArgument, ArgumentSlotPath<'a>>;
+
+pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ParsedArgumentPath<'a>>;
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
 
@@ -229,7 +264,11 @@ pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantVa
 
 pub type ObjectLiteralPath<'a> = PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
-pub type NamedObjectEntryPath<'a> = PositionResolutionPath<&'a NamedObjectEntry, ObjectLiteralPath<'a>>;
+pub type ObjectEntrySlotPath<'a> = PositionResolutionPath<&'a ObjectEntrySlot, ObjectLiteralPath<'a>>;
+
+pub type ParsedObjectEntryPath<'a> = PositionResolutionPath<&'a ParsedObjectEntry, ObjectEntrySlotPath<'a>>;
+
+pub type NamedObjectEntryPath<'a> = PositionResolutionPath<&'a NamedObjectEntry, ParsedObjectEntryPath<'a>>;
 
 pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, NamedArgumentPath<'a>>;
 
@@ -238,7 +277,7 @@ pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, Variabl
 pub type ObjectEntryNamePath<'a> = PositionResolutionPath<&'a ObjectEntryName, NamedObjectEntryPath<'a>>;
 ```
 
-`NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`. `UnparsedItemParent` in selections.rs gains the two new list contexts:
+`NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`. `UnparsedItemParent` in chunk.rs gains the two new list contexts:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -247,21 +286,6 @@ pub enum UnparsedItemParent<'a> {
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
     // parse-variables.md adds VariableDeclarationList
-}
-```
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-impl<'a> From<ArgumentListPath<'a>> for UnparsedItemParent<'a> {
-    fn from(path: ArgumentListPath<'a>) -> Self {
-        UnparsedItemParent::ArgumentList(path)
-    }
-}
-
-impl<'a> From<ObjectLiteralPath<'a>> for UnparsedItemParent<'a> {
-    fn from(path: ObjectLiteralPath<'a>) -> Self {
-        UnparsedItemParent::ObjectLiteral(path)
-    }
 }
 ```
 
@@ -274,7 +298,16 @@ pub(crate) fn consume_argument_list(
 ) -> Option<WithSpan<ArgumentList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     Some(WithSpan::new(
-        ArgumentList(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_argument)),
+        ArgumentList(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_argument)
+                .into_iter()
+                .map(WithSpan::<ArgumentSlot>::from)
+                .collect(),
+        ),
         group.location,
     ))
 }
@@ -367,18 +400,15 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
-    for selection in &selection_set.0 {
-        match &selection.item {
-            Selection::Scalar(scalar) => {
-                collect_argument_errors(&scalar.arguments, errors);
-            }
-            Selection::Object(object) => {
-                collect_argument_errors(&object.arguments, errors);
-                collect_selection_set_errors(&object.selection_set.item, errors);
-            }
-            Selection::Unparsed(unparsed) => errors.push(unparsed.reason),
+    collect_selection_slot_errors(&selection_set.0, |selection, errors| match selection {
+        Selection::Scalar(scalar) => {
+            collect_argument_errors(&scalar.arguments, errors);
         }
-    }
+        Selection::Object(object) => {
+            collect_argument_errors(&object.arguments, errors);
+            collect_selection_set_errors(&object.selection_set.item, errors);
+        }
+    }, errors);
 }
 ```
 
@@ -391,7 +421,7 @@ pub(crate) fn collect_argument_errors(
     let Some(arguments) = arguments else {
         return;
     };
-    collect_slot_errors(&arguments.item.0, |argument, errors| match argument {
+    collect_argument_slot_errors(&arguments.item.0, |argument, errors| match argument {
         Argument::Named(named) => collect_value_errors(&named.value.item, errors),
     }, errors);
 }
@@ -403,7 +433,7 @@ pub(crate) fn collect_value_errors(
     let NonConstantValue::Object(object) = value else {
         return;
     };
-    collect_slot_errors(&object.0, |entry, errors| match entry {
+    collect_object_entry_slot_errors(&object.0, |entry, errors| match entry {
         ObjectEntry::Named(named) => collect_value_errors(&named.value.item, errors),
     }, errors);
 }
@@ -416,6 +446,7 @@ pub(crate) fn collect_value_errors(
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     ArgumentList(ArgumentListPath<'a>),
+    ParsedArgument(ParsedArgumentPath<'a>),
     NamedArgument(NamedArgumentPath<'a>),
     ArgumentName(ArgumentNamePath<'a>),
     VariableUse(VariableUsePath<'a>),
@@ -425,6 +456,7 @@ pub(crate) fn collect_value_errors(
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
+    ParsedObjectEntry(ParsedObjectEntryPath<'a>),
     NamedObjectEntry(NamedObjectEntryPath<'a>),
     ObjectEntryName(ObjectEntryNamePath<'a>),
 ```
@@ -496,9 +528,9 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
-    fn arguments_of(slot: &LevelSlot<Selection>) -> &WithSpan<ArgumentList> {
+    fn arguments_of(slot: &SelectionSlot) -> &WithSpan<ArgumentList> {
         let arguments = match slot {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
                 Selection::Scalar(scalar) => &scalar.arguments,
                 Selection::Object(object) => &object.arguments,
             },
@@ -507,9 +539,9 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         arguments.as_ref().expect("the fixture's selection carries arguments")
     }
 
-    fn as_named_argument(slot: &LevelSlot<Argument>) -> &NamedArgument {
+    fn as_named_argument(slot: &ArgumentSlot) -> &NamedArgument {
         match slot {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            ArgumentSlot::Parsed(parsed) => match &parsed.item.item {
                 Argument::Named(named) => named,
             },
             slot => panic!("expected a named argument, got {slot:?}"),
@@ -570,7 +602,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         };
         assert_eq!(object.0.len(), 2);
         let nested = match &object.0[1].item {
-            LevelSlot::Parsed(parsed) => match &parsed.item {
+            ObjectEntrySlot::Parsed(parsed) => match &parsed.item.item {
                 ObjectEntry::Named(named) => named,
             },
             entry => panic!("expected a named entry, got {entry:?}"),
@@ -592,7 +624,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed,
+            ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(unparsed.reason.item, ParseError::IntegerDoesNotFitI64);
@@ -607,7 +639,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed,
+            ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(
@@ -623,7 +655,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            LevelSlot::Unparsed(unparsed) => unparsed,
+            ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(

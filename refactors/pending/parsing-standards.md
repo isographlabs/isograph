@@ -396,76 +396,96 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. The comma uses the same `end_expectation`. The index into `.0` is in this module.
 
-### `LevelSlot` and `ResolvePosition`
+`LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives.
 
-A position in `Parsed` is resolved by `T::resolve`. A position in `Unparsed` is resolved by `UnparsedItem::resolve`. `trailing` has no `#[resolve_field]`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl<T> ResolvePosition for LevelSlot<T>
-where
-    T: ResolvePosition,
-    for<'a> UnparsedItemParent<'a>: From<T::Parent<'a>>,
-{
-    type Parent<'a>
-        = T::Parent<'a>
-    where
-        Self: 'a;
-    type ResolvedNode<'a>
-        = T::ResolvedNode<'a>
-    where
-        Self: 'a;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a> {
-        match self {
-            LevelSlot::Parsed(parsed) => parsed.item.resolve(parent, position),
-            LevelSlot::Unparsed(unparsed) => unparsed.resolve(UnparsedItemParent::from(parent), position),
-        }
-    }
-}
-```
-
-Each list path converts into `UnparsedItemParent`:
+### Concrete slots
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-impl<'a> From<SelectionSetPath<'a>> for UnparsedItemParent<'a> {
-    fn from(path: SelectionSetPath<'a>) -> Self {
-        UnparsedItemParent::SelectionSet(path)
-    }
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum SelectionSlot {
+    Parsed(ParsedSelection),
+    Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
 }
-```
 
-The same `From` exists for `ArgumentListPath`, `ObjectLiteralPath`, and `VariableDeclarationListPath`, each landing with that list.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ParsedSelection {
+    #[resolve_field]
+    pub item: WithSpan<Selection>,
+    pub trailing: Option<WithSpan<ParseError>>,
+}
 
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<LevelSlot<Selection>>>);
+pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
     Scalar(ScalarSelection),
     Object(ObjectSelection),
 }
 ```
 
-### Errors from slots
+`ArgumentSlot` / `ParsedArgument`, `ObjectEntrySlot` / `ParsedObjectEntry`, `ConstantObjectEntrySlot` / `ParsedConstantObjectEntry`, and `VariableDeclarationSlot` / `ParsedVariableDeclaration` are the same shape, each with that list's path as `parent_type` and `parent_variant` on `Unparsed`.
 
 ```rust
-// from crates/isograph_parser/src/chunk.rs
-pub(crate) fn collect_slot_errors<T>(
-    slots: &[WithSpan<LevelSlot<T>>],
-    nested: impl Fn(&T, &mut Vec<WithSpan<ParseError>>),
+// from crates/isograph_parser/src/selections.rs
+impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
+    fn from(slot: WithSpan<LevelSlot<Selection>>) -> Self {
+        let location = slot.location;
+        let item = match slot.item {
+            LevelSlot::Parsed(ParsedSlot { item, trailing }) => {
+                SelectionSlot::Parsed(ParsedSelection {
+                    item: WithSpan::new(item, location),
+                    trailing,
+                })
+            }
+            LevelSlot::Unparsed(unparsed) => SelectionSlot::Unparsed(unparsed),
+        };
+        WithSpan::new(item, location)
+    }
+}
+```
+
+The same `From` exists per list. A list site maps the combinator output:
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+        SelectionSet(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .into_iter()
+                .map(WithSpan::<SelectionSlot>::from)
+                .collect(),
+        )
+```
+
+`UnparsedItemParent` is the parent of `UnparsedItem`. The derive's `parent_variant` wraps the list path. There is no `From` into `UnparsedItemParent`.
+
+### Errors from slots
+
+`collect_slot_errors` is one function per list. The selection-set copy:
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub(crate) fn collect_selection_slot_errors(
+    slots: &[WithSpan<SelectionSlot>],
+    nested: impl Fn(&Selection, &mut Vec<WithSpan<ParseError>>),
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
     for slot in slots {
         match &slot.item {
-            LevelSlot::Parsed(parsed) => {
-                nested(&parsed.item, errors);
+            SelectionSlot::Parsed(parsed) => {
+                nested(&parsed.item.item, errors);
                 if let Some(trailing) = parsed.trailing {
                     errors.push(trailing);
                 }
             }
-            LevelSlot::Unparsed(unparsed) => errors.push(unparsed.reason),
+            SelectionSlot::Unparsed(unparsed) => errors.push(unparsed.reason),
         }
     }
 }
@@ -489,7 +509,16 @@ pub(crate) fn consume_selection_set(
 ) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
     Some(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
+        SelectionSet(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .into_iter()
+                .map(WithSpan::<SelectionSlot>::from)
+                .collect(),
+        ),
         group.location,
     ))
 }
@@ -499,7 +528,16 @@ pub(crate) fn require_selection_set(
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
     Ok(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
+        SelectionSet(
+            group
+                .item
+                .children
+                .item
+                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .into_iter()
+                .map(WithSpan::<SelectionSlot>::from)
+                .collect(),
+        ),
         group.location,
     ))
 }
@@ -560,7 +598,10 @@ pub(crate) fn parse_value(
                     .item
                     .children
                     .item
-                    .parse_items_with_trailing(cursor.text(), parse_object_entry),
+                    .parse_items_with_trailing(cursor.text(), parse_object_entry)
+                    .into_iter()
+                    .map(WithSpan::<ObjectEntrySlot>::from)
+                    .collect(),
             )));
         }
         Err(cursor.expected(Expectation::Value))
@@ -639,7 +680,7 @@ pub enum Boolean {
     False,
 }
 
-pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<LevelSlot<ObjectEntry>>>);
+pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
 
 pub enum ObjectEntry {
     Named(NamedObjectEntry),
@@ -652,7 +693,7 @@ pub struct NamedObjectEntry {
     pub value: WithSpan<NonConstantValue>,
 }
 
-pub struct ConstantObjectLiteral(#[resolve_field] pub Vec<WithSpan<LevelSlot<ConstantObjectEntry>>>);
+pub struct ConstantObjectLiteral(#[resolve_field] pub Vec<WithSpan<ConstantObjectEntrySlot>>);
 
 pub enum ConstantObjectEntry {
     Named(NamedConstantObjectEntry),
@@ -709,7 +750,10 @@ pub(crate) fn parse_constant_value(
                     .item
                     .children
                     .item
-                    .parse_items_with_trailing(cursor.text(), parse_constant_object_entry),
+                    .parse_items_with_trailing(cursor.text(), parse_constant_object_entry)
+                    .into_iter()
+                    .map(WithSpan::<ConstantObjectEntrySlot>::from)
+                    .collect(),
             )));
         }
         Err(cursor.expected(Expectation::ConstantValue))
@@ -761,9 +805,9 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSlot::trailing`). `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
+Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
 
-A failed list chunk is `LevelSlot::Unparsed`; sibling chunks are parsed. A failed declaration is `UnparsedLiteral`. One reason per those regions. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+A failed list chunk is the concrete slot's `Unparsed` variant; sibling chunks are parsed. A failed declaration is `UnparsedLiteral`. One reason per those regions. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
@@ -775,7 +819,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 A tree enum is wrapped in `WithSpan` at its slot. Variant payloads are bare. Each struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
 
-`ResolvePosition` is derived. The two blanket delegations are `Box<T>` (parse-variables.md) and `LevelSlot<T>` above. A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedLiteral` and `UnparsedItem`.
+`ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedLiteral` and `UnparsedItem`.
 
 ## Performance
 
@@ -798,7 +842,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` via `boundary_comma`
-- Leftover after a list item: `ParsedSlot::trailing`
+- Leftover after a list item: `ParsedSelection::trailing` (and the other `Parsed*` trailing fields)
 - Leftover after a singleton: `parse_singleton`'s `require_end`
 - Group interior: `require_group` / `consume_group_if`, then `parse_items_with_trailing` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
@@ -808,7 +852,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 Each method lands with the feature doc of its first caller.
 
 - parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `consume_token_if`, `require_token`, `expected`, `require_end`, `text`, `token_text`, `parse_singleton`, `boundary_comma`, `ChunkedLevel::len`
-- parse-fields.md: `consume_group_if`, `require_group`, `spanning` (via `parse_chunk`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
+- parse-fields.md: `consume_group_if`, `require_group`, `spanning` (via `parse_chunk`), `contents_span`, `LevelSlot`, `ParsedSlot`, `SelectionSlot`, `ParsedSelection`, `UnparsedItem`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `collect_selection_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
 - parse-arguments.md: `parse_value`, `spanning` around `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`

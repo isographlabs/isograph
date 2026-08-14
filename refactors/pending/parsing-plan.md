@@ -58,7 +58,7 @@ A boundary is a chunk's trailing separator run. The model: line breaks are swall
 
 ## The error model
 
-Every literal yields a tree; the parse never fails to return one. Malformed regions degrade to unparsed nodes that hold the reason and the chunk-stage data they cover, so every error is representable in the tree and every position inside a degraded region still resolves. Leftover after a successful list item is `ParsedSlot::trailing`. `errors()` on the result collects the reasons in source order; there is no error list beside the tree.
+Every literal yields a tree; the parse never fails to return one. Malformed regions degrade to unparsed nodes that hold the reason and the chunk-stage data they cover, so every error is representable in the tree and every position inside a degraded region still resolves. Leftover after a successful list item is that list's `Parsed*` `trailing` field. `errors()` on the result collects the reasons in source order; there is no error list beside the tree.
 
 There is one error enum, `ParseError`, and its workhorse variant is generic, in the shape of upstream's token errors:
 
@@ -86,7 +86,7 @@ A reason is a `WithSpan<ParseError>`; the span points at the offending item, or 
 Failure granularity starts coarse and refines:
 
 - parse-entrypoint.md: any failure produces `UnparsedLiteral`, which stores the reason and the entire root `ChunkedLevel`. `parse_singleton` returns those errors: empty literal, extra chunk, leftover, trailing comma.
-- parse-fields.md introduces per-item degradation with `LevelSlot`: a list chunk that fails to parse becomes `LevelSlot::Unparsed` holding its cloned chunk; leftover after a successful item is `ParsedSlot::trailing`. Siblings parse normally. Declaration-header errors keep degrading the whole literal.
+- parse-fields.md introduces per-item degradation with `SelectionSlot`: a list chunk that fails to parse becomes `SelectionSlot::Unparsed` holding its cloned chunk; leftover after a successful item is `ParsedSelection::trailing`. Siblings parse normally. Declaration-header errors keep degrading the whole literal.
 
 ## The resolution surface
 
@@ -105,11 +105,13 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 
 ## The docs, in order
 
-parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins:
+parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
+
+`resolve-position-generic-slot.md` is a `resolve_position_macros` prefactor that makes `LevelSlot<T>` derivable. The series below uses one concrete slot enum per list.
 
 0. `chunk-contents-nonempty.md`. `Chunk::contents` and `ChunkSeparator` become `nonempty::NonEmpty`. A comma no item precedes is already a `CommaWithoutItem`; this doc makes the empty-contents state unrepresentable.
 1. `parse-entrypoint.md`. The skeleton: `ItemCursor` / `ChunkStream`, `parse_singleton`, `parse_iso_literal`, keyword dispatch, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
-2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections, `LevelSlot` / `parse_items` / `parse_items_with_trailing`, and the parent-enum conversions second parents force. Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group after a selection name is that selection's trailing leftover until the next doc.
+2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections, `SelectionSlot` / `parse_items` / `parse_items_with_trailing`, and the parent-enum conversions second parents force. Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group after a selection name is that selection's trailing leftover until the next doc.
 3. `parse-arguments.md`. Argument lists on selections, `name: value` pairs, and values: variable, string, integer (with the `i64` conversion and `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals.
 4. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl the recursion needs in `resolve_position`.
 5. `parse-descriptions.md`. The optional description (string or block string) a field declaration carries before its selection set, via two `consume_token_if` calls.
