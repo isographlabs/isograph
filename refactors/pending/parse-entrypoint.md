@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `ChunkedLevel::chunks`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
 
 ## The grammar
 
@@ -163,7 +163,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_declaration` returns after the last identifier. `parse_singleton` matches `chunks()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is `parse_declaration` then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
+`parse_declaration` returns after the last identifier. `parse_singleton` matches `len()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is `parse_declaration` then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -303,7 +303,7 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`ChunkedLevel`'s vec becomes a private field. `len` and `chunks` read it.
+`ChunkedLevel`'s vec becomes a private field. `len` is the chunk count. Tests call `chunks()`.
 
 Before:
 
@@ -323,6 +323,7 @@ impl ChunkedLevel {
         self.0.len()
     }
 
+    #[cfg(test)]
     pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
         &self.0
     }

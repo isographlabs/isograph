@@ -240,7 +240,7 @@ impl Chunk {
 
 ## Lists and one-item levels
 
-`ChunkedLevel`'s vec is private to the `chunk` module. `len` and `chunks` read it. `parse_items` maps each chunk to a slot. `parse_items_with_trailing` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior): it matches `len` before it parses.
+`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk to a slot. `parse_items_with_trailing` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior): it matches `len` before it parses. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -353,6 +353,7 @@ impl ChunkedLevel {
         self.0.len()
     }
 
+    #[cfg(test)]
     pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
         &self.0
     }
@@ -366,10 +367,10 @@ pub(crate) fn parse_singleton<'a, T>(
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
     end_expectation: Expectation,
 ) -> Result<T, WithSpan<ParseError>> {
-    match level.item.chunks() {
-        [] => Err(empty()),
-        [_, extra_chunk, ..] => Err(extra(extra_chunk)),
-        [chunk] => {
+    match level.item.len() {
+        0 => Err(empty()),
+        1 => {
+            let chunk = &level.item.0[0];
             let mut stream = chunk.item.stream(text);
             let item = parse(stream.cursor())?;
             stream.require_end(end_expectation)?;
@@ -384,6 +385,7 @@ pub(crate) fn parse_singleton<'a, T>(
             }
             Ok(item)
         }
+        _ => Err(extra(&level.item.0[1])),
     }
 }
 ```
@@ -392,7 +394,7 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_items_with_trailing` is `parse_items` plus `require_end` on each chunk. `Ok` plus `require_end` `Err` is `ParsedSlot::trailing`. List sites call this one. `foo bar` is the selection `foo` (span on `foo`) and a trailing error at `bar`. A position on `bar` resolves to the selection set. `foo bar { baz }` is the scalar `foo` and leftover from `bar` on.
 
-`parse_singleton` matches `chunks()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. The comma uses the same `end_expectation`.
+`parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. The comma uses the same `end_expectation`. The index into `.0` is in this module.
 
 ### `LevelSlot` and `ResolvePosition`
 
@@ -794,7 +796,6 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - List of items, leftover as trailing: `ChunkedLevel::parse_items_with_trailing`
 - One-item context: `parse_singleton`
 - Chunk count: `ChunkedLevel::len`
-- A level's chunks: `ChunkedLevel::chunks`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` via `boundary_comma`
 - Leftover after a list item: `ParsedSlot::trailing`
@@ -806,7 +807,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 
 Each method lands with the feature doc of its first caller.
 
-- parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `consume_token_if`, `require_token`, `expected`, `require_end`, `text`, `token_text`, `parse_singleton`, `boundary_comma`, `ChunkedLevel::len`, `ChunkedLevel::chunks`
+- parse-entrypoint.md: `ItemCursor`, `ChunkStream`, `Chunk::stream`, `consume_token_if`, `require_token`, `expected`, `require_end`, `text`, `token_text`, `parse_singleton`, `boundary_comma`, `ChunkedLevel::len`
 - parse-fields.md: `consume_group_if`, `require_group`, `spanning` (via `parse_chunk`), `contents_span`, `LevelSlot`, `ParsedSlot`, `UnparsedItem`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `collect_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
 - parse-arguments.md: `parse_value`, `spanning` around `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `Chunk::first_item`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`

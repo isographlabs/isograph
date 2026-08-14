@@ -163,7 +163,7 @@ fn parse_pointer(
 }
 ```
 
-`parse_pointer` does not call `require_end`. `parse_singleton` matches `chunks()` first, then on one chunk calls `require_end` and `boundary_comma`.
+`parse_pointer` does not call `require_end`. `parse_singleton` matches `len()` first, then on one chunk calls `require_end` and `boundary_comma`.
 `errors()` gains the pointer arm, mirroring the field arm (the target type contributes nothing: a bad target fails the header, degrading the whole literal):
 
 ```rust
