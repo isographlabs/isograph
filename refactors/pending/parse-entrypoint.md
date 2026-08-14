@@ -107,7 +107,6 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
         parse_declaration,
-        Expectation::EndOfDeclaration,
     ) {
         Ok(parse) => WithSpan::new(parse, location),
         Err(reason) => WithSpan::new(
@@ -296,7 +295,6 @@ pub(crate) fn parse_singleton<'a, T>(
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-    end_expectation: Expectation,
 ) -> Result<T, WithSpan<ParseError>> {
     /* parsing-standards.md */
 }

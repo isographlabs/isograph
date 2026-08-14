@@ -1,6 +1,6 @@
 # no-final-comma: one-item contexts reject a trailing comma
 
-The rule: a comma is meaningful only inside a list, so a one-item context admits no comma. `parse_singleton` (parsing-standards.md) is that check: after the parse function returns `Ok` and the chunk is exhausted, `boundary_comma` is an `Expected(end_expectation, Token(Comma))` error at the comma.
+The rule: a comma is meaningful only inside a list, so a one-item context admits no comma. `parse_singleton` (parsing-standards.md) is that check: after the parse function returns `Ok` and the chunk is exhausted, `boundary_comma` is an `Expected(EndOfDeclaration, Token(Comma))` error at the comma.
 
 The two one-item contexts and the tests that cover them:
 

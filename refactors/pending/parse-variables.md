@@ -330,7 +330,6 @@ fn parse_bracket_interior_type(
             )
         },
         parse_type_annotation,
-        Expectation::EndOfType,
     )
 }
 ```
@@ -570,7 +569,7 @@ Extending the parse_iso_literal.rs test module.
         };
         assert_eq!(
             unparsed.item,
-            expected(Expectation::EndOfType, Found::Token(Comma))
+            expected(Expectation::EndOfDeclaration, Found::Token(Comma))
         );
         assert_eq!(unparsed.location, span_of(text, ","));
     }

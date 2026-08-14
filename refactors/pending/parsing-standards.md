@@ -191,7 +191,6 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
         parse_declaration,
-        Expectation::EndOfDeclaration,
     ) {
         Ok(parse) => WithSpan::new(parse, location),
         Err(reason) => WithSpan::new(
@@ -364,7 +363,6 @@ pub(crate) fn parse_singleton<'a, T>(
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-    end_expectation: Expectation,
 ) -> Result<T, WithSpan<ParseError>> {
     match level.item.len() {
         0 => Err(empty()),
@@ -373,12 +371,12 @@ pub(crate) fn parse_singleton<'a, T>(
             let mut stream = chunk.item.stream(text);
             let item = parse(stream.cursor())?;
             if stream.require_end().is_err() {
-                return Err(stream.cursor().expected(end_expectation));
+                return Err(stream.cursor().expected(Expectation::EndOfDeclaration));
             }
             if let Some(comma) = chunk.item.boundary_comma() {
                 return Err(WithSpan::new(
                     ParseError::expected(
-                        end_expectation,
+                        Expectation::EndOfDeclaration,
                         Found::Token(NonBracketTokenKind::Comma),
                     ),
                     comma,
@@ -395,7 +393,7 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_items_with_trailing` is `parse_items` plus `require_end` on each chunk. `Ok` plus `require_end` `Err` is `ParsedSlot::trailing`. List sites call this one. `foo bar` is the selection `foo` (span on `foo`) and a trailing error at `bar`. A position on `bar` resolves to the selection set. `foo bar { baz }` is the scalar `foo` and leftover from `bar` on.
 
-`parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. The comma uses the same `end_expectation`. The index into `.0` is in this module.
+`parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. Leftover and the comma use `Expectation::EndOfDeclaration`. The index into `.0` is in this module.
 
 `LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives.
 
