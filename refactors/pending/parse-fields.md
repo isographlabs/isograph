@@ -199,7 +199,7 @@ fn parse_field(
 }
 ```
 
-`parse_field` does not call `require_end`. `parse_singleton` calls `require_end`, checks `boundary_comma`, and returns `Err` on a second chunk. `errors()` gains the field arm (listed with `collect_selection_set_errors` below).
+`parse_field` does not call `require_end`. `parse_singleton` matches `chunks()` first, then on one chunk calls `require_end` and `boundary_comma`. `errors()` gains the field arm (listed with `collect_selection_set_errors` below).
 
 The two names' parents become enums, since a name now sits under an entrypoint or a field declaration. Before:
 

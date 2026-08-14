@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `ChunkedLevel::chunks`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
 
 ## The grammar
 
@@ -168,7 +168,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_declaration` returns after the last identifier. `parse_singleton` then calls `require_end`, checks `boundary_comma`, and applies `empty` / `extra`. An incomplete declaration on the first chunk (`entrypoint\nQuery.foo`) returns that chunk's `Err` (`Expected(Identifier, EndOfChunk)`). A complete declaration plus another chunk (`entrypoint Query.foo\nfield User.name`) returns `MultipleDeclarations`.
+`parse_declaration` returns after the last identifier. `parse_singleton` matches `chunks()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is `parse_declaration` then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -304,27 +304,11 @@ pub(crate) fn parse_singleton<'a, T>(
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
     end_expectation: Expectation,
 ) -> Result<T, WithSpan<ParseError>> {
-    let mut chunks = level.item.0.iter();
-    let Some(chunk) = chunks.next() else {
-        return Err(empty());
-    };
-    let mut stream = chunk.item.stream(text);
-    let item = parse(stream.cursor())?;
-    stream.require_end(end_expectation)?;
-    if let Some(comma) = chunk.item.boundary_comma() {
-        return Err(WithSpan::new(
-            ParseError::expected(end_expectation, Found::Token(NonBracketTokenKind::Comma)),
-            comma,
-        ));
-    }
-    if let Some(more) = chunks.next() {
-        return Err(extra(more));
-    }
-    Ok(item)
+    /* parsing-standards.md */
 }
 ```
 
-`ChunkedLevel`'s vec becomes a private field. Tests in other modules call `chunks()`.
+`ChunkedLevel`'s vec becomes a private field. `len` and `chunks` read it.
 
 Before:
 
@@ -340,7 +324,10 @@ After:
 pub struct ChunkedLevel(#[resolve_field] Vec<WithSpan<Chunk>>);
 
 impl ChunkedLevel {
-    #[cfg(test)]
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+
     pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
         &self.0
     }
@@ -772,29 +759,28 @@ mod tests {
     }
 
     #[test]
-    fn a_comma_before_a_second_declaration_reports_the_comma() {
+    fn a_comma_before_a_second_declaration_is_multiple_declarations() {
         let text = "entrypoint Query.foo, field User.name";
         assert_unparsed(
             text,
-            expected(EndOfDeclaration, Found::Token(Comma)),
-            span_of(text, ","),
+            ParseError::MultipleDeclarations,
+            span_of(text, "field User.name"),
         );
     }
 
     #[test]
-    fn a_second_contentful_chunk_after_a_complete_declaration_is_an_error() {
+    fn a_second_contentful_chunk_is_multiple_declarations() {
         let text = "entrypoint Query.foo\nfield User.name";
         assert_unparsed(text, ParseError::MultipleDeclarations, span_of(text, "field User.name"));
     }
 
     #[test]
-    fn an_incomplete_declaration_reports_its_own_error_before_the_extra_chunk() {
+    fn two_chunks_are_multiple_declarations_without_parsing_the_first() {
         let text = "entrypoint\nQuery.foo";
-        let keyword_end = span_of(text, "entrypoint").end;
         assert_unparsed(
             text,
-            expected(token(Identifier), Found::EndOfChunk),
-            Span::new(keyword_end, keyword_end),
+            ParseError::MultipleDeclarations,
+            span_of(text, "Query.foo"),
         );
     }
 
