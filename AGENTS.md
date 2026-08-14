@@ -99,6 +99,12 @@ This is distinct from total handling of values the outside world owns. A parse o
 - If a function does not return every variant of an enum, e.g. only a Some, it should not return a value whose type is that enum. Return something narrower instead, e.g. a different enum or T. In some cases, for example when propagating errors, we can return the final type instead of dealing with many intermediate narrower enums. However, even in situations like this, this pattern is an anti-pattern.
 - Always test degenerate cases.
 
+## Result
+
+Do not `match` a `Result` to bind the success value and return or convert the error. Write `let value = expr.map_err(...)?;`.
+
+When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do not `match` on `Ok` / `Err` then.
+
 ## Audits
 
 When told to audit, the deliverable is the whole class fixed everywhere, not the instance that was quoted. Sweep every file the standard touches before reporting done; the failure mode is the user opening the most obvious place and finding the problem still there. An audit that only edits what was pointed at is not an audit.
