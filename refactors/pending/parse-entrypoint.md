@@ -101,19 +101,17 @@ The root is borrowed until the end: on `Err` it moves into `UnparsedLiteral`; on
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
-    match parse_singleton(
+    let parse = parse_singleton(
         &root,
         text,
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
         parse_declaration,
-    ) {
-        Ok(parse) => WithSpan::new(parse, location),
-        Err(reason) => WithSpan::new(
-            IsoLiteralParse::Unparsed(UnparsedLiteral { reason, level: root }),
-            location,
-        ),
-    }
+    )
+    .unwrap_or_else(|reason| {
+        IsoLiteralParse::Unparsed(UnparsedLiteral { reason, level: root })
+    });
+    WithSpan::new(parse, location)
 }
 
 fn parse_declaration(cursor: &mut ItemCursor<'_>) -> Result<IsoLiteralParse, WithSpan<ParseError>> {

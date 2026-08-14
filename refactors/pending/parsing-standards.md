@@ -182,19 +182,17 @@ impl<'a> ItemCursor<'a> {
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
-    match parse_singleton(
+    let parse = parse_singleton(
         &root,
         text,
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
         parse_declaration,
-    ) {
-        Ok(parse) => WithSpan::new(parse, location),
-        Err(reason) => WithSpan::new(
-            IsoLiteralParse::Unparsed(UnparsedLiteral { reason, level: root }),
-            location,
-        ),
-    }
+    )
+    .unwrap_or_else(|reason| {
+        IsoLiteralParse::Unparsed(UnparsedLiteral { reason, level: root })
+    });
+    WithSpan::new(parse, location)
 }
 ```
 
@@ -302,15 +300,19 @@ impl ChunkedLevel {
     ) -> Vec<WithSpan<LevelSlot<P>>> {
         self.0
             .iter()
-            .map(|chunk| match parse_chunk(chunk, text, &parse_item) {
-                (_, Ok(item)) => WithSpan::new(
-                    LevelSlot::Parsed(ParsedSlot {
-                        item: item.item,
-                        trailing: None,
-                    }),
-                    item.location,
-                ),
-                (_, Err(reason)) => unparsed_slot(chunk, reason),
+            .map(|chunk| {
+                let (_, result) = parse_chunk(chunk, text, &parse_item);
+                result
+                    .map(|item| {
+                        WithSpan::new(
+                            LevelSlot::Parsed(ParsedSlot {
+                                item: item.item,
+                                trailing: None,
+                            }),
+                            item.location,
+                        )
+                    })
+                    .unwrap_or_else(|reason| unparsed_slot(chunk, reason))
             })
             .collect()
     }
@@ -324,12 +326,12 @@ impl ChunkedLevel {
             .iter()
             .map(|chunk| {
                 let (mut stream, result) = parse_chunk(chunk, text, &parse_item);
-                match result {
-                    Ok(item) => {
-                        let trailing = match stream.require_end() {
-                            Ok(()) => None,
-                            Err(()) => Some(stream.cursor().expected(Expectation::Separator)),
-                        };
+                result
+                    .map(|item| {
+                        let trailing = stream
+                            .require_end()
+                            .err()
+                            .map(|()| stream.cursor().expected(Expectation::Separator));
                         WithSpan::new(
                             LevelSlot::Parsed(ParsedSlot {
                                 item: item.item,
@@ -337,9 +339,8 @@ impl ChunkedLevel {
                             }),
                             item.location,
                         )
-                    }
-                    Err(reason) => unparsed_slot(chunk, reason),
-                }
+                    })
+                    .unwrap_or_else(|reason| unparsed_slot(chunk, reason))
             })
             .collect()
     }
