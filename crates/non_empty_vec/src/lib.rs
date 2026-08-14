@@ -1,6 +1,5 @@
-use std::iter::{Chain, Once, once};
+use std::iter::once;
 use std::ops::Index;
-use std::slice;
 
 /// A vec with at least one element, by representation: the first element is its own
 /// field, so no emptying operation can exist and `first`/`last` are total.
@@ -35,8 +34,8 @@ impl<T> NonEmptyVec<T> {
         1 + self.rest.len()
     }
 
-    pub fn iter(&self) -> Iter<'_, T> {
-        Iter(once(&self.first).chain(self.rest.iter()))
+    pub fn iter(&self) -> impl Iterator<Item = &T> {
+        once(&self.first).chain(self.rest.iter())
     }
 
     pub fn get(&self, index: usize) -> Option<&T> {
@@ -44,22 +43,6 @@ impl<T> NonEmptyVec<T> {
             0 => Some(&self.first),
             index => self.rest.get(index - 1),
         }
-    }
-}
-
-/// The concrete iterator `iter` returns: `first`, then `rest` in order. It exists as a
-/// named type so a struct field can hold it; an `impl` return type has no name.
-pub struct Iter<'a, T>(Chain<Once<&'a T>, slice::Iter<'a, T>>);
-
-impl<'a, T> Iterator for Iter<'a, T> {
-    type Item = &'a T;
-
-    fn next(&mut self) -> Option<&'a T> {
-        self.0.next()
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        self.0.size_hint()
     }
 }
 
@@ -77,7 +60,7 @@ impl<T> Index<usize> for NonEmptyVec<T> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Iter, NonEmptyVec};
+    use super::NonEmptyVec;
 
     #[test]
     fn a_single_element_is_first_and_last() {
@@ -106,15 +89,5 @@ mod tests {
         assert_eq!(vec[1], 2);
         assert_eq!(vec[2], 3);
         assert_eq!(vec.iter().copied().collect::<Vec<_>>(), vec![1, 2, 3]);
-    }
-
-    #[test]
-    fn iter_is_a_nameable_type() {
-        let mut vec = NonEmptyVec::of(1);
-        vec.push(2);
-        let mut iter: Iter<'_, i32> = vec.iter();
-        assert_eq!(iter.next(), Some(&1));
-        assert_eq!(iter.next(), Some(&2));
-        assert_eq!(iter.next(), None);
     }
 }
