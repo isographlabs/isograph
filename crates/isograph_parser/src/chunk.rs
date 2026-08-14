@@ -1,3 +1,4 @@
+use nonempty::NonEmpty;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
@@ -28,7 +29,7 @@ pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 #[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
-    contents: Vec<WithSpan<ChunkContentItem>>,
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     trailing_separator: Option<WithSpan<ChunkSeparator>>,
 }
@@ -60,7 +61,7 @@ pub struct ChunkedGroup {
 /// tokens are not resolution leaves; a position on any of them answers the separator.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkSeparator(pub Vec<WithSpan<SeparatorToken>>);
+pub struct ChunkSeparator(pub NonEmpty<WithSpan<SeparatorToken>>);
 
 /// The two token kinds a separator boundary can hold.
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
@@ -169,7 +170,7 @@ fn absorb_chunk(
     };
     let first_location = peek.commit().location;
     let mut span = first_location;
-    let mut contents = vec![WithSpan::new(first, first_location)];
+    let mut contents = NonEmpty::new(WithSpan::new(first, first_location));
     while let Some(peek) = items.peek() {
         let Some(content_item) = as_content(peek.view(), errors) else {
             break;
@@ -179,29 +180,32 @@ fn absorb_chunk(
         contents.push(WithSpan::new(content_item, item.location));
     }
 
-    let mut separators: Vec<WithSpan<SeparatorToken>> = Vec::new();
+    let mut separators: Option<NonEmpty<WithSpan<SeparatorToken>>> = None;
     while let Some(peek) = items.peek() {
         let Some(separator) = separator_of(peek.view()) else {
             break;
         };
         if separator == SeparatorToken::Comma
-            && separators
-                .iter()
-                .any(|token| token.item == SeparatorToken::Comma)
+            && separators.as_ref().is_some_and(|absorbed| {
+                absorbed
+                    .iter()
+                    .any(|token| token.item == SeparatorToken::Comma)
+            })
         {
-            // The second comma opens the next absorption.
             break;
         }
         let item = peek.commit();
-        separators.push(WithSpan::new(separator, item.location));
+        let token = WithSpan::new(separator, item.location);
+        match &mut separators {
+            None => separators = Some(NonEmpty::new(token)),
+            Some(absorbed) => absorbed.push(token),
+        }
     }
 
-    let location = separators
-        .first()
-        .zip(separators.last())
-        .map(|(first, last)| Span::join(first.location, last.location));
-    let trailing_separator =
-        location.map(|location| WithSpan::new(ChunkSeparator(separators), location));
+    let trailing_separator = separators.map(|separators| {
+        let location = Span::join(separators.first().location, separators.last().location);
+        WithSpan::new(ChunkSeparator(separators), location)
+    });
     let span = match &trailing_separator {
         Some(separator) => Span::join(span, separator.location),
         None => span,
@@ -294,13 +298,14 @@ mod tests {
     }
 
     fn chunk_span(chunk: &Chunk) -> Span {
-        chunk
-            .contents
-            .iter()
-            .map(|c| c.location)
-            .chain(chunk.trailing_separator.as_ref().map(|s| s.location))
-            .reduce(Span::join)
-            .expect("a chunk has at least one part")
+        let contents = Span::join(
+            chunk.contents.first().location,
+            chunk.contents.last().location,
+        );
+        match &chunk.trailing_separator {
+            Some(separator) => Span::join(contents, separator.location),
+            None => contents,
+        }
     }
 
     fn render_chunk<'a>(literal: &'a str, chunk: &Chunk) -> &'a str {

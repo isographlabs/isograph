@@ -949,6 +949,7 @@ name = "isograph_parser"
 version = "0.5.3"
 dependencies = [
  "logos",
+ "nonempty",
  "resolve_position",
  "resolve_position_macros",
  "safe_peekable",
@@ -1091,6 +1092,12 @@ name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "650eef8c711430f1a879fdd01d4745a7deea475becfb90269c06775983bbf086"
+
+[[package]]
+name = "nonempty"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9737e026353e5cd0736f98eddae28665118eb6f6600902a7f50db585621fecb6"
 
 [[package]]
 name = "nu-ansi-term"
