@@ -398,7 +398,7 @@ impl Chunk {
 }
 ```
 
-`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (the `nonempty` crate). These methods are the only item access and the only boundary read. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
+`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (the `nonempty` crate; chunk-contents-nonempty.md). These methods are the only item access and the only boundary read. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
 
 `contents_span` is allowed `Span::join`: it is a `Chunk` method, not a parser.
 

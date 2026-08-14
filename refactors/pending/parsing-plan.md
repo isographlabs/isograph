@@ -107,6 +107,7 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins:
 
+0. `chunk-contents-nonempty.md`. `Chunk::contents` and `ChunkSeparator` become `nonempty::NonEmpty`. A comma no item precedes is already a `CommaWithoutItem`; this doc makes the empty-contents state unrepresentable.
 1. `parse-entrypoint.md`. The skeleton: `LiteralText`, `ItemCursor` / `ChunkStream`, `parse_singleton`, `parse_iso_literal`, keyword dispatch, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
 2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections, `LevelSlot` / `parse_items`, and the parent-enum conversions second parents force. Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group after a selection name is that selection's trailing leftover until the next doc.
 3. `parse-arguments.md`. Argument lists on selections, `name: value` pairs, and values: variable, string, integer (with the `i64` conversion and `IntegerOutOfRange`), `BooleanValue(Boolean::{True, False})`, null, and object literals.
