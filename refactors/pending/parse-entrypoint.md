@@ -22,7 +22,7 @@ Everything else produces an `UnparsedLiteral` holding one reason and the entire 
 
 ## New module: chunk_stream.rs
 
-The enforcement structure parsing-standards.md specifies, at the subset this doc's grammar needs; later docs extend the `ItemCursor` impl. The module has no re-export: `ItemCursor` and `ChunkStream` are `pub(crate)` and never cross the crate boundary. The listings are the ones in parsing-standards.md for `ItemCursor` (`require_token`, `token_text`, `end_span`, `text`, `missing`) and `ChunkStream` (`new`, `cursor`, `require_end`). Methods this doc does not call (`consume_token_if`, `consume_token_if_any`, `require_keyword`, `consume_group_if`, `require_group`, `take_next`, `integer`, `spanning`) are absent from the impl until their first caller.
+The `ItemCursor` / `ChunkStream` subset this grammar uses. Later docs add methods to the same impl. `ItemCursor` and `ChunkStream` are `pub(crate)` and are not re-exported. This doc lands `require_token`, `token_text`, `end_span`, `text`, `missing`, `new`, `cursor`, and `require_end`.
 
 `new` takes `NonEmpty<WithSpan<ChunkContentItem>>` (chunk contents) and `&str`.
 

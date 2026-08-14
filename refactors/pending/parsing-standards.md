@@ -33,10 +33,7 @@ use crate::{
     BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind, ParseError,
 };
 
-/// Parameter of a parse function. No rewind. No `peek` method. No `require_end`.
-/// `commit` advances past the current item. The next call reads at most the
-/// following item. `parse_items` and `parse_singleton` call `require_end` after
-/// the parse function returns.
+/// Sequential reader of one chunk. Parameter of a parse function.
 pub(crate) struct ItemCursor<'a> {
     items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     /// The end of the last item this cursor advanced past (the chunk's start before
@@ -282,9 +279,7 @@ impl<'a> ItemCursor<'a> {
 
 `take_next`'s iterator item is `&'a WithSpan<ChunkContentItem>` (`nonempty::Iter` yields references). `require_token` / `consume_token_if` copy that reference out of `view` (`I::Item` is `Copy`) and then `commit`. `consume_group_if` / `require_group` rematch after `commit` so the `&'a ChunkedGroup` is borrowed from the committed reference, not from the peek guard. The `NonBracket` arm after a successful `Group` view is the item-cannot-change-between-view-and-commit invariant; it is a typed error or `None`, not a panic.
 
-`ChunkStream::require_end` calls `peek` on the cursor's iterator. `require_end` is not a method on `ItemCursor`. A parse function's parameter is `&mut ItemCursor`, so it has no `require_end` to call.
-
-There is no `consume_keyword_if` and no `spanning` sibling that returns `T` or `Option<T>`. Neither has a caller. A method with no caller exists only in this doc, and these do not.
+`ChunkStream::require_end` calls `peek` on the cursor's iterator. A parse function's parameter is `&mut ItemCursor`, which does not include `require_end`.
 
 ### Span sources
 
@@ -292,7 +287,7 @@ A leaf's span is the `Span` returned by `require_token`, `consume_token_if`, `co
 
 Construction is `WithSpan::new` and plain `Ok` / `Some`.
 
-A value made of several items is parsed by one `spanning` call. The closure passed to `spanning` calls `take_next` or the first `require_*`. If the caller already advanced past the first item, a later `spanning` does not include that item: the caller already has that item's span, and the remaining items are read with `require_*` / `consume_*`. If those items and the first item must share one span, they are all read inside the `spanning` that advanced past the first item. There is no `spanning_from` method.
+A value made of several items is parsed by one `spanning` call. The closure passed to `spanning` calls `take_next` or the first `require_*`. If the caller already advanced past the first item, a later `spanning` starts at the next item: the caller already has that first item's span, and the remaining items are read with `require_*` / `consume_*`. If those items and the first item must share one span, they are all read inside the `spanning` that advanced past the first item.
 
 `ItemCursor` stores the same `&str` `parse_iso_literal` received. `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. That span came from a token of this literal. Names in the tree are spans; the only converted scalar is the `i64`.
 
@@ -666,7 +661,7 @@ Content dispatch is the same shape one level down: `require_token(Identifier, ..
 
 A form that is absent until its first item appears, then required (`$name`, later `@ name (args)`), is a `take_next` arm. After that item, the rest is `require_*`.
 
-Whether a form is present is determined by the next item. One optional item is `consume_*` and does not return `Err`. A form of several items that starts optionally advances past the first item in the `take_next` match and may return `Err` on the second (`@@` returns `Err` at the second `@`). After `require_token` on an identifier, `consume_token_if(Colon)` tells whether that identifier is an alias; both arms of that `match` use the identifier. There is no method that advances past an item and then restores it. A grammar form that requires reading two items before the function can return `Some` or `None` cannot be implemented with this surface.
+Whether a form is present is determined by the next item. One optional item is `consume_*` and does not return `Err`. A form of several items that starts optionally advances past the first item in the `take_next` match and may return `Err` on the second (`@@` returns `Err` at the second `@`). After `require_token` on an identifier, `consume_token_if(Colon)` tells whether that identifier is an alias; both arms of that `match` use the identifier. Optionality uses one item of lookahead.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -859,11 +854,7 @@ A name is a fieldless marker struct in a `WithSpan`. Each role is its own type (
 
 ## Performance
 
-One pass, by reference; the output copies spans and `Copy` tokens. Cloning happens only when a region degrades: allocation beyond the output vecs is proportional to the error count.
-
-No backtracking exists (no rewind), so parse time is linear in the token count.
-
-No pico, no interning: plain functions over `&str` and the chunk tree.
+One pass, by reference. The output copies spans and `Copy` tokens. Cloning happens when a region degrades: allocation beyond the output vecs is proportional to the error count. Each item is advanced past at most once, so parse time is linear in the token count. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
