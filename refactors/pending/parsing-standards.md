@@ -4,7 +4,7 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 
 ## Input shape
 
-- The unit of parsing is the chunk: a `NonEmpty` (the `nonempty` crate; adopt-nonempty.md) of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that the root holds exactly one chunk, the declaration, is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
+- The unit of parsing is the chunk: a vec of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that the root holds exactly one chunk, the declaration, is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
 - A group is one item, consumed whole, always really closed. Its interior re-enters parsing only as fresh levels.
 - Items arrive pre-spanned. Parsers compute a span only for a multi-item composite, via `spanning`.
 - Separators were absorbed into boundaries by chunking: "a separator comes next" is `take_next()` returning `None`. An unmatched bracket and its level's tail never left the matcher, and a comma no item precedes never left chunking: no bracket or empty-chunk state reaches a parser.
@@ -27,7 +27,7 @@ Every operation a parser can perform on a chunk is a method on one of two types.
 /// The only reader of a chunk's contents. No rewind and no raw peek exist: a committed
 /// item is committed, and a decision is made on at most the next item.
 pub(crate) struct ChunkStream<'a> {
-    items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
+    items: SafePeekable<std::slice::Iter<'a, WithSpan<ChunkContentItem>>>,
     /// The end of the last accepted item (the chunk's start before any): where an
     /// `Expected(_, EndOfChunk)` error points.
     previous_end: u32,
@@ -87,8 +87,9 @@ impl Chunk {
     /// The stream a parser reads this chunk through.
     pub(crate) fn stream(&self) -> ChunkStream<'_>;
 
-    /// The span of the contents, without the boundary: a degraded slot's span. Total,
-    /// because every chunk has contents.
+    /// The span of the contents, without the boundary: a degraded slot's span. Total:
+    /// chunking emits no empty chunks (refactors/past/no-empty-chunks.md), and the
+    /// unreachable empty case degrades to an empty span.
     pub fn contents_span(&self) -> Span;
 
     /// The comma in the trailing boundary, when one exists; one-item contexts reject
