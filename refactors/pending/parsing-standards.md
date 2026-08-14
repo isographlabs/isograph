@@ -18,7 +18,7 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 
 ## Enforcement structures
 
-Every operation a parser can perform is a method on one of four types. A new operation is a new method here, never a local helper.
+Every operation a parser can perform on a chunk or the text is a method on one of three types. A new operation is a new method here, never a local helper. A level needs no such surface: `ChunkedLevel`'s public vec is iterated plainly by the walkers, which Level walks below names as its only consumers.
 
 ### `ChunkStream`
 
@@ -78,19 +78,6 @@ impl<'a> ChunkStream<'a> {
 - Span sources, exhaustively: a leaf's span is what a stream method returned (`require_token`, `consume_token_if`) or the wrapper a consumed item carried (`consume_group_if`, `take_next`); an item's span is what its parse consumed (a degraded slot's is its chunk's `contents_span`); a composite's span comes from `spanning`. `Span::join` in a parser is banned; a span no source provides is a missing method here.
 - Construction is `WithSpan::new` and plain `Ok`/`Some`; the upstream postfix helpers (`wrap_ok`, `with_span`) are not used.
 - Anticipated amendments, each landing with its first caller: `spanning_from(start, parse)`, for a composite whose first item a dispatch arm already committed, so plain `spanning` cannot start early enough; and a plainly-returning `spanning` sibling. An `Option`-returning sibling has no possible caller: a single optional item carries its own span, and a composite that is required once its first item appears is `require_*` flow from there on.
-
-### `ChunkedLevel`
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl ChunkedLevel {
-    /// The only access to a level's chunks, each with contents
-    /// (refactors/past/no-empty-chunks.md).
-    pub fn chunks(&self) -> impl Iterator<Item = &WithSpan<Chunk>>;
-}
-```
-
-- `ChunkedLevel`'s field is private to chunk.rs. Callers are `parse_level_items` and the one-item walkers, and no others.
 
 ### `Chunk`
 
@@ -215,6 +202,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, `LiteralText::identifier`, and `ChunkedLevel`'s privacy with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, and `LiteralText::identifier` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
