@@ -108,13 +108,12 @@ impl Chunk {
 pub(crate) struct LiteralText<'a>(&'a str);
 
 impl<'a> LiteralText<'a> {
-    /// The text of an identifier token, for keyword dispatch by string match. The span
-    /// is one an identifier-accepting stream method returned.
-    pub(crate) fn identifier(&self, span: Span) -> &'a str;
+    /// The literal text a span covers. The parser reads it only to recognize keywords.
+    pub(crate) fn token_text(&self, span: Span) -> &'a str;
 }
 ```
 
-- The complete set of text reads is this impl block: identifier text (the declaration keywords, `to`, `true`/`false`/`null`, all matched as strings at their one dispatch site each) and, when parse-arguments.md amends it, `integer` (`None` on out of range). String-literal contents and every other span stay unreadable.
+- The complete set of text reads is this impl block: a token's text (the declaration keywords, `to`, `true`/`false`/`null`, all matched as strings at their one dispatch site each) and, when parse-arguments.md amends it, `integer` (`None` on out of range). String-literal contents and every other span stay unreadable.
 
 ## Dispatch
 
@@ -128,7 +127,7 @@ match stream.take_next() {
             NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
             NonBracketTokenKind::StringLiteral => { /* done; item.location is the span */ }
             NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
-            NonBracketTokenKind::Identifier => { /* match LiteralText::identifier: true/false/null */ }
+            NonBracketTokenKind::Identifier => { /* match LiteralText::token_text: true/false/null */ }
             kind => return Err(WithSpan::new(
                 ParseError::expected(Expectation::Value, Found::Token(kind)),
                 item.location,
@@ -143,7 +142,7 @@ match stream.take_next() {
 }
 ```
 
-- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::identifier`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
+- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::token_text`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
 - `consume_*_if` is not a dispatch tool. It exists for the composition boundary: a sub-parser declining an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`). A `consume_*_if` chain where one production owns all the alternatives is banned.
 - A construct that is optional as a whole but required once its first item appears (`$name`, a future `@ name (args)`) is a dispatch arm; the first item commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
 - Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its first item and is fallible from its second on (`@@` errors at the second `@`). Committing before knowing the interpretation (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consuming and then declining does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.

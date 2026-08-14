@@ -2,6 +2,8 @@
 
 A prefactor to the parsing series: the grammar stage's one gate onto the literal's text, landed ahead of the series so parse-entrypoint.md carries only grammar. Its first production caller is parse-entrypoint.md's keyword dispatch, the next doc to land; shipping one doc ahead of that caller is a deliberate exception to parsing-standards.md's ship-with-first-caller rule, made because the type couples to nothing undecided (no error types, no chunk types, only `Span` and the text).
 
+The method is parse-entrypoint.md's free function `token_text`, moved onto the type unchanged; the delta this doc exists for is the gate alone, that the raw `&str` is unreachable outside this impl. parse-entrypoint.md's revision deletes its free function in favor of this method.
+
 ## The module
 
 ```rust
@@ -17,9 +19,8 @@ impl<'a> LiteralText<'a> {
         LiteralText(text)
     }
 
-    /// The text of an identifier token, for keyword dispatch by string match. The span
-    /// is one an identifier-accepting stream method returned.
-    pub(crate) fn identifier(&self, span: Span) -> &'a str {
+    /// The literal text a span covers. The parser reads it only to recognize keywords.
+    pub(crate) fn token_text(&self, span: Span) -> &'a str {
         &self.0[span.as_usize_range()]
     }
 }
@@ -37,11 +38,11 @@ mod tests {
     use span::Span;
 
     #[test]
-    fn identifier_returns_the_spanned_text() {
+    fn token_text_returns_the_spanned_text() {
         let text = LiteralText::new("entrypoint Query.foo");
-        assert_eq!(text.identifier(Span::new(0, 10)), "entrypoint");
-        assert_eq!(text.identifier(Span::new(11, 16)), "Query");
-        assert_eq!(text.identifier(Span::new(17, 20)), "foo");
+        assert_eq!(text.token_text(Span::new(0, 10)), "entrypoint");
+        assert_eq!(text.token_text(Span::new(11, 16)), "Query");
+        assert_eq!(text.token_text(Span::new(17, 20)), "foo");
     }
 }
 ```
