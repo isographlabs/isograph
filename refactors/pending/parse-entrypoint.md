@@ -206,11 +206,13 @@ impl<'a> ChunkStream<'a> {
         &mut self.cursor
     }
 
-    pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>> {
-        if self.cursor.items.peek().is_none() {
-            Ok(())
-        } else {
-            Err(self.cursor.expected(expected))
+    pub(crate) fn require_end(&mut self) -> Result<(), WithSpan<Found>> {
+        match self.cursor.items.peek() {
+            None => Ok(()),
+            Some(peek) => {
+                let item = *peek.view();
+                Err(WithSpan::new(Found::from(&item.item), item.location))
+            }
         }
     }
 }

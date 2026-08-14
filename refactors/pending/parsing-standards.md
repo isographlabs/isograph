@@ -61,11 +61,13 @@ impl<'a> ChunkStream<'a> {
         &mut self.cursor
     }
 
-    pub(crate) fn require_end(&mut self, expected: Expectation) -> Result<(), WithSpan<ParseError>> {
-        if self.cursor.items.peek().is_none() {
-            Ok(())
-        } else {
-            Err(self.cursor.expected(expected))
+    pub(crate) fn require_end(&mut self) -> Result<(), WithSpan<Found>> {
+        match self.cursor.items.peek() {
+            None => Ok(()),
+            Some(peek) => {
+                let item = *peek.view();
+                Err(WithSpan::new(Found::from(&item.item), item.location))
+            }
         }
     }
 }
@@ -331,9 +333,12 @@ impl ChunkedLevel {
                 let (mut stream, result) = parse_chunk(chunk, text, &parse_item);
                 match result {
                     Ok(item) => {
-                        let trailing = match stream.require_end(Expectation::Separator) {
+                        let trailing = match stream.require_end() {
                             Ok(()) => None,
-                            Err(error) => Some(error),
+                            Err(found) => Some(WithSpan::new(
+                                ParseError::expected(Expectation::Separator, found.item),
+                                found.location,
+                            )),
                         };
                         WithSpan::new(
                             LevelSlot::Parsed(ParsedSlot {
@@ -373,7 +378,12 @@ pub(crate) fn parse_singleton<'a, T>(
             let chunk = &level.item.0[0];
             let mut stream = chunk.item.stream(text);
             let item = parse(stream.cursor())?;
-            stream.require_end(end_expectation)?;
+            if let Err(found) = stream.require_end() {
+                return Err(WithSpan::new(
+                    ParseError::expected(end_expectation, found.item),
+                    found.location,
+                ));
+            }
             if let Some(comma) = chunk.item.boundary_comma() {
                 return Err(WithSpan::new(
                     ParseError::expected(
