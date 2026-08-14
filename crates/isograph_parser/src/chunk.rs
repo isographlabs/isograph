@@ -29,9 +29,9 @@ pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 #[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
-    pub contents: NonEmptyVec<WithSpan<ChunkContentItem>>,
+    contents: NonEmptyVec<WithSpan<ChunkContentItem>>,
     #[resolve_field]
-    pub trailing_separator: Option<WithSpan<ChunkSeparator>>,
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
 }
 
 /// What a chunk holds: every non-separator item of its level, groups included.

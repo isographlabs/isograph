@@ -97,7 +97,7 @@ impl Chunk {
 }
 ```
 
-- `Chunk`'s fields are private to chunk.rs (today they are `pub` with no reader outside chunk.rs; the privatization lands with `stream`). These methods are the only item access and the only boundary reads a parser has. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
+- `Chunk`'s fields are private to chunk.rs (landed; refactors/past/private-chunk-fields.md). These methods are the only item access and the only boundary reads a parser has. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
 
 ## Dispatch
 
@@ -185,6 +185,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Each structure, method, and structural change lands with the feature doc of its first production caller (`Chunk::stream`, the privatization of `Chunk`'s fields, `require_token`, `require_end`, and `token_text` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning`, `end_span`, and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Each structure and each method lands with the feature doc of its first production caller (`Chunk::stream`, `require_token`, `require_end`, and `token_text` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning`, `end_span`, and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks and the text-read free functions; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
