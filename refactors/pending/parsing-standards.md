@@ -61,13 +61,10 @@ impl<'a> ChunkStream<'a> {
         &mut self.cursor
     }
 
-    pub(crate) fn require_end(&mut self) -> Result<(), WithSpan<Found>> {
+    pub(crate) fn require_end(&mut self) -> Result<(), ()> {
         match self.cursor.items.peek() {
             None => Ok(()),
-            Some(peek) => {
-                let item = *peek.view();
-                Err(WithSpan::new(Found::from(&item.item), item.location))
-            }
+            Some(_) => Err(()),
         }
     }
 }
@@ -335,10 +332,7 @@ impl ChunkedLevel {
                     Ok(item) => {
                         let trailing = match stream.require_end() {
                             Ok(()) => None,
-                            Err(found) => Some(WithSpan::new(
-                                ParseError::expected(Expectation::Separator, found.item),
-                                found.location,
-                            )),
+                            Err(()) => Some(stream.cursor().expected(Expectation::Separator)),
                         };
                         WithSpan::new(
                             LevelSlot::Parsed(ParsedSlot {
@@ -378,11 +372,8 @@ pub(crate) fn parse_singleton<'a, T>(
             let chunk = &level.item.0[0];
             let mut stream = chunk.item.stream(text);
             let item = parse(stream.cursor())?;
-            if let Err(found) = stream.require_end() {
-                return Err(WithSpan::new(
-                    ParseError::expected(end_expectation, found.item),
-                    found.location,
-                ));
+            if stream.require_end().is_err() {
+                return Err(stream.cursor().expected(end_expectation));
             }
             if let Some(comma) = chunk.item.boundary_comma() {
                 return Err(WithSpan::new(
