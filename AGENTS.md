@@ -105,6 +105,14 @@ Do not `match` a `Result` to bind the success value and return or convert the er
 
 When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do not `match` on `Ok` / `Err` then.
 
+## Ok, Err, Some
+
+Do not write `Ok(...)`, `Err(...)`, or `Some(...)` constructors. Write `value.wrap_ok()`, `value.wrap_err()`, and `value.wrap_some()` from `prelude::Postfix`.
+
+Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`. `None` has no value to wrap; it stays `None`.
+
+The bodies of `wrap_ok`, `wrap_err`, and `wrap_some` in prelude are the one place the constructors appear.
+
 ## Audits
 
 When told to audit, the deliverable is the whole class fixed everywhere, not the instance that was quoted. Sweep every file the standard touches before reporting done; the failure mode is the user opening the most obvious place and finding the problem still there. An audit that only edits what was pointed at is not an audit.
