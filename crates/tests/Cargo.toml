@@ -5,6 +5,9 @@ edition = { workspace = true }
 license = { workspace = true }
 
 [dependencies]
+prelude = { path = "../prelude" }
+proc-macro2 = { workspace = true, features = ["span-locations"] }
+syn = { workspace = true, features = ["full", "visit"] }
 
 [lints]
 workspace = true

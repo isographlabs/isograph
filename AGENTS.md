@@ -111,7 +111,7 @@ Do not write `Ok(...)`, `Err(...)`, or `Some(...)` constructors. Write `value.wr
 
 Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`. `None` has no value to wrap; it stays `None`.
 
-The bodies of `wrap_ok`, `wrap_err`, and `wrap_some` in prelude are the one place the constructors appear.
+The bodies of `wrap_ok`, `wrap_err`, and `wrap_some` in prelude are the one place the constructors appear. Clippy cannot ban enum constructors; `crates/tests` `postfix_constructors` is the enforcement.
 
 ## Audits
 

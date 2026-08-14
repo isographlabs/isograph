@@ -2302,6 +2302,11 @@ dependencies = [
 [[package]]
 name = "tests"
 version = "0.5.3"
+dependencies = [
+ "prelude",
+ "proc-macro2",
+ "syn 2.0.98",
+]
 
 [[package]]
 name = "textwrap"

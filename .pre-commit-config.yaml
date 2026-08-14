@@ -30,3 +30,10 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
+      # Clippy cannot ban Ok/Err/Some constructors; this is the enforcement.
+      - id: postfix-constructors
+        name: postfix constructors
+        entry: cargo test -p tests --lib postfix_constructors
+        language: system
+        files: '\.(rs|md)$'
+        pass_filenames: false
