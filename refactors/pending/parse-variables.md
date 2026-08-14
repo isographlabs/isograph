@@ -227,7 +227,7 @@ pub(crate) fn consume_variable_declaration_list(
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     Some(WithSpan::new(
         VariableDeclarationList(
-            group.item.children.item.parse_items(cursor.text(), parse_variable_declaration),
+            group.item.children.item.parse_items_with_trailing(cursor.text(), parse_variable_declaration),
         ),
         group.location,
     ))

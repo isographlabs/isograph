@@ -274,7 +274,7 @@ pub(crate) fn consume_argument_list(
 ) -> Option<WithSpan<ArgumentList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     Some(WithSpan::new(
-        ArgumentList(group.item.children.item.parse_items(cursor.text(), parse_argument)),
+        ArgumentList(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_argument)),
         group.location,
     ))
 }

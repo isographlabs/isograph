@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `LevelSlot` / `UnparsedItem`, `parse_items`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
+Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `LevelSlot` / `UnparsedItem`, `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
 
 ## The grammar this doc accepts
 
@@ -317,7 +317,7 @@ pub type SelectionNamePath<'a> = PositionResolutionPath<&'a SelectionName, Selec
 pub type SelectionAliasPath<'a> = PositionResolutionPath<&'a SelectionAlias, SelectionAliasParent<'a>>;
 ```
 
-`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_items`, `contents_span`, and the `LevelSlot` `ResolvePosition` blanket are the listings in parsing-standards.md; they land here.
+`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, and the `LevelSlot` `ResolvePosition` blanket are the listings in parsing-standards.md; they land here.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -349,7 +349,7 @@ pub(crate) fn require_selection_set(
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
     Ok(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items(cursor.text(), parse_selection)),
+        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
         group.location,
     ))
 }
@@ -357,7 +357,7 @@ pub(crate) fn require_selection_set(
 fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
     Some(WithSpan::new(
-        SelectionSet(group.item.children.item.parse_items(cursor.text(), parse_selection)),
+        SelectionSet(group.item.children.item.parse_items_with_trailing(cursor.text(), parse_selection)),
         group.location,
     ))
 }
@@ -389,7 +389,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
 }
 ```
 
-`parse_selection` does not call `require_end`. `parse_items` wraps it in `spanning` and records leftover as `ParsedSlot::trailing`.
+`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSlot::trailing`.
 
 ## The errors
 
@@ -874,6 +874,6 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 
 ## Landing checklist
 
-1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `parse_items`, `contents_span`, the `LevelSlot` blanket, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
+1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, the `LevelSlot` blanket, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
 2. selections.rs, the parse_iso_literal.rs and parse_error.rs changes, the `ItemCursor` methods this doc adds (`consume_group_if`, `require_group`, `spanning`), the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.
