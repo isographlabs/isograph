@@ -41,11 +41,11 @@ pub enum IsoLiteralParse {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         text if text == "entrypoint" => {
-            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
-        text if text == "field" => Ok(IsoLiteralParse::Field(parse_field(keyword, cursor)?)),
+        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
         text if text == "pointer" => {
-            Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword))
+            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
         }
 ```
 
@@ -64,11 +64,11 @@ pub enum IsoLiteralParse {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         text if text == "entrypoint" => {
-            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
-        text if text == "field" => Ok(IsoLiteralParse::Field(parse_field(keyword, cursor)?)),
+        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
         text if text == "pointer" => {
-            Ok(IsoLiteralParse::Pointer(parse_pointer(keyword, cursor)?))
+            IsoLiteralParse::Pointer(parse_pointer(keyword, cursor)?).wrap_ok()
         }
 ```
 
@@ -139,18 +139,18 @@ fn parse_pointer(
         Expectation::ToKeyword,
     )?;
     if cursor.token_text(to_keyword) != "to" {
-        return Err(WithSpan::new(
+        return WithSpan::new(
             ParseError::expected(
                 Expectation::ToKeyword,
                 Found::Token(NonBracketTokenKind::Identifier),
             ),
             to_keyword,
-        ));
+        ).wrap_err();
     }
     let target_type = parse_type_annotation(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
-    Ok(ClientPointerDeclaration {
+    ClientPointerDeclaration {
         pointer_keyword: WithSpan::new(PointerKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
         client_pointer_name: WithSpan::new(ClientPointerName, client_pointer_name),
@@ -159,7 +159,7 @@ fn parse_pointer(
         target_type,
         description,
         selection_set,
-    })
+    }.wrap_ok()
 }
 ```
 

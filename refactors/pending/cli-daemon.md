@@ -98,7 +98,7 @@ pub fn config_path(flag: Option<&Path>) -> Result<PathBuf, DiscoverError> {
                 .map_err(|source| DiscoverError::NoCurrentDir { source })?;
             match nearest_config(&start) {
                 Some(found) => found,
-                None => return Err(DiscoverError::NotFound { start }),
+                None => return DiscoverError::NotFound { start }.wrap_err(),
             }
         }
     };
@@ -120,7 +120,7 @@ fn nearest_config(start: &Path) -> Option<PathBuf> {
 pub fn config_and_instance(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {
     let config = config_path(flag)?;
     let instance = Instance::named("isograph", slug(&config), config.display().to_string())?;
-    Ok((config, instance))
+    (config, instance).wrap_ok()
 }
 
 /// The slug for the daemon keyed to `config`: one filename per canonical path, stable across
@@ -197,7 +197,7 @@ impl App for Isograph {
     const NAME: &'static str = "isograph";
 
     fn instance(_: &NoArgs) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(Instance::global(Self::NAME)?)
+        Instance::global(Self::NAME)?.wrap_ok()
     }
 
     fn run_daemon(_: &NoArgs, _: &IsographArgs) {
@@ -235,7 +235,7 @@ impl App for Isograph {
 
     fn instance(id: &ConfigFlag) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
         let (_, instance) = discover::config_and_instance(id.config.as_deref())?;
-        Ok(instance)
+        instance.wrap_ok()
     }
 
     fn run_daemon(_: &ConfigFlag, _: &NoArgs) {
@@ -404,12 +404,12 @@ pub fn listen(event_tx: UnboundedSender<IsographEvent>) -> io::Result<(RequestSo
         }
     });
 
-    Ok((
+    (
         RequestSocket {
             _shutdown: shutdown,
         },
         port,
-    ))
+    ).wrap_ok()
 }
 
 /// Resolves once the [`RequestSocket`] has been dropped, taking the only sender with it.
@@ -643,8 +643,8 @@ fn project_root(config_path: &Path) -> Result<PathBuf, ProjectRootError> {
     })?;
     let root = config_dir.join(&config.project_root);
     match root.canonicalize() {
-        Ok(root) => Ok(root),
-        Err(source) => Err(ProjectRootError::Unresolvable { path: root, source }),
+        Ok(root) => root.wrap_ok(),
+        Err(source) => ProjectRootError::Unresolvable { path: root, source }.wrap_err(),
     }
 }
 
@@ -825,7 +825,7 @@ fn watch(
             }
         })?;
     watcher.watch(project_root, notify::RecursiveMode::Recursive)?;
-    Ok(watcher)
+    watcher.wrap_ok()
 }
 
 /// What one notified path means, if anything. The filesystem is the truth: the notification
@@ -840,7 +840,7 @@ fn classify(path: PathBuf) -> Option<SourceEvent> {
     } else {
         SourceChange::Absent
     };
-    Some(SourceEvent { path, change })
+    SourceEvent { path, change }.wrap_some()
 }
 
 fn is_tracked_source(path: &Path) -> bool {
@@ -858,7 +858,7 @@ fn is_tracked_source(path: &Path) -> bool {
 fn is_skipped_directory(path: &Path) -> bool {
     SKIPPED_DIRECTORIES
         .iter()
-        .any(|skipped| path.file_name() == Some(OsStr::new(skipped)))
+        .any(|skipped| path.file_name() == OsStr::new(skipped).wrap_some())
 }
 
 /// Seed the tracked set: every tracked source under `dir`, sent through the same channel the
@@ -962,21 +962,21 @@ pub fn request(
 ) -> Result<IsographResponse, ClientError> {
     let port_file = instance.lock_file().with_extension("port");
     let Ok(contents) = std::fs::read_to_string(&port_file) else {
-        return Err(ClientError::NotRunning {
+        return ClientError::NotRunning {
             daemon: instance.display_name().to_owned(),
-        });
+        }.wrap_err();
     };
     let Ok(port) = contents.trim().parse::<u16>() else {
-        return Err(ClientError::BadPortFile { path: port_file });
+        return ClientError::BadPortFile { path: port_file }.wrap_err();
     };
     let stream = match TcpStream::connect(SocketAddr::from((Ipv4Addr::LOCALHOST, port))) {
         Ok(stream) => stream,
         // A port file with nothing listening is a daemon that died without cleaning up, which
         // is the same answer as no daemon at all.
         Err(_) => {
-            return Err(ClientError::NotRunning {
+            return ClientError::NotRunning {
                 daemon: instance.display_name().to_owned(),
-            });
+            }.wrap_err();
         }
     };
     let frame = serde_json::to_string(&RequestFrame {
@@ -990,12 +990,12 @@ pub fn request(
     BufReader::new(&stream).read_line(&mut line)?;
     let response: ResponseFrame = serde_json::from_str(&line)?;
     if response.id != CLI_REQUEST_ID {
-        return Err(ClientError::WrongId {
+        return ClientError::WrongId {
             asked: CLI_REQUEST_ID,
             answered: response.id,
-        });
+        }.wrap_err();
     }
-    Ok(response.response)
+    response.response.wrap_ok()
 }
 ```
 
@@ -1234,13 +1234,11 @@ impl DaemonFixture {
                 return None;
             }
             let payload: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
-            Some(
-                payload["files"]
+            payload["files"]
                     .as_array()?
                     .iter()
                     .filter_map(|file| file.as_str().map(PathBuf::from))
-                    .collect(),
-            )
+                    .collect().wrap_some()
         })
     }
 }

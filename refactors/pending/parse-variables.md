@@ -237,7 +237,7 @@ pub(crate) fn consume_variable_declaration_list(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<VariableDeclarationList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    Some(WithSpan::new(
+    WithSpan::new(
         VariableDeclarationList(
             group
                 .item
@@ -249,7 +249,7 @@ pub(crate) fn consume_variable_declaration_list(
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_some()
 }
 
 fn parse_variable_declaration(
@@ -269,15 +269,15 @@ fn parse_variable_declaration(
     )?;
     let type_annotation = parse_type_annotation(cursor)?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals) {
-        Some(_) => Some(parse_constant_value(cursor)?),
+        Some(_) => parse_constant_value(cursor)?.wrap_some(),
         None => None,
     };
-    Ok(VariableDeclaration::Declaration(DeclaredVariable {
+    VariableDeclaration::Declaration(DeclaredVariable {
         dollar: WithSpan::new(Dollar, dollar),
         name: WithSpan::new(VariableName, name),
         type_annotation,
         default_value,
-    }))
+    }).wrap_ok()
 }
 
 pub(crate) fn parse_type_annotation(
@@ -288,22 +288,22 @@ pub(crate) fn parse_type_annotation(
             let exclamation = cursor
                 .consume_token_if(NonBracketTokenKind::Exclamation)
                 .map(|span| WithSpan::new(Exclamation, span));
-            return Ok(TypeAnnotation::Named(NamedTypeAnnotation {
+            return TypeAnnotation::Named(NamedTypeAnnotation {
                 name: WithSpan::new(TypeName, name),
                 exclamation,
-            }));
+            }).wrap_ok();
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
             let inner = parse_bracket_interior_type(cursor.text(), &group.item.children)?;
             let exclamation = cursor
                 .consume_token_if(NonBracketTokenKind::Exclamation)
                 .map(|span| WithSpan::new(Exclamation, span));
-            return Ok(TypeAnnotation::List(ListTypeAnnotation {
+            return TypeAnnotation::List(ListTypeAnnotation {
                 inner: WithSpan::new(Box::new(inner.item), group.location),
                 exclamation,
-            }));
+            }).wrap_ok();
         }
-        Err(cursor.expected(Expectation::TypeAnnotation))
+        cursor.expected(Expectation::TypeAnnotation).wrap_err()
     })
 }
 

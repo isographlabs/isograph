@@ -121,18 +121,18 @@ fn parse_declaration(cursor: &mut ItemCursor<'_>) -> Result<IsoLiteralParse, Wit
     )?;
     match cursor.token_text(keyword) {
         text if text == "entrypoint" => {
-            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
         text if text == "field" || text == "pointer" => {
-            Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword))
+            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
         }
-        _ => Err(WithSpan::new(
+        _ => WithSpan::new(
             ParseError::expected(
                 Expectation::DeclarationKeyword,
                 Found::Token(NonBracketTokenKind::Identifier),
             ),
             keyword,
-        )),
+        ).wrap_err(),
     }
 }
 
@@ -152,11 +152,11 @@ fn parse_entrypoint(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
-    Ok(EntrypointDeclaration {
+    EntrypointDeclaration {
         entrypoint_keyword: WithSpan::new(EntrypointKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
         client_field_name: WithSpan::new(ClientFieldName, client_field_name),
-    })
+    }.wrap_ok()
 }
 ```
 
@@ -204,7 +204,7 @@ impl<'a> ChunkStream<'a> {
     }
 
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        self.cursor.items.peek().map_or(Ok(()), |_| Err(()))
+        self.cursor.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
 }
 
@@ -216,7 +216,7 @@ impl<'a> ItemCursor<'a> {
             ChunkContentItem::NonBracket(token) if token.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                Some(item.location)
+                item.location.wrap_some()
             }
             _ => None,
         }
@@ -244,8 +244,8 @@ impl<'a> ItemCursor<'a> {
         expected: Expectation,
     ) -> Result<Span, WithSpan<ParseError>> {
         match self.consume_token_if(kind) {
-            Some(span) => Ok(span),
-            None => Err(self.expected(expected)),
+            Some(span) => span.wrap_ok(),
+            None => self.expected(expected).wrap_err(),
         }
     }
 

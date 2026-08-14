@@ -62,7 +62,7 @@ impl<'a> ChunkStream<'a> {
     }
 
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        self.cursor.items.peek().map_or(Ok(()), |_| Err(()))
+        self.cursor.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
 }
 
@@ -74,7 +74,7 @@ impl<'a> ItemCursor<'a> {
             ChunkContentItem::NonBracket(token) if token.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                Some(item.location)
+                item.location.wrap_some()
             }
             _ => None,
         }
@@ -91,7 +91,7 @@ impl<'a> ItemCursor<'a> {
                 let location = item.location;
                 peek.commit();
                 self.previous_end = location.end;
-                Some(WithSpan::new(group, location))
+                WithSpan::new(group, location).wrap_some()
             }
             _ => None,
         }
@@ -119,8 +119,8 @@ impl<'a> ItemCursor<'a> {
         expected: Expectation,
     ) -> Result<Span, WithSpan<ParseError>> {
         match self.consume_token_if(kind) {
-            Some(span) => Ok(span),
-            None => Err(self.expected(expected)),
+            Some(span) => span.wrap_ok(),
+            None => self.expected(expected).wrap_err(),
         }
     }
 
@@ -130,8 +130,8 @@ impl<'a> ItemCursor<'a> {
         expected: Expectation,
     ) -> Result<WithSpan<&'a ChunkedGroup>, WithSpan<ParseError>> {
         match self.consume_group_if(kind) {
-            Some(group) => Ok(group),
-            None => Err(self.expected(expected)),
+            Some(group) => group.wrap_ok(),
+            None => self.expected(expected).wrap_err(),
         }
     }
 
@@ -158,7 +158,7 @@ impl<'a> ItemCursor<'a> {
         } else {
             Span::new(start, self.previous_end)
         };
-        Ok(WithSpan::new(value, span))
+        WithSpan::new(value, span).wrap_ok()
     }
 
     fn end_span(&self) -> Span {
@@ -363,26 +363,26 @@ pub(crate) fn parse_singleton<'a, T>(
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
 ) -> Result<T, WithSpan<ParseError>> {
     match level.item.len() {
-        0 => Err(empty()),
+        0 => empty().wrap_err(),
         1 => {
             let chunk = &level.item.0[0];
             let mut stream = chunk.item.stream(text);
             let item = parse(stream.cursor())?;
             if stream.require_end().is_err() {
-                return Err(stream.cursor().expected(Expectation::EndOfDeclaration));
+                return stream.cursor().expected(Expectation::EndOfDeclaration).wrap_err();
             }
             if let Some(comma) = chunk.item.boundary_comma() {
-                return Err(WithSpan::new(
+                return WithSpan::new(
                     ParseError::expected(
                         Expectation::EndOfDeclaration,
                         Found::Token(NonBracketTokenKind::Comma),
                     ),
                     comma,
-                ));
+                ).wrap_err();
             }
-            Ok(item)
+            item.wrap_ok()
         }
-        _ => Err(extra(&level.item.0[1])),
+        _ => extra(&level.item.0[1]).wrap_err(),
     }
 }
 ```
@@ -505,7 +505,7 @@ pub(crate) fn consume_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    Some(WithSpan::new(
+    WithSpan::new(
         SelectionSet(
             group
                 .item
@@ -517,14 +517,14 @@ pub(crate) fn consume_selection_set(
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_some()
 }
 
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
-    Ok(WithSpan::new(
+    WithSpan::new(
         SelectionSet(
             group
                 .item
@@ -536,7 +536,7 @@ pub(crate) fn require_selection_set(
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_ok()
 }
 ```
 
@@ -555,42 +555,42 @@ pub(crate) fn parse_value(
                 NonBracketTokenKind::Identifier,
                 Expectation::Token(NonBracketTokenKind::Identifier),
             )?;
-            return Ok(NonConstantValue::Variable(VariableUse {
+            return NonConstantValue::Variable(VariableUse {
                 dollar: WithSpan::new(Dollar, dollar),
                 name: WithSpan::new(VariableName, name),
-            }));
+            }).wrap_ok();
         }
         if cursor
             .consume_token_if(NonBracketTokenKind::StringLiteral)
             .is_some()
         {
-            return Ok(NonConstantValue::String(StringValue));
+            return NonConstantValue::String(StringValue).wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
             let value = match cursor.token_text(span).parse() {
                 Ok(value) => value,
                 Err(_) => {
-                    return Err(WithSpan::new(ParseError::IntegerDoesNotFitI64, span));
+                    return WithSpan::new(ParseError::IntegerDoesNotFitI64, span).wrap_err();
                 }
             };
-            return Ok(NonConstantValue::Integer(IntegerValue(value)));
+            return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
             return match cursor.token_text(span) {
-                "true" => Ok(NonConstantValue::Boolean(BooleanValue(Boolean::True))),
-                "false" => Ok(NonConstantValue::Boolean(BooleanValue(Boolean::False))),
-                "null" => Ok(NonConstantValue::Null(NullValue)),
-                _ => Err(WithSpan::new(
+                "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
+                "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
+                "null" => NonConstantValue::Null(NullValue).wrap_ok(),
+                _ => WithSpan::new(
                     ParseError::expected(
                         Expectation::Value,
                         Found::Token(NonBracketTokenKind::Identifier),
                     ),
                     span,
-                )),
+                ).wrap_err(),
             };
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return Ok(NonConstantValue::Object(ObjectLiteral(
+            return NonConstantValue::Object(ObjectLiteral(
                 group
                     .item
                     .children
@@ -599,9 +599,9 @@ pub(crate) fn parse_value(
                     .into_iter()
                     .map(WithSpan::<ObjectEntrySlot>::from)
                     .collect(),
-            )));
+            )).wrap_ok();
         }
-        Err(cursor.expected(Expectation::Value))
+        cursor.expected(Expectation::Value).wrap_err()
     })
 }
 ```
@@ -621,7 +621,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
                 Expectation::Token(NonBracketTokenKind::Identifier),
             )?;
             (
-                Some(WithSpan::new(SelectionAlias, first)),
+                WithSpan::new(SelectionAlias, first).wrap_some(),
                 WithSpan::new(SelectionName, name),
             )
         }
@@ -629,7 +629,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
     };
     let arguments = consume_argument_list(cursor);
     let selection_set = consume_selection_set(cursor);
-    Ok(match selection_set {
+    (match selection_set {
         Some(selection_set) => Selection::Object(ObjectSelection {
             reader_alias,
             name,
@@ -641,7 +641,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
             name,
             arguments,
         }),
-    })
+    }).wrap_ok()
 }
 ```
 
@@ -716,33 +716,33 @@ pub(crate) fn parse_constant_value(
             .consume_token_if(NonBracketTokenKind::StringLiteral)
             .is_some()
         {
-            return Ok(ConstantValue::String(StringValue));
+            return ConstantValue::String(StringValue).wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
             let value = match cursor.token_text(span).parse() {
                 Ok(value) => value,
                 Err(_) => {
-                    return Err(WithSpan::new(ParseError::IntegerDoesNotFitI64, span));
+                    return WithSpan::new(ParseError::IntegerDoesNotFitI64, span).wrap_err();
                 }
             };
-            return Ok(ConstantValue::Integer(IntegerValue(value)));
+            return ConstantValue::Integer(IntegerValue(value)).wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
             return match cursor.token_text(span) {
-                "true" => Ok(ConstantValue::Boolean(BooleanValue(Boolean::True))),
-                "false" => Ok(ConstantValue::Boolean(BooleanValue(Boolean::False))),
-                "null" => Ok(ConstantValue::Null(NullValue)),
-                _ => Err(WithSpan::new(
+                "true" => ConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
+                "false" => ConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
+                "null" => ConstantValue::Null(NullValue).wrap_ok(),
+                _ => WithSpan::new(
                     ParseError::expected(
                         Expectation::ConstantValue,
                         Found::Token(NonBracketTokenKind::Identifier),
                     ),
                     span,
-                )),
+                ).wrap_err(),
             };
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return Ok(ConstantValue::Object(ConstantObjectLiteral(
+            return ConstantValue::Object(ConstantObjectLiteral(
                 group
                     .item
                     .children
@@ -751,9 +751,9 @@ pub(crate) fn parse_constant_value(
                     .into_iter()
                     .map(WithSpan::<ConstantObjectEntrySlot>::from)
                     .collect(),
-            )));
+            )).wrap_ok();
         }
-        Err(cursor.expected(Expectation::ConstantValue))
+        cursor.expected(Expectation::ConstantValue).wrap_err()
     })
 }
 ```

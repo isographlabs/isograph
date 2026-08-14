@@ -297,7 +297,7 @@ pub(crate) fn consume_argument_list(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<ArgumentList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    Some(WithSpan::new(
+    WithSpan::new(
         ArgumentList(
             group
                 .item
@@ -309,7 +309,7 @@ pub(crate) fn consume_argument_list(
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_some()
 }
 
 fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
@@ -319,10 +319,10 @@ fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<Pars
         Expectation::Token(NonBracketTokenKind::Colon),
     )?;
     let value = parse_value(cursor)?;
-    Ok(Argument::Named(NamedArgument {
+    Argument::Named(NamedArgument {
         name: WithSpan::new(ArgumentName, name),
         value,
-    }))
+    }).wrap_ok()
 }
 
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
@@ -332,10 +332,10 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
         Expectation::Token(NonBracketTokenKind::Colon),
     )?;
     let value = parse_value(cursor)?;
-    Ok(ObjectEntry::Named(NamedObjectEntry {
+    ObjectEntry::Named(NamedObjectEntry {
         name: WithSpan::new(ObjectEntryName, name),
         value,
-    }))
+    }).wrap_ok()
 }
 ```
 

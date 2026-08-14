@@ -115,10 +115,10 @@ pub enum IsoLiteralParse {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         text if text == "entrypoint" => {
-            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
         text if text == "field" || text == "pointer" => {
-            Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword))
+            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
         }
 ```
 
@@ -136,11 +136,11 @@ pub enum IsoLiteralParse {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         text if text == "entrypoint" => {
-            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
-        text if text == "field" => Ok(IsoLiteralParse::Field(parse_field(keyword, cursor)?)),
+        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
         text if text == "pointer" => {
-            Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword))
+            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
         }
 ```
 
@@ -188,12 +188,12 @@ fn parse_field(
         Expectation::Token(NonBracketTokenKind::Identifier),
     )?;
     let selection_set = require_selection_set(cursor)?;
-    Ok(ClientFieldDeclaration {
+    ClientFieldDeclaration {
         field_keyword: WithSpan::new(FieldKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
         client_field_name: WithSpan::new(ClientFieldName, client_field_name),
         selection_set,
-    })
+    }.wrap_ok()
 }
 ```
 
@@ -357,7 +357,7 @@ pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
-    Ok(WithSpan::new(
+    WithSpan::new(
         SelectionSet(
             group
                 .item
@@ -369,12 +369,12 @@ pub(crate) fn require_selection_set(
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_ok()
 }
 
 fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    Some(WithSpan::new(
+    WithSpan::new(
         SelectionSet(
             group
                 .item
@@ -386,7 +386,7 @@ fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Selecti
                 .collect(),
         ),
         group.location,
-    ))
+    ).wrap_some()
 }
 
 fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
@@ -398,21 +398,21 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
                 Expectation::Token(NonBracketTokenKind::Identifier),
             )?;
             (
-                Some(WithSpan::new(SelectionAlias, first)),
+                WithSpan::new(SelectionAlias, first).wrap_some(),
                 WithSpan::new(SelectionName, name),
             )
         }
         None => (None, WithSpan::new(SelectionName, first)),
     };
     let selection_set = consume_selection_set(cursor);
-    Ok(match selection_set {
+    (match selection_set {
         Some(selection_set) => Selection::Object(ObjectSelection {
             reader_alias,
             name,
             selection_set,
         }),
         None => Selection::Scalar(ScalarSelection { reader_alias, name }),
-    })
+    }).wrap_ok()
 }
 ```
 
