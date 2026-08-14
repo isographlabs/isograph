@@ -27,7 +27,7 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-An argument or entry chunk that fails becomes an unparsed item; its siblings parse normally.
+An argument or entry chunk that fails becomes `LevelSlot::Unparsed`; leftover after a successful argument is `ParsedSlot::trailing`. Siblings parse normally.
 
 ## Changes to parse_error.rs
 
@@ -84,26 +84,23 @@ The new `Display` arms:
 // from crates/isograph_parser/src/arguments.rs
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use safe_peekable::IntoSafePeekable;
 use span::{Span, WithSpan};
 
 use crate::{
-    consume_token_if, expect_chunk_end, expect_token, parse_level_items, token_text, BracketKind,
-    Chunk, ChunkContentItem, ChunkContents, Expectation, Found, IsographResolutionNode,
-    NonBracketTokenKind, ObjectSelectionPath, ParseError, ScalarSelectionPath, UnparsedItem,
+    BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, ItemCursor,
+    LevelSlot, NonBracketTokenKind, ObjectSelectionPath, ParseError, ScalarSelectionPath,
 };
 
 /// The arguments a `( ... )` group holds, one per contentful chunk of its interior.
 /// The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Argument>>);
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<LevelSlot<Argument>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Argument {
     Named(NamedArgument),
-    Unparsed(#[resolve_field(parent_variant = ArgumentList)] UnparsedItem),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -150,7 +147,10 @@ pub struct IntegerValue(pub i64);
 /// `true` or `false`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct BooleanValue(pub bool);
+pub enum BooleanValue {
+    True,
+    False,
+}
 
 /// `null`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -161,13 +161,12 @@ pub struct NullValue;
 /// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntry>>);
+pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<LevelSlot<ObjectEntry>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ObjectEntry {
     Named(NamedObjectEntry),
-    Unparsed(#[resolve_field(parent_variant = ObjectLiteral)] UnparsedItem),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -239,7 +238,7 @@ pub type ObjectEntryNamePath<'a> = PositionResolutionPath<&'a ObjectEntryName, N
 `NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`. `UnparsedItemParent` in selections.rs gains the two new list contexts:
 
 ```rust
-// from crates/isograph_parser/src/selections.rs
+// from crates/isograph_parser/src/chunk.rs
 pub enum UnparsedItemParent<'a> {
     SelectionSet(SelectionSetPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
@@ -248,163 +247,90 @@ pub enum UnparsedItemParent<'a> {
 }
 ```
 
+```rust
+// from crates/isograph_parser/src/arguments.rs
+impl<'a> From<ArgumentListPath<'a>> for UnparsedItemParent<'a> {
+    fn from(path: ArgumentListPath<'a>) -> Self {
+        UnparsedItemParent::ArgumentList(path)
+    }
+}
+
+impl<'a> From<ObjectLiteralPath<'a>> for UnparsedItemParent<'a> {
+    fn from(path: ObjectLiteralPath<'a>) -> Self {
+        UnparsedItemParent::ObjectLiteral(path)
+    }
+}
+```
+
 The parse functions:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-/// The next item, consumed, when it is a paren group; its interior parses into
-/// arguments, infallibly, each failed chunk degrading to `Argument::Unparsed`.
 pub(crate) fn consume_argument_list(
-    text: &str,
-    items: &mut ChunkContents<'_>,
+    cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<ArgumentList>> {
-    let peek = items.peek()?;
-    let item = peek.view();
-    match &item.item {
-        ChunkContentItem::Group(group) if group.opening.item.0 == BracketKind::Parenthesis => {
-            let argument_list = ArgumentList(parse_level_items(
-                &group.children.item,
-                Expectation::Argument,
-                |chunk| parse_argument(text, chunk),
-                Argument::Unparsed,
-            ));
-            let span = item.location;
-            peek.commit();
-            Some(WithSpan::new(argument_list, span))
-        }
-        _ => None,
-    }
+    let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
+    Some(WithSpan::new(
+        ArgumentList(group.item.children.item.parse_items(cursor.text(), parse_argument)),
+        group.location,
+    ))
 }
 
-fn parse_argument(text: &str, chunk: &WithSpan<Chunk>) -> Result<Argument, WithSpan<ParseError>> {
-    let mut items = chunk.item.contents.iter().safe_peekable();
-    let name = expect_token(
-        &mut items,
-        NonBracketTokenKind::Identifier,
-        Expectation::Argument,
-        chunk.location.start,
-    )?;
-    let colon = expect_token(
-        &mut items,
+fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
+    let name = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::Argument)?;
+    cursor.require_token(
         NonBracketTokenKind::Colon,
         Expectation::Token(NonBracketTokenKind::Colon),
-        name.end,
     )?;
-    let value = parse_value(text, &mut items, colon.end)?;
-    expect_chunk_end(&mut items, Expectation::Separator)?;
+    let value = parse_value(cursor)?;
     Ok(Argument::Named(NamedArgument {
         name: WithSpan::new(ArgumentName, name),
         value,
     }))
 }
 
-fn parse_object_entry(
-    text: &str,
-    chunk: &WithSpan<Chunk>,
-) -> Result<ObjectEntry, WithSpan<ParseError>> {
-    let mut items = chunk.item.contents.iter().safe_peekable();
-    let name = expect_token(
-        &mut items,
-        NonBracketTokenKind::Identifier,
-        Expectation::ObjectEntry,
-        chunk.location.start,
-    )?;
-    let colon = expect_token(
-        &mut items,
+fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
+    let name = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::ObjectEntry)?;
+    cursor.require_token(
         NonBracketTokenKind::Colon,
         Expectation::Token(NonBracketTokenKind::Colon),
-        name.end,
     )?;
-    let value = parse_value(text, &mut items, colon.end)?;
-    expect_chunk_end(&mut items, Expectation::Separator)?;
+    let value = parse_value(cursor)?;
     Ok(ObjectEntry::Named(NamedObjectEntry {
         name: WithSpan::new(ObjectEntryName, name),
         value,
     }))
 }
+```
 
-/// One value as the next item (or two, for a variable's `$ name`); the error otherwise.
-pub(crate) fn parse_value(
-    text: &str,
-    items: &mut ChunkContents<'_>,
-    missing_at: u32,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
-    let Some(peek) = items.peek() else {
-        return Err(WithSpan::new(
-            ParseError::expected(Expectation::Value, Found::EndOfChunk),
-            Span::new(missing_at, missing_at),
-        ));
-    };
-    let item = peek.view();
-    let span = item.location;
-    match &item.item {
-        ChunkContentItem::NonBracket(token) if token.0 == NonBracketTokenKind::Dollar => {
-            peek.commit();
-            let name = expect_token(
-                items,
-                NonBracketTokenKind::Identifier,
-                Expectation::Token(NonBracketTokenKind::Identifier),
-                span.end,
-            )?;
-            Ok(WithSpan::new(
-                NonConstantValue::Variable(VariableUse {
-                    dollar: WithSpan::new(Dollar, span),
-                    name: WithSpan::new(VariableName, name),
-                }),
-                Span::join(span, name),
-            ))
+`parse_value` is the listing in parsing-standards.md (dispatch on `take_next` inside `spanning`, `cursor.integer`, `BooleanValue::True` / `False`).
+
+```rust
+// from crates/isograph_parser/src/literal_text.rs
+impl TokenText<'_> {
+    pub(crate) fn integer(self, span: Span) -> Result<i64, WithSpan<ParseError>> {
+        match self.0.parse() {
+            Ok(value) => Ok(value),
+            Err(_) => Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
         }
-        ChunkContentItem::NonBracket(token) if token.0 == NonBracketTokenKind::StringLiteral => {
-            peek.commit();
-            Ok(WithSpan::new(NonConstantValue::String(StringValue), span))
-        }
-        ChunkContentItem::NonBracket(token) if token.0 == NonBracketTokenKind::IntegerLiteral => {
-            // The tokenizer's regex admits only optionally-signed digit runs, so the
-            // conversion fails only when the value does not fit.
-            let value = match token_text(text, span).parse::<i64>() {
-                Ok(value) => value,
-                Err(_) => return Err(WithSpan::new(ParseError::IntegerOutOfRange, span)),
-            };
-            peek.commit();
-            Ok(WithSpan::new(NonConstantValue::Integer(IntegerValue(value)), span))
-        }
-        ChunkContentItem::NonBracket(token) if token.0 == NonBracketTokenKind::Identifier => {
-            let value = match token_text(text, span) {
-                "true" => NonConstantValue::Boolean(BooleanValue(true)),
-                "false" => NonConstantValue::Boolean(BooleanValue(false)),
-                "null" => NonConstantValue::Null(NullValue),
-                _ => {
-                    return Err(WithSpan::new(
-                        ParseError::expected(
-                            Expectation::Value,
-                            Found::Token(NonBracketTokenKind::Identifier),
-                        ),
-                        span,
-                    ));
-                }
-            };
-            peek.commit();
-            Ok(WithSpan::new(value, span))
-        }
-        ChunkContentItem::Group(group) if group.opening.item.0 == BracketKind::Brace => {
-            let object = ObjectLiteral(parse_level_items(
-                &group.children.item,
-                Expectation::ObjectEntry,
-                |chunk| parse_object_entry(text, chunk),
-                ObjectEntry::Unparsed,
-            ));
-            peek.commit();
-            Ok(WithSpan::new(NonConstantValue::Object(object), span))
-        }
-        other => Err(WithSpan::new(
-            ParseError::expected(Expectation::Value, Found::from(other)),
-            span,
-        )),
     }
+}
+
+impl<'a> ItemCursor<'a> {
+    pub(crate) fn integer(&self, span: Span) -> Result<i64, WithSpan<ParseError>> {
+        self.text.at(span).integer(span)
+    }
+
+    pub(crate) fn take_next(&mut self) -> Option<&'a WithSpan<ChunkContentItem>> { /* parsing-standards.md */ }
+
+    pub(crate) fn spanning<T>(
+        &mut self,
+        parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
+    ) -> Result<WithSpan<T>, WithSpan<ParseError>> { /* parsing-standards.md */ }
 }
 ```
 
-`token_text` in parse_iso_literal.rs becomes `pub(crate)`.
+`parse_selection` threads the cursor into `consume_argument_list(cursor)` between the name and the selection set. The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted; the suite below replaces it.
 
 ## Changes to selections.rs
 
@@ -456,24 +382,11 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-fn parse_selection(text: &str, chunk: &WithSpan<Chunk>) -> Result<Selection, WithSpan<ParseError>> {
-    // ... the alias-and-name parse is unchanged ...
-    let arguments = consume_argument_list(text, &mut items);
-    let selection_set = consume_selection_set(text, &mut items);
-    expect_chunk_end(&mut items, Expectation::Separator)?;
-    Ok(match selection_set {
-        Some(selection_set) => Selection::Object(ObjectSelection {
-            reader_alias,
-            name,
-            arguments,
-            selection_set,
-        }),
-        None => Selection::Scalar(ScalarSelection { reader_alias, name, arguments }),
-    })
-}
+    let arguments = consume_argument_list(cursor);
+    let selection_set = consume_selection_set(cursor);
 ```
 
-`consume_selection_set` and `expect_selection_set` gain the `text` parameter and pass `|chunk| parse_selection(text, chunk)` to `parse_level_items`; `parse_field` in parse_iso_literal.rs passes `text` through (its signature becomes `parse_field(text: &str, keyword: Span, items: &mut ChunkContents<'_>)`). The parse-fields.md test `arguments_do_not_parse_yet` is deleted; the suite below replaces it.
+The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted; the suite below replaces it.
 
 ## The errors
 
@@ -509,12 +422,9 @@ pub(crate) fn collect_argument_errors(
     let Some(arguments) = arguments else {
         return;
     };
-    for argument in &arguments.item.0 {
-        match &argument.item {
-            Argument::Named(named) => collect_value_errors(&named.value.item, errors),
-            Argument::Unparsed(unparsed) => errors.push(unparsed.reason),
-        }
-    }
+    collect_slot_errors(&arguments.item.0, |argument, errors| match argument {
+        Argument::Named(named) => collect_value_errors(&named.value.item, errors),
+    }, errors);
 }
 
 pub(crate) fn collect_value_errors(
@@ -524,12 +434,9 @@ pub(crate) fn collect_value_errors(
     let NonConstantValue::Object(object) = value else {
         return;
     };
-    for entry in &object.0 {
-        match &entry.item {
-            ObjectEntry::Named(named) => collect_value_errors(&named.value.item, errors),
-            ObjectEntry::Unparsed(unparsed) => errors.push(unparsed.reason),
-        }
-    }
+    collect_slot_errors(&object.0, |entry, errors| match entry {
+        ObjectEntry::Named(named) => collect_value_errors(&named.value.item, errors),
+    }, errors);
 }
 ```
 
@@ -620,19 +527,23 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
-    fn arguments_of(selection: &Selection) -> &WithSpan<ArgumentList> {
-        let arguments = match selection {
-            Selection::Scalar(scalar) => &scalar.arguments,
-            Selection::Object(object) => &object.arguments,
-            selection => panic!("expected a parsed selection, got {selection:?}"),
+    fn arguments_of(slot: &LevelSlot<Selection>) -> &WithSpan<ArgumentList> {
+        let arguments = match slot {
+            LevelSlot::Parsed(parsed) => match &parsed.item {
+                Selection::Scalar(scalar) => &scalar.arguments,
+                Selection::Object(object) => &object.arguments,
+            },
+            slot => panic!("expected a parsed selection, got {slot:?}"),
         };
         arguments.as_ref().expect("the fixture's selection carries arguments")
     }
 
-    fn as_named_argument(argument: &Argument) -> &NamedArgument {
-        match argument {
-            Argument::Named(named) => named,
-            argument => panic!("expected a named argument, got {argument:?}"),
+    fn as_named_argument(slot: &LevelSlot<Argument>) -> &NamedArgument {
+        match slot {
+            LevelSlot::Parsed(parsed) => match &parsed.item {
+                Argument::Named(named) => named,
+            },
+            slot => panic!("expected a named argument, got {slot:?}"),
         }
     }
 
@@ -667,8 +578,8 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         assert!(matches!(values[1], NonConstantValue::String(_)));
         assert!(matches!(values[2], NonConstantValue::Integer(IntegerValue(42))));
         assert!(matches!(values[3], NonConstantValue::Integer(IntegerValue(-7))));
-        assert!(matches!(values[4], NonConstantValue::Boolean(BooleanValue(true))));
-        assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue(false))));
+        assert!(matches!(values[4], NonConstantValue::Boolean(BooleanValue::True)));
+        assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue::False)));
         assert!(matches!(values[6], NonConstantValue::Null(_)));
         assert_eq!(
             as_named_argument(&arguments.item.0[0].item).value.location,
@@ -690,7 +601,9 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         };
         assert_eq!(object.0.len(), 2);
         let nested = match &object.0[1].item {
-            ObjectEntry::Named(named) => named,
+            LevelSlot::Parsed(parsed) => match &parsed.item {
+                ObjectEntry::Named(named) => named,
+            },
             entry => panic!("expected a named entry, got {entry:?}"),
         };
         assert_eq!(nested.name.location, span_of(text, "nested"));
@@ -710,7 +623,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            Argument::Unparsed(unparsed) => unparsed,
+            LevelSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(unparsed.reason.item, ParseError::IntegerOutOfRange);
@@ -725,7 +638,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            Argument::Unparsed(unparsed) => unparsed,
+            LevelSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(
@@ -741,7 +654,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
         let unparsed = match &arguments.item.0[0].item {
-            Argument::Unparsed(unparsed) => unparsed,
+            LevelSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(
@@ -752,19 +665,16 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
     }
 
     #[test]
-    fn a_doubled_comma_between_arguments_is_an_unparsed_argument() {
+    fn a_doubled_comma_between_arguments_is_chunkings_error() {
         let text = "field Query.Foo { bar(a: 1,, b: 2) }";
-        let parse = parsed(text);
+        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors.len(), 1);
         let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
-        assert_eq!(arguments.item.0.len(), 3);
-        let unparsed = match &arguments.item.0[1].item {
-            Argument::Unparsed(unparsed) => unparsed,
-            argument => panic!("expected an unparsed argument, got {argument:?}"),
-        };
-        assert_eq!(
-            unparsed.reason.item,
-            expected(Expectation::Argument, Found::Token(Comma))
-        );
+        assert_eq!(arguments.item.0.len(), 2);
+        as_named_argument(&arguments.item.0[0].item);
+        as_named_argument(&arguments.item.0[1].item);
+        assert_eq!(parse.item.errors(), vec![]);
     }
 
     #[test]
