@@ -426,7 +426,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_declaration` stops when the production ends. `parse_singleton` owns `require_end`, the boundary comma, extra chunks, and the empty-level error. An incomplete declaration split across a line break reports its own error; only a complete declaration followed by more content reports `MultipleDeclarations`.
+`parse_declaration` stops after the last item of the declaration. `parse_singleton` owns `require_end`, the boundary comma, extra chunks, and the empty-level error. An incomplete declaration split across a line break reports its own error; only a complete declaration followed by more content reports `MultipleDeclarations`.
 ## lib.rs
 
 Before:
