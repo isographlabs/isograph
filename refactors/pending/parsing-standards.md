@@ -4,7 +4,7 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 
 ## Input shape
 
-- The unit of parsing is the chunk: a `NonEmptyVec` of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that exactly one holds the declaration is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
+- The unit of parsing is the chunk: a `NonEmptyVec` of tokens and matched groups, read by exactly one `SafePeekable`, behind that chunk's `ChunkStream`. The root level's chunks are the literal's top-level items (the grammar's rule that the root holds exactly one chunk, the declaration, is parse-entrypoint.md's, not a structural fact); a group's interior is levels of further chunks; each chunk parses independently. No cursor spans two chunks.
 - A group is one item, consumed whole, always really closed. Its interior re-enters parsing only as fresh levels.
 - Items arrive pre-spanned. Parsers compute a span only for a multi-item composite, via `spanning`.
 - Separators were absorbed into boundaries by chunking: "a separator comes next" is `take_next()` returning `None`. An unmatched bracket and its level's tail never left the matcher, and a comma no item precedes never left chunking: no bracket or empty-chunk state reaches a parser.
@@ -12,13 +12,13 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 ## Function shapes
 
 - `require_*`: required grammar. Errors on the found item, unconsumed, or at an empty span where the missing item belonged. Consumes exactly the accepted items.
-- `consume_*`: optional grammar. Consumes and returns the item when the next item opens it; consumes nothing and returns `None` otherwise. Never errors.
+- `consume_*`: optional grammar, always a single item. Consumes and returns the item when the next item matches; consumes nothing and returns `None` otherwise. Never errors.
 - `parse_*`: a composite production built from the other two. Errors propagate from the first failing piece.
 - Shared structure is a higher-order function taking the item parser (`parse_level_items`); a hand-duplicated walk or wrapper is banned.
 
 ## Enforcement structures
 
-Every operation a parser can perform on a chunk is a method on one of two types. A new operation is a new method here, never a local helper. A level needs no such surface: `ChunkedLevel`'s public vec is iterated plainly by the walkers, which Level walks below names as its only consumers. Nor does the text: `token_text(text, span)` (the text a span covers) and, from parse-arguments.md, `integer` are free functions, and their call sites are the greppable set of text reads.
+Every operation a parser can perform on a chunk is a method on one of two types. A new operation is a new method here, never a local helper. A level needs no such surface: `ChunkedLevel`'s public vec is iterated plainly by the walkers named in Level walks below, its only consumers. Nor does the text: `token_text(text, span)` (the text a span covers) and, from parse-arguments.md, `integer` are free functions, and their call sites are the greppable set of text reads.
 
 ### `ChunkStream`
 
@@ -85,7 +85,7 @@ impl<'a> ChunkStream<'a> {
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
     /// The stream a parser reads this chunk through.
-    pub fn stream(&self) -> ChunkStream<'_>;
+    pub(crate) fn stream(&self) -> ChunkStream<'_>;
 
     /// The span of the contents, without the boundary: a degraded slot's span. Total,
     /// because every chunk has contents.
@@ -97,7 +97,7 @@ impl Chunk {
 }
 ```
 
-- `Chunk`'s fields are private to chunk.rs. These methods are the only item access and the only boundary reads.
+- `Chunk`'s fields are private to chunk.rs (today they are `pub` with no reader outside chunk.rs; the privatization lands with `stream`). These methods are the only item access and the only boundary reads a parser has. `Chunk` is `pub` and re-exported at the crate root, so `stream` is `pub(crate)`: `ChunkStream` never crosses the crate boundary.
 
 ## Dispatch
 
@@ -127,7 +127,7 @@ match stream.take_next() {
 ```
 
 - Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `token_text`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
-- `consume_*_if` is not a dispatch tool. It exists for the composition boundary: a sub-parser declining an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`). A `consume_*_if` chain where one production owns all the alternatives is banned.
+- `consume_*_if` is not a dispatch tool. It serves the single optional item (a selection's optional brace group), including at a composition boundary, where a sub-parser declines an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`) and so cannot own an exhaustive match there. A `consume_*_if` chain where one production owns all the alternatives is banned.
 - A construct that is optional as a whole but required once its first item appears (`$name`, a future `@ name (args)`) is a dispatch arm; the first item commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
 - Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its first item and is fallible from its second on (`@@` errors at the second `@`). Committing before knowing the interpretation (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consuming and then declining does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.
 
@@ -164,7 +164,7 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 ## Trees and spans
 
 - Span placement is decided at the type: a tree enum is `WithSpan`-wrapped once at its slot, variant payloads are bare, struct fields each carry their own `WithSpan`, and each wrapper's coverage is stated on the type.
-- Names are spans held by fieldless marker structs, one per role (an alias is not a name; an argument name is not an object key). No strings, no interning; the one derived scalar is the converted `i64`. Punctuation and keyword markers (`Dot`, `Dollar`, `Exclamation`, ...) are unmarked fields and answer their container.
+- A name is a `WithSpan`-wrapped fieldless marker struct, one type per role (an alias is not a name; an argument name is not an object key); its text is the wrapper's span. No strings, no interning; the one derived scalar is the converted `i64`. Punctuation and keywords (the dot, the `$`, the `!`, `to`) get no nodes of their own; their positions answer their container.
 - `ResolvePosition` is derive-only; a manual impl is a missing `resolve_position` feature and becomes a prefactor there. A parent is a direct path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants are reachable inside degraded regions only.
 
 ## Performance
@@ -185,6 +185,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, and `token_text` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Each structure, method, and structural change lands with the feature doc of its first production caller (`Chunk::stream`, the privatization of `Chunk`'s fields, `require_token`, `require_end`, `token_text`, and the named `non_empty_vec::Iter` struct that `NonEmptyVec::iter`'s `impl Iterator` return becomes — a struct field cannot name an `impl` return type — with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning`, `end_span`, and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
-A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
+A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the two impl blocks and the text-read free functions; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
