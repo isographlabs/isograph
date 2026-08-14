@@ -25,7 +25,7 @@ impl<'a> LiteralText<'a> {
 }
 ```
 
-lib.rs registers the module (`mod literal_text;`) without re-exporting it: the type is `pub(crate)` and stays so. parse-arguments.md amends the impl with `integer` (`None` on out of range); no other read exists, and string-literal contents and every other span stay unreadable.
+lib.rs registers the module (`mod literal_text;`) without re-exporting it: the type is `pub(crate)` and stays so. Until its caller lands, the impl carries `#[expect(dead_code)]`; parse-entrypoint.md's implementation removes the attribute, and the `expect` (unlike `allow`) fails the build if it is ever redundant, so it cannot outlive its reason. parse-arguments.md amends the impl with `integer` (`None` on out of range); no other read exists, and string-literal contents and every other span stay unreadable.
 
 ## Tests
 
