@@ -18,7 +18,7 @@ Rules for all grammar-stage code. The feature docs define the grammar; this doc 
 
 ## Enforcement structures
 
-Every operation a parser can perform on a chunk or the text is a method on one of three types. A new operation is a new method here, never a local helper. A level needs no such surface: `ChunkedLevel`'s public vec is iterated plainly by the walkers, which Level walks below names as its only consumers.
+Every operation a parser can perform on a chunk is a method on one of two types. A new operation is a new method here, never a local helper. A level needs no such surface: `ChunkedLevel`'s public vec is iterated plainly by the walkers, which Level walks below names as its only consumers. Nor does the text: `token_text(text, span)` (the text a span covers) and, from parse-arguments.md, `integer` are free functions, and their call sites are the greppable set of text reads.
 
 ### `ChunkStream`
 
@@ -99,22 +99,6 @@ impl Chunk {
 
 - `Chunk`'s fields are private to chunk.rs. These methods are the only item access and the only boundary reads.
 
-### `LiteralText`
-
-```rust
-// from crates/isograph_parser/src/literal_text.rs
-/// The literal's text, admitting only the reads the grammar performs. Raw slicing is
-/// unavailable outside this impl.
-pub(crate) struct LiteralText<'a>(&'a str);
-
-impl<'a> LiteralText<'a> {
-    /// The literal text a span covers. The parser reads it only to recognize keywords.
-    pub(crate) fn token_text(&self, span: Span) -> &'a str;
-}
-```
-
-- The complete set of text reads is this impl block: a token's text (the declaration keywords, `to`, `true`/`false`/`null`, all matched as strings at their one dispatch site each) and, when parse-arguments.md amends it, `integer` (`None` on out of range). String-literal contents and every other span stay unreadable.
-
 ## Dispatch
 
 A position allowing several forms is one exhaustive `match` on `take_next()`. The discriminating item commits up front; accepting arms continue from it, the rejecting arm reports it as the `found`.
@@ -126,8 +110,8 @@ match stream.take_next() {
         ChunkContentItem::NonBracket(token) => match token.0 {
             NonBracketTokenKind::Dollar => { /* the variable's name follows */ }
             NonBracketTokenKind::StringLiteral => { /* done; item.location is the span */ }
-            NonBracketTokenKind::IntegerLiteral => { /* convert via LiteralText */ }
-            NonBracketTokenKind::Identifier => { /* match LiteralText::token_text: true/false/null */ }
+            NonBracketTokenKind::IntegerLiteral => { /* convert via integer */ }
+            NonBracketTokenKind::Identifier => { /* match token_text: true/false/null */ }
             kind => return Err(WithSpan::new(
                 ParseError::expected(Expectation::Value, Found::Token(kind)),
                 item.location,
@@ -142,7 +126,7 @@ match stream.take_next() {
 }
 ```
 
-- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `LiteralText::token_text`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
+- Content dispatch is the same shape one level down: `require_token(Identifier, ...)`, then a `match` on `token_text`'s string (`"entrypoint"`, `"field"`, `"pointer"`; `"true"`/`"false"`/`"null"`; `"to"`), the `_` arm the one reject.
 - `consume_*_if` is not a dispatch tool. It exists for the composition boundary: a sub-parser declining an item that belongs to its caller (the optional `!` after a type name, whose absence might be the caller's `=`). A `consume_*_if` chain where one production owns all the alternatives is banned.
 - A construct that is optional as a whole but required once its first item appears (`$name`, a future `@ name (args)`) is a dispatch arm; the first item commits in the match, the remainder is `require_*`, repetition is the position's match in a loop.
 - Optionality is decided by the first item, always. A single optional item is a `consume_*_if`, infallible. A multi-item optional commits its first item and is fallible from its second on (`@@` errors at the second `@`). Committing before knowing the interpretation (the alias's colon deciding what the committed identifier was) is legal only when every continuation uses everything committed. Consuming and then declining does not exist, so a grammar addition needing more than one item of lookahead for optionality is unwritable.
@@ -187,7 +171,7 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 - One pass, by reference; the output copies spans and `Copy` tokens. Cloning happens only when a region degrades: allocation beyond the output vecs is proportional to the error count.
 - No backtracking exists (no rewind), so parse time is linear in the token count.
-- No pico, no interning: plain functions over `LiteralText` and the chunk tree.
+- No pico, no interning: plain functions over the literal's text and the chunk tree.
 
 ## Relation to the upstream parser
 
@@ -195,12 +179,12 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 - Upstream's `to_control_flow` alternative chains are safe only while every alternative fails on its first unconsumed token, admitted in `parse_type_annotation`'s comment ("will leave the parser in an inconsistent state"); here no rewind exists, so that parser cannot be written.
 - Upstream is fail-fast and panics on unexpected input (`number.parse().expect(...)`, `unreachable!()` in the block-string lexer); here every input yields a tree.
 - Upstream errors are inline prose `String`s, some spanless (`Span::todo_generated()`); here they are structured with mandatory spans.
-- Upstream threads `TextSource` and extraction context (its own comment: "we break memoization") and interns during the parse; here the inputs are `LiteralText` and the chunk tree.
+- Upstream threads `TextSource` and extraction context (its own comment: "we break memoization") and interns during the parse; here the inputs are the literal's text and the chunk tree.
 - Upstream re-derives separator policy per list (`parse_comma_or_line_break`, `white_space_span` inspection) and meets bracket mistakes wherever a token check trips; here separators live in chunking, brackets in the matcher.
 - Upstream accumulates semantic tokens during parsing; here they are derivable later from the tree.
 
 ## Shipping and amending
 
-Each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core and `Chunk::stream` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md), with one deliberate exception: `LiteralText` lands one doc ahead via the prefactor literal-text.md, since it couples to nothing undecided. A method with no caller yet exists only in this doc.
+Each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, and `token_text` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
