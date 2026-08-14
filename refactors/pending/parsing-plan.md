@@ -58,7 +58,7 @@ A boundary is a chunk's trailing separator run. The model: line breaks are swall
 
 ## The error model
 
-Every literal yields a tree; the parse never fails to return one. Malformed regions degrade to unparsed nodes that hold the reason and the chunk-stage data they cover, so every error is representable in the tree and every position inside a degraded region still resolves. `errors()` on the result collects the reasons in source order; there is no error list beside the tree.
+Every literal yields a tree; the parse never fails to return one. Malformed regions degrade to unparsed nodes that hold the reason and the chunk-stage data they cover, so every error is representable in the tree and every position inside a degraded region still resolves. Leftover after a successful list item is `ParsedSlot::trailing`. `errors()` on the result collects the reasons in source order; there is no error list beside the tree.
 
 There is one error enum, `ParseError`, and its workhorse variant is generic, in the shape of upstream's token errors:
 
@@ -85,8 +85,8 @@ A reason is a `WithSpan<ParseError>`; the span points at the offending item, or 
 
 Failure granularity starts coarse and refines:
 
-- parse-entrypoint.md degrades the whole literal: any failure produces `UnparsedLiteral`, holding the reason and the entire root `ChunkedLevel`.
-- parse-fields.md introduces per-item degradation with `UnparsedItem`: a list chunk that fails to parse becomes an unparsed item holding its cloned chunk, and its siblings parse normally. Declaration-header errors keep degrading the whole literal.
+- parse-entrypoint.md degrades the whole literal: any failure produces `UnparsedLiteral`, holding the reason and the entire root `ChunkedLevel`. `parse_singleton` owns the empty-literal, extra-chunk, leftover, and trailing-comma errors.
+- parse-fields.md introduces per-item degradation with `LevelSlot`: a list chunk that fails to parse becomes `LevelSlot::Unparsed` holding its cloned chunk; leftover after a successful item is `ParsedSlot::trailing`. Siblings parse normally. Declaration-header errors keep degrading the whole literal.
 
 ## The resolution surface
 
@@ -105,12 +105,12 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 
 ## The docs, in order
 
-The prefactors are landed (refactors/past/cut-at-unmatched.md, refactors/past/no-empty-chunks.md): no unmatched-bracket state and no empty chunk exist downstream of the matcher and chunking. parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins:
+parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins:
 
-1. `parse-entrypoint.md`. The skeleton everything else extends: `parse_iso_literal`, the root-level rules (the declaration is the first chunk and the only one), keyword dispatch, `ParseError` with its `Display` impls, `UnparsedLiteral` with its resolution fallback, and the complete `entrypoint Type.field` declaration. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
-2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections with nested selection sets, `UnparsedItem` and the shared level-walking helper, and the parent-enum conversions second parents force (`EntityName`, `ClientFieldName`, `Chunk`). Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group inside a selection is that selection's unparsed reason until the next doc.
-3. `parse-arguments.md`. Argument lists on selections, `name: value` pairs, and values: variable, string, integer (with the `i64` conversion and `IntegerOutOfRange`), boolean, null, and object literals with their entry chunks.
-4. `parse-variables.md`. Variable-declaration lists on field declarations, `$name: Type = default`, type annotations (named, `!`, and `[...]` with its one-chunk interior), the constant-value restriction on defaults, and the `Box` delegation impl the recursion needs in `resolve_position`.
-5. `parse-descriptions.md`. The optional description (string or block string) a field declaration carries before its selection set, and that pointers reuse.
-6. `parse-pointers.md`. `pointer Type.name to Type { ... }`, reusing type annotations, descriptions, and selection sets, and removing `UnsupportedDeclarationType`.
-7. `no-final-comma.md`. One-item contexts reject a final comma: the `boundary_comma` helper and its two call sites (the root level after the declaration, the `[...]` interior after its type), landing last so its tests cover every declaration form.
+1. `parse-entrypoint.md`. The skeleton: `LiteralText`, `ItemCursor` / `ChunkStream`, `parse_singleton`, `parse_iso_literal`, keyword dispatch, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` dispatch to a temporary `UnsupportedDeclarationType` error that parse-fields.md and parse-pointers.md remove.
+2. `parse-fields.md`. `field Type.name { ... }` with selection sets: scalar selections, `alias: name`, object selections, `LevelSlot` / `parse_items`, and the parent-enum conversions second parents force. Adds `Clone` to the chunk tree so unparsed items can own their chunks. Arguments are not yet parsed: a paren group after a selection name is that selection's trailing leftover until the next doc.
+3. `parse-arguments.md`. Argument lists on selections, `name: value` pairs, and values: variable, string, integer (with the `i64` conversion and `IntegerOutOfRange`), `BooleanValue::{True, False}`, null, and object literals.
+4. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl the recursion needs in `resolve_position`.
+5. `parse-descriptions.md`. The optional description (string or block string) a field declaration carries before its selection set, via `consume_token_if_any`.
+6. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_keyword("to")`, reusing type annotations, descriptions, and selection sets, and removing `UnsupportedDeclarationType`.
+7. `no-final-comma.md`. No new code: the test matrix for `parse_singleton`'s comma check, already written into the feature docs above.

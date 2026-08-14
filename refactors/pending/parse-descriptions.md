@@ -46,11 +46,21 @@ pub struct ClientFieldDeclaration {
 ## The parser
 
 ```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+impl<'a> ItemCursor<'a> {
+    pub(crate) fn consume_token_if_any(&mut self, kinds: &[NonBracketTokenKind]) -> Option<Span> {
+        /* parsing-standards.md */
+    }
+}
+```
+
+```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-/// The next item, consumed, when it is a string or block-string token.
-pub(crate) fn consume_description(items: &mut ChunkContents<'_>) -> Option<WithSpan<Description>> {
-    let span = consume_token_if(items, NonBracketTokenKind::StringLiteral)
-        .or_else(|| consume_token_if(items, NonBracketTokenKind::BlockStringLiteral))?;
+pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
+    let span = cursor.consume_token_if_any(&[
+        NonBracketTokenKind::StringLiteral,
+        NonBracketTokenKind::BlockStringLiteral,
+    ])?;
     Some(WithSpan::new(Description, span))
 }
 ```
@@ -59,9 +69,9 @@ pub(crate) fn consume_description(items: &mut ChunkContents<'_>) -> Option<WithS
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    let variable_definitions = consume_variable_declaration_list(text, items);
-    let description = consume_description(items);
-    let selection_set = expect_selection_set(text, items, client_field_name.end)?;
+    let variable_definitions = consume_variable_declaration_list(cursor);
+    let description = consume_description(cursor);
+    let selection_set = require_selection_set(cursor)?;
 ```
 
 No error paths are added: a malformed string token (`ErrorUnterminatedString` and kin) is not consumed here and surfaces as the found token of the selection-set expectation, and a description in any other position is an ordinary unexpected token there.

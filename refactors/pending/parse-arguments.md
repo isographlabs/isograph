@@ -359,26 +359,7 @@ pub struct ObjectSelection {
 }
 ```
 
-`parse_selection` threads `text` and consumes the arguments between the name and the selection set. Before:
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-fn parse_selection(chunk: &WithSpan<Chunk>) -> Result<Selection, WithSpan<ParseError>> {
-    // ...
-    let selection_set = consume_selection_set(&mut items);
-    expect_chunk_end(&mut items, Expectation::Separator)?;
-    Ok(match selection_set {
-        Some(selection_set) => Selection::Object(ObjectSelection {
-            reader_alias,
-            name,
-            selection_set,
-        }),
-        None => Selection::Scalar(ScalarSelection { reader_alias, name }),
-    })
-}
-```
-
-After:
+`parse_selection` consumes the arguments between the name and the selection set:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs

@@ -40,9 +40,13 @@ pub enum IsoLiteralParse {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        "entrypoint" => Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, &mut items)?)),
-        "field" => Ok(IsoLiteralParse::Field(parse_field(text, keyword, &mut items)?)),
-        "pointer" => Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword)),
+        text if text == "entrypoint" => {
+            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+        }
+        text if text == "field" => Ok(IsoLiteralParse::Field(parse_field(keyword, cursor)?)),
+        text if text == "pointer" => {
+            Err(WithSpan::new(ParseError::UnsupportedDeclarationType, keyword))
+        }
 ```
 
 After:
@@ -59,9 +63,13 @@ pub enum IsoLiteralParse {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        "entrypoint" => Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, &mut items)?)),
-        "field" => Ok(IsoLiteralParse::Field(parse_field(text, keyword, &mut items)?)),
-        "pointer" => Ok(IsoLiteralParse::Pointer(parse_pointer(text, keyword, &mut items)?)),
+        text if text == "entrypoint" => {
+            Ok(IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?))
+        }
+        text if text == "field" => Ok(IsoLiteralParse::Field(parse_field(keyword, cursor)?)),
+        text if text == "pointer" => {
+            Ok(IsoLiteralParse::Pointer(parse_pointer(keyword, cursor)?))
+        }
 ```
 
 The declaration type, its markers, and its parse function:
@@ -109,40 +117,39 @@ pub type ClientPointerNamePath<'a> =
 ```
 
 ```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+impl<'a> ItemCursor<'a> {
+    pub(crate) fn require_keyword(
+        &mut self,
+        keyword: &'static str,
+        expected: Expectation,
+    ) -> Result<Span, WithSpan<ParseError>> { /* parsing-standards.md */ }
+}
+```
+
+```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_pointer(
-    text: &str,
     keyword: Span,
-    items: &mut ChunkContents<'_>,
+    cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientPointerDeclaration, WithSpan<ParseError>> {
-    let parent_type = expect_token(
-        items,
+    let parent_type = cursor.require_token(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
-        keyword.end,
     )?;
-    let dot = expect_token(
-        items,
+    let dot = cursor.require_token(
         NonBracketTokenKind::Period,
         Expectation::Token(NonBracketTokenKind::Period),
-        parent_type.end,
     )?;
-    let client_pointer_name = expect_token(
-        items,
+    let client_pointer_name = cursor.require_token(
         NonBracketTokenKind::Identifier,
         Expectation::Token(NonBracketTokenKind::Identifier),
-        dot.end,
     )?;
-    let variable_definitions = consume_variable_declaration_list(text, items);
-    let variables_end = variable_definitions
-        .as_ref()
-        .map(|list| list.location.end)
-        .unwrap_or(client_pointer_name.end);
-    let to_keyword = expect_to_keyword(text, items, variables_end)?;
-    let target_type = parse_type_annotation(items, to_keyword.end)?;
-    let description = consume_description(items);
-    let selection_set = expect_selection_set(text, items, target_type.location.end)?;
-    expect_chunk_end(items, Expectation::EndOfDeclaration)?;
+    let variable_definitions = consume_variable_declaration_list(cursor);
+    let to_keyword = cursor.require_keyword("to", Expectation::ToKeyword)?;
+    let target_type = parse_type_annotation(cursor)?;
+    let description = consume_description(cursor);
+    let selection_set = require_selection_set(cursor)?;
     Ok(ClientPointerDeclaration {
         pointer_keyword: WithSpan::new(PointerKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
@@ -155,38 +162,9 @@ fn parse_pointer(
         selection_set,
     })
 }
-
-/// The identifier `to` as the next item; the error otherwise, including an identifier
-/// with any other text.
-fn expect_to_keyword(
-    text: &str,
-    items: &mut ChunkContents<'_>,
-    missing_at: u32,
-) -> Result<Span, WithSpan<ParseError>> {
-    let Some(peek) = items.peek() else {
-        return Err(WithSpan::new(
-            ParseError::expected(Expectation::ToKeyword, Found::EndOfChunk),
-            Span::new(missing_at, missing_at),
-        ));
-    };
-    let item = peek.view();
-    match &item.item {
-        ChunkContentItem::NonBracket(token)
-            if token.0 == NonBracketTokenKind::Identifier
-                && token_text(text, item.location) == "to" =>
-        {
-            let span = item.location;
-            peek.commit();
-            Ok(span)
-        }
-        other => Err(WithSpan::new(
-            ParseError::expected(Expectation::ToKeyword, Found::from(other)),
-            item.location,
-        )),
-    }
-}
 ```
 
+`parse_pointer` does not call `require_end`. `parse_singleton` owns exhaustion, the boundary comma, and extra chunks.
 `errors()` gains the pointer arm, mirroring the field arm (the target type contributes nothing: a bad target fails the header, degrading the whole literal):
 
 ```rust
@@ -256,6 +234,16 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
             IsoLiteralParse::Pointer(declaration) => declaration,
             parse => panic!("expected a pointer declaration, got {parse:?}"),
         }
+    }
+
+    #[test]
+    fn a_final_comma_after_the_pointer_declaration_is_an_error() {
+        let text = "pointer Pet.BestFriend to Pet { id },";
+        assert_unparsed(
+            text,
+            expected(Expectation::EndOfDeclaration, Found::Token(Comma)),
+            span_of(text, ","),
+        );
     }
 
     #[test]

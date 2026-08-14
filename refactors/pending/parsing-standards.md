@@ -925,6 +925,7 @@ Every grammar-stage task is one row. A task that is not here is a missing method
 - Missing-item error span: `ItemCursor::end_span`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
 - One-item context: `parse_singleton`
+- First item of a rejected extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` (via `boundary_comma`)
 - Leftover after a list item: `ParsedSlot::trailing`
 - Leftover after a singleton: `parse_singleton`'s `require_end`
