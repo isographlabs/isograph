@@ -105,13 +105,24 @@ Do not `match` a `Result` to bind the success value and return or convert the er
 
 When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do not `match` on `Ok` / `Err` then.
 
-## Ok, Err, Some
+## Postfix wrappers
 
-Do not write `Ok(...)`, `Err(...)`, or `Some(...)` constructors. Write `value.wrap_ok()`, `value.wrap_err()`, and `value.wrap_some()` from `prelude::Postfix`.
+Do not write prefix or constructor wrappers that `prelude::Postfix` already names. Write the method.
+
+- `Ok(value)` / `Err(value)` / `Some(value)` → `value.wrap_ok()` / `value.wrap_err()` / `value.wrap_some()`
+- `Box::new(value)` → `value.boxed()`
+- `vec![value]` (one element) → `value.wrap_vec()`
+- `value.into()` → `value.to()`
+- `*value` when copying out of a `Deref` whose target is `Copy` → `value.dereference()`
+- `&value` when taking a shared reference to a value → `value.reference()`
 
 Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`. `None` has no value to wrap; it stays `None`.
 
-The bodies of `wrap_ok`, `wrap_err`, and `wrap_some` in prelude are the one place the constructors appear. Clippy cannot ban enum constructors; `crates/tests` `postfix_constructors` is the enforcement.
+`&T` / `&str` / `&[T]` in type position, `&mut`, `&self`, and `&mut self` stay. Empty `vec![]` and `vec![a, b, ..]` stay. Prefix `&` also stays when `Postfix` cannot express it: `s[i..]` is unsized, `let x = &foo()` relies on temporary lifetime extension that `foo().reference()` does not get, and `&|...|` is what higher-ranked `Fn` bounds need. `.to()` takes a turbofish when the target type is not inferred.
+
+The bodies of these methods in prelude are the one place the std forms appear.
+
+`crates/tests` `postfix_constructors` enforces the constructors (`Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`) and `.into()`. It does not enforce `.reference()` or `.dereference()`: prefix `&` and `*` are also types, mutable places, and patterns, and a walk cannot tell those from a value borrow or a copy-out without too many holes. Still write `.reference()` and `.dereference()` in new code.
 
 ## Audits
 
