@@ -202,6 +202,6 @@ One chunk to one item, and the item is a result: each chunk parses in its entire
 
 ## Shipping and amending
 
-Nothing here ships on its own: each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core, `Chunk::stream`, and `LiteralText::identifier` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md). A method with no caller yet exists only in this doc.
+Each structure and each method lands with the feature doc of its first production caller (`ChunkStream`'s required-token core and `Chunk::stream` with parse-entrypoint.md; `take_next`, the `consume_*` methods, `contents_span`, and `parse_level_items` with parse-fields.md; `spanning` and `integer` with parse-arguments.md; `boundary_comma` with no-final-comma.md), with one deliberate exception: `LiteralText` lands one doc ahead via the prefactor literal-text.md, since it couples to nothing undecided. A method with no caller yet exists only in this doc.
 
 A feature implementation is reviewed against this doc when it lands. The expected amendment sites are the four impl blocks; a change that routes around a structure instead of extending it is what this doc exists to prevent. This doc itself never moves to refactors/past: it is normative and stays current.
