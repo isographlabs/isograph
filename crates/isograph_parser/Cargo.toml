@@ -7,6 +7,7 @@ license = { workspace = true }
 [dependencies]
 logos = { workspace = true }
 nonempty = { workspace = true }
+prelude = { path = "../prelude" }
 resolve_position = { path = "../resolve_position" }
 resolve_position_macros = { path = "../resolve_position_macros" }
 safe_peekable = { path = "../safe_peekable" }

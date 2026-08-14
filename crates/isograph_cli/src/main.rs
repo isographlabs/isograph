@@ -4,6 +4,7 @@ use std::process::ExitCode;
 
 use clap::{CommandFactory, FromArgMatches, Parser};
 use freddie_cli::{App, Instance, NoArgs};
+use prelude::Postfix;
 
 #[derive(Parser)]
 #[command(name = "isograph", version, about = "The isograph compiler.", long_about = None)]
@@ -30,7 +31,7 @@ impl App for Isograph {
     const NAME: &'static str = "isograph";
 
     fn instance(_: &NoArgs) -> Result<Instance, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(Instance::global(Self::NAME)?)
+        Instance::global(Self::NAME)?.wrap_ok()
     }
 
     fn run_daemon(_: &NoArgs, _: &IsographArgs) {

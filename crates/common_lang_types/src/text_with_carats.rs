@@ -2,6 +2,7 @@ use std::{num::NonZeroU32, ops::Range};
 
 use colored::Colorize;
 
+use prelude::Postfix;
 use span::Span;
 
 const LINE_COUNT_BUFFER: usize = 2;
@@ -42,10 +43,10 @@ fn text_with_carats_and_line_count_buffer(
     let span = span.as_usize_range();
     match locate(file_text, &span) {
         LocatedSpan::OutsideText => (String::new(), None),
-        LocatedSpan::OnLineBreaksOnly(row_col) => (String::new(), Some(row_col)),
+        LocatedSpan::OnLineBreaksOnly(row_col) => (String::new(), row_col.wrap_some()),
         LocatedSpan::Highlighting(highlighted) => {
             let rendered = render_window(file_text, &span, &highlighted, line_count_buffer, color);
-            (rendered, Some(highlighted.row_col))
+            (rendered, highlighted.row_col.wrap_some())
         }
     }
 }
@@ -78,15 +79,16 @@ fn locate(file_text: &str, span: &Range<usize>) -> LocatedSpan {
         }
         if row_col.is_none() && line_range.end > span.start {
             let col = span.start - line_range.start;
-            row_col = Some((
+            row_col = (
                 OneIndexedRowNumber(one_indexed(index)),
                 OneIndexedColNumber(one_indexed(col)),
-            ));
+            )
+                .wrap_some();
         }
         if !highlight_on_line(span, &line_range, line.len()).is_empty() {
             highlighted_lines = match highlighted_lines {
-                None => Some((index, index)),
-                Some((first_line, _)) => Some((first_line, index)),
+                None => (index, index).wrap_some(),
+                Some((first_line, _)) => (first_line, index).wrap_some(),
             };
         }
     }
@@ -187,6 +189,7 @@ mod test {
 
     use std::sync::{LazyLock, Mutex};
 
+    use prelude::Postfix;
     use span::Span;
 
     use crate::{
@@ -605,7 +608,7 @@ mod test {
     fn the_row_and_col_locate_the_spans_start() {
         let (_, row_col) =
             text_with_carats_for_test(&input_with_lines(10), Span::new(0, 1), 3, CaratColor::Plain);
-        assert_eq!(u32_row_col(row_col), Some((1, 1)));
+        assert_eq!(u32_row_col(row_col), (1, 1).wrap_some());
 
         let (_, row_col) = text_with_carats_for_test(
             &input_with_lines(10),
@@ -613,7 +616,7 @@ mod test {
             3,
             CaratColor::Plain,
         );
-        assert_eq!(u32_row_col(row_col), Some((4, 2)));
+        assert_eq!(u32_row_col(row_col), (4, 2).wrap_some());
     }
 
     #[test]
@@ -625,7 +628,7 @@ mod test {
             CaratColor::Plain,
         );
         assert_eq!(output, "");
-        assert_eq!(u32_row_col(row_col), Some((1, 10)));
+        assert_eq!(u32_row_col(row_col), (1, 10).wrap_some());
     }
 
     #[test]

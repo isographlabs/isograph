@@ -1,3 +1,4 @@
+use prelude::Postfix;
 use std::{fmt, ops::Range};
 
 /// A range of byte offsets into source text. The parser stack uses these relative to one
@@ -107,7 +108,7 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
     where
         TLocation: Copy,
     {
-        Ok(WithGenericLocation::new(map(self.item)?, self.location))
+        WithGenericLocation::new(map(self.item)?, self.location).wrap_ok()
     }
 
     pub fn as_ref(&self) -> WithGenericLocation<&T, TLocation>

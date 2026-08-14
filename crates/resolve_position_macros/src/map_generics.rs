@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use prelude::Postfix;
 use syn::{
     Error,
     visit_mut::{self, VisitMut},
@@ -86,7 +87,7 @@ pub(crate) fn validate_and_map_generics(
     let expected_count = struct_generics.len();
 
     if provided_count != expected_count {
-        return Err(Error::new_spanned(
+        return Error::new_spanned(
             &self_type_generics,
             format!(
                 "Generic parameter count mismatch: expected {} ({}), got {}",
@@ -99,19 +100,21 @@ pub(crate) fn validate_and_map_generics(
                 provided_count
             ),
         )
-        .to_compile_error());
+        .to_compile_error()
+        .wrap_err();
     }
 
     if struct_generics.is_empty() {
-        return Ok(HashMap::new());
+        return HashMap::new().wrap_ok();
     }
 
-    Ok(struct_generics
+    struct_generics
         .into_iter()
         .zip(
             self_type_generics
                 .expect("Expected self type generics to not be empty at this point")
                 .args,
         )
-        .collect())
+        .collect::<HashMap<_, _>>()
+        .wrap_ok()
 }

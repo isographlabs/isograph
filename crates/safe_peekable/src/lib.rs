@@ -1,3 +1,5 @@
+use prelude::Postfix;
+
 /// An iterator wrapper whose peek is scoped: [`peek`](SafePeekable::peek) returns a
 /// guard holding the next item, [`view`](Peek::view) lends that item,
 /// [`commit`](Peek::commit) consumes and returns it, and dropping the guard leaves the
@@ -32,7 +34,7 @@ impl<I: Iterator> SafePeekable<I> {
             self.peeked = self.iter.next();
         }
         match self.peeked {
-            Some(_) => Some(Peek(&mut self.peeked)),
+            Some(_) => Peek(&mut self.peeked).wrap_some(),
             None => None,
         }
     }
@@ -74,6 +76,8 @@ impl<T> Peek<'_, T> {
 
 #[cfg(test)]
 mod test {
+    use prelude::Postfix;
+
     use crate::IntoSafePeekable;
 
     #[test]
@@ -127,15 +131,15 @@ mod test {
     #[test]
     fn size_hint_counts_the_buffered_item() {
         let mut iter = [1, 2].into_iter().safe_peekable();
-        assert_eq!(iter.size_hint(), (2, Some(2)));
+        assert_eq!(iter.size_hint(), (2, 2usize.wrap_some()));
 
         {
             let _peek = iter.peek().expect("two items remain");
         }
-        assert_eq!(iter.size_hint(), (2, Some(2)));
+        assert_eq!(iter.size_hint(), (2, 2usize.wrap_some()));
 
         iter.peek().expect("two items remain").commit();
-        assert_eq!(iter.size_hint(), (1, Some(1)));
+        assert_eq!(iter.size_hint(), (1, 1usize.wrap_some()));
     }
 
     #[test]
@@ -146,8 +150,8 @@ mod test {
             let _peek = iter.peek().expect("two items remain");
         }
 
-        assert_eq!(iter.next(), Some(1));
-        assert_eq!(iter.next(), Some(2));
+        assert_eq!(iter.next(), 1i32.wrap_some());
+        assert_eq!(iter.next(), 2i32.wrap_some());
         assert_eq!(iter.next(), None);
     }
 }

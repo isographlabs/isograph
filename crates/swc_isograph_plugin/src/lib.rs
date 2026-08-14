@@ -157,8 +157,8 @@ impl fmt::Display for ArtifactType {
 impl ArtifactType {
     fn from_keyword(keyword: &str) -> Option<ArtifactType> {
         match keyword {
-            "entrypoint" => Some(ArtifactType::Entrypoint),
-            "field" | "pointer" => Some(ArtifactType::Field),
+            "entrypoint" => ArtifactType::Entrypoint.wrap_some(),
+            "field" | "pointer" => ArtifactType::Field.wrap_some(),
             _ => None,
         }
     }
@@ -271,7 +271,7 @@ impl IsoLiteralCompilerVisitor<'_> {
             let first = if let Some((first, [])) = quasis.split_first() {
                 first
             } else {
-                return Err(IsographTransformError::SubstitutionsNotAllowedInIsoFragments);
+                return IsographTransformError::SubstitutionsNotAllowedInIsoFragments.wrap_err();
             };
 
             return OPERATION_REGEX
@@ -280,15 +280,16 @@ impl IsoLiteralCompilerVisitor<'_> {
                 .and_then(|capture_group| {
                     debug!("capture_group {:?}", capture_group);
                     let artifact_type = ArtifactType::from_keyword(&capture_group[1])?;
-                    Some(ValidIsographTemplateLiteral {
+                    ValidIsographTemplateLiteral {
                         artifact_type,
                         field_type: capture_group[2].to_string(),
                         field_name: capture_group[3].to_string(),
-                    })
+                    }
+                    .wrap_some()
                 })
                 .ok_or(IsographTransformError::InvalidIsoKeyword);
         }
-        Err(IsographTransformError::OnlyAllowedTemplateLiteral)
+        IsographTransformError::OnlyAllowedTemplateLiteral.wrap_err()
     }
 
     fn handle_valid_isograph_entrypoint_literal(
@@ -333,7 +334,7 @@ impl IsoLiteralCompilerVisitor<'_> {
         let first = if let Some((first, [])) = iso_args.split_first() {
             first
         } else {
-            return Err(IsographTransformError::IsoRequiresOneArg);
+            return IsographTransformError::IsoRequiresOneArg.wrap_err();
         };
 
         let iso_template_literal = self.parse_iso_template_literal(first)?;
@@ -381,22 +382,24 @@ fn iso_call(expr: &Expr) -> Option<IsoCall<'_>> {
         return None;
     };
     match &**callee {
-        Expr::Ident(ident) if ident.sym == "iso" => Some(IsoCall {
+        Expr::Ident(ident) if ident.sym == "iso" => IsoCall {
             iso_args: args,
             fn_args: None,
             span: *span,
-        }),
+        }
+        .wrap_some(),
         Expr::Call(CallExpr {
             callee: Callee::Expr(inner_callee),
             args: iso_args,
             span: iso_span,
             ..
         }) => match &**inner_callee {
-            Expr::Ident(ident) if ident.sym == "iso" => Some(IsoCall {
+            Expr::Ident(ident) if ident.sym == "iso" => IsoCall {
                 iso_args,
-                fn_args: Some(args),
+                fn_args: args.as_slice().wrap_some(),
                 span: *iso_span,
-            }),
+            }
+            .wrap_some(),
             _ => None,
         },
         _ => None,

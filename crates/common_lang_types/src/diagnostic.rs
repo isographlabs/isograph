@@ -68,7 +68,7 @@ fn noop_print_location_fn_inner(
     _loc: Location,
     _formatter: &mut std::fmt::Formatter<'_>,
 ) -> std::fmt::Result {
-    Ok(())
+    ().wrap_ok()
 }
 
 pub struct PrintableDiagnostic<'a> {
@@ -83,7 +83,7 @@ impl std::fmt::Display for PrintableDiagnostic<'_> {
             writeln!(f)?;
             (self.print_location)(location, f)?;
         }
-        Ok(())
+        ().wrap_ok()
     }
 }
 

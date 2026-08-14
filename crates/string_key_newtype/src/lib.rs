@@ -1,3 +1,6 @@
+#[doc(hidden)]
+pub use prelude::Postfix as __Postfix;
+
 #[macro_export]
 macro_rules! string_key_newtype {
     ($named:ident) => {
@@ -38,9 +41,10 @@ macro_rules! string_key_newtype {
             where
                 D: serde::Deserializer<'de>,
             {
+                use $crate::__Postfix;
                 let s: String = serde::Deserialize::deserialize(deserializer)?;
                 let interned = intern::string_key::Intern::intern(s);
-                Ok($named::from(interned))
+                $named::from(interned).wrap_ok()
             }
         }
 

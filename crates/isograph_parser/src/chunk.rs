@@ -1,4 +1,5 @@
 use nonempty::NonEmpty;
+use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
@@ -119,8 +120,8 @@ fn chunk_level(level: &MatchedBrackets, errors: &mut Vec<CommaWithoutItem>) -> C
 
 fn separator_token(kind: NonBracketTokenKind) -> Option<SeparatorToken> {
     match kind {
-        NonBracketTokenKind::Comma => Some(SeparatorToken::Comma),
-        NonBracketTokenKind::LineBreak => Some(SeparatorToken::LineBreak),
+        NonBracketTokenKind::Comma => SeparatorToken::Comma.wrap_some(),
+        NonBracketTokenKind::LineBreak => SeparatorToken::LineBreak.wrap_some(),
         _ => None,
     }
 }
@@ -156,7 +157,7 @@ fn absorb_chunk(
             Some(SeparatorToken::Comma) => {
                 let comma = peek.commit().location;
                 drain_dropped_boundary(items);
-                return Some(Absorbed::CommaWithoutItem(comma));
+                return Absorbed::CommaWithoutItem(comma).wrap_some();
             }
             Some(SeparatorToken::LineBreak) => {
                 peek.commit();
@@ -197,7 +198,7 @@ fn absorb_chunk(
         let item = peek.commit();
         let token = WithSpan::new(separator, item.location);
         match &mut separators {
-            None => separators = Some(NonEmpty::new(token)),
+            None => separators = NonEmpty::new(token).wrap_some(),
             Some(absorbed) => absorbed.push(token),
         }
     }
@@ -210,13 +211,14 @@ fn absorb_chunk(
         Some(separator) => Span::join(span, separator.location),
         None => span,
     };
-    Some(Absorbed::Chunk(WithSpan::new(
+    Absorbed::Chunk(WithSpan::new(
         Chunk {
             contents,
             trailing_separator,
         },
         span,
-    )))
+    ))
+    .wrap_some()
 }
 
 /// The content this item contributes, `None` when it is a separator. Group interiors
@@ -228,9 +230,11 @@ fn as_content(
     match &item.item {
         BracketItem::Raw(token) => match separator_token(token.0) {
             Some(_) => None,
-            None => Some(ChunkContentItem::NonBracket(*token)),
+            None => ChunkContentItem::NonBracket(*token).wrap_some(),
         },
-        BracketItem::Bracketed(group) => Some(ChunkContentItem::Group(chunk_group(group, errors))),
+        BracketItem::Bracketed(group) => {
+            ChunkContentItem::Group(chunk_group(group, errors)).wrap_some()
+        }
     }
 }
 
@@ -238,7 +242,7 @@ fn as_content(
 /// further comma is not absorbed; it opens the next absorption and its own error.
 fn drain_dropped_boundary(items: &mut LevelItems<'_>) {
     while let Some(peek) = items.peek() {
-        if separator_of(peek.view()) != Some(SeparatorToken::LineBreak) {
+        if separator_of(peek.view()) != SeparatorToken::LineBreak.wrap_some() {
             break;
         }
         peek.commit();

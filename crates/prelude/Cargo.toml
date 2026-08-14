@@ -6,12 +6,5 @@ license = { workspace = true }
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
-pico = { path = "../pico", optional = true }
-
-[features]
-default = ["pico"]
-pico = ["dep:pico"]
-
 [lints]
 workspace = true

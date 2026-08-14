@@ -1,3 +1,6 @@
+#[doc(hidden)]
+pub use prelude::Postfix as __Postfix;
+
 #[macro_export]
 macro_rules! u64_newtype {
     ($named:ident) => {
@@ -50,8 +53,9 @@ macro_rules! u64_newtype {
             where
                 D: serde::Deserializer<'de>,
             {
+                use $crate::__Postfix;
                 let v: u64 = serde::Deserialize::deserialize(deserializer)?;
-                Ok($named::from(v))
+                $named::from(v).wrap_ok()
             }
         }
     };

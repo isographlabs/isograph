@@ -1,4 +1,5 @@
 use isograph_config::IsographProjectConfig;
+use prelude::Postfix;
 use std::{
     fs::read_to_string,
     path::{Path, PathBuf},
@@ -33,7 +34,7 @@ fn run(input: PathBuf) {
         &input,
         &output,
         FixtureTestConfig {
-            module: Some(true),
+            module: true.wrap_some(),
             ..Default::default()
         },
     );
@@ -65,7 +66,7 @@ fn isograph_errors(input: PathBuf) {
         &output,
         FixtureTestConfig {
             allow_error: true,
-            module: Some(true),
+            module: true.wrap_some(),
             ..Default::default()
         },
     );

@@ -938,6 +938,7 @@ dependencies = [
  "intern",
  "pico",
  "pico_macros",
+ "prelude",
  "schemars",
  "serde",
  "serde_json",
@@ -950,6 +951,7 @@ version = "0.5.3"
 dependencies = [
  "logos",
  "nonempty",
+ "prelude",
  "resolve_position",
  "resolve_position_macros",
  "safe_peekable",
@@ -1296,9 +1298,6 @@ dependencies = [
 [[package]]
 name = "prelude"
 version = "0.5.3"
-dependencies = [
- "pico",
-]
 
 [[package]]
 name = "pretty_assertions"
@@ -1584,6 +1583,9 @@ checksum = "dd29631678d6fb0903b69223673e122c32e9ae559d0960a38d574695ebc0ea15"
 [[package]]
 name = "safe_peekable"
 version = "0.5.3"
+dependencies = [
+ "prelude",
+]
 
 [[package]]
 name = "schemars"
@@ -1778,6 +1780,9 @@ dependencies = [
 [[package]]
 name = "span"
 version = "0.5.3"
+dependencies = [
+ "prelude",
+]
 
 [[package]]
 name = "stable_deref_trait"
@@ -1818,6 +1823,9 @@ dependencies = [
 [[package]]
 name = "string_key_newtype"
 version = "0.5.3"
+dependencies = [
+ "prelude",
+]
 
 [[package]]
 name = "strsim"
@@ -2485,6 +2493,7 @@ checksum = "1dccffe3ce07af9386bfd29e80c0ab1a8205a2fc34e4bcd40364df902cfa8f3f"
 name = "u64_newtypes"
 version = "0.5.3"
 dependencies = [
+ "prelude",
  "serde",
 ]
 

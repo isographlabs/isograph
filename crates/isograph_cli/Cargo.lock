@@ -193,6 +193,7 @@ version = "0.5.3"
 dependencies = [
  "clap",
  "freddie_cli",
+ "prelude",
  "tracing",
 ]
 
@@ -267,6 +268,10 @@ name = "powerfmt"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "439ee305def115ba05938db6eb1644ff94165c5ab5e9420d1c1bcedbba909391"
+
+[[package]]
+name = "prelude"
+version = "0.5.3"
 
 [[package]]
 name = "proc-macro2"

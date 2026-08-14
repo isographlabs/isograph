@@ -15,6 +15,7 @@ path = "src/main.rs"
 [dependencies]
 clap = { version = "4.5.18", features = ["derive"] }
 freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "04d3be57eef63608ef013004a7626505a4245bbf" }
+prelude = { path = "../prelude" }
 tracing = "0.1.41"
 
 [lints.clippy]

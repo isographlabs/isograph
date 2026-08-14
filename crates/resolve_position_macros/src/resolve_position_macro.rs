@@ -234,7 +234,7 @@ fn find_resolve_field_attr(
         .iter()
         .filter(|attr| attr.path().is_ident("resolve_field"));
     match (matching.next(), matching.next()) {
-        (first, None) => Ok(first),
+        (first, None) => first.wrap_ok(),
         (_, Some(duplicate)) => Error::new_spanned(duplicate, "duplicate #[resolve_field]")
             .to_compile_error()
             .wrap_err(),
@@ -277,7 +277,7 @@ fn extract_single_generic_type(segment: &syn::PathSegment) -> Option<&syn::Type>
     match &segment.arguments {
         syn::PathArguments::AngleBracketed(args) => args.args.first().and_then(|arg| {
             if let syn::GenericArgument::Type(ty) = arg {
-                Some(ty)
+                ty.wrap_some()
             } else {
                 None
             }
@@ -298,11 +298,12 @@ fn handle_case(
         ))))
         .wrap_ok()
     } else {
-        Err(Error::new_spanned(
+        Error::new_spanned(
             last_segment,
             format!("{} must have a type parameter", last_segment.ident),
         )
-        .to_compile_error())
+        .to_compile_error()
+        .wrap_err()
     }
 }
 
@@ -361,18 +362,17 @@ fn parse_resolve_field_type(
             // Recursively parse the inner type
             let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
 
-            return Ok(ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(
-                inner_wrapper,
-            )));
+            return ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(inner_wrapper)).wrap_ok();
         }
     }
 
-    Err(Error::new_spanned(
+    Error::new_spanned(
         path,
         "Expected WithSpan<T>, WithLocation<T>, WithGenericLocation<T>, GraphQLTypeAnnotation, \
         Vec<T>, Option<T>, or NonEmpty<T> where T is a valid resolve field type",
     )
-    .to_compile_error())
+    .to_compile_error()
+    .wrap_err()
 }
 
 fn get_resolve_field_info(
@@ -381,7 +381,7 @@ fn get_resolve_field_info(
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
     let Some(attr) = find_resolve_field_attr(&field.attrs)? else {
-        return Ok(None);
+        return None.wrap_ok();
     };
 
     let parent_construction = parse_parent_construction(attr)?;
@@ -404,7 +404,7 @@ fn get_resolve_field_info(
             }
             .wrap_some()
             .wrap_ok(),
-            Err(e) => Err(e),
+            Err(e) => e.wrap_err(),
         }
     } else {
         Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")

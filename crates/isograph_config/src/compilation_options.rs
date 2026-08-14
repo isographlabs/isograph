@@ -4,6 +4,7 @@ use common_lang_types::{
 };
 use intern::string_key::Intern;
 use pico_macros::Singleton;
+use prelude::Postfix;
 use schemars::JsonSchema;
 use serde::Deserialize;
 use std::path::PathBuf;
@@ -74,14 +75,14 @@ impl OptionalValidationLevel {
         on_error: impl FnOnce() -> (Diagnostic, PrintLocationFn<'a>),
     ) -> Result<(), Diagnostic> {
         match self {
-            OptionalValidationLevel::Ignore => Ok(()),
+            OptionalValidationLevel::Ignore => ().wrap_ok(),
             OptionalValidationLevel::Warn => {
                 let (warning, print_location) = on_error();
                 let printable = warning.printable(print_location);
                 warn!("{printable}");
-                Ok(())
+                ().wrap_ok()
             }
-            OptionalValidationLevel::Error => Err(on_error().0),
+            OptionalValidationLevel::Error => on_error().0.wrap_err(),
         }
     }
 }
