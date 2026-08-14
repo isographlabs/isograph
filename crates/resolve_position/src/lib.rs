@@ -1,3 +1,4 @@
+use prelude::Postfix;
 use span::{Span, WithGenericLocation};
 
 /// This module defines a trait [`ResolvePosition`], which is used to convert a
@@ -90,7 +91,7 @@ pub trait ResolvePosition: Sized {
     ) -> PositionResolutionPath<&'a Self, TParent> {
         PositionResolutionPath {
             inner: self,
-            parent: parent.into(),
+            parent: parent.to(),
         }
     }
 }
@@ -119,8 +120,10 @@ mod test {
 
     use std::ops::ControlFlow;
 
-    use crate::{PositionResolutionPath, ResolvePosition};
+    use prelude::Postfix;
     use span::{Span, WithSpan};
+
+    use crate::{PositionResolutionPath, ResolvePosition};
 
     #[derive(Debug)]
     enum TestResolvedNode<'a> {
@@ -218,7 +221,7 @@ mod test {
     #[test]
     fn resolve_parent_with_children() {
         let item = Parent {
-            children: vec![WithSpan::new(Child { children: vec![] }, Span::new(0, 5))],
+            children: WithSpan::new(Child { children: vec![] }, Span::new(0, 5)).wrap_vec(),
         };
 
         let result = item.resolve((), Span::new(0, 4));
@@ -236,12 +239,13 @@ mod test {
     #[test]
     fn resolve_parent_with_nested_children() {
         let item = Parent {
-            children: vec![WithSpan::new(
+            children: WithSpan::new(
                 Child {
-                    children: vec![WithSpan::new(Child { children: vec![] }, Span::new(0, 3))],
+                    children: WithSpan::new(Child { children: vec![] }, Span::new(0, 3)).wrap_vec(),
                 },
                 Span::new(0, 5),
-            )],
+            )
+            .wrap_vec(),
         };
 
         let result = item.resolve((), Span::new(0, 2));

@@ -105,7 +105,7 @@ pub fn relative_path_from_absolute_and_working_directory(
     .to_str()
     .expect("Expected path to be able to be stringified")
     .intern()
-    .into()
+    .to()
 }
 
 pub type WithNoLocation<TItem> = WithGenericLocation<TItem, ()>;

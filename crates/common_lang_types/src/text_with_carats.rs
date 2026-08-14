@@ -41,11 +41,17 @@ fn text_with_carats_and_line_count_buffer(
         return (String::new(), None);
     }
     let span = span.as_usize_range();
-    match locate(file_text, &span) {
+    match locate(file_text, span.reference()) {
         LocatedSpan::OutsideText => (String::new(), None),
         LocatedSpan::OnLineBreaksOnly(row_col) => (String::new(), row_col.wrap_some()),
         LocatedSpan::Highlighting(highlighted) => {
-            let rendered = render_window(file_text, &span, &highlighted, line_count_buffer, color);
+            let rendered = render_window(
+                file_text,
+                span.reference(),
+                highlighted.reference(),
+                line_count_buffer,
+                color,
+            );
             (rendered, highlighted.row_col.wrap_some())
         }
     }
@@ -85,7 +91,7 @@ fn locate(file_text: &str, span: &Range<usize>) -> LocatedSpan {
             )
                 .wrap_some();
         }
-        if !highlight_on_line(span, &line_range, line.len()).is_empty() {
+        if !highlight_on_line(span, line_range.reference(), line.len()).is_empty() {
             highlighted_lines = match highlighted_lines {
                 None => (index, index).wrap_some(),
                 Some((first_line, _)) => (first_line, index).wrap_some(),
@@ -147,7 +153,7 @@ fn render_window(
         .skip(first_printed)
         .take(last_printed - first_printed + 1)
     {
-        let highlight = highlight_on_line(span, &line_range, line.len());
+        let highlight = highlight_on_line(span, line_range.reference(), line.len());
         if highlight.is_empty() {
             output_lines.push(line.to_string());
             continue;
@@ -161,7 +167,7 @@ fn render_window(
         output_lines.push(format!(
             "{}{}{}",
             " ".repeat(highlight.start),
-            colorize(&"^".repeat(highlight.len()), color),
+            colorize("^".repeat(highlight.len()).reference(), color),
             " ".repeat(line.len() - highlight.end),
         ));
     }
@@ -260,25 +266,33 @@ mod test {
 
     #[test]
     fn empty_span() {
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 0), 3, CaratColor::Plain)
-                .0;
+        let output = text_with_carats_for_test(
+            input_with_lines(10).reference(),
+            Span::new(0, 0),
+            3,
+            CaratColor::Plain,
+        )
+        .0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn empty_span_but_not_zero() {
         // This is weird behavior, and maybe we should print no output here.
-        let output =
-            text_with_carats_for_test(&input_with_lines(10), Span::new(1, 1), 3, CaratColor::Plain)
-                .0;
+        let output = text_with_carats_for_test(
+            input_with_lines(10).reference(),
+            Span::new(1, 1),
+            3,
+            CaratColor::Plain,
+        )
+        .0;
         assert_eq!(output, "");
     }
 
     #[test]
     fn bug_span_on_line_break() {
         let output = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(9, 10),
             3,
             CaratColor::Plain,
@@ -290,8 +304,13 @@ mod test {
     #[test]
     fn one_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 1), 3, CaratColor::Plain)
-                .0,
+            text_with_carats_for_test(
+                input_with_lines(10).reference(),
+                Span::new(0, 1),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -307,8 +326,13 @@ mod test {
     #[test]
     fn multi_leading_char_first_line_span() {
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 3), 3, CaratColor::Plain)
-                .0,
+            text_with_carats_for_test(
+                input_with_lines(10).reference(),
+                Span::new(0, 3),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -330,8 +354,13 @@ mod test {
         // Note that spans do not include the final character (i.e. it is a range
         // of the form [start, end).)
         let output = with_leading_line_break(
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 9), 3, CaratColor::Plain)
-                .0,
+            text_with_carats_for_test(
+                input_with_lines(10).reference(),
+                Span::new(0, 9),
+                3,
+                CaratColor::Plain,
+            )
+            .0,
         );
         assert_eq!(
             output,
@@ -348,7 +377,7 @@ mod test {
     fn multi_leading_char_full_first_line_span_2() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(0, 10),
                 3,
                 CaratColor::Plain,
@@ -370,7 +399,7 @@ mod test {
     fn multi_char_mid_line_span() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(31, 33),
                 3,
                 CaratColor::Plain,
@@ -395,7 +424,7 @@ mod test {
     fn multi_char_multi_line_span() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(31, 43),
                 3,
                 CaratColor::Plain,
@@ -422,7 +451,7 @@ mod test {
     fn multi_char_multi_line_span_2() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(31, 53),
                 3,
                 CaratColor::Plain,
@@ -451,7 +480,7 @@ mod test {
     fn multi_line_start_on_beginning_of_line() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(30, 42),
                 3,
                 CaratColor::Plain,
@@ -479,7 +508,7 @@ mod test {
         // char 29 is the line break character...
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(29, 42),
                 3,
                 CaratColor::Plain,
@@ -506,7 +535,7 @@ mod test {
     fn span_ends_on_final_line() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(90, 100),
                 3,
                 CaratColor::Plain,
@@ -531,7 +560,7 @@ mod test {
 
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(90, 105),
                 3,
                 CaratColor::Plain,
@@ -555,7 +584,7 @@ mod test {
         // Maybe this should panic! But it doesn't.
 
         let output = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(105, 110),
             3,
             CaratColor::Plain,
@@ -568,7 +597,7 @@ mod test {
     fn line_count_buffer_0() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(31, 33),
                 0,
                 CaratColor::Plain,
@@ -587,7 +616,7 @@ mod test {
     fn line_count_buffer_1() {
         let output = with_leading_line_break(
             text_with_carats_for_test(
-                &input_with_lines(10),
+                input_with_lines(10).reference(),
                 Span::new(31, 33),
                 1,
                 CaratColor::Plain,
@@ -606,12 +635,16 @@ mod test {
 
     #[test]
     fn the_row_and_col_locate_the_spans_start() {
-        let (_, row_col) =
-            text_with_carats_for_test(&input_with_lines(10), Span::new(0, 1), 3, CaratColor::Plain);
+        let (_, row_col) = text_with_carats_for_test(
+            input_with_lines(10).reference(),
+            Span::new(0, 1),
+            3,
+            CaratColor::Plain,
+        );
         assert_eq!(u32_row_col(row_col), (1, 1).wrap_some());
 
         let (_, row_col) = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(31, 33),
             3,
             CaratColor::Plain,
@@ -622,7 +655,7 @@ mod test {
     #[test]
     fn a_span_on_a_line_break_has_a_position_but_no_output() {
         let (output, row_col) = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(9, 10),
             3,
             CaratColor::Plain,
@@ -634,7 +667,7 @@ mod test {
     #[test]
     fn a_span_past_the_text_has_no_position() {
         let (output, row_col) = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(105, 110),
             3,
             CaratColor::Plain,
@@ -653,18 +686,28 @@ mod test {
     #[test]
     fn colored_output_reads_the_same_as_plain_output() {
         for span in [Span::new(31, 33), Span::new(8, 12)] {
-            let colored =
-                text_with_carats_for_test(&input_with_lines(10), span, 3, CaratColor::Colored).0;
-            let plain =
-                text_with_carats_for_test(&input_with_lines(10), span, 3, CaratColor::Plain).0;
-            assert_eq!(stripped(&colored), plain);
+            let colored = text_with_carats_for_test(
+                input_with_lines(10).reference(),
+                span,
+                3,
+                CaratColor::Colored,
+            )
+            .0;
+            let plain = text_with_carats_for_test(
+                input_with_lines(10).reference(),
+                span,
+                3,
+                CaratColor::Plain,
+            )
+            .0;
+            assert_eq!(stripped(colored.reference()), plain);
         }
     }
 
     #[test]
     fn colored_output_highlights_in_bright_red_and_plain_output_has_no_escapes() {
         let colored = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(31, 33),
             3,
             CaratColor::Colored,
@@ -672,7 +715,7 @@ mod test {
         .0;
         assert!(colored.contains("\u{1b}[91m"));
         let plain = text_with_carats_for_test(
-            &input_with_lines(10),
+            input_with_lines(10).reference(),
             Span::new(31, 33),
             3,
             CaratColor::Plain,

@@ -36,11 +36,11 @@ fn rust_sources_use_postfix_constructors() {
     let root = workspace_root();
     let mut hits = Vec::new();
     for rel in RUST_ROOTS {
-        walk_rust(&root.join(rel), &mut hits);
+        walk_rust(root.join(rel).reference(), &mut hits);
     }
     assert!(
         hits.is_empty(),
-        "use wrap_ok/wrap_err/wrap_some, not Ok/Err/Some constructors:\n{}",
+        "use postfix wrappers, not Ok/Err/Some, Box::new, vec![x], or .into():\n{}",
         hits.join("\n")
     );
 }
@@ -49,10 +49,10 @@ fn rust_sources_use_postfix_constructors() {
 fn pending_docs_use_postfix_constructors() {
     let root = workspace_root();
     let mut hits = Vec::new();
-    walk_markdown(&root.join("refactors/pending"), &mut hits);
+    walk_markdown(root.join("refactors/pending").reference(), &mut hits);
     assert!(
         hits.is_empty(),
-        "use wrap_ok/wrap_err/wrap_some, not Ok/Err/Some constructors:\n{}",
+        "use postfix wrappers, not Ok/Err/Some, Box::new, vec![x], or .into():\n{}",
         hits.join("\n")
     );
 }
@@ -67,9 +67,9 @@ fn workspace_root() -> PathBuf {
 }
 
 fn walk_rust(dir: &Path, hits: &mut Vec<String>) {
-    let mut stack = vec![dir.to_path_buf()];
+    let mut stack = dir.to_path_buf().wrap_vec();
     while let Some(dir) = stack.pop() {
-        let entries = match fs::read_dir(&dir) {
+        let entries = match fs::read_dir(dir.reference()) {
             Ok(entries) => entries,
             Err(_) => continue,
         };
@@ -82,7 +82,7 @@ fn walk_rust(dir: &Path, hits: &mut Vec<String>) {
                 }
                 stack.push(path);
             } else if path.extension().is_some_and(|e| e == "rs") {
-                lint_rust_file(&path, hits);
+                lint_rust_file(path.reference(), hits);
             }
         }
     }
@@ -96,7 +96,7 @@ fn walk_markdown(dir: &Path, hits: &mut Vec<String>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.extension().is_some_and(|e| e == "md") {
-            lint_markdown_file(&path, hits);
+            lint_markdown_file(path.reference(), hits);
         }
     }
 }
@@ -109,7 +109,7 @@ fn lint_rust_file(path: &Path, hits: &mut Vec<String>) {
             return;
         }
     };
-    let file = match syn::parse_file(&src) {
+    let file = match syn::parse_file(src.reference()) {
         Ok(file) => file,
         Err(e) => {
             hits.push(format!("{}: failed to parse: {e}", path.display()));
@@ -121,7 +121,7 @@ fn lint_rust_file(path: &Path, hits: &mut Vec<String>) {
         hits,
         ctor_check: CtorCheck::Lint,
     };
-    collector.visit_file(&file);
+    collector.visit_file(file.reference());
 }
 
 fn lint_markdown_file(path: &Path, hits: &mut Vec<String>) {
@@ -155,7 +155,7 @@ fn lint_markdown_file(path: &Path, hits: &mut Vec<String>) {
         };
         let body = &rest[..end];
         if matches!(lang, "rust" | "rs") {
-            lint_rust_snippet(&display, line, body, hits);
+            lint_rust_snippet(display.reference(), line, body, hits);
         }
         line += body.bytes().filter(|&b| b == b'\n').count();
         rest = &rest[end + 3..];
@@ -170,7 +170,7 @@ fn lint_rust_snippet(path: &str, start_line: usize, body: &str, hits: &mut Vec<S
             hits,
             ctor_check: CtorCheck::Lint,
         };
-        collector.visit_file(&file);
+        collector.visit_file(file.reference());
         shift_new_hits(hits, before, path, start_line.saturating_sub(1));
         return;
     }
@@ -180,7 +180,7 @@ fn lint_rust_snippet(path: &str, start_line: usize, body: &str, hits: &mut Vec<S
             hits,
             ctor_check: CtorCheck::Lint,
         };
-        collector.visit_item(&item);
+        collector.visit_item(item.reference());
         shift_new_hits(hits, before, path, start_line.saturating_sub(1));
         return;
     }
@@ -190,18 +190,18 @@ fn lint_rust_snippet(path: &str, start_line: usize, body: &str, hits: &mut Vec<S
             hits,
             ctor_check: CtorCheck::Lint,
         };
-        collector.visit_expr(&expr);
+        collector.visit_expr(expr.reference());
         shift_new_hits(hits, before, path, start_line.saturating_sub(1));
         return;
     }
     let wrapped = format!("fn __postfix_wrap() {{\n{body}\n}}");
-    if let Ok(file) = syn::parse_file(&wrapped) {
+    if let Ok(file) = syn::parse_file(wrapped.reference()) {
         let mut collector = Collector {
             path: path.to_string(),
             hits,
             ctor_check: CtorCheck::Lint,
         };
-        collector.visit_file(&file);
+        collector.visit_file(file.reference());
         shift_new_hits(hits, before, path, start_line.saturating_sub(1));
         return;
     }
@@ -217,7 +217,7 @@ fn shift_new_hits(hits: &mut [String], before: usize, path: &str, delta: usize) 
 }
 
 fn shift_hit_line(hit: &str, path: &str, delta: usize) -> Option<String> {
-    let rest = hit.strip_prefix(&format!("{path}:"))?;
+    let rest = hit.strip_prefix(format!("{path}:").reference())?;
     let (line, msg) = rest.split_once(": ")?;
     let n: usize = line.parse().ok()?;
     format!("{path}:{}: {msg}", n + delta).wrap_some()
@@ -257,7 +257,10 @@ struct Collector<'a> {
 
 impl Collector<'_> {
     fn enter_fn(&mut self, name: &str) -> CtorCheck {
-        let next = if matches!(name, "wrap_ok" | "wrap_err" | "wrap_some") {
+        let next = if matches!(
+            name,
+            "wrap_ok" | "wrap_err" | "wrap_some" | "boxed" | "wrap_vec" | "to"
+        ) {
             CtorCheck::InWrapImpl
         } else {
             CtorCheck::Lint
@@ -265,42 +268,52 @@ impl Collector<'_> {
         std::mem::replace(&mut self.ctor_check, next)
     }
 
-    fn record(&mut self, span: proc_macro2::Span, name: &str) {
+    fn record(&mut self, span: proc_macro2::Span, what: &str) {
         let line = span.start().line;
         let where_ = if line == 0 {
             self.path.clone()
         } else {
             format!("{}:{line}", self.path)
         };
-        self.hits.push(format!("{where_}: {name}( constructor"));
+        self.hits.push(format!("{where_}: {what}"));
     }
 }
 
 impl<'ast> Visit<'ast> for Collector<'_> {
     fn visit_item_fn(&mut self, node: &'ast ItemFn) {
-        let was = self.enter_fn(&node.sig.ident.to_string());
+        let was = self.enter_fn(node.sig.ident.to_string().reference());
         syn::visit::visit_item_fn(self, node);
         self.ctor_check = was;
     }
 
     fn visit_impl_item_fn(&mut self, node: &'ast ImplItemFn) {
-        let was = self.enter_fn(&node.sig.ident.to_string());
+        let was = self.enter_fn(node.sig.ident.to_string().reference());
         syn::visit::visit_impl_item_fn(self, node);
         self.ctor_check = was;
     }
 
     fn visit_trait_item_fn(&mut self, node: &'ast TraitItemFn) {
-        let was = self.enter_fn(&node.sig.ident.to_string());
+        let was = self.enter_fn(node.sig.ident.to_string().reference());
         syn::visit::visit_trait_item_fn(self, node);
         self.ctor_check = was;
     }
 
     fn visit_expr(&mut self, expr: &'ast Expr) {
-        if let CtorCheck::Lint = self.ctor_check
-            && let Expr::Path(path) = expr
-            && let Some(name) = ctor_name(&path.path)
-        {
-            self.record(path.path.span(), name);
+        if let CtorCheck::Lint = self.ctor_check {
+            match expr {
+                Expr::Path(path) => {
+                    if let Some(name) = ctor_name(path.path.reference()) {
+                        self.record(path.path.span(), &format!("{name}( constructor"));
+                    }
+                }
+                Expr::Call(call) if is_box_new(call.func.reference()) => {
+                    self.record(call.func.span(), "Box::new");
+                }
+                Expr::MethodCall(m) if m.method == "into" && m.args.is_empty() => {
+                    self.record(m.method.span(), ".into()");
+                }
+                _ => {}
+            }
         }
         syn::visit::visit_expr(self, expr);
     }
@@ -321,7 +334,16 @@ impl<'ast> Visit<'ast> for Collector<'_> {
             "quote" | "quote_spanned" => return,
             "matches" => {
                 if let Ok(expr) = syn::parse2::<Expr>(tokens_before_comma(mac.tokens.clone())) {
-                    self.visit_expr(&expr);
+                    self.visit_expr(expr.reference());
+                }
+                return;
+            }
+            "vec" => {
+                if let Ok(exprs) = syn::parse2::<ExprList>(mac.tokens.clone())
+                    && exprs.0.len() == 1
+                    && !mac.tokens.to_string().contains(';')
+                {
+                    self.record(mac.path.span(), "vec![x]");
                 }
                 return;
             }
@@ -329,7 +351,7 @@ impl<'ast> Visit<'ast> for Collector<'_> {
         }
         if let Ok(exprs) = syn::parse2::<ExprList>(mac.tokens.clone()) {
             for expr in exprs.0 {
-                self.visit_expr(&expr);
+                self.visit_expr(expr.reference());
             }
         }
     }
@@ -359,7 +381,7 @@ impl syn::parse::Parse for ExprList {
 fn tokens_before_comma(tokens: proc_macro2::TokenStream) -> proc_macro2::TokenStream {
     let mut out = proc_macro2::TokenStream::new();
     for tt in tokens {
-        if let proc_macro2::TokenTree::Punct(p) = &tt
+        if let proc_macro2::TokenTree::Punct(p) = tt.reference()
             && p.as_char() == ','
         {
             break;
@@ -369,8 +391,27 @@ fn tokens_before_comma(tokens: proc_macro2::TokenStream) -> proc_macro2::TokenSt
     out
 }
 
+fn is_box_new(func: &Expr) -> bool {
+    let Expr::Path(path) = func else {
+        return false;
+    };
+    let segs: Vec<_> = path
+        .path
+        .segments
+        .iter()
+        .map(|s| s.ident.to_string())
+        .collect();
+    matches!(
+        segs.iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>()
+            .as_slice(),
+        ["Box", "new"] | ["std", "boxed", "Box", "new"]
+    )
+}
+
 fn ctor_name(path: &syn::Path) -> Option<&'static str> {
-    let ident = &path.segments.last()?.ident;
+    let ident = path.segments.last()?.ident.reference();
     if ident == "Ok" {
         "Ok".wrap_some()
     } else if ident == "Err" {

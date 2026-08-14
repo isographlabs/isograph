@@ -149,7 +149,7 @@ pub fn create_config(
         )
     });
 
-    let config_parsed: IsographProjectConfig = serde_json::from_str(&config_contents)
+    let config_parsed: IsographProjectConfig = serde_json::from_str(config_contents.reference())
         .unwrap_or_else(|e| panic!("Error parsing config. Error: {e}"));
 
     let mut config_dir = config_location.clone();
@@ -160,13 +160,14 @@ pub fn create_config(
             config_parsed
                 .artifact_directory
                 .as_ref()
-                .unwrap_or(&config_parsed.project_root),
+                .unwrap_or(config_parsed.project_root.reference()),
         )
         .join(ISOGRAPH_FOLDER);
-    std::fs::create_dir_all(&artifact_dir).expect("Unable to create artifact directory");
+    std::fs::create_dir_all(artifact_dir.reference()).expect("Unable to create artifact directory");
 
-    let project_root_dir = config_dir.join(&config_parsed.project_root);
-    std::fs::create_dir_all(&project_root_dir).expect("Unable to create project root directory");
+    let project_root_dir = config_dir.join(config_parsed.project_root.reference());
+    std::fs::create_dir_all(project_root_dir.reference())
+        .expect("Unable to create project root directory");
 
     CompilerConfig {
         config_location: config_location.canonicalize().unwrap_or_else(|_| {
@@ -190,7 +191,7 @@ pub fn create_config(
         schema: absolute_and_relative_paths(
             current_working_directory,
             config_dir
-                .join(&config_parsed.schema)
+                .join(config_parsed.schema.reference())
                 .canonicalize()
                 .unwrap_or_else(|_| {
                     panic!(
@@ -206,7 +207,7 @@ pub fn create_config(
                 absolute_and_relative_paths(
                     current_working_directory,
                     config_dir
-                        .join(&schema_extension)
+                        .join(schema_extension.reference())
                         .canonicalize()
                         .unwrap_or_else(|_| {
                             panic!(
@@ -304,7 +305,7 @@ fn create_options(options: ConfigFileOptions) -> CompilerConfigOptions {
         }
     }
 
-    let generated_file_header = options.generated_file_header.map(|x| x.intern().into());
+    let generated_file_header = options.generated_file_header.map(|x| x.intern().to());
 
     CompilerConfigOptions {
         on_invalid_id_type: create_optional_validation_level(options.on_invalid_id_type),
@@ -382,7 +383,7 @@ pub fn absolute_and_relative_paths(
 ) -> AbsolutePathAndRelativePath {
     let relative_path = relative_path_from_absolute_and_working_directory(
         current_working_directory,
-        &absolute_path,
+        absolute_path.reference(),
     );
 
     AbsolutePathAndRelativePath {

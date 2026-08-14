@@ -117,7 +117,7 @@ impl<T, TLocation> WithGenericLocation<T, TLocation> {
     {
         WithGenericLocation {
             location: self.location,
-            item: &self.item,
+            item: self.item.reference(),
         }
     }
 

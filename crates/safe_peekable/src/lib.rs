@@ -86,11 +86,11 @@ mod test {
 
         {
             let peek = iter.peek().expect("two items remain");
-            assert_eq!(peek.view(), &1);
+            assert_eq!(peek.view(), 1.reference());
         }
 
         let peek = iter.peek().expect("two items remain");
-        assert_eq!(peek.view(), &1);
+        assert_eq!(peek.view(), 1.reference());
     }
 
     #[test]
@@ -100,12 +100,12 @@ mod test {
         assert_eq!(iter.peek().expect("two items remain").commit(), 1);
 
         let peek = iter.peek().expect("one item remains");
-        assert_eq!(peek.view(), &2);
+        assert_eq!(peek.view(), 2.reference());
     }
 
     #[test]
     fn a_non_copy_item_moves_out_through_commit() {
-        let mut iter = vec![String::from("a")].into_iter().safe_peekable();
+        let mut iter = String::from("a").wrap_vec().into_iter().safe_peekable();
 
         let peek = iter.peek().expect("one item remains");
         assert_eq!(*peek.view(), "a");

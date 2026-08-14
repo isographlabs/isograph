@@ -1,3 +1,4 @@
+use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
 use scoped_stack::Stack;
@@ -143,7 +144,7 @@ fn parse_items(
                 }
             }
             SplitToken::Bracket(BracketToken::Close(kind)) => {
-                if enclosing_stack.all().contains(&kind) {
+                if enclosing_stack.all().contains(kind.reference()) {
                     // Some enclosing group owns this close. Dropping the peek leaves it
                     // unconsumed for its owner; every group between here and the owner
                     // reports unclosed.
@@ -197,6 +198,8 @@ fn parse_bracketed(
 
 #[cfg(test)]
 mod tests {
+    use prelude::Postfix;
+
     use super::*;
     use crate::tokenize;
     use BracketKind::{Brace, Parenthesis};
@@ -228,14 +231,14 @@ mod tests {
     }
 
     fn raw(items: &[WithSpan<BracketItem>], index: usize) -> NonBracketToken {
-        match &items[index].item {
+        match items[index].item.reference() {
             BracketItem::Raw(token) => *token,
             item => panic!("expected a raw token at {index}, got {item:?}"),
         }
     }
 
     fn group(items: &[WithSpan<BracketItem>], index: usize) -> &Bracketed {
-        match &items[index].item {
+        match items[index].item.reference() {
             BracketItem::Bracketed(group) => group,
             item => panic!("expected a group at {index}, got {item:?}"),
         }
@@ -246,7 +249,7 @@ mod tests {
         let tree = well_formed("field Query.Foo");
         assert_eq!(tree.item.0.len(), 4);
         for index in 0..4 {
-            raw(&tree.item.0, index);
+            raw(tree.item.0.reference(), index);
         }
     }
 
@@ -254,16 +257,16 @@ mod tests {
     fn balanced_input_nests_as_typed() {
         let text = "field Query.Foo { bar(arg: [1, 2]) { id } }";
         let tree = well_formed(text);
-        let brace = group(&tree.item.0, 4);
+        let brace = group(tree.item.0.reference(), 4);
         assert_eq!(brace.opening.item.0, Brace);
         let brace_anchor = span_of(text, "{ bar");
         assert_eq!(
             brace.opening.location,
             Span::new(brace_anchor.start, brace_anchor.start + 1)
         );
-        let parenthesis = group(&brace.children.item.0, 1);
+        let parenthesis = group(brace.children.item.0.reference(), 1);
         assert_eq!(parenthesis.opening.item.0, Parenthesis);
-        let square = group(&parenthesis.children.item.0, 2);
+        let square = group(parenthesis.children.item.0.reference(), 2);
         assert_eq!(square.opening.item.0, BracketKind::Bracket);
     }
 
@@ -272,24 +275,24 @@ mod tests {
         let text = "{ foo, bar) }";
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 1);
-        let brace = group(&tree.item.0, 0);
+        let brace = group(tree.item.0.reference(), 0);
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.opening.location, span_of(text, "{"));
         assert_eq!(brace.closing.item.0, Brace);
         assert_eq!(brace.closing.location, span_of(text, "}"));
         assert_eq!(brace.children.item.0.len(), 3);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
+            raw(brace.children.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(brace.children.item.0[0].location, span_of(text, "foo"));
         assert_eq!(
-            raw(&brace.children.item.0, 1),
+            raw(brace.children.item.0.reference(), 1),
             NonBracketToken(NonBracketTokenKind::Comma)
         );
         assert_eq!(brace.children.item.0[1].location, span_of(text, ","));
         assert_eq!(
-            raw(&brace.children.item.0, 2),
+            raw(brace.children.item.0.reference(), 2),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(brace.children.item.0[2].location, span_of(text, "bar"));
@@ -308,11 +311,11 @@ mod tests {
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
-        let brace = group(&tree.item.0, 1);
+        let brace = group(tree.item.0.reference(), 1);
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.opening.location, span_of(text, "{"));
         assert_eq!(brace.closing.item.0, Brace);
@@ -333,11 +336,11 @@ mod tests {
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
-        let brace = group(&tree.item.0, 1);
+        let brace = group(tree.item.0.reference(), 1);
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.opening.location, span_of(text, "{"));
         assert_eq!(brace.closing.item.0, Brace);
@@ -363,11 +366,11 @@ mod tests {
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
-        let brace = group(&tree.item.0, 1);
+        let brace = group(tree.item.0.reference(), 1);
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.children.item.0.len(), 0);
         match errors.as_slice() {
@@ -391,18 +394,18 @@ mod tests {
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 2);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.item.0[0].location, span_of(text, "foo"));
-        let brace = group(&tree.item.0, 1);
+        let brace = group(tree.item.0.reference(), 1);
         assert_eq!(brace.opening.item.0, Brace);
         assert_eq!(brace.opening.location, span_of(text, "{"));
         assert_eq!(brace.closing.item.0, Brace);
         assert_eq!(brace.closing.location, span_of(text, "}"));
         assert_eq!(brace.children.item.0.len(), 1);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
+            raw(brace.children.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(brace.children.item.0[0].location, span_of(text, "bar"));
@@ -421,7 +424,7 @@ mod tests {
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 1);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.item.0[0].location, span_of(text, "a"));
@@ -441,7 +444,7 @@ mod tests {
     #[test]
     fn brackets_inside_strings_are_not_structural() {
         let tree = well_formed("{ name: \"a}\" }");
-        let brace = group(&tree.item.0, 0);
+        let brace = group(tree.item.0.reference(), 0);
         assert_eq!(brace.children.item.0.len(), 3);
     }
 
@@ -450,7 +453,7 @@ mod tests {
         let text = "( } )";
         let (tree, errors) = tree(text);
         assert_eq!(tree.item.0.len(), 1);
-        let parenthesis = group(&tree.item.0, 0);
+        let parenthesis = group(tree.item.0.reference(), 0);
         assert_eq!(parenthesis.opening.item.0, Parenthesis);
         assert_eq!(parenthesis.opening.location, span_of(text, "("));
         assert_eq!(parenthesis.closing.item.0, Parenthesis);
@@ -470,7 +473,7 @@ mod tests {
         let text = "  { a }  ";
         let tree = well_formed(text);
         assert_eq!(tree.location, Span::from_usize(0, text.len()));
-        let brace = group(&tree.item.0, 0);
+        let brace = group(tree.item.0.reference(), 0);
         assert_eq!(
             brace.children.location,
             Span::new(span_of(text, "{").end, span_of(text, "}").start)
@@ -481,14 +484,14 @@ mod tests {
     fn a_closed_groups_opening_captures_the_line_breaks_after_it() {
         let text = "foo {\n\n bar\n}";
         let tree = well_formed(text);
-        let brace = group(&tree.item.0, 1);
+        let brace = group(tree.item.0.reference(), 1);
         assert_eq!(brace.children.item.0.len(), 2);
         assert_eq!(
-            raw(&brace.children.item.0, 0),
+            raw(brace.children.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(
-            raw(&brace.children.item.0, 1),
+            raw(brace.children.item.0.reference(), 1),
             NonBracketToken(NonBracketTokenKind::LineBreak)
         );
     }
@@ -499,7 +502,7 @@ mod tests {
         let tree = well_formed(text);
         assert_eq!(tree.item.0.len(), 1);
         assert_eq!(
-            raw(&tree.item.0, 0),
+            raw(tree.item.0.reference(), 0),
             NonBracketToken(NonBracketTokenKind::Identifier)
         );
         assert_eq!(tree.location, Span::from_usize(0, text.len()));

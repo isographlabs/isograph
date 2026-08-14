@@ -87,7 +87,7 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo \"the home route\" { bar }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let description = as_field(&parse).description.as_ref().expect("the fixture carries a description");
+        let description = as_field(parse.reference()).description.as_ref().expect("the fixture carries a description");
         assert_eq!(description.location, span_of(text, "\"the home route\""));
     }
 
@@ -96,9 +96,9 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo($id: ID!) \"\"\"\n  the home\n  route\n\"\"\" { bar }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let description = as_field(&parse).description.as_ref().expect("the fixture carries a description");
+        let description = as_field(parse.reference()).description.as_ref().expect("the fixture carries a description");
         assert_eq!(description.location, span_of(text, "\"\"\"\n  the home\n  route\n\"\"\""));
-        assert!(as_field(&parse).variable_definitions.is_some());
+        assert!(as_field(parse.reference()).variable_definitions.is_some());
     }
 
     #[test]

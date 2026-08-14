@@ -2,6 +2,7 @@ use logos::Logos;
 use span::WithSpan;
 
 use crate::IsographLangTokenKind;
+use prelude::Postfix;
 
 /// Tokenize one literal: every token with its span, in order, ending at the end of the input
 /// rather than with an `EndOfFile` token. The tokenizer skips spaces (line breaks are
@@ -11,7 +12,7 @@ pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
     let mut lexer = IsographLangTokenKind::lexer(literal);
     let mut tokens = Vec::new();
     while let Some(kind) = lexer.next() {
-        tokens.push(WithSpan::new(kind, lexer.span().into()));
+        tokens.push(WithSpan::new(kind, lexer.span().to()));
     }
     tokens
 }

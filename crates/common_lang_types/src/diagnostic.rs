@@ -95,7 +95,7 @@ pub type DiagnosticVecResult<T> = Result<T, Vec<Diagnostic>>;
 // use ? on those in functions which return Result<T, Vec<Diagnostic>>
 impl From<Diagnostic> for Vec<Diagnostic> {
     fn from(value: Diagnostic) -> Self {
-        vec![value]
+        value.wrap_vec()
     }
 }
 

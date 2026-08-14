@@ -1,3 +1,5 @@
+use prelude::Postfix;
+
 /// A stack whose only mutation is a scoped push: [`pushed`](Stack::pushed)
 /// returns a guard that pops on drop, and [`with_pushed`](Stack::with_pushed) scopes
 /// the push to a closure. Everything pushed is popped when its scope ends.
@@ -11,7 +13,7 @@ impl<T> Stack<T> {
 
     /// Every item on the stack, the callers' items included, innermost last.
     pub fn all(&self) -> &[T] {
-        &self.0
+        self.0.reference()
     }
 
     /// The item stays until the returned guard drops. The guard borrows the stack, so
@@ -63,6 +65,8 @@ impl<T> Drop for Pushed<'_, T> {
 
 #[cfg(test)]
 mod test {
+    use prelude::Postfix;
+
     use crate::Stack;
 
     #[test]
@@ -70,7 +74,7 @@ mod test {
         let mut stack = Stack::new();
 
         stack.with_pushed(1, |stack| {
-            assert_eq!(stack.all(), &[1]);
+            assert_eq!(stack.all(), [1].reference());
         });
 
         assert!(stack.all().is_empty());
@@ -82,9 +86,9 @@ mod test {
 
         stack.with_pushed(1, |stack| {
             stack.with_pushed(2, |stack| {
-                assert_eq!(stack.all(), &[1, 2]);
+                assert_eq!(stack.all(), [1, 2].reference());
             });
-            assert_eq!(stack.all(), &[1]);
+            assert_eq!(stack.all(), [1].reference());
         });
     }
 
@@ -94,10 +98,10 @@ mod test {
 
         {
             let mut pushed = stack.pushed(1);
-            assert_eq!(pushed.all(), &[1]);
+            assert_eq!(pushed.all(), [1].reference());
 
             let pushed_again = pushed.stack().pushed(2);
-            assert_eq!(pushed_again.all(), &[1, 2]);
+            assert_eq!(pushed_again.all(), [1, 2].reference());
         }
 
         assert!(stack.all().is_empty());
@@ -108,17 +112,17 @@ mod test {
         fn callee(stack: &mut Stack<i32>) {
             let mut pushed = stack.pushed(2);
             recurse(pushed.stack());
-            assert_eq!(pushed.all(), &[1, 2]);
+            assert_eq!(pushed.all(), [1, 2].reference());
         }
 
         fn recurse(stack: &mut Stack<i32>) {
-            assert_eq!(stack.all(), &[1, 2]);
+            assert_eq!(stack.all(), [1, 2].reference());
         }
 
         let mut stack = Stack::new();
         stack.with_pushed(1, |stack| {
             callee(stack);
-            assert_eq!(stack.all(), &[1]);
+            assert_eq!(stack.all(), [1].reference());
         });
     }
 

@@ -1,4 +1,5 @@
 use crate::{ArtifactFileName, EntityNameAndSelectableName};
+use prelude::Postfix;
 
 #[derive(Debug, Clone)]
 pub struct FileContent(pub String);
@@ -19,7 +20,7 @@ impl std::ops::Deref for FileContent {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.reference()
     }
 }
 
@@ -52,7 +53,7 @@ impl std::ops::Deref for ArtifactHash {
     type Target = String;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.reference()
     }
 }
 

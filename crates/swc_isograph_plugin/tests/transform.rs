@@ -14,7 +14,7 @@ fn run(input: PathBuf) {
     let root_dir = input.parent().unwrap();
     let isograph_config =
         read_to_string(root_dir.join("isograph.config.json")).expect("failed to read config.json");
-    let config: IsographProjectConfig = serde_json::from_str(&isograph_config).unwrap();
+    let config: IsographProjectConfig = serde_json::from_str(isograph_config.reference()).unwrap();
     let output = root_dir.join("output.js");
     let filename = format!("{}/src/components/HomeRoute.tsx", root_dir.display());
 
@@ -25,14 +25,14 @@ fn run(input: PathBuf) {
         }),
         &|_| {
             compile_iso_literal_visitor(
-                &config,
-                Path::new(&filename),
+                config.reference(),
+                Path::new(filename.reference()),
                 Path::new(root_dir),
                 SyntaxContext::empty(),
             )
         },
-        &input,
-        &output,
+        input.reference(),
+        output.reference(),
         FixtureTestConfig {
             module: true.wrap_some(),
             ..Default::default()
@@ -45,7 +45,7 @@ fn isograph_errors(input: PathBuf) {
     let root_dir = input.parent().unwrap();
     let isograph_config =
         read_to_string(root_dir.join("isograph.config.json")).expect("failed to read config.json");
-    let config: IsographProjectConfig = serde_json::from_str(&isograph_config).unwrap();
+    let config: IsographProjectConfig = serde_json::from_str(isograph_config.reference()).unwrap();
     let output = root_dir.join("output.js");
     let filename = format!("{}/src/components/HomeRoute.tsx", root_dir.display());
 
@@ -56,14 +56,14 @@ fn isograph_errors(input: PathBuf) {
         }),
         &|_| {
             compile_iso_literal_visitor(
-                &config,
-                Path::new(&filename),
+                config.reference(),
+                Path::new(filename.reference()),
                 Path::new(root_dir),
                 SyntaxContext::empty(),
             )
         },
-        &input,
-        &output,
+        input.reference(),
+        output.reference(),
         FixtureTestConfig {
             allow_error: true,
             module: true.wrap_some(),

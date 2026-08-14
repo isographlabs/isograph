@@ -87,7 +87,7 @@ impl IsoLiteralParse {
     pub fn errors(&self) -> Vec<WithSpan<ParseError>> {
         match self {
             IsoLiteralParse::Entrypoint(_) => vec![],
-            IsoLiteralParse::Unparsed(unparsed) => vec![unparsed.reason],
+            IsoLiteralParse::Unparsed(unparsed) => unparsed.reason.wrap_vec(),
         }
     }
 }
@@ -102,7 +102,7 @@ The root is borrowed until the end: on `Err` it moves into `UnparsedLiteral`; on
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
     let parse = parse_singleton(
-        &root,
+        root.reference(),
         text,
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
@@ -212,7 +212,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
         let item = *peek.view();
-        match &item.item {
+        match item.item.reference() {
             ChunkContentItem::NonBracket(token) if token.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
@@ -231,7 +231,7 @@ impl<'a> ItemCursor<'a> {
             Some(peek) => {
                 let item = *peek.view();
                 WithSpan::new(
-                    ParseError::expected(expected, Found::from(&item.item)),
+                    ParseError::expected(expected, Found::from(item.item.reference())),
                     item.location,
                 )
             }
@@ -271,7 +271,7 @@ Extracted from parsing-standards.md. Delta: none on these items.
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
     pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
-        ChunkStream::new(&self.contents, text)
+        ChunkStream::new(self.contents.reference(), text)
     }
 
     pub fn boundary_comma(&self) -> Option<Span> {
@@ -317,7 +317,7 @@ impl ChunkedLevel {
 
     #[cfg(test)]
     pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
-        &self.0
+        self.0.reference()
     }
 }
 ```
@@ -573,10 +573,10 @@ impl ::resolve_position::ResolvePosition for UnparsedLiteral {
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
         if self.level.location.contains(position) {
-            let new_parent = <ChunkedLevel as ::resolve_position::ResolvePosition>::Parent::UnparsedLiteral(self.path(parent).into());
+            let new_parent = <ChunkedLevel as ::resolve_position::ResolvePosition>::Parent::UnparsedLiteral(self.path(parent).to());
             return self.level.item.resolve(new_parent, position);
         }
-        return Self::ResolvedNode::UnparsedLiteral(self.path(parent).into());
+        return Self::ResolvedNode::UnparsedLiteral(self.path(parent).to());
     }
 }
 ```
@@ -612,7 +612,7 @@ mod tests {
         text: &str,
     ) -> (WithSpan<IsoLiteralParse>, Vec<BracketError>, Vec<CommaWithoutItem>) {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-        let (tree, comma_errors) = chunk(&brackets);
+        let (tree, comma_errors) = chunk(brackets.reference());
         (parse_iso_literal(text, tree), bracket_errors, comma_errors)
     }
 
@@ -637,7 +637,7 @@ mod tests {
     }
 
     fn as_entrypoint(parse: &WithSpan<IsoLiteralParse>) -> &EntrypointDeclaration {
-        match &parse.item {
+        match parse.item.reference() {
             IsoLiteralParse::Entrypoint(declaration) => declaration,
             parse => panic!("expected an entrypoint declaration, got {parse:?}"),
         }
@@ -645,11 +645,11 @@ mod tests {
 
     fn assert_unparsed(text: &str, reason: ParseError, reason_span: Span) {
         let parse = parsed(text);
-        match &parse.item {
+        match parse.item.reference() {
             IsoLiteralParse::Unparsed(unparsed) => {
                 assert_eq!(unparsed.reason.item, reason, "for literal {text:?}");
                 assert_eq!(unparsed.reason.location, reason_span, "for literal {text:?}");
-                assert_eq!(parse.item.errors(), vec![unparsed.reason]);
+                assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
             }
             parse => panic!("expected an unparsed literal for {text:?}, got {parse:?}"),
         }
@@ -659,7 +659,7 @@ mod tests {
     fn an_entrypoint_declaration_parses_with_tight_spans() {
         let text = "entrypoint Query.foo";
         let parse = parsed(text);
-        let declaration = as_entrypoint(&parse);
+        let declaration = as_entrypoint(parse.reference());
         assert_eq!(declaration.entrypoint_keyword.location, span_of(text, "entrypoint"));
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
@@ -675,7 +675,7 @@ mod tests {
             "entrypoint Query . foo",
         ] {
             let parse = parsed(text);
-            let declaration = as_entrypoint(&parse);
+            let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
@@ -698,7 +698,7 @@ mod tests {
             let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
             assert!(bracket_errors.is_empty(), "for literal {text:?}");
             assert_eq!(comma_errors.len(), comma_error_count, "for literal {text:?}");
-            let declaration = as_entrypoint(&parse);
+            let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
         }
@@ -710,7 +710,7 @@ mod tests {
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        match &parse.item {
+        match parse.item.reference() {
             IsoLiteralParse::Unparsed(unparsed) => {
                 assert_eq!(unparsed.reason.item, ParseError::EmptyLiteral);
                 assert_eq!(unparsed.reason.location, Span::from_usize(0, text.len()));
@@ -725,7 +725,7 @@ mod tests {
             let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
             assert_eq!(bracket_errors.len(), 1, "for literal {text:?}");
             assert_eq!(comma_errors, vec![], "for literal {text:?}");
-            let declaration = as_entrypoint(&parse);
+            let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
         }
@@ -895,11 +895,11 @@ mod tests {
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                let interior_level = match &token.parent.parent.parent {
+                let interior_level = match token.parent.parent.parent.reference() {
                     ChunkedLevelParent::Interior(group) => group,
                     parent => panic!("expected an interior level, got {parent:?}"),
                 };
-                match &interior_level.parent.parent.parent {
+                match interior_level.parent.parent.parent.reference() {
                     ChunkedLevelParent::UnparsedLiteral(unparsed) => {
                         assert_eq!(
                             unparsed.inner.reason.item,
@@ -919,7 +919,7 @@ mod tests {
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "fieldd")) {
             IsographResolutionNode::NonBracketToken(token) => {
-                match &token.parent.parent.parent {
+                match token.parent.parent.parent.reference() {
                     ChunkedLevelParent::UnparsedLiteral(_) => {}
                     parent => panic!("expected the unparsed literal at the top, got {parent:?}"),
                 }

@@ -400,13 +400,13 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
-    collect_selection_slot_errors(&selection_set.0, |selection, errors| match selection {
+    collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
         Selection::Scalar(scalar) => {
-            collect_argument_errors(&scalar.arguments, errors);
+            collect_argument_errors(scalar.arguments.reference(), errors);
         }
         Selection::Object(object) => {
-            collect_argument_errors(&object.arguments, errors);
-            collect_selection_set_errors(&object.selection_set.item, errors);
+            collect_argument_errors(object.arguments.reference(), errors);
+            collect_selection_set_errors(object.selection_set.item.reference(), errors);
         }
     }, errors);
 }
@@ -421,8 +421,8 @@ pub(crate) fn collect_argument_errors(
     let Some(arguments) = arguments else {
         return;
     };
-    collect_argument_slot_errors(&arguments.item.0, |argument, errors| match argument {
-        Argument::Named(named) => collect_value_errors(&named.value.item, errors),
+    collect_argument_slot_errors(arguments.item.0.reference(), |argument, errors| match argument {
+        Argument::Named(named) => collect_value_errors(named.value.item.reference(), errors),
     }, errors);
 }
 
@@ -433,8 +433,8 @@ pub(crate) fn collect_value_errors(
     let NonConstantValue::Object(object) = value else {
         return;
     };
-    collect_object_entry_slot_errors(&object.0, |entry, errors| match entry {
-        ObjectEntry::Named(named) => collect_value_errors(&named.value.item, errors),
+    collect_object_entry_slot_errors(object.0.reference(), |entry, errors| match entry {
+        ObjectEntry::Named(named) => collect_value_errors(named.value.item.reference(), errors),
     }, errors);
 }
 ```
@@ -498,10 +498,10 @@ impl ::resolve_position::ResolvePosition for NamedArgument {
             return self.name.item.resolve(new_parent, position);
         }
         if self.value.location.contains(position) {
-            let new_parent = <NonConstantValue as ::resolve_position::ResolvePosition>::Parent::Argument(self.path(parent).into());
+            let new_parent = <NonConstantValue as ::resolve_position::ResolvePosition>::Parent::Argument(self.path(parent).to());
             return self.value.item.resolve(new_parent, position);
         }
-        return Self::ResolvedNode::NamedArgument(self.path(parent).into());
+        return Self::ResolvedNode::NamedArgument(self.path(parent).to());
     }
 }
 ```
@@ -515,7 +515,7 @@ impl ::resolve_position::ResolvePosition for IntegerValue {
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        return Self::ResolvedNode::IntegerValue(self.path(parent).into());
+        return Self::ResolvedNode::IntegerValue(self.path(parent).to());
     }
 }
 ```
@@ -530,9 +530,9 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
     fn arguments_of(slot: &SelectionSlot) -> &WithSpan<ArgumentList> {
         let arguments = match slot {
-            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
-                Selection::Scalar(scalar) => &scalar.arguments,
-                Selection::Object(object) => &object.arguments,
+            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
+                Selection::Scalar(scalar) => scalar.arguments.reference(),
+                Selection::Object(object) => object.arguments.reference(),
             },
             slot => panic!("expected a parsed selection, got {slot:?}"),
         };
@@ -541,7 +541,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
 
     fn as_named_argument(slot: &ArgumentSlot) -> &NamedArgument {
         match slot {
-            ArgumentSlot::Parsed(parsed) => match &parsed.item.item {
+            ArgumentSlot::Parsed(parsed) => match parsed.item.item.reference() {
                 Argument::Named(named) => named,
             },
             slot => panic!("expected a named argument, got {slot:?}"),
@@ -553,12 +553,12 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let text = "field Query.Foo { pet(id: $petId) { name(shouted: true) } }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let outer_selection = &selections(&as_field(&parse).selection_set)[0].item;
+        let outer_selection = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
         let outer = arguments_of(outer_selection);
         assert_eq!(outer.location, span_of(text, "(id: $petId)"));
-        assert_eq!(as_named_argument(&outer.item.0[0].item).name.location, span_of(text, "id"));
+        assert_eq!(as_named_argument(outer.item.0[0].item.reference()).name.location, span_of(text, "id"));
         let object = as_object(outer_selection);
-        let inner_selection = &selections(&object.selection_set)[0].item;
+        let inner_selection = selections(object.selection_set.reference())[0].item.reference();
         let inner = arguments_of(inner_selection);
         assert_eq!(inner.location, span_of(text, "(shouted: true)"));
     }
@@ -568,12 +568,12 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let text = r#"field Query.Foo { bar(a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null) }"#;
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
         let values: Vec<&NonConstantValue> = arguments
             .item
             .0
             .iter()
-            .map(|argument| &as_named_argument(&argument.item).value.item)
+            .map(|argument| as_named_argument(argument.item.reference()).value.item.reference())
             .collect();
         assert!(matches!(values[0], NonConstantValue::Variable(_)));
         assert!(matches!(values[1], NonConstantValue::String(_)));
@@ -583,7 +583,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue(Boolean::False))));
         assert!(matches!(values[6], NonConstantValue::Null(_)));
         assert_eq!(
-            as_named_argument(&arguments.item.0[0].item).value.location,
+            as_named_argument(arguments.item.0[0].item.reference()).value.location,
             span_of(text, "$x")
         );
     }
@@ -593,16 +593,16 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let text = "field Query.Foo { bar(input: { id: 4, nested: { on: true } }) }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
-        let value = &as_named_argument(&arguments.item.0[0].item).value;
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let value = as_named_argument(arguments.item.0[0].item.reference()).value.reference();
         assert_eq!(value.location, span_of(text, "{ id: 4, nested: { on: true } }"));
-        let object = match &value.item {
+        let object = match value.item.reference() {
             NonConstantValue::Object(object) => object,
             value => panic!("expected an object literal, got {value:?}"),
         };
         assert_eq!(object.0.len(), 2);
-        let nested = match &object.0[1].item {
-            ObjectEntrySlot::Parsed(parsed) => match &parsed.item.item {
+        let nested = match object.0[1].item.reference() {
+            ObjectEntrySlot::Parsed(parsed) => match parsed.item.item.reference() {
                 ObjectEntry::Named(named) => named,
             },
             entry => panic!("expected a named entry, got {entry:?}"),
@@ -615,30 +615,30 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let text = "field Query.Foo { bar() }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        assert_eq!(arguments_of(&selections(&as_field(&parse).selection_set)[0].item).item.0.len(), 0);
+        assert_eq!(arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference()).item.0.len(), 0);
     }
 
     #[test]
     fn integer_overflow_is_a_typed_error_on_that_argument() {
         let text = "field Query.Foo { bar(a: 99999999999999999999, b: 1) }";
         let parse = parsed(text);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
-        let unparsed = match &arguments.item.0[0].item {
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let unparsed = match arguments.item.0[0].item.reference() {
             ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
         assert_eq!(unparsed.reason.item, ParseError::IntegerDoesNotFitI64);
         assert_eq!(unparsed.reason.location, span_of(text, "99999999999999999999"));
-        as_named_argument(&arguments.item.0[1].item);
-        assert_eq!(parse.item.errors(), vec![unparsed.reason]);
+        as_named_argument(arguments.item.0[1].item.reference());
+        assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
     }
 
     #[test]
     fn a_malformed_argument_degrades_that_argument_alone() {
         let text = "field Query.Foo { bar(a 1, b: 2) }";
         let parse = parsed(text);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
-        let unparsed = match &arguments.item.0[0].item {
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let unparsed = match arguments.item.0[0].item.reference() {
             ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
@@ -646,15 +646,15 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
             unparsed.reason.item,
             expected(token(NonBracketTokenKind::Colon), Found::Token(IntegerLiteral))
         );
-        assert_eq!(as_named_argument(&arguments.item.0[1].item).name.location, span_of(text, "b"));
+        assert_eq!(as_named_argument(arguments.item.0[1].item.reference()).name.location, span_of(text, "b"));
     }
 
     #[test]
     fn a_non_value_identifier_is_an_error_at_the_value() {
         let text = "field Query.Foo { bar(a: yes) }";
         let parse = parsed(text);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
-        let unparsed = match &arguments.item.0[0].item {
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let unparsed = match arguments.item.0[0].item.reference() {
             ArgumentSlot::Unparsed(unparsed) => unparsed,
             argument => panic!("expected an unparsed argument, got {argument:?}"),
         };
@@ -671,10 +671,10 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        let arguments = arguments_of(&selections(&as_field(&parse).selection_set)[0].item);
+        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
         assert_eq!(arguments.item.0.len(), 2);
-        as_named_argument(&arguments.item.0[0].item);
-        as_named_argument(&arguments.item.0[1].item);
+        as_named_argument(arguments.item.0[0].item.reference());
+        as_named_argument(arguments.item.0[1].item.reference());
         assert_eq!(parse.item.errors(), vec![]);
     }
 
@@ -684,7 +684,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "petId")) {
             IsographResolutionNode::VariableName(name) => {
-                match &name.parent.parent {
+                match name.parent.parent.reference() {
                     NonConstantValueParent::Argument(argument) => {
                         assert_eq!(argument.inner.name.location, span_of(text, "a"));
                     }
@@ -696,7 +696,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
         match parse.resolve((), span_of(text, "4")) {
             IsographResolutionNode::IntegerValue(value) => {
                 assert_eq!(value.inner.0, 4);
-                match &value.parent {
+                match value.parent.reference() {
                     NonConstantValueParent::ObjectEntry(entry) => {
                         assert_eq!(entry.inner.name.location, span_of(text, "id"));
                     }

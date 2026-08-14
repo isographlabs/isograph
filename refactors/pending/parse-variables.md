@@ -294,12 +294,12 @@ pub(crate) fn parse_type_annotation(
             }).wrap_ok();
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
-            let inner = parse_bracket_interior_type(cursor.text(), &group.item.children)?;
+            let inner = parse_bracket_interior_type(cursor.text(), group.item.children.reference())?;
             let exclamation = cursor
                 .consume_token_if(NonBracketTokenKind::Exclamation)
                 .map(|span| WithSpan::new(Exclamation, span));
             return TypeAnnotation::List(ListTypeAnnotation {
-                inner: WithSpan::new(Box::new(inner.item), group.location),
+                inner: WithSpan::new(inner.item.boxed(), group.location),
                 exclamation,
             }).wrap_ok();
         }
@@ -324,7 +324,7 @@ fn parse_bracket_interior_type(
             WithSpan::new(
                 ParseError::expected(
                     Expectation::EndOfType,
-                    Found::from(&extra.item.first_item().item),
+                    Found::from(extra.item.first_item().item.reference()),
                 ),
                 extra.location,
             )
@@ -384,11 +384,11 @@ pub(crate) fn collect_variable_errors(
     let Some(declarations) = declarations else {
         return;
     };
-    collect_variable_declaration_slot_errors(&declarations.item.0, |declaration, errors| {
+    collect_variable_declaration_slot_errors(declarations.item.0.reference(), |declaration, errors| {
         match declaration {
             VariableDeclaration::Declaration(declared) => {
-                if let Some(default) = &declared.default_value {
-                    crate::collect_constant_value_errors(&default.item, errors);
+                if let Some(default) = declared.default_value.reference() {
+                    crate::collect_constant_value_errors(default.item.reference(), errors);
                 }
             }
         }
@@ -422,10 +422,10 @@ impl ::resolve_position::ResolvePosition for ListTypeAnnotation {
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
         if self.inner.location.contains(position) {
-            let new_parent = <Box<TypeAnnotation> as ::resolve_position::ResolvePosition>::Parent::List(self.path(parent).into());
+            let new_parent = <Box<TypeAnnotation> as ::resolve_position::ResolvePosition>::Parent::List(self.path(parent).to());
             return self.inner.item.resolve(new_parent, position);
         }
-        return Self::ResolvedNode::ListTypeAnnotation(self.path(parent).into());
+        return Self::ResolvedNode::ListTypeAnnotation(self.path(parent).to());
     }
 }
 ```
@@ -447,7 +447,7 @@ Extending the parse_iso_literal.rs test module.
 
     fn as_declared(slot: &VariableDeclarationSlot) -> &DeclaredVariable {
         match slot {
-            VariableDeclarationSlot::Parsed(parsed) => match &parsed.item.item {
+            VariableDeclarationSlot::Parsed(parsed) => match parsed.item.item.reference() {
                 VariableDeclaration::Declaration(declared) => declared,
             },
             slot => panic!("expected a declared variable, got {slot:?}"),
@@ -459,11 +459,11 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.PetCheckinListRoute(\n  $id: ID !\n) {\n  pets\n}";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let variables = variables_of(&parse);
+        let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 1);
-        let declared = as_declared(&variables.item.0[0].item);
+        let declared = as_declared(variables.item.0[0].item.reference());
         assert_eq!(declared.name.location, span_of(text, "id"));
-        match &declared.type_annotation.item {
+        match declared.type_annotation.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "ID"));
                 assert!(named.exclamation.is_some());
@@ -477,9 +477,9 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo($pets: [Pet!]!) { bar }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let declared = as_declared(&variables_of(&parse).item.0[0].item);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(declared.type_annotation.location, span_of(text, "[Pet!]!"));
-        let list = match &declared.type_annotation.item {
+        let list = match declared.type_annotation.item.reference() {
             TypeAnnotation::List(list) => list,
             annotation => panic!("expected a list type, got {annotation:?}"),
         };
@@ -499,13 +499,13 @@ Extending the parse_iso_literal.rs test module.
         let text = "field Query.Foo($limit: Int = 10) { bar }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let declared = as_declared(&variables_of(&parse).item.0[0].item);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         let default = declared.default_value.as_ref().expect("the fixture declares a default");
         assert!(matches!(default.item, ConstantValue::Integer(IntegerValue(10))));
 
         let shallow = "field Query.Foo($limit: Int = $other) { bar }";
         let parse = parsed(shallow);
-        let unparsed = match &variables_of(&parse).item.0[0].item {
+        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -517,7 +517,7 @@ Extending the parse_iso_literal.rs test module.
 
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
         let parse = parsed(deep);
-        let unparsed = match &variables_of(&parse).item.0[0].item {
+        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -528,9 +528,9 @@ Extending the parse_iso_literal.rs test module.
     fn each_malformed_variable_declaration_degrades_alone() {
         let text = "field Query.Foo($a Int, $b: , id: ID, $c: Float) { bar }";
         let parse = parsed(text);
-        let variables = variables_of(&parse);
+        let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 4);
-        let missing_colon = match &variables.item.0[0].item {
+        let missing_colon = match variables.item.0[0].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -539,7 +539,7 @@ Extending the parse_iso_literal.rs test module.
             expected(token(NonBracketTokenKind::Colon), Found::Token(Identifier))
         );
         assert_eq!(missing_colon.location, span_of(text, "Int"));
-        let missing_type = match &variables.item.0[1].item {
+        let missing_type = match variables.item.0[1].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -547,7 +547,7 @@ Extending the parse_iso_literal.rs test module.
             missing_type.item,
             expected(Expectation::TypeAnnotation, Found::EndOfChunk)
         );
-        let dollarless = match &variables.item.0[2].item {
+        let dollarless = match variables.item.0[2].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -555,7 +555,7 @@ Extending the parse_iso_literal.rs test module.
             dollarless.item,
             expected(Expectation::VariableDeclaration, Found::Token(Identifier))
         );
-        as_declared(&variables.item.0[3].item);
+        as_declared(variables.item.0[3].item.reference());
         assert_eq!(parse.item.errors().len(), 3);
     }
 
@@ -563,7 +563,7 @@ Extending the parse_iso_literal.rs test module.
     fn a_final_comma_inside_a_list_type_degrades_that_declaration() {
         let text = "field Query.Foo($pets: [Pet,]) { bar }";
         let parse = parsed(text);
-        let unparsed = match &variables_of(&parse).item.0[0].item {
+        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -578,7 +578,7 @@ Extending the parse_iso_literal.rs test module.
     fn a_line_break_inside_a_list_type_degrades_that_declaration() {
         let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
         let parse = parsed(text);
-        let unparsed = match &variables_of(&parse).item.0[0].item {
+        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
             VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
             declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
         };
@@ -594,11 +594,11 @@ Extending the parse_iso_literal.rs test module.
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::TypeName(name) => {
-                let list = match &name.parent.parent {
+                let list = match name.parent.parent.reference() {
                     TypeAnnotationParent::List(list) => list,
                     parent => panic!("expected a list parent, got {parent:?}"),
                 };
-                match &list.parent {
+                match list.parent.reference() {
                     TypeAnnotationParent::Variable(variable) => {
                         assert_eq!(variable.inner.name.location, span_of(text, "pets"));
                     }

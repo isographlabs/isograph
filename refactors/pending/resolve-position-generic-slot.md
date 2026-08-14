@@ -86,7 +86,7 @@ fn handle_data_enum(
 
     let generics_map = match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
         Ok(map) => map,
-        Err(e) => return e.into(),
+        Err(e) => return e.to(),
     };
 
     let match_arms = data_enum.variants.iter().map(|variant| {
@@ -94,7 +94,7 @@ fn handle_data_enum(
     });
 
     let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let ty_generics = match &self_type_generics {
+    let ty_generics = match self_type_generics.reference() {
         Some(explicit) => quote!(#explicit),
         None => quote!(#ty_generics),
     };
@@ -122,7 +122,7 @@ fn handle_data_enum(
         }
     };
 
-    output.into()
+    output.to()
 }
 ```
 

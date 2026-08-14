@@ -70,7 +70,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
         let item = *peek.view();
-        match &item.item {
+        match item.item.reference() {
             ChunkContentItem::NonBracket(token) if token.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
@@ -86,7 +86,7 @@ impl<'a> ItemCursor<'a> {
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
         let peek = self.items.peek()?;
         let item = *peek.view();
-        match &item.item {
+        match item.item.reference() {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
                 let location = item.location;
                 peek.commit();
@@ -106,7 +106,7 @@ impl<'a> ItemCursor<'a> {
             Some(peek) => {
                 let item = *peek.view();
                 WithSpan::new(
-                    ParseError::expected(expected, Found::from(&item.item)),
+                    ParseError::expected(expected, Found::from(item.item.reference())),
                     item.location,
                 )
             }
@@ -183,7 +183,7 @@ impl<'a> ItemCursor<'a> {
 pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
     let parse = parse_singleton(
-        &root,
+        root.reference(),
         text,
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
@@ -202,7 +202,7 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 // from crates/isograph_parser/src/chunk.rs
 impl Chunk {
     pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
-        ChunkStream::new(&self.contents, text)
+        ChunkStream::new(self.contents.reference(), text)
     }
 
     /// First content item through last content item. `WithSpan<Chunk>` also covers
@@ -301,7 +301,7 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                let (_, result) = parse_chunk(chunk, text, &parse_item);
+                let (_, result) = parse_chunk(chunk, text, parse_item.reference());
                 result
                     .map(|item| {
                         WithSpan::new(
@@ -325,7 +325,7 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                let (mut stream, result) = parse_chunk(chunk, text, &parse_item);
+                let (mut stream, result) = parse_chunk(chunk, text, parse_item.reference());
                 result
                     .map(|item| {
                         let trailing = stream
@@ -351,7 +351,7 @@ impl ChunkedLevel {
 
     #[cfg(test)]
     pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
-        &self.0
+        self.0.reference()
     }
 }
 
@@ -475,9 +475,9 @@ pub(crate) fn collect_selection_slot_errors(
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
     for slot in slots {
-        match &slot.item {
+        match slot.item.reference() {
             SelectionSlot::Parsed(parsed) => {
-                nested(&parsed.item.item, errors);
+                nested(parsed.item.item.reference(), errors);
                 if let Some(trailing) = parsed.trailing {
                     errors.push(trailing);
                 }

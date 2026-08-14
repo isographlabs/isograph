@@ -431,10 +431,10 @@ impl IsoLiteralParse {
             IsoLiteralParse::Entrypoint(_) => vec![],
             IsoLiteralParse::Field(declaration) => {
                 let mut errors = Vec::new();
-                collect_selection_set_errors(&declaration.selection_set.item, &mut errors);
+                collect_selection_set_errors(declaration.selection_set.item.reference(), &mut errors);
                 errors
             }
-            IsoLiteralParse::Unparsed(unparsed) => vec![unparsed.reason],
+            IsoLiteralParse::Unparsed(unparsed) => unparsed.reason.wrap_vec(),
         }
     }
 }
@@ -446,10 +446,10 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
-    collect_selection_slot_errors(&selection_set.0, |selection, errors| match selection {
+    collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
         Selection::Scalar(_) => {}
         Selection::Object(object) => {
-            collect_selection_set_errors(&object.selection_set.item, errors)
+            collect_selection_set_errors(object.selection_set.item.reference(), errors)
         }
     }, errors);
 }
@@ -487,7 +487,7 @@ impl ::resolve_position::ResolvePosition for SelectionSlot {
         match self {
             SelectionSlot::Parsed(inner) => inner.resolve(parent, position),
             SelectionSlot::Unparsed(inner) => inner.resolve(
-                <UnparsedItem as ::resolve_position::ResolvePosition>::Parent::SelectionSet(parent.into()),
+                <UnparsedItem as ::resolve_position::ResolvePosition>::Parent::SelectionSet(parent.to()),
                 position,
             ),
         }
@@ -527,7 +527,7 @@ impl ::resolve_position::ResolvePosition for SelectionSet {
                 return item.item.resolve(new_parent, position);
             }
         }
-        return Self::ResolvedNode::SelectionSet(self.path(parent).into());
+        return Self::ResolvedNode::SelectionSet(self.path(parent).to());
     }
 }
 ```
@@ -542,10 +542,10 @@ impl ::resolve_position::ResolvePosition for UnparsedItem {
 
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
         if self.chunk.location.contains(position) {
-            let new_parent = <Chunk as ::resolve_position::ResolvePosition>::Parent::UnparsedItem(self.path(parent).into());
+            let new_parent = <Chunk as ::resolve_position::ResolvePosition>::Parent::UnparsedItem(self.path(parent).to());
             return self.chunk.item.resolve(new_parent, position);
         }
-        return Self::ResolvedNode::UnparsedItem(self.path(parent).into());
+        return Self::ResolvedNode::UnparsedItem(self.path(parent).to());
     }
 }
 ```
@@ -561,19 +561,19 @@ impl ::resolve_position::ResolvePosition for ObjectSelection {
     fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
         for item in self.reader_alias.iter() {
             if item.location.contains(position) {
-                let new_parent = <SelectionAlias as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).into());
+                let new_parent = <SelectionAlias as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
                 return item.item.resolve(new_parent, position);
             }
         }
         if self.name.location.contains(position) {
-            let new_parent = <SelectionName as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).into());
+            let new_parent = <SelectionName as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
             return self.name.item.resolve(new_parent, position);
         }
         if self.selection_set.location.contains(position) {
-            let new_parent = <SelectionSet as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).into());
+            let new_parent = <SelectionSet as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
             return self.selection_set.item.resolve(new_parent, position);
         }
-        return Self::ResolvedNode::ObjectSelection(self.path(parent).into());
+        return Self::ResolvedNode::ObjectSelection(self.path(parent).to());
     }
 }
 ```
@@ -587,19 +587,19 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
     fn as_field(parse: &WithSpan<IsoLiteralParse>) -> &ClientFieldDeclaration {
-        match &parse.item {
+        match parse.item.reference() {
             IsoLiteralParse::Field(declaration) => declaration,
             parse => panic!("expected a field declaration, got {parse:?}"),
         }
     }
 
     fn selections(selection_set: &WithSpan<SelectionSet>) -> &[WithSpan<SelectionSlot>] {
-        &selection_set.item.0
+        selection_set.item.0.reference()
     }
 
     fn as_scalar(slot: &SelectionSlot) -> &ScalarSelection {
         match slot {
-            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
+            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
                 Selection::Scalar(scalar) => scalar,
                 selection => panic!("expected a scalar selection, got {selection:?}"),
             },
@@ -609,7 +609,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
 
     fn as_object(slot: &SelectionSlot) -> &ObjectSelection {
         match slot {
-            SelectionSlot::Parsed(parsed) => match &parsed.item.item {
+            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
                 Selection::Object(object) => object,
                 selection => panic!("expected an object selection, got {selection:?}"),
             },
@@ -637,15 +637,15 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn a_field_declaration_parses_with_scalar_selections() {
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
         let parse = parsed(text);
-        let declaration = as_field(&parse);
+        let declaration = as_field(parse.reference());
         assert_eq!(declaration.field_keyword.location, span_of(text, "field"));
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "Foo"));
         assert_eq!(declaration.selection_set.location, Span::new(span_of(text, "{").start, span_of(text, "}").end));
-        let items = selections(&declaration.selection_set);
+        let items = selections(declaration.selection_set.reference());
         assert_eq!(items.len(), 2);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "bar"));
-        assert_eq!(as_scalar(&items[1].item).name.location, span_of(text, "baz"));
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
+        assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "baz"));
         assert_eq!(items[0].location, span_of(text, "bar"));
         assert_eq!(parse.item.errors(), vec![]);
     }
@@ -654,9 +654,9 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn a_single_line_selection_set_parses_without_a_trailing_separator() {
         let text = "field Query.Foo { bar }";
         let parse = parsed(text);
-        let items = selections(&as_field(&parse).selection_set);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 1);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "bar"));
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
         assert_eq!(parse.item.errors(), vec![]);
     }
 
@@ -668,7 +668,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
             "field Query.Foo {\n}",
         ] {
             let parse = parsed(text);
-            assert_eq!(selections(&as_field(&parse).selection_set).len(), 0, "for literal {text:?}");
+            assert_eq!(selections(as_field(parse.reference()).selection_set.reference()).len(), 0, "for literal {text:?}");
             assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
         }
     }
@@ -679,16 +679,16 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        let items = selections(&as_field(&parse).selection_set);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 1);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "bar"));
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
         assert_eq!(parse.item.errors(), vec![]);
 
         let lone = "field Query.Foo {,}";
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(lone);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        assert_eq!(selections(&as_field(&parse).selection_set).len(), 0);
+        assert_eq!(selections(as_field(parse.reference()).selection_set.reference()).len(), 0);
         assert_eq!(parse.item.errors(), vec![]);
     }
 
@@ -696,7 +696,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn an_alias_splits_from_the_name_at_the_colon() {
         let text = "field Query.Foo { b: bar }";
         let parse = parsed(text);
-        let scalar = as_scalar(&selections(&as_field(&parse).selection_set)[0].item);
+        let scalar = as_scalar(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
         let alias = scalar.reader_alias.as_ref().expect("the fixture selects with an alias");
         let alias_anchor = span_of(text, "b:");
         assert_eq!(alias.location, Span::new(alias_anchor.start, alias_anchor.start + 1));
@@ -707,12 +707,12 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn object_selections_nest() {
         let text = "field Query.Foo { pet { name, age } }";
         let parse = parsed(text);
-        let object = as_object(&selections(&as_field(&parse).selection_set)[0].item);
+        let object = as_object(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
         assert_eq!(object.name.location, span_of(text, "pet"));
-        let inner = selections(&object.selection_set);
+        let inner = selections(object.selection_set.reference());
         assert_eq!(inner.len(), 2);
-        assert_eq!(as_scalar(&inner[0].item).name.location, span_of(text, "name"));
-        assert_eq!(as_scalar(&inner[1].item).name.location, span_of(text, "age"));
+        assert_eq!(as_scalar(inner[0].item.reference()).name.location, span_of(text, "name"));
+        assert_eq!(as_scalar(inner[1].item.reference()).name.location, span_of(text, "age"));
         assert_eq!(parse.item.errors(), vec![]);
     }
 
@@ -720,16 +720,16 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn an_orphaned_group_after_a_line_break_is_an_unparsed_selection() {
         let text = "field Query.Foo {\n  bar\n  { baz }\n}";
         let parse = parsed(text);
-        let items = selections(&as_field(&parse).selection_set);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "bar"));
-        let unparsed = as_unparsed_item(&items[1].item);
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
+        let unparsed = as_unparsed_item(items[1].item.reference());
         assert_eq!(
             unparsed.reason.item,
             expected(Expectation::Selection, Found::Group(BracketKind::Brace))
         );
         assert_eq!(unparsed.reason.location, span_of(text, "{ baz }"));
-        assert_eq!(parse.item.errors(), vec![unparsed.reason]);
+        assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
     }
 
     #[test]
@@ -738,10 +738,10 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        let items = selections(&as_field(&parse).selection_set);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "a"));
-        assert_eq!(as_scalar(&items[1].item).name.location, span_of(text, "b"));
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "a"));
+        assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "b"));
         assert_eq!(parse.item.errors(), vec![]);
     }
 
@@ -749,24 +749,24 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn leftover_after_a_selection_keeps_the_item() {
         let text = "field Query.Foo {\n  bar baz\n  qux\n}";
         let parse = parsed(text);
-        let items = selections(&as_field(&parse).selection_set);
+        let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
-        assert_eq!(as_scalar(&items[0].item).name.location, span_of(text, "bar"));
-        let trailing = trailing_of(&items[0].item);
+        assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
+        let trailing = trailing_of(items[0].item.reference());
         assert_eq!(
             trailing.item,
             expected(Expectation::Separator, Found::Token(Identifier))
         );
         assert_eq!(trailing.location, span_of(text, "baz"));
-        assert_eq!(as_scalar(&items[1].item).name.location, span_of(text, "qux"));
-        assert_eq!(parse.item.errors(), vec![trailing]);
+        assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "qux"));
+        assert_eq!(parse.item.errors(), trailing.wrap_vec());
     }
 
     #[test]
     fn arguments_are_trailing_leftover_until_parse_arguments() {
         let text = "field Query.Foo { bar(x: 1) }";
         let parse = parsed(text);
-        let slot = &selections(&as_field(&parse).selection_set)[0].item;
+        let slot = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
         assert_eq!(as_scalar(slot).name.location, span_of(text, "bar"));
         let trailing = trailing_of(slot);
         assert_eq!(
@@ -780,7 +780,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     fn a_directive_on_a_selection_is_trailing_leftover() {
         let text = "field Query.Foo { bar @loadable }";
         let parse = parsed(text);
-        let slot = &selections(&as_field(&parse).selection_set)[0].item;
+        let slot = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
         assert_eq!(as_scalar(slot).name.location, span_of(text, "bar"));
         let trailing = trailing_of(slot);
         assert_eq!(
@@ -841,7 +841,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         assert_eq!(errors[0].location, span_of(text, "b"));
         assert_eq!(errors[1].location, span_of(text, "d"));
         assert_eq!(errors[2].location, span_of(text, "f"));
-        assert_eq!(as_scalar(&selections(&as_field(&parse).selection_set)[0].item).name.location, span_of(text, "a"));
+        assert_eq!(as_scalar(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference()).name.location, span_of(text, "a"));
     }
 
     #[test]
@@ -890,14 +890,14 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "42")) {
             IsographResolutionNode::NonBracketToken(token) => {
-                let chunk_parent = &token.parent.parent;
+                let chunk_parent = token.parent.parent.reference();
                 match chunk_parent {
                     ChunkParent::UnparsedItem(unparsed) => {
                         assert_eq!(
                             unparsed.inner.reason.item,
                             expected(Expectation::Selection, Found::Token(IntegerLiteral))
                         );
-                        match &unparsed.parent {
+                        match unparsed.parent.reference() {
                             UnparsedItemParent::SelectionSet(_) => {}
                             parent => panic!("expected a selection-set parent, got {parent:?}"),
                         }

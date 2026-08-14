@@ -229,7 +229,7 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
     fn as_pointer(parse: &WithSpan<IsoLiteralParse>) -> &ClientPointerDeclaration {
-        match &parse.item {
+        match parse.item.reference() {
             IsoLiteralParse::Pointer(declaration) => declaration,
             parse => panic!("expected a pointer declaration, got {parse:?}"),
         }
@@ -250,18 +250,18 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
         let text = "pointer Pet.BestFriend to Pet { id }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let declaration = as_pointer(&parse);
+        let declaration = as_pointer(parse.reference());
         assert_eq!(declaration.pointer_keyword.location, span_of(text, "pointer"));
         assert_eq!(declaration.client_pointer_name.location, span_of(text, "BestFriend"));
         assert_eq!(declaration.to_keyword.location, span_of(text, "to"));
         let target_anchor = span_of(text, "Pet {");
-        match &declaration.target_type.item {
+        match declaration.target_type.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, Span::new(target_anchor.start, target_anchor.start + 3));
             }
             annotation => panic!("expected a named target, got {annotation:?}"),
         }
-        assert_eq!(selections(&declaration.selection_set).len(), 1);
+        assert_eq!(selections(declaration.selection_set.reference()).len(), 1);
     }
 
     #[test]
@@ -269,7 +269,7 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
         let text = "pointer Pet.Owner($limit: Int) to Person! \"the owner\" { name }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        let declaration = as_pointer(&parse);
+        let declaration = as_pointer(parse.reference());
         assert!(declaration.variable_definitions.is_some());
         assert_eq!(declaration.target_type.location, span_of(text, "Person!"));
         assert!(declaration.description.is_some());
@@ -280,7 +280,7 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
         let text = "pointer Pet.Friends to [Pet!]! { id }";
         let parse = parsed(text);
         assert_eq!(parse.item.errors(), vec![]);
-        assert_eq!(as_pointer(&parse).target_type.location, span_of(text, "[Pet!]!"));
+        assert_eq!(as_pointer(parse.reference()).target_type.location, span_of(text, "[Pet!]!"));
     }
 
     #[test]
@@ -315,7 +315,7 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
         }
         match parse.resolve((), span_of(text, "Owner")) {
             IsographResolutionNode::TypeName(name) => {
-                match &name.parent.parent {
+                match name.parent.parent.reference() {
                     TypeAnnotationParent::PointerTarget(_) => {}
                     parent => panic!("expected the pointer-target parent, got {parent:?}"),
                 }

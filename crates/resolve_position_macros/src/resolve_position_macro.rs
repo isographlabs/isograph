@@ -13,7 +13,7 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
 
     let resolve_position_args = match deluxe::extract_attributes(&mut input) {
         Ok(resolve_position_args) => resolve_position_args,
-        Err(e) => return e.into_compile_error().into(),
+        Err(e) => return e.into_compile_error().to(),
     };
 
     match input.data {
@@ -29,7 +29,7 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
         syn::Data::Union(_) => {
             Error::new(input.span(), "This derive only works on structs and enums")
                 .to_compile_error()
-                .into()
+                .to()
         }
     }
 }
@@ -49,7 +49,7 @@ fn handle_data_struct(
     let generics_map = match validate_and_map_generics(input_generics, self_type_generics.clone()) {
         Ok(map) => map,
         Err(e) => {
-            return e.into();
+            return e.to();
         }
     };
 
@@ -57,7 +57,7 @@ fn handle_data_struct(
         .fields
         .iter()
         .enumerate()
-        .map(|(index, field)| get_resolve_field_info(field, index, &generics_map))
+        .map(|(index, field)| get_resolve_field_info(field, index, generics_map.reference()))
         .collect::<Result<Vec<_>, _>>()
     {
         Ok(field_infos) => field_infos
@@ -69,12 +69,16 @@ fn handle_data_struct(
                      field_type,
                      parent_construction,
                  }| {
-                    generate_resolve_code(&field_accessor, &field_type, &parent_construction)
+                    generate_resolve_code(
+                        field_accessor.reference(),
+                        field_type.reference(),
+                        parent_construction.reference(),
+                    )
                 },
             )
             .collect::<Vec<_>>(),
         Err(e) => {
-            return e.into();
+            return e.to();
         }
     };
 
@@ -95,7 +99,7 @@ fn handle_data_struct(
         }
     };
 
-    output.into()
+    output.to()
 }
 
 fn handle_data_enum(
@@ -110,13 +114,15 @@ fn handle_data_enum(
     } = resolve_position_args;
 
     let match_arms = data_enum.variants.iter().map(|variant| {
-        let variant_name = &variant.ident;
+        let variant_name = variant.ident.reference();
 
-        match &variant.fields {
+        match variant.fields.reference() {
             syn::Fields::Unnamed(fields) => {
                 let mut payloads = fields.unnamed.iter();
                 match (payloads.next(), payloads.next()) {
-                    (Some(payload), None) => generate_enum_arm(&enum_name, variant_name, payload),
+                    (Some(payload), None) => {
+                        generate_enum_arm(enum_name.reference(), variant_name, payload)
+                    }
                     _ => single_payload_error(variant),
                 }
             }
@@ -141,7 +147,7 @@ fn handle_data_enum(
         }
     };
 
-    output.into()
+    output.to()
 }
 
 fn generate_enum_arm(
@@ -149,7 +155,7 @@ fn generate_enum_arm(
     variant_name: &syn::Ident,
     payload: &syn::Field,
 ) -> proc_macro2::TokenStream {
-    let attr = match find_resolve_field_attr(&payload.attrs) {
+    let attr = match find_resolve_field_attr(payload.attrs.reference()) {
         Ok(attr) => attr,
         Err(e) => return e,
     };
@@ -165,7 +171,7 @@ fn generate_enum_arm(
 
     match parse_parent_construction(attr) {
         Ok(ParentConstruction::EnumVariant(parent_variant)) => {
-            let payload_type = &payload.ty;
+            let payload_type = payload.ty.reference();
             quote! {
                 #enum_name::#variant_name(inner) => inner.resolve(
                     <#payload_type as ::resolve_position::ResolvePosition>::Parent::#parent_variant(parent.into()),
@@ -244,20 +250,20 @@ fn find_resolve_field_attr(
 fn parse_parent_construction(
     attr: &syn::Attribute,
 ) -> Result<ParentConstruction, proc_macro2::TokenStream> {
-    match &attr.meta {
+    match attr.meta.reference() {
         syn::Meta::Path(_) => ParentConstruction::ContainerPath.wrap_ok(),
         syn::Meta::List(_) => {
             let name_value = attr
                 .parse_args::<syn::MetaNameValue>()
                 .map_err(|e| e.to_compile_error())?;
-            if let syn::Expr::Path(value) = &name_value.value
+            if let syn::Expr::Path(value) = name_value.value.reference()
                 && name_value.path.is_ident("parent_variant")
                 && let Some(variant) = value.path.get_ident()
             {
                 return ParentConstruction::EnumVariant(variant.clone()).wrap_ok();
             }
             Error::new_spanned(
-                &attr.meta,
+                attr.meta.reference(),
                 "expected `#[resolve_field(parent_variant = SomeVariant)]`",
             )
             .to_compile_error()
@@ -274,7 +280,7 @@ fn parse_parent_construction(
 
 // Attempts to extract the single generic type from angle bracketed path arguments, e.g. X<Inner>
 fn extract_single_generic_type(segment: &syn::PathSegment) -> Option<&syn::Type> {
-    match &segment.arguments {
+    match segment.arguments.reference() {
         syn::PathArguments::AngleBracketed(args) => args.args.first().and_then(|arg| {
             if let syn::GenericArgument::Type(ty) = arg {
                 ty.wrap_some()
@@ -292,10 +298,9 @@ fn handle_case(
     ctor: fn(syn::Type) -> ResolveFieldInfoType,
 ) -> Result<ResolveFieldInfoTypeWrapper, proc_macro2::TokenStream> {
     if let Some(inner_type) = extract_single_generic_type(last_segment) {
-        ResolveFieldInfoTypeWrapper::None(Box::new(ctor(replace_generics_in_type(
-            inner_type.clone(),
-            generics_map,
-        ))))
+        ResolveFieldInfoTypeWrapper::None(
+            ctor(replace_generics_in_type(inner_type.clone(), generics_map)).boxed(),
+        )
         .wrap_ok()
     } else {
         Error::new_spanned(
@@ -362,7 +367,7 @@ fn parse_resolve_field_type(
             // Recursively parse the inner type
             let inner_wrapper = parse_resolve_field_type(inner_path, generics_map)?;
 
-            return ResolveFieldInfoTypeWrapper::IteratorWrapper(Box::new(inner_wrapper)).wrap_ok();
+            return ResolveFieldInfoTypeWrapper::IteratorWrapper(inner_wrapper.boxed()).wrap_ok();
         }
     }
 
@@ -380,14 +385,14 @@ fn get_resolve_field_info(
     index: usize,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
-    let Some(attr) = find_resolve_field_attr(&field.attrs)? else {
+    let Some(attr) = find_resolve_field_attr(field.attrs.reference())? else {
         return None.wrap_ok();
     };
 
     let parent_construction = parse_parent_construction(attr)?;
 
     // A named field is accessed by name, a tuple field by index.
-    let field_accessor = match &field.ident {
+    let field_accessor = match field.ident.reference() {
         Some(ident) => quote!(#ident),
         None => {
             let index = syn::Index::from(index);
@@ -395,7 +400,7 @@ fn get_resolve_field_info(
         }
     };
 
-    if let syn::Type::Path(syn::TypePath { path, .. }) = &field.ty {
+    if let syn::Type::Path(syn::TypePath { path, .. }) = field.ty.reference() {
         match parse_resolve_field_type(path, generics_map) {
             Ok(field_type) => ResolveFieldInfo {
                 field_accessor,
@@ -407,9 +412,12 @@ fn get_resolve_field_info(
             Err(e) => e.wrap_err(),
         }
     } else {
-        Error::new_spanned(&field.ty, "#[resolve_field] fields must be path types")
-            .to_compile_error()
-            .wrap_err()
+        Error::new_spanned(
+            field.ty.reference(),
+            "#[resolve_field] fields must be path types",
+        )
+        .to_compile_error()
+        .wrap_err()
     }
 }
 
@@ -441,7 +449,7 @@ fn generate_resolve_code_recursive(
     field_expr: proc_macro2::TokenStream,
 ) -> proc_macro2::TokenStream {
     match wrapper {
-        ResolveFieldInfoTypeWrapper::None(inner) => match &**inner {
+        ResolveFieldInfoTypeWrapper::None(inner) => match (**inner).reference() {
             ResolveFieldInfoType::WithSpan(inner_type) => {
                 let new_parent = new_parent_expr(parent_construction, inner_type);
                 quote! {

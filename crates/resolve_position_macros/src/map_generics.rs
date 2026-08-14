@@ -19,7 +19,7 @@ impl<'a> VisitMut for GenericReplacer<'a> {
                     && type_path.path.segments.len() == 1
                     && type_path.path.segments[0].arguments.is_empty()
                 {
-                    let ident = &type_path.path.segments[0].ident;
+                    let ident = type_path.path.segments[0].ident.reference();
 
                     // If we have a mapping for this identifier, replace the entire type
                     if let Some(syn::GenericArgument::Type(replacement_type)) =
@@ -44,7 +44,7 @@ impl<'a> VisitMut for GenericReplacer<'a> {
         match arg {
             syn::GenericArgument::Lifetime(lifetime) => {
                 // Check if we have a mapping for this lifetime
-                if let Some(replacement) = self.generics_map.get(&lifetime.ident) {
+                if let Some(replacement) = self.generics_map.get(lifetime.ident.reference()) {
                     *arg = replacement.clone();
                 }
             }
@@ -88,7 +88,7 @@ pub(crate) fn validate_and_map_generics(
 
     if provided_count != expected_count {
         return Error::new_spanned(
-            &self_type_generics,
+            self_type_generics.reference(),
             format!(
                 "Generic parameter count mismatch: expected {} ({}), got {}",
                 expected_count,

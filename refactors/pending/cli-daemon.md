@@ -96,7 +96,7 @@ pub fn config_path(flag: Option<&Path>) -> Result<PathBuf, DiscoverError> {
         None => {
             let start = std::env::current_dir()
                 .map_err(|source| DiscoverError::NoCurrentDir { source })?;
-            match nearest_config(&start) {
+            match nearest_config(start.reference()) {
                 Some(found) => found,
                 None => return DiscoverError::NotFound { start }.wrap_err(),
             }
@@ -119,7 +119,7 @@ fn nearest_config(start: &Path) -> Option<PathBuf> {
 /// config with some other config's instance.
 pub fn config_and_instance(flag: Option<&Path>) -> Result<(PathBuf, Instance), DiscoverError> {
     let config = config_path(flag)?;
-    let instance = Instance::named("isograph", slug(&config), config.display().to_string())?;
+    let instance = Instance::named("isograph", slug(config.reference()), config.display().to_string())?;
     (config, instance).wrap_ok()
 }
 
@@ -150,9 +150,9 @@ mod tests {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let project = dir.path().join("project");
         let deep = project.join("src/components");
-        std::fs::create_dir_all(&deep).expect("a test can create directories");
+        std::fs::create_dir_all(deep.reference()).expect("a test can create directories");
         std::fs::write(project.join(CONFIG_FILE_NAME), "{}").expect("a test can write a config");
-        let found = nearest_config(&deep).expect("the config above is found");
+        let found = nearest_config(deep.reference()).expect("the config above is found");
         assert_eq!(found, project.join(CONFIG_FILE_NAME));
     }
 
@@ -436,7 +436,7 @@ async fn serve(
             line = lines.next() => line,
         };
         match line {
-            Some(Ok(line)) => match serde_json::from_str::<RequestFrame>(&line) {
+            Some(Ok(line)) => match serde_json::from_str::<RequestFrame>(line.reference()) {
                 Ok(frame) => {
                     let reply = ReplyHandle {
                         connection: response_tx.clone(),
@@ -466,7 +466,7 @@ async fn serve(
 /// every outstanding [`ReplyHandle`] for this connection are gone.
 async fn write_responses(mut write: OwnedWriteHalf, mut responses: UnboundedReceiver<ResponseFrame>) {
     while let Some(frame) = responses.recv().await {
-        let line = match serde_json::to_string(&frame) {
+        let line = match serde_json::to_string(frame.reference()) {
             Ok(line) => line,
             Err(e) => {
                 warn!(error = %e, "unserializable response");
@@ -504,10 +504,10 @@ use crate::protocol::{IsographRequest, IsographResponse, TrackedFilesResponse};
 use crate::socket::ReplyHandle;
 
 /// The extensions tracked under project_root.
-const TRACKED_EXTENSIONS: &[&str] = &["ts", "tsx", "js", "jsx"];
+const TRACKED_EXTENSIONS: &[&str] = ["ts", "tsx", "js", "jsx"].reference();
 
 /// Directories never looked inside: generated artifacts and dependencies.
-const SKIPPED_DIRECTORIES: &[&str] = &["__isograph", "node_modules"];
+const SKIPPED_DIRECTORIES: &[&str] = ["__isograph", "node_modules"].reference();
 
 /// Everything that can happen to a running daemon, one variant per source.
 #[derive(Debug)]
@@ -607,7 +607,7 @@ pub fn run(config_flag: Option<&Path>) {
             return;
         }
     };
-    let project_root = match project_root(&config_path) {
+    let project_root = match project_root(config_path.reference()) {
         Ok(root) => root,
         Err(e) => {
             error!(error = %e, "not starting");
@@ -634,14 +634,14 @@ fn project_root(config_path: &Path) -> Result<PathBuf, ProjectRootError> {
         }
     })?;
     let config: DaemonConfig =
-        serde_json::from_str(&contents).map_err(|source| ProjectRootError::Unparseable {
+        serde_json::from_str(contents.reference()).map_err(|source| ProjectRootError::Unparseable {
             path: config_path.to_owned(),
             source,
         })?;
     let config_dir = config_path.parent().ok_or_else(|| ProjectRootError::NoParent {
         path: config_path.to_owned(),
     })?;
-    let root = config_dir.join(&config.project_root);
+    let root = config_dir.join(config.project_root.reference());
     match root.canonicalize() {
         Ok(root) => root.wrap_ok(),
         Err(source) => ProjectRootError::Unresolvable { path: root, source }.wrap_err(),
@@ -675,14 +675,14 @@ async fn serve(project_root: PathBuf, port_file: PathBuf) {
 
     // The watcher before the scan, so a change landing mid-scan arrives as an event and the
     // set converges on the filesystem.
-    let _watcher = match watch(&project_root, event_tx.clone()) {
+    let _watcher = match watch(project_root.reference(), event_tx.clone()) {
         Ok(watcher) => watcher,
         Err(e) => {
             error!(error = %e, root = %project_root.display(), "could not watch the project root");
             return;
         }
     };
-    scan(&project_root, &event_tx);
+    scan(project_root.reference(), event_tx.reference());
 
     // The socket after the scan has been queued: the seed events sit ahead of any request in
     // the one event channel, so the earliest answer a client can get is already seeded.
@@ -693,7 +693,7 @@ async fn serve(project_root: PathBuf, port_file: PathBuf) {
             return;
         }
     };
-    if let Err(e) = std::fs::write(&port_file, port.to_string()) {
+    if let Err(e) = std::fs::write(port_file.reference(), port.to_string()) {
         error!(error = %e, path = %port_file.display(), "could not write the port file");
         return;
     }
@@ -710,7 +710,7 @@ async fn serve(project_root: PathBuf, port_file: PathBuf) {
     drop(socket);
     // Best effort: a daemon that dies without reaching this leaves a stale file, which a
     // client's refused connect already reads as "not running".
-    let _ = std::fs::remove_file(&port_file);
+    let _ = std::fs::remove_file(port_file.reference());
 }
 
 /// The event loop: read the event channel and dispatch each event.
@@ -720,7 +720,7 @@ async fn run_event_loop(
     effect_tx: UnboundedSender<IsographEffect>,
 ) {
     while let Some(event) = event_rx.recv().await {
-        dispatch_event(&mut state, event, &effect_tx);
+        dispatch_event(&mut state, event, effect_tx.reference());
     }
 }
 
@@ -754,16 +754,16 @@ fn handle(state: &mut IsographState, event: IsographEvent) -> Vec<IsographEffect
                     state.files.insert(path);
                 }
                 SourceChange::Absent => {
-                    state.files.remove(&path);
+                    state.files.remove(path.reference());
                 }
             }
             Vec::new()
         }
         IsographEvent::Request(IncomingRequest { request, reply }) => {
-            let response = respond(state, &request);
-            vec![IsographEffect::Respond(Respond { reply, response })]
+            let response = respond(state, request.reference());
+            IsographEffect::Respond(Respond { reply, response }).wrap_vec()
         }
-        IsographEvent::Quit => vec![IsographEffect::Kill],
+        IsographEvent::Quit => IsographEffect::Kill.wrap_vec(),
     }
 }
 
@@ -832,7 +832,7 @@ fn watch(
 /// only names a path to re-check, so create, write, rename, and remove all funnel into
 /// present-or-absent.
 fn classify(path: PathBuf) -> Option<SourceEvent> {
-    if !is_tracked_source(&path) {
+    if !is_tracked_source(path.reference()) {
         return None;
     }
     let change = if path.is_file() {
@@ -847,7 +847,7 @@ fn is_tracked_source(path: &Path) -> bool {
     let Some(extension) = path.extension().and_then(OsStr::to_str) else {
         return false;
     };
-    TRACKED_EXTENSIONS.contains(&extension)
+    TRACKED_EXTENSIONS.contains(extension.reference())
         && !path.components().any(|component| {
             SKIPPED_DIRECTORIES
                 .iter()
@@ -878,10 +878,10 @@ fn scan(dir: &Path, event_tx: &UnboundedSender<IsographEvent>) {
         };
         // `file_type` does not follow symlinks, so a symlinked directory is not descended into.
         if file_type.is_dir() {
-            if !is_skipped_directory(&path) {
-                scan(&path, event_tx);
+            if !is_skipped_directory(path.reference()) {
+                scan(path.reference(), event_tx);
             }
-        } else if file_type.is_file() && is_tracked_source(&path) {
+        } else if file_type.is_file() && is_tracked_source(path.reference()) {
             let _ = event_tx.send(IsographEvent::Source(SourceEvent {
                 path,
                 change: SourceChange::Present,
@@ -961,7 +961,7 @@ pub fn request(
     request: IsographRequest,
 ) -> Result<IsographResponse, ClientError> {
     let port_file = instance.lock_file().with_extension("port");
-    let Ok(contents) = std::fs::read_to_string(&port_file) else {
+    let Ok(contents) = std::fs::read_to_string(port_file.reference()) else {
         return ClientError::NotRunning {
             daemon: instance.display_name().to_owned(),
         }.wrap_err();
@@ -979,16 +979,16 @@ pub fn request(
             }.wrap_err();
         }
     };
-    let frame = serde_json::to_string(&RequestFrame {
+    let frame = serde_json::to_string(RequestFrame {
         id: CLI_REQUEST_ID,
         request,
-    })?;
-    let mut writer = &stream;
+    }.reference())?;
+    let mut writer = stream.reference();
     writer.write_all(frame.as_bytes())?;
     writer.write_all(b"\n")?;
     let mut line = String::new();
-    BufReader::new(&stream).read_line(&mut line)?;
-    let response: ResponseFrame = serde_json::from_str(&line)?;
+    BufReader::new(stream.reference()).read_line(&mut line)?;
+    let response: ResponseFrame = serde_json::from_str(line.reference())?;
     if response.id != CLI_REQUEST_ID {
         return ClientError::WrongId {
             asked: CLI_REQUEST_ID,
@@ -1039,10 +1039,10 @@ enum IsographVerb {
 
 ```rust
     match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, &matches),
+        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            &matches,
+            matches.reference(),
         ),
     }
 ```
@@ -1052,14 +1052,14 @@ After:
 ```rust
     match cli.verb {
         Some(IsographVerb::Lifecycle(verb)) => {
-            freddie_cli::run_lifecycle_verb::<Isograph>(verb, &matches)
+            freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference())
         }
         Some(IsographVerb::TrackedFiles(args)) => {
-            run_request_verb(&args.id, protocol::IsographRequest::TrackedFiles)
+            run_request_verb(args.id.reference(), protocol::IsographRequest::TrackedFiles)
         }
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            &matches,
+            matches.reference(),
         ),
     }
 ```
@@ -1076,9 +1076,9 @@ fn run_request_verb(id: &ConfigFlag, request: protocol::IsographRequest) -> Exit
             clap::Error::raw(clap::error::ErrorKind::ValueValidation, format!("{e}\n")).exit()
         }
     };
-    freddie_cli::init_client_logging(&instance);
-    match client::request(&instance, request) {
-        Ok(response) => print_response(&response),
+    freddie_cli::init_client_logging(instance.reference());
+    match client::request(instance.reference(), request) {
+        Ok(response) => print_response(response.reference()),
         Err(e) => {
             tracing::error!(error = %e, "request failed");
             ExitCode::FAILURE
@@ -1180,12 +1180,12 @@ impl DaemonFixture {
     fn start(fixture: &str) -> DaemonFixture {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
         let started = DaemonFixture { dir };
-        copy_tree(&fixture_source(fixture), &started.project());
-        let output = started.isograph(&["start"]);
+        copy_tree(fixture_source(fixture).reference(), started.project().reference());
+        let output = started.isograph(["start"].reference());
         assert!(
             output.status.success(),
             "start failed: {}",
-            String::from_utf8_lossy(&output.stderr)
+            String::from_utf8_lossy(output.stderr.reference())
         );
         started
     }
@@ -1198,23 +1198,23 @@ impl DaemonFixture {
     /// side in one state directory. The caller stops it.
     fn add_project(&self, fixture: &str, name: &str) -> PathBuf {
         let target = self.dir.path().join(name);
-        copy_tree(&fixture_source(fixture), &target);
+        copy_tree(fixture_source(fixture).reference(), target.reference());
         target
     }
 
     fn isograph(&self, args: &[&str]) -> Output {
-        self.isograph_in(&self.project(), args)
+        self.isograph_in(self.project().reference(), args)
     }
 
     /// Run the built binary in `dir`, with every per-user path under this fixture's private
     /// HOME.
     fn isograph_in(&self, dir: &Path, args: &[&str]) -> Output {
         let home = self.dir.path().join("home");
-        std::fs::create_dir_all(&home).expect("a test can create its private HOME");
+        std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
         Command::new(env!("CARGO_BIN_EXE_isograph"))
             .args(args)
             .current_dir(dir)
-            .env("HOME", &home)
+            .env("HOME", home.reference())
             .env("XDG_STATE_HOME", home.join("state"))
             .env("LOCALAPPDATA", home.join("appdata"))
             .output()
@@ -1222,18 +1222,18 @@ impl DaemonFixture {
     }
 
     fn tracked_files(&self) -> Vec<PathBuf> {
-        self.tracked_files_in(&self.project())
+        self.tracked_files_in(self.project().reference())
     }
 
     /// The daemon's tracked files, once it answers: `start` returns before the daemon has its
     /// socket up, so this retries until the deadline.
     fn tracked_files_in(&self, dir: &Path) -> Vec<PathBuf> {
         poll(|| {
-            let output = self.isograph_in(dir, &["tracked-files"]);
+            let output = self.isograph_in(dir, ["tracked-files"].reference());
             if !output.status.success() {
                 return None;
             }
-            let payload: serde_json::Value = serde_json::from_slice(&output.stdout).ok()?;
+            let payload: serde_json::Value = serde_json::from_slice(output.stdout.reference()).ok()?;
             payload["files"]
                     .as_array()?
                     .iter()
@@ -1248,7 +1248,7 @@ impl Drop for DaemonFixture {
     /// watching a directory that is gone. `--force`, because a wedged daemon is exactly what
     /// this must clean up after.
     fn drop(&mut self) {
-        let _ = self.isograph(&["stop", "--force"]);
+        let _ = self.isograph(["stop", "--force"].reference());
     }
 }
 
@@ -1267,9 +1267,9 @@ fn copy_tree(from: &Path, to: &Path) {
         let target = to.join(entry.file_name());
         let file_type = entry.file_type().expect("the fixture's entries are readable");
         if file_type.is_dir() {
-            copy_tree(&entry.path(), &target);
+            copy_tree(entry.path().reference(), target.reference());
         } else {
-            std::fs::copy(entry.path(), &target).expect("the fixture's files copy");
+            std::fs::copy(entry.path(), target.reference()).expect("the fixture's files copy");
         }
     }
 }
@@ -1295,16 +1295,16 @@ fn contains_suffix(files: &[PathBuf], suffix: &str) -> bool {
 fn the_project_files_are_tracked() {
     let daemon = DaemonFixture::start("hello");
     let files = daemon.tracked_files();
-    assert!(contains_suffix(&files, "src/a.ts"), "{files:?}");
-    assert!(contains_suffix(&files, "src/nested/b.tsx"), "{files:?}");
+    assert!(contains_suffix(files.reference(), "src/a.ts"), "{files:?}");
+    assert!(contains_suffix(files.reference(), "src/nested/b.tsx"), "{files:?}");
 }
 
 #[test]
 fn generated_and_non_source_files_are_not_tracked() {
     let daemon = DaemonFixture::start("hello");
     let files = daemon.tracked_files();
-    assert!(!contains_suffix(&files, "generated.ts"), "{files:?}");
-    assert!(!contains_suffix(&files, "notes.md"), "{files:?}");
+    assert!(!contains_suffix(files.reference(), "generated.ts"), "{files:?}");
+    assert!(!contains_suffix(files.reference(), "notes.md"), "{files:?}");
 }
 
 #[test]
@@ -1313,38 +1313,38 @@ fn a_created_file_becomes_tracked() {
     daemon.tracked_files(); // the daemon is up
     std::fs::write(daemon.project().join("src/c.ts"), "export const c = 3;\n")
         .expect("a test can write into its copy");
-    poll(|| contains_suffix(&daemon.tracked_files(), "src/c.ts").then_some(()));
+    poll(|| contains_suffix(daemon.tracked_files().reference(), "src/c.ts").then_some(()));
 }
 
 #[test]
 fn a_removed_file_is_forgotten() {
     let daemon = DaemonFixture::start("hello");
-    poll(|| contains_suffix(&daemon.tracked_files(), "src/a.ts").then_some(()));
+    poll(|| contains_suffix(daemon.tracked_files().reference(), "src/a.ts").then_some(()));
     std::fs::remove_file(daemon.project().join("src/a.ts"))
         .expect("a test can edit its copy");
-    poll(|| (!contains_suffix(&daemon.tracked_files(), "src/a.ts")).then_some(()));
+    poll(|| (!contains_suffix(daemon.tracked_files().reference(), "src/a.ts")).then_some(()));
 }
 
 #[test]
 fn stop_ends_the_daemon() {
     let daemon = DaemonFixture::start("hello");
     daemon.tracked_files(); // the daemon is up
-    let stopped = daemon.isograph(&["stop"]);
+    let stopped = daemon.isograph(["stop"].reference());
     assert!(stopped.status.success());
-    poll(|| (!daemon.isograph(&["tracked-files"]).status.success()).then_some(()));
+    poll(|| (!daemon.isograph(["tracked-files"].reference()).status.success()).then_some(()));
 }
 
 #[test]
 fn two_configs_are_two_daemons() {
     let daemon = DaemonFixture::start("hello");
     let second = daemon.add_project("hello", "second");
-    let started = daemon.isograph_in(&second, &["start"]);
+    let started = daemon.isograph_in(second.reference(), ["start"].reference());
     assert!(started.status.success());
     std::fs::write(second.join("src/only_second.ts"), "export const s = 1;\n")
         .expect("a test can write into its copy");
-    poll(|| contains_suffix(&daemon.tracked_files_in(&second), "only_second.ts").then_some(()));
-    assert!(!contains_suffix(&daemon.tracked_files(), "only_second.ts"));
-    let _ = daemon.isograph_in(&second, &["stop", "--force"]);
+    poll(|| contains_suffix(daemon.tracked_files_in(second.reference()).reference(), "only_second.ts").then_some(()));
+    assert!(!contains_suffix(daemon.tracked_files().reference(), "only_second.ts"));
+    let _ = daemon.isograph_in(second.reference(), ["stop", "--force"].reference());
 }
 
 #[test]
@@ -1353,8 +1353,8 @@ fn a_second_start_for_one_config_is_the_running_daemon() {
     // a second start is not an error, and the daemon still answers after it.
     let daemon = DaemonFixture::start("hello");
     daemon.tracked_files(); // the daemon is up
-    let again = daemon.isograph(&["start"]);
+    let again = daemon.isograph(["start"].reference());
     assert!(again.status.success());
-    assert!(contains_suffix(&daemon.tracked_files(), "src/a.ts"));
+    assert!(contains_suffix(daemon.tracked_files().reference(), "src/a.ts"));
 }
 ```

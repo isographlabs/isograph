@@ -50,7 +50,8 @@ macro_rules! string_key_newtype {
 
         impl $named {
             pub fn unchecked_conversion<T: From<intern::string_key::StringKey>>(self) -> T {
-                self.0.into()
+                use $crate::__Postfix;
+                self.0.to()
             }
         }
 

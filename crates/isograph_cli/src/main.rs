@@ -47,14 +47,14 @@ fn main() -> ExitCode {
     // The matches are kept beside the parse because `run_lifecycle_verb` reads what was written
     // from them, to forward to the daemon it spawns.
     let matches = IsographCli::command().get_matches();
-    let cli = IsographCli::from_arg_matches(&matches)
+    let cli = IsographCli::from_arg_matches(matches.reference())
         .expect("the derived type matches the command it derived");
 
     match cli.verb {
-        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, &matches),
+        Some(verb) => freddie_cli::run_lifecycle_verb::<Isograph>(verb, matches.reference()),
         None => freddie_cli::run_lifecycle_verb::<Isograph>(
             freddie_cli::verb_for_bare_invocation::<Isograph>(),
-            &matches,
+            matches.reference(),
         ),
     }
 }

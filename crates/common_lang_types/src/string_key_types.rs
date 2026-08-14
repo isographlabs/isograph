@@ -2,6 +2,7 @@ use pico::{Key, Singleton, Source};
 use string_key_newtype::{string_key_equality, string_key_newtype, string_key_one_way_conversion};
 
 use crate::SelectableName;
+use prelude::Postfix;
 
 string_key_newtype!(DirectiveName);
 string_key_newtype!(DirectiveArgumentName);
@@ -79,7 +80,7 @@ impl Singleton for CurrentWorkingDirectory {
         use ::std::hash::{DefaultHasher, Hash, Hasher};
         let mut s = DefaultHasher::new();
         ::core::any::TypeId::of::<CurrentWorkingDirectory>().hash(&mut s);
-        s.finish().into()
+        s.finish().to()
     }
 }
 
