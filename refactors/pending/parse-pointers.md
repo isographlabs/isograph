@@ -121,23 +121,19 @@ fn parse_pointer(
     keyword: Span,
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientPointerDeclaration, WithSpan<ParseError>> {
-    let parent_type = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
-    cursor.require_token(
-        NonBracketTokenKind::Period,
-        Expectation::Token(NonBracketTokenKind::Period),
-    )?;
-    let client_pointer_name = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_pointer_name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let variable_definitions = consume_variable_declaration_list(cursor);
-    let to_keyword = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::ToKeyword,
-    )?;
+    let to_keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
     if cursor.token_text(to_keyword) != "to" {
         return WithSpan::new(
             ParseError::expected(

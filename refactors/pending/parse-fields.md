@@ -175,18 +175,15 @@ fn parse_field(
     keyword: Span,
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
-    let parent_type = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
-    cursor.require_token(
-        NonBracketTokenKind::Period,
-        Expectation::Token(NonBracketTokenKind::Period),
-    )?;
-    let client_field_name = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_field_name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
         field_keyword: WithSpan::new(FieldKeyword, keyword),
@@ -356,7 +353,9 @@ The parse functions (the shapes parsing-standards.md writes):
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
-    let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
+    let group = cursor
+        .require_group(BracketKind::Brace)
+        .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
     WithSpan::new(
         SelectionSet(
             group
@@ -390,13 +389,14 @@ fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Selecti
 }
 
 fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
-    let first = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::Selection)?;
+    let first = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Selection))?;
     let (reader_alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon) {
         Some(_) => {
-            let name = cursor.require_token(
-                NonBracketTokenKind::Identifier,
-                Expectation::Token(NonBracketTokenKind::Identifier),
-            )?;
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier)
+                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             (
                 WithSpan::new(SelectionAlias, first).wrap_some(),
                 WithSpan::new(SelectionName, name),

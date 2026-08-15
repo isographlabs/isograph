@@ -115,10 +115,9 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 }
 
 fn parse_declaration(cursor: &mut ItemCursor<'_>) -> Result<IsoLiteralParse, WithSpan<ParseError>> {
-    let keyword = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::DeclarationKeyword,
-    )?;
+    let keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
     match cursor.token_text(keyword) {
         text if text == "entrypoint" => {
             IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
@@ -140,18 +139,15 @@ fn parse_entrypoint(
     keyword: Span,
     cursor: &mut ItemCursor<'_>,
 ) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
-    let parent_type = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
-    cursor.require_token(
-        NonBracketTokenKind::Period,
-        Expectation::Token(NonBracketTokenKind::Period),
-    )?;
-    let client_field_name = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_field_name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
         entrypoint_keyword: WithSpan::new(EntrypointKeyword, keyword),
         parent_type: WithSpan::new(EntityName, parent_type),
@@ -238,15 +234,8 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn require_token(
-        &mut self,
-        kind: NonBracketTokenKind,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> {
-        match self.consume_token_if(kind) {
-            Some(span) => span.wrap_ok(),
-            None => self.expected(expected).wrap_err(),
-        }
+    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()> {
+        self.consume_token_if(kind).ok_or(())
     }
 
     pub(crate) fn text(&self) -> &'a str {

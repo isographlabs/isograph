@@ -255,18 +255,15 @@ pub(crate) fn consume_variable_declaration_list(
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<VariableDeclaration, WithSpan<ParseError>> {
-    let dollar = cursor.require_token(
-        NonBracketTokenKind::Dollar,
-        Expectation::VariableDeclaration,
-    )?;
-    let name = cursor.require_token(
-        NonBracketTokenKind::Identifier,
-        Expectation::Token(NonBracketTokenKind::Identifier),
-    )?;
-    cursor.require_token(
-        NonBracketTokenKind::Colon,
-        Expectation::Token(NonBracketTokenKind::Colon),
-    )?;
+    let dollar = cursor
+        .require_token(NonBracketTokenKind::Dollar)
+        .map_err(|()| cursor.expected(Expectation::VariableDeclaration))?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let type_annotation = parse_type_annotation(cursor)?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals) {
         Some(_) => parse_constant_value(cursor)?.wrap_some(),

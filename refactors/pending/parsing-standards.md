@@ -113,26 +113,15 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn require_token(
-        &mut self,
-        kind: NonBracketTokenKind,
-        expected: Expectation,
-    ) -> Result<Span, WithSpan<ParseError>> {
-        match self.consume_token_if(kind) {
-            Some(span) => span.wrap_ok(),
-            None => self.expected(expected).wrap_err(),
-        }
+    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()> {
+        self.consume_token_if(kind).ok_or(())
     }
 
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
-        expected: Expectation,
-    ) -> Result<WithSpan<&'a ChunkedGroup>, WithSpan<ParseError>> {
-        match self.consume_group_if(kind) {
-            Some(group) => group.wrap_ok(),
-            None => self.expected(expected).wrap_err(),
-        }
+    ) -> Result<WithSpan<&'a ChunkedGroup>, ()> {
+        self.consume_group_if(kind).ok_or(())
     }
 
     pub(crate) fn text(&self) -> &'a str {
@@ -494,7 +483,7 @@ Nested errors (arguments, nested selections) precede that slot's trailing error,
 
 - `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
 - `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
-- `require_*`: `consume_*` or `expected()`.
+- `require_*`: `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
 - `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_items_with_trailing`, `parse_singleton`, or `spanning`.
 
 A group plus its interior:
@@ -523,7 +512,9 @@ pub(crate) fn consume_selection_set(
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
-    let group = cursor.require_group(BracketKind::Brace, Expectation::SelectionSet)?;
+    let group = cursor
+        .require_group(BracketKind::Brace)
+        .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
     WithSpan::new(
         SelectionSet(
             group
@@ -551,10 +542,9 @@ pub(crate) fn parse_value(
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
         if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar) {
-            let name = cursor.require_token(
-                NonBracketTokenKind::Identifier,
-                Expectation::Token(NonBracketTokenKind::Identifier),
-            )?;
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier)
+                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse {
                 dollar: WithSpan::new(Dollar, dollar),
                 name: WithSpan::new(VariableName, name),
@@ -613,13 +603,14 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
 ```rust
 // from crates/isograph_parser/src/selections.rs
 fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
-    let first = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::Selection)?;
+    let first = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Selection))?;
     let (reader_alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon) {
         Some(_) => {
-            let name = cursor.require_token(
-                NonBracketTokenKind::Identifier,
-                Expectation::Token(NonBracketTokenKind::Identifier),
-            )?;
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier)
+                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             (
                 WithSpan::new(SelectionAlias, first).wrap_some(),
                 WithSpan::new(SelectionName, name),

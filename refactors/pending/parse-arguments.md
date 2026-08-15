@@ -313,11 +313,12 @@ pub(crate) fn consume_argument_list(
 }
 
 fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
-    let name = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::Argument)?;
-    cursor.require_token(
-        NonBracketTokenKind::Colon,
-        Expectation::Token(NonBracketTokenKind::Colon),
-    )?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Argument))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     Argument::Named(NamedArgument {
         name: WithSpan::new(ArgumentName, name),
@@ -326,11 +327,12 @@ fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<Pars
 }
 
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
-    let name = cursor.require_token(NonBracketTokenKind::Identifier, Expectation::ObjectEntry)?;
-    cursor.require_token(
-        NonBracketTokenKind::Colon,
-        Expectation::Token(NonBracketTokenKind::Colon),
-    )?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::ObjectEntry))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     ObjectEntry::Named(NamedObjectEntry {
         name: WithSpan::new(ObjectEntryName, name),
