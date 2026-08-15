@@ -105,6 +105,8 @@ Do not `match` a `Result` to bind the success value and return or convert the er
 
 When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do not `match` on `Ok` / `Err` then.
 
+Do not pass a value that is used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other arm. `require_token(kind, expected)` is `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`. Same for `require_group`.
+
 ## Postfix wrappers
 
 Do not write prefix or constructor wrappers that `prelude::Postfix` already names. Write the method.
