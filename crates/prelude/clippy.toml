@@ -1,0 +1,6 @@
+# Workspace `cargo clippy` reads this through the repo-root `clippy.toml` symlink.
+disallowed-methods = [
+  { path = "prelude::Postfix::dbg" },
+  { path = "prelude::Postfix::dbg_with_note" },
+  { path = "prelude::Postfix::note_do_not_commit" },
+]

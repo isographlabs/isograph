@@ -4,7 +4,7 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use prelude::Postfix;
+use crate::Postfix;
 use syn::spanned::Spanned;
 use syn::visit::Visit;
 use syn::{Expr, ImplItemFn, ItemFn, Macro, Pat, TraitItemFn};
@@ -60,7 +60,7 @@ fn pending_docs_use_postfix_constructors() {
 fn workspace_root() -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
-        .expect("crates/tests sits under crates/")
+        .expect("crates/prelude sits under crates/")
         .parent()
         .expect("crates sits under the workspace root")
         .to_path_buf()

@@ -115,3 +115,6 @@ impl<T, E> DropErr for Result<T, E> {
         self.map_err(|_| ())
     }
 }
+
+#[cfg(test)]
+mod postfix_constructors;

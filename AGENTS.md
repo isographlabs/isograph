@@ -122,7 +122,7 @@ Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!
 
 The bodies of these methods in prelude are the one place the std forms appear.
 
-`crates/tests` `postfix_constructors` enforces the constructors (`Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`) and `.into()`. It does not enforce `.reference()` or `.dereference()`: prefix `&` and `*` are also types, mutable places, and patterns, and a walk cannot tell those from a value borrow or a copy-out without too many holes. Still write `.reference()` and `.dereference()` in new code.
+`crates/prelude` holds the enforcement: `clippy.toml` bans `dbg` / `dbg_with_note` / `note_do_not_commit`, and `postfix_constructors` flags `Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`, and `.into()`. It does not enforce `.reference()` or `.dereference()`: prefix `&` and `*` are also types, mutable places, and patterns, and a walk cannot tell those from a value borrow or a copy-out without too many holes. Still write `.reference()` and `.dereference()` in new code.
 
 ## Audits
 
