@@ -16,7 +16,7 @@ iso(`
 `)
 ```
 
-A failed first chunk is `RootSlot::Failed` (that chunk’s tokens). Extra chunks still sit in `ExtraChunks`.
+A failed first chunk is `RootSlot::Failed` (that chunk’s items). Extra chunks still sit in `ExtraChunks`.
 
 ## Types
 
@@ -165,7 +165,7 @@ impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk into `Failed`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
+The root is borrowed until the end. A failed first chunk clones that chunk into `Failed.items`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -218,7 +218,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires `errors()` empty (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral`. A failed first chunk is `Failed` plus that chunk’s tokens; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `MultipleDeclarations`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover tokens) and `Expected(EndOfDeclaration, Identifier)`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires `errors()` empty (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `MultipleDeclarations`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `Expected(EndOfDeclaration, Identifier)`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -625,7 +625,7 @@ pub enum UnparsedChunkItemsParent<'a> {
 
 ## Generated code
 
-`UnparsedChunkItems` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `tokens`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 

@@ -19,9 +19,9 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. Diagnostics are not leftover tokens. Leftover and failed tokens are an `UnparsedChunkItems` (a cloned `Chunk` of unread or whole-chunk items). `item` on a slot is `Some` for `Complete` and `Both`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. Diagnostics are not leftover items. Leftover and failed items are `UnparsedChunkItems`. `item` on a slot is `Some` for `Complete` and `Both`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
 
-`Tok` (unparsed tokens) and `E` (diagnostics) may later become type parameters on the slot. This pass hardcodes `UnparsedChunkItems` and `Vec<WithSpan<ParseError>>`.
+`Tok` (unparsed chunk items) and `E` (diagnostics) may later become type parameters on the slot. This pass hardcodes `UnparsedChunkItems` and `Vec<WithSpan<ParseError>>`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -178,7 +178,7 @@ impl<'a> ItemCursor<'a> {
 
 - Leaf: the `Span` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
 - Parsed list item: the `WithSpan` `spanning` returned, stored on `Complete` and on `Both.item`.
-- Slot: `Complete` is that same item span. `Both` is the join of the item span and the leftover chunk span. `Failed` / an `UnparsedChunkItems` is `contents_span`.
+- Slot: `Complete` is that same item span. `Both` is the join of the item span and the leftover items' span. `Failed` / an `UnparsedChunkItems` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
 `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. Names in the tree are spans. The converted scalar is the `i64`.
@@ -271,7 +271,9 @@ impl Chunk {
 }
 ```
 
-`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. A leftover `UnparsedChunkItems` has no trailing separator; a failed slot clones the original chunk. A position on a list chunk's comma resolves to the list.
+A `Chunk` is the whole unit: its chunk items plus the optional trailing separator. A chunk item is a `ChunkContentItem` (a token or a group). `UnparsedChunkItems` is unread or failed items from the chunk under parse, not a chunk. `ExtraChunks` is whole extra chunks after chunk 0.
+
+`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover items have no trailing separator (`from_contents`). A failed slot clones the source chunk, including its trailing separator if it had one. A position on a list chunk's comma resolves to the list.
 
 ## Lists and one-item levels
 
@@ -289,7 +291,8 @@ use crate::{
     ParseError,
 };
 
-/// Unread or failed-chunk content items. Resolve walks `chunk`. No diagnostic field.
+/// Unread or failed items from the chunk under parse. Resolve walks them through
+/// `chunk` (a `Chunk` of those items). No diagnostic field.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems {
@@ -329,7 +332,7 @@ pub struct Both<T> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Failed {
-    pub tokens: UnparsedChunkItems,
+    pub items: UnparsedChunkItems,
     pub errors: Vec<WithSpan<ParseError>>,
 }
 
@@ -402,7 +405,7 @@ fn parse_one_item<'a, P>(
         }
         Err(reason) => WithSpan::new(
             LevelSlot::Failed(Failed {
-                tokens: UnparsedChunkItems {
+                items: UnparsedChunkItems {
                     chunk: chunk.clone(),
                 },
                 errors: reason.wrap_vec(),
@@ -493,11 +496,11 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`ChunkStream::remaining_contents` returns the unread items after `require_end` `Err`. That list is nonempty. A leftover `Chunk` is those items and no trailing separator.
+`ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items in a `Chunk` with no trailing separator.
 
-`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and leftover tokens plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the original chunk. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
+`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and leftover items plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the source chunk. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
 
-`parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `Both`: the object selection `foo { bar }` and leftover tokens `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
+`parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `Both`: the object selection `foo { bar }` and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
 `parse_singleton` is not `Vec<LevelSlot>`. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `extra` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic in `Singleton::errors`. Empty is `first: None` and `empty()`. `item` on the first slot is `Some` when that slot is `Complete` or `Both`.
 
@@ -934,13 +937,13 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`Both::errors`, `Failed::errors`, `IsoLiteralParse::errors`). Resolve walks leftover and failed tokens, not those diagnostics. `errors()` collects diagnostics in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists. Artifact generation runs only then.
+Errors are stored on the tree (`Both::errors`, `Failed::errors`, `IsoLiteralParse::errors`). Resolve walks leftover and failed items, not those diagnostics. `errors()` collects diagnostics in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists. Artifact generation runs only then.
 
 A failed list chunk is `Failed`. Leftover after a successful list item is `Both` plus `Expected(Separator, ...)`. Tokenless diagnostics (empty literal, a root comma) are `Vec<WithSpan<ParseError>>` with no `UnparsedChunkItems`. Extra root chunks are `ExtraChunks` plus `MultipleDeclarations`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
-`parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in leftover or failed tokens resolves through `UnparsedChunkItems`. Extra root chunks resolve through `ExtraChunks`. A position on whitespace or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
+`parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in leftover or failed items resolves through `UnparsedChunkItems`. Extra root chunks resolve through `ExtraChunks`. A position on whitespace or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
 
 Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar } asdf`, a position on `asdf` resolves through the leftover `UnparsedChunkItems`; find-references returns no references. Hover reads the leftover diagnostic by span. Completion reads the resolution path.
 
@@ -952,7 +955,7 @@ A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `WithSpan` 
 
 ## Performance
 
-One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when leftover or failed tokens are stored: a leftover suffix or a failed chunk. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
+One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when leftover items or a failed chunk are stored: leftover items in a separator-less `Chunk`, or a clone of the source chunk. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
@@ -986,12 +989,12 @@ The first implementation step is the shared surface, with tests, before any gram
 - `LevelSlot`, `Both`, `Failed`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
-Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `Both` with tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
+Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `Both` with leftover items, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
 
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
-- parse-fields.md: `SelectionSlot`, `BothSelection`, `Failed`, `collect_selection_slot_errors`, `Clone` on leftover and failed chunks, `ChunkParent` variants for `Unparsed` and `Extra`. resolve-position-generic-slot.md: the slot becomes `LevelSlot<Selection>`
+- parse-fields.md: `SelectionSlot`, `BothSelection`, `Failed`, `collect_selection_slot_errors`, `Clone` on leftover items and failed chunks, `ChunkParent` variants for `Unparsed` and `Extra`. resolve-position-generic-slot.md: the slot becomes `LevelSlot<Selection>`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
