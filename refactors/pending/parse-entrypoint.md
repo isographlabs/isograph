@@ -51,7 +51,7 @@ pub struct IsoLiteralParse {
 pub enum RootSlot {
     Complete(#[resolve_field(parent_variant = Complete)] WithSpan<IsoLiteralItem>),
     Both(BothRoot),
-    Failed(Failed),
+    Failed(#[resolve_field(parent_variant = Failed)] Failed),
 }
 
 /// Derived stand-in for `Both<IsoLiteralItem>`. resolve-position-generic-slot.md.
@@ -60,9 +60,14 @@ pub enum RootSlot {
 pub struct BothRoot {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<IsoLiteralItem>,
-    #[resolve_field]
-    pub leftover: UnparsedChunkItems,
-    pub errors: Vec<WithSpan<ParseError>>,
+    #[resolve_field(parent_variant = Both)]
+    pub failed: WithSpan<Failed>,
+}
+
+#[derive(Debug)]
+pub enum FailedParent<'a> {
+    Both(BothRootPath<'a>),
+    Failed(IsoLiteralParsePath<'a>),
 }
 
 #[derive(Debug)]
@@ -113,9 +118,9 @@ pub type EntrypointDeclarationPath<'a> =
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, FailedParent<'a>>;
 
-pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, RootSlotPath<'a>>;
+pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, FailedPath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
@@ -142,7 +147,7 @@ impl IsoLiteralParse {
         if let Some(first) = self.first.as_ref() {
             match first.item.reference() {
                 RootSlot::Complete(_) => {}
-                RootSlot::Both(both) => errors.extend(both.errors.iter()),
+                RootSlot::Both(both) => errors.extend(both.failed.item.errors.iter()),
                 RootSlot::Failed(failed) => errors.extend(failed.errors.iter()),
             }
         }
@@ -158,8 +163,7 @@ impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
             LevelSlot::Complete(item) => RootSlot::Complete(item),
             LevelSlot::Both(both) => RootSlot::Both(BothRoot {
                 item: both.item,
-                leftover: both.leftover,
-                errors: both.errors,
+                failed: both.failed,
             }),
             LevelSlot::Failed(failed) => RootSlot::Failed(failed),
         }
@@ -565,7 +569,7 @@ After:
 use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
-    IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
+    FailedPath, IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
     RootSlotPath, UnparsedChunkItemsPath,
 };
 
@@ -581,6 +585,7 @@ pub enum IsographResolutionNode<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
+    Failed(FailedPath<'a>),
     UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
     ExtraChunks(ExtraChunksPath<'a>),
     ChunkedLevel(ChunkedLevelPath<'a>),
@@ -622,12 +627,6 @@ pub enum ChunkContentItemParent<'a> {
     Chunk(ChunkPath<'a>),
     Unparsed(UnparsedChunkItemsPath<'a>),
 }
-
-#[derive(Debug)]
-pub enum UnparsedChunkItemsParent<'a> {
-    Both(BothRootPath<'a>),
-    Failed(FailedPath<'a>),
-}
 ```
 
 Before:
@@ -666,11 +665,11 @@ pub enum ChunkContentItem {
 }
 ```
 
-`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkItemsParent` gains `Both` and `Failed`. Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`.
+`Root` remains the parent a caller passes when resolving a bare chunk tree. `FailedParent` is `Both` or `Failed`. Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`.
 
 ## Generated code
 
-`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `failed`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 

@@ -287,16 +287,10 @@ use crate::{
 
 /// Unread or failed items from the chunk under parse. No diagnostic field.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = FailedPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems {
     #[resolve_field(parent_variant = Unparsed)]
     pub items: NonEmpty<WithSpan<ChunkContentItem>>,
-}
-
-#[derive(Debug)]
-pub enum UnparsedChunkItemsParent<'a> {
-    Both(BothSelectionPath<'a>),
-    Failed(FailedPath<'a>),
 }
 
 /// Extra root chunks after the first. Resolve walks each chunk.
@@ -319,15 +313,24 @@ pub enum LevelSlot<T> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Both<T> {
     pub item: WithSpan<T>,
-    pub leftover: UnparsedChunkItems,
+    pub failed: WithSpan<Failed>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = FailedParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct Failed {
+    #[resolve_field]
+    pub items: WithSpan<UnparsedChunkItems>,
     pub errors: Vec<WithSpan<ParseError>>,
 }
 
-#[derive(Debug, PartialEq, Eq)]
-pub struct Failed {
-    pub items: UnparsedChunkItems,
-    pub errors: Vec<WithSpan<ParseError>>,
+#[derive(Debug)]
+pub enum FailedParent<'a> {
+    Both(BothSelectionPath<'a>),
+    Failed(SelectionSetPath<'a>),
 }
+
+pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, FailedParent<'a>>;
 
 impl<T> LevelSlot<T> {
     pub fn item(&self) -> Option<&T> {
@@ -341,7 +344,7 @@ impl<T> LevelSlot<T> {
     pub fn errors(&self) -> Vec<&WithSpan<ParseError>> {
         match self {
             LevelSlot::Complete(_) => Vec::new(),
-            LevelSlot::Both(both) => both.errors.iter().collect(),
+            LevelSlot::Both(both) => both.failed.item.errors.iter().collect(),
             LevelSlot::Failed(failed) => failed.errors.iter().collect(),
         }
     }
@@ -381,8 +384,16 @@ fn parse_one_item<'a, P>(
                     WithSpan::new(
                         LevelSlot::Both(Both {
                             item,
-                            leftover: UnparsedChunkItems { items: remaining },
-                            errors: error.wrap_vec(),
+                            failed: WithSpan::new(
+                                Failed {
+                                    items: WithSpan::new(
+                                        UnparsedChunkItems { items: remaining },
+                                        leftover_span,
+                                    ),
+                                    errors: error.wrap_vec(),
+                                },
+                                leftover_span,
+                            ),
                         }),
                         location,
                     )
@@ -392,9 +403,12 @@ fn parse_one_item<'a, P>(
         }
         Err(reason) => WithSpan::new(
             LevelSlot::Failed(Failed {
-                items: UnparsedChunkItems {
-                    items: chunk.item.contents.clone(),
-                },
+                items: WithSpan::new(
+                    UnparsedChunkItems {
+                        items: chunk.item.contents.clone(),
+                    },
+                    chunk.item.contents_span(),
+                ),
                 errors: reason.wrap_vec(),
             }),
             chunk.item.contents_span(),
@@ -485,7 +499,7 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items.
 
-`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and leftover items plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
+`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and a `Failed` of leftover items plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `Both`: the object selection `foo { bar }` and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
@@ -503,7 +517,7 @@ pub(crate) fn parse_singleton<'a, T>(
 pub enum SelectionSlot {
     Complete(#[resolve_field(parent_variant = Complete)] WithSpan<Selection>),
     Both(BothSelection),
-    Failed(Failed),
+    Failed(#[resolve_field(parent_variant = Failed)] Failed),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -512,9 +526,8 @@ pub enum SelectionSlot {
 pub struct BothSelection {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<Selection>,
-    #[resolve_field]
-    pub leftover: UnparsedChunkItems,
-    pub errors: Vec<WithSpan<ParseError>>,
+    #[resolve_field(parent_variant = Both)]
+    pub failed: WithSpan<Failed>,
 }
 
 pub type BothSelectionPath<'a> =
@@ -549,8 +562,7 @@ impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
             LevelSlot::Complete(item) => SelectionSlot::Complete(item),
             LevelSlot::Both(both) => SelectionSlot::Both(BothSelection {
                 item: both.item,
-                leftover: both.leftover,
-                errors: both.errors,
+                failed: both.failed,
             }),
             LevelSlot::Failed(failed) => SelectionSlot::Failed(failed),
         };
@@ -576,7 +588,7 @@ The same `From` exists per list. A list site maps `parse_items`:
         )
 ```
 
-`UnparsedChunkItemsParent` is the parent of leftover and failed `UnparsedChunkItems`. The derive's `parent_variant` wraps `Both` or `Failed`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`. There is no `From` into those parent enums.
+`FailedParent` is the parent of leftover and slot `Failed`. The derive's `parent_variant` wraps `Both` or `Failed`. `UnparsedChunkItems` sits only on `Failed`; its parent is `FailedPath`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`. There is no `From` into those parent enums.
 
 ### Errors from slots
 
@@ -595,7 +607,7 @@ pub(crate) fn collect_selection_slot_errors(
             SelectionSlot::Complete(selection) => nested(selection.item.reference(), errors),
             SelectionSlot::Both(both) => {
                 nested(both.item.item.reference(), errors);
-                errors.extend(both.errors.iter().copied());
+                errors.extend(both.failed.item.errors.iter().copied());
             }
             SelectionSlot::Failed(failed) => errors.extend(failed.errors.iter().copied()),
         }
@@ -925,7 +937,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`Both::errors`, `Failed::errors`, `IsoLiteralParse::errors`). Resolve walks leftover and failed items, not those diagnostics. `errors()` collects diagnostics in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists. Artifact generation runs only then.
+Errors are stored on the tree (`Failed::errors`, `IsoLiteralParse::errors`). Resolve walks leftover and failed items, not those diagnostics. `errors()` collects diagnostics in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists. Artifact generation runs only then.
 
 A failed list chunk is `Failed`. Leftover after a successful list item is `Both` plus `Expected(Separator, ...)`. Tokenless diagnostics (empty literal, a root comma) are `Vec<WithSpan<ParseError>>` with no `UnparsedChunkItems`. Extra root chunks are `ExtraChunks` plus `MultipleDeclarations`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
