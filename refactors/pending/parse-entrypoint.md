@@ -165,7 +165,7 @@ impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk into `Failed.items`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Failed.items`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -610,8 +610,13 @@ After:
 #[derive(Debug)]
 pub enum ChunkParent<'a> {
     Level(ChunkedLevelPath<'a>),
-    Unparsed(UnparsedChunkItemsPath<'a>),
     Extra(ExtraChunksPath<'a>),
+}
+
+#[derive(Debug)]
+pub enum ChunkContentItemParent<'a> {
+    Chunk(ChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
 }
 
 #[derive(Debug)]
@@ -621,11 +626,47 @@ pub enum UnparsedChunkItemsParent<'a> {
 }
 ```
 
-`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkItemsParent` gains `BothRoot` and `FailedRoot`. Extra root chunks use `parent_variant = Extra`.
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub struct Chunk {
+    #[resolve_field]
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
+}
+
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ChunkContentItem {
+    NonBracket(NonBracketToken),
+    Group(ChunkedGroup),
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub struct Chunk {
+    #[resolve_field(parent_variant = Chunk)]
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
+}
+
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ChunkContentItem {
+    NonBracket(NonBracketToken),
+    Group(ChunkedGroup),
+}
+```
+
+`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkItemsParent` gains `Both` and `Failed`. Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`.
 
 ## Generated code
 
-`UnparsedChunkItems` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
@@ -1003,5 +1044,5 @@ mod tests {
 
 ## Landing checklist
 
-1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode` and `ChunkParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

@@ -253,13 +253,6 @@ impl Chunk {
         self.contents.first()
     }
 
-    pub(crate) fn from_contents(contents: NonEmpty<WithSpan<ChunkContentItem>>) -> Self {
-        Chunk {
-            contents,
-            trailing_separator: None,
-        }
-    }
-
     pub fn boundary_comma(&self) -> Option<Span> {
         let separator = self.trailing_separator.as_ref()?;
         separator
@@ -273,7 +266,7 @@ impl Chunk {
 
 A `Chunk` is the whole unit: its chunk items plus the optional trailing separator. A chunk item is a `ChunkContentItem` (a token or a group). `UnparsedChunkItems` is unread or failed items from the chunk under parse, not a chunk. `ExtraChunks` is whole extra chunks after chunk 0.
 
-`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover items have no trailing separator (`from_contents`). A failed slot clones the source chunk, including its trailing separator if it had one. A position on a list chunk's comma resolves to the list.
+`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover and failed `UnparsedChunkItems` are those items only; a list chunk's comma is not among them. A position on that comma resolves to the list.
 
 ## Lists and one-item levels
 
@@ -291,13 +284,12 @@ use crate::{
     ParseError,
 };
 
-/// Unread or failed items from the chunk under parse. Resolve walks them through
-/// `chunk` (a `Chunk` of those items). No diagnostic field.
+/// Unread or failed items from the chunk under parse. No diagnostic field.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems {
     #[resolve_field(parent_variant = Unparsed)]
-    pub chunk: WithSpan<Chunk>,
+    pub items: NonEmpty<WithSpan<ChunkContentItem>>,
 }
 
 #[derive(Debug)]
@@ -367,13 +359,6 @@ fn parse_chunk<'a, P>(
     (stream, result)
 }
 
-fn leftover_chunk(
-    remaining: NonEmpty<WithSpan<ChunkContentItem>>,
-) -> WithSpan<Chunk> {
-    let location = Span::join(remaining.first().location, remaining.last().location);
-    WithSpan::new(Chunk::from_contents(remaining), location)
-}
-
 fn parse_one_item<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
@@ -389,12 +374,13 @@ fn parse_one_item<'a, P>(
             let error = leftover_error(stream.cursor());
             match stream.remaining_contents() {
                 Some(remaining) => {
-                    let leftover = leftover_chunk(remaining);
-                    let location = Span::join(item.location, leftover.location);
+                    let leftover_span =
+                        Span::join(remaining.first().location, remaining.last().location);
+                    let location = Span::join(item.location, leftover_span);
                     WithSpan::new(
                         LevelSlot::Both(Both {
                             item,
-                            leftover: UnparsedChunkItems { chunk: leftover },
+                            leftover: UnparsedChunkItems { items: remaining },
                             errors: error.wrap_vec(),
                         }),
                         location,
@@ -406,7 +392,7 @@ fn parse_one_item<'a, P>(
         Err(reason) => WithSpan::new(
             LevelSlot::Failed(Failed {
                 items: UnparsedChunkItems {
-                    chunk: chunk.clone(),
+                    items: chunk.item.contents.clone(),
                 },
                 errors: reason.wrap_vec(),
             }),
@@ -496,9 +482,9 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items in a `Chunk` with no trailing separator.
+`ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items.
 
-`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and leftover items plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the source chunk. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
+`parse_one_item` is one chunk. `Complete` is parse `Ok` and `require_end` `Ok`. `Both` is parse `Ok` and leftover items plus `expected(Separator)` (lists) or `expected(EndOfDeclaration)` (singleton). `Failed` is parse `Err` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection.
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `Both`: the object selection `foo { bar }` and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
@@ -588,7 +574,7 @@ The same `From` exists per list. A list site maps `parse_items`:
         )
 ```
 
-`UnparsedChunkItemsParent` is the parent of leftover and failed `UnparsedChunkItems`. The derive's `parent_variant` wraps `Both` or `Failed`. Extra chunks use `Chunk`'s parent variant `Extra`. There is no `From` into those parent enums.
+`UnparsedChunkItemsParent` is the parent of leftover and failed `UnparsedChunkItems`. The derive's `parent_variant` wraps `Both` or `Failed`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`. There is no `From` into those parent enums.
 
 ### Errors from slots
 
@@ -955,7 +941,7 @@ A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `WithSpan` 
 
 ## Performance
 
-One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when leftover items or a failed chunk are stored: leftover items in a separator-less `Chunk`, or a clone of the source chunk. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
+One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when leftover or failed items are stored. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
@@ -986,7 +972,7 @@ The first implementation step is the shared surface, with tests, before any gram
 
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `LevelSlot`, `Both`, `Failed`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`
+- `LevelSlot`, `Both`, `Failed`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `ChunkContentItemParent`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `Both` with leftover items, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
@@ -994,7 +980,7 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
-- parse-fields.md: `SelectionSlot`, `BothSelection`, `Failed`, `collect_selection_slot_errors`, `Clone` on leftover items and failed chunks, `ChunkParent` variants for `Unparsed` and `Extra`. resolve-position-generic-slot.md: the slot becomes `LevelSlot<Selection>`
+- parse-fields.md: `SelectionSlot`, `BothSelection`, `Failed`, `collect_selection_slot_errors`, `Clone` on leftover and failed items, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`. resolve-position-generic-slot.md: the slot becomes `LevelSlot<Selection>`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
