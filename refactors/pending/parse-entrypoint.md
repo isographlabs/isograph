@@ -42,7 +42,6 @@ pub struct IsoLiteralParse {
     pub first: Option<WithSpan<RootSlot>>,
     #[resolve_field]
     pub extra: Option<ExtraChunks>,
-    pub errors: Vec<WithSpan<ParseError>>,
 }
 
 /// Derived stand-in for `LevelSlot<IsoLiteralItem>`. resolve-position-generic-slot.md.
@@ -141,19 +140,6 @@ impl IsoLiteralParse {
             IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
         }
     }
-
-    pub fn errors(&self) -> Vec<&WithSpan<ParseError>> {
-        let mut errors = Vec::new();
-        if let Some(first) = self.first.as_ref() {
-            match first.item.reference() {
-                RootSlot::Complete(_) => {}
-                RootSlot::Both(both) => errors.extend(both.failed.item.errors.iter()),
-                RootSlot::Failed(failed) => errors.extend(failed.errors.iter()),
-            }
-        }
-        errors.extend(self.errors.iter());
-        errors
-    }
 }
 
 // resolve-position-generic-slot.md: this From is gone.
@@ -173,11 +159,15 @@ impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `Failed.items`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Failed`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<IsoLiteralParse> {
+pub fn parse_iso_literal(
+    text: &str,
+    root: WithSpan<ChunkedLevel>,
+    push_error: impl FnMut(WithSpan<ParseError>),
+) -> WithSpan<IsoLiteralParse> {
     /* parsing-standards.md */
 }
 
@@ -226,7 +216,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires `errors()` empty (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `MultipleDeclarations`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `Expected(EndOfDeclaration, Identifier)`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -343,13 +333,17 @@ impl Chunk {
     }
 }
 
-pub(crate) fn parse_singleton<'a, T>(
+pub(crate) fn parse_singleton<'a, T, F>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
-    parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-) -> Singleton<T> {
+    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
+    push_error: &mut F,
+) -> Singleton<T>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     /* parsing-standards.md */
 }
 ```
@@ -669,7 +663,7 @@ pub enum ChunkContentItem {
 
 ## Generated code
 
-`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `failed`. `Failed` descends into `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `failed`. `Failed` descends into its `UnparsedChunkItems`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
@@ -688,19 +682,26 @@ mod tests {
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{At, Comma, Identifier, IntegerLiteral, Period};
 
-    fn parsed(text: &str) -> WithSpan<IsoLiteralParse> {
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
+        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
-        parse
+        (parse, errors)
     }
 
     fn parsed_with_errors(
         text: &str,
-    ) -> (WithSpan<IsoLiteralParse>, Vec<BracketError>, Vec<CommaWithoutItem>) {
+    ) -> (
+        WithSpan<IsoLiteralParse>,
+        Vec<WithSpan<ParseError>>,
+        Vec<BracketError>,
+        Vec<CommaWithoutItem>,
+    ) {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         let (tree, comma_errors) = chunk(brackets.reference());
-        (parse_iso_literal(text, tree), bracket_errors, comma_errors)
+        let mut errors = Vec::new();
+        let parse = parse_iso_literal(text, tree, |error| errors.push(error));
+        (parse, errors, bracket_errors, comma_errors)
     }
 
     fn expected(expectation: Expectation, found: Found) -> ParseError {
@@ -731,9 +732,8 @@ mod tests {
     }
 
     fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         assert!(parse.item.item().is_none(), "for literal {text:?}");
-        let errors = parse.item.errors();
         assert!(
             errors.iter().any(|error| error.item == reason && error.location == reason_span),
             "for literal {text:?}, errors were {errors:?}",
@@ -743,12 +743,12 @@ mod tests {
     #[test]
     fn an_entrypoint_declaration_parses_with_tight_spans() {
         let text = "entrypoint Query.foo";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let declaration = as_entrypoint(parse.reference());
         assert_eq!(declaration.entrypoint_keyword.location, span_of(text, "entrypoint"));
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
         assert_eq!(parse.location, Span::from_usize(0, text.len()));
     }
 
@@ -759,11 +759,11 @@ mod tests {
             "\n\nentrypoint Query.foo",
             "entrypoint Query . foo",
         ] {
-            let parse = parsed(text);
+            let (parse, errors) = parsed(text);
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
-            assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
@@ -780,39 +780,37 @@ mod tests {
             (",entrypoint Query.foo", 1),
             (",,entrypoint Query.foo", 2),
         ] {
-            let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+            let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
             assert!(bracket_errors.is_empty(), "for literal {text:?}");
             assert_eq!(comma_errors.len(), comma_error_count, "for literal {text:?}");
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.parent_type.location, span_of(text, "Query"), "for literal {text:?}");
-            assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
     #[test]
     fn a_lone_comma_is_chunkings_error_and_an_empty_literal() {
         let text = ",";
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
         assert!(parse.item.item().is_none());
         assert_eq!(
-            parse.item.errors(),
-            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len()))
-                .reference()
-                .wrap_vec(),
+            errors,
+            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
         );
     }
 
     #[test]
     fn the_cut_removes_an_unmatched_bracket_and_the_declaration_parses() {
         for text in ["entrypoint Query.foo)", "entrypoint Query.foo ("] {
-            let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+            let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
             assert_eq!(bracket_errors.len(), 1, "for literal {text:?}");
             assert_eq!(comma_errors, vec![], "for literal {text:?}");
             let declaration = as_entrypoint(parse.reference());
             assert_eq!(declaration.client_field_name.location, span_of(text, "foo"), "for literal {text:?}");
-            assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
@@ -822,13 +820,11 @@ mod tests {
             "entrypoint Query.foo,",
             "\nentrypoint Query.foo,\n",
         ] {
-            let parse = parsed(text);
+            let (parse, errors) = parsed(text);
             as_entrypoint(parse.reference());
             assert_eq!(
-                parse.item.errors(),
-                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ","))
-                    .reference()
-                    .wrap_vec(),
+                errors,
+                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")).wrap_vec(),
                 "for literal {text:?}",
             );
         }
@@ -837,13 +833,13 @@ mod tests {
     #[test]
     fn a_comma_before_a_second_declaration_is_the_boundary_comma() {
         let text = "entrypoint Query.foo, field User.name";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         assert_eq!(as_entrypoint(parse.reference()).client_field_name.location, span_of(text, "foo"));
         assert_eq!(
-            parse.item.errors(),
+            errors,
             vec![
-                &WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
-                &WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
+                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
+                WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
             ],
         );
         assert!(parse.item.extra.as_ref().is_some());
@@ -852,13 +848,11 @@ mod tests {
     #[test]
     fn a_second_contentful_chunk_is_multiple_declarations() {
         let text = "entrypoint Query.foo\nfield User.name";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         assert_eq!(as_entrypoint(parse.reference()).client_field_name.location, span_of(text, "foo"));
         assert_eq!(
-            parse.item.errors(),
-            WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name"))
-                .reference()
-                .wrap_vec(),
+            errors,
+            WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")).wrap_vec(),
         );
         assert!(parse.item.extra.as_ref().is_some());
     }
@@ -867,9 +861,8 @@ mod tests {
     fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         assert!(parse.item.item().is_none());
-        let errors = parse.item.errors();
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
                 && error.location == Span::new(keyword_end, keyword_end)
@@ -942,32 +935,29 @@ mod tests {
     #[test]
     fn tokens_after_a_complete_entrypoint_are_leftover() {
         let text = "entrypoint Query.foo bar";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
         match parse.item.first.as_ref().map(|slot| slot.item.reference()) {
             Some(RootSlot::Both(_)) => {}
             other => panic!("expected Both, got {other:?}"),
         }
         assert_eq!(
-            parse.item.errors(),
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar"))
-                .reference()
-                .wrap_vec(),
+            errors,
+            WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
         );
     }
 
     #[test]
     fn a_selection_set_on_an_entrypoint_is_leftover() {
         let text = "entrypoint Query.foo { bar }";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
         assert_eq!(
-            parse.item.errors(),
+            errors,
             WithSpan::new(
                 expected(EndOfDeclaration, Found::Group(BracketKind::Brace)),
                 span_of(text, "{ bar }"),
             )
-            .reference()
             .wrap_vec(),
         );
     }
@@ -975,20 +965,18 @@ mod tests {
     #[test]
     fn a_directive_is_an_ordinary_unexpected_token() {
         let text = "entrypoint Query.foo @lazy";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
         assert_eq!(
-            parse.item.errors(),
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(At)), span_of(text, "@"))
-                .reference()
-                .wrap_vec(),
+            errors,
+            WithSpan::new(expected(EndOfDeclaration, Found::Token(At)), span_of(text, "@")).wrap_vec(),
         );
     }
 
     #[test]
     fn leftover_after_an_entrypoint_resolves_to_the_leftover_token() {
         let text = "entrypoint Query.foo bar";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the leftover token, got {node:?}"),
@@ -998,7 +986,7 @@ mod tests {
     #[test]
     fn names_resolve_to_their_leaves_and_the_rest_to_the_declaration() {
         let text = "entrypoint Query.foo";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Query")) {
             IsographResolutionNode::EntityName(name) => {
                 assert_eq!(name.parent.inner.client_field_name.location, span_of(text, "foo"));
@@ -1024,7 +1012,7 @@ mod tests {
     #[test]
     fn positions_inside_a_failed_first_chunk_resolve_through_the_cloned_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
@@ -1036,7 +1024,7 @@ mod tests {
     #[test]
     fn the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk() {
         let text = "fieldd Query.foo { bar }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "fieldd")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the token leaf, got {node:?}"),
