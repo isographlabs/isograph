@@ -422,6 +422,7 @@ pub enum SelectionSlot {
     Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
 }
 
+// resolve-position-generic-slot.md: this is ParsedSlot<Selection>; not a path segment or ResolvedNode variant.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ParsedSelection {
@@ -430,8 +431,10 @@ pub struct ParsedSelection {
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Selection>>>.
 pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
@@ -472,6 +475,7 @@ The same `From` exists per list. A list site maps the combinator output:
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_selection)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
                 .collect(),
@@ -486,6 +490,7 @@ The same `From` exists per list. A list site maps the combinator output:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
+// resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
 pub(crate) fn collect_selection_slot_errors(
     slots: &[WithSpan<SelectionSlot>],
     nested: impl Fn(&Selection, &mut Vec<WithSpan<ParseError>>),
@@ -529,6 +534,7 @@ pub(crate) fn consume_selection_set(
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_selection)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
                 .collect(),
@@ -550,6 +556,7 @@ pub(crate) fn require_selection_set(
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_selection)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
                 .collect(),
@@ -614,6 +621,7 @@ pub(crate) fn parse_value(
                     .children
                     .item
                     .parse_items_with_trailing(cursor.text(), parse_object_entry)
+                    // resolve-position-generic-slot.md: this map is gone.
                     .into_iter()
                     .map(WithSpan::<ObjectEntrySlot>::from)
                     .collect(),
@@ -696,6 +704,7 @@ pub enum Boolean {
     False,
 }
 
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<ObjectEntry>>>.
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
 
 pub enum ObjectEntry {
@@ -709,6 +718,7 @@ pub struct NamedObjectEntry {
     pub value: WithSpan<NonConstantValue>,
 }
 
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<ConstantObjectEntry>>>.
 pub struct ConstantObjectLiteral(#[resolve_field] pub Vec<WithSpan<ConstantObjectEntrySlot>>);
 
 pub enum ConstantObjectEntry {
@@ -767,6 +777,7 @@ pub(crate) fn parse_constant_value(
                     .children
                     .item
                     .parse_items_with_trailing(cursor.text(), parse_constant_object_entry)
+                    // resolve-position-generic-slot.md: this map is gone.
                     .into_iter()
                     .map(WithSpan::<ConstantObjectEntrySlot>::from)
                     .collect(),
@@ -821,7 +832,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
+Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: those trailing fields are `ParsedSlot::trailing`. `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
 
 A failed list chunk is the concrete slot's `Unparsed` variant; sibling chunks are parsed. A failed declaration is `UnparsedLiteral`. One reason per those regions. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
@@ -858,7 +869,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` via `boundary_comma`
-- Leftover after a list item: `ParsedSelection::trailing` (and the other `Parsed*` trailing fields)
+- Leftover after a list item: `ParsedSelection::trailing` (and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: `ParsedSlot::trailing`
 - Leftover after a singleton: `parse_singleton`'s `require_end`
 - Group interior: `require_group` / `consume_group_if`, then `parse_items_with_trailing` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
@@ -877,7 +888,7 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `UnparsedLiteral`, `entrypoint Type.field`
-- parse-fields.md: `SelectionSlot`, `ParsedSelection`, `UnparsedItem`, `collect_selection_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`
+- parse-fields.md: `SelectionSlot`, `ParsedSelection`, `UnparsedItem`, `collect_selection_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`. resolve-position-generic-slot.md: the slot, wrapper, and per-list collect become `LevelSlot<Selection>` / `ParsedSlot<Selection>` / one walk
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`

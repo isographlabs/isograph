@@ -357,7 +357,7 @@ In `crates/resolve_position_macros` (or the existing derive test crate), a fixtu
 - a position on an unparsed child's span resolves through the unparsed payload; the unparsed parent is `From::from` the list path
 - `Slot<T>` does not appear as a `ResolvedNode` variant
 
-The parsing series is not updated by this doc. Collapsing `SelectionSlot` / `ArgumentSlot` / `ObjectEntrySlot` / `ConstantObjectEntrySlot` / `VariableDeclarationSlot` onto `LevelSlot<T>` is a later mechanical change against this emit.
+The parsing series is not updated by this doc. Collapsing `SelectionSlot` / `ArgumentSlot` / `ObjectEntrySlot` / `ConstantObjectEntrySlot` / `VariableDeclarationSlot` onto `LevelSlot<T>` is a later mechanical change against this emit. That change deletes the concrete slot enums, the `Parsed*` wrappers, the `From<WithSpan<LevelSlot<T>>>` impls and their `.map` call sites, the `*SlotPath` / `Parsed*Path` aliases, the per-list `collect_*_slot_errors` copies, and the `Parsed*` `ResolvedNode` variants. Item `parent_type` becomes the list path. Test helpers take `LevelSlot<T>`. Each of those sites in the series docs names this file.
 
 ## Landing checklist
 

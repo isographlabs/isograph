@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `SelectionSlot` / `UnparsedItem`, `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
+Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `SelectionSlot` / `UnparsedItem` (resolve-position-generic-slot.md: `LevelSlot<Selection>`), `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
 
 ## The grammar this doc accepts
 
@@ -16,7 +16,7 @@ The brace group is required and is the last item of the chunk. Each contentful c
 [<Identifier> :] <Identifier> [<brace group>]
 ```
 
-The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. A selection chunk that fails to parse becomes `SelectionSlot::Unparsed`, holding the reason and its chunk; leftover after a successful selection is `ParsedSelection::trailing`. Sibling selections and the declaration parse normally. Declaration-header failures still degrade the whole literal, as in parse-entrypoint.md.
+The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. A selection chunk that fails to parse becomes `SelectionSlot::Unparsed`, holding the reason and its chunk; leftover after a successful selection is `ParsedSelection::trailing`. resolve-position-generic-slot.md: `LevelSlot::Unparsed` and `ParsedSlot::trailing`. Sibling selections and the declaration parse normally. Declaration-header failures still degrade the whole literal, as in parse-entrypoint.md.
 
 ## Changes to chunk.rs
 
@@ -242,6 +242,7 @@ use crate::{
 /// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Selection>>>.
 pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
 /// Derived stand-in for `LevelSlot<Selection>`. resolve-position-generic-slot.md.
@@ -252,6 +253,7 @@ pub enum SelectionSlot {
     Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
 }
 
+// resolve-position-generic-slot.md: this is ParsedSlot<Selection>; not a path segment or ResolvedNode variant.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ParsedSelection {
@@ -260,6 +262,7 @@ pub struct ParsedSelection {
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
@@ -267,6 +270,7 @@ pub enum Selection {
     Object(ObjectSelection),
 }
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ScalarSelection {
@@ -276,6 +280,7 @@ pub struct ScalarSelection {
     pub name: WithSpan<SelectionName>,
 }
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectSelection {
@@ -318,12 +323,16 @@ pub enum SelectionAliasParent<'a> {
 
 pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, SelectionSetParent<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type SelectionSlotPath<'a> = PositionResolutionPath<&'a SelectionSlot, SelectionSetPath<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ParsedSelectionPath<'a> = PositionResolutionPath<&'a ParsedSelection, SelectionSlotPath<'a>>;
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, ParsedSelectionPath<'a>>;
 
+// resolve-position-generic-slot.md: parent is SelectionSetPath.
 pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, ParsedSelectionPath<'a>>;
 
 pub type UnparsedItemPath<'a> = PositionResolutionPath<&'a UnparsedItem, UnparsedItemParent<'a>>;
@@ -333,11 +342,12 @@ pub type SelectionNamePath<'a> = PositionResolutionPath<&'a SelectionName, Selec
 pub type SelectionAliasPath<'a> = PositionResolutionPath<&'a SelectionAlias, SelectionAliasParent<'a>>;
 ```
 
-`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `SelectionSlot`, `ParsedSelection`, and the `From<WithSpan<LevelSlot<Selection>>>` conversion are the listings in parsing-standards.md; they land here.
+`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `SelectionSlot`, `ParsedSelection`, and the `From<WithSpan<LevelSlot<Selection>>>` conversion are the listings in parsing-standards.md; they land here. resolve-position-generic-slot.md: the slot, wrapper, and `From` go away.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 #[derive(Debug)]
+// resolve-position-generic-slot.md: each variant is From the list path for parent_from.
 pub enum UnparsedItemParent<'a> {
     SelectionSet(SelectionSetPath<'a>),
     // parse-arguments.md adds ArgumentList and ObjectLiteral,
@@ -364,6 +374,7 @@ pub(crate) fn require_selection_set(
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_selection)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
                 .collect(),
@@ -381,6 +392,7 @@ fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Selecti
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_selection)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
                 .collect(),
@@ -417,7 +429,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
 }
 ```
 
-`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSelection::trailing`.
+`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSelection::trailing`. resolve-position-generic-slot.md: `ParsedSlot::trailing`.
 
 ## The errors
 
@@ -447,6 +459,7 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
+    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
     collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
         Selection::Scalar(_) => {}
         Selection::Object(object) => {
@@ -469,6 +482,7 @@ pub(crate) fn collect_selection_set_errors(
     SelectionName(SelectionNamePath<'a>),
     SelectionAlias(SelectionAliasPath<'a>),
     UnparsedItem(UnparsedItemPath<'a>),
+    // resolve-position-generic-slot.md: deleted.
     ParsedSelection(ParsedSelectionPath<'a>),
 ```
 
@@ -480,6 +494,7 @@ The novel shapes, expanded. `SelectionSlot` delegates `Parsed` and wraps `Unpars
 
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
+// resolve-position-generic-slot.md: this impl is the generic LevelSlot emit.
 impl ::resolve_position::ResolvePosition for SelectionSlot {
     type Parent<'a> = SelectionSetPath<'a>;
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
@@ -501,6 +516,7 @@ The enum delegates two variants:
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
 impl ::resolve_position::ResolvePosition for Selection {
+    // resolve-position-generic-slot.md: Parent is SelectionSetPath.
     type Parent<'a> = ParsedSelectionPath<'a>;
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
 
@@ -556,6 +572,7 @@ The object selection's set field boxes on the way in:
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
 impl ::resolve_position::ResolvePosition for ObjectSelection {
+    // resolve-position-generic-slot.md: Parent is SelectionSetPath.
     type Parent<'a> = ParsedSelectionPath<'a>;
     type ResolvedNode<'a> = IsographResolutionNode<'a>;
 
@@ -594,6 +611,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
         }
     }
 
+    // resolve-position-generic-slot.md: these take LevelSlot<Selection>.
     fn selections(selection_set: &WithSpan<SelectionSet>) -> &[WithSpan<SelectionSlot>] {
         selection_set.item.0.reference()
     }

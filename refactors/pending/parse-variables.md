@@ -99,6 +99,7 @@ use crate::{
 /// of its interior. The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<VariableDeclaration>>>.
 pub struct VariableDeclarationList(#[resolve_field] pub Vec<WithSpan<VariableDeclarationSlot>>);
 
 /// Derived stand-in for `LevelSlot<VariableDeclaration>`. resolve-position-generic-slot.md.
@@ -109,6 +110,7 @@ pub enum VariableDeclarationSlot {
     Unparsed(#[resolve_field(parent_variant = VariableDeclarationList)] UnparsedItem),
 }
 
+// resolve-position-generic-slot.md: this is ParsedSlot<VariableDeclaration>; not a path segment or ResolvedNode variant.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ParsedVariableDeclaration {
@@ -117,6 +119,7 @@ pub struct ParsedVariableDeclaration {
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
+// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum VariableDeclaration {
@@ -124,6 +127,7 @@ pub enum VariableDeclaration {
 }
 
 /// `$name: Type = default`. The dollar's position answers this node.
+// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct DeclaredVariable {
@@ -180,12 +184,15 @@ pub enum TypeAnnotationParent<'a> {
 pub type VariableDeclarationListPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationList, ClientFieldDeclarationPath<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type VariableDeclarationSlotPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationSlot, VariableDeclarationListPath<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ParsedVariableDeclarationPath<'a> =
     PositionResolutionPath<&'a ParsedVariableDeclaration, VariableDeclarationSlotPath<'a>>;
 
+// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
 pub type DeclaredVariablePath<'a> =
     PositionResolutionPath<&'a DeclaredVariable, ParsedVariableDeclarationPath<'a>>;
 
@@ -220,7 +227,7 @@ pub enum VariableNameParent<'a> {
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableNameParent<'a>>;
 ```
 
-`UnparsedItemParent` in chunk.rs gains `VariableDeclarationList(VariableDeclarationListPath<'a>)`. `ConstantValue` and `parse_constant_value` land in arguments.rs (parsing-standards.md). `ConstantValueParent` is:
+`UnparsedItemParent` in chunk.rs gains `VariableDeclarationList(VariableDeclarationListPath<'a>)`. resolve-position-generic-slot.md: that variant is `From` the list path for `parent_from`. `ConstantValue` and `parse_constant_value` land in arguments.rs (parsing-standards.md). `ConstantValueParent` is:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -245,6 +252,7 @@ pub(crate) fn consume_variable_declaration_list(
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_variable_declaration)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<VariableDeclarationSlot>::from)
                 .collect(),
@@ -382,6 +390,7 @@ pub(crate) fn collect_variable_errors(
     let Some(declarations) = declarations else {
         return;
     };
+    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
     collect_variable_declaration_slot_errors(declarations.item.0.reference(), |declaration, errors| {
         match declaration {
             VariableDeclaration::Declaration(declared) => {
@@ -401,6 +410,7 @@ pub(crate) fn collect_variable_errors(
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     VariableDeclarationList(VariableDeclarationListPath<'a>),
+    // resolve-position-generic-slot.md: deleted.
     ParsedVariableDeclaration(ParsedVariableDeclarationPath<'a>),
     DeclaredVariable(DeclaredVariablePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
@@ -443,6 +453,7 @@ Extending the parse_iso_literal.rs test module.
             .expect("the fixture's declaration carries variable definitions")
     }
 
+    // resolve-position-generic-slot.md: helpers and matches below take LevelSlot<VariableDeclaration>.
     fn as_declared(slot: &VariableDeclarationSlot) -> &DeclaredVariable {
         match slot {
             VariableDeclarationSlot::Parsed(parsed) => match parsed.item.item.reference() {

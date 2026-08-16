@@ -27,7 +27,7 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-An argument or entry chunk that fails becomes `ArgumentSlot::Unparsed` or `ObjectEntrySlot::Unparsed`; leftover after a successful argument is `ParsedArgument::trailing`. Siblings parse normally.
+An argument or entry chunk that fails becomes `ArgumentSlot::Unparsed` or `ObjectEntrySlot::Unparsed`; leftover after a successful argument is `ParsedArgument::trailing`. resolve-position-generic-slot.md: `LevelSlot::Unparsed` and `ParsedSlot::trailing`. Siblings parse normally.
 
 ## Changes to parse_error.rs
 
@@ -95,6 +95,7 @@ use crate::{
 /// The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Argument>>>.
 pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<ArgumentSlot>>);
 
 /// Derived stand-in for `LevelSlot<Argument>`. resolve-position-generic-slot.md.
@@ -105,6 +106,7 @@ pub enum ArgumentSlot {
     Unparsed(#[resolve_field(parent_variant = ArgumentList)] UnparsedItem),
 }
 
+// resolve-position-generic-slot.md: this is ParsedSlot<Argument>; not a path segment or ResolvedNode variant.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ParsedArgument {
@@ -113,12 +115,14 @@ pub struct ParsedArgument {
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
+// resolve-position-generic-slot.md: parent is ArgumentListPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Argument {
     Named(NamedArgument),
 }
 
+// resolve-position-generic-slot.md: parent is ArgumentListPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedArgument {
@@ -181,6 +185,7 @@ pub struct NullValue;
 /// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<ObjectEntry>>>.
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
 
 /// Derived stand-in for `LevelSlot<ObjectEntry>`. resolve-position-generic-slot.md.
@@ -191,6 +196,7 @@ pub enum ObjectEntrySlot {
     Unparsed(#[resolve_field(parent_variant = ObjectLiteral)] UnparsedItem),
 }
 
+// resolve-position-generic-slot.md: this is ParsedSlot<ObjectEntry>; not a path segment or ResolvedNode variant.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ParsedObjectEntry {
@@ -199,12 +205,14 @@ pub struct ParsedObjectEntry {
     pub trailing: Option<WithSpan<ParseError>>,
 }
 
+// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ObjectEntry {
     Named(NamedObjectEntry),
 }
 
+// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedObjectEntry {
@@ -248,10 +256,13 @@ pub enum NonConstantValueParent<'a> {
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ArgumentSlotPath<'a> = PositionResolutionPath<&'a ArgumentSlot, ArgumentListPath<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ParsedArgumentPath<'a> = PositionResolutionPath<&'a ParsedArgument, ArgumentSlotPath<'a>>;
 
+// resolve-position-generic-slot.md: parent is ArgumentListPath.
 pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ParsedArgumentPath<'a>>;
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
@@ -266,10 +277,13 @@ pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantVa
 
 pub type ObjectLiteralPath<'a> = PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ObjectEntrySlotPath<'a> = PositionResolutionPath<&'a ObjectEntrySlot, ObjectLiteralPath<'a>>;
 
+// resolve-position-generic-slot.md: deleted.
 pub type ParsedObjectEntryPath<'a> = PositionResolutionPath<&'a ParsedObjectEntry, ObjectEntrySlotPath<'a>>;
 
+// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
 pub type NamedObjectEntryPath<'a> = PositionResolutionPath<&'a NamedObjectEntry, ParsedObjectEntryPath<'a>>;
 
 pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, NamedArgumentPath<'a>>;
@@ -283,6 +297,7 @@ pub type ObjectEntryNamePath<'a> = PositionResolutionPath<&'a ObjectEntryName, N
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+// resolve-position-generic-slot.md: each variant is From the list path for parent_from.
 pub enum UnparsedItemParent<'a> {
     SelectionSet(SelectionSetPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
@@ -306,6 +321,7 @@ pub(crate) fn consume_argument_list(
                 .children
                 .item
                 .parse_items_with_trailing(cursor.text(), parse_argument)
+                // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<ArgumentSlot>::from)
                 .collect(),
@@ -404,6 +420,7 @@ pub(crate) fn collect_selection_set_errors(
     selection_set: &SelectionSet,
     errors: &mut Vec<WithSpan<ParseError>>,
 ) {
+    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
     collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
         Selection::Scalar(scalar) => {
             collect_argument_errors(scalar.arguments.reference(), errors);
@@ -425,6 +442,7 @@ pub(crate) fn collect_argument_errors(
     let Some(arguments) = arguments else {
         return;
     };
+    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
     collect_argument_slot_errors(arguments.item.0.reference(), |argument, errors| match argument {
         Argument::Named(named) => collect_value_errors(named.value.item.reference(), errors),
     }, errors);
@@ -437,6 +455,7 @@ pub(crate) fn collect_value_errors(
     let NonConstantValue::Object(object) = value else {
         return;
     };
+    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
     collect_object_entry_slot_errors(object.0.reference(), |entry, errors| match entry {
         ObjectEntry::Named(named) => collect_value_errors(named.value.item.reference(), errors),
     }, errors);
@@ -450,6 +469,7 @@ pub(crate) fn collect_value_errors(
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     ArgumentList(ArgumentListPath<'a>),
+    // resolve-position-generic-slot.md: deleted.
     ParsedArgument(ParsedArgumentPath<'a>),
     NamedArgument(NamedArgumentPath<'a>),
     ArgumentName(ArgumentNamePath<'a>),
@@ -460,6 +480,7 @@ pub(crate) fn collect_value_errors(
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
+    // resolve-position-generic-slot.md: deleted.
     ParsedObjectEntry(ParsedObjectEntryPath<'a>),
     NamedObjectEntry(NamedObjectEntryPath<'a>),
     ObjectEntryName(ObjectEntryNamePath<'a>),
@@ -532,6 +553,7 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs (test module)
+    // resolve-position-generic-slot.md: helpers and matches below take LevelSlot<T>.
     fn arguments_of(slot: &SelectionSlot) -> &WithSpan<ArgumentList> {
         let arguments = match slot {
             SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
