@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root level is one chunk. `parse_singleton` uses `Expectation::EndOfDeclaration`. Empty level: `EmptyLiteral` at the root span. Extra chunk: `MultipleDeclarations` at that chunk's span. Boundary comma: `Expected(EndOfDeclaration, Token(Comma))` at the comma.
+The root level is one chunk. `parse_singleton` uses `Expectation::EndOfDeclaration` and parses the first chunk whenever one exists. Empty level: `EmptyLiteral` at the root span. A failed first chunk is that parse error; extra is not reported. A successful first item plus leftover, a boundary comma, or a second chunk is `UnparsedLiteral` for that reason: leftover and the comma are `Expected(EndOfDeclaration, ...)`, extra is `MultipleDeclarations` at the second chunk's span.
 
 ```
 iso(`
@@ -159,7 +159,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `UnparsedLiteral` on `Err`, then the root span. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` matches `len()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is `parse_iso_literal_item` then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `UnparsedLiteral` on `Err`, then the root span. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` parses the first chunk whenever one exists. Empty is `EmptyLiteral`. A failed first item is that `Err`. A successful first item is then leftover, a boundary comma, then a second chunk: leftover and the comma are `Expected(EndOfDeclaration, ...)`, extra is `MultipleDeclarations`. `entrypoint Query.foo\nfield User.name` is `MultipleDeclarations` at `field User.name`. `entrypoint\nQuery.foo` is `Expected(Identifier, EndOfChunk)` at the end of `entrypoint`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -738,12 +738,12 @@ mod tests {
     }
 
     #[test]
-    fn a_comma_before_a_second_declaration_is_multiple_declarations() {
+    fn a_comma_before_a_second_declaration_is_the_boundary_comma() {
         let text = "entrypoint Query.foo, field User.name";
         assert_unparsed(
             text,
-            ParseError::MultipleDeclarations,
-            span_of(text, "field User.name"),
+            expected(EndOfDeclaration, Found::Token(Comma)),
+            span_of(text, ","),
         );
     }
 
@@ -754,12 +754,13 @@ mod tests {
     }
 
     #[test]
-    fn two_chunks_are_multiple_declarations_without_parsing_the_first() {
+    fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
         let text = "entrypoint\nQuery.foo";
+        let keyword_end = span_of(text, "entrypoint").end;
         assert_unparsed(
             text,
-            ParseError::MultipleDeclarations,
-            span_of(text, "Query.foo"),
+            expected(token(Identifier), Found::EndOfChunk),
+            Span::new(keyword_end, keyword_end),
         );
     }
 
