@@ -330,7 +330,7 @@ pub enum LevelSlot<T> {
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Both<T> {
-    pub item: WithSpan<T>,
+    pub item: T,
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
 }
@@ -345,16 +345,16 @@ impl<T> LevelSlot<T> {
     pub fn item(&self) -> Option<&T> {
         match self {
             LevelSlot::Complete(item) => item.wrap_some(),
-            LevelSlot::Both(both) => (&both.item.item).wrap_some(),
+            LevelSlot::Both(both) => both.item.reference().wrap_some(),
             LevelSlot::Failed(_) => None,
         }
     }
 
-    pub fn errors(&self) -> &[WithSpan<ParseError>] {
+    pub fn errors(&self) -> Vec<&WithSpan<ParseError>> {
         match self {
-            LevelSlot::Complete(_) => &[],
-            LevelSlot::Both(both) => both.errors.reference(),
-            LevelSlot::Failed(failed) => failed.errors.reference(),
+            LevelSlot::Complete(_) => Vec::new(),
+            LevelSlot::Both(both) => both.errors.iter().collect(),
+            LevelSlot::Failed(failed) => failed.errors.iter().collect(),
         }
     }
 }
@@ -398,7 +398,7 @@ fn parse_one_item<'a, P>(
                     let location = Span::join(item.location, leftover.location);
                     WithSpan::new(
                         LevelSlot::Both(Both {
-                            item,
+                            item: item.item,
                             leftover: UnparsedChunk { chunk: leftover },
                             errors: error.wrap_vec(),
                         }),
@@ -535,7 +535,7 @@ pub enum SelectionSlot {
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BothSelection {
     #[resolve_field(parent_variant = Both)]
-    pub item: WithSpan<Selection>,
+    pub item: Selection,
     #[resolve_field]
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -618,7 +618,7 @@ pub(crate) fn collect_selection_slot_errors(
         match slot.item.reference() {
             SelectionSlot::Complete(selection) => nested(selection, errors),
             SelectionSlot::Both(both) => {
-                nested(both.item.item.reference(), errors);
+                nested(&both.item, errors);
                 errors.extend(both.errors.iter().copied());
             }
             SelectionSlot::Failed(failed) => errors.extend(failed.errors.iter().copied()),

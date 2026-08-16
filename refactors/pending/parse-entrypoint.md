@@ -56,7 +56,7 @@ pub enum RootSlot {
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BothRoot {
     #[resolve_field(parent_variant = Both)]
-    pub item: WithSpan<IsoLiteralItem>,
+    pub item: IsoLiteralItem,
     #[resolve_field]
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -126,7 +126,7 @@ impl IsoLiteralParse {
         let first = self.first.as_ref()?;
         let item = match first.item.reference() {
             RootSlot::Complete(item) => item,
-            RootSlot::Both(both) => both.item.item.reference(),
+            RootSlot::Both(both) => both.item.reference(),
             RootSlot::Failed(_) => return None,
         };
         match item {
@@ -134,16 +134,16 @@ impl IsoLiteralParse {
         }
     }
 
-    pub fn errors(&self) -> Vec<WithSpan<ParseError>> {
+    pub fn errors(&self) -> Vec<&WithSpan<ParseError>> {
         let mut errors = Vec::new();
         if let Some(first) = self.first.as_ref() {
             match first.item.reference() {
                 RootSlot::Complete(_) => {}
-                RootSlot::Both(both) => errors.extend(both.errors.iter().copied()),
-                RootSlot::Failed(failed) => errors.extend(failed.errors.iter().copied()),
+                RootSlot::Both(both) => errors.extend(both.errors.iter()),
+                RootSlot::Failed(failed) => errors.extend(failed.errors.iter()),
             }
         }
-        errors.extend(self.errors.iter().copied());
+        errors.extend(self.errors.iter());
         errors
     }
 }
@@ -755,7 +755,9 @@ mod tests {
         assert!(parse.item.item().is_none());
         assert_eq!(
             parse.item.errors(),
-            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
+            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len()))
+                .reference()
+                .wrap_vec(),
         );
     }
 
@@ -781,7 +783,9 @@ mod tests {
             as_entrypoint(parse.reference());
             assert_eq!(
                 parse.item.errors(),
-                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")).wrap_vec(),
+                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ","))
+                    .reference()
+                    .wrap_vec(),
                 "for literal {text:?}",
             );
         }
@@ -795,8 +799,8 @@ mod tests {
         assert_eq!(
             parse.item.errors(),
             vec![
-                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
-                WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
+                &WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
+                &WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
             ],
         );
         assert!(parse.item.extra.as_ref().is_some());
@@ -809,7 +813,9 @@ mod tests {
         assert_eq!(as_entrypoint(parse.reference()).client_field_name.location, span_of(text, "foo"));
         assert_eq!(
             parse.item.errors(),
-            WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")).wrap_vec(),
+            WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name"))
+                .reference()
+                .wrap_vec(),
         );
         assert!(parse.item.extra.as_ref().is_some());
     }
@@ -901,7 +907,9 @@ mod tests {
         }
         assert_eq!(
             parse.item.errors(),
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
+            WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar"))
+                .reference()
+                .wrap_vec(),
         );
     }
 
@@ -916,6 +924,7 @@ mod tests {
                 expected(EndOfDeclaration, Found::Group(BracketKind::Brace)),
                 span_of(text, "{ bar }"),
             )
+            .reference()
             .wrap_vec(),
         );
     }
@@ -927,7 +936,9 @@ mod tests {
         as_entrypoint(parse.reference());
         assert_eq!(
             parse.item.errors(),
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(At)), span_of(text, "@")).wrap_vec(),
+            WithSpan::new(expected(EndOfDeclaration, Found::Token(At)), span_of(text, "@"))
+                .reference()
+                .wrap_vec(),
         );
     }
 
