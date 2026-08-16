@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `parse_singleton`, `parse_iso_literal`, `ParseError`, `UnparsedLiteral`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
+First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `parse_singleton`, `parse_iso_literal`, `ParseError`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
 
 ## The grammar
 
@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root level is one chunk. `parse_singleton` uses `Expectation::EndOfDeclaration` and parses the first chunk whenever one exists. Empty level: `EmptyLiteral` at the root span, `item` is `None`. A failed first chunk is that parse error; extra is not reported; `item` is `None`. A successful first item is kept: leftover and a boundary comma are `Expected(EndOfDeclaration, ...)` on `trailing`, a second chunk is `MultipleDeclarations` on `trailing`. `item` is `Some` the declaration.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Complete` / `Both` / `Failed`). Remaining chunks are `ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item()` is `Some` when chunk 0 is `Complete` or `Both`.
 
 ```
 iso(`
@@ -16,7 +16,7 @@ iso(`
 `)
 ```
 
-A failed first chunk is `UnparsedLiteral`: one reason and the entire root level.
+A failed first chunk is `RootSlot::Failed` (that chunk’s tokens). Extra chunks still sit in `ExtraChunks`.
 
 ## Types
 
@@ -38,15 +38,40 @@ use crate::{
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
     #[resolve_field]
-    pub item: WithSpan<IsoLiteralItem>,
-    pub trailing: Option<WithSpan<ParseError>>,
+    pub first: Option<WithSpan<RootSlot>>,
+    #[resolve_field]
+    pub extra: Option<ExtraChunks>,
+    pub errors: Vec<WithSpan<ParseError>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum RootSlot {
+    Complete(#[resolve_field(parent_variant = Complete)] IsoLiteralItem),
+    Both(BothRoot),
+    Failed(Failed),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct BothRoot {
+    #[resolve_field(parent_variant = Both)]
+    pub item: WithSpan<IsoLiteralItem>,
+    #[resolve_field]
+    pub leftover: UnparsedChunk,
+    pub errors: Vec<WithSpan<ParseError>>,
+}
+
+#[derive(Debug)]
+pub enum IsoLiteralItemParent<'a> {
+    Complete(IsoLiteralParsePath<'a>),
+    Both(BothRootPath<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
-    Unparsed(UnparsedLiteral),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -57,14 +82,6 @@ pub struct EntrypointDeclaration {
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field]
     pub client_field_name: WithSpan<ClientFieldName>,
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralItemPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnparsedLiteral {
-    pub reason: WithSpan<ParseError>,
-    #[resolve_field(parent_variant = UnparsedLiteral)]
-    pub level: WithSpan<ChunkedLevel>,
 }
 
 /// The name of a schema type, `Query` in `entrypoint Query.foo`. Its text is its span.
@@ -82,12 +99,20 @@ pub struct EntrypointKeyword;
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
-pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralParsePath<'a>>;
+pub type RootSlotPath<'a> = PositionResolutionPath<&'a RootSlot, IsoLiteralParsePath<'a>>;
+
+pub type BothRootPath<'a> = PositionResolutionPath<&'a BothRoot, IsoLiteralParsePath<'a>>;
+
+pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralItemParent<'a>>;
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
 
-pub type UnparsedLiteralPath<'a> = PositionResolutionPath<&'a UnparsedLiteral, IsoLiteralItemPath<'a>>;
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, ExtraChunksParent<'a>>;
+
+pub type UnparsedChunkPath<'a> = PositionResolutionPath<&'a UnparsedChunk, UnparsedChunkParent<'a>>;
+
+pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, RootSlotPath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
@@ -98,28 +123,49 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 // from crates/isograph_parser/src/parse_iso_literal.rs
 impl IsoLiteralParse {
     pub fn item(&self) -> Option<&EntrypointDeclaration> {
-        match self.item.item.reference() {
+        let first = self.first.as_ref()?;
+        let item = match first.item.reference() {
+            RootSlot::Complete(item) => item,
+            RootSlot::Both(both) => both.item.item.reference(),
+            RootSlot::Failed(_) => return None,
+        };
+        match item {
             IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
-            IsoLiteralItem::Unparsed(_) => None,
         }
     }
 
     pub fn errors(&self) -> Vec<WithSpan<ParseError>> {
-        let mut errors = match self.item.item.reference() {
-            IsoLiteralItem::Entrypoint(_) => vec![],
-            IsoLiteralItem::Unparsed(unparsed) => unparsed.reason.wrap_vec(),
-        };
-        if let Some(trailing) = self.trailing {
-            errors.push(trailing);
+        let mut errors = Vec::new();
+        if let Some(first) = self.first.as_ref() {
+            match first.item.reference() {
+                RootSlot::Complete(_) => {}
+                RootSlot::Both(both) => errors.extend(both.errors.iter().copied()),
+                RootSlot::Failed(failed) => errors.extend(failed.errors.iter().copied()),
+            }
         }
+        errors.extend(self.errors.iter().copied());
         errors
+    }
+}
+
+impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
+    fn from(slot: LevelSlot<IsoLiteralItem>) -> Self {
+        match slot {
+            LevelSlot::Complete(item) => RootSlot::Complete(item),
+            LevelSlot::Both(both) => RootSlot::Both(BothRoot {
+                item: both.item,
+                leftover: both.leftover,
+                errors: both.errors,
+            }),
+            LevelSlot::Failed(failed) => RootSlot::Failed(failed),
+        }
     }
 }
 ```
 
 ## The parser
 
-The root is borrowed until the end: on `Err((None, _))` it moves into `UnparsedLiteral`; on `Ok` or `Err((Some(_), _))` it is dropped.
+The root is borrowed until the end. A failed first chunk clones that chunk into `Failed`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -172,7 +218,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from the `Result`, then the root span. The tree is always recovered: `item()` is `Some` when the first declaration parsed. Artifact generation requires `errors()` empty (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` parses the first chunk whenever one exists. Empty is `UnparsedLiteral` with `EmptyLiteral`. A failed first item is `UnparsedLiteral`. A successful first item is kept; leftover, a boundary comma, and a second chunk are `trailing`. `entrypoint Query.foo\nfield User.name` is the entrypoint plus `MultipleDeclarations` at `field User.name`. `entrypoint Query.foo bar` is the entrypoint plus leftover at `bar`. `entrypoint\nQuery.foo` is `Expected(Identifier, EndOfChunk)` at the end of `entrypoint`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires `errors()` empty (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral`. A failed first chunk is `Failed` plus that chunk’s tokens; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `MultipleDeclarations`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover tokens) and `Expected(EndOfDeclaration, Identifier)`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -295,7 +341,7 @@ pub(crate) fn parse_singleton<'a, T>(
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-) -> ParseResult<WithSpan<T>> {
+) -> Singleton<T> {
     /* parsing-standards.md */
 }
 ```
@@ -514,8 +560,9 @@ After:
 // from crates/isograph_parser/src/isograph_resolution_node.rs
 use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
-    CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, IsoLiteralItemPath,
-    IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath, UnparsedLiteralPath,
+    CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
+    IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
+    RootSlotPath, UnparsedChunkPath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -525,11 +572,13 @@ use crate::{
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
     IsoLiteralParse(IsoLiteralParsePath<'a>),
+    RootSlot(RootSlotPath<'a>),
     IsoLiteralItem(IsoLiteralItemPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
-    UnparsedLiteral(UnparsedLiteralPath<'a>),
+    UnparsedChunk(UnparsedChunkPath<'a>),
+    ExtraChunks(ExtraChunksPath<'a>),
     ChunkedLevel(ChunkedLevelPath<'a>),
     /// This will be resolved for spans that contain one of the opening/closing brackets
     /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
@@ -559,36 +608,24 @@ After:
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 #[derive(Debug)]
-pub enum ChunkedLevelParent<'a> {
-    Root,
-    Interior(Box<ChunkedGroupPath<'a>>),
-    UnparsedLiteral(UnparsedLiteralPath<'a>),
+pub enum ChunkParent<'a> {
+    Level(ChunkedLevelPath<'a>),
+    Unparsed(UnparsedChunkPath<'a>),
+    Extra(ExtraChunksPath<'a>),
+}
+
+#[derive(Debug)]
+pub enum UnparsedChunkParent<'a> {
+    Both(BothRootPath<'a>),
+    Failed(FailedPath<'a>),
 }
 ```
 
-`UnparsedLiteralPath` ends at `()`, so `UnparsedLiteral` is unboxed. `Root` is the parent a caller passes when resolving a bare chunk tree.
+`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkParent` gains `BothRoot` and `FailedRoot`. Extra root chunks use `parent_variant = Extra`.
 
 ## Generated code
 
-The novel shape is `UnparsedLiteral`'s field: `parent_variant` constructs an unboxed variant. The enum delegation, struct descent with a fallthrough leaf, and fieldless-marker impls follow chunk.rs.
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for UnparsedLiteral {
-    type Parent<'a> = ();
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        if self.level.location.contains(position) {
-            let new_parent = <ChunkedLevel as ::resolve_position::ResolvePosition>::Parent::UnparsedLiteral(self.path(parent).to());
-            return self.level.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::UnparsedLiteral(self.path(parent).to());
-    }
-}
-```
-
-The level's span is the whole literal, so the fallthrough leaf is the derive's required shape.
+`UnparsedChunk` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `tokens`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
@@ -650,18 +687,14 @@ mod tests {
             .expect("the fixture's literal is an entrypoint")
     }
 
-    fn assert_unparsed(text: &str, reason: ParseError, reason_span: Span) {
+    fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
         let parse = parsed(text);
         assert!(parse.item.item().is_none(), "for literal {text:?}");
-        match parse.item.item.item.reference() {
-            IsoLiteralItem::Unparsed(unparsed) => {
-                assert_eq!(unparsed.reason.item, reason, "for literal {text:?}");
-                assert_eq!(unparsed.reason.location, reason_span, "for literal {text:?}");
-                assert_eq!(parse.item.trailing, None, "for literal {text:?}");
-                assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
-            }
-            parse => panic!("expected an unparsed literal for {text:?}, got {parse:?}"),
-        }
+        let errors = parse.item.errors();
+        assert!(
+            errors.iter().any(|error| error.item == reason && error.location == reason_span),
+            "for literal {text:?}, errors were {errors:?}",
+        );
     }
 
     #[test]
@@ -694,7 +727,7 @@ mod tests {
     #[test]
     fn empty_and_whitespace_only_literals_are_empty_literal_errors() {
         for text in ["", "   ", "\n\n"] {
-            assert_unparsed(text, ParseError::EmptyLiteral, Span::from_usize(0, text.len()));
+            assert_no_declaration(text, ParseError::EmptyLiteral, Span::from_usize(0, text.len()));
         }
     }
 
@@ -719,13 +752,11 @@ mod tests {
         let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        match parse.item.item.item.reference() {
-            IsoLiteralItem::Unparsed(unparsed) => {
-                assert_eq!(unparsed.reason.item, ParseError::EmptyLiteral);
-                assert_eq!(unparsed.reason.location, Span::from_usize(0, text.len()));
-            }
-            parse => panic!("expected an unparsed literal, got {parse:?}"),
-        }
+        assert!(parse.item.item().is_none());
+        assert_eq!(
+            parse.item.errors(),
+            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
+        );
     }
 
     #[test]
@@ -763,8 +794,12 @@ mod tests {
         assert_eq!(as_entrypoint(parse.reference()).client_field_name.location, span_of(text, "foo"));
         assert_eq!(
             parse.item.errors(),
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")).wrap_vec(),
+            vec![
+                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
+                WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
+            ],
         );
+        assert!(parse.item.extra.as_ref().is_some());
     }
 
     #[test]
@@ -776,23 +811,28 @@ mod tests {
             parse.item.errors(),
             WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")).wrap_vec(),
         );
+        assert!(parse.item.extra.as_ref().is_some());
     }
 
     #[test]
     fn a_failed_first_chunk_is_reported_even_when_a_second_exists() {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
-        assert_unparsed(
-            text,
-            expected(token(Identifier), Found::EndOfChunk),
-            Span::new(keyword_end, keyword_end),
-        );
+        let parse = parsed(text);
+        assert!(parse.item.item().is_none());
+        let errors = parse.item.errors();
+        assert!(errors.iter().any(|error| {
+            error.item == expected(token(Identifier), Found::EndOfChunk)
+                && error.location == Span::new(keyword_end, keyword_end)
+        }));
+        assert!(errors.iter().any(|error| error.item == ParseError::MultipleDeclarations));
+        assert!(parse.item.extra.as_ref().is_some());
     }
 
     #[test]
     fn an_unknown_keyword_is_an_error_at_the_keyword() {
         let text = "fieldd Query.foo { bar }";
-        assert_unparsed(
+        assert_no_declaration(
             text,
             expected(DeclarationKeyword, Found::Token(Identifier)),
             span_of(text, "fieldd"),
@@ -802,7 +842,7 @@ mod tests {
     #[test]
     fn a_literal_opening_with_a_group_expects_a_keyword() {
         let text = "{ bar }";
-        assert_unparsed(
+        assert_no_declaration(
             text,
             expected(DeclarationKeyword, Found::Group(BracketKind::Brace)),
             span_of(text, "{ bar }"),
@@ -812,30 +852,30 @@ mod tests {
     #[test]
     fn field_and_pointer_declarations_do_not_parse_yet() {
         let field = "field Query.foo { bar }";
-        assert_unparsed(field, ParseError::UnsupportedDeclarationType, span_of(field, "field"));
+        assert_no_declaration(field, ParseError::UnsupportedDeclarationType, span_of(field, "field"));
         let pointer = "pointer Query.foo to Bar { id }";
-        assert_unparsed(pointer, ParseError::UnsupportedDeclarationType, span_of(pointer, "pointer"));
+        assert_no_declaration(pointer, ParseError::UnsupportedDeclarationType, span_of(pointer, "pointer"));
     }
 
     #[test]
     fn each_missing_entrypoint_part_reports_at_its_position() {
         let bare = "entrypoint";
         let keyword_end = span_of(bare, "entrypoint").end;
-        assert_unparsed(
+        assert_no_declaration(
             bare,
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(keyword_end, keyword_end),
         );
 
         let numeric = "entrypoint 42.foo";
-        assert_unparsed(
+        assert_no_declaration(
             numeric,
             expected(token(Identifier), Found::Token(IntegerLiteral)),
             span_of(numeric, "42"),
         );
 
         let dotless = "entrypoint Query foo";
-        assert_unparsed(
+        assert_no_declaration(
             dotless,
             expected(token(Period), Found::Token(Identifier)),
             span_of(dotless, "foo"),
@@ -843,7 +883,7 @@ mod tests {
 
         let nameless = "entrypoint Query.";
         let dot_end = span_of(nameless, ".").end;
-        assert_unparsed(
+        assert_no_declaration(
             nameless,
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(dot_end, dot_end),
@@ -855,6 +895,10 @@ mod tests {
         let text = "entrypoint Query.foo bar";
         let parse = parsed(text);
         as_entrypoint(parse.reference());
+        match parse.item.first.as_ref().map(|slot| slot.item.reference()) {
+            Some(RootSlot::Both(_)) => {}
+            other => panic!("expected Both, got {other:?}"),
+        }
         assert_eq!(
             parse.item.errors(),
             WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
@@ -888,12 +932,12 @@ mod tests {
     }
 
     #[test]
-    fn leftover_after_an_entrypoint_resolves_to_the_literal() {
+    fn leftover_after_an_entrypoint_resolves_to_the_leftover_token() {
         let text = "entrypoint Query.foo bar";
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::IsoLiteralParse(_) => {}
-            node => panic!("expected the literal, got {node:?}"),
+            IsographResolutionNode::NonBracketToken(_) => {}
+            node => panic!("expected the leftover token, got {node:?}"),
         }
     }
 
@@ -924,41 +968,23 @@ mod tests {
     }
 
     #[test]
-    fn positions_inside_an_unparsed_literal_resolve_through_the_chunk_tree() {
+    fn positions_inside_a_failed_first_chunk_resolve_through_the_cloned_chunk() {
         let text = "fieldd Query.foo { bar }";
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                let interior_level = match token.parent.parent.parent.reference() {
-                    ChunkedLevelParent::Interior(group) => group,
-                    parent => panic!("expected an interior level, got {parent:?}"),
-                };
-                match interior_level.parent.parent.parent.reference() {
-                    ChunkedLevelParent::UnparsedLiteral(unparsed) => {
-                        assert_eq!(
-                            unparsed.inner.reason.item,
-                            expected(DeclarationKeyword, Found::Token(Identifier))
-                        );
-                    }
-                    parent => panic!("expected the unparsed literal at the top, got {parent:?}"),
-                }
             }
             node => panic!("expected the token leaf, got {node:?}"),
         }
     }
 
     #[test]
-    fn the_unrecognized_keyword_itself_resolves_under_the_unparsed_literal() {
+    fn the_unrecognized_keyword_resolves_as_a_token_in_the_failed_chunk() {
         let text = "fieldd Query.foo { bar }";
         let parse = parsed(text);
         match parse.resolve((), span_of(text, "fieldd")) {
-            IsographResolutionNode::NonBracketToken(token) => {
-                match token.parent.parent.parent.reference() {
-                    ChunkedLevelParent::UnparsedLiteral(_) => {}
-                    parent => panic!("expected the unparsed literal at the top, got {parent:?}"),
-                }
-            }
+            IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the token leaf, got {node:?}"),
         }
     }
@@ -967,5 +993,5 @@ mod tests {
 
 ## Landing checklist
 
-1. chunk_stream.rs, `Chunk::stream`, `boundary_comma`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode` and `ChunkedLevelParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode` and `ChunkParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
