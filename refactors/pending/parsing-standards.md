@@ -19,7 +19,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items` and `parse_singleton` then call `stream.require_end`. Their result type is `Result<T, (Option<T>, WithSpan<ParseError>)>`: `Ok` is a complete item, `Err((Some(item), e))` is that item plus leftover (or, for `parse_singleton`, a boundary comma or a second chunk), `Err((None, e))` is a failed parse. `item` is the optimistic pass: `Ok(t)` and `Err((Some(t), _))` are `Some(t)`, `Err((None, _))` is `None`. Callers that want a tree use `item`; callers that want diagnostics match the `Result`. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items` and `parse_singleton` then call `stream.require_end`. Their result type is `Result<T, (Option<T>, WithSpan<ParseError>)>`: `Ok` is a complete item, `Err((Some(item), e))` is that item plus leftover (or, for `parse_singleton`, a boundary comma or a second chunk), `Err((None, e))` is a failed parse. Every parse is this recovered tree: keep the item when one exists, store the error on the tree. `item` reads that tree: `Ok(t)` and `Err((Some(t), _))` are `Some(t)`, `Err((None, _))` is `None`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -848,7 +848,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `IsoLiteralParse::trailing`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: those list trailing fields are `ParsedSlot::trailing`. `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
+Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `IsoLiteralParse::trailing`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: those list trailing fields are `ParsedSlot::trailing`. `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists. Artifact generation runs only then.
 
 A failed list chunk is the concrete slot's `Unparsed` variant; sibling chunks are parsed. Leftover after a successful list item is `ParsedSlot::trailing`. A failed first declaration is `UnparsedLiteral`. Leftover, a boundary comma, and a second chunk after a successful first item are `IsoLiteralParse::trailing`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
@@ -881,7 +881,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
 - One-item context: `parse_singleton` → `Result<WithSpan<T>, (Option<WithSpan<T>>, WithSpan<ParseError>)>`
-- Optimistic item: `item(result)` → `Option<T>`; `LevelSlot::item` / `IsoLiteralParse::item` are the same pass on the tree
+- Recovered item: `item(result)` → `Option<T>`; `LevelSlot::item` / `IsoLiteralParse::item` are the same read on the tree
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` via `boundary_comma` on `Err((Some(item), e))`
