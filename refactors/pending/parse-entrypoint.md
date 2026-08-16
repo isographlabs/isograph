@@ -37,6 +37,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
+    // resolve-position-generic-slot.md: Option<WithSpan<LevelSlot<IsoLiteralItem>>>.
     #[resolve_field]
     pub first: Option<WithSpan<RootSlot>>,
     #[resolve_field]
@@ -44,6 +45,7 @@ pub struct IsoLiteralParse {
     pub errors: Vec<WithSpan<ParseError>>,
 }
 
+/// Derived stand-in for `LevelSlot<IsoLiteralItem>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum RootSlot {
@@ -52,6 +54,7 @@ pub enum RootSlot {
     Failed(Failed),
 }
 
+/// Derived stand-in for `Both<IsoLiteralItem>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BothRoot {
@@ -148,6 +151,7 @@ impl IsoLiteralParse {
     }
 }
 
+// resolve-position-generic-slot.md: this From is gone.
 impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
     fn from(slot: LevelSlot<IsoLiteralItem>) -> Self {
         match slot {

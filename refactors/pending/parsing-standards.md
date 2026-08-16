@@ -197,6 +197,7 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
     WithSpan::new(
         IsoLiteralParse {
             first: singleton.first.map(|slot| {
+                // resolve-position-generic-slot.md: this map is gone.
                 WithSpan::new(RootSlot::from(slot.item), slot.location)
             }),
             extra: singleton.extra,
@@ -490,7 +491,7 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_singleton` is not `Vec<LevelSlot>`. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `extra` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic in `Singleton::errors`. Empty is `first: None` and `empty()`. `item` on the first slot is `Some` when that slot is `Complete` or `Both`.
 
-`LevelSlot` does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives. resolve-position-generic-slot.md puts `LevelSlot<T>` on the tree instead.
+`LevelSlot` does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives. The root stores `RootSlot` / `BothRoot`. resolve-position-generic-slot.md puts `LevelSlot<T>` on the tree instead.
 
 ### Concrete slots
 
@@ -507,6 +508,7 @@ pub enum SelectionSlot {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+/// Derived stand-in for `Both<Selection>`. resolve-position-generic-slot.md.
 pub struct BothSelection {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<Selection>,
