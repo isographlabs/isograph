@@ -177,9 +177,8 @@ impl<'a> ItemCursor<'a> {
 ### Span sources
 
 - Leaf: the `Span` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
-- Parsed list item: the span `spanning` returned.
-- `LevelSlot::Failed` / an `UnparsedChunk`: `contents_span`.
-- `LevelSlot::Both`: join of the item span and the leftover chunk span.
+- Parsed list item: the `WithSpan` `spanning` returned, stored on `Complete` and on `Both.item`.
+- Slot: `Complete` is that same item span. `Both` is the join of the item span and the leftover chunk span. `Failed` / an `UnparsedChunk` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
 `token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. Names in the tree are spans. The converted scalar is the `i64`.
@@ -323,14 +322,14 @@ pub enum ExtraChunksParent<'a> {
 /// resolve-position-generic-slot.md puts this on the tree instead of a concrete copy.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LevelSlot<T> {
-    Complete(T),
+    Complete(WithSpan<T>),
     Both(Both<T>),
     Failed(Failed),
 }
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Both<T> {
-    pub item: T,
+    pub item: WithSpan<T>,
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
 }
@@ -344,8 +343,8 @@ pub struct Failed {
 impl<T> LevelSlot<T> {
     pub fn item(&self) -> Option<&T> {
         match self {
-            LevelSlot::Complete(item) => item.wrap_some(),
-            LevelSlot::Both(both) => both.item.reference().wrap_some(),
+            LevelSlot::Complete(item) => item.item.reference().wrap_some(),
+            LevelSlot::Both(both) => both.item.item.reference().wrap_some(),
             LevelSlot::Failed(_) => None,
         }
     }
@@ -389,7 +388,7 @@ fn parse_one_item<'a, P>(
     match result {
         Ok(item) => {
             if stream.require_end().is_ok() {
-                return WithSpan::new(LevelSlot::Complete(item.item), item.location);
+                return WithSpan::new(LevelSlot::Complete(item), item.location);
             }
             let error = leftover_error(stream.cursor());
             match stream.remaining_contents() {
@@ -398,14 +397,14 @@ fn parse_one_item<'a, P>(
                     let location = Span::join(item.location, leftover.location);
                     WithSpan::new(
                         LevelSlot::Both(Both {
-                            item: item.item,
+                            item,
                             leftover: UnparsedChunk { chunk: leftover },
                             errors: error.wrap_vec(),
                         }),
                         location,
                     )
                 }
-                None => WithSpan::new(LevelSlot::Complete(item.item), item.location),
+                None => WithSpan::new(LevelSlot::Complete(item), item.location),
             }
         }
         Err(reason) => WithSpan::new(
@@ -526,7 +525,7 @@ fn item<T, E>(result: ParseResult<T, E>) -> Option<T> {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum SelectionSlot {
-    Complete(#[resolve_field(parent_variant = Complete)] Selection),
+    Complete(#[resolve_field(parent_variant = Complete)] WithSpan<Selection>),
     Both(BothSelection),
     Failed(Failed),
 }
@@ -535,7 +534,7 @@ pub enum SelectionSlot {
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BothSelection {
     #[resolve_field(parent_variant = Both)]
-    pub item: Selection,
+    pub item: WithSpan<Selection>,
     #[resolve_field]
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -616,9 +615,9 @@ pub(crate) fn collect_selection_slot_errors(
 ) {
     for slot in slots {
         match slot.item.reference() {
-            SelectionSlot::Complete(selection) => nested(selection, errors),
+            SelectionSlot::Complete(selection) => nested(selection.item.reference(), errors),
             SelectionSlot::Both(both) => {
-                nested(&both.item, errors);
+                nested(both.item.item.reference(), errors);
                 errors.extend(both.errors.iter().copied());
             }
             SelectionSlot::Failed(failed) => errors.extend(failed.errors.iter().copied()),
@@ -961,7 +960,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. Variant payloads are bare. Each struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
+A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `WithSpan` on `Complete` and on `Both.item`. Other variant payloads are bare. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunk` and `ExtraChunks`.
 

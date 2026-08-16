@@ -47,7 +47,7 @@ pub struct IsoLiteralParse {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum RootSlot {
-    Complete(#[resolve_field(parent_variant = Complete)] IsoLiteralItem),
+    Complete(#[resolve_field(parent_variant = Complete)] WithSpan<IsoLiteralItem>),
     Both(BothRoot),
     Failed(Failed),
 }
@@ -56,7 +56,7 @@ pub enum RootSlot {
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct BothRoot {
     #[resolve_field(parent_variant = Both)]
-    pub item: IsoLiteralItem,
+    pub item: WithSpan<IsoLiteralItem>,
     #[resolve_field]
     pub leftover: UnparsedChunk,
     pub errors: Vec<WithSpan<ParseError>>,
@@ -125,8 +125,8 @@ impl IsoLiteralParse {
     pub fn item(&self) -> Option<&EntrypointDeclaration> {
         let first = self.first.as_ref()?;
         let item = match first.item.reference() {
-            RootSlot::Complete(item) => item,
-            RootSlot::Both(both) => both.item.reference(),
+            RootSlot::Complete(item) => item.item.reference(),
+            RootSlot::Both(both) => both.item.item.reference(),
             RootSlot::Failed(_) => return None,
         };
         match item {
