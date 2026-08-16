@@ -102,6 +102,7 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 - Diagnostics rendering: turning `WithSpan<ParseError>` plus the literal text into printed messages, including the contextual suggestions keyed off `(expected, found)` pairs.
 - Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set, and synthetic closing of unclosed groups (unclosed-group-recovery.md), a future optimization over the cut. The series builds the minimal correct version first.
 - Span-slot genericity: this series builds `Span`-only trees. refactors/pending/spanless-parsing.md said to decide the `TSpan` parameter together with this stage; the decision here is to not adopt it now, and adopting it later is the mechanical change that doc describes.
+- Unparsed leftover tokens start as a cloned `NonEmpty` of unread items. A later change can store a range into the original chunk contents instead, by keeping that vec on the tree and passing it down.
 
 ## The docs, in order
 
