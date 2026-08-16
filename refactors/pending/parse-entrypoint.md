@@ -58,7 +58,7 @@ pub struct BothRoot {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<IsoLiteralItem>,
     #[resolve_field]
-    pub leftover: UnparsedChunk,
+    pub leftover: UnparsedChunkItems,
     pub errors: Vec<WithSpan<ParseError>>,
 }
 
@@ -110,7 +110,7 @@ pub type EntrypointDeclarationPath<'a> =
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type UnparsedChunkPath<'a> = PositionResolutionPath<&'a UnparsedChunk, UnparsedChunkParent<'a>>;
+pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
 
 pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, RootSlotPath<'a>>;
 
@@ -562,7 +562,7 @@ use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
     IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
-    RootSlotPath, UnparsedChunkPath,
+    RootSlotPath, UnparsedChunkItemsPath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -577,7 +577,7 @@ pub enum IsographResolutionNode<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
-    UnparsedChunk(UnparsedChunkPath<'a>),
+    UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
     ExtraChunks(ExtraChunksPath<'a>),
     ChunkedLevel(ChunkedLevelPath<'a>),
     /// This will be resolved for spans that contain one of the opening/closing brackets
@@ -610,22 +610,22 @@ After:
 #[derive(Debug)]
 pub enum ChunkParent<'a> {
     Level(ChunkedLevelPath<'a>),
-    Unparsed(UnparsedChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
     Extra(ExtraChunksPath<'a>),
 }
 
 #[derive(Debug)]
-pub enum UnparsedChunkParent<'a> {
+pub enum UnparsedChunkItemsParent<'a> {
     Both(BothRootPath<'a>),
     Failed(FailedPath<'a>),
 }
 ```
 
-`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkParent` gains `BothRoot` and `FailedRoot`. Extra root chunks use `parent_variant = Extra`.
+`Root` remains the parent a caller passes when resolving a bare chunk tree. `UnparsedChunkItemsParent` gains `BothRoot` and `FailedRoot`. Extra root chunks use `parent_variant = Extra`.
 
 ## Generated code
 
-`UnparsedChunk` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `tokens`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` descends into its cloned `Chunk`. `BothRoot` tries `item` then `leftover`. `Failed` descends into `tokens`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
