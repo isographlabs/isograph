@@ -13,13 +13,13 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
 
 `parse_iso_literal` takes `text: &str` and the chunked literal. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` is built from one chunk.
 
-A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items_with_trailing` or `parse_singleton` on `group.children`.
+A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
 Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `expected` on an exhausted cursor is `Expected(_, EndOfChunk)` at `end_span`.
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items_with_trailing` and `parse_singleton` then call `stream.require_end`. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items` and `parse_singleton` then call `stream.require_end`. Leftover is a failed chunk: `LevelSlot::Unparsed` or `parse_singleton`'s `Err`. The grammar has no leftover form. `require_end` is a method on `ChunkStream`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -246,7 +246,7 @@ impl Chunk {
 
 ## Lists and one-item levels
 
-`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk to a slot. `parse_items_with_trailing` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior): it parses the first chunk whenever one exists. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
+`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list): one chunk, one slot, leftover is `Unparsed`. `parse_singleton` is a one-item level (the root, a `[...]` interior): it parses the first chunk whenever one exists. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -263,15 +263,8 @@ use crate::{
 /// Combinator result only; resolve-position-generic-slot.md derives this on the tree.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LevelSlot<T> {
-    Parsed(ParsedSlot<T>),
+    Parsed(T),
     Unparsed(UnparsedItem),
-}
-
-/// Combinator Ok payload: the item and leftover. resolve-position-generic-slot.md.
-#[derive(Debug, PartialEq, Eq)]
-pub struct ParsedSlot<T> {
-    pub item: T,
-    pub trailing: Option<WithSpan<ParseError>>,
 }
 
 /// A chunk that failed to parse as its level's item: the reason, and the chunk itself
@@ -316,46 +309,19 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                let (_, result) = parse_chunk(chunk, text, parse_item.reference());
-                result
-                    .map(|item| {
-                        WithSpan::new(
-                            LevelSlot::Parsed(ParsedSlot {
-                                item: item.item,
-                                trailing: None,
-                            }),
-                            item.location,
-                        )
-                    })
-                    .unwrap_or_else(|reason| unparsed_slot(chunk, reason))
-            })
-            .collect()
-    }
-
-    pub(crate) fn parse_items_with_trailing<'a, P>(
-        &'a self,
-        text: &'a str,
-        parse_item: impl Fn(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
-    ) -> Vec<WithSpan<LevelSlot<P>>> {
-        self.0
-            .iter()
-            .map(|chunk| {
                 let (mut stream, result) = parse_chunk(chunk, text, parse_item.reference());
-                result
-                    .map(|item| {
-                        let trailing = stream
-                            .require_end()
-                            .err()
-                            .map(|()| stream.cursor().expected(Expectation::Separator));
-                        WithSpan::new(
-                            LevelSlot::Parsed(ParsedSlot {
-                                item: item.item,
-                                trailing,
-                            }),
-                            item.location,
-                        )
-                    })
-                    .unwrap_or_else(|reason| unparsed_slot(chunk, reason))
+                match result {
+                    Ok(item) => {
+                        if stream.require_end().is_err() {
+                            return unparsed_slot(
+                                chunk,
+                                stream.cursor().expected(Expectation::Separator),
+                            );
+                        }
+                        WithSpan::new(LevelSlot::Parsed(item.item), item.location)
+                    }
+                    Err(reason) => unparsed_slot(chunk, reason),
+                }
             })
             .collect()
     }
@@ -403,9 +369,7 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`parse_items` is one chunk, one slot: `spanning` around the parse function, leftover ignored, `trailing` is `None`. Length equals chunk count. `Err` from the parse function is `LevelSlot::Unparsed`.
-
-`parse_items_with_trailing` is `parse_items` plus `require_end` on each chunk. `Ok` plus `require_end` `Err` is `ParsedSlot::trailing`. List sites call this one. `foo bar` is the selection `foo` (span on `foo`) and a trailing error at `bar`. A position on `bar` resolves to the selection set. `foo bar { baz }` is the scalar `foo` and leftover from `bar` on.
+`parse_items` is one chunk, one slot: `parse_chunk`, then `require_end`. Length equals chunk count. `Err` from the parse function, or leftover, is `LevelSlot::Unparsed`. `foo bar` is one unparsed slot over that chunk; `expected(Separator)` at `bar`.
 
 `parse_singleton` parses the first chunk whenever `len() >= 1`. Empty is `empty()`. A successful first item is then checked for leftover, a boundary comma, and a second chunk; any of those is `Err` and the item is discarded. Leftover and the comma use `Expectation::EndOfDeclaration`. Extra is the `extra` callback on the second chunk. A failed first item is that `Err`; extra is not reported. There is no mode that skips the first chunk when extra exists. The index into `.0` is in this module.
 
@@ -419,17 +383,8 @@ pub(crate) fn parse_singleton<'a, T>(
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum SelectionSlot {
-    Parsed(ParsedSelection),
+    Parsed(Selection),
     Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
-}
-
-// resolve-position-generic-slot.md: this is ParsedSlot<Selection>; not a path segment or ResolvedNode variant.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ParsedSelection {
-    #[resolve_field]
-    pub item: WithSpan<Selection>,
-    pub trailing: Option<WithSpan<ParseError>>,
 }
 
 // resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Selection>>>.
@@ -437,14 +392,14 @@ pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
 // resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
     Scalar(ScalarSelection),
     Object(ObjectSelection),
 }
 ```
 
-`ArgumentSlot` / `ParsedArgument`, `ObjectEntrySlot` / `ParsedObjectEntry`, `ConstantObjectEntrySlot` / `ParsedConstantObjectEntry`, and `VariableDeclarationSlot` / `ParsedVariableDeclaration` are the same shape, each with that list's path as `parent_type` and `parent_variant` on `Unparsed`. resolve-position-generic-slot.md.
+`ArgumentSlot`, `ObjectEntrySlot`, `ConstantObjectEntrySlot`, and `VariableDeclarationSlot` are the same shape, each with that list's path as `parent_type` and `parent_variant` on `Unparsed`. resolve-position-generic-slot.md.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -453,12 +408,7 @@ impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
     fn from(slot: WithSpan<LevelSlot<Selection>>) -> Self {
         let location = slot.location;
         let item = match slot.item {
-            LevelSlot::Parsed(ParsedSlot { item, trailing }) => {
-                SelectionSlot::Parsed(ParsedSelection {
-                    item: WithSpan::new(item, location),
-                    trailing,
-                })
-            }
+            LevelSlot::Parsed(item) => SelectionSlot::Parsed(item),
             LevelSlot::Unparsed(unparsed) => SelectionSlot::Unparsed(unparsed),
         };
         WithSpan::new(item, location)
@@ -475,7 +425,7 @@ The same `From` exists per list. A list site maps the combinator output:
                 .item
                 .children
                 .item
-                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .parse_items(cursor.text(), parse_selection)
                 // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
@@ -499,26 +449,21 @@ pub(crate) fn collect_selection_slot_errors(
 ) {
     for slot in slots {
         match slot.item.reference() {
-            SelectionSlot::Parsed(parsed) => {
-                nested(parsed.item.item.reference(), errors);
-                if let Some(trailing) = parsed.trailing {
-                    errors.push(trailing);
-                }
-            }
+            SelectionSlot::Parsed(selection) => nested(selection, errors),
             SelectionSlot::Unparsed(unparsed) => errors.push(unparsed.reason),
         }
     }
 }
 ```
 
-Nested errors (arguments, nested selections) precede that slot's trailing error, matching source order.
+Nested errors (arguments, nested selections) are collected from parsed slots in source order.
 
 ## Function shapes
 
 - `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
 - `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
 - `require_*`: `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
-- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_items_with_trailing`, `parse_singleton`, or `spanning`.
+- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`.
 
 A group plus its interior:
 
@@ -534,7 +479,7 @@ pub(crate) fn consume_selection_set(
                 .item
                 .children
                 .item
-                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .parse_items(cursor.text(), parse_selection)
                 // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
@@ -556,7 +501,7 @@ pub(crate) fn require_selection_set(
                 .item
                 .children
                 .item
-                .parse_items_with_trailing(cursor.text(), parse_selection)
+                .parse_items(cursor.text(), parse_selection)
                 // resolve-position-generic-slot.md: this map is gone.
                 .into_iter()
                 .map(WithSpan::<SelectionSlot>::from)
@@ -621,7 +566,7 @@ pub(crate) fn parse_value(
                     .item
                     .children
                     .item
-                    .parse_items_with_trailing(cursor.text(), parse_object_entry)
+                    .parse_items(cursor.text(), parse_object_entry)
                     // resolve-position-generic-slot.md: this map is gone.
                     .into_iter()
                     .map(WithSpan::<ObjectEntrySlot>::from)
@@ -673,7 +618,7 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
 }
 ```
 
-`parse_items_with_trailing` wraps `parse_selection` in `spanning` and then calls `require_end`.
+`parse_items` wraps `parse_selection` in `spanning` and then calls `require_end`. Leftover is `Unparsed`.
 
 ## Narrower types for narrower grammars
 
@@ -777,7 +722,7 @@ pub(crate) fn parse_constant_value(
                     .item
                     .children
                     .item
-                    .parse_items_with_trailing(cursor.text(), parse_constant_object_entry)
+                    .parse_items(cursor.text(), parse_constant_object_entry)
                     // resolve-position-generic-slot.md: this map is gone.
                     .into_iter()
                     .map(WithSpan::<ConstantObjectEntrySlot>::from)
@@ -833,15 +778,15 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 `UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
 
-Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`, `ParsedSelection::trailing` and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: those trailing fields are `ParsedSlot::trailing`. `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
+Errors are stored on the tree (`UnparsedLiteral`, `UnparsedItem`). `errors()` collects them in source order. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. An error-free literal has three empty lists.
 
 A failed list chunk is the concrete slot's `Unparsed` variant; sibling chunks are parsed. A failed declaration is `UnparsedLiteral`. One reason per those regions. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
-`parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in `UnparsedLiteral` or `UnparsedItem` resolves through the retained chunk. A position on whitespace, leftover, or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
+`parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in `UnparsedLiteral` or `UnparsedItem` resolves through the retained chunk. A position on whitespace or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
 
-Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar baz }`, a position on `baz` resolves to the selection set; find-references returns no references. Hover and completion read the resolution path.
+Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar baz }`, `bar baz` is one unparsed slot; a position on `baz` resolves through that chunk. Hover and completion read the resolution path.
 
 ## Trees and spans
 
@@ -865,14 +810,12 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
-- List of items, leftover as trailing: `ChunkedLevel::parse_items_with_trailing`
 - One-item context: `parse_singleton`
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `parse_singleton` via `boundary_comma`
-- Leftover after a list item: `ParsedSelection::trailing` (and the other `Parsed*` trailing fields). resolve-position-generic-slot.md: `ParsedSlot::trailing`
-- Leftover after a singleton: `parse_singleton`'s `require_end`
-- Group interior: `require_group` / `consume_group_if`, then `parse_items_with_trailing` or `parse_singleton` on `group.children`
+- Leftover in a chunk: `require_end` fails the chunk (`Unparsed` or `parse_singleton`'s `Err`)
+- Group interior: `require_group` / `consume_group_if`, then `parse_items` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
 
 ## Shipping and amending
@@ -881,18 +824,18 @@ The first implementation step is the shared surface, with tests, before any gram
 
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `LevelSlot`, `ParsedSlot`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `parse_singleton`
+- `LevelSlot`, `parse_chunk`, `parse_items`, `parse_singleton`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
-Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_items` / `parse_items_with_trailing` / `parse_singleton` on fixture chunks. No grammar tree, no `parse_iso_literal`.
+Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_items` leftover is `Unparsed`, `parse_singleton` on fixture chunks. No grammar tree, no `parse_iso_literal`.
 
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `UnparsedLiteral`, `entrypoint Type.field`
-- parse-fields.md: `SelectionSlot`, `ParsedSelection`, `UnparsedItem`, `collect_selection_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`. resolve-position-generic-slot.md: the slot, wrapper, and per-list collect become `LevelSlot<Selection>` / `ParsedSlot<Selection>` / one walk
+- parse-fields.md: `SelectionSlot`, `UnparsedItem`, `collect_selection_slot_errors`, `Clone` on the chunk tree, `ChunkParent::UnparsedItem`. resolve-position-generic-slot.md: the slot becomes `LevelSlot<Selection>`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
 
-A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, and `parse_singleton`. This doc stays in `refactors/pending`.
+A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_chunk`, `parse_items`, and `parse_singleton`. This doc stays in `refactors/pending`.

@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root level is one chunk. `parse_singleton` uses `Expectation::EndOfDeclaration` and parses the first chunk whenever one exists. Empty level: `EmptyLiteral` at the root span. A failed first chunk is that parse error; extra is not reported. A successful first item plus leftover, a boundary comma, or a second chunk is `UnparsedLiteral` for that reason: leftover and the comma are `Expected(EndOfDeclaration, ...)`, extra is `MultipleDeclarations` at the second chunk's span.
+The root level is one chunk. `parse_singleton` uses `Expectation::EndOfDeclaration` and parses the first chunk whenever one exists. Empty level: `EmptyLiteral` at the root span. A failed first chunk is that parse error; extra is not reported. Extra tokens in the first chunk (`require_end`) and a boundary comma fail that chunk: `Expected(EndOfDeclaration, ...)`. A successful first item plus a second chunk is `MultipleDeclarations` at the second chunk's span.
 
 ```
 iso(`
@@ -159,7 +159,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `UnparsedLiteral` on `Err`, then the root span. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` parses the first chunk whenever one exists. Empty is `EmptyLiteral`. A failed first item is that `Err`. A successful first item is then leftover, a boundary comma, then a second chunk: leftover and the comma are `Expected(EndOfDeclaration, ...)`, extra is `MultipleDeclarations`. `entrypoint Query.foo\nfield User.name` is `MultipleDeclarations` at `field User.name`. `entrypoint\nQuery.foo` is `Expected(Identifier, EndOfChunk)` at the end of `entrypoint`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `UnparsedLiteral` on `Err`, then the root span. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` parses the first chunk whenever one exists. Empty is `EmptyLiteral`. A failed first item is that `Err`. Extra tokens in the first chunk and a boundary comma are `Expected(EndOfDeclaration, ...)`. A second chunk after a successful first item is `MultipleDeclarations`. `entrypoint Query.foo\nfield User.name` is `MultipleDeclarations` at `field User.name`. `entrypoint\nQuery.foo` is `Expected(Identifier, EndOfChunk)` at the end of `entrypoint`.
 
 ## `ItemCursor` and `ChunkStream`
 
