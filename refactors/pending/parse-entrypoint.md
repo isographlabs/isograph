@@ -108,7 +108,7 @@ pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, Iso
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
 
-pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, ExtraChunksParent<'a>>;
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 pub type UnparsedChunkPath<'a> = PositionResolutionPath<&'a UnparsedChunk, UnparsedChunkParent<'a>>;
 

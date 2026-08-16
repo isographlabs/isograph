@@ -305,15 +305,10 @@ pub enum UnparsedChunkParent<'a> {
 
 /// Extra root chunks after the first. Resolve walks each chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ExtraChunksParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ExtraChunks {
     #[resolve_field(parent_variant = Extra)]
     pub chunks: NonEmpty<WithSpan<Chunk>>,
-}
-
-#[derive(Debug)]
-pub enum ExtraChunksParent<'a> {
-    Literal(IsoLiteralParsePath<'a>),
 }
 
 /// One chunk. Does not implement `ResolvePosition`.
