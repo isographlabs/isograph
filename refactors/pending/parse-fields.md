@@ -244,6 +244,7 @@ use crate::{
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
 
+/// Derived stand-in for `LevelSlot<Selection>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum SelectionSlot {

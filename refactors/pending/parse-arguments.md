@@ -97,6 +97,7 @@ use crate::{
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<ArgumentSlot>>);
 
+/// Derived stand-in for `LevelSlot<Argument>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ArgumentSlot {
@@ -182,6 +183,7 @@ pub struct NullValue;
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
 
+/// Derived stand-in for `LevelSlot<ObjectEntry>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ObjectEntrySlot {

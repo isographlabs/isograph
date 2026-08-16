@@ -260,12 +260,14 @@ use crate::{
 
 /// One chunk's outcome in a list. The wrapping `WithSpan`'s span is the parsed
 /// item's span, or the chunk's `contents_span` when unparsed.
+/// Combinator result only; resolve-position-generic-slot.md derives this on the tree.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LevelSlot<T> {
     Parsed(ParsedSlot<T>),
     Unparsed(UnparsedItem),
 }
 
+/// Combinator Ok payload: the item and leftover. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParsedSlot<T> {
     pub item: T,
@@ -406,12 +408,13 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. Leftover and the comma use `Expectation::EndOfDeclaration`. The index into `.0` is in this module.
 
-`LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives.
+`LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives. resolve-position-generic-slot.md puts `LevelSlot<T>` on the tree instead.
 
 ### Concrete slots
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
+/// Derived stand-in for `LevelSlot<Selection>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum SelectionSlot {
@@ -437,10 +440,11 @@ pub enum Selection {
 }
 ```
 
-`ArgumentSlot` / `ParsedArgument`, `ObjectEntrySlot` / `ParsedObjectEntry`, `ConstantObjectEntrySlot` / `ParsedConstantObjectEntry`, and `VariableDeclarationSlot` / `ParsedVariableDeclaration` are the same shape, each with that list's path as `parent_type` and `parent_variant` on `Unparsed`.
+`ArgumentSlot` / `ParsedArgument`, `ObjectEntrySlot` / `ParsedObjectEntry`, `ConstantObjectEntrySlot` / `ParsedConstantObjectEntry`, and `VariableDeclarationSlot` / `ParsedVariableDeclaration` are the same shape, each with that list's path as `parent_type` and `parent_variant` on `Unparsed`. resolve-position-generic-slot.md.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
+// resolve-position-generic-slot.md: the list field is LevelSlot<Selection>.
 impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
     fn from(slot: WithSpan<LevelSlot<Selection>>) -> Self {
         let location = slot.location;

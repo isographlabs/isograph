@@ -101,6 +101,7 @@ use crate::{
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableDeclarationList(#[resolve_field] pub Vec<WithSpan<VariableDeclarationSlot>>);
 
+/// Derived stand-in for `LevelSlot<VariableDeclaration>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum VariableDeclarationSlot {
