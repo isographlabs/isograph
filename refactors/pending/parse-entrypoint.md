@@ -295,7 +295,7 @@ pub(crate) fn parse_singleton<'a, T>(
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-) -> Result<WithSpan<T>, (Option<WithSpan<T>>, WithSpan<ParseError>)> {
+) -> ParseResult<WithSpan<T>> {
     /* parsing-standards.md */
 }
 ```

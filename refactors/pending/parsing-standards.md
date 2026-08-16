@@ -19,7 +19,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items` and `parse_singleton` then call `stream.require_end`. Their result type is `Result<T, (Option<T>, WithSpan<ParseError>)>`: `Ok` is a complete item, `Err((Some(item), e))` is that item plus leftover (or, for `parse_singleton`, a boundary comma or a second chunk), `Err((None, e))` is a failed parse. Every parse is this recovered tree: keep the item when one exists, store the error on the tree. `item` reads that tree: `Ok(t)` and `Err((Some(t), _))` are `Some(t)`, `Err((None, _))` is `None`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_items` and `parse_singleton` then call `stream.require_end`. Their result type is `ParseResult<T>`: `Ok` is a complete item, `Err((Some(item), e))` is that item plus leftover (or, for `parse_singleton`, a boundary comma or a second chunk), `Err((None, e))` is a failed parse. Every parse is this recovered tree: keep the item when one exists, store the error on the tree. `item` reads that tree: `Ok(t)` and `Err((Some(t), _))` are `Some(t)`, `Err((None, _))` is `None`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -271,6 +271,8 @@ use crate::{
     Chunk, ChunkStream, Expectation, Found, ItemCursor, NonBracketTokenKind, ParseError,
 };
 
+pub type ParseResult<T, E = WithSpan<ParseError>> = Result<T, (Option<T>, E)>;
+
 /// One chunk's outcome in a list. The wrapping `WithSpan`'s span is the parsed
 /// item's span, or the chunk's `contents_span` when unparsed.
 /// Combinator result only; resolve-position-generic-slot.md derives this on the tree.
@@ -376,7 +378,7 @@ pub(crate) fn parse_singleton<'a, T>(
     empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
-) -> Result<WithSpan<T>, (Option<WithSpan<T>>, WithSpan<ParseError>)> {
+) -> ParseResult<WithSpan<T>> {
     if level.item.len() == 0 {
         return (None, empty()).wrap_err();
     }
@@ -412,7 +414,7 @@ pub(crate) fn parse_singleton<'a, T>(
     item.wrap_ok()
 }
 
-fn item<T, E>(result: Result<T, (Option<T>, E)>) -> Option<T> {
+fn item<T, E>(result: ParseResult<T, E>) -> Option<T> {
     match result {
         Ok(item) => item.wrap_some(),
         Err((item, _)) => item,
@@ -422,7 +424,7 @@ fn item<T, E>(result: Result<T, (Option<T>, E)>) -> Option<T> {
 
 `parse_items` is one chunk, one slot: `parse_chunk`, then `require_end`. Length equals chunk count. `Err` from the parse function is `LevelSlot::Unparsed`. Leftover is `Ok` plus `require_end` `Err`: `ParsedSlot::trailing` via `expected(Separator)`, item kept. `foo { bar } asdf` is the object selection `foo { bar }` (span on that) and a trailing error at `asdf`. A position on `asdf` resolves to the selection set.
 
-`parse_singleton` parses the first chunk whenever `len() >= 1` and returns `Result<WithSpan<T>, (Option<WithSpan<T>>, WithSpan<ParseError>)>`. Empty is `Err((None, empty()))`. A failed first item is `Err((None, reason))`; extra is not reported. A successful first item plus leftover, a boundary comma, or a second chunk is `Err((Some(item), e))`. Leftover and the comma use `Expectation::EndOfDeclaration`. Extra is the `extra` callback. There is no mode that skips the first chunk when extra exists. The index into `.0` is in this module. `item(result)` is `Some` whenever a first item parsed.
+`parse_singleton` parses the first chunk whenever `len() >= 1` and returns `ParseResult<WithSpan<T>>`. Empty is `Err((None, empty()))`. A failed first item is `Err((None, reason))`; extra is not reported. A successful first item plus leftover, a boundary comma, or a second chunk is `Err((Some(item), e))`. Leftover and the comma use `Expectation::EndOfDeclaration`. Extra is the `extra` callback. There is no mode that skips the first chunk when extra exists. The index into `.0` is in this module. `item(result)` is `Some` whenever a first item parsed.
 
 `LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives. resolve-position-generic-slot.md puts `LevelSlot<T>` on the tree instead.
 
@@ -880,7 +882,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
-- One-item context: `parse_singleton` → `Result<WithSpan<T>, (Option<WithSpan<T>>, WithSpan<ParseError>)>`
+- One-item context: `parse_singleton` → `ParseResult<WithSpan<T>>`
 - Recovered item: `item(result)` → `Option<T>`; `LevelSlot::item` / `IsoLiteralParse::item` are the same read on the tree
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
@@ -896,7 +898,7 @@ The first implementation step is the shared surface, with tests, before any gram
 
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `LevelSlot`, `ParsedSlot`, `parse_chunk`, `parse_items`, `parse_singleton`, `item`
+- `LevelSlot`, `ParsedSlot`, `ParseResult`, `parse_chunk`, `parse_items`, `parse_singleton`, `item`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_items` leftover is `ParsedSlot::trailing`, `parse_singleton` `Err((Some, e))` keeps the item. No grammar tree, no `parse_iso_literal`.
