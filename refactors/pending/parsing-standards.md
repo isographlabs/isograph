@@ -945,7 +945,7 @@ A failed list chunk is `Failed`. Leftover after a successful list item is `Both`
 
 `parse_iso_literal` returns a tree for every `&str`. A position in a parsed region resolves to a grammar leaf. A position in leftover or failed items resolves through `UnparsedChunkItems`. Extra root chunks resolve through `ExtraChunks`. A position on whitespace or a dropped comma or unmatched-bracket region resolves to the nearest containing node.
 
-Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar } asdf`, a position on `asdf` resolves through the leftover `UnparsedChunkItems`; find-references returns no references. Hover reads the leftover diagnostic by span. Completion reads the resolution path.
+Find-references, rename, and go-to-definition run when the resolved leaf is a name leaf. In `foo { bar } asdf`, a position on `asdf` resolves through the leftover `UnparsedChunkItems`; find-references returns no references. Completion reads the resolution path. Diagnostics are a separate list.
 
 ## Trees and spans
 
