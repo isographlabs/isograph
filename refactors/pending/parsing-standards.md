@@ -19,7 +19,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. `ParseResult<T>` is `Result<T, (Option<T>, E)>`: `Ok` is `Complete`, `Err((Some(item), e))` is `Both`, `Err((None, e))` is `Failed`. Diagnostics (`E`) are not leftover tokens. Leftover and failed tokens are an `UnparsedChunk` (a cloned `Chunk` of unread or whole-chunk items). `item` on a slot is `Some` for `Complete` and `Both`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. Diagnostics are not leftover tokens. Leftover and failed tokens are an `UnparsedChunk` (a cloned `Chunk` of unread or whole-chunk items). `item` on a slot is `Some` for `Complete` and `Both`. Artifact generation requires the tree's `errors()` and the earlier-stage error lists to be empty. `require_end` is a method on `ChunkStream`.
 
 `Tok` (unparsed tokens) and `E` (diagnostics) may later become type parameters on the slot. This pass hardcodes `UnparsedChunk` and `Vec<WithSpan<ParseError>>`.
 
@@ -289,8 +289,6 @@ use crate::{
     ParseError,
 };
 
-pub type ParseResult<T, E = WithSpan<ParseError>> = Result<T, (Option<T>, E)>;
-
 /// Unread or failed-chunk content items. Resolve walks `chunk`. No diagnostic field.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = UnparsedChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -318,7 +316,7 @@ pub enum ExtraChunksParent<'a> {
     Literal(IsoLiteralParsePath<'a>),
 }
 
-/// Combinator result of one chunk. Does not implement `ResolvePosition`.
+/// One chunk. Does not implement `ResolvePosition`.
 /// resolve-position-generic-slot.md puts this on the tree instead of a concrete copy.
 #[derive(Debug, PartialEq, Eq)]
 pub enum LevelSlot<T> {
@@ -498,13 +496,6 @@ pub(crate) fn parse_singleton<'a, T>(
         errors,
     }
 }
-
-fn item<T, E>(result: ParseResult<T, E>) -> Option<T> {
-    match result {
-        Ok(item) => item.wrap_some(),
-        Err((item, _)) => item,
-    }
-}
 ```
 
 `ChunkStream::remaining_contents` returns the unread items after `require_end` `Err`. That list is nonempty. A leftover `Chunk` is those items and no trailing separator.
@@ -582,7 +573,7 @@ impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
 }
 ```
 
-The same `From` exists per list. A list site maps the combinator output:
+The same `From` exists per list. A list site maps `parse_items`:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -997,7 +988,7 @@ The first implementation step is the shared surface, with tests, before any gram
 
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `LevelSlot`, `Both`, `Failed`, `UnparsedChunk`, `ExtraChunks`, `Singleton`, `ParseResult`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `item`
+- `LevelSlot`, `Both`, `Failed`, `UnparsedChunk`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `Both` with tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.

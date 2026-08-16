@@ -639,8 +639,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        chunk, match_brackets, tokenize, BracketError, BracketKind, ChunkedLevelParent,
-        CommaWithoutItem,
+        chunk, match_brackets, tokenize, BracketError, BracketKind, CommaWithoutItem,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{At, Comma, Identifier, IntegerLiteral, Period};
