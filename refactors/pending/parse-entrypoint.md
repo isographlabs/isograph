@@ -106,33 +106,32 @@ pub fn parse_iso_literal(text: &str, root: WithSpan<ChunkedLevel>) -> WithSpan<I
         text,
         || WithSpan::new(ParseError::EmptyLiteral, location),
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
-        parse_declaration,
+        |cursor| {
+            let keyword = cursor
+                .require_token(NonBracketTokenKind::Identifier)
+                .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
+            match cursor.token_text(keyword) {
+                text if text == "entrypoint" => {
+                    IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
+                }
+                text if text == "field" || text == "pointer" => {
+                    WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+                }
+                _ => WithSpan::new(
+                    ParseError::expected(
+                        Expectation::DeclarationKeyword,
+                        Found::Token(NonBracketTokenKind::Identifier),
+                    ),
+                    keyword,
+                )
+                .wrap_err(),
+            }
+        },
     )
     .unwrap_or_else(|reason| {
         IsoLiteralParse::Unparsed(UnparsedLiteral { reason, level: root })
     });
     WithSpan::new(parse, location)
-}
-
-fn parse_declaration(cursor: &mut ItemCursor<'_>) -> Result<IsoLiteralParse, WithSpan<ParseError>> {
-    let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match cursor.token_text(keyword) {
-        text if text == "entrypoint" => {
-            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
-        }
-        text if text == "field" || text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
-        }
-        _ => WithSpan::new(
-            ParseError::expected(
-                Expectation::DeclarationKeyword,
-                Found::Token(NonBracketTokenKind::Identifier),
-            ),
-            keyword,
-        ).wrap_err(),
-    }
 }
 
 fn parse_entrypoint(
@@ -156,7 +155,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_declaration` returns after the last identifier. `parse_singleton` matches `len()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is `parse_declaration` then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
+The singleton item is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. `parse_singleton` matches `len()` first: empty is `EmptyLiteral`, two or more is `MultipleDeclarations` on the second chunk (the first is not parsed), one chunk is that closure then `require_end` then `boundary_comma`. `entrypoint\nQuery.foo` is two chunks, so `MultipleDeclarations` at `Query.foo`.
 
 ## `ItemCursor` and `ChunkStream`
 
