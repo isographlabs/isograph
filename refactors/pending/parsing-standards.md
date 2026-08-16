@@ -246,7 +246,7 @@ impl Chunk {
 
 ## Lists and one-item levels
 
-`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk to a slot. `parse_items_with_trailing` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior): it matches `len` before it parses. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
+`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk to a slot. `parse_items_with_trailing` is the list combinator (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior): it parses the first chunk whenever one exists. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -377,28 +377,29 @@ pub(crate) fn parse_singleton<'a, T>(
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>) -> Result<T, WithSpan<ParseError>>,
 ) -> Result<T, WithSpan<ParseError>> {
-    match level.item.len() {
-        0 => empty().wrap_err(),
-        1 => {
-            let chunk = &level.item.0[0];
-            let mut stream = chunk.item.stream(text);
-            let item = parse(stream.cursor())?;
-            if stream.require_end().is_err() {
-                return stream.cursor().expected(Expectation::EndOfDeclaration).wrap_err();
-            }
-            if let Some(comma) = chunk.item.boundary_comma() {
-                return WithSpan::new(
-                    ParseError::expected(
-                        Expectation::EndOfDeclaration,
-                        Found::Token(NonBracketTokenKind::Comma),
-                    ),
-                    comma,
-                ).wrap_err();
-            }
-            item.wrap_ok()
-        }
-        _ => extra(&level.item.0[1]).wrap_err(),
+    if level.item.len() == 0 {
+        return empty().wrap_err();
     }
+    let chunk = &level.item.0[0];
+    let mut stream = chunk.item.stream(text);
+    let item = parse(stream.cursor())?;
+    if stream.require_end().is_err() {
+        return stream.cursor().expected(Expectation::EndOfDeclaration).wrap_err();
+    }
+    if let Some(comma) = chunk.item.boundary_comma() {
+        return WithSpan::new(
+            ParseError::expected(
+                Expectation::EndOfDeclaration,
+                Found::Token(NonBracketTokenKind::Comma),
+            ),
+            comma,
+        )
+        .wrap_err();
+    }
+    if level.item.len() > 1 {
+        return extra(&level.item.0[1]).wrap_err();
+    }
+    item.wrap_ok()
 }
 ```
 
@@ -406,7 +407,7 @@ pub(crate) fn parse_singleton<'a, T>(
 
 `parse_items_with_trailing` is `parse_items` plus `require_end` on each chunk. `Ok` plus `require_end` `Err` is `ParsedSlot::trailing`. List sites call this one. `foo bar` is the selection `foo` (span on `foo`) and a trailing error at `bar`. A position on `bar` resolves to the selection set. `foo bar { baz }` is the scalar `foo` and leftover from `bar` on.
 
-`parse_singleton` matches `len()` first. Empty is `empty()`. Two or more is `extra` on the second chunk; the first is not parsed. One chunk is `parse`, then `require_end`, then `boundary_comma`. Leftover and the comma use `Expectation::EndOfDeclaration`. The index into `.0` is in this module.
+`parse_singleton` parses the first chunk whenever `len() >= 1`. Empty is `empty()`. A successful first item is then checked for leftover, a boundary comma, and a second chunk; any of those is `Err` and the item is discarded. Leftover and the comma use `Expectation::EndOfDeclaration`. Extra is the `extra` callback on the second chunk. A failed first item is that `Err`; extra is not reported. There is no mode that skips the first chunk when extra exists. The index into `.0` is in this module.
 
 `LevelSlot` is the combinator's result. It does not implement `ResolvePosition`. Each list stores a concrete slot enum that derives. resolve-position-generic-slot.md puts `LevelSlot<T>` on the tree instead.
 
