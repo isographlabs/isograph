@@ -205,6 +205,7 @@ pub fn parse_iso_literal(
     let singleton = parse_singleton(
         root.reference(),
         text,
+        Expectation::EndOfDeclaration,
         |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
         |cursor, _| parse_iso_literal_item(cursor),
         &mut push_error,
@@ -537,6 +538,7 @@ impl ChunkedLevel {
 pub(crate) fn parse_singleton<'a, T, F>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
+    end: Expectation,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
     push_error: &mut F,
@@ -550,16 +552,13 @@ where
     let item = parse_one_item(
         &level.item.0[0],
         text,
-        |cursor| cursor.expected(Expectation::EndOfDeclaration),
+        |cursor| cursor.expected(end),
         parse,
         push_error,
     );
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         push_error(WithSpan::new(
-            ParseError::expected(
-                Expectation::EndOfDeclaration,
-                Found::Token(NonBracketTokenKind::Comma),
-            ),
+            ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)),
             comma,
         ));
     }
@@ -585,7 +584,7 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
 
 `Slot<T, E>` is `item: T` and `extra: E`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
 
@@ -796,7 +795,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `push_error` (tokenless)
 - Leftover after a list item: `item: Some` plus extra tokens and `push_error(Expected(Separator, ...))`
-- Leftover after a singleton first chunk: `item: Some` plus extra tokens and `push_error(Expected(EndOfDeclaration, ...))`
+- Leftover after a singleton first chunk: `item: Some` plus extra tokens and `push_error(Expected(end, ...))`
 - Extra root chunks: `ExtraChunks` plus `push_error(MultipleDeclarations)`
 - Diagnostic: `push_error` on `parse_one_item` / `parse_singleton` / `parse_iso_literal`
 - Group interior: `require_group` / `consume_group_if`, then `parse_items` or `parse_singleton` on `group.children`
