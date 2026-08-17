@@ -140,6 +140,15 @@ impl IsoLiteralParse {
             IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
         }
     }
+
+    pub fn remaining(&self) -> Option<&Failed> {
+        let first = self.first.as_ref()?;
+        match first.item.reference() {
+            RootSlot::Complete(_) => None,
+            RootSlot::Both(both) => both.remaining.item.reference().wrap_some(),
+            RootSlot::Failed(failed) => failed.reference().wrap_some(),
+        }
+    }
 }
 
 // resolve-position-generic-slot.md: this From is gone.

@@ -23,7 +23,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. Diagnostics are not leftover items. Leftover and failed items are `UnparsedChunkItems`. `item` on a slot is `Some` for `Complete` and `Both`. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `LevelSlot`. Diagnostics are not leftover items. Leftover and failed items are `UnparsedChunkItems`. `item` on a slot is `Some` for `Complete` and `Both`. `remaining` is `Some` for `Both` and `Failed`. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 `Tok` (unparsed chunk items) may later become a type parameter on the slot. This pass hardcodes `UnparsedChunkItems`.
 
@@ -342,6 +342,14 @@ impl<T> LevelSlot<T> {
             LevelSlot::Complete(item) => item.item.reference().wrap_some(),
             LevelSlot::Both(both) => both.item.item.reference().wrap_some(),
             LevelSlot::Failed(_) => None,
+        }
+    }
+
+    pub fn remaining(&self) -> Option<&Failed> {
+        match self {
+            LevelSlot::Complete(_) => None,
+            LevelSlot::Both(both) => both.remaining.item.reference().wrap_some(),
+            LevelSlot::Failed(failed) => failed.reference().wrap_some(),
         }
     }
 }
@@ -971,6 +979,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<LevelSlot<P>>>`
 - One-item context: `parse_singleton` → `Singleton<T>`
 - Recovered item: `LevelSlot::item` / `IsoLiteralParse::item` → `Option<&T>`
+- Remaining items: `LevelSlot::remaining` / `IsoLiteralParse::remaining` → `Option<&Failed>`
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `push_error` (tokenless)
