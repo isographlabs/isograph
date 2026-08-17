@@ -16,11 +16,11 @@ iso(`
 `)
 ```
 
-A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `S::ExtraChunks`.
+A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `IsoLiteralParse.extra`.
 
 ## Types
 
-Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `item` is the first slot's attempt (`parse_one_item`). Only `IsoLiteralParse<OptimisticStage>` and `IsoLiteralSlot<OptimisticStage>` impl `ResolvePosition` among the slot/singleton types.
+Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `item` is the first slot's attempt (`parse_one_item`). `IsoLiteralParse` and `IsoLiteralSlot` are the optimistic tree and impl `ResolvePosition`. Generic `Slot` / `Singleton` do not.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -34,36 +34,26 @@ use crate::{
     parse_singleton,
 };
 
-/// Concrete root singleton so resolve has a named type to parent at. Goes away
-/// when resolve-position-generic-slot.md lands. Fields are the `OptimisticStage`
-/// projection so the derive sees concrete `Option<WithSpan<_>>` types. Only that
-/// monomorph impls `ResolvePosition`.
+/// Concrete root singleton. This is the optimistic tree. Goes away when
+/// resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = (),
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <OptimisticStage>
-)]
-pub struct IsoLiteralParse<S: Stage> {
+#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+pub struct IsoLiteralParse {
     #[resolve_field]
-    pub item: WithSpan<IsoLiteralSlot<S>>,
+    pub item: WithSpan<IsoLiteralSlot>,
     #[resolve_field]
-    pub extra: S::ExtraChunks,
+    pub extra: Option<WithSpan<ExtraChunks>>,
 }
 
-/// Concrete first-chunk slot. Goes away when resolve-position-generic-slot.md lands.
-/// Only the `OptimisticStage` monomorph impls `ResolvePosition`.
+/// Concrete first-chunk slot. This is the optimistic tree. Goes away when
+/// resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <OptimisticStage>
-)]
-pub struct IsoLiteralSlot<S: Stage> {
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct IsoLiteralSlot {
     #[resolve_field]
-    pub item: S::IsoLiteral,
+    pub item: Option<WithSpan<IsoLiteralItem>>,
     #[resolve_field]
-    pub extra: S::UnparsedTokens,
+    pub extra: Option<WithSpan<UnparsedChunkItems>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -96,11 +86,10 @@ pub struct ClientFieldName;
 pub struct EntrypointKeyword;
 
 // Concrete. Goes away when resolve-position-generic-slot.md lands.
-pub type IsoLiteralParsePath<'a> =
-    PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
 pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralSlot<OptimisticStage>, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
 
 pub type IsoLiteralItemPath<'a> =
     PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralSlotPath<'a>>;
@@ -132,7 +121,7 @@ type OptimisticSingleton = Singleton<
     <OptimisticStage as Stage>::ExtraChunks,
 >;
 
-impl From<OptimisticSlot> for IsoLiteralSlot<OptimisticStage> {
+impl From<OptimisticSlot> for IsoLiteralSlot {
     fn from(slot: OptimisticSlot) -> Self {
         IsoLiteralSlot {
             item: slot.item,
@@ -141,7 +130,7 @@ impl From<OptimisticSlot> for IsoLiteralSlot<OptimisticStage> {
     }
 }
 
-impl From<OptimisticSingleton> for IsoLiteralParse<OptimisticStage> {
+impl From<OptimisticSingleton> for IsoLiteralParse {
     fn from(singleton: OptimisticSingleton) -> Self {
         IsoLiteralParse {
             item: singleton.item.map(IsoLiteralSlot::from),
@@ -161,7 +150,7 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
-) -> WithSpan<IsoLiteralParse<OptimisticStage>> {
+) -> WithSpan<IsoLiteralParse> {
     /* parsing-standards.md */
 }
 
@@ -210,7 +199,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is an empty `IsoLiteralSlot` plus `extra: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::ExtraChunks`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is an empty `IsoLiteralSlot` plus `extra: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `IsoLiteralParse.extra`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `IsoLiteralParse.extra` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `IsoLiteralParse.extra` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -331,7 +320,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
 ) -> Singleton<
     WithSpan<
         Slot<
-            Option<T>,
+            Option<WithSpan<T>>,
             Option<WithSpan<UnparsedChunkItems>>,
         >,
     >,
@@ -724,7 +713,7 @@ mod tests {
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
     use NonBracketTokenKind::{At, Comma, Dollar, Identifier, IntegerLiteral, Period};
 
-    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse<OptimisticStage>>, Vec<WithSpan<ParseError>>) {
+    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
@@ -734,7 +723,7 @@ mod tests {
     fn parsed_with_errors(
         text: &str,
     ) -> (
-        WithSpan<IsoLiteralParse<OptimisticStage>>,
+        WithSpan<IsoLiteralParse>,
         Vec<WithSpan<ParseError>>,
         Vec<BracketError>,
         Vec<CommaWithoutItem>,
@@ -766,7 +755,7 @@ mod tests {
         Span::from_usize(offset, offset + pattern.len())
     }
 
-    fn as_entrypoint(parse: &WithSpan<IsoLiteralParse<OptimisticStage>>) -> &EntrypointDeclaration {
+    fn as_entrypoint(parse: &WithSpan<IsoLiteralParse>) -> &EntrypointDeclaration {
         let item = parse
             .item
             .item
@@ -774,7 +763,7 @@ mod tests {
             .item
             .as_ref()
             .expect("the fixture's literal parsed an item");
-        match item {
+        match item.item.reference() {
             IsoLiteralItem::Entrypoint(declaration) => declaration,
         }
     }
