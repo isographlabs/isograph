@@ -103,19 +103,29 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 impl
     From<
         Singleton<
-            <OptimisticStage as Stage>::IsoLiteral,
+            WithSpan<
+                Slot<
+                    <OptimisticStage as Stage>::Item<IsoLiteralItem>,
+                    <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+                >,
+            >,
             <OptimisticStage as Stage>::Extra<ExtraChunks>,
         >,
     > for IsoLiteralParse<OptimisticStage>
 {
     fn from(
         singleton: Singleton<
-            <OptimisticStage as Stage>::IsoLiteral,
+            WithSpan<
+                Slot<
+                    <OptimisticStage as Stage>::Item<IsoLiteralItem>,
+                    <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+                >,
+            >,
             <OptimisticStage as Stage>::Extra<ExtraChunks>,
         >,
     ) -> Self {
         IsoLiteralParse {
-            item: singleton.item,
+            item: singleton.item.wrap_some(),
             extra: singleton.extra,
         }
     }
@@ -297,12 +307,11 @@ impl Chunk {
 pub(crate) fn parse_singleton<'a, T, F>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
-    empty: impl FnOnce() -> WithSpan<ParseError>,
     extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
     push_error: &mut F,
 ) -> Singleton<
-    <OptimisticStage as Stage>::Item<
+    WithSpan<
         Slot<
             <OptimisticStage as Stage>::Item<T>,
             <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
