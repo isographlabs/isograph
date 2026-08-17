@@ -203,27 +203,23 @@ pub(crate) struct ItemCursor<'a> {
 }
 
 /// Sequential reader of one chunk, plus `require_end`.
-pub(crate) struct ChunkStream<'a> {
-    cursor: ItemCursor<'a>,
-}
+pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
     pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self {
-        ChunkStream {
-            cursor: ItemCursor {
-                previous_end: contents.first().location.start,
-                items: contents.iter().safe_peekable(),
-                text,
-            },
-        }
+        ChunkStream(ItemCursor {
+            previous_end: contents.first().location.start,
+            items: contents.iter().safe_peekable(),
+            text,
+        })
     }
 
     pub(crate) fn cursor(&mut self) -> &mut ItemCursor<'a> {
-        &mut self.cursor
+        &mut self.0
     }
 
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        self.cursor.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
+        self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
 }
 
@@ -626,7 +622,7 @@ pub enum ChunkContentItem {
 
 ## Generated code
 
-`Slot` tries `item` then `extra`. `ExtraTokens` walks `items` when `Some`. `UnparsedChunkItems` iterates `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`Slot` tries `item` then `extra`. `ExtraTokens` walks the option when `Some`. `UnparsedChunkItems` iterates the `NonEmpty`. `ExtraChunks` iterates the `NonEmpty`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
@@ -902,8 +898,8 @@ mod tests {
         assert!(parse.item.item().is_none());
         match parse.item.remaining() {
             Some(items) => {
-                assert_eq!(items.items.first().location, span_of(text, "entrypoint"));
-                assert_eq!(items.items.last().location, span_of(text, "asdf"));
+                assert_eq!(items.0.first().location, span_of(text, "entrypoint"));
+                assert_eq!(items.0.last().location, span_of(text, "asdf"));
             }
             None => panic!("expected remaining items covering the whole chunk"),
         }

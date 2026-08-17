@@ -48,34 +48,30 @@ pub(crate) struct ItemCursor<'a> {
 }
 
 /// Sequential reader of one chunk, plus `require_end`.
-pub(crate) struct ChunkStream<'a> {
-    cursor: ItemCursor<'a>,
-}
+pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
     pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self {
-        ChunkStream {
-            cursor: ItemCursor {
-                previous_end: contents.first().location.start,
-                items: contents.iter().safe_peekable(),
-                text,
-            },
-        }
+        ChunkStream(ItemCursor {
+            previous_end: contents.first().location.start,
+            items: contents.iter().safe_peekable(),
+            text,
+        })
     }
 
     pub(crate) fn cursor(&mut self) -> &mut ItemCursor<'a> {
-        &mut self.cursor
+        &mut self.0
     }
 
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        self.cursor.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
+        self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
 
     /// Unread content items. `None` when the cursor is at end.
     pub(crate) fn remaining_contents(&mut self) -> Option<NonEmpty<WithSpan<ChunkContentItem>>> {
-        let first = self.cursor.items.next()?;
+        let first = self.0.items.next()?;
         let mut tail = Vec::new();
-        while let Some(item) = self.cursor.items.next() {
+        while let Some(item) = self.0.items.next() {
             tail.push(*item);
         }
         NonEmpty {
@@ -287,10 +283,9 @@ use crate::{
 /// Unread or failed items from the chunk under parse.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ExtraTokensPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnparsedChunkItems {
-    #[resolve_field(parent_variant = Unparsed)]
-    pub items: NonEmpty<WithSpan<ChunkContentItem>>,
-}
+pub struct UnparsedChunkItems(
+    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
@@ -341,20 +336,14 @@ pub type EntrypointDeclarationPath<'a> =
 /// Extra root chunks after the first. Resolve walks each chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks {
-    #[resolve_field(parent_variant = Extra)]
-    pub chunks: NonEmpty<WithSpan<Chunk>>,
-}
+pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-/// Remaining unparsed items in the chunk. `items` is `None` when the form consumed the chunk.
+/// Remaining unparsed items in the chunk. `None` when the form consumed the chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraTokens {
-    #[resolve_field]
-    pub items: Option<WithSpan<UnparsedChunkItems>>,
-}
+pub struct ExtraTokens(#[resolve_field] pub Option<WithSpan<UnparsedChunkItems>>);
 
 pub trait Stage {
     type Item<T>;
@@ -378,7 +367,7 @@ impl Stage for OptimisticStage {
         item.as_ref().map(|wrapped| wrapped.item.reference())
     }
     fn extra<'a>(extra: &'a ExtraTokens) -> Option<&'a UnparsedChunkItems> {
-        extra.items.as_ref().map(|wrapped| wrapped.item.reference())
+        extra.0.as_ref().map(|wrapped| wrapped.item.reference())
     }
 }
 
@@ -479,7 +468,7 @@ where
                 return WithSpan::new(
                     Slot {
                         item: item.wrap_some(),
-                        extra: ExtraTokens { items: None },
+                        extra: ExtraTokens(None),
                     },
                     item.location,
                 );
@@ -493,13 +482,10 @@ where
                     WithSpan::new(
                         Slot {
                             item: item.wrap_some(),
-                            extra: ExtraTokens {
-                                items: WithSpan::new(
-                                    UnparsedChunkItems { items: remaining },
-                                    leftover_span,
-                                )
-                                .wrap_some(),
-                            },
+                            extra: ExtraTokens(
+                                WithSpan::new(UnparsedChunkItems(remaining), leftover_span)
+                                    .wrap_some(),
+                            ),
                         },
                         location,
                     )
@@ -507,7 +493,7 @@ where
                 None => WithSpan::new(
                     Slot {
                         item: item.wrap_some(),
-                        extra: ExtraTokens { items: None },
+                        extra: ExtraTokens(None),
                     },
                     item.location,
                 ),
@@ -519,15 +505,13 @@ where
             WithSpan::new(
                 Slot {
                     item: None,
-                    extra: ExtraTokens {
-                        items: WithSpan::new(
-                            UnparsedChunkItems {
-                                items: chunk.item.contents.clone(),
-                            },
+                    extra: ExtraTokens(
+                        WithSpan::new(
+                            UnparsedChunkItems(chunk.item.contents.clone()),
                             location,
                         )
                         .wrap_some(),
-                    },
+                    ),
                 },
                 location,
             )
@@ -614,7 +598,7 @@ where
             tail: level.item.0[2..].to_vec(),
         };
         push_error(extra(&rest.head));
-        ExtraChunks { chunks: rest }
+        ExtraChunks(rest)
     });
     Singleton {
         first: first.wrap_some(),
@@ -881,9 +865,7 @@ pub enum TypeAnnotation {
     Named(NamedTypeAnnotation),
 }
 
-pub struct NamedTypeAnnotation {
-    pub name: WithSpan<TypeName>,
-}
+pub struct NamedTypeAnnotation(pub WithSpan<TypeName>);
 
 pub struct TypeName;
 ```

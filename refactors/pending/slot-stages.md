@@ -26,13 +26,10 @@ pub struct OptimisticStage;
 
 pub struct ArtifactGenerationStage;
 
-/// Remaining unparsed items in the chunk. `items` is `None` when the form consumed the chunk.
+/// Remaining unparsed items in the chunk. `None` when the form consumed the chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraTokens {
-    #[resolve_field]
-    pub items: Option<WithSpan<UnparsedChunkItems>>,
-}
+pub struct ExtraTokens(#[resolve_field] pub Option<WithSpan<UnparsedChunkItems>>);
 
 impl Stage for OptimisticStage {
     type Item<T> = Option<WithSpan<T>>;
@@ -43,7 +40,7 @@ impl Stage for OptimisticStage {
         item.as_ref().map(|wrapped| wrapped.item.reference())
     }
     fn extra<'a>(extra: &'a ExtraTokens) -> Option<&'a UnparsedChunkItems> {
-        extra.items.as_ref().map(|wrapped| wrapped.item.reference())
+        extra.0.as_ref().map(|wrapped| wrapped.item.reference())
     }
 }
 
@@ -103,7 +100,7 @@ pub fn require_complete<T>(
 ) -> Option<WithSpan<ArtifactGenerationSlot<T>>> {
     let location = slot.location;
     let Slot { item, extra } = slot.item;
-    match (item, extra.items) {
+    match (item, extra.0) {
         (Some(item), None) => WithSpan::new(Slot { item, extra: () }, location).wrap_some(),
         _ => None,
     }
@@ -190,7 +187,7 @@ pub fn require_complete_literal(
 
 ## Resolve
 
-`Slot<Item, Extra>` derives `ResolvePosition` once `resolve-position-generic-slot.md` can emit a generic struct. `OptimisticStage` walks `item` when `Some` and `extra.items` when `Some`. `ArtifactGenerationStage` walks `item` only. `()` has no `resolve_field`.
+`Slot<Item, Extra>` derives `ResolvePosition` once `resolve-position-generic-slot.md` can emit a generic struct. `OptimisticStage` walks `item` when `Some` and `extra.0` when `Some`. `ArtifactGenerationStage` walks `item` only. `()` has no `resolve_field`.
 
 ## Deleted types
 
