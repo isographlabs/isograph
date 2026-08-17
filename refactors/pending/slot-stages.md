@@ -20,6 +20,7 @@ pub struct Singleton<T, E> {
 
 pub trait Stage {
     type IsoLiteral;
+    type Unparsed;
     type Extra;
 }
 
@@ -28,25 +29,26 @@ pub struct OptimisticStage;
 pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
-    type IsoLiteral =
-        Option<WithSpan<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>>;
+    type IsoLiteral = Option<IsoLiteralItem>;
+    type Unparsed = Option<WithSpan<UnparsedChunkItems>>;
     type Extra = Option<WithSpan<ExtraChunks>>;
 }
 
 impl Stage for ArtifactGenerationStage {
-    type IsoLiteral = WithSpan<IsoLiteralItem>;
+    type IsoLiteral = IsoLiteralItem;
+    type Unparsed = ();
     type Extra = ();
 }
 ```
 
-`parse_one_item` already returns `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
+`parse_one_item` already returns `Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
 
 ## Convert
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub fn require_complete<T>(
-    slot: WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>,
+    slot: WithSpan<Slot<Option<T>, Option<WithSpan<UnparsedChunkItems>>>>,
 ) -> Option<WithSpan<T>> {
     let location = slot.location;
     let Slot { item, extra } = slot.item;
@@ -66,7 +68,7 @@ Before (the series, lists still pinned to optimistic `Slot`):
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub struct SelectionSet(
-    pub Vec<WithSpan<Slot<Option<WithSpan<Selection>>, Option<WithSpan<UnparsedChunkItems>>>>>,
+    pub Vec<WithSpan<Slot<Option<Selection>, Option<WithSpan<UnparsedChunkItems>>>>>,
 );
 ```
 
@@ -86,12 +88,15 @@ pub fn require_complete_literal(
     if parse.extra.is_some() {
         return None;
     }
-    let item = match parse.item {
-        None => return None,
-        Some(slot) => require_complete(slot)?,
-    };
+    if parse.item.extra.is_some() {
+        return None;
+    }
+    let item = parse.item.item?;
     IsoLiteralParse {
-        item,
+        item: Slot {
+            item,
+            extra: (),
+        },
         extra: (),
     }
     .wrap_some()

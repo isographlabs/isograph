@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>`). Remaining chunks are `S::Extra` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item` is `Some` when the form parsed.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>`). Remaining chunks are `S::Extra` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and `Slot { item: None, extra: None }`. `item` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -38,7 +38,7 @@ use crate::{
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: S::IsoLiteral,
+    pub item: Slot<S::IsoLiteral, S::Unparsed>,
     #[resolve_field]
     pub extra: S::Extra,
 }
@@ -76,10 +76,7 @@ pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
 pub type SlotPath<'a> = PositionResolutionPath<
-    &'a Slot<
-        Option<WithSpan<IsoLiteralItem>>,
-        Option<WithSpan<UnparsedChunkItems>>,
-    >,
+    &'a Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>,
     IsoLiteralParsePath<'a>,
 >;
 
@@ -103,29 +100,19 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 impl
     From<
         Singleton<
-            WithSpan<
-                Slot<
-                    Option<WithSpan<IsoLiteralItem>>,
-                    Option<WithSpan<UnparsedChunkItems>>,
-                >,
-            >,
+            WithSpan<Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>>,
             Option<WithSpan<ExtraChunks>>,
         >,
     > for IsoLiteralParse<OptimisticStage>
 {
     fn from(
         singleton: Singleton<
-            WithSpan<
-                Slot<
-                    Option<WithSpan<IsoLiteralItem>>,
-                    Option<WithSpan<UnparsedChunkItems>>,
-                >,
-            >,
+            WithSpan<Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>>,
             Option<WithSpan<ExtraChunks>>,
         >,
     ) -> Self {
         IsoLiteralParse {
-            item: singleton.item.wrap_some(),
+            item: singleton.item.item,
             extra: singleton.extra,
         }
     }
@@ -191,7 +178,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `item: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::Extra`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::Extra` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::Extra` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `Slot { item: None, extra: None }` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::Extra`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::Extra` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::Extra` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -313,7 +300,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
 ) -> Singleton<
     WithSpan<
         Slot<
-            Option<WithSpan<T>>,
+            Option<T>,
             Option<WithSpan<UnparsedChunkItems>>,
         >,
     >,
@@ -705,8 +692,8 @@ mod tests {
         let item = parse
             .item
             .item
+            .item
             .as_ref()
-            .and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference()))
             .expect("the fixture's literal parsed an item");
         match item {
             IsoLiteralItem::Entrypoint(declaration) => declaration,
@@ -716,7 +703,7 @@ mod tests {
     fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
         let (parse, errors) = parsed(text);
         assert!(
-            parse.item.item.as_ref().and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference())).is_none(),
+            parse.item.item.item.as_ref().is_none(),
             "for literal {text:?}",
         );
         assert!(
@@ -780,7 +767,7 @@ mod tests {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        assert!(parse.item.item.as_ref().and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference())).is_none());
+        assert!(parse.item.item.item.as_ref().is_none());
         assert_eq!(
             errors,
             WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
@@ -847,7 +834,7 @@ mod tests {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item.as_ref().and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference())).is_none());
+        assert!(parse.item.item.item.as_ref().is_none());
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
                 && error.location == Span::new(keyword_end, keyword_end)
@@ -921,8 +908,8 @@ mod tests {
     fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
         let text = "entrypoint Foo.$ asdf";
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item.as_ref().and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference())).is_none());
-        match parse.item.item.as_ref().and_then(|slot| slot.item.extra.as_ref().map(|wrapped| wrapped.item.reference())) {
+        assert!(parse.item.item.item.as_ref().is_none());
+        match parse.item.item.extra.as_ref().map(|wrapped| wrapped.item.reference()) {
             Some(items) => {
                 assert_eq!(items.0.first().location, span_of(text, "entrypoint"));
                 assert_eq!(items.0.last().location, span_of(text, "asdf"));
@@ -940,8 +927,8 @@ mod tests {
         let text = "entrypoint Query.foo bar";
         let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
-        assert!(parse.item.item.as_ref().and_then(|slot| slot.item.item.as_ref().map(|wrapped| wrapped.item.reference())).is_some());
-        assert!(parse.item.item.as_ref().and_then(|slot| slot.item.extra.as_ref().map(|wrapped| wrapped.item.reference())).is_some());
+        assert!(parse.item.item.item.as_ref().is_some());
+        assert!(parse.item.item.extra.as_ref().map(|wrapped| wrapped.item.reference()).is_some());
         assert_eq!(
             errors,
             WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
