@@ -1,6 +1,6 @@
 # Slot stages: `Option<T>` plus `ExtraTokens`, then `T` plus `()`
 
-Follow-up after the parsing series and resolve-position-generic-slot.md. Replaces `LevelSlot` / `Both` / `Failed` with `Slot<Item, Extra>`. Form types (`EntrypointDeclaration`, `Selection`, …) stay concrete. Every type that stores a slot is generic over a stage.
+Follow-up after the parsing series and resolve-position-generic-slot.md. The series already parses `InitialSlot<T>` (`Slot<Option<WithSpan<T>>, ExtraTokens>`). This step adds `require_complete` to `ArtifactSlot<T>` (`Slot<WithSpan<T>, ()>`) and makes every slot-holding type generic over `S: Stage`. Form types (`EntrypointDeclaration`, `SelectionName`, …) stay concrete.
 
 Parse builds `IsoLiteralParse<Initial>`. Artifact generation runs on `IsoLiteralParse<Artifact>`, produced by `require_complete` when `push_error` was never called and every slot has an item and empty extra.
 
@@ -87,102 +87,7 @@ impl<T> Slot<WithSpan<T>, ()> {
 }
 ```
 
-## `parse_one_item`
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-fn parse_one_item<'a, P, F>(
-    chunk: &'a WithSpan<Chunk>,
-    text: &'a str,
-    leftover_error: impl FnOnce(&mut ItemCursor<'a>) -> WithSpan<ParseError>,
-    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
-    push_error: &mut F,
-) -> WithSpan<LevelSlot<P>>
-where
-    F: FnMut(WithSpan<ParseError>),
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-fn parse_one_item<'a, P, F>(
-    chunk: &'a WithSpan<Chunk>,
-    text: &'a str,
-    leftover_error: impl FnOnce(&mut ItemCursor<'a>) -> WithSpan<ParseError>,
-    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
-    push_error: &mut F,
-) -> WithSpan<InitialSlot<P>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
-    let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
-    match result {
-        Ok(item) => {
-            if stream.require_end().is_ok() {
-                return WithSpan::new(
-                    Slot {
-                        item: item.wrap_some(),
-                        extra: ExtraTokens { items: None },
-                    },
-                    item.location,
-                );
-            }
-            push_error(leftover_error(stream.cursor()));
-            match stream.remaining_contents() {
-                Some(remaining) => {
-                    let leftover_span =
-                        Span::join(remaining.first().location, remaining.last().location);
-                    let location = Span::join(item.location, leftover_span);
-                    WithSpan::new(
-                        Slot {
-                            item: item.wrap_some(),
-                            extra: ExtraTokens {
-                                items: WithSpan::new(
-                                    UnparsedChunkItems { items: remaining },
-                                    leftover_span,
-                                )
-                                .wrap_some(),
-                            },
-                        },
-                        location,
-                    )
-                }
-                None => WithSpan::new(
-                    Slot {
-                        item: item.wrap_some(),
-                        extra: ExtraTokens { items: None },
-                    },
-                    item.location,
-                ),
-            }
-        }
-        Err(reason) => {
-            push_error(reason);
-            let location = chunk.item.contents_span();
-            WithSpan::new(
-                Slot {
-                    item: None,
-                    extra: ExtraTokens {
-                        items: WithSpan::new(
-                            UnparsedChunkItems {
-                                items: chunk.item.contents.clone(),
-                            },
-                            location,
-                        )
-                        .wrap_some(),
-                    },
-                },
-                location,
-            )
-        }
-    }
-}
-```
-
-`entrypoint Foo.$ asdf` is form `Err` at `$`. `item` is `None`. `extra.items` is the whole chunk `entrypoint Foo.$ asdf`.
+`parse_one_item` already returns `InitialSlot`. This step does not change it.
 
 ## Convert
 
@@ -209,12 +114,12 @@ Before:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct IsoLiteralParse {
-    pub first: Option<WithSpan<RootSlot>>,
+    pub first: Option<WithSpan<InitialSlot<IsoLiteralItem>>>,
     pub extra: Option<ExtraChunks>,
 }
 
 // from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(pub Vec<WithSpan<SelectionSlot>>);
+pub struct SelectionSet(pub Vec<WithSpan<InitialSlot<Selection>>>);
 ```
 
 After:
@@ -250,7 +155,7 @@ Every type that contains a slot takes `S`. Form payloads that contain no slot (`
 
 `IsoLiteralItem<S>`, `ArgumentList<S>`, `ObjectLiteral<S>`, `Singleton<S, T>`, and the other list holders are the same `S` parameter.
 
-`RootSlot`, `BothRoot`, `BothSelection`, `SelectionSlot`, `Both`, `Failed`, and `LevelSlot` are deleted. `FailedParent` is deleted. `UnparsedChunkItems` sits on `ExtraTokens`. `ExtraTokens` has one parent, the slot. `ExtraTokensPath` is `PositionResolutionPath<&'a ExtraTokens, SlotPath<'a>>`.
+`InitialSlot<T>` on the tree becomes `Slot<S::Item<T>, S::Extra>`. `IsoLiteralParse` and every list holder take `S`.
 
 ## Tree convert
 
@@ -284,8 +189,8 @@ pub fn require_complete_literal(
 
 ## Deleted types
 
-`LevelSlot`, `Both`, `Failed`, `FailedParent`, `RootSlot`, `BothRoot`, `SelectionSlot`, `BothSelection`, and the other concrete slot copies. `item()` / `remaining()` on those types move to `Slot` plus `Stage`.
+No new slot enum. `Stage` moves from the series' `Initial` / `Artifact` impls onto every slot-holding type.
 
 ## Shipping
 
-Lands after the parsing series and resolve-position-generic-slot.md. One step: `Stage`, `Initial`, `Artifact`, `Slot`, `ExtraTokens`, `parse_one_item` / `parse_items` / `parse_singleton` return `InitialSlot`, `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every slot-holding type, delete the three-arm slot types. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+Lands after the parsing series and resolve-position-generic-slot.md. One step: `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every slot-holding type. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.

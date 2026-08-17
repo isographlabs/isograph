@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Complete` / `Both` / `Failed`). Remaining chunks are `ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item()` is `Some` when chunk 0 is `Complete` or `Both`.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`InitialSlot<IsoLiteralItem>`). Remaining chunks are `ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item()` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -16,7 +16,7 @@ iso(`
 `)
 ```
 
-A failed first chunk is `RootSlot::Failed` (that chunk’s items). Extra chunks still sit in `ExtraChunks`.
+A failed first chunk is `item: None` plus that chunk’s items in `ExtraTokens`. Extra chunks still sit in `ExtraChunks`.
 
 ## Types
 
@@ -37,46 +37,14 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
-    // resolve-position-generic-slot.md: Option<WithSpan<LevelSlot<IsoLiteralItem>>>.
     #[resolve_field]
-    pub first: Option<WithSpan<RootSlot>>,
+    pub first: Option<WithSpan<InitialSlot<IsoLiteralItem>>>,
     #[resolve_field]
     pub extra: Option<ExtraChunks>,
 }
 
-/// Derived stand-in for `LevelSlot<IsoLiteralItem>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum RootSlot {
-    Complete(#[resolve_field(parent_variant = Complete)] WithSpan<IsoLiteralItem>),
-    Both(BothRoot),
-    Failed(#[resolve_field(parent_variant = Failed)] Failed),
-}
-
-/// Derived stand-in for `Both<IsoLiteralItem>`. resolve-position-generic-slot.md.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct BothRoot {
-    #[resolve_field(parent_variant = Both)]
-    pub item: WithSpan<IsoLiteralItem>,
-    #[resolve_field(parent_variant = Both)]
-    pub remaining: WithSpan<Failed>,
-}
-
-#[derive(Debug)]
-pub enum FailedParent<'a> {
-    Both(BothRootPath<'a>),
-    Failed(IsoLiteralParsePath<'a>),
-}
-
-#[derive(Debug)]
-pub enum IsoLiteralItemParent<'a> {
-    Complete(IsoLiteralParsePath<'a>),
-    Both(BothRootPath<'a>),
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
 }
@@ -106,20 +74,20 @@ pub struct EntrypointKeyword;
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
-pub type RootSlotPath<'a> = PositionResolutionPath<&'a RootSlot, IsoLiteralParsePath<'a>>;
+pub type SlotPath<'a> =
+    PositionResolutionPath<&'a InitialSlot<IsoLiteralItem>, IsoLiteralParsePath<'a>>;
 
-pub type BothRootPath<'a> = PositionResolutionPath<&'a BothRoot, IsoLiteralParsePath<'a>>;
-
-pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralItemParent<'a>>;
+pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type FailedPath<'a> = PositionResolutionPath<&'a Failed, FailedParent<'a>>;
+pub type ExtraTokensPath<'a> = PositionResolutionPath<&'a ExtraTokens, SlotPath<'a>>;
 
-pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, FailedPath<'a>>;
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, ExtraTokensPath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
@@ -130,45 +98,21 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 // from crates/isograph_parser/src/parse_iso_literal.rs
 impl IsoLiteralParse {
     pub fn item(&self) -> Option<&EntrypointDeclaration> {
-        let first = self.first.as_ref()?;
-        let item = match first.item.reference() {
-            RootSlot::Complete(item) => item.item.reference(),
-            RootSlot::Both(both) => both.item.item.reference(),
-            RootSlot::Failed(_) => return None,
-        };
+        let item = self.first.as_ref()?.item.item()?;
         match item {
             IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
         }
     }
 
-    pub fn remaining(&self) -> Option<&Failed> {
-        let first = self.first.as_ref()?;
-        match first.item.reference() {
-            RootSlot::Complete(_) => None,
-            RootSlot::Both(both) => both.remaining.item.reference().wrap_some(),
-            RootSlot::Failed(failed) => failed.reference().wrap_some(),
-        }
-    }
-}
-
-// resolve-position-generic-slot.md: this From is gone.
-impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
-    fn from(slot: LevelSlot<IsoLiteralItem>) -> Self {
-        match slot {
-            LevelSlot::Complete(item) => RootSlot::Complete(item),
-            LevelSlot::Both(both) => RootSlot::Both(BothRoot {
-                item: both.item,
-                remaining: both.remaining,
-            }),
-            LevelSlot::Failed(failed) => RootSlot::Failed(failed),
-        }
+    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
+        self.first.as_ref()?.item.remaining()
     }
 }
 ```
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `Failed`. Extra chunks after the first are moved into `ExtraChunks`. On `Complete` with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `ExtraTokens`. Extra chunks after the first are moved into `ExtraChunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -225,7 +169,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `Failed`: the error is at `$`, `remaining()` is the whole chunk. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `remaining()` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -572,8 +516,8 @@ After:
 use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
-    FailedPath, IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
-    RootSlotPath, UnparsedChunkItemsPath,
+    ExtraTokensPath, IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
+    SlotPath, UnparsedChunkItemsPath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -583,12 +527,12 @@ use crate::{
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
     IsoLiteralParse(IsoLiteralParsePath<'a>),
-    RootSlot(RootSlotPath<'a>),
+    Slot(SlotPath<'a>),
     IsoLiteralItem(IsoLiteralItemPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
-    Failed(FailedPath<'a>),
+    ExtraTokens(ExtraTokensPath<'a>),
     UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
     ExtraChunks(ExtraChunksPath<'a>),
     ChunkedLevel(ChunkedLevelPath<'a>),
@@ -668,11 +612,11 @@ pub enum ChunkContentItem {
 }
 ```
 
-`Root` remains the parent a caller passes when resolving a bare chunk tree. `FailedParent` is `Both` or `Failed`. Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`.
+`Root` remains the parent a caller passes when resolving a bare chunk tree. Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`.
 
 ## Generated code
 
-`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `remaining`. `Failed` descends into its `UnparsedChunkItems`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`Slot` tries `item` then `extra`. `ExtraTokens` walks `items` when `Some`. `UnparsedChunkItems` iterates `items`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 
@@ -947,10 +891,9 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert!(parse.item.item().is_none());
         match parse.item.remaining() {
-            Some(failed) => {
-                let items = failed.0.item.items.reference();
-                assert_eq!(items.first().location, span_of(text, "entrypoint"));
-                assert_eq!(items.last().location, span_of(text, "asdf"));
+            Some(items) => {
+                assert_eq!(items.items.first().location, span_of(text, "entrypoint"));
+                assert_eq!(items.items.last().location, span_of(text, "asdf"));
             }
             None => panic!("expected remaining items covering the whole chunk"),
         }
@@ -965,10 +908,8 @@ mod tests {
         let text = "entrypoint Query.foo bar";
         let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
-        match parse.item.first.as_ref().map(|slot| slot.item.reference()) {
-            Some(RootSlot::Both(_)) => {}
-            other => panic!("expected Both, got {other:?}"),
-        }
+        assert!(parse.item.item().is_some());
+        assert!(parse.item.remaining().is_some());
         assert_eq!(
             errors,
             WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
@@ -1063,5 +1004,5 @@ mod tests {
 
 ## Landing checklist
 
-1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, `Slot`, `ExtraTokens`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
