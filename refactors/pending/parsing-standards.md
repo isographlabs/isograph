@@ -23,7 +23,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra`. Extra root chunks sit on `IsoLiteralParse.extra`. `IsoLiteralSlot.item` is `Some` when the form parsed. `IsoLiteralSlot.extra` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra root chunks sit on `IsoLiteralParse.extra_chunks`. `IsoLiteralSlot.item` is `Some` when the form parsed. `IsoLiteralSlot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 This pass is `IsoLiteralParse`. Resolve walks that tree only. Artifact generation does not resolve.
 
@@ -196,11 +196,11 @@ pub fn parse_iso_literal(
                 item: WithSpan::new(
                     IsoLiteralSlot {
                         item: None,
-                        extra: None,
+                        extra_tokens: None,
                     },
                     location,
                 ),
-                extra: None,
+                extra_chunks: None,
             },
             location,
         );
@@ -310,7 +310,7 @@ pub struct IsoLiteralParse {
     #[resolve_field]
     pub item: WithSpan<IsoLiteralSlot>,
     #[resolve_field]
-    pub extra: Option<WithSpan<ExtraChunks>>,
+    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
 }
 
 /// Concrete first-chunk slot. This is the optimistic tree. Goes away when
@@ -321,7 +321,7 @@ pub struct IsoLiteralSlot {
     #[resolve_field]
     pub item: Option<WithSpan<IsoLiteralItem>>,
     #[resolve_field]
-    pub extra: Option<WithSpan<UnparsedChunkItems>>,
+    pub extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -404,14 +404,14 @@ impl Stage for ArtifactGenerationStage {
 /// `parse_one_item` / `parse_items` return this; call sites convert to a concrete slot.
 pub struct Slot<T, E> {
     pub item: T,
-    pub extra: E,
+    pub extra_tokens: E,
 }
 
 /// One-item level. Combinator only. `parse_singleton` returns this; call sites
 /// convert to a concrete singleton.
 pub struct Singleton<T, E> {
     pub item: T,
-    pub extra: E,
+    pub extra_chunks: E,
 }
 
 type OptimisticSlot = Slot<
@@ -428,7 +428,7 @@ impl From<OptimisticSlot> for IsoLiteralSlot {
     fn from(slot: OptimisticSlot) -> Self {
         IsoLiteralSlot {
             item: slot.item,
-            extra: slot.extra,
+            extra_tokens: slot.extra_tokens,
         }
     }
 }
@@ -437,7 +437,7 @@ impl From<OptimisticSingleton> for IsoLiteralParse {
     fn from(singleton: OptimisticSingleton) -> Self {
         IsoLiteralParse {
             item: singleton.item.map(IsoLiteralSlot::from),
-            extra: singleton.extra,
+            extra_chunks: singleton.extra_chunks,
         }
     }
 }
@@ -472,7 +472,7 @@ where
                 return WithSpan::new(
                     Slot {
                         item: item.wrap_some(),
-                        extra: None,
+                        extra_tokens: None,
                     },
                     item.location,
                 );
@@ -486,8 +486,11 @@ where
                     WithSpan::new(
                         Slot {
                             item: item.wrap_some(),
-                            extra: WithSpan::new(UnparsedChunkItems(remaining), leftover_span)
-                                .wrap_some(),
+                            extra_tokens: WithSpan::new(
+                                UnparsedChunkItems(remaining),
+                                leftover_span,
+                            )
+                            .wrap_some(),
                         },
                         location,
                     )
@@ -495,7 +498,7 @@ where
                 None => WithSpan::new(
                     Slot {
                         item: item.wrap_some(),
-                        extra: None,
+                        extra_tokens: None,
                     },
                     item.location,
                 ),
@@ -507,7 +510,7 @@ where
             WithSpan::new(
                 Slot {
                     item: None,
-                    extra: WithSpan::new(
+                    extra_tokens: WithSpan::new(
                         UnparsedChunkItems(chunk.item.contents.clone()),
                         location,
                     )
@@ -559,7 +562,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
     end: Expectation,
-    extra: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
+    extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
     push_error: &mut F,
 ) -> Singleton<
@@ -587,30 +590,30 @@ where
             head: level.item.0[1].clone(),
             tail: level.item.0[2..].to_vec(),
         };
-        push_error(extra(&rest.head));
+        push_error(extra_chunks(&rest.head));
         let location = Span::join(rest.head.location, rest.last().location);
         WithSpan::new(ExtraChunks(rest), location)
     });
     Singleton {
         item,
-        extra: extra_chunks,
+        extra_chunks,
     }
 }
 ```
 
 `ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items.
 
-`parse_one_item` is one chunk. Form `Ok` and `require_end` `Ok` is `item: Some`, empty `extra`. Form `Ok` and leftover is `item: Some` plus leftover items in `extra`. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item` is `None`. `extra` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
+`parse_one_item` is one chunk. Form `Ok` and `require_end` `Ok` is `item: Some`, empty `extra_tokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `extra_tokens`. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item` is `None`. `extra_tokens` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns an empty `IsoLiteralSlot` plus `extra: None`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns an empty `IsoLiteralSlot` plus `extra_chunks: None`). `item` on the first slot is `Some` when the form parsed.
 
-`Slot<T, E>` is `item: T` and `extra: E`. Combinator only; `parse_one_item` returns it. `From` builds `IsoLiteralSlot`. `Singleton<T, E>` is the combinator result of `parse_singleton`; `From` builds `IsoLiteralParse`. Extra chunks sit on `IsoLiteralParse.extra`. Resolve walks `IsoLiteralParse` only.
+`Slot<T, E>` is `item: T` and `extra_tokens: E`. Combinator only; `parse_one_item` returns it. `From` builds `IsoLiteralSlot`. `Singleton<T, E>` is the combinator result of `parse_singleton`; `From` builds `IsoLiteralParse`. Extra chunks sit on `IsoLiteralParse.extra_chunks`. Resolve walks `IsoLiteralParse` only.
 
 A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
-`UnparsedChunkItems` sits on `Slot.extra`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`.
+`UnparsedChunkItems` sits on `Slot.extra_tokens`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`.
 
 ## Function shapes
 
@@ -778,7 +781,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 Diagnostics are not on the tree. `parse_one_item` calls `push_error` for leftover and for a failed form. `parse_iso_literal` calls it for empty. `parse_singleton` calls it for a boundary comma and extra. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
 
-A failed list chunk is `item: None` plus the chunk's items in `Slot.extra`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `S::ExtraChunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+A failed list chunk is `item: None` plus the chunk's items in `Slot.extra_tokens`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `S::ExtraChunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
@@ -810,7 +813,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>>>`
 - One-item context: `parse_singleton` → `Singleton<WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>, Option<WithSpan<ExtraChunks>>>`
 - Recovered item: `Slot.item` → `Option<WithSpan<T>>`
-- Extra items: `Slot.extra` → `Option<WithSpan<UnparsedChunkItems>>`
+- Extra items: `Slot.extra_tokens` → `Option<WithSpan<UnparsedChunkItems>>`
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `push_error` (tokenless)

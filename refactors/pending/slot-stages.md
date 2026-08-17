@@ -12,12 +12,12 @@ Parse builds `IsoLiteralParse`. Artifact generation runs on `IsoLiteralParse<Art
 /// until slot-singleton-resolve.md lands.
 pub struct Slot<T, E> {
     pub item: T,
-    pub extra: E,
+    pub extra_tokens: E,
 }
 
 pub struct Singleton<T, E> {
     pub item: T,
-    pub extra: E,
+    pub extra_chunks: E,
 }
 
 /// Associated types are the entrypoint root's fail-able pieces; feature docs
@@ -54,7 +54,7 @@ impl Stage for ArtifactGenerationStage {
 pub fn require_complete<T>(
     slot: WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>,
 ) -> Option<WithSpan<T>> {
-    match (slot.item.item, slot.item.extra) {
+    match (slot.item.item, slot.item.extra_tokens) {
         (Some(item), None) => item.wrap_some(),
         _ => None,
     }
@@ -80,10 +80,10 @@ Nested lists have the same function per holder. Each maps `require_complete` ove
 pub fn require_complete_literal(
     parse: IsoLiteralParse,
 ) -> Option<IsoLiteralParse<ArtifactGenerationStage>> {
-    if parse.extra.is_some() {
+    if parse.extra_chunks.is_some() {
         return None;
     }
-    if parse.item.item.extra.is_some() {
+    if parse.item.item.extra_tokens.is_some() {
         return None;
     }
     let location = parse.item.location;
@@ -92,11 +92,11 @@ pub fn require_complete_literal(
         item: WithSpan::new(
             IsoLiteralSlot {
                 item: item.item,
-                extra: (),
+                extra_tokens: (),
             },
             location,
         ),
-        extra: (),
+        extra_chunks: (),
     }
     .wrap_some()
 }

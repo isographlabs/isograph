@@ -4,7 +4,7 @@ Lands after parse-entrypoint.md. Entrypoint keeps `IsoLiteralParse` / `IsoLitera
 
 `parse_one_item` / `parse_items` / `parse_singleton` already return `Slot` and `Singleton`. After this doc, those values are the tree. There is no `From` into a parallel concrete slot.
 
-This is not resolve-position-generic-slot.md. That doc derives `LevelSlot<T>` / `ParsedSlot<T>` (parsed vs unparsed enum, trailing on the parsed wrapper). The series' `Slot` is `item` plus leftover `extra`. This doc does not add `LevelSlot`.
+This is not resolve-position-generic-slot.md. That doc derives `LevelSlot<T>` / `ParsedSlot<T>` (parsed vs unparsed enum, trailing on the parsed wrapper). The series' `Slot` is `item` plus leftover `extra_tokens`. This doc does not add `LevelSlot`.
 
 ## After
 
@@ -23,7 +23,7 @@ pub struct Slot<T, E> {
     #[resolve_field]
     pub item: T,
     #[resolve_field]
-    pub extra: E,
+    pub extra_tokens: E,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -42,7 +42,7 @@ pub struct Singleton<T, E> {
     #[resolve_field]
     pub item: T,
     #[resolve_field]
-    pub extra: E,
+    pub extra_chunks: E,
 }
 
 pub type IsoLiteralParse = Singleton<
@@ -84,11 +84,11 @@ pub fn parse_iso_literal(
                 item: WithSpan::new(
                     Slot {
                         item: None,
-                        extra: None,
+                        extra_tokens: None,
                     },
                     location,
                 ),
-                extra: None,
+                extra_chunks: None,
             },
             location,
         );
@@ -174,7 +174,7 @@ impl ::resolve_position::ResolvePosition
                 return item.item.resolve(new_parent, position);
             }
         }
-        for item in self.extra.iter() {
+        for item in self.extra_tokens.iter() {
             if item.location.contains(position) {
                 let new_parent = <UnparsedChunkItems as ::resolve_position::ResolvePosition>::Parent::Unparsed(
                     self.path(parent).to(),
@@ -187,7 +187,7 @@ impl ::resolve_position::ResolvePosition
 }
 ```
 
-`item` uses the container path (`SlotPath`) as `IsoLiteralItem`'s parent. `extra` uses `parent_variant = Unparsed` on `UnparsedChunkItems`'s contents today; the `UnparsedChunkItems` value's parent is `SlotPath`. The `#[resolve_field]` on `Slot.extra` is bare: `UnparsedChunkItems::Parent` is `SlotPath`, so the parent is `self.path(parent)` unwrapped. The `parent_variant = Unparsed` stays on `UnparsedChunkItems`'s `NonEmpty` field, not on `Slot.extra`.
+`item` uses the container path (`SlotPath`) as `IsoLiteralItem`'s parent. `extra_tokens` uses `parent_variant = Unparsed` on `UnparsedChunkItems`'s contents today; the `UnparsedChunkItems` value's parent is `SlotPath`. The `#[resolve_field]` on `Slot.extra_tokens` is bare: `UnparsedChunkItems::Parent` is `SlotPath`, so the parent is `self.path(parent)` unwrapped. The `parent_variant = Unparsed` stays on `UnparsedChunkItems`'s `NonEmpty` field, not on `Slot.extra_tokens`.
 
 ## Generated `Singleton` (root optimistic monomorph)
 
@@ -216,7 +216,7 @@ impl ::resolve_position::ResolvePosition
             let new_parent = self.path(parent);
             return self.item.item.resolve(new_parent, position);
         }
-        for item in self.extra.iter() {
+        for item in self.extra_chunks.iter() {
             if item.location.contains(position) {
                 let new_parent = self.path(parent);
                 return item.item.resolve(new_parent, position);
@@ -258,11 +258,11 @@ pub struct Slot<T: ResolvePosition, E> {
     #[resolve_field(transparent)]
     pub item: T,
     #[resolve_field]
-    pub extra: E,
+    pub extra_tokens: E,
 }
 ```
 
-`transparent` is resolve-position-generic-slot.md's field mode: no `WithSpan` check, `T::resolve` with the same parent. This doc lands `transparent` if that doc has not. `Slot` is not a path segment in the generic impl. A position in leftover still walks `extra`. A position in the slot span but in neither field answers `T`'s parent (the singleton or the list).
+`transparent` is resolve-position-generic-slot.md's field mode: no `WithSpan` check, `T::resolve` with the same parent. This doc lands `transparent` if that doc has not. `Slot` is not a path segment in the generic impl. A position in leftover still walks `extra_tokens`. A position in the slot span but in neither field answers `T`'s parent (the singleton or the list).
 
 The pinned root impl from the previous section is deleted when this generic impl lands. `IsographResolutionNode::Slot` is deleted. `IsoLiteralItem`'s `parent_type` becomes `IsoLiteralParsePath<'a>` (the singleton). `UnparsedChunkItems`'s `parent_type` becomes a parent enum:
 
@@ -286,9 +286,9 @@ impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
 }
 ```
 
-`Slot.extra`'s `#[resolve_field]` uses `parent_from` (resolve-position-generic-slot.md) so `UnparsedChunkItems` receives `From::from` of the container parent. Feature docs that put a `Slot` in a list add a variant and a `From`.
+`Slot.extra_tokens`'s `#[resolve_field]` uses `parent_from` (resolve-position-generic-slot.md) so `UnparsedChunkItems` receives `From::from` of the container parent. Feature docs that put a `Slot` in a list add a variant and a `From`.
 
-`Singleton` in a `[...]` type has a parent other than `()`. The generic `Singleton` impl is the same shape as `Slot`: transparent `item`, `extra` via `parent_from`, `parent_type = <T as ResolvePosition>::Parent<'a>`. The root pinned impl (`parent_type = ()`, `resolved_node_variant = IsoLiteralParse`) stays until `[...]` lands; parse-variables.md deletes it and uses the generic impl, with `TypeAnnotation` (or the type-annotation path that doc names) as `T::Parent`.
+`Singleton` in a `[...]` type has a parent other than `()`. The generic `Singleton` impl is the same shape as `Slot`: transparent `item`, `extra_chunks` via `parent_from`, `parent_type = <T as ResolvePosition>::Parent<'a>`. The root pinned impl (`parent_type = ()`, `resolved_node_variant = IsoLiteralParse`) stays until `[...]` lands; parse-variables.md deletes it and uses the generic impl, with `TypeAnnotation` (or the type-annotation path that doc names) as `T::Parent`.
 
 ## Lists
 
@@ -314,7 +314,7 @@ pub struct SelectionSet(
 
 `crates/resolve_position_macros`: a struct `Slot<T, E>` with `self_type_generics = <Option<WithSpan<Child>>, Option<WithSpan<Extra>>>`. `Child` and `Extra` impl `ResolvePosition`. Assert a position on the child's span resolves to the child; a position on the extra span resolves to extra; a position in the slot but in neither field resolves to `Slot`.
 
-`crates/isograph_parser` entrypoint tests: `as_entrypoint` walks `parse.item.item.item` (`Singleton.item` is `WithSpan<Slot>`, `Slot.item` is `Option<WithSpan<IsoLiteralItem>>`). Leftover is `parse.item.item.extra`. Extra chunks are `parse.extra`. Resolve on a leftover token is `NonBracketToken`. Resolve on `Query` is `EntityName`. `IsoLiteralParse` / `Slot` leaves match the renamed variants.
+`crates/isograph_parser` entrypoint tests: `as_entrypoint` walks `parse.item.item.item` (`Singleton.item` is `WithSpan<Slot>`, `Slot.item` is `Option<WithSpan<IsoLiteralItem>>`). Leftover is `parse.item.item.extra_tokens`. Extra chunks are `parse.extra_chunks`. Resolve on a leftover token is `NonBracketToken`. Resolve on `Query` is `EntityName`. `IsoLiteralParse` / `Slot` leaves match the renamed variants.
 
 ## Shipping
 
