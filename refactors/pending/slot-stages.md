@@ -33,7 +33,7 @@ pub struct OptimisticStage;
 pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
-    type IsoLiteral = Option<IsoLiteralItem>;
+    type IsoLiteral = Option<WithSpan<IsoLiteralItem>>;
     type UnparsedTokens = Option<WithSpan<UnparsedChunkItems>>;
     type ExtraChunks = Option<WithSpan<ExtraChunks>>;
 }

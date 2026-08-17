@@ -20,7 +20,7 @@ A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. 
 
 ## Types
 
-Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `item` is the first slot's attempt (`parse_one_item`). Only `IsoLiteralParse<OptimisticStage>` and `IsoLiteralSlot` impl `ResolvePosition` among the slot/singleton types.
+Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `item` is the first slot's attempt (`parse_one_item`). Only `IsoLiteralParse<OptimisticStage>` and `IsoLiteralSlot<OptimisticStage>` impl `ResolvePosition` among the slot/singleton types.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -46,15 +46,21 @@ use crate::{
 )]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: WithSpan<IsoLiteralSlot>,
+    pub item: WithSpan<IsoLiteralSlot<S>>,
     #[resolve_field]
     pub extra: Option<WithSpan<ExtraChunks>>,
 }
 
 /// Concrete first-chunk slot. Goes away when resolve-position-generic-slot.md lands.
+/// Fields are the `OptimisticStage` projection so the derive sees concrete
+/// `Option<WithSpan<_>>` types. Only that monomorph impls `ResolvePosition`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralSlot {
+#[resolve_position(
+    parent_type = IsoLiteralParsePath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <OptimisticStage>
+)]
+pub struct IsoLiteralSlot<S: Stage> {
     #[resolve_field]
     pub item: Option<WithSpan<IsoLiteralItem>>,
     #[resolve_field]
@@ -95,7 +101,7 @@ pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
 pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a IsoLiteralSlot<OptimisticStage>, IsoLiteralParsePath<'a>>;
 
 pub type IsoLiteralItemPath<'a> =
     PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralSlotPath<'a>>;
@@ -117,6 +123,19 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+impl From<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>
+    for IsoLiteralSlot<OptimisticStage>
+{
+    fn from(
+        slot: Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>,
+    ) -> Self {
+        IsoLiteralSlot {
+            item: slot.item,
+            extra: slot.extra,
+        }
+    }
+}
+
 impl
     From<
         Singleton<
@@ -133,10 +152,7 @@ impl
     ) -> Self {
         IsoLiteralParse {
             item: WithSpan::new(
-                IsoLiteralSlot {
-                    item: singleton.item.item.item,
-                    extra: singleton.item.item.extra,
-                },
+                IsoLiteralSlot::from(singleton.item.item),
                 singleton.item.location,
             ),
             extra: singleton.extra,

@@ -314,15 +314,21 @@ pub struct UnparsedChunkItems(
 )]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: WithSpan<IsoLiteralSlot>,
+    pub item: WithSpan<IsoLiteralSlot<S>>,
     #[resolve_field]
     pub extra: Option<WithSpan<ExtraChunks>>,
 }
 
 /// Concrete first-chunk slot. Goes away when resolve-position-generic-slot.md lands.
+/// Fields are the `OptimisticStage` projection so the derive sees concrete
+/// `Option<WithSpan<_>>` types. Only that monomorph impls `ResolvePosition`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralSlot {
+#[resolve_position(
+    parent_type = IsoLiteralParsePath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <OptimisticStage>
+)]
+pub struct IsoLiteralSlot<S: Stage> {
     #[resolve_field]
     pub item: Option<WithSpan<IsoLiteralItem>>,
     #[resolve_field]
@@ -361,7 +367,7 @@ pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
 pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a IsoLiteralSlot<OptimisticStage>, IsoLiteralParsePath<'a>>;
 
 pub type IsoLiteralItemPath<'a> =
     PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralSlotPath<'a>>;
@@ -395,7 +401,7 @@ pub struct OptimisticStage;
 pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
-    type IsoLiteral = Option<IsoLiteralItem>;
+    type IsoLiteral = Option<WithSpan<IsoLiteralItem>>;
     type UnparsedTokens = Option<WithSpan<UnparsedChunkItems>>;
     type ExtraChunks = Option<WithSpan<ExtraChunks>>;
 }
@@ -406,16 +412,31 @@ impl Stage for ArtifactGenerationStage {
     type ExtraChunks = ();
 }
 
-/// One chunk's parse result. Combinator only; does not impl ResolvePosition
-/// until resolve-position-generic-slot.md lands.
+/// One chunk's parse result. Combinator only; does not impl ResolvePosition.
+/// `parse_one_item` / `parse_items` return this; call sites convert to a concrete slot.
 pub struct Slot<T, E> {
     pub item: T,
     pub extra: E,
 }
 
+/// One-item level. Combinator only. `parse_singleton` returns this; call sites
+/// convert to a concrete singleton.
 pub struct Singleton<T, E> {
     pub item: T,
     pub extra: E,
+}
+
+impl From<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>
+    for IsoLiteralSlot<OptimisticStage>
+{
+    fn from(
+        slot: Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>,
+    ) -> Self {
+        IsoLiteralSlot {
+            item: slot.item,
+            extra: slot.extra,
+        }
+    }
 }
 
 impl
@@ -434,10 +455,7 @@ impl
     ) -> Self {
         IsoLiteralParse {
             item: WithSpan::new(
-                IsoLiteralSlot {
-                    item: singleton.item.item.item,
-                    extra: singleton.item.item.extra,
-                },
+                IsoLiteralSlot::from(singleton.item.item),
                 singleton.item.location,
             ),
             extra: singleton.extra,
@@ -609,7 +627,7 @@ where
 
 `parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns an empty `IsoLiteralSlot` plus `extra: None`). `item` on the first slot is `Some` when the form parsed.
 
-`Slot<T, E>` is `item: T` and `extra: E`. Combinator only. `From` copies the first slot into `IsoLiteralSlot` under `IsoLiteralParse.item`. Extra chunks sit on `IsoLiteralParse.extra`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result.
+`Slot<T, E>` is `item: T` and `extra: E`. Combinator only; `parse_one_item` returns it. `From` builds `IsoLiteralSlot<OptimisticStage>`. `Singleton<T, E>` is the combinator result of `parse_singleton`; `From` builds `IsoLiteralParse<OptimisticStage>`. Extra chunks sit on `IsoLiteralParse.extra`. Resolve walks `IsoLiteralParse<OptimisticStage>` only.
 
 A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
