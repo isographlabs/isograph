@@ -87,16 +87,16 @@ pub fn require_complete_literal(
         return None;
     }
     let location = parse.item.location;
-    let item = parse.item.item.item.item?;
+    let item = parse.item.item.item?;
     IsoLiteralParse {
         item: WithSpan::new(
             IsoLiteralSlot {
-                item: WithSpan::new(item, parse.item.item.item.location),
+                item,
                 extra: (),
             },
             location,
         ),
-        extra: None,
+        extra: (),
     }
     .wrap_some()
 }

@@ -195,7 +195,7 @@ pub fn parse_iso_literal(
             IsoLiteralParse {
                 item: WithSpan::new(
                     IsoLiteralSlot {
-                        item: WithSpan::new(None, location),
+                        item: None,
                         extra: None,
                     },
                     location,
@@ -316,7 +316,7 @@ pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
     pub item: WithSpan<IsoLiteralSlot<S>>,
     #[resolve_field]
-    pub extra: Option<WithSpan<ExtraChunks>>,
+    pub extra: S::ExtraChunks,
 }
 
 /// Concrete first-chunk slot. Goes away when resolve-position-generic-slot.md lands.
@@ -329,7 +329,7 @@ pub struct IsoLiteralParse<S: Stage> {
 )]
 pub struct IsoLiteralSlot<S: Stage> {
     #[resolve_field]
-    pub item: WithSpan<S::IsoLiteral>,
+    pub item: S::IsoLiteral,
     #[resolve_field]
     pub extra: S::UnparsedTokens,
 }
@@ -435,20 +435,19 @@ type OptimisticSingleton = Singleton<
     <OptimisticStage as Stage>::ExtraChunks,
 >;
 
-impl From<WithSpan<OptimisticSlot>> for WithSpan<IsoLiteralSlot<OptimisticStage>> {
-    fn from(slot: WithSpan<OptimisticSlot>) -> Self {
-        let location = slot.location;
-        slot.map(|slot| IsoLiteralSlot {
-            item: WithSpan::new(slot.item, location),
+impl From<OptimisticSlot> for IsoLiteralSlot<OptimisticStage> {
+    fn from(slot: OptimisticSlot) -> Self {
+        IsoLiteralSlot {
+            item: slot.item,
             extra: slot.extra,
-        })
+        }
     }
 }
 
 impl From<OptimisticSingleton> for IsoLiteralParse<OptimisticStage> {
     fn from(singleton: OptimisticSingleton) -> Self {
         IsoLiteralParse {
-            item: singleton.item.to(),
+            item: singleton.item.map(IsoLiteralSlot::from),
             extra: singleton.extra,
         }
     }
@@ -800,7 +799,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. The parsed item on `IsoLiteralSlot` is `WithSpan<S::IsoLiteral>` (`Option<IsoLiteralItem>` or `IsoLiteralItem`). Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
+A tree enum is wrapped in `WithSpan` at its slot. `IsoLiteralSlot.item` is `S::IsoLiteral` (`Option<IsoLiteralItem>` or `IsoLiteralItem`). The slot's `WithSpan` is on `IsoLiteralParse.item`. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunkItems` and `ExtraChunks`.
 
