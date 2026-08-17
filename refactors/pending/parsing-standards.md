@@ -295,7 +295,7 @@ use crate::{
 };
 
 /// Unread or failed items from the chunk under parse. Concrete leftover holder
-/// parented at the root slot; goes away when resolve-position-generic-slot.md lands.
+/// parented at the root slot; goes away when slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
@@ -303,7 +303,7 @@ pub struct UnparsedChunkItems(
 );
 
 /// Concrete root singleton. This is the optimistic tree. Goes away when
-/// resolve-position-generic-slot.md lands.
+/// slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
@@ -314,7 +314,7 @@ pub struct IsoLiteralParse {
 }
 
 /// Concrete first-chunk slot. This is the optimistic tree. Goes away when
-/// resolve-position-generic-slot.md lands.
+/// slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralSlot {
@@ -351,7 +351,7 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
+// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
 pub type IsoLiteralSlotPath<'a> =
@@ -367,12 +367,12 @@ pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
 
 /// Extra root chunks after the first. Resolve walks each chunk. Concrete holder
-/// for the root singleton; goes away when resolve-position-generic-slot.md lands.
+/// for the root singleton; goes away when slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
+// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 /// How far along the tree is. Associated types are the entrypoint root's
@@ -836,6 +836,7 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
+- slot-singleton-resolve.md: `Slot` / `Singleton` in the tree; deletes `IsoLiteralSlot` and the `IsoLiteralParse` struct
 - parse-fields.md: field declarations and selection sets via `parse_items`, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`

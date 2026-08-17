@@ -35,7 +35,7 @@ use crate::{
 };
 
 /// Concrete root singleton. This is the optimistic tree. Goes away when
-/// resolve-position-generic-slot.md lands.
+/// slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
@@ -46,7 +46,7 @@ pub struct IsoLiteralParse {
 }
 
 /// Concrete first-chunk slot. This is the optimistic tree. Goes away when
-/// resolve-position-generic-slot.md lands.
+/// slot-singleton-resolve.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralSlot {
@@ -85,7 +85,7 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
+// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
 pub type IsoLiteralSlotPath<'a> =
@@ -97,10 +97,10 @@ pub type IsoLiteralItemPath<'a> =
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
+// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
+// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
 

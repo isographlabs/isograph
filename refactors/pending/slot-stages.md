@@ -9,7 +9,7 @@ Parse builds `IsoLiteralParse`. Artifact generation runs on `IsoLiteralParse<Art
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 /// One chunk's parse result. Combinator only; does not impl ResolvePosition
-/// until resolve-position-generic-slot.md lands.
+/// until slot-singleton-resolve.md lands.
 pub struct Slot<T, E> {
     pub item: T,
     pub extra: E,
@@ -67,7 +67,7 @@ pub fn require_complete<T>(
 
 A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
-`IsoLiteralParse` is a concrete root singleton so resolve has a named type to parent at. It goes away when resolve-position-generic-slot.md lands. `IsoLiteralItem` takes a stage parameter when a variant holds a type that contains a group.
+`IsoLiteralParse` is a concrete root singleton so resolve has a named type to parent at. It goes away when slot-singleton-resolve.md lands. `IsoLiteralItem` takes a stage parameter when a variant holds a type that contains a group.
 
 ## Tree convert
 
