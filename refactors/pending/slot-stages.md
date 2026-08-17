@@ -20,6 +20,8 @@ pub struct Singleton<T, E> {
     pub extra: E,
 }
 
+/// Associated types are the entrypoint root's fail-able pieces; feature docs
+/// add one when they introduce a new one.
 pub trait Stage {
     type IsoLiteral;
     type UnparsedTokens;

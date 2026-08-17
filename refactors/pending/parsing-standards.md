@@ -361,8 +361,9 @@ pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<Wit
 // Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-/// How far along the tree is. A bag of associated types: each names something that
-/// can fail at parse. Optimistic types carry the failure. Artifact types do not.
+/// How far along the tree is. Associated types are the entrypoint root's
+/// fail-able pieces; feature docs add one when they introduce a new one.
+/// Optimistic types carry the failure. Artifact types do not.
 pub trait Stage {
     type IsoLiteral;
     type UnparsedTokens;
