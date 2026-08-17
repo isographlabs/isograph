@@ -12,7 +12,7 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
-) -> WithSpan<IsoLiteralParse>
+) -> WithSpan<IsoLiteralParse<OptimisticStage>>
 ```
 
 `parse_iso_literal` takes `text: &str`, the chunked literal, and `push_error`. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` is built from one chunk.
@@ -23,9 +23,9 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot`. Diagnostics are not leftover items. Leftover and failed items are `ExtraTokens` (`Option<UnparsedChunkItems>`). `item()` is `Some` when the form parsed. `remaining()` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<OptimisticStage, P>`. Diagnostics are not leftover items. Leftover and failed items are `OptimisticStage::Extra` (`ExtraTokens`). `item()` is `Some` when the form parsed. `extra()` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
-This pass is `OptimisticStage`: `Slot<Option<WithSpan<T>>, ExtraTokens>`. `ArtifactGenerationStage` (`Slot<WithSpan<T>, ()>`) is slot-stages.md.
+This pass is `IsoLiteralParse<OptimisticStage>`. `ArtifactGenerationStage` (`Item<T> = WithSpan<T>`, `Extra = ()`) is slot-stages.md.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -189,7 +189,7 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     mut push_error: impl FnMut(WithSpan<ParseError>),
-) -> WithSpan<IsoLiteralParse> {
+) -> WithSpan<IsoLiteralParse<OptimisticStage>> {
     let location = root.location;
     let singleton = parse_singleton(
         root.reference(),
@@ -289,9 +289,9 @@ pub struct UnparsedChunkItems(
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralParse {
+pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub first: Option<WithSpan<OptimisticSlot<IsoLiteralItem>>>,
+    pub first: Option<WithSpan<Slot<S, IsoLiteralItem>>>,
     #[resolve_field]
     pub extra: Option<ExtraChunks>,
 }
@@ -323,10 +323,11 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
-pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+pub type IsoLiteralParsePath<'a> =
+    PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
 pub type SlotPath<'a> =
-    PositionResolutionPath<&'a OptimisticSlot<IsoLiteralItem>, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a Slot<OptimisticStage, IsoLiteralItem>, IsoLiteralParsePath<'a>>;
 
 pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
 
@@ -384,39 +385,25 @@ impl Stage for ArtifactGenerationStage {
 
 /// One chunk. resolve-position-generic-slot.md derives this.
 #[derive(Debug, PartialEq, Eq)]
-pub struct Slot<Item, Extra> {
-    pub item: Item,
-    pub extra: Extra,
+pub struct Slot<S: Stage, T> {
+    pub item: S::Item<T>,
+    pub extra: S::Extra,
 }
-
-pub type OptimisticSlot<T> = Slot<Option<WithSpan<T>>, ExtraTokens>;
-
-pub type ArtifactGenerationSlot<T> = Slot<WithSpan<T>, ()>;
 
 pub type ExtraTokensPath<'a> = PositionResolutionPath<&'a ExtraTokens, SlotPath<'a>>;
 
-impl<T> Slot<Option<WithSpan<T>>, ExtraTokens> {
-    pub fn item(&self) -> Option<&T> {
-        OptimisticStage::item(&self.item)
+impl<S: Stage, T> Slot<S, T> {
+    pub fn item(&self) -> S::ItemRef<'_, T> {
+        S::item(&self.item)
     }
 
-    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
-        OptimisticStage::extra(&self.extra)
-    }
-}
-
-impl<T> Slot<WithSpan<T>, ()> {
-    pub fn item(&self) -> &T {
-        ArtifactGenerationStage::item(&self.item)
-    }
-
-    pub fn remaining(&self) {
-        ArtifactGenerationStage::extra(&self.extra)
+    pub fn extra(&self) -> S::ExtraRef<'_> {
+        S::extra(&self.extra)
     }
 }
 
 // slot-stages.md: this From is gone.
-impl From<Singleton<IsoLiteralItem>> for IsoLiteralParse {
+impl From<Singleton<IsoLiteralItem>> for IsoLiteralParse<OptimisticStage> {
     fn from(singleton: Singleton<IsoLiteralItem>) -> Self {
         IsoLiteralParse {
             first: singleton.first,
@@ -444,7 +431,7 @@ fn parse_one_item<'a, P, F>(
     leftover_error: impl FnOnce(&mut ItemCursor<'a>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
     push_error: &mut F,
-) -> WithSpan<OptimisticSlot<P>>
+) -> WithSpan<Slot<OptimisticStage, P>>
 where
     F: FnMut(WithSpan<ParseError>),
 {
@@ -507,7 +494,7 @@ where
 }
 
 pub struct Singleton<T> {
-    pub first: Option<WithSpan<OptimisticSlot<T>>>,
+    pub first: Option<WithSpan<Slot<OptimisticStage, T>>>,
     pub extra: Option<ExtraChunks>,
 }
 
@@ -517,7 +504,7 @@ impl ChunkedLevel {
         text: &'a str,
         parse_item: impl Fn(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
         push_error: &mut F,
-    ) -> Vec<WithSpan<OptimisticSlot<P>>>
+    ) -> Vec<WithSpan<Slot<OptimisticStage, P>>>
     where
         F: FnMut(WithSpan<ParseError>),
     {
@@ -596,19 +583,19 @@ where
 
 `ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items.
 
-`parse_one_item` is one chunk. Form `Ok` and `require_end` `Ok` is `item: Some`, empty `ExtraTokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `ExtraTokens`. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item()` is `None`. `remaining()` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
+`parse_one_item` is one chunk. Form `Ok` and `require_end` `Ok` is `item: Some`, empty `ExtraTokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `ExtraTokens`. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item()` is `None`. `extra()` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
 `parse_singleton` is not a vec of slots. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `extra` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic via `push_error`. Empty is `first: None` and `empty()` through `push_error`. `item()` on the first slot is `Some` when the form parsed.
 
-`Slot` derives `ResolvePosition` in resolve-position-generic-slot.md. This pass uses `OptimisticSlot<T>` on the tree. `Singleton` is the combinator result. `IsoLiteralParse` is the root tree type (`parent_type = ()`). `From<Singleton<IsoLiteralItem>>` builds it; slot-stages.md deletes that `From`.
+`Slot` derives `ResolvePosition` in resolve-position-generic-slot.md. This pass uses `Slot<OptimisticStage, T>` on the tree. `Singleton` is the combinator result. `IsoLiteralParse<OptimisticStage>` is the root tree type (`parent_type = ()`). `From<Singleton<IsoLiteralItem>>` builds it; slot-stages.md deletes that `From`.
 
 ### Lists
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<OptimisticSlot<Selection>>>);
+pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<Slot<OptimisticStage, Selection>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -634,7 +621,7 @@ pub struct SelectionAlias;
 
 pub struct SelectionName;
 
-pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<OptimisticSlot<Argument>>>);
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<OptimisticStage, Argument>>>);
 
 pub enum Argument {
     Named(NamedArgument),
@@ -648,7 +635,7 @@ pub struct NamedArgument {
 pub struct ArgumentName;
 ```
 
-Argument lists, object literals, constant object literals, and variable-declaration lists are `Vec<WithSpan<OptimisticSlot<...>>>` the same way.
+Argument lists, object literals, constant object literals, and variable-declaration lists are `Vec<WithSpan<Slot<OptimisticStage, ...>>>` the same way.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -900,7 +887,7 @@ pub enum Boolean {
     False,
 }
 
-pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<OptimisticSlot<ObjectEntry>>>);
+pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<Slot<OptimisticStage, ObjectEntry>>>);
 
 pub enum ObjectEntry {
     Named(NamedObjectEntry),
@@ -914,7 +901,7 @@ pub struct NamedObjectEntry {
 }
 
 pub struct ConstantObjectLiteral(
-    #[resolve_field] pub Vec<WithSpan<OptimisticSlot<ConstantObjectEntry>>>,
+    #[resolve_field] pub Vec<WithSpan<Slot<OptimisticStage, ConstantObjectEntry>>>,
 );
 
 pub enum ConstantObjectEntry {
@@ -1041,7 +1028,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `Option<WithSpan<T>>` on `OptimisticSlot`. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
+A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `OptimisticStage::Item<T>` (`Option<WithSpan<T>>`). Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunkItems` and `ExtraChunks`.
 
@@ -1060,10 +1047,10 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Keyword / boolean / null text: `token_text` after an identifier
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Composite span: `ItemCursor::spanning`
-- List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<OptimisticSlot<P>>>`
+- List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<OptimisticStage, P>>>`
 - One-item context: `parse_singleton` → `Singleton<T>`
-- Recovered item: `OptimisticSlot::item` → `Option<&T>`
-- Remaining items: `OptimisticSlot::remaining` → `Option<&UnparsedChunkItems>`
+- Recovered item: `Slot::item` → `OptimisticStage::ItemRef` (`Option<&T>`)
+- Extra items: `Slot::extra` → `OptimisticStage::ExtraRef` (`Option<&UnparsedChunkItems>`)
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `push_error` (tokenless)
@@ -1080,7 +1067,7 @@ The first implementation step is the shared surface, with tests, before any gram
 
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `Slot`, `OptimisticStage`, `ArtifactGenerationStage`, `OptimisticSlot`, `ExtraTokens`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`, `ChunkContentItemParent`
+- `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `ExtraTokens`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`, `ChunkContentItemParent`
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `item: Some` plus extra tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
@@ -1088,12 +1075,12 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
-- parse-fields.md: `SelectionSet` of `OptimisticSlot<Selection>`, `Clone` on leftover and failed items, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`. resolve-position-generic-slot.md derives `Slot`.
+- parse-fields.md: `SelectionSet` of `Slot<OptimisticStage, Selection>`, `Clone` on leftover and failed items, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`. resolve-position-generic-slot.md derives `Slot`.
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
 
-slot-stages.md: `require_complete` to `ArtifactGenerationSlot` (`T` plus `()`), and `<S: Stage>` on every slot-holding type.
+slot-stages.md: `require_complete` to `Slot<ArtifactGenerationStage, T>` (`Item<T> = WithSpan<T>`, `Extra = ()`).
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_chunk`, `parse_items`, and `parse_singleton`. This doc stays in `refactors/pending`.

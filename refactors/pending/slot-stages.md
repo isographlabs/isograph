@@ -1,6 +1,6 @@
-# Slot stages: `Option<T>` plus `ExtraTokens`, then `T` plus `()`
+# Slot stages: `require_complete` to `ArtifactGenerationStage`
 
-Follow-up after the parsing series and resolve-position-generic-slot.md. The series already parses `OptimisticSlot<T>` (`Slot<Option<WithSpan<T>>, ExtraTokens>`). This step adds `require_complete` to `ArtifactGenerationSlot<T>` (`Slot<WithSpan<T>, ()>`) and makes every slot-holding type generic over `S: Stage`. Form types (`EntrypointDeclaration`, `SelectionName`, …) stay concrete.
+Follow-up after the parsing series and resolve-position-generic-slot.md. The series already parses `Slot<OptimisticStage, T>` (`Item<T> = Option<WithSpan<T>>`, `Extra = ExtraTokens`) and `IsoLiteralParse<OptimisticStage>`. This step adds `require_complete` to `Slot<ArtifactGenerationStage, T>` (`Item<T> = WithSpan<T>`, `Extra = ()`) and puts `S: Stage` on every remaining slot-holding type (`SelectionSet`, `ArgumentList`, …). Form types (`EntrypointDeclaration`, `SelectionName`, …) stay concrete.
 
 Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `IsoLiteralParse<ArtifactGenerationStage>`, produced by `require_complete` when `push_error` was never called and every slot has an item and empty extra.
 
@@ -8,9 +8,9 @@ Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `Is
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-pub struct Slot<Item, Extra> {
-    pub item: Item,
-    pub extra: Extra,
+pub struct Slot<S: Stage, T> {
+    pub item: S::Item<T>,
+    pub extra: S::Extra,
 }
 
 pub trait Stage {
@@ -55,49 +55,30 @@ impl Stage for ArtifactGenerationStage {
     fn extra<'a>(_: &'a ()) {}
 }
 
-pub type OptimisticSlot<T> = Slot<Option<WithSpan<T>>, ExtraTokens>;
+impl<S: Stage, T> Slot<S, T> {
+    pub fn item(&self) -> S::ItemRef<'_, T> {
+        S::item(&self.item)
+    }
 
-pub type ArtifactGenerationSlot<T> = Slot<WithSpan<T>, ()>;
+    pub fn extra(&self) -> S::ExtraRef<'_> {
+        S::extra(&self.extra)
+    }
+}
 ```
 
 `OptimisticStage` `item()` is `Option<&T>` and `extra()` is `Option<&UnparsedChunkItems>`. `ArtifactGenerationStage` `item()` is `&T` and `extra()` is `()`. Artifact code does not unwrap.
 
 `None` plus empty `ExtraTokens` is representable and unused. `parse_one_item` never builds it: a form `Err` always clones the source chunk's items into `extra`.
 
-## `item` / `remaining`
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl<T> Slot<Option<WithSpan<T>>, ExtraTokens> {
-    pub fn item(&self) -> Option<&T> {
-        OptimisticStage::item(&self.item)
-    }
-
-    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
-        OptimisticStage::extra(&self.extra)
-    }
-}
-
-impl<T> Slot<WithSpan<T>, ()> {
-    pub fn item(&self) -> &T {
-        ArtifactGenerationStage::item(&self.item)
-    }
-
-    pub fn remaining(&self) {
-        ArtifactGenerationStage::extra(&self.extra)
-    }
-}
-```
-
-`parse_one_item` already returns `OptimisticSlot`. This step does not change it.
+`parse_one_item` already returns `Slot<OptimisticStage, P>`. This step does not change it.
 
 ## Convert
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub fn require_complete<T>(
-    slot: WithSpan<OptimisticSlot<T>>,
-) -> Option<WithSpan<ArtifactGenerationSlot<T>>> {
+    slot: WithSpan<Slot<OptimisticStage, T>>,
+) -> Option<WithSpan<Slot<ArtifactGenerationStage, T>>> {
     let location = slot.location;
     let Slot { item, extra } = slot.item;
     match (item, extra.0) {
@@ -111,17 +92,17 @@ pub fn require_complete<T>(
 
 ## Tree types
 
-Before:
+Before (the series, lists still pinned to `OptimisticStage`):
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct IsoLiteralParse {
-    pub first: Option<WithSpan<OptimisticSlot<IsoLiteralItem>>>,
+pub struct IsoLiteralParse<S: Stage> {
+    pub first: Option<WithSpan<Slot<S, IsoLiteralItem>>>,
     pub extra: Option<ExtraChunks>,
 }
 
 // from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(pub Vec<WithSpan<OptimisticSlot<Selection>>>);
+pub struct SelectionSet(pub Vec<WithSpan<Slot<OptimisticStage, Selection>>>);
 ```
 
 After:
@@ -130,14 +111,14 @@ After:
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub first: Option<WithSpan<Slot<S::Item<IsoLiteralItem<S>>, S::Extra>>>,
+    pub first: Option<WithSpan<Slot<S, IsoLiteralItem<S>>>>,
     #[resolve_field]
     pub extra: Option<ExtraChunks>,
 }
 
 // from crates/isograph_parser/src/selections.rs
 pub struct SelectionSet<S: Stage>(
-    #[resolve_field] pub Vec<WithSpan<Slot<S::Item<Selection<S>>, S::Extra>>>,
+    #[resolve_field] pub Vec<WithSpan<Slot<S, Selection<S>>>>,
 );
 
 pub enum Selection<S: Stage> {
@@ -156,8 +137,6 @@ pub struct ObjectSelection<S: Stage> {
 Every type that contains a slot takes `S`. Form payloads that contain no slot (`EntityName`, `EntrypointKeyword`, `SelectionName`) stay unparameterized. `EntrypointDeclaration` takes `S` only if a later field is a slot.
 
 `IsoLiteralItem<S>`, `ArgumentList<S>`, `ObjectLiteral<S>`, `Singleton<S, T>`, and the other list holders are the same `S` parameter.
-
-`OptimisticSlot<T>` on the tree becomes `Slot<S::Item<T>, S::Extra>`. `IsoLiteralParse` and every list holder take `S`.
 
 ## Tree convert
 
@@ -187,12 +166,12 @@ pub fn require_complete_literal(
 
 ## Resolve
 
-`Slot<Item, Extra>` derives `ResolvePosition` once `resolve-position-generic-slot.md` can emit a generic struct. `OptimisticStage` walks `item` when `Some` and `extra.0` when `Some`. `ArtifactGenerationStage` walks `item` only. `()` has no `resolve_field`.
+`Slot<S, T>` derives `ResolvePosition` once `resolve-position-generic-slot.md` can emit a generic struct. `OptimisticStage` walks `item` when `Some` and `extra.0` when `Some`. `ArtifactGenerationStage` walks `item` only. `()` has no `resolve_field`.
 
 ## Deleted types
 
-No new slot enum. `Stage` moves from the series' `OptimisticStage` / `ArtifactGenerationStage` impls onto every slot-holding type. The `From<Singleton<IsoLiteralItem>> for IsoLiteralParse` in the series is gone.
+No new slot enum. The `From<Singleton<IsoLiteralItem>> for IsoLiteralParse<OptimisticStage>` in the series is gone.
 
 ## Shipping
 
-Lands after the parsing series and resolve-position-generic-slot.md. One step: `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every slot-holding type. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+Lands after the parsing series and resolve-position-generic-slot.md. One step: `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every remaining slot-holding type. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
