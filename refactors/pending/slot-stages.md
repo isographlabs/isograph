@@ -83,14 +83,19 @@ pub fn require_complete_literal(
     if parse.extra.is_some() {
         return None;
     }
-    if parse.leftover.is_some() {
+    if parse.item.item.extra.is_some() {
         return None;
     }
-    let item = parse.item?;
+    let location = parse.item.location;
+    let item = parse.item.item.item?;
     IsoLiteralParse {
-        attempt: parse.attempt,
-        item: item.wrap_some(),
-        leftover: None,
+        item: WithSpan::new(
+            IsoLiteralSlot {
+                item: item.wrap_some(),
+                extra: None,
+            },
+            location,
+        ),
         extra: None,
     }
     .wrap_some()
