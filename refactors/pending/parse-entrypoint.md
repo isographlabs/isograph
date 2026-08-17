@@ -231,15 +231,13 @@ impl<'a> ChunkStream<'a> {
 impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
-        let item = *peek.view();
-        match item.item.reference() {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                item.location.wrap_some()
-            }
-            _ => None,
+        match peek.view().item.reference() {
+            ChunkContentItem::NonBracket(token) if token.0 == kind => {}
+            _ => return None,
         }
+        let item = peek.commit();
+        self.previous_end = item.location.end;
+        item.location.wrap_some()
     }
 
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
@@ -249,7 +247,7 @@ impl<'a> ItemCursor<'a> {
                 self.end_span(),
             ),
             Some(peek) => {
-                let item = *peek.view();
+                let item = peek.view();
                 WithSpan::new(
                     ParseError::expected(expected, Found::from(item.item.reference())),
                     item.location,

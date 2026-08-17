@@ -72,10 +72,10 @@ impl<'a> ChunkStream<'a> {
         let first = self.0.items.next()?;
         let mut tail = Vec::new();
         while let Some(item) = self.0.items.next() {
-            tail.push(*item);
+            tail.push(item.clone());
         }
         NonEmpty {
-            head: *first,
+            head: first.clone(),
             tail,
         }
         .wrap_some()
@@ -85,15 +85,13 @@ impl<'a> ChunkStream<'a> {
 impl<'a> ItemCursor<'a> {
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
-        let item = *peek.view();
-        match item.item.reference() {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                item.location.wrap_some()
-            }
-            _ => None,
+        match peek.view().item.reference() {
+            ChunkContentItem::NonBracket(token) if token.0 == kind => {}
+            _ => return None,
         }
+        let item = peek.commit();
+        self.previous_end = item.location.end;
+        item.location.wrap_some()
     }
 
     pub(crate) fn consume_group_if(
@@ -101,14 +99,14 @@ impl<'a> ItemCursor<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
         let peek = self.items.peek()?;
-        let item = *peek.view();
+        match peek.view().item.reference() {
+            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {}
+            _ => return None,
+        }
+        let item = peek.commit();
+        self.previous_end = item.location.end;
         match item.item.reference() {
-            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
-                let location = item.location;
-                peek.commit();
-                self.previous_end = location.end;
-                WithSpan::new(group, location).wrap_some()
-            }
+            ChunkContentItem::Group(group) => WithSpan::new(group, item.location).wrap_some(),
             _ => None,
         }
     }
@@ -120,7 +118,7 @@ impl<'a> ItemCursor<'a> {
                 self.end_span(),
             ),
             Some(peek) => {
-                let item = *peek.view();
+                let item = peek.view();
                 WithSpan::new(
                     ParseError::expected(expected, Found::from(item.item.reference())),
                     item.location,
@@ -172,7 +170,7 @@ impl<'a> ItemCursor<'a> {
 }
 ```
 
-`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_group_if` copies it, matches out the `&'a ChunkedGroup` from the chunk item, then `commit`s.
+`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_*` views to decide, then `commit`s and reads the `'a` item. `expected` only views.
 
 ### Span sources
 
