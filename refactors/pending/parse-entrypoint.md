@@ -225,7 +225,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `first: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `Failed` plus that chunk’s items; extra chunks still sit in `ExtraChunks`. `entrypoint Query.foo\nfield User.name` is `Complete` plus `ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `Both` (declaration plus leftover items) and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `Failed`: the error is at `$`, `remaining()` is the whole chunk. `entrypoint\nQuery.foo` is `Failed` on `entrypoint` plus `ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `Complete` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -689,7 +689,7 @@ mod tests {
         chunk, match_brackets, tokenize, BracketError, BracketKind, CommaWithoutItem,
     };
     use Expectation::{DeclarationKeyword, EndOfDeclaration};
-    use NonBracketTokenKind::{At, Comma, Identifier, IntegerLiteral, Period};
+    use NonBracketTokenKind::{At, Comma, Dollar, Identifier, IntegerLiteral, Period};
 
     fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
@@ -939,6 +939,25 @@ mod tests {
             expected(token(Identifier), Found::EndOfChunk),
             Span::new(dot_end, dot_end),
         );
+    }
+
+    #[test]
+    fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
+        let text = "entrypoint Foo.$ asdf";
+        let (parse, errors) = parsed(text);
+        assert!(parse.item.item().is_none());
+        match parse.item.remaining() {
+            Some(failed) => {
+                let items = failed.0.item.items.reference();
+                assert_eq!(items.first().location, span_of(text, "entrypoint"));
+                assert_eq!(items.last().location, span_of(text, "asdf"));
+            }
+            None => panic!("expected remaining items covering the whole chunk"),
+        }
+        assert!(errors.iter().any(|error| {
+            error.item == expected(token(Identifier), Found::Token(Dollar))
+                && error.location == span_of(text, "$")
+        }));
     }
 
     #[test]
