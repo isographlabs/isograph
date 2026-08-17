@@ -425,19 +425,6 @@ impl From<Singleton<IsoLiteralItem>> for IsoLiteralParse {
     }
 }
 
-impl IsoLiteralParse {
-    pub fn item(&self) -> Option<&EntrypointDeclaration> {
-        let item = self.first.as_ref()?.item.item()?;
-        match item {
-            IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
-        }
-    }
-
-    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
-        self.first.as_ref()?.item.remaining()
-    }
-}
-
 fn parse_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
@@ -1075,8 +1062,8 @@ One pass by reference. The output copies spans and `Copy` tokens. Cloning happen
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<OptimisticSlot<P>>>`
 - One-item context: `parse_singleton` → `Singleton<T>`
-- Recovered item: `OptimisticSlot::item` / `IsoLiteralParse::item` → `Option<&T>`
-- Remaining items: `OptimisticSlot::remaining` / `IsoLiteralParse::remaining` → `Option<&UnparsedChunkItems>`
+- Recovered item: `OptimisticSlot::item` → `Option<&T>`
+- Remaining items: `OptimisticSlot::remaining` → `Option<&UnparsedChunkItems>`
 - Chunk count: `ChunkedLevel::len`
 - First item of an extra chunk: `Chunk::first_item`
 - Trailing comma in a one-item context: `push_error` (tokenless)

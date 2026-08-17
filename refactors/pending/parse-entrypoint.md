@@ -105,19 +105,6 @@ impl From<Singleton<IsoLiteralItem>> for IsoLiteralParse {
         }
     }
 }
-
-impl IsoLiteralParse {
-    pub fn item(&self) -> Option<&EntrypointDeclaration> {
-        let item = self.first.as_ref()?.item.item()?;
-        match item {
-            IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
-        }
-    }
-
-    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
-        self.first.as_ref()?.item.remaining()
-    }
-}
 ```
 
 ## The parser
@@ -684,15 +671,23 @@ mod tests {
     }
 
     fn as_entrypoint(parse: &WithSpan<IsoLiteralParse>) -> &EntrypointDeclaration {
-        parse
+        let item = parse
             .item
-            .item()
-            .expect("the fixture's literal is an entrypoint")
+            .first
+            .as_ref()
+            .and_then(|slot| slot.item.item())
+            .expect("the fixture's literal parsed an item");
+        match item {
+            IsoLiteralItem::Entrypoint(declaration) => declaration,
+        }
     }
 
     fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item().is_none(), "for literal {text:?}");
+        assert!(
+            parse.item.first.as_ref().and_then(|slot| slot.item.item()).is_none(),
+            "for literal {text:?}",
+        );
         assert!(
             errors.iter().any(|error| error.item == reason && error.location == reason_span),
             "for literal {text:?}, errors were {errors:?}",
@@ -754,7 +749,7 @@ mod tests {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        assert!(parse.item.item().is_none());
+        assert!(parse.item.first.as_ref().and_then(|slot| slot.item.item()).is_none());
         assert_eq!(
             errors,
             WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
@@ -821,7 +816,7 @@ mod tests {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item().is_none());
+        assert!(parse.item.first.as_ref().and_then(|slot| slot.item.item()).is_none());
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
                 && error.location == Span::new(keyword_end, keyword_end)
@@ -895,8 +890,8 @@ mod tests {
     fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
         let text = "entrypoint Foo.$ asdf";
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item().is_none());
-        match parse.item.remaining() {
+        assert!(parse.item.first.as_ref().and_then(|slot| slot.item.item()).is_none());
+        match parse.item.first.as_ref().and_then(|slot| slot.item.remaining()) {
             Some(items) => {
                 assert_eq!(items.0.first().location, span_of(text, "entrypoint"));
                 assert_eq!(items.0.last().location, span_of(text, "asdf"));
@@ -914,8 +909,8 @@ mod tests {
         let text = "entrypoint Query.foo bar";
         let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
-        assert!(parse.item.item().is_some());
-        assert!(parse.item.remaining().is_some());
+        assert!(parse.item.first.as_ref().and_then(|slot| slot.item.item()).is_some());
+        assert!(parse.item.first.as_ref().and_then(|slot| slot.item.remaining()).is_some());
         assert_eq!(
             errors,
             WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
