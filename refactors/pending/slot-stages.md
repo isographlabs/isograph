@@ -45,18 +45,16 @@ impl Stage for ArtifactGenerationStage {
 }
 ```
 
-`parse_one_item` already returns `Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
+`parse_one_item` already returns `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
 
 ## Convert
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub fn require_complete<T>(
-    slot: WithSpan<Slot<Option<T>, Option<WithSpan<UnparsedChunkItems>>>>,
+    slot: WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>,
 ) -> Option<WithSpan<T>> {
-    let location = slot.location;
-    let Slot { item, extra } = slot.item;
-    match (item, extra) {
+    match (slot.item.item, slot.item.extra) {
         (Some(item), None) => item.wrap_some(),
         _ => None,
     }
@@ -85,20 +83,15 @@ pub fn require_complete_literal(
     if parse.extra.is_some() {
         return None;
     }
-    if parse.item.item.extra.is_some() {
+    if parse.leftover.is_some() {
         return None;
     }
-    let location = parse.item.location;
-    let item = parse.item.item.item?;
+    let item = parse.item?;
     IsoLiteralParse {
-        item: WithSpan::new(
-            Slot {
-                item,
-                extra: (),
-            },
-            location,
-        ),
-        extra: (),
+        attempt: parse.attempt,
+        item: item.wrap_some(),
+        leftover: None,
+        extra: None,
     }
     .wrap_some()
 }
