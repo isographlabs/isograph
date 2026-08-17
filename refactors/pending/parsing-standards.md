@@ -367,7 +367,7 @@ impl Stage for ArtifactGenerationStage {
 
 /// One chunk, as parsed. Leftover and failed items are `extra`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Slot<T> {
     #[resolve_field]
     pub item: Option<WithSpan<T>>,
