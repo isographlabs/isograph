@@ -123,12 +123,18 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-impl From<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>
-    for IsoLiteralSlot<OptimisticStage>
-{
-    fn from(
-        slot: Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>,
-    ) -> Self {
+type OptimisticSlot = Slot<
+    <OptimisticStage as Stage>::IsoLiteral,
+    <OptimisticStage as Stage>::UnparsedTokens,
+>;
+
+type OptimisticSingleton = Singleton<
+    WithSpan<OptimisticSlot>,
+    <OptimisticStage as Stage>::ExtraChunks,
+>;
+
+impl From<OptimisticSlot> for IsoLiteralSlot<OptimisticStage> {
+    fn from(slot: OptimisticSlot) -> Self {
         IsoLiteralSlot {
             item: slot.item,
             extra: slot.extra,
@@ -136,25 +142,10 @@ impl From<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkIt
     }
 }
 
-impl
-    From<
-        Singleton<
-            WithSpan<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>,
-            Option<WithSpan<ExtraChunks>>,
-        >,
-    > for IsoLiteralParse<OptimisticStage>
-{
-    fn from(
-        singleton: Singleton<
-            WithSpan<Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>>,
-            Option<WithSpan<ExtraChunks>>,
-        >,
-    ) -> Self {
+impl From<OptimisticSingleton> for IsoLiteralParse<OptimisticStage> {
+    fn from(singleton: OptimisticSingleton) -> Self {
         IsoLiteralParse {
-            item: WithSpan::new(
-                IsoLiteralSlot::from(singleton.item.item),
-                singleton.item.location,
-            ),
+            item: singleton.item.map(IsoLiteralSlot::from),
             extra: singleton.extra,
         }
     }
