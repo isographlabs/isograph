@@ -8,8 +8,8 @@ Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `Is
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-/// One chunk's parse result. The ResolvePosition parent is the concrete root
-/// slot path; that pinning goes away when resolve-position-generic-slot.md lands.
+/// One chunk's parse result. Combinator only; does not impl ResolvePosition
+/// until resolve-position-generic-slot.md lands.
 pub struct Slot<T, E> {
     pub item: T,
     pub extra: E,

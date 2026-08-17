@@ -295,9 +295,9 @@ use crate::{
 };
 
 /// Unread or failed items from the chunk under parse. Concrete leftover holder
-/// parented at the root slot; goes away when resolve-position-generic-slot.md lands.
+/// parented at the root singleton; goes away when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
     #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
@@ -305,22 +305,24 @@ pub struct UnparsedChunkItems(
 /// Concrete root singleton so resolve has a named type to parent at. Goes away
 /// when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(
+    parent_type = (),
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <OptimisticStage>
+)]
 pub struct IsoLiteralParse<S: Stage> {
-    #[resolve_field]
     pub item: WithSpan<Slot<S::IsoLiteral, S::UnparsedTokens>>,
-    #[resolve_field]
     pub extra: S::ExtraChunks,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralItemPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
     #[resolve_field]
@@ -344,16 +346,11 @@ pub struct EntrypointKeyword;
 pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
-pub type SlotPath<'a> = PositionResolutionPath<
-    &'a Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>,
-    IsoLiteralParsePath<'a>,
->;
-
-pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
+pub type IsoLiteralItemPath<'a> =
+    PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralParsePath<'a>>;
 
 pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
 
 /// Extra root chunks after the first. Resolve walks each chunk. Concrete holder
 /// for the root singleton; goes away when resolve-position-generic-slot.md lands.
@@ -389,14 +386,10 @@ impl Stage for ArtifactGenerationStage {
     type ExtraChunks = ();
 }
 
-/// One chunk's parse result. The ResolvePosition parent is the concrete root
-/// slot path; that pinning goes away when resolve-position-generic-slot.md lands.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+/// One chunk's parse result. Combinator only; does not impl ResolvePosition
+/// until resolve-position-generic-slot.md lands.
 pub struct Slot<T, E> {
-    #[resolve_field]
     pub item: T,
-    #[resolve_field]
     pub extra: E,
 }
 

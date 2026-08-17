@@ -37,22 +37,24 @@ use crate::{
 /// Concrete root singleton so resolve has a named type to parent at. Goes away
 /// when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(
+    parent_type = (),
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <OptimisticStage>
+)]
 pub struct IsoLiteralParse<S: Stage> {
-    #[resolve_field]
     pub item: WithSpan<Slot<S::IsoLiteral, S::UnparsedTokens>>,
-    #[resolve_field]
     pub extra: S::ExtraChunks,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralItemPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
     #[resolve_field]
@@ -78,23 +80,18 @@ pub struct EntrypointKeyword;
 pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
-// Concrete. Goes away when resolve-position-generic-slot.md lands.
-pub type SlotPath<'a> = PositionResolutionPath<
-    &'a Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>,
-    IsoLiteralParsePath<'a>,
->;
-
-pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
+pub type IsoLiteralItemPath<'a> =
+    PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralParsePath<'a>>;
 
 pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
 
 // Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 // Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type UnparsedChunkItemsPath<'a> =
-    PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
+    PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralParsePath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
@@ -534,7 +531,7 @@ use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
     IsoLiteralItemPath, IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath,
-    SlotPath, UnparsedChunkItemsPath,
+    UnparsedChunkItemsPath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -544,7 +541,6 @@ use crate::{
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
     IsoLiteralParse(IsoLiteralParsePath<'a>),
-    Slot(SlotPath<'a>),
     IsoLiteralItem(IsoLiteralItemPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
@@ -632,7 +628,7 @@ pub enum ChunkContentItem {
 
 ## Generated code
 
-`Slot` tries `item` then `extra`. `UnparsedChunkItems` iterates the `NonEmpty`. `ExtraChunks` iterates the `NonEmpty`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs. Resolve walks the optimistic tree only.
+`Slot` does not impl `ResolvePosition`. `UnparsedChunkItems` iterates the `NonEmpty`. `ExtraChunks` iterates the `NonEmpty`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs. Resolve walks the optimistic tree only.
 
 ## Tests
 
