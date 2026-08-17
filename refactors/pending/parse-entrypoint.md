@@ -60,7 +60,7 @@ pub struct BothRoot {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<IsoLiteralItem>,
     #[resolve_field(parent_variant = Both)]
-    pub failed: WithSpan<Failed>,
+    pub remaining: WithSpan<Failed>,
 }
 
 #[derive(Debug)]
@@ -149,7 +149,7 @@ impl From<LevelSlot<IsoLiteralItem>> for RootSlot {
             LevelSlot::Complete(item) => RootSlot::Complete(item),
             LevelSlot::Both(both) => RootSlot::Both(BothRoot {
                 item: both.item,
-                failed: both.failed,
+                remaining: both.remaining,
             }),
             LevelSlot::Failed(failed) => RootSlot::Failed(failed),
         }
@@ -663,7 +663,7 @@ pub enum ChunkContentItem {
 
 ## Generated code
 
-`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `failed`. `Failed` descends into its `UnparsedChunkItems`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
+`UnparsedChunkItems` iterates `items`. `BothRoot` tries `item` then `remaining`. `Failed` descends into its `UnparsedChunkItems`. `ExtraChunks` iterates `chunks`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs.
 
 ## Tests
 

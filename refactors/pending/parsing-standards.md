@@ -321,7 +321,7 @@ pub enum LevelSlot<T> {
 #[derive(Debug, PartialEq, Eq)]
 pub struct Both<T> {
     pub item: WithSpan<T>,
-    pub failed: WithSpan<Failed>,
+    pub remaining: WithSpan<Failed>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -384,7 +384,7 @@ where
                     WithSpan::new(
                         LevelSlot::Both(Both {
                             item,
-                            failed: WithSpan::new(
+                            remaining: WithSpan::new(
                                 Failed(WithSpan::new(
                                     UnparsedChunkItems { items: remaining },
                                     leftover_span,
@@ -531,7 +531,7 @@ pub struct BothSelection {
     #[resolve_field(parent_variant = Both)]
     pub item: WithSpan<Selection>,
     #[resolve_field(parent_variant = Both)]
-    pub failed: WithSpan<Failed>,
+    pub remaining: WithSpan<Failed>,
 }
 
 pub type BothSelectionPath<'a> =
@@ -566,7 +566,7 @@ impl From<WithSpan<LevelSlot<Selection>>> for WithSpan<SelectionSlot> {
             LevelSlot::Complete(item) => SelectionSlot::Complete(item),
             LevelSlot::Both(both) => SelectionSlot::Both(BothSelection {
                 item: both.item,
-                failed: both.failed,
+                remaining: both.remaining,
             }),
             LevelSlot::Failed(failed) => SelectionSlot::Failed(failed),
         };
