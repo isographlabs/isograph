@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`InitialSlot<IsoLiteralItem>`). Remaining chunks are `ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item()` is `Some` when the form parsed.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`OptimisticSlot<IsoLiteralItem>`). Remaining chunks are `ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item()` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -38,7 +38,7 @@ use crate::{
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse {
     #[resolve_field]
-    pub first: Option<WithSpan<InitialSlot<IsoLiteralItem>>>,
+    pub first: Option<WithSpan<OptimisticSlot<IsoLiteralItem>>>,
     #[resolve_field]
     pub extra: Option<ExtraChunks>,
 }
@@ -75,7 +75,7 @@ pub struct EntrypointKeyword;
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
 pub type SlotPath<'a> =
-    PositionResolutionPath<&'a InitialSlot<IsoLiteralItem>, IsoLiteralParsePath<'a>>;
+    PositionResolutionPath<&'a OptimisticSlot<IsoLiteralItem>, IsoLiteralParsePath<'a>>;
 
 pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
 
@@ -96,6 +96,16 @@ pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, E
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+// slot-stages.md: this From is gone.
+impl From<Singleton<IsoLiteralItem>> for IsoLiteralParse {
+    fn from(singleton: Singleton<IsoLiteralItem>) -> Self {
+        IsoLiteralParse {
+            first: singleton.first,
+            extra: singleton.extra,
+        }
+    }
+}
+
 impl IsoLiteralParse {
     pub fn item(&self) -> Option<&EntrypointDeclaration> {
         let item = self.first.as_ref()?.item.item()?;
