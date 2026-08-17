@@ -585,7 +585,7 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
 
 `Slot<T, E>` is `item: T` and `extra: E`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
 
@@ -775,7 +775,7 @@ A tree enum is wrapped in `WithSpan` at its slot. The parsed item is `Option<T>`
 
 ## Performance
 
-One pass by reference. The output copies spans and `Copy` tokens. Cloning happens when leftover or failed items are stored. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
+One pass by reference. The output copies spans and `Copy` tokens. Leftover and failed items clone. Extra chunks clone for now. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
@@ -809,6 +809,7 @@ The first implementation step is the shared surface, with tests, before any gram
 - `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
 - `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`, `ChunkContentItemParent`
+- `Clone` on `ChunkedLevel`, `Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`. Extra chunks clone for now.
 - `ParseError` / `Expectation` / `Found` as the error types those methods return
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `item: Some` plus extra tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
@@ -816,7 +817,7 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
-- parse-fields.md: field declarations and selection sets via `parse_items`, `Clone` on leftover and failed items, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
+- parse-fields.md: field declarations and selection sets via `parse_items`, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`

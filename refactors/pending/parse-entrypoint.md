@@ -1,6 +1,6 @@
 # parse-entrypoint: the grammar stage's skeleton, and entrypoint declarations
 
-First doc of the series parsing-plan.md orders, written against parsing-standards.md. This doc lands `ItemCursor` / `ChunkStream` (`new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`), `Chunk::stream`, `boundary_comma`, `ChunkedLevel::len`, `parse_singleton`, `parse_iso_literal`, `ParseError`, and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
+First grammar feature, written against parsing-standards.md. The shared surface lands first. This doc lands `parse_iso_literal` and `entrypoint Type.field`. `field` and `pointer` are identifiers that return `UnsupportedDeclarationType`; parse-fields.md and parse-pointers.md replace those arms.
 
 ## The grammar
 
@@ -127,7 +127,7 @@ impl
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are moved into `S::ExtraChunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are cloned into `S::ExtraChunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -188,7 +188,7 @@ fn parse_entrypoint(
 
 ## `ItemCursor` and `ChunkStream`
 
-Extracted from parsing-standards.md. Delta: this impl is `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `expected`, `text`, `token_text`, `end_span`. Group methods and `spanning` land in parse-fields.md. `ItemCursor` and `ChunkStream` are `pub(crate)` and are not re-exported.
+Extracted from parsing-standards.md. Delta: none. Already landed by the shared surface. `ItemCursor` and `ChunkStream` are `pub(crate)` and are not re-exported.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -1027,5 +1027,5 @@ mod tests {
 
 ## Landing checklist
 
-1. chunk_stream.rs, `Chunk::stream`, `remaining_contents`, `boundary_comma`, `parse_one_item`, `parse_singleton`, `Slot`, parse_error.rs, parse_iso_literal.rs, the lib.rs registrations, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. parse_iso_literal.rs, the `ParseError` variants this form adds, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes this form needs, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
