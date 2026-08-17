@@ -215,31 +215,70 @@ pub fn parse_iso_literal(
     );
     WithSpan::new(IsoLiteralParse::from(singleton), location)
 }
+```
 
-fn parse_iso_literal_item(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<IsoLiteralItem, WithSpan<ParseError>> {
-    let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match cursor.token_text(keyword) {
-        text if text == "entrypoint" => {
-            IsoLiteralItem::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
+`parse_iso_literal_item` is the first-chunk form. parse-entrypoint.md writes it.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+/// Concrete root singleton. This is the optimistic tree. Goes away when
+/// slot-singleton-resolve.md lands.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+pub struct IsoLiteralParse {
+    #[resolve_field]
+    pub item: WithSpan<IsoLiteralSlot>,
+    #[resolve_field]
+    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
+}
+
+/// Concrete first-chunk slot. This is the optimistic tree. Goes away when
+/// slot-singleton-resolve.md lands.
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct IsoLiteralSlot {
+    #[resolve_field]
+    pub item: Option<WithSpan<IsoLiteralItem>>,
+    #[resolve_field]
+    pub extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
+}
+
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+
+// Goes away when slot-singleton-resolve.md lands.
+pub type IsoLiteralSlotPath<'a> =
+    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
+
+type OptimisticSlot = Slot<
+    <OptimisticStage as Stage>::IsoLiteral,
+    <OptimisticStage as Stage>::UnparsedTokens,
+>;
+
+type OptimisticSingleton = Singleton<
+    WithSpan<OptimisticSlot>,
+    <OptimisticStage as Stage>::ExtraChunks,
+>;
+
+impl From<OptimisticSlot> for IsoLiteralSlot {
+    fn from(slot: OptimisticSlot) -> Self {
+        IsoLiteralSlot {
+            item: slot.item,
+            extra_tokens: slot.extra_tokens,
         }
-        text if text == "field" || text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+    }
+}
+
+impl From<OptimisticSingleton> for IsoLiteralParse {
+    fn from(singleton: OptimisticSingleton) -> Self {
+        IsoLiteralParse {
+            item: singleton.item.map(IsoLiteralSlot::from),
+            extra_chunks: singleton.extra_chunks,
         }
-        _ => WithSpan::new(
-            ParseError::expected(
-                Expectation::DeclarationKeyword,
-                Found::Token(NonBracketTokenKind::Identifier),
-            ),
-            keyword,
-        )
-        .wrap_err(),
     }
 }
 ```
+
+`IsoLiteralItem` is the declaration enum. parse-entrypoint.md writes it.
 
 ## `Chunk`
 
@@ -278,6 +317,117 @@ A `Chunk` is the whole unit: its chunk items plus the optional trailing separato
 
 `Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover and failed `UnparsedChunkItems` are those items only; a list chunk's comma is not among them. A position on that comma resolves to the list.
 
+`ChunkedLevelParent` stays. Extra root chunks parent a `Chunk` at `ChunkParent::Extra`. Leftover and failed items parent a `ChunkContentItem` at `ChunkContentItemParent::Unparsed`. `ChunkContentItem` is transparent, so `NonBracketToken` and `ChunkedGroup` parent at `ChunkContentItemParent`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug)]
+pub enum ChunkedLevelParent<'a> {
+    Root,
+    Interior(Box<ChunkedGroupPath<'a>>),
+}
+
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
+
+pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
+
+#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct Chunk {
+    #[resolve_field]
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
+}
+
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ChunkContentItem {
+    NonBracket(NonBracketToken),
+    Group(ChunkedGroup),
+}
+
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ChunkedGroup {
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
+    #[resolve_field(parent_variant = Interior)]
+    pub children: WithSpan<ChunkedLevel>,
+    #[resolve_field]
+    pub closing: WithSpan<CloseBracket>,
+}
+```
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NonBracketToken(pub NonBracketTokenKind);
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug)]
+pub enum ChunkedLevelParent<'a> {
+    Root,
+    Interior(Box<ChunkedGroupPath<'a>>),
+}
+
+#[derive(Debug)]
+pub enum ChunkParent<'a> {
+    Level(ChunkedLevelPath<'a>),
+    Extra(ExtraChunksPath<'a>),
+}
+
+#[derive(Debug)]
+pub enum ChunkContentItemParent<'a> {
+    Chunk(ChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
+}
+
+pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedLevelParent<'a>>;
+
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
+
+pub type ChunkedGroupPath<'a> = PositionResolutionPath<&'a ChunkedGroup, ChunkContentItemParent<'a>>;
+
+pub type NonBracketTokenPath<'a> =
+    PositionResolutionPath<&'a NonBracketToken, ChunkContentItemParent<'a>>;
+
+pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] Vec<WithSpan<Chunk>>);
+
+#[resolve_position(parent_type = ChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct Chunk {
+    #[resolve_field(parent_variant = Chunk)]
+    contents: NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    trailing_separator: Option<WithSpan<ChunkSeparator>>,
+}
+
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ChunkContentItem {
+    NonBracket(NonBracketToken),
+    Group(ChunkedGroup),
+}
+
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ChunkedGroup {
+    #[resolve_field]
+    pub opening: WithSpan<OpenBracket>,
+    #[resolve_field(parent_variant = Interior)]
+    pub children: WithSpan<ChunkedLevel>,
+    #[resolve_field]
+    pub closing: WithSpan<CloseBracket>,
+}
+```
+
+```rust
+// from crates/isograph_parser/src/matched_brackets.rs
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NonBracketToken(pub NonBracketTokenKind);
+```
+
 ## Lists and one-item levels
 
 `ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk through `parse_one_item` (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior) with at least one chunk: chunk 0 through `parse_one_item`, then extra chunks and, at the root, a boundary comma. Empty is the caller's. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
@@ -294,85 +444,23 @@ use crate::{
     ParseError,
 };
 
-/// Unread or failed items from the chunk under parse. Concrete leftover holder
-/// parented at the root slot; goes away when slot-singleton-resolve.md lands.
+/// Unread or failed items from the chunk under parse. Parent is
+/// `IsoLiteralSlotPath` until slot-singleton-resolve.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
     #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
-/// Concrete root singleton. This is the optimistic tree. Goes away when
-/// slot-singleton-resolve.md lands.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralParse {
-    #[resolve_field]
-    pub item: WithSpan<IsoLiteralSlot>,
-    #[resolve_field]
-    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
-}
-
-/// Concrete first-chunk slot. This is the optimistic tree. Goes away when
-/// slot-singleton-resolve.md lands.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralSlot {
-    #[resolve_field]
-    pub item: Option<WithSpan<IsoLiteralItem>>,
-    #[resolve_field]
-    pub extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum IsoLiteralItem {
-    Entrypoint(EntrypointDeclaration),
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntrypointDeclaration {
-    pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
-    #[resolve_field]
-    pub parent_type: WithSpan<EntityName>,
-    #[resolve_field]
-    pub client_field_name: WithSpan<ClientFieldName>,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientFieldName;
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct EntrypointKeyword;
-
-// Concrete. Goes away when slot-singleton-resolve.md lands.
-pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
-
-pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
-
-pub type IsoLiteralItemPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralSlotPath<'a>>;
-
-pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
-
 pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
 
-/// Extra root chunks after the first. Resolve walks each chunk. Concrete holder
-/// for the root singleton; goes away when slot-singleton-resolve.md lands.
+/// Extra root chunks after the first. Resolve walks each chunk. Parent is
+/// `IsoLiteralParsePath` until slot-singleton-resolve.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 
-// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 /// How far along the tree is. Associated types are the entrypoint root's
@@ -412,34 +500,6 @@ pub struct Slot<T, E> {
 pub struct Singleton<T, E> {
     pub item: T,
     pub extra_chunks: E,
-}
-
-type OptimisticSlot = Slot<
-    <OptimisticStage as Stage>::IsoLiteral,
-    <OptimisticStage as Stage>::UnparsedTokens,
->;
-
-type OptimisticSingleton = Singleton<
-    WithSpan<OptimisticSlot>,
-    <OptimisticStage as Stage>::ExtraChunks,
->;
-
-impl From<OptimisticSlot> for IsoLiteralSlot {
-    fn from(slot: OptimisticSlot) -> Self {
-        IsoLiteralSlot {
-            item: slot.item,
-            extra_tokens: slot.extra_tokens,
-        }
-    }
-}
-
-impl From<OptimisticSingleton> for IsoLiteralParse {
-    fn from(singleton: OptimisticSingleton) -> Self {
-        IsoLiteralParse {
-            item: singleton.item.map(IsoLiteralSlot::from),
-            extra_chunks: singleton.extra_chunks,
-        }
-    }
 }
 
 fn parse_chunk<'a, P>(
@@ -521,8 +581,6 @@ where
         }
     }
 }
-
-
 
 impl ChunkedLevel {
     pub(crate) fn parse_items<'a, P, F>(
@@ -607,7 +665,7 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns an empty `IsoLiteralSlot` plus `extra_chunks: None`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) and sit on `IsoLiteralParse.extra_chunks`. At the root, the `extra_chunks` callback pushes `MultipleDeclarations` on the first extra chunk. Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns an empty `IsoLiteralSlot` plus `extra_chunks: None`). `item` on the first slot is `Some` when the form parsed.
 
 `Slot<T, E>` is `item: T` and `extra_tokens: E`. Combinator only; `parse_one_item` returns it. `From` builds `IsoLiteralSlot`. `Singleton<T, E>` is the combinator result of `parse_singleton`; `From` builds `IsoLiteralParse`. Extra chunks sit on `IsoLiteralParse.extra_chunks`. Resolve walks `IsoLiteralParse` only.
 
@@ -781,7 +839,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 Diagnostics are not on the tree. `parse_one_item` calls `push_error` for leftover and for a failed form. `parse_iso_literal` calls it for empty. `parse_singleton` calls it for a boundary comma and extra. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
 
-A failed list chunk is `item: None` plus the chunk's items in `Slot.extra_tokens`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `S::ExtraChunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+A failed list chunk is `item: None` plus the chunk's items in `Slot.extra_tokens`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `IsoLiteralParse.extra_chunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 
@@ -810,7 +868,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Keyword / boolean / null text: `token_text` after an identifier
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Composite span: `ItemCursor::spanning`
-- List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>>>`
+- List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>>>`
 - One-item context: `parse_singleton` → `Singleton<WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>, Option<WithSpan<ExtraChunks>>>`
 - Recovered item: `Slot.item` → `Option<WithSpan<T>>`
 - Extra items: `Slot.extra_tokens` → `Option<WithSpan<UnparsedChunkItems>>`
@@ -828,19 +886,19 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 The first implementation step is the shared surface, with tests, before any grammar feature. That step lands:
 
-- `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
+- `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `remaining_contents`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`, `ChunkContentItemParent`
+- `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`
 - `Clone` on `ChunkedLevel`, `Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`. Extra chunks clone for now.
-- `ParseError` / `Expectation` / `Found` as the error types those methods return
+- `ParseError` / `Expectation` / `Found` as the error types those methods return. `Stage` impls wait for `IsoLiteralItem`.
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `item: Some` plus extra tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
 
 Each grammar feature then lands on that surface.
 
-- parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
+- parse-entrypoint.md: `parse_iso_literal`, `IsoLiteralParse` / `IsoLiteralSlot`, `Stage` impls, `UnparsedChunkItems` / `ExtraChunks` `ResolvePosition`, `ChunkParent`, `ChunkContentItemParent`, `entrypoint Type.field`
 - slot-singleton-resolve.md: `Slot` / `Singleton` in the tree; deletes `IsoLiteralSlot` and the `IsoLiteralParse` struct
-- parse-fields.md: field declarations and selection sets via `parse_items`, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
+- parse-fields.md: field declarations and selection sets via `parse_items`, `push_error` through `parse_items`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
