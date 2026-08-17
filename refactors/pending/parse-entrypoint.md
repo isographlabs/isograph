@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<S::Item<IsoLiteralItem>, S::Extra<UnparsedChunkItems>>`). Remaining chunks are `S::Extra<ExtraChunks>` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item` is `Some` when the form parsed.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<Option<WithSpan<IsoLiteralItem>>, Option<WithSpan<UnparsedChunkItems>>>`). Remaining chunks are `S::Extra` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and no first slot. `item` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -16,7 +16,7 @@ iso(`
 `)
 ```
 
-A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `S::Extra<ExtraChunks>`.
+A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `S::Extra`.
 
 ## Types
 
@@ -40,7 +40,7 @@ pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
     pub item: S::IsoLiteral,
     #[resolve_field]
-    pub extra: S::Extra<ExtraChunks>,
+    pub extra: S::Extra,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -77,8 +77,8 @@ pub type IsoLiteralParsePath<'a> =
 
 pub type SlotPath<'a> = PositionResolutionPath<
     &'a Slot<
-        <OptimisticStage as Stage>::Item<IsoLiteralItem>,
-        <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+        Option<WithSpan<IsoLiteralItem>>,
+        Option<WithSpan<UnparsedChunkItems>>,
     >,
     IsoLiteralParsePath<'a>,
 >;
@@ -105,11 +105,11 @@ impl
         Singleton<
             WithSpan<
                 Slot<
-                    <OptimisticStage as Stage>::Item<IsoLiteralItem>,
-                    <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+                    Option<WithSpan<IsoLiteralItem>>,
+                    Option<WithSpan<UnparsedChunkItems>>,
                 >,
             >,
-            <OptimisticStage as Stage>::Extra<ExtraChunks>,
+            Option<WithSpan<ExtraChunks>>,
         >,
     > for IsoLiteralParse<OptimisticStage>
 {
@@ -117,11 +117,11 @@ impl
         singleton: Singleton<
             WithSpan<
                 Slot<
-                    <OptimisticStage as Stage>::Item<IsoLiteralItem>,
-                    <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+                    Option<WithSpan<IsoLiteralItem>>,
+                    Option<WithSpan<UnparsedChunkItems>>,
                 >,
             >,
-            <OptimisticStage as Stage>::Extra<ExtraChunks>,
+            Option<WithSpan<ExtraChunks>>,
         >,
     ) -> Self {
         IsoLiteralParse {
@@ -134,7 +134,7 @@ impl
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are moved into `S::Extra<ExtraChunks>`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are moved into `S::Extra`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -191,7 +191,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `item: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::Extra<ExtraChunks>`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::Extra<ExtraChunks>` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::Extra<ExtraChunks>` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `item: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::Extra`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::Extra` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::Extra` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
@@ -313,11 +313,11 @@ pub(crate) fn parse_singleton<'a, T, F>(
 ) -> Singleton<
     WithSpan<
         Slot<
-            <OptimisticStage as Stage>::Item<T>,
-            <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+            Option<WithSpan<T>>,
+            Option<WithSpan<UnparsedChunkItems>>,
         >,
     >,
-    <OptimisticStage as Stage>::Extra<ExtraChunks>,
+    Option<WithSpan<ExtraChunks>>,
 >
 where
     F: FnMut(WithSpan<ParseError>),
