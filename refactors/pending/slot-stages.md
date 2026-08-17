@@ -33,7 +33,7 @@ pub struct OptimisticStage;
 pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
-    type IsoLiteral = Option<WithSpan<IsoLiteralItem>>;
+    type IsoLiteral = Option<IsoLiteralItem>;
     type UnparsedTokens = Option<WithSpan<UnparsedChunkItems>>;
     type ExtraChunks = Option<WithSpan<ExtraChunks>>;
 }
@@ -45,17 +45,17 @@ impl Stage for ArtifactGenerationStage {
 }
 ```
 
-`parse_one_item` already returns `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
+`parse_one_item` already returns `Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>`. This step does not change it.
 
 ## Convert
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub fn require_complete<T>(
-    slot: WithSpan<Slot<Option<WithSpan<T>>, Option<WithSpan<UnparsedChunkItems>>>>,
+    slot: WithSpan<Slot<Option<T>, Option<WithSpan<UnparsedChunkItems>>>>,
 ) -> Option<WithSpan<T>> {
     match (slot.item.item, slot.item.extra) {
-        (Some(item), None) => item.wrap_some(),
+        (Some(item), None) => WithSpan::new(item, slot.location).wrap_some(),
         _ => None,
     }
 }
@@ -87,12 +87,12 @@ pub fn require_complete_literal(
         return None;
     }
     let location = parse.item.location;
-    let item = parse.item.item.item?;
+    let item = parse.item.item.item.item?;
     IsoLiteralParse {
         item: WithSpan::new(
             IsoLiteralSlot {
-                item: item.wrap_some(),
-                extra: None,
+                item: WithSpan::new(item, parse.item.item.item.location),
+                extra: (),
             },
             location,
         ),

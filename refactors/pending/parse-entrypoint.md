@@ -52,8 +52,7 @@ pub struct IsoLiteralParse<S: Stage> {
 }
 
 /// Concrete first-chunk slot. Goes away when resolve-position-generic-slot.md lands.
-/// Fields are the `OptimisticStage` projection so the derive sees concrete
-/// `Option<WithSpan<_>>` types. Only that monomorph impls `ResolvePosition`.
+/// Only the `OptimisticStage` monomorph impls `ResolvePosition`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = IsoLiteralParsePath<'a>,
@@ -62,9 +61,9 @@ pub struct IsoLiteralParse<S: Stage> {
 )]
 pub struct IsoLiteralSlot<S: Stage> {
     #[resolve_field]
-    pub item: Option<WithSpan<IsoLiteralItem>>,
+    pub item: WithSpan<S::IsoLiteral>,
     #[resolve_field]
-    pub extra: Option<WithSpan<UnparsedChunkItems>>,
+    pub extra: S::UnparsedTokens,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -133,19 +132,20 @@ type OptimisticSingleton = Singleton<
     <OptimisticStage as Stage>::ExtraChunks,
 >;
 
-impl From<OptimisticSlot> for IsoLiteralSlot<OptimisticStage> {
-    fn from(slot: OptimisticSlot) -> Self {
-        IsoLiteralSlot {
-            item: slot.item,
+impl From<WithSpan<OptimisticSlot>> for WithSpan<IsoLiteralSlot<OptimisticStage>> {
+    fn from(slot: WithSpan<OptimisticSlot>) -> Self {
+        let location = slot.location;
+        slot.map(|slot| IsoLiteralSlot {
+            item: WithSpan::new(slot.item, location),
             extra: slot.extra,
-        }
+        })
     }
 }
 
 impl From<OptimisticSingleton> for IsoLiteralParse<OptimisticStage> {
     fn from(singleton: OptimisticSingleton) -> Self {
         IsoLiteralParse {
-            item: singleton.item.map(IsoLiteralSlot::from),
+            item: singleton.item.to(),
             extra: singleton.extra,
         }
     }
@@ -332,7 +332,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
 ) -> Singleton<
     WithSpan<
         Slot<
-            Option<WithSpan<T>>,
+            Option<T>,
             Option<WithSpan<UnparsedChunkItems>>,
         >,
     >,
@@ -773,9 +773,10 @@ mod tests {
             .item
             .item
             .item
+            .item
             .as_ref()
             .expect("the fixture's literal parsed an item");
-        match item.item.reference() {
+        match item {
             IsoLiteralItem::Entrypoint(declaration) => declaration,
         }
     }
@@ -783,7 +784,7 @@ mod tests {
     fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
         let (parse, errors) = parsed(text);
         assert!(
-            parse.item.item.item.item.as_ref().is_none(),
+            parse.item.item.item.item.item.as_ref().is_none(),
             "for literal {text:?}",
         );
         assert!(
@@ -847,7 +848,7 @@ mod tests {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        assert!(parse.item.item.item.item.as_ref().is_none());
+        assert!(parse.item.item.item.item.item.as_ref().is_none());
         assert_eq!(
             errors,
             WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
@@ -914,7 +915,7 @@ mod tests {
         let text = "entrypoint\nQuery.foo";
         let keyword_end = span_of(text, "entrypoint").end;
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item.item.item.as_ref().is_none());
+        assert!(parse.item.item.item.item.item.as_ref().is_none());
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::EndOfChunk)
                 && error.location == Span::new(keyword_end, keyword_end)
@@ -988,7 +989,7 @@ mod tests {
     fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
         let text = "entrypoint Foo.$ asdf";
         let (parse, errors) = parsed(text);
-        assert!(parse.item.item.item.item.as_ref().is_none());
+        assert!(parse.item.item.item.item.item.as_ref().is_none());
         match parse.item.item.item.extra.as_ref().map(|wrapped| wrapped.item.reference()) {
             Some(items) => {
                 assert_eq!(items.0.first().location, span_of(text, "entrypoint"));
@@ -1007,7 +1008,7 @@ mod tests {
         let text = "entrypoint Query.foo bar";
         let (parse, errors) = parsed(text);
         as_entrypoint(parse.reference());
-        assert!(parse.item.item.item.item.as_ref().is_some());
+        assert!(parse.item.item.item.item.item.as_ref().is_some());
         assert!(parse.item.item.item.extra.as_ref().map(|wrapped| wrapped.item.reference()).is_some());
         assert_eq!(
             errors,
