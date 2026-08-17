@@ -20,8 +20,8 @@ pub struct Singleton<T, E> {
 
 pub trait Stage {
     type IsoLiteral;
-    type Unparsed;
-    type Extra;
+    type UnparsedTokens;
+    type ExtraChunks;
 }
 
 pub struct OptimisticStage;
@@ -30,14 +30,14 @@ pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
     type IsoLiteral = Option<IsoLiteralItem>;
-    type Unparsed = Option<WithSpan<UnparsedChunkItems>>;
-    type Extra = Option<WithSpan<ExtraChunks>>;
+    type UnparsedTokens = Option<WithSpan<UnparsedChunkItems>>;
+    type ExtraChunks = Option<WithSpan<ExtraChunks>>;
 }
 
 impl Stage for ArtifactGenerationStage {
     type IsoLiteral = IsoLiteralItem;
-    type Unparsed = ();
-    type Extra = ();
+    type UnparsedTokens = ();
+    type ExtraChunks = ();
 }
 ```
 
@@ -78,7 +78,7 @@ After: each list holder gets an associated type on `Stage` (`SelectionSet`, `Arg
 
 Nested lists have the same function per holder. Each maps `require_complete` over its slots.
 
-`parse_iso_literal` returns `IsoLiteralParse<OptimisticStage>`. The caller that generates artifacts calls `require_complete_literal` after checking that `push_error` was never invoked. Extra root chunks (`S::Extra`) still mean the literal is not artifact-ready; `require_complete_literal` is `None` when `extra` is `Some`.
+`parse_iso_literal` returns `IsoLiteralParse<OptimisticStage>`. The caller that generates artifacts calls `require_complete_literal` after checking that `push_error` was never invoked. Extra root chunks (`S::ExtraChunks`) still mean the literal is not artifact-ready; `require_complete_literal` is `None` when `extra` is `Some`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs

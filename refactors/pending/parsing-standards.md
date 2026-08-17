@@ -23,7 +23,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra`. Extra root chunks sit on `IsoLiteralParse.extra` (`S::Extra`). `item` is `Some` when the form parsed. `extra` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<Option<P>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra`. Extra root chunks sit on `IsoLiteralParse.extra` (`S::ExtraChunks`). `item` is `Some` when the form parsed. `extra` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 This pass is `IsoLiteralParse<OptimisticStage>`. Resolve walks that tree only. Artifact generation does not resolve.
 
@@ -303,9 +303,9 @@ pub struct UnparsedChunkItems(
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: Slot<S::IsoLiteral, S::Unparsed>,
+    pub item: Slot<S::IsoLiteral, S::UnparsedTokens>,
     #[resolve_field]
-    pub extra: S::Extra,
+    pub extra: S::ExtraChunks,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -359,8 +359,8 @@ pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLitera
 /// can fail at parse. Optimistic types carry the failure. Artifact types do not.
 pub trait Stage {
     type IsoLiteral;
-    type Unparsed;
-    type Extra;
+    type UnparsedTokens;
+    type ExtraChunks;
 }
 
 pub struct OptimisticStage;
@@ -369,14 +369,14 @@ pub struct ArtifactGenerationStage;
 
 impl Stage for OptimisticStage {
     type IsoLiteral = Option<IsoLiteralItem>;
-    type Unparsed = Option<WithSpan<UnparsedChunkItems>>;
-    type Extra = Option<WithSpan<ExtraChunks>>;
+    type UnparsedTokens = Option<WithSpan<UnparsedChunkItems>>;
+    type ExtraChunks = Option<WithSpan<ExtraChunks>>;
 }
 
 impl Stage for ArtifactGenerationStage {
     type IsoLiteral = IsoLiteralItem;
-    type Unparsed = ();
-    type Extra = ();
+    type UnparsedTokens = ();
+    type ExtraChunks = ();
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -578,7 +578,7 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `S::Extra` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
 
 `Slot<T, E>` is `item: T` and `extra: E`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
 
@@ -1047,7 +1047,7 @@ One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the of
 
 Diagnostics are not on the tree. `parse_one_item` calls `push_error` for leftover and for a failed form. `parse_iso_literal` calls it for empty. `parse_singleton` calls it for a boundary comma and extra. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
 
-A failed list chunk is `item: None` plus the chunk's items in `Slot.extra`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `S::Extra` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+A failed list chunk is `item: None` plus the chunk's items in `Slot.extra`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `S::ExtraChunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
 
 ## Totality
 

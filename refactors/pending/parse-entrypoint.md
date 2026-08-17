@@ -8,7 +8,7 @@ First doc of the series parsing-plan.md orders, written against parsing-standard
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>`). Remaining chunks are `S::Extra` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and `Slot { item: None, extra: None }`. `item` is `Some` when the form parsed.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` (`Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>`). Remaining chunks are `S::ExtraChunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and `Slot { item: None, extra: None }`. `item` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -16,7 +16,7 @@ iso(`
 `)
 ```
 
-A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `S::Extra`.
+A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra`. Extra chunks sit in `S::ExtraChunks`.
 
 ## Types
 
@@ -38,9 +38,9 @@ use crate::{
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: Slot<S::IsoLiteral, S::Unparsed>,
+    pub item: Slot<S::IsoLiteral, S::UnparsedTokens>,
     #[resolve_field]
-    pub extra: S::Extra,
+    pub extra: S::ExtraChunks,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -121,7 +121,7 @@ impl
 
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are moved into `S::Extra`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra`. Extra chunks after the first are moved into `S::ExtraChunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -178,7 +178,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `Slot { item: None, extra: None }` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::Extra`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::Extra` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::Extra` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is `Slot { item: None, extra: None }` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `S::ExtraChunks`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `S::ExtraChunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `S::ExtraChunks` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ItemCursor` and `ChunkStream`
 
