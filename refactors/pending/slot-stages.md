@@ -1,124 +1,102 @@
 # Slot stages: `require_complete` to `ArtifactGenerationStage`
 
-Follow-up after the parsing series and resolve-position-generic-slot.md. The series already parses `Slot<OptimisticStage, T>` (`Item<T> = Option<WithSpan<T>>`, `Extra = ExtraTokens`) and `IsoLiteralParse<OptimisticStage>`. This step adds `require_complete` to `Slot<ArtifactGenerationStage, T>` (`Item<T> = WithSpan<T>`, `Extra = ()`) and puts `S: Stage` on every remaining slot-holding type (`SelectionSet`, `ArgumentList`, …). Form types (`EntrypointDeclaration`, `SelectionName`, …) stay concrete.
+Follow-up after the parsing series. The series already parses `IsoLiteralParse<OptimisticStage>`. `Slot<T, E>` and `Singleton<T, E>` take `T` and `E` from `Stage`. This step converts an optimistic tree to `IsoLiteralParse<ArtifactGenerationStage>` when `push_error` was never called and every extra is empty.
 
-Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `IsoLiteralParse<ArtifactGenerationStage>`, produced by `require_complete` when `push_error` was never called and every slot has an item and empty extra.
+Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `IsoLiteralParse<ArtifactGenerationStage>`. Resolve walks the optimistic tree only.
 
 ## The slot
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-pub struct Slot<S: Stage, T> {
-    pub item: S::Item<T>,
-    pub extra: S::Extra,
+pub struct Slot<T, E> {
+    pub item: T,
+    pub extra: E,
+}
+
+pub struct Singleton<T, E> {
+    pub item: T,
+    pub extra: E,
 }
 
 pub trait Stage {
     type Item<T>;
-    type Extra;
-    type ItemRef<'a, T: 'a>;
-    type ExtraRef<'a>;
-    fn item<'a, T: 'a>(item: &'a Self::Item<T>) -> Self::ItemRef<'a, T>;
-    fn extra<'a>(extra: &'a Self::Extra) -> Self::ExtraRef<'a>;
+    type Extra<T>;
+    type IsoLiteral;
 }
 
 pub struct OptimisticStage;
 
 pub struct ArtifactGenerationStage;
 
-/// Remaining unparsed items in the chunk. `None` when the form consumed the chunk.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraTokens(#[resolve_field] pub Option<WithSpan<UnparsedChunkItems>>);
-
 impl Stage for OptimisticStage {
     type Item<T> = Option<WithSpan<T>>;
-    type Extra = ExtraTokens;
-    type ItemRef<'a, T: 'a> = Option<&'a T>;
-    type ExtraRef<'a> = Option<&'a UnparsedChunkItems>;
-    fn item<'a, T: 'a>(item: &'a Option<WithSpan<T>>) -> Option<&'a T> {
-        item.as_ref().map(|wrapped| wrapped.item.reference())
-    }
-    fn extra<'a>(extra: &'a ExtraTokens) -> Option<&'a UnparsedChunkItems> {
-        extra.0.as_ref().map(|wrapped| wrapped.item.reference())
-    }
+    type Extra<T> = Option<WithSpan<T>>;
+    type IsoLiteral = Option<
+        WithSpan<
+            Slot<
+                <OptimisticStage as Stage>::Item<IsoLiteralItem>,
+                <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+            >,
+        >,
+    >;
 }
 
 impl Stage for ArtifactGenerationStage {
     type Item<T> = WithSpan<T>;
-    type Extra = ();
-    type ItemRef<'a, T: 'a> = &'a T;
-    type ExtraRef<'a> = ();
-    fn item<'a, T: 'a>(item: &'a WithSpan<T>) -> &'a T {
-        item.item.reference()
-    }
-    fn extra<'a>(_: &'a ()) {}
-}
-
-impl<S: Stage, T> Slot<S, T> {
-    pub fn item(&self) -> S::ItemRef<'_, T> {
-        S::item(&self.item)
-    }
-
-    pub fn extra(&self) -> S::ExtraRef<'_> {
-        S::extra(&self.extra)
-    }
+    type Extra<T> = ();
+    type IsoLiteral = WithSpan<IsoLiteralItem>;
 }
 ```
 
-`OptimisticStage` `item()` is `Option<&T>` and `extra()` is `Option<&UnparsedChunkItems>`. `ArtifactGenerationStage` `item()` is `&T` and `extra()` is `()`. Artifact code does not unwrap.
-
-`None` plus empty `ExtraTokens` is representable and unused. `parse_one_item` never builds it: a form `Err` always clones the source chunk's items into `extra`.
-
-`parse_one_item` already returns `Slot<OptimisticStage, P>`. This step does not change it.
+`parse_one_item` already returns `Slot<OptimisticStage::Item<P>, OptimisticStage::Extra<UnparsedChunkItems>>`. This step does not change it.
 
 ## Convert
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub fn require_complete<T>(
-    slot: WithSpan<Slot<OptimisticStage, T>>,
-) -> Option<WithSpan<Slot<ArtifactGenerationStage, T>>> {
+    slot: WithSpan<
+        Slot<
+            <OptimisticStage as Stage>::Item<T>,
+            <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+        >,
+    >,
+) -> Option<WithSpan<T>> {
     let location = slot.location;
     let Slot { item, extra } = slot.item;
-    match (item, extra.0) {
-        (Some(item), None) => WithSpan::new(Slot { item, extra: () }, location).wrap_some(),
+    match (item, extra) {
+        (Some(item), None) => item.wrap_some(),
         _ => None,
     }
 }
 ```
 
-`require_complete` is `None` on leftover or on a form `Err`. Artifact generation calls it on every slot. If any slot is `None`, artifact generation does not run.
+`require_complete` is `None` on leftover or on a form `Err`. Artifact generation calls it on every slot. If any slot is `None`, artifact generation does not run. The artifact value is `WithSpan<T>` (`ArtifactGenerationStage::Item<T>`), not a `Slot`.
 
 ## Tree types
 
 Before (the series, lists still pinned to `OptimisticStage`):
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct IsoLiteralParse<S: Stage> {
-    pub first: Option<WithSpan<Slot<S, IsoLiteralItem>>>,
-    pub extra: Option<ExtraChunks>,
-}
-
 // from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(pub Vec<WithSpan<Slot<OptimisticStage, Selection>>>);
+pub struct SelectionSet(
+    pub Vec<
+        WithSpan<
+            Slot<
+                <OptimisticStage as Stage>::Item<Selection>,
+                <OptimisticStage as Stage>::Extra<UnparsedChunkItems>,
+            >,
+        >,
+    >,
+);
 ```
 
 After:
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct IsoLiteralParse<S: Stage> {
-    #[resolve_field]
-    pub first: Option<WithSpan<Slot<S, IsoLiteralItem<S>>>>,
-    #[resolve_field]
-    pub extra: Option<ExtraChunks>,
-}
-
 // from crates/isograph_parser/src/selections.rs
 pub struct SelectionSet<S: Stage>(
-    #[resolve_field] pub Vec<WithSpan<Slot<S, Selection<S>>>>,
+    #[resolve_field] pub Vec<WithSpan<S::Item<Selection<S>>>>,
 );
 
 pub enum Selection<S: Stage> {
@@ -134,15 +112,13 @@ pub struct ObjectSelection<S: Stage> {
 }
 ```
 
-Every type that contains a slot takes `S`. Form payloads that contain no slot (`EntityName`, `EntrypointKeyword`, `SelectionName`) stay unparameterized. `EntrypointDeclaration` takes `S` only if a later field is a slot.
-
-`IsoLiteralItem<S>`, `ArgumentList<S>`, `ObjectLiteral<S>`, `Singleton<S, T>`, and the other list holders are the same `S` parameter.
+Every type that contains a slot-shaped field takes `S`. Form payloads that contain no slot (`EntityName`, `EntrypointKeyword`, `SelectionName`) stay unparameterized. `IsoLiteralItem` takes `S` when a variant holds a slot. `ArgumentList<S>`, `ObjectLiteral<S>`, and the other list holders are the same `S` parameter.
 
 ## Tree convert
 
 Nested lists have the same function per holder (`require_complete_selection_set`, …). Each maps `require_complete` over its slots and maps the item through the matching convert. `ObjectSelection<OptimisticStage>` becomes `ObjectSelection<ArtifactGenerationStage>` only when the nested `SelectionSet` converts.
 
-`parse_iso_literal` returns `IsoLiteralParse<OptimisticStage>`. The caller that generates artifacts calls `require_complete_literal` after checking that `push_error` was never invoked. Extra root chunks (`ExtraChunks`) still mean the literal is not artifact-ready; `require_complete_literal` is `None` when `extra` is `Some`.
+`parse_iso_literal` returns `IsoLiteralParse<OptimisticStage>`. The caller that generates artifacts calls `require_complete_literal` after checking that `push_error` was never invoked. Extra root chunks (`S::Extra<ExtraChunks>`) still mean the literal is not artifact-ready; `require_complete_literal` is `None` when `extra` is `Some`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -152,26 +128,28 @@ pub fn require_complete_literal(
     if parse.extra.is_some() {
         return None;
     }
-    let first = match parse.first {
-        None => None,
-        Some(slot) => require_complete(slot)?.wrap_some(),
+    let item = match parse.item {
+        None => return None,
+        Some(slot) => require_complete(slot)?,
     };
     IsoLiteralParse {
-        first,
-        extra: None,
+        item,
+        extra: (),
     }
     .wrap_some()
 }
 ```
 
+Empty (`item: None`) is not artifact-ready. A parsed first slot with no extra becomes `WithSpan<IsoLiteralItem>`.
+
 ## Resolve
 
-`Slot<S, T>` derives `ResolvePosition` once `resolve-position-generic-slot.md` can emit a generic struct. `OptimisticStage` walks `item` when `Some` and `extra.0` when `Some`. `ArtifactGenerationStage` walks `item` only. `()` has no `resolve_field`.
+Resolve walks `IsoLiteralParse<OptimisticStage>` only. The artifact tree is not resolved.
 
 ## Deleted types
 
-No new slot enum. The `From<Singleton<IsoLiteralItem>> for IsoLiteralParse<OptimisticStage>` in the series is gone.
+No new slot enum. The `From<Singleton<...>> for IsoLiteralParse<OptimisticStage>` in the series is gone.
 
 ## Shipping
 
-Lands after the parsing series and resolve-position-generic-slot.md. One step: `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every remaining slot-holding type. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+Lands after the parsing series. One step: `require_complete` / `require_complete_literal` and the nested converts, the `<S>` parameter on every remaining slot-holding type. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
