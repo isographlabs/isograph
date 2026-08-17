@@ -298,6 +298,52 @@ pub struct UnparsedChunkItems {
     pub items: NonEmpty<WithSpan<ChunkContentItem>>,
 }
 
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+pub struct IsoLiteralParse {
+    #[resolve_field]
+    pub first: Option<WithSpan<InitialSlot<IsoLiteralItem>>>,
+    #[resolve_field]
+    pub extra: Option<ExtraChunks>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum IsoLiteralItem {
+    Entrypoint(EntrypointDeclaration),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralItemPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntrypointDeclaration {
+    pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
+    #[resolve_field]
+    pub parent_type: WithSpan<EntityName>,
+    #[resolve_field]
+    pub client_field_name: WithSpan<ClientFieldName>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntityName;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ClientFieldName;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct EntrypointKeyword;
+
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+
+pub type SlotPath<'a> =
+    PositionResolutionPath<&'a InitialSlot<IsoLiteralItem>, IsoLiteralParsePath<'a>>;
+
+pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, SlotPath<'a>>;
+
+pub type EntrypointDeclarationPath<'a> =
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
+
 /// Extra root chunks after the first. Resolve walks each chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -305,6 +351,8 @@ pub struct ExtraChunks {
     #[resolve_field(parent_variant = Extra)]
     pub chunks: NonEmpty<WithSpan<Chunk>>,
 }
+
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 /// Remaining unparsed items in the chunk. `items` is `None` when the form consumed the chunk.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -376,6 +424,19 @@ impl<T> Slot<Option<WithSpan<T>>, ExtraTokens> {
 impl<T> Slot<WithSpan<T>, ()> {
     pub fn item(&self) -> &T {
         Artifact::item(&self.item)
+    }
+}
+
+impl IsoLiteralParse {
+    pub fn item(&self) -> Option<&EntrypointDeclaration> {
+        let item = self.first.as_ref()?.item.item()?;
+        match item {
+            IsoLiteralItem::Entrypoint(declaration) => declaration.wrap_some(),
+        }
+    }
+
+    pub fn remaining(&self) -> Option<&UnparsedChunkItems> {
+        self.first.as_ref()?.item.remaining()
     }
 }
 
@@ -575,6 +636,36 @@ pub enum Selection {
     Scalar(ScalarSelection),
     Object(ObjectSelection),
 }
+
+pub struct ScalarSelection {
+    pub reader_alias: Option<WithSpan<SelectionAlias>>,
+    pub name: WithSpan<SelectionName>,
+    pub arguments: Option<WithSpan<ArgumentList>>,
+}
+
+pub struct ObjectSelection {
+    pub reader_alias: Option<WithSpan<SelectionAlias>>,
+    pub name: WithSpan<SelectionName>,
+    pub arguments: Option<WithSpan<ArgumentList>>,
+    pub selection_set: WithSpan<SelectionSet>,
+}
+
+pub struct SelectionAlias;
+
+pub struct SelectionName;
+
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<InitialSlot<Argument>>>);
+
+pub enum Argument {
+    Named(NamedArgument),
+}
+
+pub struct NamedArgument {
+    pub name: WithSpan<ArgumentName>,
+    pub value: WithSpan<NonConstantValue>,
+}
+
+pub struct ArgumentName;
 ```
 
 Argument lists, object literals, constant object literals, and variable-declaration lists are `Vec<WithSpan<InitialSlot<...>>>` the same way.
@@ -770,6 +861,25 @@ where
 Variable defaults are `ConstantValue`. `parse_constant_value` returns `Err` at `$`. `DeclaredVariable::default_value` is `Option<WithSpan<ConstantValue>>`.
 
 ```rust
+// from crates/isograph_parser/src/variables.rs
+pub struct DeclaredVariable {
+    pub name: WithSpan<VariableName>,
+    pub type_: WithSpan<TypeAnnotation>,
+    pub default_value: Option<WithSpan<ConstantValue>>,
+}
+
+pub enum TypeAnnotation {
+    Named(NamedTypeAnnotation),
+}
+
+pub struct NamedTypeAnnotation {
+    pub name: WithSpan<TypeName>,
+}
+
+pub struct TypeName;
+```
+
+```rust
 // from crates/isograph_parser/src/arguments.rs
 pub enum NonConstantValue {
     Variable(VariableUse),
@@ -779,6 +889,23 @@ pub enum NonConstantValue {
     Null(NullValue),
     Object(ObjectLiteral),
 }
+
+pub struct VariableUse {
+    pub dollar: WithSpan<Dollar>,
+    pub name: WithSpan<VariableName>,
+}
+
+pub struct Dollar;
+
+pub struct VariableName;
+
+pub struct StringValue;
+
+pub struct IntegerValue(pub i64);
+
+pub struct NullValue;
+
+pub struct ObjectEntryName;
 
 pub enum ConstantValue {
     String(StringValue),
