@@ -8,6 +8,8 @@ Parse builds `IsoLiteralParse<OptimisticStage>`. Artifact generation runs on `Is
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// One chunk's parse result. The ResolvePosition parent is the concrete root
+/// slot path; that pinning goes away when resolve-position-generic-slot.md lands.
 pub struct Slot<T, E> {
     pub item: T,
     pub extra: E,
@@ -63,16 +65,9 @@ pub fn require_complete<T>(
 
 ## Tree types
 
-Before (the series, lists still pinned to optimistic `Slot`):
+A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(
-    pub Vec<WithSpan<Slot<Option<Selection>, Option<WithSpan<UnparsedChunkItems>>>>>,
-);
-```
-
-After: each list holder gets an associated type on `Stage` (`SelectionSet`, `ArgumentList`, …). Form payloads that contain no slot stay unparameterized. `IsoLiteralItem` takes a stage parameter when a variant holds a slot.
+`IsoLiteralParse` is a concrete root singleton so resolve has a named type to parent at. It goes away when resolve-position-generic-slot.md lands. `IsoLiteralItem` takes a stage parameter when a variant holds a type that contains a group.
 
 ## Tree convert
 
@@ -115,4 +110,4 @@ No new slot enum. The `From<Singleton<...>> for IsoLiteralParse<OptimisticStage>
 
 ## Shipping
 
-Lands after the parsing series. One step: `require_complete` / `require_complete_literal` and the nested converts, plus a `Stage` associated type per remaining list holder. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+Lands after the parsing series. One step: `require_complete` / `require_complete_literal` and the nested converts on every `T<S>` that contains a group. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.

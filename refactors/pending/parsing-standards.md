@@ -292,13 +292,16 @@ use crate::{
     ParseError,
 };
 
-/// Unread or failed items from the chunk under parse.
+/// Unread or failed items from the chunk under parse. Concrete leftover holder
+/// parented at the root slot; goes away when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
     #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
+/// Concrete root singleton so resolve has a named type to parent at. Goes away
+/// when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
@@ -335,9 +338,11 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type SlotPath<'a> = PositionResolutionPath<
     &'a Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>,
     IsoLiteralParsePath<'a>,
@@ -348,11 +353,13 @@ pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, Slo
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
 
-/// Extra root chunks after the first. Resolve walks each chunk.
+/// Extra root chunks after the first. Resolve walks each chunk. Concrete holder
+/// for the root singleton; goes away when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
 /// How far along the tree is. A bag of associated types: each names something that
@@ -379,6 +386,8 @@ impl Stage for ArtifactGenerationStage {
     type ExtraChunks = ();
 }
 
+/// One chunk's parse result. The ResolvePosition parent is the concrete root
+/// slot path; that pinning goes away when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Slot<T, E> {
@@ -582,83 +591,7 @@ where
 
 `Slot<T, E>` is `item: T` and `extra: E`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
 
-### Lists
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub struct SelectionSet(
-    #[resolve_field]
-    pub Vec<
-        WithSpan<
-            Slot<
-                Option<Selection>,
-                Option<WithSpan<UnparsedChunkItems>>,
-            >,
-        >,
-    >,
-);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum Selection {
-    Scalar(ScalarSelection),
-    Object(ObjectSelection),
-}
-
-pub struct ScalarSelection {
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    pub name: WithSpan<SelectionName>,
-    pub arguments: Option<WithSpan<ArgumentList>>,
-}
-
-pub struct ObjectSelection {
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    pub name: WithSpan<SelectionName>,
-    pub arguments: Option<WithSpan<ArgumentList>>,
-    pub selection_set: WithSpan<SelectionSet>,
-}
-
-pub struct SelectionAlias;
-
-pub struct SelectionName;
-
-pub struct ArgumentList(
-    #[resolve_field]
-    pub Vec<
-        WithSpan<
-            Slot<
-                Option<Argument>,
-                Option<WithSpan<UnparsedChunkItems>>,
-            >,
-        >,
-    >,
-);
-
-pub enum Argument {
-    Named(NamedArgument),
-}
-
-pub struct NamedArgument {
-    pub name: WithSpan<ArgumentName>,
-    pub value: WithSpan<NonConstantValue>,
-}
-
-pub struct ArgumentName;
-```
-
-Argument lists, object literals, constant object literals, and variable-declaration lists are `Vec<WithSpan<Slot<Option<...>, Option<WithSpan<UnparsedChunkItems>>>>>` the same way.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-        SelectionSet(
-            group
-                .item
-                .children
-                .item
-                .parse_items(cursor.text(), parse_selection, push_error)
-                .collect(),
-        )
-```
+A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
 `UnparsedChunkItems` sits on `Slot.extra`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`.
 
@@ -670,53 +603,26 @@ Argument lists, object literals, constant object literals, and variable-declarat
 - `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`. A nested list also takes `push_error`.
 - Diagnostic: `push_error` on `parse_one_item`, `parse_items`, `parse_singleton`, `parse_iso_literal`. Not stored on the tree.
 
-A group plus its interior:
+A group plus its interior is `consume_group_if` or `require_group`, then `parse_items` or `parse_singleton` on `group.children`:
 
 ```rust
-// from crates/isograph_parser/src/selections.rs
-pub(crate) fn consume_selection_set<F>(
-    cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Option<WithSpan<SelectionSet>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    WithSpan::new(
-        SelectionSet(
-            group
-                .item
-                .children
-                .item
-                .parse_items(cursor.text(), parse_selection, push_error)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_some()
-}
+    group
+        .item
+        .children
+        .item
+        .parse_items(cursor.text(), parse_item, push_error)
+```
 
-pub(crate) fn require_selection_set<F>(
-    cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+```rust
     let group = cursor
         .require_group(BracketKind::Brace)
-        .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
-    WithSpan::new(
-        SelectionSet(
-            group
-                .item
-                .children
-                .item
-                .parse_items(cursor.text(), parse_selection, push_error)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_ok()
-}
+        .map_err(|()| cursor.expected(expectation))?;
+    group
+        .item
+        .children
+        .item
+        .parse_items(cursor.text(), parse_item, push_error)
 ```
 
 ## Dispatch
@@ -772,14 +678,12 @@ where
             };
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return NonConstantValue::Object(ObjectLiteral(
-                group
-                    .item
-                    .children
-                    .item
-                    .parse_items(cursor.text(), parse_object_entry, push_error)
-                    .collect(),
-            )).wrap_ok();
+            return group
+                .item
+                .children
+                .item
+                .parse_items(cursor.text(), parse_object_entry, push_error)
+                .wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
@@ -791,215 +695,25 @@ Keyword text after `require_token(Identifier, ...)` or `consume_token_if(Identif
 One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar)` then `require_token(Identifier)`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
 
 ```rust
-// from crates/isograph_parser/src/selections.rs
-fn parse_selection<F>(
-    cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<Selection, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
     let first = cursor
         .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::Selection))?;
-    let (reader_alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon) {
+        .map_err(|()| cursor.expected(expectation))?;
+    let (alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon) {
         Some(_) => {
             let name = cursor
                 .require_token(NonBracketTokenKind::Identifier)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-            (
-                WithSpan::new(SelectionAlias, first).wrap_some(),
-                WithSpan::new(SelectionName, name),
-            )
+            (first.wrap_some(), name)
         }
-        None => (None, WithSpan::new(SelectionName, first)),
+        None => (None, first),
     };
-    let arguments = consume_argument_list(cursor, push_error);
-    let selection_set = consume_selection_set(cursor, push_error);
-    (match selection_set {
-        Some(selection_set) => Selection::Object(ObjectSelection {
-            reader_alias,
-            name,
-            arguments,
-            selection_set,
-        }),
-        None => Selection::Scalar(ScalarSelection {
-            reader_alias,
-            name,
-            arguments,
-        }),
-    }).wrap_ok()
-}
 ```
 
-`parse_one_item` wraps `parse_selection` in `spanning` and then calls `require_end`. Leftover is extra tokens.
+`parse_one_item` wraps the item parse in `spanning` and then calls `require_end`. Leftover is extra tokens.
 
 ## Narrower types for narrower grammars
 
-Variable defaults are `ConstantValue`. `parse_constant_value` returns `Err` at `$`. `DeclaredVariable::default_value` is `Option<WithSpan<ConstantValue>>`.
-
-```rust
-// from crates/isograph_parser/src/variables.rs
-pub struct DeclaredVariable {
-    pub name: WithSpan<VariableName>,
-    pub type_: WithSpan<TypeAnnotation>,
-    pub default_value: Option<WithSpan<ConstantValue>>,
-}
-
-pub enum TypeAnnotation {
-    Named(NamedTypeAnnotation),
-}
-
-pub struct NamedTypeAnnotation(pub WithSpan<TypeName>);
-
-pub struct TypeName;
-```
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-pub enum NonConstantValue {
-    Variable(VariableUse),
-    String(StringValue),
-    Integer(IntegerValue),
-    Boolean(BooleanValue),
-    Null(NullValue),
-    Object(ObjectLiteral),
-}
-
-pub struct VariableUse {
-    pub dollar: WithSpan<Dollar>,
-    pub name: WithSpan<VariableName>,
-}
-
-pub struct Dollar;
-
-pub struct VariableName;
-
-pub struct StringValue;
-
-pub struct IntegerValue(pub i64);
-
-pub struct NullValue;
-
-pub struct ObjectEntryName;
-
-pub enum ConstantValue {
-    String(StringValue),
-    Integer(IntegerValue),
-    Boolean(BooleanValue),
-    Null(NullValue),
-    Object(ConstantObjectLiteral),
-}
-
-pub struct BooleanValue(pub Boolean);
-
-pub enum Boolean {
-    True,
-    False,
-}
-
-pub struct ObjectLiteral(
-    #[resolve_field]
-    pub Vec<
-        WithSpan<
-            Slot<
-                Option<ObjectEntry>,
-                Option<WithSpan<UnparsedChunkItems>>,
-            >,
-        >,
-    >,
-);
-
-pub enum ObjectEntry {
-    Named(NamedObjectEntry),
-}
-
-pub struct NamedObjectEntry {
-    #[resolve_field]
-    pub name: WithSpan<ObjectEntryName>,
-    #[resolve_field(parent_variant = ObjectEntry)]
-    pub value: WithSpan<NonConstantValue>,
-}
-
-pub struct ConstantObjectLiteral(
-    #[resolve_field]
-    pub Vec<
-        WithSpan<
-            Slot<
-                Option<ConstantObjectEntry>,
-                Option<WithSpan<UnparsedChunkItems>>,
-            >,
-        >,
-    >,
-);
-
-pub enum ConstantObjectEntry {
-    Named(NamedConstantObjectEntry),
-}
-
-pub struct NamedConstantObjectEntry {
-    #[resolve_field]
-    pub name: WithSpan<ObjectEntryName>,
-    #[resolve_field(parent_variant = ConstantObjectEntry)]
-    pub value: WithSpan<ConstantValue>,
-}
-```
-
-`parse_constant_value` is the same ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. Object entries call `parse_constant_object_entry`. The integer arm is the same `token_text(span).parse()` match; that `span` is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_constant_value<F>(
-    cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<WithSpan<ConstantValue>, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
-    cursor.spanning(|cursor| {
-        if cursor
-            .consume_token_if(NonBracketTokenKind::StringLiteral)
-            .is_some()
-        {
-            return ConstantValue::String(StringValue).wrap_ok();
-        }
-        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
-            let value = match cursor.token_text(span).parse() {
-                Ok(value) => value,
-                Err(_) => {
-                    return WithSpan::new(ParseError::IntegerDoesNotFitI64, span).wrap_err();
-                }
-            };
-            return ConstantValue::Integer(IntegerValue(value)).wrap_ok();
-        }
-        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
-            return match cursor.token_text(span) {
-                "true" => ConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
-                "false" => ConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
-                "null" => ConstantValue::Null(NullValue).wrap_ok(),
-                _ => WithSpan::new(
-                    ParseError::expected(
-                        Expectation::ConstantValue,
-                        Found::Token(NonBracketTokenKind::Identifier),
-                    ),
-                    span,
-                ).wrap_err(),
-            };
-        }
-        if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return ConstantValue::Object(ConstantObjectLiteral(
-                group
-                    .item
-                    .children
-                    .item
-                    .parse_items(cursor.text(), parse_constant_object_entry, push_error)
-                    .collect(),
-            )).wrap_ok();
-        }
-        cursor.expected(Expectation::ConstantValue).wrap_err()
-    })
-}
-```
+Variable defaults are constant values. The constant-value ladder is the value ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. The integer arm is the same `token_text(span).parse()` match; that `span` is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
 
 ## Errors
 
@@ -1104,7 +818,7 @@ Tests assert facts about that surface: `require_*` / `consume_*` match and misma
 Each grammar feature then lands on that surface.
 
 - parse-entrypoint.md: `parse_iso_literal`, `parse_singleton` at the root, `entrypoint Type.field`
-- parse-fields.md: `SelectionSet` of `Slot<Option<Selection>, Option<WithSpan<UnparsedChunkItems>>>`, `Clone` on leftover and failed items, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
+- parse-fields.md: field declarations and selection sets via `parse_items`, `Clone` on leftover and failed items, `push_error` through `parse_items`, `ChunkContentItemParent` variant `Unparsed`, `ChunkParent` variant `Extra`
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`

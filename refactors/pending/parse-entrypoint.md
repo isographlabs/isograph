@@ -34,6 +34,8 @@ use crate::{
     parse_singleton,
 };
 
+/// Concrete root singleton so resolve has a named type to parent at. Goes away
+/// when resolve-position-generic-slot.md lands.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
@@ -72,9 +74,11 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type IsoLiteralParsePath<'a> =
     PositionResolutionPath<&'a IsoLiteralParse<OptimisticStage>, ()>;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type SlotPath<'a> = PositionResolutionPath<
     &'a Slot<Option<IsoLiteralItem>, Option<WithSpan<UnparsedChunkItems>>>,
     IsoLiteralParsePath<'a>,
@@ -85,8 +89,10 @@ pub type IsoLiteralItemPath<'a> = PositionResolutionPath<&'a IsoLiteralItem, Slo
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralItemPath<'a>>;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
+// Concrete. Goes away when resolve-position-generic-slot.md lands.
 pub type UnparsedChunkItemsPath<'a> =
     PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
 
