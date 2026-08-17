@@ -193,10 +193,13 @@ pub fn parse_iso_literal(
         push_error(WithSpan::new(ParseError::EmptyLiteral, location));
         return WithSpan::new(
             IsoLiteralParse {
-                item: Slot {
-                    item: None,
-                    extra: None,
-                },
+                item: WithSpan::new(
+                    Slot {
+                        item: None,
+                        extra: None,
+                    },
+                    location,
+                ),
                 extra: None,
             },
             location,
@@ -305,7 +308,7 @@ pub struct UnparsedChunkItems(
 #[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
 pub struct IsoLiteralParse<S: Stage> {
     #[resolve_field]
-    pub item: Slot<S::IsoLiteral, S::UnparsedTokens>,
+    pub item: WithSpan<Slot<S::IsoLiteral, S::UnparsedTokens>>,
     #[resolve_field]
     pub extra: S::ExtraChunks,
 }
@@ -417,7 +420,7 @@ impl
         >,
     ) -> Self {
         IsoLiteralParse {
-            item: singleton.item.item,
+            item: singleton.item,
             extra: singleton.extra,
         }
     }
@@ -585,9 +588,9 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `Slot { item: None, extra: None }`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) plus `S::ExtraChunks` (at the root, `MultipleDeclarations` on the first extra chunk). Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `WithSpan<Slot { item: None, extra: None }>` at the literal span). `item` on the first slot is `Some` when the form parsed.
 
-`Slot<T, E>` is `item: T` and `extra: E`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
+`Slot<T, E>` is `item: T` and `extra: E`. `IsoLiteralParse.item` keeps `parse_one_item`'s `WithSpan`. Resolve walks `IsoLiteralParse<OptimisticStage>` only. `Singleton<T, E>` is the combinator result. `From` builds the root.
 
 A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
