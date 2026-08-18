@@ -959,6 +959,7 @@ dependencies = [
  "safe_peekable",
  "scoped_stack",
  "span",
+ "thiserror 1.0.69",
 ]
 
 [[package]]
