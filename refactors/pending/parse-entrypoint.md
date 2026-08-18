@@ -52,7 +52,6 @@ pub enum IsoLiteralItem {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
-    pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
     #[resolve_field]
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field]
@@ -80,9 +79,6 @@ impl From<intern::string_key::StringKey> for ClientFieldName {
         ClientFieldName(key.to())
     }
 }
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct EntrypointKeyword;
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, SlotPath<'a>>;
@@ -119,7 +115,7 @@ fn parse_iso_literal_item(
         .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
     match cursor.token_text(keyword) {
         text if text == "entrypoint" => {
-            IsoLiteralItem::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
+            IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok()
         }
         text if text == "field" || text == "pointer" => {
             ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
@@ -134,7 +130,6 @@ fn parse_iso_literal_item(
 }
 
 fn parse_entrypoint(
-    keyword: Span,
     cursor: &mut ItemCursor<'_>,
 ) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
     let parent_type = cursor
@@ -147,7 +142,6 @@ fn parse_entrypoint(
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
-        entrypoint_keyword: EntrypointKeyword.with_span(keyword),
         parent_type: cursor
             .token_text(parent_type)
             .intern()
@@ -730,7 +724,6 @@ mod tests {
         let text = "entrypoint Query.foo";
         let (parse, errors) = parsed(text);
         let declaration = as_entrypoint(parse.reference());
-        assert_eq!(declaration.entrypoint_keyword.location, span_of(text, "entrypoint"));
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
         assert_eq!(errors, vec![]);
