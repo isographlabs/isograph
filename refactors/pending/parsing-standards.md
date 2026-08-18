@@ -458,10 +458,21 @@ pub enum Expectation {
 pub enum Found {
     #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("a group opened by {}", opening_bracket_text(*.0))]
+    #[error("a group opened by {0}")]
     Group(BracketKind),
     #[error("nothing more")]
     EndOfChunk,
+}
+
+// from crates/isograph_parser/src/non_bracket_token.rs
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
+pub enum BracketKind {
+    #[strum(to_string = "'('")]
+    Parenthesis,
+    #[strum(to_string = "'{'")]
+    Brace,
+    #[strum(to_string = "'['")]
+    Bracket,
 }
 ```
 
