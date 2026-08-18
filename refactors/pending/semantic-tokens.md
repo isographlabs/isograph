@@ -12,8 +12,6 @@ A `SemanticToken` is a role. `require_token(NonBracketTokenKind::Identifier, Sem
 // from crates/isograph_parser/src/semantic_token.rs
 use span::{Span, WithSpan};
 
-use crate::{BracketKind, NonBracketTokenKind};
-
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SemanticToken {
     Keyword,
@@ -24,79 +22,43 @@ pub enum SemanticToken {
     DirectiveName,
     Variable,
     Argument,
-    Identifier,
     Integer,
     String,
     BooleanOrNull,
     Period,
     Colon,
     Equals,
-    Comma,
     Parenthesis,
     Brace,
+    Content,
     Bracket,
-    LineBreak,
-    EndOfFile,
     Error,
-}
-
-impl SemanticToken {
-    pub fn from_non_bracket(kind: NonBracketTokenKind) -> SemanticToken {
-        match kind {
-            NonBracketTokenKind::Identifier => SemanticToken::Identifier,
-            NonBracketTokenKind::IntegerLiteral => SemanticToken::Integer,
-            NonBracketTokenKind::StringLiteral | NonBracketTokenKind::BlockStringLiteral => {
-                SemanticToken::String
-            }
-            NonBracketTokenKind::Period => SemanticToken::Period,
-            NonBracketTokenKind::Colon => SemanticToken::Colon,
-            NonBracketTokenKind::Dollar => SemanticToken::Variable,
-            NonBracketTokenKind::Equals => SemanticToken::Equals,
-            NonBracketTokenKind::Exclamation => SemanticToken::GraphQLTypeName,
-            NonBracketTokenKind::At => SemanticToken::DirectiveName,
-            NonBracketTokenKind::Comma => SemanticToken::Comma,
-            NonBracketTokenKind::LineBreak => SemanticToken::LineBreak,
-            NonBracketTokenKind::EndOfFile => SemanticToken::EndOfFile,
-            NonBracketTokenKind::Error => SemanticToken::Error,
-        }
-    }
-
-    pub fn from_bracket(kind: BracketKind) -> SemanticToken {
-        match kind {
-            BracketKind::Parenthesis => SemanticToken::Parenthesis,
-            BracketKind::Brace => SemanticToken::Brace,
-            BracketKind::Bracket => SemanticToken::Bracket,
-        }
-    }
 }
 ```
 
-`from_non_bracket` and `from_bracket` are the leftover mapping. Every `NonBracketTokenKind` and every `BracketKind` has a token. Grammar consume does not call them; the call site names the role.
+Grammar consume names the role. Unparsed extra tokens, extra chunks, and the matcher's cut are classified later by `leftover_token`, a free function only that fill-in calls.
 
-Call sites and the leftover mapping, by variant:
+Call sites, by variant:
 
 - `Keyword`: `entrypoint`, `field`, `pointer`, `to`.
 - `Type`: `Query` / `User` in `Type.fieldName`.
 - `FieldName`: `foo` in `Query.foo`, a selection name, and a selection alias. The first identifier of `alias: name` is consumed before the colon is visible; `SafePeekable` has one item of lookahead, so that identifier is `FieldName` on both arms.
 - `ObjectKey`: an object-literal key.
 - `GraphQLTypeName`: a type annotation's name, `!`, and a type-list `[]` the grammar consumes (`Foo`, `Foo!`, `[Foo]`). This variant goes away when type annotations leave the language.
-- `DirectiveName`: `@` and the directive identifier. Leftover `@` is this via `from_non_bracket`.
-- `Variable`: `$` and the variable identifier.
+- `DirectiveName`: `@` and the directive identifier the grammar consumes.
+- `Variable`: `$` and the variable identifier the grammar consumes.
 - `Argument`: an argument name.
-- `Identifier`: leftover identifiers. Grammar consume names a role instead.
-- `Integer`: an integer literal.
-- `String`: a string or block string, including a description.
+- `Integer`: an integer literal the grammar consumes. Leftover fill-in reuses this for an unparsed integer.
+- `String`: a string or block string the grammar consumes, including a description. Leftover fill-in reuses this for an unparsed string.
 - `BooleanOrNull`: `true` / `false` / `null`.
 - `Period`: `.` in `Type.fieldName`.
-- `Colon`: alias, argument, type-annotation, and object-entry colons.
+- `Colon`: alias, argument, type-annotation, and object-entry colons the grammar consumes.
 - `Equals`: a variable default.
-- `Comma`: leftover and separator commas. Grammar consume does not target `Comma`.
-- `Parenthesis`: `(` and `)`.
-- `Brace`: `{` and `}`.
-- `Bracket`: leftover `[]`. A type-list consume passes `GraphQLTypeName` for both sides.
-- `LineBreak`: leftover line breaks. Grammar consume does not target `LineBreak`.
-- `EndOfFile`: the leftover mapping for that kind. `tokenize` does not emit it.
-- `Error`: every error token.
+- `Parenthesis`: `(` and `)` the grammar consumes.
+- `Brace`: `{` and `}` the grammar consumes.
+- `Content`: leftover fill-in only. Identifiers, `@`, `!`, `$`, `.`, `:`, `=`, `,`, and the other non-bracket content kinds that no consume covered.
+- `Bracket`: leftover fill-in only. `(`, `)`, `{`, `}`, `[`, `]` that no consume covered.
+- `Error`: leftover fill-in only. An `Error` token.
 
 Open and close of one `BracketKind` share one token. `consume_group_if(kind, token)` records `token` on the open; `record_group_close(group, token)` records the same `token` on the close.
 
@@ -636,12 +598,12 @@ impl<'a> ItemCursor<'a> {
 }
 ```
 
-`parse_group_items_with_trailing` is the same wrapper around `parse_items_with_trailing`, and lands with that function (parse-fields.md). It takes `token` and passes it to `record_group_close`.
+`parse_group_items_with_trailing` is the same wrapper around `parse_items_with_trailing`, and lands with that function (parse-arguments.md). It takes `token` and passes it to `record_group_close`.
 
 Before (group interior):
 
 ```rust
-// from crates/isograph_parser/src/selections.rs (parse-fields.md)
+// from crates/isograph_parser/src/selections.rs (parse-selection-sets.md)
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
@@ -679,7 +641,7 @@ After:
 
 `parse_value`'s brace arm, `consume_argument_list`, `consume_variable_declaration_list`, and `[...]` via `parse_group_singleton` are the same substitution. Type-list `[...]` passes `SemanticToken::GraphQLTypeName` to both `consume_group_if` / `require_group` and `parse_group_singleton`. Those functions still take only the cursor besides `push_error`.
 
-`parse_group_*` is not landed until `parse_items` is (parse-fields.md). This change lands `record_group_close` and the open-on-consume. parse-fields.md and parse-arguments.md / parse-variables.md use the helper in the snippets above.
+`parse_group_*` is not landed until `parse_items` is (parse-arguments.md). This change lands `record_group_close` and the open-on-consume. parse-selection-sets.md and parse-arguments.md / parse-variables.md use the helper in the snippets above.
 
 ### Pending grammar call sites
 
@@ -860,7 +822,7 @@ parse-pointers.md (origin `refactors/pending/parse-pointers.md`):
         .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
 ```
 
-When directives land, `@name` is `consume_token_if(At, DirectiveName)` then `require_token(Identifier, DirectiveName)`. Until then leftover fill-in maps `@` to `DirectiveName` and the identifier to `Identifier`.
+When directives land, `@name` is `consume_token_if(At, DirectiveName)` then `require_token(Identifier, DirectiveName)`. Until then leftover `@name` is `Content` at `@` and `Content` at `name`.
 
 ### Threading through the list helpers
 
@@ -958,7 +920,7 @@ where
 }
 ```
 
-`parse_items` (parsing-standards.md, lands in parse-fields.md) takes `tokens: &mut Vec<WithSpan<SemanticToken>>` and passes it to each `parse_one_item`. Sequential chunks: the previous `ChunkStream` is dropped before the next `stream` reborrows `tokens`.
+`parse_items` (parsing-standards.md, lands in parse-arguments.md) takes `tokens: &mut Vec<WithSpan<SemanticToken>>` and passes it to each `parse_one_item`. Sequential chunks: the previous `ChunkStream` is dropped before the next `stream` reborrows `tokens`.
 
 ### Entry point
 
@@ -1010,17 +972,15 @@ Leftover items (`asdf`) and separator commas are not consumed, so they are not r
 Every byte of the literal is classified by at most one of these. Diagnostics stay a third channel:
 
 1. Recorded: a token or bracket the grammar consumed, classified by the `SemanticToken` the call site passed.
-2. Lexical fill-in (later): a token no consume covered (leftover, a separator comma, text in the matcher's cut, an `Error` token). Classification is `from_non_bracket` / `from_bracket`.
+2. Lexical fill-in (later): a token no consume covered (unparsed extra tokens, extra chunks, a separator comma, text in the matcher's cut, an `Error` token). Classification is `leftover_token`: `Content`, `Integer`, `String`, `Bracket`, or `Error`.
 3. Diagnostics: the matcher's vec, chunking's `CommaWithoutItem` vec, and `push_error`. An `Error` token is highlighting. It does not replace a diagnostic.
 
-So `foo ( asfd`: `foo` is recorded as `FieldName` when that consume ran; `(` is an unmatched-open diagnostic and is not in the tree; `asfd` sits in the cut and, after fill-in, highlights as `Identifier`. After fill-in the `(` highlights as `Parenthesis`.
+So `foo ( asfd`: `foo` is recorded as `FieldName` when that consume ran; `(` is an unmatched-open diagnostic and is not in the tree; `asfd` sits in the cut and, after fill-in, highlights as `Content`. After fill-in the `(` highlights as `Bracket`.
 
 ### Tests
 
 No snapshots. Facts:
 
-- `from_non_bracket` on each `NonBracketTokenKind` is the mapping in `What a token is`. `Error` is `Error`. `Comma` is `Comma`. `At` is `DirectiveName`. `Dollar` is `Variable`. `Exclamation` is `GraphQLTypeName`. `StringLiteral` and `BlockStringLiteral` are `String`.
-- `from_bracket` on `Parenthesis` / `Brace` / `Bracket` is `Parenthesis` / `Brace` / `Bracket`.
 - `require_token(Identifier, Keyword)` on `entrypoint` yields `[Keyword @ entrypoint]`.
 - `require_token(Identifier, Type)` on `Query` yields `[Type @ Query]`.
 - `require_token(Identifier, FieldName)` on `foo` yields `[FieldName @ foo]`.
@@ -1048,13 +1008,13 @@ No snapshots. Facts:
     }
 ```
 
-Existing consume tests pass `&mut Vec::new()` and a `SemanticToken` on every `consume_*` / `require_*`. They do not assert on the vec. Collecting tests pass a vec and assert its contents. Matching tests that do not care about the role pass `from_non_bracket(kind)` / `from_bracket(kind)`.
+Existing consume tests pass `&mut Vec::new()` and a `SemanticToken` on every `consume_*` / `require_*`. They do not assert on the vec. Collecting tests pass a vec and assert its contents. Matching tests that do not care about the role pass any `SemanticToken`.
 
 ### Docs this change amends
 
 - parsing-standards.md: `ItemCursor` gains `tokens: &'a mut Vec<WithSpan<SemanticToken>>`. `consume_token_if` / `require_token` take `(NonBracketTokenKind, SemanticToken)`. `consume_group_if` / `require_group` take `(BracketKind, SemanticToken)`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take the vec. Catalog adds `record`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper. The value ladder, `$name`, alias, and `to` listings pass the tokens in Pending grammar call sites.
 - parse-entrypoint.md: `parse_iso_literal` takes `tokens: &mut Vec<WithSpan<SemanticToken>>`. The keyword / type / period / field-name consumes pass the tokens above.
-- parse-fields.md, parse-arguments.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each consume listed above.
+- parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each consume listed above.
 - parsing-plan.md: tokens are recorded during parse into a vec. `require_token` takes the role.
 
 ## 3. Construct with a noop or a non-noop
@@ -1237,7 +1197,7 @@ The change-2 facts still hold against `CollectedSemanticTokens`. Added:
 
 - parsing-standards.md: `ItemCursor` / `ChunkStream` gain `TTokens`. List helpers are generic over `TTokens: SemanticTokens`. Grammar functions take `ItemCursor<'_, TTokens>`. Catalog replaces the vec with `SemanticTokens`, `CollectedSemanticTokens::new`, `NoSemanticTokens::new`.
 - parse-entrypoint.md: `parse_iso_literal` is generic over `TTokens`.
-- parse-fields.md, parse-arguments.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each `parse_*` gains `TTokens: SemanticTokens`.
+- parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each `parse_*` gains `TTokens: SemanticTokens`.
 - spanless-parsing.md: the cheap pass is `NoSemanticTokens::new()` plus `NoSpan`.
 
 ## Later changes
@@ -1246,11 +1206,45 @@ Each is independently shippable.
 
 ### Drop `GraphQLTypeName`
 
-When type annotations leave the language, `GraphQLTypeName` leaves this enum. `from_non_bracket(Exclamation)` and the type-annotation call sites go with it.
+When type annotations leave the language, `GraphQLTypeName` leaves this enum. The type-annotation call sites go with it.
 
 ### Leftover fill-in
 
-A walk over `tokenize(text)` that emits `from_non_bracket` / `from_bracket` for every token whose span is not already in the collected vec, in source order. Separators, leftover items, the matcher's cut, and `Error` tokens get those tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
+A walk over `tokenize(text)` that emits `leftover_token` for every token whose span is not already in the collected vec, in source order. This covers `Slot.extra_tokens`, `Singleton.extra_chunks`, separator commas, the matcher's cut, and `Error` tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
+
+`leftover_token` is a free function only leftover fill-in calls. It picks one of four format buckets, or `Error`.
+
+```rust
+// from crates/isograph_parser/src/semantic_token.rs
+// Only leftover fill-in: extra_tokens, extra_chunks, the matcher's cut.
+fn leftover_token(kind: SplitToken) -> Option<SemanticToken> {
+    match kind {
+        SplitToken::NonBracket(NonBracketTokenKind::IntegerLiteral) => {
+            SemanticToken::Integer.wrap_some()
+        }
+        SplitToken::NonBracket(
+            NonBracketTokenKind::StringLiteral | NonBracketTokenKind::BlockStringLiteral,
+        ) => SemanticToken::String.wrap_some(),
+        SplitToken::NonBracket(NonBracketTokenKind::Error) => SemanticToken::Error.wrap_some(),
+        SplitToken::NonBracket(NonBracketTokenKind::LineBreak | NonBracketTokenKind::EndOfFile) => {
+            None
+        }
+        SplitToken::NonBracket(_) => SemanticToken::Content.wrap_some(),
+        SplitToken::Bracket(_) => SemanticToken::Bracket.wrap_some(),
+    }
+}
+```
+
+`Content` is identifiers, `@`, `!`, `$`, `.`, `:`, `=`, `,`. `Bracket` is any leftover `(`, `)`, `{`, `}`, `[`, `]`. A leftover `@lazy` is `Content` at `@` and `Content` at `lazy`. A leftover `$` is `Content`. A leftover `!` is `Content`. A leftover `[` is `Bracket`.
+
+Facts:
+
+- `leftover_token` on `Identifier`, `At`, `Exclamation`, `Dollar`, `Period`, `Colon`, `Equals`, and `Comma` is `Content`.
+- `leftover_token` on `IntegerLiteral` is `Integer`. On `StringLiteral` and `BlockStringLiteral` is `String`. On `Error` is `Error`.
+- `leftover_token` on each `BracketToken` is `Bracket`.
+- `leftover_token` on `LineBreak` and `EndOfFile` is `None`.
+- After fill-in, `entrypoint Query.foo bar` has the four consumed tokens plus `Content` at `bar`.
+- After fill-in, `entrypoint Query.foo @lazy` has `Content` at `@` and `Content` at `lazy`.
 
 ### Formatter metadata
 
