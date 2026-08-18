@@ -109,7 +109,7 @@ Do not pass a value that is used only on one arm of the `Result` or `Option` the
 
 ## Postfix wrappers
 
-Do not write prefix or constructor wrappers that `prelude::Postfix` already names. Write the method.
+Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::WithSpanPostfix` already names. Write the method.
 
 - `Ok(value)` / `Err(value)` / `Some(value)` → `value.wrap_ok()` / `value.wrap_err()` / `value.wrap_some()`
 - `Box::new(value)` → `value.boxed()`
@@ -117,12 +117,13 @@ Do not write prefix or constructor wrappers that `prelude::Postfix` already name
 - `value.into()` → `value.to()`
 - `*value` when copying out of a `Deref` whose target is `Copy` → `value.dereference()`
 - `&value` when taking a shared reference to a value → `value.reference()`
+- `WithSpan::new(item, span)` → `item.with_span(span)`
 
 Patterns stay: `if let Some(x)`, `match r { Ok(v) =>`, `let Err(e) =`, `matches!(x, Some(_))`. `None` has no value to wrap; it stays `None`.
 
 `&T` / `&str` / `&[T]` in type position, `&mut`, `&self`, and `&mut self` stay. Empty `vec![]` and `vec![a, b, ..]` stay. Prefix `&` also stays when `Postfix` cannot express it: `s[i..]` is unsized, `let x = &foo()` relies on temporary lifetime extension that `foo().reference()` does not get, and `&|...|` is what higher-ranked `Fn` bounds need. `.to()` takes a turbofish when the target type is not inferred.
 
-The bodies of these methods in prelude are the one place the std forms appear.
+The bodies of these methods in prelude are the one place the std forms appear. `WithSpan::new` appears only in the body of `span::WithSpanPostfix::with_span`.
 
 `crates/prelude` holds the enforcement: `clippy.toml` bans `dbg` / `dbg_with_note` / `note_do_not_commit`, and `postfix_constructors` flags `Ok`/`Err`/`Some`, `Box::new`, one-element `vec![]`, and `.into()`. It does not enforce `.reference()` or `.dereference()`: prefix `&` and `*` are also types, mutable places, and patterns, and a walk cannot tell those from a value borrow or a copy-out without too many holes. Still write `.reference()` and `.dereference()` in new code.
 
