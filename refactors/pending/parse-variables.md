@@ -142,7 +142,7 @@ pub type ListTypeAnnotationPath<'a> =
 pub type TypeNamePath<'a> = PositionResolutionPath<&'a TypeName, NamedTypeAnnotationPath<'a>>;
 ```
 
-A position on `$` answers `DeclaredVariable`. A position on `!` answers the annotation (`NamedTypeAnnotation` or `ListTypeAnnotation`). There is no `Exclamation` field. Non-null is part of the annotation's spanning span, not a stored marker.
+A position on `$` answers `DeclaredVariable`. `parse_type_annotation`'s `spanning` covers a trailing `!`. A position on `!` answers `NamedTypeAnnotation` or `ListTypeAnnotation` (the `Foo!` / `[Foo]!` node). Hover uses that node. There is no `Exclamation` field and no `NonNull` variant.
 
 `TypeAnnotation` is the slot item inside `[...]`. `Slot<TypeAnnotation, UnparsedChunkItems>::Parent` is `TypeAnnotation::Parent`, which is `TypeAnnotationParent`. `#[resolve_field(parent_variant = List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover `parent_from` wraps that same parent:
 
@@ -565,6 +565,18 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
                 assert!(matches!(name.parent, VariableNameParent::Declaration(_)));
             }
             node => panic!("expected the variable name leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_bang_resolves_to_the_annotation() {
+        let text = "field Query.Foo($id: ID!) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "!")) {
+            IsographResolutionNode::NamedTypeAnnotation(annotation) => {
+                assert_eq!(annotation.inner.name.location, span_of(text, "ID"));
+            }
+            node => panic!("expected the named type, got {node:?}"),
         }
     }
 ```

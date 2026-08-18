@@ -225,9 +225,24 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 The derive emits one impl per type. `self_type_generics = <IsoLiteralItem, UnparsedChunkItems>` is only `Slot<IsoLiteralItem, UnparsedChunkItems>`. A selection set is `Slot<Selection, UnparsedChunkItems>` and needs the generic impl.
 
-`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent: `SelectionSetPath` for a selection, `IsoLiteralParsePath` for a declaration, `TypeAnnotationParent` for a list-type element. `parent_from` on both fields forwards that parent. `Slot` is not a path segment and is not a `ResolvedNode` variant.
+`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent. That parent is the container the slot sits in:
 
-A leftover gap is a position in the slot span but in neither field. `entrypoint Query.foo bar`: if leftover were tight to `bar`, the space after `foo` would be in the slot and in neither field. With no `Slot` fallback, `resolve` would not return. Leftover span starts at `item.location.end`, so that space is inside `extra_tokens`. Form `Ok` with no leftover: slot span is the item span. Form `Err`: extra is the whole chunk. Every position in the slot is in a field.
+- `Slot<Selection, _>` sits in a `SelectionSet`, and `Selection::Parent` is `SelectionSetPath`
+- `Slot<IsoLiteralItem, _>` sits in the root singleton, and `IsoLiteralItem::Parent` is `IsoLiteralParsePath`
+- `Slot<TypeAnnotation, _>` sits in a `ListTypeAnnotation`, and `TypeAnnotation::Parent` is `TypeAnnotationParent` (`List` wraps that list-type path)
+
+`parent_from` on both fields forwards that parent into the child. `From<P> for P` is identity for the item. `From<P> for UnparsedChunkItemsParent` wraps leftover. `Slot` is not a path segment and is not a `ResolvedNode` variant.
+
+A leftover gap is a position in the slot span but in neither field. Take `entrypoint Query.foo bar`:
+
+- `item` span is `entrypoint Query.foo`
+- leftover items start at `bar`
+
+If leftover span were tight to `bar`, the space after `foo` would be in the slot span and in neither field. The pinned impl answers that space with `IsographResolutionNode::Slot`. The generic impl has no `Slot` fallback (both fields are `parent_from`), so `resolve` would not return.
+
+Leftover span starts at `item.location.end`, so that space is inside `extra_tokens`. A position on the space answers `UnparsedChunkItems`. A position on `bar` answers the token.
+
+Form `Ok` with no leftover: slot span is the item span. Form `Err`: extra is the whole chunk. Every position in the slot is in a field.
 
 ## Change 2: `parse_items`
 
