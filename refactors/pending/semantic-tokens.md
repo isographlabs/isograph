@@ -6,7 +6,7 @@ Three shippable changes. The first folds every logos error kind into `NonBracket
 
 ## What a token is
 
-A `SemanticToken` is a role. `require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)` records `Keyword`. The same identifier kind records `Type` or `FieldName` at the call sites that consume those roles.
+A `SemanticToken` is a role. `require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)` records `Keyword`. The same identifier kind records `Type`, `FieldName`, `ObjectKey`, or `GraphQLTypeName` at the call sites that consume those roles.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
@@ -19,6 +19,8 @@ pub enum SemanticToken {
     Keyword,
     Type,
     FieldName,
+    ObjectKey,
+    GraphQLTypeName,
     DirectiveName,
     Variable,
     Argument,
@@ -50,7 +52,7 @@ impl SemanticToken {
             NonBracketTokenKind::Colon => SemanticToken::Colon,
             NonBracketTokenKind::Dollar => SemanticToken::Variable,
             NonBracketTokenKind::Equals => SemanticToken::Equals,
-            NonBracketTokenKind::Exclamation => SemanticToken::Type,
+            NonBracketTokenKind::Exclamation => SemanticToken::GraphQLTypeName,
             NonBracketTokenKind::At => SemanticToken::DirectiveName,
             NonBracketTokenKind::Comma => SemanticToken::Comma,
             NonBracketTokenKind::LineBreak => SemanticToken::LineBreak,
@@ -74,8 +76,10 @@ impl SemanticToken {
 Call sites and the leftover mapping, by variant:
 
 - `Keyword`: `entrypoint`, `field`, `pointer`, `to`.
-- `Type`: `Query` / `User` in `Type.fieldName`, a type annotation's name, `!`, and a type-list `[]` the grammar consumes.
-- `FieldName`: `foo` in `Query.foo`, a selection name, a selection alias, an object-literal key.
+- `Type`: `Query` / `User` in `Type.fieldName`.
+- `FieldName`: `foo` in `Query.foo`, a selection name, and a selection alias. The first identifier of `alias: name` is consumed before the colon is visible; `SafePeekable` has one item of lookahead, so that identifier is `FieldName` on both arms.
+- `ObjectKey`: an object-literal key.
+- `GraphQLTypeName`: a type annotation's name, `!`, and a type-list `[]` the grammar consumes (`Foo`, `Foo!`, `[Foo]`). This variant goes away when type annotations leave the language.
 - `DirectiveName`: `@` and the directive identifier. Leftover `@` is this via `from_non_bracket`.
 - `Variable`: `$` and the variable identifier.
 - `Argument`: an argument name.
@@ -89,7 +93,7 @@ Call sites and the leftover mapping, by variant:
 - `Comma`: leftover and separator commas. Grammar consume does not target `Comma`.
 - `Parenthesis`: `(` and `)`.
 - `Brace`: `{` and `}`.
-- `Bracket`: leftover `[]`. A type-list consume passes `Type` for both sides.
+- `Bracket`: leftover `[]`. A type-list consume passes `GraphQLTypeName` for both sides.
 - `LineBreak`: leftover line breaks. Grammar consume does not target `LineBreak`.
 - `EndOfFile`: the leftover mapping for that kind. `tokenize` does not emit it.
 - `Error`: every error token.
@@ -166,7 +170,7 @@ Delta, common to the recording changes below:
 
 - `require_token` / `consume_token_if` take the kind and the `SemanticToken`. `require_group` / `consume_group_if` take the `BracketKind` and the `SemanticToken`.
 - Open and close share one token. Upstream splits `ST_OPEN_PAREN` / `ST_CLOSE_PAREN` (and the brace pair) for formatter metadata.
-- One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` / `ST_TYPE_ANNOTATION` and `!` are `Type`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` / `ST_OBJECT_LITERAL_KEY` are `FieldName`; `ST_STRING_LITERAL` covers string and block string.
+- One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` is `Type`; `ST_TYPE_ANNOTATION` and `!` are `GraphQLTypeName`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` are `FieldName`; `ST_OBJECT_LITERAL_KEY` is `ObjectKey`; `ST_STRING_LITERAL` covers string and block string.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.
@@ -673,7 +677,7 @@ After:
     .wrap_ok()
 ```
 
-`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_declaration_list`, and `[...]` via `parse_group_singleton` are the same substitution. Type-list `[...]` passes `SemanticToken::Type` to both `consume_group_if` / `require_group` and `parse_group_singleton`. Those functions still take only the cursor besides `push_error`.
+`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_declaration_list`, and `[...]` via `parse_group_singleton` are the same substitution. Type-list `[...]` passes `SemanticToken::GraphQLTypeName` to both `consume_group_if` / `require_group` and `parse_group_singleton`. Those functions still take only the cursor besides `push_error`.
 
 `parse_group_*` is not landed until `parse_items` is (parse-fields.md). This change lands `record_group_close` and the open-on-consume. parse-fields.md and parse-arguments.md / parse-variables.md use the helper in the snippets above.
 
@@ -711,6 +715,8 @@ parse-fields.md (`parse_field`, origin `refactors/pending/parse-fields.md`):
                 })?;
 ```
 
+Both identifiers are `FieldName`. The first is consumed before the colon is visible.
+
 `require_selection_set` / `consume_selection_set` pass `SemanticToken::Brace` as in the group-interior snippet above.
 
 parse-arguments.md (origin `refactors/pending/parse-arguments.md` and `refactors/pending/parsing-standards.md`):
@@ -733,7 +739,7 @@ parse-arguments.md (origin `refactors/pending/parse-arguments.md` and `refactors
 ```rust
 // from crates/isograph_parser/src/arguments.rs
     let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::ObjectKey)
         .map_err(|()| cursor.expected(Expectation::ObjectEntry))?;
     cursor
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
@@ -775,7 +781,7 @@ parse-arguments.md (origin `refactors/pending/parse-arguments.md` and `refactors
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace) {
 ```
 
-`parse_constant_value` (parse-variables.md) is the same ladder without the `$` arm, with the same tokens on the remaining arms.
+`parse_constant_value` (parse-variables.md) is the same ladder without the `$` arm, with the same tokens on the remaining arms. A constant object-entry key is `ObjectKey`.
 
 parse-variables.md (origin `refactors/pending/parse-variables.md`):
 
@@ -802,24 +808,27 @@ parse-variables.md (origin `refactors/pending/parse-variables.md`):
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-        if let Some(name) =
-            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::Type)
-        {
-            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::Type);
+        if let Some(name) = cursor.consume_token_if(
+            NonBracketTokenKind::Identifier,
+            SemanticToken::GraphQLTypeName,
+        ) {
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::GraphQLTypeName);
 ```
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-        if let Some(group) = cursor.consume_group_if(BracketKind::Bracket, SemanticToken::Type) {
+        if let Some(group) =
+            cursor.consume_group_if(BracketKind::Bracket, SemanticToken::GraphQLTypeName)
+        {
             let inner = parse_bracket_interior_type(
                 cursor.text(),
                 group.item.children.reference(),
                 push_error,
             )?;
-            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::Type);
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::GraphQLTypeName);
 ```
 
-The `[...]` interior goes through `parse_group_singleton(group, SemanticToken::Type, ...)`. Both sides of the type list are `Type`.
+The `[...]` interior goes through `parse_group_singleton(group, SemanticToken::GraphQLTypeName, ...)`. Both sides of the type list are `GraphQLTypeName`.
 
 parse-descriptions.md (origin `refactors/pending/parse-descriptions.md`):
 
@@ -1010,11 +1019,14 @@ So `foo ( asfd`: `foo` is recorded as `FieldName` when that consume ran; `(` is 
 
 No snapshots. Facts:
 
-- `from_non_bracket` on each `NonBracketTokenKind` is the mapping in `What a token is`. `Error` is `Error`. `Comma` is `Comma`. `At` is `DirectiveName`. `Dollar` is `Variable`. `Exclamation` is `Type`. `StringLiteral` and `BlockStringLiteral` are `String`.
+- `from_non_bracket` on each `NonBracketTokenKind` is the mapping in `What a token is`. `Error` is `Error`. `Comma` is `Comma`. `At` is `DirectiveName`. `Dollar` is `Variable`. `Exclamation` is `GraphQLTypeName`. `StringLiteral` and `BlockStringLiteral` are `String`.
 - `from_bracket` on `Parenthesis` / `Brace` / `Bracket` is `Parenthesis` / `Brace` / `Bracket`.
 - `require_token(Identifier, Keyword)` on `entrypoint` yields `[Keyword @ entrypoint]`.
 - `require_token(Identifier, Type)` on `Query` yields `[Type @ Query]`.
 - `require_token(Identifier, FieldName)` on `foo` yields `[FieldName @ foo]`.
+- `require_token(Identifier, ObjectKey)` on `id` yields `[ObjectKey @ id]`.
+- `require_token(Identifier, GraphQLTypeName)` on `Foo` yields `[GraphQLTypeName @ Foo]`.
+- `alias: name` records `FieldName` at `alias`, `Colon` at `:`, `FieldName` at `name`.
 - `require_token(Period, Period)` when the next item is an identifier records nothing and returns `Err(())`.
 - `consume_token_if` that does not match records nothing.
 - `consume_group_if(Brace, Brace)` on `{ bar }` records `Brace` at `{`. `record_group_close(group, Brace)` then records `Brace` at `}`.
@@ -1231,6 +1243,10 @@ The change-2 facts still hold against `CollectedSemanticTokens`. Added:
 ## Later changes
 
 Each is independently shippable.
+
+### Drop `GraphQLTypeName`
+
+When type annotations leave the language, `GraphQLTypeName` leaves this enum. `from_non_bracket(Exclamation)` and the type-annotation call sites go with it.
 
 ### Leftover fill-in
 
