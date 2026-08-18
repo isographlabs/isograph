@@ -1,82 +1,100 @@
 # Semantic tokens
 
-The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. `require_token` takes a token kind, not a legend class. The tree does not mention tokens; they are a sibling of the tree, not a field on it.
+The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. Each of those methods takes the `SemanticToken` the call site is consuming. The tree does not mention tokens; they are a sibling of the tree, not a field on it.
 
-Two shippable changes. The first always constructs tokens into a `Vec`. The second makes the collector a type parameter so the parse can be constructed with a noop or a non-noop.
+Three shippable changes. The first folds every logos error kind into `NonBracketTokenKind::Error`. The second always constructs tokens into a `Vec`. The third makes the collector a type parameter so the parse can be constructed with a noop or a non-noop.
 
 ## What a token is
 
-First pass classifies by the kind just consumed. `require_token(NonBracketTokenKind::Identifier)` records `SemanticToken::Identifier`. An identifier that is a keyword, a type name, or a field name is still `Identifier` until the reclassify change.
+A `SemanticToken` is a role. `require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)` records `Keyword`. The same identifier kind records `Type` or `FieldName` at the call sites that consume those roles.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
 use span::{Span, WithSpan};
 
+use crate::{BracketKind, NonBracketTokenKind};
+
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
 pub enum SemanticToken {
+    Keyword,
+    Type,
+    FieldName,
+    DirectiveName,
+    Variable,
+    Argument,
     Identifier,
     Integer,
     String,
-    BlockString,
+    BooleanOrNull,
     Period,
     Colon,
-    Dollar,
     Equals,
-    Exclamation,
-    At,
-    OpenParenthesis,
-    CloseParenthesis,
-    OpenBrace,
-    CloseBrace,
-    OpenBracket,
-    CloseBracket,
+    Comma,
+    Parenthesis,
+    Brace,
+    Bracket,
+    LineBreak,
+    EndOfFile,
+    Error,
 }
 
 impl SemanticToken {
-    pub fn from_non_bracket(kind: NonBracketTokenKind) -> Option<SemanticToken> {
+    pub fn from_non_bracket(kind: NonBracketTokenKind) -> SemanticToken {
         match kind {
-            NonBracketTokenKind::Identifier => SemanticToken::Identifier.wrap_some(),
-            NonBracketTokenKind::IntegerLiteral => SemanticToken::Integer.wrap_some(),
-            NonBracketTokenKind::StringLiteral => SemanticToken::String.wrap_some(),
-            NonBracketTokenKind::BlockStringLiteral => SemanticToken::BlockString.wrap_some(),
-            NonBracketTokenKind::Period => SemanticToken::Period.wrap_some(),
-            NonBracketTokenKind::Colon => SemanticToken::Colon.wrap_some(),
-            NonBracketTokenKind::Dollar => SemanticToken::Dollar.wrap_some(),
-            NonBracketTokenKind::Equals => SemanticToken::Equals.wrap_some(),
-            NonBracketTokenKind::Exclamation => SemanticToken::Exclamation.wrap_some(),
-            NonBracketTokenKind::At => SemanticToken::At.wrap_some(),
-            NonBracketTokenKind::Comma
-            | NonBracketTokenKind::LineBreak
-            | NonBracketTokenKind::EndOfFile
-            | NonBracketTokenKind::Error
-            | NonBracketTokenKind::ErrorUnterminatedString
-            | NonBracketTokenKind::ErrorUnsupportedStringCharacter
-            | NonBracketTokenKind::ErrorUnterminatedBlockString
-            | NonBracketTokenKind::ErrorNumberLiteralLeadingZero
-            | NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid
-            | NonBracketTokenKind::ErrorFloatLiteralMissingZero => None,
+            NonBracketTokenKind::Identifier => SemanticToken::Identifier,
+            NonBracketTokenKind::IntegerLiteral => SemanticToken::Integer,
+            NonBracketTokenKind::StringLiteral | NonBracketTokenKind::BlockStringLiteral => {
+                SemanticToken::String
+            }
+            NonBracketTokenKind::Period => SemanticToken::Period,
+            NonBracketTokenKind::Colon => SemanticToken::Colon,
+            NonBracketTokenKind::Dollar => SemanticToken::Variable,
+            NonBracketTokenKind::Equals => SemanticToken::Equals,
+            NonBracketTokenKind::Exclamation => SemanticToken::Type,
+            NonBracketTokenKind::At => SemanticToken::DirectiveName,
+            NonBracketTokenKind::Comma => SemanticToken::Comma,
+            NonBracketTokenKind::LineBreak => SemanticToken::LineBreak,
+            NonBracketTokenKind::EndOfFile => SemanticToken::EndOfFile,
+            NonBracketTokenKind::Error => SemanticToken::Error,
         }
     }
 
-    pub fn for_open(kind: BracketKind) -> SemanticToken {
+    pub fn from_bracket(kind: BracketKind) -> SemanticToken {
         match kind {
-            BracketKind::Parenthesis => SemanticToken::OpenParenthesis,
-            BracketKind::Brace => SemanticToken::OpenBrace,
-            BracketKind::Bracket => SemanticToken::OpenBracket,
-        }
-    }
-
-    pub fn for_close(kind: BracketKind) -> SemanticToken {
-        match kind {
-            BracketKind::Parenthesis => SemanticToken::CloseParenthesis,
-            BracketKind::Brace => SemanticToken::CloseBrace,
-            BracketKind::Bracket => SemanticToken::CloseBracket,
+            BracketKind::Parenthesis => SemanticToken::Parenthesis,
+            BracketKind::Brace => SemanticToken::Brace,
+            BracketKind::Bracket => SemanticToken::Bracket,
         }
     }
 }
 ```
 
-`from_non_bracket` is `None` for kinds the grammar stage does not consume (`Comma` and `LineBreak` live on chunk boundaries; `Error*` and `EndOfFile` are not `require_token` targets). Those spans get tokens only in the leftover fill-in change.
+`from_non_bracket` and `from_bracket` are the leftover mapping. Every `NonBracketTokenKind` and every `BracketKind` has a token. Grammar consume does not call them; the call site names the role.
+
+Call sites and the leftover mapping, by variant:
+
+- `Keyword`: `entrypoint`, `field`, `pointer`, `to`.
+- `Type`: `Query` / `User` in `Type.fieldName`, a type annotation's name, `!`, and a type-list `[]` the grammar consumes.
+- `FieldName`: `foo` in `Query.foo`, a selection name, a selection alias, an object-literal key.
+- `DirectiveName`: `@` and the directive identifier. Leftover `@` is this via `from_non_bracket`.
+- `Variable`: `$` and the variable identifier.
+- `Argument`: an argument name.
+- `Identifier`: leftover identifiers. Grammar consume names a role instead.
+- `Integer`: an integer literal.
+- `String`: a string or block string, including a description.
+- `BooleanOrNull`: `true` / `false` / `null`.
+- `Period`: `.` in `Type.fieldName`.
+- `Colon`: alias, argument, type-annotation, and object-entry colons.
+- `Equals`: a variable default.
+- `Comma`: leftover and separator commas. Grammar consume does not target `Comma`.
+- `Parenthesis`: `(` and `)`.
+- `Brace`: `{` and `}`.
+- `Bracket`: leftover `[]`. A type-list consume passes `Type` for both sides.
+- `LineBreak`: leftover line breaks. Grammar consume does not target `LineBreak`.
+- `EndOfFile`: the leftover mapping for that kind. `tokenize` does not emit it.
+- `Error`: every error token.
+
+Open and close of one `BracketKind` share one token. `consume_group_if(kind, token)` records `token` on the open; `record_group_close(group, token)` records the same `token` on the close.
 
 No `line_behavior` / `indent_change` on this type. Upstream puts both on `IsographSemanticToken` and the formatter walks that vec. Formatter metadata is a later change on this same type.
 
@@ -144,18 +162,206 @@ let dot = tokens
     .parse_token_of_kind(IsographLangTokenKind::Period, semantic_token_legend::ST_DOT)?;
 ```
 
-Delta, common to both changes below:
+Delta, common to the recording changes below:
 
-- `require_token` / `consume_token_if` take only the token kind. The recorded class is `SemanticToken::from_non_bracket(kind)`. The call site does not name a legend entry.
+- `require_token` / `consume_token_if` take the kind and the `SemanticToken`. `require_group` / `consume_group_if` take the `BracketKind` and the `SemanticToken`.
+- Open and close share one token. Upstream splits `ST_OPEN_PAREN` / `ST_CLOSE_PAREN` (and the brace pair) for formatter metadata.
+- One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` / `ST_TYPE_ANNOTATION` and `!` are `Type`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` / `ST_OBJECT_LITERAL_KEY` are `FieldName`; `ST_STRING_LITERAL` covers string and block string.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.
 
-## 1. Always record into a `Vec`
+## 1. One `Error` kind
+
+`NonBracketTokenKind` has one error variant. Logos still has one variant per error regex. The split folds them.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum NonBracketTokenKind {
+    Error,
+    ErrorUnterminatedString,
+    ErrorUnsupportedStringCharacter,
+    ErrorUnterminatedBlockString,
+    At,
+    Colon,
+    Dollar,
+    EndOfFile,
+    Equals,
+    Exclamation,
+    Identifier,
+    IntegerLiteral,
+    LineBreak,
+    ErrorNumberLiteralLeadingZero,
+    ErrorNumberLiteralTrailingInvalid,
+    ErrorFloatLiteralMissingZero,
+    Period,
+    Comma,
+    StringLiteral,
+    BlockStringLiteral,
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+/// `IsographLangTokenKind` with the six bracket tokens unrepresentable. Every logos error
+/// kind is `Error`.
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub enum NonBracketTokenKind {
+    Error,
+    At,
+    Colon,
+    Dollar,
+    EndOfFile,
+    Equals,
+    Exclamation,
+    Identifier,
+    IntegerLiteral,
+    LineBreak,
+    Period,
+    Comma,
+    StringLiteral,
+    BlockStringLiteral,
+}
+```
+
+Before (`From<IsographLangTokenKind> for SplitToken` error arms):
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            IsographLangTokenKind::Error => SplitToken::NonBracket(NonBracketTokenKind::Error),
+            IsographLangTokenKind::ErrorUnterminatedString => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnterminatedString)
+            }
+            IsographLangTokenKind::ErrorUnsupportedStringCharacter => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnsupportedStringCharacter)
+            }
+            IsographLangTokenKind::ErrorUnterminatedBlockString => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnterminatedBlockString)
+            }
+```
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            IsographLangTokenKind::ErrorNumberLiteralLeadingZero => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorNumberLiteralLeadingZero)
+            }
+            IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid)
+            }
+            IsographLangTokenKind::ErrorFloatLiteralMissingZero => {
+                SplitToken::NonBracket(NonBracketTokenKind::ErrorFloatLiteralMissingZero)
+            }
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            IsographLangTokenKind::Error
+            | IsographLangTokenKind::ErrorUnterminatedString
+            | IsographLangTokenKind::ErrorUnsupportedStringCharacter
+            | IsographLangTokenKind::ErrorUnterminatedBlockString
+            | IsographLangTokenKind::ErrorNumberLiteralLeadingZero
+            | IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
+            | IsographLangTokenKind::ErrorFloatLiteralMissingZero => {
+                SplitToken::NonBracket(NonBracketTokenKind::Error)
+            }
+```
+
+Before (`From<NonBracketTokenKind> for IsographLangTokenKind` error arms):
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            NonBracketTokenKind::Error => IsographLangTokenKind::Error,
+            NonBracketTokenKind::ErrorUnterminatedString => {
+                IsographLangTokenKind::ErrorUnterminatedString
+            }
+            NonBracketTokenKind::ErrorUnsupportedStringCharacter => {
+                IsographLangTokenKind::ErrorUnsupportedStringCharacter
+            }
+            NonBracketTokenKind::ErrorUnterminatedBlockString => {
+                IsographLangTokenKind::ErrorUnterminatedBlockString
+            }
+```
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            NonBracketTokenKind::ErrorNumberLiteralLeadingZero => {
+                IsographLangTokenKind::ErrorNumberLiteralLeadingZero
+            }
+            NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid => {
+                IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
+            }
+            NonBracketTokenKind::ErrorFloatLiteralMissingZero => {
+                IsographLangTokenKind::ErrorFloatLiteralMissingZero
+            }
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+            NonBracketTokenKind::Error => IsographLangTokenKind::Error,
+```
+
+`Display` still delegates to `IsographLangTokenKind::from(*self)`. `Found::Token(Error)` formats as `error`.
+
+Before (the one grammar test that names a specific error kind):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    use NonBracketTokenKind::{
+        At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
+    };
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        let numeric = "entrypoint 42.foo";
+        assert_no_declaration(
+            numeric,
+            expected(
+                token(Identifier),
+                Found::Token(ErrorNumberLiteralTrailingInvalid),
+            ),
+            span_of(numeric, "42."),
+        );
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    use NonBracketTokenKind::{At, Comma, Dollar, Error, Identifier, Period};
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        let numeric = "entrypoint 42.foo";
+        assert_no_declaration(
+            numeric,
+            expected(token(Identifier), Found::Token(Error)),
+            span_of(numeric, "42."),
+        );
+```
+
+### Tests
+
+- `SplitToken::from` on `Error`, `ErrorUnterminatedString`, `ErrorUnsupportedStringCharacter`, `ErrorUnterminatedBlockString`, `ErrorNumberLiteralLeadingZero`, `ErrorNumberLiteralTrailingInvalid`, and `ErrorFloatLiteralMissingZero` is `NonBracket(Error)`.
+- `IsographLangTokenKind::from(NonBracketTokenKind::Error)` is `IsographLangTokenKind::Error`.
+- `a_non_bracket_token_round_trips_through_the_split` still holds for `At`, `Identifier`, `StringLiteral`, and `Error`.
+- `entrypoint 42.foo` is `Found::Token(Error)` at `42.`.
+
+## 2. Always record into a `Vec`
 
 No trait. No type parameter. The cursor holds `&mut Vec<WithSpan<SemanticToken>>`. Every parse constructs tokens.
 
-Grammar functions stay `fn parse_entrypoint(cursor: &mut ItemCursor<'_>)`. They do not mention the vec.
+Grammar functions stay `fn parse_entrypoint(cursor: &mut ItemCursor<'_>)`. They do not mention the vec. They pass a `SemanticToken` into each consume.
 
 ### The cursor
 
@@ -232,23 +438,26 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
+    pub(crate) fn consume_token_if(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Option<Span> {
         let peek = self.items.peek()?;
         match peek.view().item.reference() {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {}
+            ChunkContentItem::NonBracket(found) if found.0 == kind => {}
             _ => return None,
         }
         let item = peek.commit();
         self.previous_end = item.location.end;
-        if let Some(token) = SemanticToken::from_non_bracket(kind) {
-            self.record(token, item.location);
-        }
+        self.record(token, item.location);
         item.location.wrap_some()
     }
 
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
+        token: SemanticToken,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
         let peek = self.items.peek()?;
         let item = *peek.view();
@@ -256,18 +465,15 @@ After:
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                self.record(SemanticToken::for_open(kind), group.opening.location);
+                self.record(token, group.opening.location);
                 group.with_span(item.location).wrap_some()
             }
             _ => None,
         }
     }
 
-    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup) {
-        self.record(
-            SemanticToken::for_close(group.closing.item.0),
-            group.closing.location,
-        );
+    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken) {
+        self.record(token, group.closing.location);
     }
 
     fn record(&mut self, token: SemanticToken, span: Span) {
@@ -275,17 +481,106 @@ After:
     }
 ```
 
-`require_token` / `require_group` stay `consume_*` or `Err(())`. They inherit the side effect. `expected` only peeks and records nothing.
+`require_token` / `require_group` stay `consume_*` or `Err(())`. They take the same `token` and inherit the side effect. `expected` only peeks and records nothing.
 
-A consume that does not match records nothing. `from_non_bracket` returning `None` also records nothing.
+A consume that does not match records nothing.
 
-`parse_iso_literal_item` and `parse_entrypoint` are unchanged: they already call `require_token(Identifier)` / `require_token(Period)`.
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+    pub(crate) fn require_token(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Result<Span, ()> {
+        self.consume_token_if(kind, token).ok_or(())
+    }
+
+    pub(crate) fn require_group(
+        &mut self,
+        kind: BracketKind,
+        token: SemanticToken,
+    ) -> Result<WithSpan<&'a ChunkedGroup>, ()> {
+        self.consume_group_if(kind, token).ok_or(())
+    }
+```
+
+### Landed grammar call sites
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
+    match cursor.token_text(keyword) {
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" | "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
+        _ => ParseError::expected(
+            Expectation::DeclarationKeyword,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(keyword)
+        .wrap_err(),
+    }
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_field_name = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
+        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
+    match cursor.token_text(keyword) {
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" | "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
+        _ => ParseError::expected(
+            Expectation::DeclarationKeyword,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(keyword)
+        .wrap_err(),
+    }
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_field_name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+```
+
+`fieldd Query.foo` records `Keyword` at `fieldd`, then fails. The identifier was in the keyword position.
 
 ### Source order for groups
 
 `consume_group_if` records the opening and returns the group. The interior is a new cursor over `group.children`. The closing must be recorded after that interior, or the vec is `open, close, interior...`.
 
-The group-plus-interior pattern in parsing-standards.md becomes one method on the cursor. The method reborrows `self.tokens` for the child cursors, then records the close. The parent cursor is not used for anything else during the reborrow.
+The group-plus-interior pattern in parsing-standards.md becomes one method on the cursor. The method reborrows `self.tokens` for the child cursors, then records the close with the same token the open used. The parent cursor is not used for anything else during the reborrow.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -293,6 +588,7 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn parse_group_items<P, F>(
         &mut self,
         group: &ChunkedGroup,
+        token: SemanticToken,
         parse_item: impl Fn(&mut ItemCursor<'_>, &mut F) -> Result<P, WithSpan<ParseError>>,
         push_error: &mut F,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
@@ -304,13 +600,14 @@ impl<'a> ItemCursor<'a> {
             .children
             .item
             .parse_items(text, self.tokens, parse_item, push_error);
-        self.record_group_close(group);
+        self.record_group_close(group, token);
         items
     }
 
     pub(crate) fn parse_group_singleton<T, F>(
         &mut self,
         group: &ChunkedGroup,
+        token: SemanticToken,
         end: Expectation,
         extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<ParseError>,
         parse: impl FnOnce(&mut ItemCursor<'_>, &mut F) -> Result<T, WithSpan<ParseError>>,
@@ -329,13 +626,13 @@ impl<'a> ItemCursor<'a> {
             parse,
             push_error,
         );
-        self.record_group_close(group);
+        self.record_group_close(group, token);
         parsed
     }
 }
 ```
 
-`parse_group_items_with_trailing` is the same wrapper around `parse_items_with_trailing`, and lands with that function (parse-fields.md).
+`parse_group_items_with_trailing` is the same wrapper around `parse_items_with_trailing`, and lands with that function (parse-fields.md). It takes `token` and passes it to `record_group_close`.
 
 Before (group interior):
 
@@ -363,11 +660,11 @@ After:
 ```rust
 // from crates/isograph_parser/src/selections.rs
     let group = cursor
-        .require_group(BracketKind::Brace)
+        .require_group(BracketKind::Brace, SemanticToken::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
     SelectionSet(
         cursor
-            .parse_group_items_with_trailing(group.item, parse_selection)
+            .parse_group_items_with_trailing(group.item, SemanticToken::Brace, parse_selection)
             .into_iter()
             .map(WithSpan::<SelectionSlot>::from)
             .collect(),
@@ -376,9 +673,185 @@ After:
     .wrap_ok()
 ```
 
-`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_definitions`, and `[...]` via `parse_group_singleton` are the same substitution. Those functions still take only the cursor.
+`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_declaration_list`, and `[...]` via `parse_group_singleton` are the same substitution. Type-list `[...]` passes `SemanticToken::Type` to both `consume_group_if` / `require_group` and `parse_group_singleton`. Those functions still take only the cursor besides `push_error`.
 
 `parse_group_*` is not landed until `parse_items` is (parse-fields.md). This change lands `record_group_close` and the open-on-consume. parse-fields.md and parse-arguments.md / parse-variables.md use the helper in the snippets above.
+
+### Pending grammar call sites
+
+Each `require_*` / `consume_*` in a pending feature doc gains the `SemanticToken` argument. Delta from the listed origin, per call.
+
+parse-fields.md (`parse_field`, origin `refactors/pending/parse-fields.md`):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_field_name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+```
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+    let first = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Selection))?;
+    let (reader_alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon)
+    {
+        Some(_) => {
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .map_err(|()| {
+                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+                })?;
+```
+
+`require_selection_set` / `consume_selection_set` pass `SemanticToken::Brace` as in the group-interior snippet above.
+
+parse-arguments.md (origin `refactors/pending/parse-arguments.md` and `refactors/pending/parsing-standards.md`):
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+    let group = cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis)?;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Argument)
+        .map_err(|()| cursor.expected(Expectation::Argument))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::ObjectEntry))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        {
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        {
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
+        {
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::BooleanOrNull)
+        {
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if let Some(group) = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace) {
+```
+
+`parse_constant_value` (parse-variables.md) is the same ladder without the `$` arm, with the same tokens on the remaining arms.
+
+parse-variables.md (origin `refactors/pending/parse-variables.md`):
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+    let group = cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis)?;
+```
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+    cursor
+        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(Expectation::VariableDeclaration))?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
+    let type_annotation = parse_type_annotation(cursor, push_error)?;
+    let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
+    {
+```
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+        if let Some(name) =
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        {
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::Type);
+```
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+        if let Some(group) = cursor.consume_group_if(BracketKind::Bracket, SemanticToken::Type) {
+            let inner = parse_bracket_interior_type(
+                cursor.text(),
+                group.item.children.reference(),
+                push_error,
+            )?;
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::Type);
+```
+
+The `[...]` interior goes through `parse_group_singleton(group, SemanticToken::Type, ...)`. Both sides of the type list are `Type`.
+
+parse-descriptions.md (origin `refactors/pending/parse-descriptions.md`):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let span = cursor
+        .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        .or_else(|| {
+            cursor.consume_token_if(NonBracketTokenKind::BlockStringLiteral, SemanticToken::String)
+        })?;
+```
+
+parse-pointers.md (origin `refactors/pending/parse-pointers.md`):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let client_pointer_name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
+    let to_keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
+        .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
+```
+
+When directives land, `@name` is `consume_token_if(At, DirectiveName)` then `require_token(Identifier, DirectiveName)`. Until then leftover fill-in maps `@` to `DirectiveName` and the identifier to `Identifier`.
 
 ### Threading through the list helpers
 
@@ -514,35 +987,40 @@ entrypoint Query.foo
 
 records, in source order:
 
-- `SemanticToken::Identifier` at `entrypoint`
-- `SemanticToken::Identifier` at `Query`
+- `SemanticToken::Keyword` at `entrypoint`
+- `SemanticToken::Type` at `Query`
 - `SemanticToken::Period` at `.`
-- `SemanticToken::Identifier` at `foo`
+- `SemanticToken::FieldName` at `foo`
 
-`entrypoint Foo.$ asdf` records `entrypoint`, `Foo`, `.` and then fails at `$`. Those three tokens stay. There is no pop.
+`entrypoint Foo.$ asdf` records `Keyword` at `entrypoint`, `Type` at `Foo`, `Period` at `.`, then fails at `$`. Those three tokens stay. There is no pop.
 
 Leftover items (`asdf`) and separator commas are not consumed, so they are not recorded. Positions in leftover still resolve through `UnparsedChunkItems`. Highlighting them is the leftover fill-in change.
 
 ### Layering
 
-Every byte of the literal is classified by at most one of these, and errors are a third channel:
+Every byte of the literal is classified by at most one of these. Diagnostics stay a third channel:
 
-1. Recorded: a token or bracket the grammar consumed. First pass: the kind. After reclassify: the role.
-2. Lexical fill-in (later): a token no consume covered (leftover, a separator comma, text in the matcher's cut). Classification is the token kind from `tokenize`.
-3. Errors are diagnostics: the matcher's vec, chunking's `CommaWithoutItem` vec, and `push_error`. No `SemanticToken` variant is an error.
+1. Recorded: a token or bracket the grammar consumed, classified by the `SemanticToken` the call site passed.
+2. Lexical fill-in (later): a token no consume covered (leftover, a separator comma, text in the matcher's cut, an `Error` token). Classification is `from_non_bracket` / `from_bracket`.
+3. Diagnostics: the matcher's vec, chunking's `CommaWithoutItem` vec, and `push_error`. An `Error` token is highlighting. It does not replace a diagnostic.
 
-So `foo ( asfd`: `foo` is recorded as `Identifier`; `(` is an unmatched-open diagnostic and is not in the tree; `asfd` sits in the cut and, after fill-in, highlights as an identifier.
+So `foo ( asfd`: `foo` is recorded as `FieldName` when that consume ran; `(` is an unmatched-open diagnostic and is not in the tree; `asfd` sits in the cut and, after fill-in, highlights as `Identifier`. After fill-in the `(` highlights as `Parenthesis`.
 
 ### Tests
 
 No snapshots. Facts:
 
-- `require_token(Identifier)` on `foo` yields `[Identifier @ foo]`.
-- `require_token(Period)` when the next item is an identifier records nothing and returns `Err(())`.
+- `from_non_bracket` on each `NonBracketTokenKind` is the mapping in `What a token is`. `Error` is `Error`. `Comma` is `Comma`. `At` is `DirectiveName`. `Dollar` is `Variable`. `Exclamation` is `Type`. `StringLiteral` and `BlockStringLiteral` are `String`.
+- `from_bracket` on `Parenthesis` / `Brace` / `Bracket` is `Parenthesis` / `Brace` / `Bracket`.
+- `require_token(Identifier, Keyword)` on `entrypoint` yields `[Keyword @ entrypoint]`.
+- `require_token(Identifier, Type)` on `Query` yields `[Type @ Query]`.
+- `require_token(Identifier, FieldName)` on `foo` yields `[FieldName @ foo]`.
+- `require_token(Period, Period)` when the next item is an identifier records nothing and returns `Err(())`.
 - `consume_token_if` that does not match records nothing.
-- `consume_group_if(Brace)` on `{ bar }` records `OpenBrace` at `{`. `record_group_close` then records `CloseBrace` at `}`.
+- `consume_group_if(Brace, Brace)` on `{ bar }` records `Brace` at `{`. `record_group_close(group, Brace)` then records `Brace` at `}`.
 - `parse_iso_literal` on `entrypoint Query.foo` fills the four tokens above and the same tree as today.
-- A failed first chunk that consumed a prefix (`entrypoint Foo.$`) still has the prefix tokens.
+- A failed first chunk that consumed a prefix (`entrypoint Foo.$`) still has the prefix tokens (`Keyword`, `Type`, `Period`).
+- `fieldd Query.foo` records `Keyword` at `fieldd`.
 - `expected` does not record.
 
 `stream_of` in `chunk_stream.rs` tests takes the vec:
@@ -558,16 +1036,16 @@ No snapshots. Facts:
     }
 ```
 
-Existing consume tests pass `&mut Vec::new()` and do not assert on it. Collecting tests pass a vec and assert its contents.
+Existing consume tests pass `&mut Vec::new()` and a `SemanticToken` on every `consume_*` / `require_*`. They do not assert on the vec. Collecting tests pass a vec and assert its contents. Matching tests that do not care about the role pass `from_non_bracket(kind)` / `from_bracket(kind)`.
 
 ### Docs this change amends
 
-- parsing-standards.md: `ItemCursor` gains `tokens: &'a mut Vec<WithSpan<SemanticToken>>`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take that vec. Catalog adds `record`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper.
-- parse-entrypoint.md: `parse_iso_literal` takes `tokens: &mut Vec<WithSpan<SemanticToken>>`.
-- parse-fields.md, parse-arguments.md, parse-variables.md: group interiors go through the helper.
-- parsing-plan.md: tokens are recorded during parse into a vec.
+- parsing-standards.md: `ItemCursor` gains `tokens: &'a mut Vec<WithSpan<SemanticToken>>`. `consume_token_if` / `require_token` take `(NonBracketTokenKind, SemanticToken)`. `consume_group_if` / `require_group` take `(BracketKind, SemanticToken)`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take the vec. Catalog adds `record`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper. The value ladder, `$name`, alias, and `to` listings pass the tokens in Pending grammar call sites.
+- parse-entrypoint.md: `parse_iso_literal` takes `tokens: &mut Vec<WithSpan<SemanticToken>>`. The keyword / type / period / field-name consumes pass the tokens above.
+- parse-fields.md, parse-arguments.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each consume listed above.
+- parsing-plan.md: tokens are recorded during parse into a vec. `require_token` takes the role.
 
-## 2. Construct with a noop or a non-noop
+## 3. Construct with a noop or a non-noop
 
 The collector becomes a type parameter. Two implementors, by design; this seam is the whole of what the trait exists for. The parse is constructed with one or the other.
 
@@ -608,7 +1086,7 @@ impl SemanticTokens for NoSemanticTokens {
 
 ### Cursor and helpers
 
-`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 1 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`.
+`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 2 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`. Consume signatures stay `(kind, token)`.
 
 Before:
 
@@ -727,7 +1205,7 @@ The tree is the same either way.
 
 ### Tests
 
-The change-1 facts still hold against `CollectedSemanticTokens`. Added:
+The change-2 facts still hold against `CollectedSemanticTokens`. Added:
 
 - `parse_iso_literal` with `NoSemanticTokens::new()` returns the same tree as with `CollectedSemanticTokens::new()`.
 - `stream_of` is generic. Existing consume tests that do not assert tokens pass `&mut NoSemanticTokens::new()`. Collecting tests pass `&mut CollectedSemanticTokens::new()` and assert on `.0`.
@@ -747,75 +1225,20 @@ The change-1 facts still hold against `CollectedSemanticTokens`. Added:
 
 - parsing-standards.md: `ItemCursor` / `ChunkStream` gain `TTokens`. List helpers are generic over `TTokens: SemanticTokens`. Grammar functions take `ItemCursor<'_, TTokens>`. Catalog replaces the vec with `SemanticTokens`, `CollectedSemanticTokens::new`, `NoSemanticTokens::new`.
 - parse-entrypoint.md: `parse_iso_literal` is generic over `TTokens`.
-- parse-fields.md, parse-arguments.md, parse-variables.md: each `parse_*` gains `TTokens: SemanticTokens`.
+- parse-fields.md, parse-arguments.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each `parse_*` gains `TTokens: SemanticTokens`.
 - spanless-parsing.md: the cheap pass is `NoSemanticTokens::new()` plus `NoSpan`.
 
 ## Later changes
 
-Each is independently shippable. `require_token` still takes only a kind.
-
-### Reclassify
-
-After `token_text` names the role, the cursor overwrites the token it just recorded. The trait grows one method. `NoSemanticTokens` stays a no-op.
-
-```rust
-// from crates/isograph_parser/src/semantic_token.rs
-pub trait SemanticTokens {
-    fn record(&mut self, token: SemanticToken, span: Span);
-    fn reclassify_last(&mut self, token: SemanticToken);
-}
-
-impl SemanticTokens for CollectedSemanticTokens {
-    fn record(&mut self, token: SemanticToken, span: Span) {
-        self.0.push(token.with_span(span));
-    }
-
-    fn reclassify_last(&mut self, token: SemanticToken) {
-        if let Some(last) = self.0.last_mut() {
-            last.item = token;
-        }
-    }
-}
-
-impl SemanticTokens for NoSemanticTokens {
-    fn record(&mut self, _token: SemanticToken, _span: Span) {}
-
-    fn reclassify_last(&mut self, _token: SemanticToken) {}
-}
-
-// from crates/isograph_parser/src/chunk_stream.rs
-impl<TTokens: SemanticTokens> ItemCursor<'_, TTokens> {
-    pub(crate) fn reclassify(&mut self, token: SemanticToken) {
-        self.tokens.reclassify_last(token);
-    }
-}
-```
-
-`SemanticToken` grows the roles the grammar knows: `Keyword`, `Type`, `Field`, `Variable`, `BooleanOrNull`. `parse_iso_literal_item` after matching `"entrypoint"`:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match cursor.token_text(keyword) {
-        text if text == "entrypoint" => {
-            cursor.reclassify(SemanticToken::Keyword);
-            IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok()
-        }
-        /* field / pointer / other unchanged */
-    }
-```
-
-`parse_entrypoint` reclassifies `Query` to `Type` and `foo` to `Field`. Selection names, argument names, variable names, `to`, `true` / `false` / `null` are the same. `reclassify` is called immediately after the consume that recorded.
+Each is independently shippable.
 
 ### Leftover fill-in
 
-A walk over `tokenize(text)` that emits `from_non_bracket` / `for_open` / `for_close` for every token whose span is not already in the collected vec, in source order. Separators, leftover items, and the matcher's cut get lexical tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
+A walk over `tokenize(text)` that emits `from_non_bracket` / `from_bracket` for every token whose span is not already in the collected vec, in source order. Separators, leftover items, the matcher's cut, and `Error` tokens get those tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
 
 ### Formatter metadata
 
-`SemanticToken` gains `line_behavior` and `indent_change`, the fields on upstream `IsographSemanticToken`. Reclassify (or the first-pass mapping) fills them. The formatter walks `Vec<WithSpan<SemanticToken>>` the way `crates/isograph_lsp/src/format.rs` walks the upstream vec.
+`SemanticToken` gains `line_behavior` and `indent_change`, the fields on upstream `IsographSemanticToken`. The formatter walks `Vec<WithSpan<SemanticToken>>` the way `crates/isograph_lsp/src/format.rs` walks the upstream vec.
 
 ### Cheap pass
 
@@ -837,4 +1260,4 @@ if /* push_error was called, or tree.has_errors() */ {
 
 The LSP path always constructs with `CollectedSemanticTokens::new()` and `TSpan = Span`. One function, two instantiations of each parameter, same consume-time recording. The two trees cannot disagree about structure.
 
-`TSpan` is the tree's parameter. `TTokens` is the cursor's. They are chosen together at the entry point by which values are constructed. `require_token` names neither.
+`TSpan` is the tree's parameter. `TTokens` is the cursor's. They are chosen together at the entry point by which values are constructed. `require_token` names neither parameter.
