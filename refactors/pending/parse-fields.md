@@ -1,6 +1,6 @@
 # parse-fields: field declarations and selection sets
 
-`field Type.name { ... }` declarations and selection sets. Lands `parse_items` and the generic `Slot` impl the lists use.
+`field Type.name { ... }` declarations and selection sets. Lands `parse_items`. Lands after generic-slot.md.
 
 ## The grammar this doc accepts
 
@@ -16,235 +16,7 @@ The brace group is required and is the last item of the chunk. Each contentful c
 
 The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. Arguments are not parsed: a paren group after a selection name is that selection's leftover.
 
-## Change 1: generic `Slot`
-
-`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<Selection, UnparsedChunkItems>`. Drop `self_type_generics`. Both fields use `parent_from`. `Slot` is not a path segment and is not a `ResolvedNode` variant.
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
-)]
-pub struct Slot<T, E> {
-    #[resolve_field]
-    pub item: Option<WithSpan<T>>,
-    #[resolve_field]
-    pub extra_tokens: Option<WithSpan<E>>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum IsoLiteralItem {
-    Entrypoint(EntrypointDeclaration),
-}
-
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntrypointDeclaration { /* ... */ }
-
-pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
-
-pub type SlotPath<'a> =
-    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
-```
-
-```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-    Slot(SlotPath<'a>),
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(
-    parent_type = <T as ResolvePosition>::Parent<'a>,
-    resolved_node = IsographResolutionNode<'a>
-)]
-pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
-    #[resolve_field(parent_from)]
-    pub item: Option<WithSpan<T>>,
-    #[resolve_field(parent_from)]
-    pub extra_tokens: Option<WithSpan<E>>,
-}
-
-#[derive(Debug)]
-pub enum UnparsedChunkItemsParent<'a> {
-    Literal(IsoLiteralParsePath<'a>),
-}
-
-#[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
-);
-
-pub type UnparsedChunkItemsPath<'a> =
-    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
-
-impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(parent: IsoLiteralParsePath<'a>) -> Self {
-        UnparsedChunkItemsParent::Literal(parent)
-    }
-}
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum IsoLiteralItem {
-    Entrypoint(EntrypointDeclaration),
-}
-
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntrypointDeclaration { /* fields unchanged */ }
-
-pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
-```
-
-`SlotPath` is deleted. `IsographResolutionNode::Slot` is deleted. `IsoLiteralItem` and `UnparsedChunkItems` import `UnparsedChunkItemsParent` in place of `SlotPath`.
-
-`#[resolve_field(parent_from)]` on a struct field is accepted. Emission is `From::from(parent)`. A struct that has a `parent_from` field has no container fallback (same as a `transparent` field).
-
-The `FromParent` error on struct fields is deleted.
-
-Before:
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
-            inner_type,
-            "`parent_from` and `transparent` do not build a field parent",
-        )
-        .to_compile_error(),
-```
-
-After:
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-        ParentConstruction::FromParent => quote!(::std::convert::From::from(parent)),
-        ParentConstruction::Transparent => Error::new_spanned(
-            inner_type,
-            "`transparent` does not build a field parent",
-        )
-        .to_compile_error(),
-```
-
-Fallback suppression treats `FromParent` like `Transparent`:
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-    let fallback = if field_infos.iter().any(|info| {
-        matches!(
-            info.parent_construction,
-            ParentConstruction::Transparent | ParentConstruction::FromParent
-        )
-    }) {
-        quote!()
-    } else {
-        quote! {
-            return Self::ResolvedNode::#struct_name(self.path(parent).into());
-        }
-    };
-```
-
-Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover.
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-                let leftover_span =
-                    Span::join(remaining.first().location, remaining.last().location);
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-                let leftover_span = Span::new(item.location.end, remaining.last().location.end);
-```
-
-Generated `Slot`:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl<T, E> ::resolve_position::ResolvePosition for Slot<T, E>
-where
-    T: ::resolve_position::ResolvePosition<ResolvedNode<'static> = IsographResolutionNode<'static>>,
-    E: ::resolve_position::ResolvePosition<ResolvedNode<'static> = IsographResolutionNode<'static>>,
-{
-    type Parent<'a>
-        = <T as ::resolve_position::ResolvePosition>::Parent<'a>
-    where
-        Self: 'a;
-    type ResolvedNode<'a>
-        = IsographResolutionNode<'a>
-    where
-        Self: 'a;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        for item in self.item.iter() {
-            if item.location.contains(position) {
-                let new_parent = ::std::convert::From::from(parent);
-                return item.item.resolve(new_parent, position);
-            }
-        }
-        for item in self.extra_tokens.iter() {
-            if item.location.contains(position) {
-                let new_parent = ::std::convert::From::from(parent);
-                return item.item.resolve(new_parent, position);
-            }
-        }
-    }
-}
-```
-
-The derive does not write `'static`. It writes `type ResolvedNode<'a> = IsographResolutionNode<'a> where Self: 'a` and keeps `T: ResolvePosition` / `E: ResolvePosition` only if the type states those bounds. Add the bounds on `Slot`:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
-```
-
-`where Self: 'a` on the associated types makes `parent_type = <T as ResolvePosition>::Parent<'a>` legal.
-
-Entrypoint tests keep passing. A leftover token still resolves to `NonBracketToken`. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still resolves `Query` / `foo` / `entrypoint` / `.` the same way. `token.parent` inside leftover is `ChunkContentItemParent::Unparsed`; that path's parent is `UnparsedChunkItemsParent::Literal`.
-
-The derive emits one impl per type. `self_type_generics = <IsoLiteralItem, UnparsedChunkItems>` is only `Slot<IsoLiteralItem, UnparsedChunkItems>`. A selection set is `Slot<Selection, UnparsedChunkItems>` and needs the generic impl.
-
-`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent. That parent is the container the slot sits in:
-
-- `Slot<Selection, _>` sits in a `SelectionSet`, and `Selection::Parent` is `SelectionSetPath`
-- `Slot<IsoLiteralItem, _>` sits in the root singleton, and `IsoLiteralItem::Parent` is `IsoLiteralParsePath`
-- `Slot<TypeAnnotation, _>` sits in a `ListTypeAnnotation`, and `TypeAnnotation::Parent` is `TypeAnnotationParent` (`List` wraps that list-type path)
-
-`parent_from` on both fields forwards that parent into the child. `From<P> for P` is identity for the item. `From<P> for UnparsedChunkItemsParent` wraps leftover. `Slot` is not a path segment and is not a `ResolvedNode` variant.
-
-A leftover gap is a position in the slot span but in neither field. Take `entrypoint Query.foo bar`:
-
-- `item` span is `entrypoint Query.foo`
-- leftover items start at `bar`
-
-If leftover span were tight to `bar`, the space after `foo` would be in the slot span and in neither field. The pinned impl answers that space with `IsographResolutionNode::Slot`. The generic impl has no `Slot` fallback (both fields are `parent_from`), so `resolve` would not return.
-
-Leftover span starts at `item.location.end`, so that space is inside `extra_tokens`. A position on the space answers `UnparsedChunkItems`. A position on `bar` answers the token.
-
-Form `Ok` with no leftover: slot span is the item span. Form `Err`: extra is the whole chunk. Every position in the slot is in a field.
-
-## Change 2: `parse_items`
+## Change 1: `parse_items`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -277,7 +49,7 @@ impl ChunkedLevel {
 
 A list trailing comma is legal and is not a diagnostic. Length equals chunk count.
 
-## Change 3: `Expectation`
+## Change 2: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -310,7 +82,7 @@ pub enum ClosingDelimiter {
 
 Before, `Separator` is a unit variant (`"a comma or line break"`). This doc gives it the closer. Selection leftover is `Expectation::Separator(ClosingDelimiter::Brace)`.
 
-## Change 4: `IsoLiteralItem::Field`
+## Change 3: `IsoLiteralItem::Field`
 
 Before:
 
@@ -431,7 +203,20 @@ pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntityNameP
 
 The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` matches `name.parent.inner.client_field_name` through `EntityNameParent::Entrypoint`.
 
-## Change 5: `selections.rs`
+`as_entrypoint` gains an exhaustive arm:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    fn as_entrypoint(parse: &WithSpan<IsoLiteralParse>) -> &EntrypointDeclaration {
+        let item = parsed_item(parse).expect("the fixture's literal parsed an item");
+        match item {
+            IsoLiteralItem::Entrypoint(declaration) => declaration,
+            item => panic!("expected an entrypoint declaration, got {item:?}"),
+        }
+    }
+```
+
+## Change 4: `selections.rs`
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -443,9 +228,8 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ClientFieldDeclarationPath, Expectation, ExtraChunks, IsoLiteralParsePath,
+    BracketKind, ClientFieldDeclarationPath, ClosingDelimiter, Expectation,
     IsographResolutionNode, NonBracketTokenKind, ParseError, Slot, UnparsedChunkItems,
-    UnparsedChunkItemsParent,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -532,6 +316,17 @@ pub type SelectionAliasPath<'a> = PositionResolutionPath<&'a SelectionAlias, Sel
 
 `SelectionSetParent::Object` is boxed to break the cycle `SelectionSetPath -> ObjectSelectionPath -> SelectionSetPath`. The derive's `parent.into()` converts through `From<T> for Box<T>`.
 
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
+}
+```
+
+After:
+
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub enum UnparsedChunkItemsParent<'a> {
@@ -546,7 +341,7 @@ impl<'a> From<SelectionSetPath<'a>> for UnparsedChunkItemsParent<'a> {
 }
 ```
 
-`Selection: ResolvePosition<Parent = SelectionSetPath>`, so `Slot<Selection, UnparsedChunkItems>::Parent` is `SelectionSetPath`. `From<SelectionSetPath> for SelectionSetPath` is identity (the `item` field). `From<SelectionSetPath> for UnparsedChunkItemsParent` is the `SelectionSet` variant (the `extra_tokens` field).
+`From<IsoLiteralParsePath>` stays. `Selection: ResolvePosition<Parent = SelectionSetPath>`, so `Slot<Selection, UnparsedChunkItems>::Parent` is `SelectionSetPath`. `From<SelectionSetPath> for SelectionSetPath` is identity (the `item` field). `From<SelectionSetPath> for UnparsedChunkItemsParent` is the `SelectionSet` variant (the `extra_tokens` field).
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -697,7 +492,7 @@ where
     SelectionAlias(SelectionAliasPath<'a>),
 ```
 
-`Slot` is gone. A position on a list comma or on whitespace inside a selection set answers `SelectionSet`. A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSet`. A failed selection chunk is the same walk; the whole chunk's items sit in `extra_tokens`.
+A position on a list comma or on whitespace inside a selection set answers `SelectionSet`. A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSet`. A failed selection chunk is the same walk; the whole chunk's items sit in `extra_tokens`.
 
 `SelectionSet` iterates the vec, each hit descending with the container's path. `Selection` delegates. `ObjectSelection` / `ScalarSelection` / `ClientFieldDeclaration` expand like `EntrypointDeclaration` with `parent_variant` wrapping. `SelectionName` and `SelectionAlias` are interned-key leaves like `EntityName`.
 
@@ -1076,6 +871,5 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
 
 ## Landing checklist
 
-1. Macro: `parent_from` on struct fields, fallback suppression, generic `Slot`, `UnparsedChunkItemsParent`, leftover span, deleted `Slot` / `SlotPath`, entrypoint parent paths. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-2. `parse_items`, `selections.rs`, `IsoLiteralItem::Field`, `Expectation::{SelectionSet, Selection}`, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
-3. Move this doc to refactors/past.
+1. `parse_items`, `selections.rs`, `IsoLiteralItem::Field`, `Expectation::{SelectionSet, Selection}`, `ClosingDelimiter`, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. Move this doc to refactors/past.

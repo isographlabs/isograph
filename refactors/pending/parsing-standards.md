@@ -543,7 +543,8 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 Each grammar feature lands on this surface.
 
-- parse-fields.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `parse_items`, field declarations and selection sets
+- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, leftover span
+- parse-fields.md: `parse_items`, field declarations and selection sets
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
