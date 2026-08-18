@@ -8,7 +8,7 @@ First grammar feature, written against parsing-standards.md. The shared surface 
 entrypoint <Identifier> . <Identifier>
 ```
 
-The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` into `IsoLiteralSlot`. Remaining chunks are `IsoLiteralParse.extra_chunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and an empty `IsoLiteralSlot`. `IsoLiteralSlot.item` is `Some` when the form parsed.
+The root is a one-item context, not a list. Chunk 0 goes through `parse_one_item` into `Slot<IsoLiteralItem, UnparsedChunkItems>`. Remaining chunks are `IsoLiteralParse.extra_chunks` plus `MultipleDeclarations` on the first extra chunk. A boundary comma is a tokenless diagnostic. Empty is `EmptyLiteral` and a `Slot` with `item: None` and `extra_tokens: None`. `Slot.item` is `Some` when the form parsed.
 
 ```
 iso(`
@@ -20,7 +20,7 @@ A failed first chunk is `item: None` plus that chunk’s items in `Slot.extra_to
 
 ## Types
 
-Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `item` is the first slot's attempt (`parse_one_item`). `IsoLiteralParse` and `IsoLiteralSlot` are the optimistic tree and impl `ResolvePosition`. Generic `Slot` / `Singleton` do not.
+Most important first. The wrapping `WithSpan` on `IsoLiteralParse` is the whole literal. The `WithSpan` on `Singleton.item` is the first slot's attempt (`parse_one_item`). `Slot` / `Singleton` are the optimistic tree and impl `ResolvePosition`. `IsoLiteralParse` is the alias.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -30,40 +30,27 @@ use span::{Span, WithSpan};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkedLevel, Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
-    parse_singleton,
+    ChunkedLevel, Expectation, Found, ExtraChunks, IsographResolutionNode, NonBracketTokenKind,
+    ParseError, Singleton, Slot, UnparsedChunkItems, parse_singleton,
 };
 
-/// Concrete root singleton. This is the optimistic tree. Goes away when
-/// slot-singleton-resolve.md lands.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralParse {
-    #[resolve_field]
-    pub item: WithSpan<IsoLiteralSlot>,
-    #[resolve_field]
-    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
-}
+pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
 
-/// Concrete first-chunk slot. This is the optimistic tree. Goes away when
-/// slot-singleton-resolve.md lands.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct IsoLiteralSlot {
-    #[resolve_field]
-    pub item: Option<WithSpan<IsoLiteralItem>>,
-    #[resolve_field]
-    pub extra_tokens: Option<WithSpan<UnparsedChunkItems>>,
-}
+pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
+
+pub type SlotPath<'a> = PositionResolutionPath<
+    &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
+    IsoLiteralParsePath<'a>,
+>;
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     pub entrypoint_keyword: WithSpan<EntrypointKeyword>,
     #[resolve_field]
@@ -85,61 +72,22 @@ pub struct ClientFieldName;
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
 
-// Concrete. Goes away when slot-singleton-resolve.md lands.
-pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
-
-pub type IsoLiteralSlotPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
-
 pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
+    PositionResolutionPath<&'a EntrypointDeclaration, SlotPath<'a>>;
 
-// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-// Concrete. Goes away when slot-singleton-resolve.md lands.
 pub type UnparsedChunkItemsPath<'a> =
-    PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
+    PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
 pub type ClientFieldNamePath<'a> = PositionResolutionPath<&'a ClientFieldName, EntrypointDeclarationPath<'a>>;
 ```
 
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-type OptimisticSlot = Slot<
-    <OptimisticStage as Stage>::IsoLiteral,
-    <OptimisticStage as Stage>::UnparsedTokens,
->;
-
-type OptimisticSingleton = Singleton<
-    WithSpan<OptimisticSlot>,
-    <OptimisticStage as Stage>::ExtraChunks,
->;
-
-impl From<OptimisticSlot> for IsoLiteralSlot {
-    fn from(slot: OptimisticSlot) -> Self {
-        IsoLiteralSlot {
-            item: slot.item,
-            extra_tokens: slot.extra_tokens,
-        }
-    }
-}
-
-impl From<OptimisticSingleton> for IsoLiteralParse {
-    fn from(singleton: OptimisticSingleton) -> Self {
-        IsoLiteralParse {
-            item: singleton.item.map(IsoLiteralSlot::from),
-            extra_chunks: singleton.extra_chunks,
-        }
-    }
-}
-```
-
 ## The parser
 
-The root is borrowed until the end. A failed first chunk clones that chunk's items into `IsoLiteralSlot.extra_tokens`. Extra chunks after the first are cloned into `IsoLiteralParse.extra_chunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
+The root is borrowed until the end. A failed first chunk clones that chunk's items into `Slot.extra_tokens`. Extra chunks after the first are cloned into `IsoLiteralParse.extra_chunks`. On a parsed first slot with no extra the root `ChunkedLevel` is dropped. Diagnostics go through `push_error`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -196,7 +144,7 @@ fn parse_entrypoint(
 }
 ```
 
-`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton`, then `IsoLiteralParse` from `Singleton`. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is an empty `IsoLiteralSlot` plus `extra_chunks: None` and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `IsoLiteralParse.extra_chunks`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `IsoLiteralParse.extra_chunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra_tokens` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `IsoLiteralParse.extra_chunks` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
+`parse_iso_literal` wraps `parse_iso_literal_item`: `parse_singleton` is the tree. Artifact generation requires that `push_error` was never called (and the earlier-stage lists empty). Resolve walks the optimistic tree only. `parse_iso_literal_item` is the keyword dispatch. After `entrypoint` it calls `parse_entrypoint`. Empty is a `Slot` with `item: None` and `extra_tokens: None`, plus `extra_chunks: None`, and `EmptyLiteral` through `push_error`. A failed first chunk is `item: None` plus that chunk’s items; extra chunks still sit in `IsoLiteralParse.extra_chunks`. `entrypoint Query.foo\nfield User.name` is a parsed first slot plus `IsoLiteralParse.extra_chunks` and `push_error(MultipleDeclarations)`. `entrypoint Query.foo bar` is `item: Some` plus leftover items and `push_error(Expected(EndOfDeclaration, Identifier))`. `entrypoint Foo.$ asdf` is `item: None`: the error is at `$`, `extra_tokens` is the whole chunk. `entrypoint\nQuery.foo` is `item: None` on `entrypoint` plus `IsoLiteralParse.extra_chunks` for `Query.foo`. `entrypoint Query.foo,` is `item: Some` plus a tokenless comma diagnostic through `push_error`.
 
 ## `ParseError`
 
@@ -388,7 +336,7 @@ After:
 use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
-    IsoLiteralParsePath, IsoLiteralSlotPath, NonBracketTokenPath, OpenBracketPath,
+    IsoLiteralParsePath, NonBracketTokenPath, OpenBracketPath, SlotPath,
     UnparsedChunkItemsPath,
 };
 
@@ -398,8 +346,8 @@ use crate::{
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum IsographResolutionNode<'a> {
-    IsoLiteralParse(IsoLiteralParsePath<'a>),
-    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    Singleton(IsoLiteralParsePath<'a>),
+    Slot(SlotPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
@@ -666,7 +614,7 @@ After:
 
 ## Generated code
 
-Generic `Slot<T, E>` does not impl `ResolvePosition`. `IsoLiteralSlot` tries `item` then `extra`. `UnparsedChunkItems` iterates the `NonEmpty`. `ExtraChunks` iterates the `NonEmpty`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs. Resolve walks the optimistic tree only.
+`Slot<IsoLiteralItem, UnparsedChunkItems>` tries `item` then `extra_tokens`; leftover gap is `Slot`. `Singleton<...>` tries `item` then `extra_chunks`; leftover gap is `Singleton`. `UnparsedChunkItems` iterates the `NonEmpty`. `ExtraChunks` iterates the `NonEmpty`. The enum delegation, struct descent, and fieldless-marker impls follow chunk.rs. Resolve walks the optimistic tree only.
 
 ## Tests
 
