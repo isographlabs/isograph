@@ -29,40 +29,44 @@ null                    null
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum ParseError {
+    #[error("{0}")]
     Expected(ExpectedFound),
+    #[error("Expected a declaration. An isograph literal cannot be empty.")]
     EmptyLiteral,
+    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
     MultipleDeclarations,
+    #[error("This declaration type is not supported yet.")]
     UnsupportedDeclarationType,
+    #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Expectation {
+    #[error("{0}")]
     Token(NonBracketTokenKind),
+    #[error("one of `entrypoint`, `field`, or `pointer`")]
     DeclarationKeyword,
+    #[error("the end of the declaration")]
     EndOfDeclaration,
+    #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
+    #[error("a field selection")]
     Selection,
+    #[error("a comma or line break")]
     Separator,
+    #[error("an argument, like 'id: $id'")]
     Argument,
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
     Value,
+    #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
 }
-```
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-            ParseError::IntegerDoesNotFitI64 => {
-                write!(f, "This integer does not fit in a 64-bit signed integer.")
-            }
-            Expectation::Argument => write!(f, "an argument, like 'id: $id'"),
-            Expectation::Value => {
-                write!(f, "a value, like $foo, 42, \"bar\", true, false, null, or an object literal")
-            }
-            Expectation::ObjectEntry => write!(f, "an object entry, like 'id: 4'"),
 ```
 
 ## New module: arguments.rs

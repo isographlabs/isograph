@@ -64,7 +64,9 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+use thiserror::Error;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error("{0}")]
     Expected(ExpectedFound),
@@ -78,11 +80,64 @@ pub enum ParseError {
     IntegerDoesNotFitI64,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 #[error("Expected {expected}, found {found}.")]
 pub struct ExpectedFound {
     pub expected: Expectation,
     pub found: Found,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+pub enum Expectation {
+    #[error("{0}")]
+    Token(NonBracketTokenKind),
+    #[error("one of `entrypoint`, `field`, or `pointer`")]
+    DeclarationKeyword,
+    #[error("the end of the declaration")]
+    EndOfDeclaration,
+    #[error("a selection set, like '{{ id, name }}'")]
+    SelectionSet,
+    #[error("a field selection")]
+    Selection,
+    #[error("a comma or line break")]
+    Separator,
+    #[error("an argument, like 'id: $id'")]
+    Argument,
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
+    Value,
+    #[error("an object entry, like 'id: 4'")]
+    ObjectEntry,
+    #[error("a variable declaration, like '$id: ID!'")]
+    VariableDeclaration,
+    #[error("a type, like 'String', 'String!', or '[String]'")]
+    TypeAnnotation,
+    #[error("a constant value; variables are not allowed here")]
+    ConstantValue,
+    #[error("the end of the type")]
+    EndOfType,
+    #[error("the keyword `to`")]
+    ToKeyword,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+pub enum Found {
+    #[error("{0}")]
+    Token(NonBracketTokenKind),
+    #[error("a group opened by {0}")]
+    Group(BracketKind),
+    #[error("nothing more")]
+    EndOfChunk,
+}
+
+// from crates/isograph_parser/src/non_bracket_token.rs
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
+pub enum BracketKind {
+    #[strum(to_string = "'('")]
+    Parenthesis,
+    #[strum(to_string = "'{'")]
+    Brace,
+    #[strum(to_string = "'['")]
+    Bracket,
 }
 ```
 

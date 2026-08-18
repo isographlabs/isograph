@@ -260,6 +260,7 @@ A list trailing comma is legal and is not a diagnostic. Length equals chunk coun
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Expectation {
     #[error("{0}")]
     Token(NonBracketTokenKind),

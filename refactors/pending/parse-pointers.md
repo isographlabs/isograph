@@ -12,16 +12,12 @@ The `to` keyword is an identifier whose text is `to`. The target type is a type 
 
 ## Changes to parse_error.rs
 
-`UnsupportedDeclarationType` and its `Display` arm are deleted. Remaining structural variants: `Expected`, `EmptyLiteral`, `MultipleDeclarations`, `IntegerDoesNotFitI64`.
+`UnsupportedDeclarationType` is deleted. Remaining structural variants: `Expected`, `EmptyLiteral`, `MultipleDeclarations`, `IntegerDoesNotFitI64`.
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+    #[error("the keyword `to`")]
     ToKeyword,
-```
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-            Expectation::ToKeyword => write!(f, "the keyword `to`"),
 ```
 
 ## Changes to parse_iso_literal.rs

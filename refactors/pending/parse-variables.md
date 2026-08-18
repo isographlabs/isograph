@@ -46,67 +46,15 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+    #[error("a variable declaration, like '$id: ID!'")]
     VariableDeclaration,
+    #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
+    #[error("a constant value; variables are not allowed here")]
     ConstantValue,
+    #[error("the end of the type")]
     EndOfType,
 ```
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-            Expectation::VariableDeclaration => {
-                write!(f, "a variable declaration, like '$id: ID!'")
-            }
-            Expectation::TypeAnnotation => {
-                write!(f, "a type, like 'String', 'String!', or '[String]'")
-            }
-            Expectation::ConstantValue => {
-                write!(f, "a constant value; variables are not allowed here")
-            }
-            Expectation::EndOfType => write!(f, "the end of the type"),
-```
-
-## Change 3: `ExtraChunksParent`
-
-`ExtraChunks` sits on the root singleton and on a `[...]` type. Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
-
-pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug)]
-pub enum ExtraChunksParent<'a> {
-    Literal(IsoLiteralParsePath<'a>),
-    ListType(ListTypeAnnotationPath<'a>),
-}
-
-#[resolve_position(parent_type = ExtraChunksParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
-
-pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, ExtraChunksParent<'a>>;
-
-impl<'a> From<IsoLiteralParsePath<'a>> for ExtraChunksParent<'a> {
-    fn from(parent: IsoLiteralParsePath<'a>) -> Self {
-        ExtraChunksParent::Literal(parent)
-    }
-}
-
-impl<'a> From<ListTypeAnnotationPath<'a>> for ExtraChunksParent<'a> {
-    fn from(parent: ListTypeAnnotationPath<'a>) -> Self {
-        ExtraChunksParent::ListType(parent)
-    }
-}
-```
-
-Root `Singleton.extra_chunks` respells to `#[resolve_field(parent_from)]`.
 
 ## New module: variables.rs
 
@@ -146,7 +94,7 @@ pub struct DeclaredVariable {
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum TypeAnnotation {
     Named(NamedTypeAnnotation),
-    List(ListTypeAnnotation),
+    List(Box<ListTypeAnnotation>),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -161,8 +109,6 @@ pub struct NamedTypeAnnotation {
 pub struct ListTypeAnnotation {
     #[resolve_field(parent_variant = List)]
     pub inner: WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>,
-    #[resolve_field(parent_from)]
-    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -198,6 +144,17 @@ pub type TypeNamePath<'a> = PositionResolutionPath<&'a TypeName, NamedTypeAnnota
 
 A position on `$` answers `DeclaredVariable`. A position on `!` answers the annotation (`NamedTypeAnnotation` or `ListTypeAnnotation`). There is no `Exclamation` field. Non-null is part of the annotation's spanning span, not a stored marker.
 
+`TypeAnnotation` is the slot item inside `[...]`. `Slot<TypeAnnotation, UnparsedChunkItems>::Parent` is `TypeAnnotation::Parent`, which is `TypeAnnotationParent`. `#[resolve_field(parent_variant = List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover `parent_from` wraps that same parent:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+impl<'a> From<TypeAnnotationParent<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: TypeAnnotationParent<'a>) -> Self {
+        UnparsedChunkItemsParent::TypeAnnotation(parent)
+    }
+}
+```
+
 `TypeAnnotationParent::List` is boxed to break the cycle.
 
 `VariableName` gains a second parent. Before:
@@ -230,7 +187,7 @@ pub enum UnparsedChunkItemsParent<'a> {
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
     VariableDeclarationList(VariableDeclarationListPath<'a>),
-    ListType(ListTypeAnnotationPath<'a>),
+    TypeAnnotation(TypeAnnotationParent<'a>),
 }
 ```
 
@@ -322,14 +279,13 @@ where
             .wrap_ok();
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
-            let (inner, extra_chunks) =
-                parse_bracket_interior_type(cursor.text(), group.item.children.reference(), push_error)?;
+            let inner = parse_bracket_interior_type(
+                cursor.text(),
+                group.item.children.reference(),
+                push_error,
+            )?;
             cursor.consume_token_if(NonBracketTokenKind::Exclamation);
-            return TypeAnnotation::List(ListTypeAnnotation {
-                inner,
-                extra_chunks,
-            })
-            .wrap_ok();
+            return TypeAnnotation::List(ListTypeAnnotation { inner }.boxed()).wrap_ok();
         }
         cursor.expected(Expectation::TypeAnnotation).wrap_err()
     })
@@ -339,13 +295,7 @@ fn parse_bracket_interior_type<F>(
     text: &str,
     level: &WithSpan<ChunkedLevel>,
     push_error: &mut F,
-) -> Result<
-    (
-        WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>,
-        Option<WithSpan<ExtraChunks>>,
-    ),
-    WithSpan<ParseError>,
->
+) -> Result<WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>, WithSpan<ParseError>>
 where
     F: FnMut(WithSpan<ParseError>),
 {
@@ -353,6 +303,15 @@ where
         return ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
             .with_span(Span::new(level.location.end, level.location.end))
             .wrap_err();
+    }
+    if level.item.len() > 1 {
+        let extra = level.item.0[1].reference();
+        return ParseError::expected(
+            Expectation::EndOfType,
+            Found::from(extra.item.first_item().item.reference()),
+        )
+        .with_span(extra.location)
+        .wrap_err();
     }
     let singleton = parse_singleton(
         level,
@@ -368,15 +327,15 @@ where
         |cursor, push_error| parse_type_annotation(cursor, push_error).map(|wrapped| wrapped.item),
         push_error,
     );
-    (singleton.item, singleton.extra_chunks).wrap_ok()
+    singleton.item.wrap_ok()
 }
 ```
 
-`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_one_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt. Extra interior chunks sit on `extra_chunks`.
+`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_one_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt.
 
-`[Pet,]` is `inner.item: Some(Pet)` plus `push_error(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
+`[Pet,]` is one chunk plus a boundary comma: `inner.item: Some(Pet)` plus `push_error(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
 
-`[Pet\n!]` is `inner.item: Some(Pet)` plus `extra_chunks` for `!` and `push_error(Expected(EndOfType, ...))`. The `!` does not attach to `Pet`.
+`[Pet\n!]` is two chunks. The type is `Err` at `!`. The enclosing variable declaration is `item: None`. The `!` does not attach to `Pet`.
 
 Empty `[]` is `Expected(TypeAnnotation, EndOfChunk)` and fails `parse_type_annotation`, so the enclosing variable declaration is `item: None`.
 
