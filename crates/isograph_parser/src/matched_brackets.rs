@@ -5,7 +5,7 @@ use scoped_stack::Stack;
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketKind, BracketToken, ChunkPath, ChunkedGroupPath, IsographLangTokenKind,
+    BracketKind, BracketToken, ChunkContentItemParent, ChunkedGroupPath, IsographLangTokenKind,
     IsographResolutionNode, NonBracketTokenKind, SplitToken,
 };
 
@@ -28,7 +28,7 @@ pub struct Bracketed {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NonBracketToken(pub NonBracketTokenKind);
 
 /// An opening bracket: a group's own opening.

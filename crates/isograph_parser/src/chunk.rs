@@ -6,8 +6,9 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketItem, Bracketed, CloseBracket, Expectation, Found, IsographResolutionNode,
-    MatchedBrackets, NonBracketToken, NonBracketTokenKind, OpenBracket, ParseError,
+    BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem,
+    IsoLiteralParsePath, IsographResolutionNode, MatchedBrackets, NonBracketToken,
+    NonBracketTokenKind, OpenBracket, ParseError, SlotPath, UnparsedChunkItemsPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -18,7 +19,7 @@ use crate::{
 /// `CommaWithoutItem` error beside the tree, its boundary dropped.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
+pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpan<Chunk>>);
 
 /// A maximal separator-free run of a level's items — tokens and groups — plus the
 /// boundary that ended it when one did: line breaks and at most one comma, a second
@@ -28,9 +29,9 @@ pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 /// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
 /// end.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
-    #[resolve_field]
+    #[resolve_field(parent_variant = Chunk)]
     contents: NonEmpty<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     trailing_separator: Option<WithSpan<ChunkSeparator>>,
@@ -38,7 +39,7 @@ pub struct Chunk {
 
 /// What a chunk holds: every non-separator item of its level, groups included.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ChunkContentItem {
     NonBracket(NonBracketToken),
     Group(ChunkedGroup),
@@ -47,7 +48,7 @@ pub enum ChunkContentItem {
 /// A matched group re-chunked: the bracket tree's opening and closing are kept, and the
 /// interior is a `ChunkedLevel` — same layout as `Bracketed` / `MatchedBrackets`.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedGroup {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
@@ -83,15 +84,29 @@ pub enum ChunkedLevelParent<'a> {
     Interior(Box<ChunkedGroupPath<'a>>),
 }
 
+#[derive(Debug)]
+pub enum ChunkParent<'a> {
+    Level(ChunkedLevelPath<'a>),
+    Extra(ExtraChunksPath<'a>),
+}
+
+#[derive(Debug)]
+pub enum ChunkContentItemParent<'a> {
+    Chunk(ChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
+}
+
 pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedLevelParent<'a>>;
 
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
+pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
 
-pub type ChunkedGroupPath<'a> = PositionResolutionPath<&'a ChunkedGroup, ChunkPath<'a>>;
+pub type ChunkedGroupPath<'a> =
+    PositionResolutionPath<&'a ChunkedGroup, ChunkContentItemParent<'a>>;
 
 pub type ChunkSeparatorPath<'a> = PositionResolutionPath<&'a ChunkSeparator, ChunkPath<'a>>;
 
-pub type NonBracketTokenPath<'a> = PositionResolutionPath<&'a NonBracketToken, ChunkPath<'a>>;
+pub type NonBracketTokenPath<'a> =
+    PositionResolutionPath<&'a NonBracketToken, ChunkContentItemParent<'a>>;
 
 pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, ChunkedGroupPath<'a>>;
 pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, ChunkedGroupPath<'a>>;
@@ -135,24 +150,42 @@ impl ChunkedLevel {
 }
 
 /// Unread or failed items from the chunk under parse.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct UnparsedChunkItems(pub NonEmpty<WithSpan<ChunkContentItem>>);
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnparsedChunkItems(
+    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+);
 
 /// Extra root chunks after the first.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ExtraChunks(pub NonEmpty<WithSpan<Chunk>>);
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 
 /// One chunk's parse result.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = IsoLiteralParsePath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+)]
 pub struct Slot<T, E> {
+    #[resolve_field]
     pub item: Option<WithSpan<T>>,
+    #[resolve_field]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 
 /// One-item level.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = (),
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>
+)]
 pub struct Singleton<T, E> {
+    #[resolve_field]
     pub item: WithSpan<T>,
+    #[resolve_field]
     pub extra_chunks: Option<WithSpan<E>>,
 }
 
@@ -898,7 +931,12 @@ mod tests {
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
             IsographResolutionNode::OpenBracket(open) => {
                 assert_eq!(open.parent.inner.closing.item.0, Brace);
-                assert_eq!(render_chunk(text, open.parent.parent.inner), "foo { bar }");
+                match open.parent.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(render_chunk(text, chunk.inner), "foo { bar }");
+                    }
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
             }
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
@@ -930,10 +968,15 @@ mod tests {
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                assert!(matches!(
-                    token.parent.parent.parent,
-                    ChunkedLevelParent::Interior(_)
-                ));
+                match token.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => match chunk.parent.reference() {
+                        ChunkParent::Level(level) => {
+                            assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                        }
+                        parent => panic!("expected a level parent, got {parent:?}"),
+                    },
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
             }
             node => panic!("expected the token leaf, got {node:?}"),
         }
@@ -960,24 +1003,40 @@ mod tests {
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(token) => {
                 assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
-                assert_eq!(render_chunk(text, token.parent.inner), "bar,");
-                match token.parent.parent.parent.reference() {
-                    ChunkedLevelParent::Interior(group) => {
-                        assert_eq!(render_chunk(text, group.parent.inner), "foo { bar, baz }");
+                match token.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(render_chunk(text, chunk.inner), "bar,");
+                        match chunk.parent.reference() {
+                            ChunkParent::Level(level) => match level.parent.reference() {
+                                ChunkedLevelParent::Interior(group) => {
+                                    match group.parent.reference() {
+                                        ChunkContentItemParent::Chunk(outer) => {
+                                            assert_eq!(
+                                                render_chunk(text, outer.inner),
+                                                "foo { bar, baz }"
+                                            );
+                                        }
+                                        parent => panic!("expected a chunk parent, got {parent:?}"),
+                                    }
+                                }
+                                parent => panic!("expected an interior level, got {parent:?}"),
+                            },
+                            parent => panic!("expected a level parent, got {parent:?}"),
+                        }
                     }
-                    parent => panic!("expected an interior level, got {parent:?}"),
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
                 }
             }
             node => panic!("expected the token leaf, got {node:?}"),
         }
 
         match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
-            IsographResolutionNode::OpenBracket(open) => {
-                assert_eq!(
-                    render_chunk(text, open.parent.parent.inner),
-                    "foo { bar, baz }"
-                );
-            }
+            IsographResolutionNode::OpenBracket(open) => match open.parent.parent.reference() {
+                ChunkContentItemParent::Chunk(chunk) => {
+                    assert_eq!(render_chunk(text, chunk.inner), "foo { bar, baz }");
+                }
+                parent => panic!("expected a chunk parent, got {parent:?}"),
+            },
             node => panic!("expected the open bracket leaf, got {node:?}"),
         }
 

@@ -100,9 +100,9 @@ fn handle_data_struct(
     };
 
     let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let ty_generics = match self_type_generics.reference() {
-        Some(explicit) => quote!(#explicit),
-        None => quote!(#ty_generics),
+    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
+        Some(explicit) => (quote!(), quote!(#explicit), None),
+        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
     };
 
     let output = quote! {
