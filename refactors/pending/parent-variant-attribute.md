@@ -1,26 +1,26 @@
 # Parent-variant attribute
 
-`parent_variant` and `parent_from` are attributes of their own. `#[resolve_field]` is the struct-field opt-in. `#[resolve_field(transparent)]` is its one list form: a mode of that opt-in, never valid alone. Parent construction on an enum payload is `#[parent_variant = V]` or `#[parent_from]`.
+`parent_variant` and `parent_from` are attributes of their own. `#[resolve_field]` is the struct-field opt-in. `#[resolve_field(transparent)]` is its one list form: a mode of that opt-in, never valid alone. Parent construction on an enum payload is `#[parent_variant(V)]` or `#[parent_from]`.
 
 The full grammar, with every invalid combination a compile error:
 
 - struct field, unmarked: skipped.
 - struct field, `#[resolve_field]`: descend, container's path as the parent.
-- struct field, `#[resolve_field]` + `#[parent_variant = V]`: descend, container's path wrapped in `V`.
+- struct field, `#[resolve_field]` + `#[parent_variant(V)]`: descend, container's path wrapped in `V`.
 - struct field, `#[resolve_field(transparent)]`: descend without a span check, `parent` passed through, no container fallback.
-- struct field, `#[parent_variant = V]` alone: error, "`#[parent_variant]` requires `#[resolve_field]`".
+- struct field, `#[parent_variant(V)]` alone: error, "`#[parent_variant]` requires `#[resolve_field]`".
 - struct field, `#[parent_from]` alone: error, "`#[parent_from]` requires `#[resolve_field]`".
 - struct field, `#[resolve_field]` + `#[parent_from]`: error, "`#[parent_from]` is an enum-payload attribute".
-- struct field, `#[resolve_field(transparent)]` + `#[parent_variant = V]`: error, "`#[resolve_field(transparent)]` cannot combine with `#[parent_variant]`".
+- struct field, `#[resolve_field(transparent)]` + `#[parent_variant(V)]`: error, "`#[resolve_field(transparent)]` cannot combine with `#[parent_variant]`".
 - struct field, `#[resolve_field(transparent)]` + `#[parent_from]`: error, "`#[resolve_field(transparent)]` cannot combine with `#[parent_from]`".
-- struct field, `#[resolve_field]` + `#[parent_variant = V]` + `#[parent_from]`: error, "cannot combine `#[parent_variant]` and `#[parent_from]`".
+- struct field, `#[resolve_field]` + `#[parent_variant(V)]` + `#[parent_from]`: error, "cannot combine `#[parent_variant]` and `#[parent_from]`".
 - enum payload, unmarked: delegate, parent passed through unchanged.
-- enum payload, `#[parent_variant = V]`: delegate, parent wrapped in `V`.
+- enum payload, `#[parent_variant(V)]`: delegate, parent wrapped in `V`.
 - enum payload, `#[parent_from]`: delegate, parent converted with `From::from`.
-- enum payload, `#[resolve_field]`: error, "an enum payload always resolves and passes the parent through; annotate only to construct the parent: `#[parent_variant = SomeVariant]` or `#[parent_from]`".
+- enum payload, `#[resolve_field]`: error, "an enum payload always resolves and passes the parent through; annotate only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`".
 - enum payload, `#[resolve_field(transparent)]`: error, "`#[resolve_field(transparent)]` is a struct-field attribute; an unmarked payload already forwards `parent`".
 - enum payload, `#[resolve_field]` (either form) plus `parent_variant` or `parent_from`: the `resolve_field` error above, checked first.
-- enum payload, `#[parent_variant = V]` + `#[parent_from]`: error, "cannot combine `#[parent_variant]` and `#[parent_from]`".
+- enum payload, `#[parent_variant(V)]` + `#[parent_from]`: error, "cannot combine `#[parent_variant]` and `#[parent_from]`".
 - `#[resolve_field(parent_variant = V)]` and `#[resolve_field(parent_from)]` no longer parse; the error points at the standalone spelling.
 
 Behavior is unchanged at every existing site: the generated code is identical, and the test suite passes with no assertion edits.
@@ -79,13 +79,13 @@ After:
 // from crates/isograph_parser/src/chunk.rs
 pub struct ChunkedLevel(
     #[resolve_field]
-    #[parent_variant = Level]
+    #[parent_variant(Level)]
     pub Vec<WithSpan<Chunk>>,
 );
 
 pub struct Chunk {
     #[resolve_field]
-    #[parent_variant = Chunk]
+    #[parent_variant(Chunk)]
     contents: NonEmpty<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     trailing_separator: Option<WithSpan<ChunkSeparator>>,
@@ -96,7 +96,7 @@ pub struct ChunkedGroup {
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
     #[resolve_field]
-    #[parent_variant = Interior]
+    #[parent_variant(Interior)]
     pub children: WithSpan<ChunkedLevel>,
     #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
@@ -104,13 +104,13 @@ pub struct ChunkedGroup {
 
 pub struct UnparsedChunkItems(
     #[resolve_field]
-    #[parent_variant = Unparsed]
+    #[parent_variant(Unparsed)]
     pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
 pub struct ExtraChunks(
     #[resolve_field]
-    #[parent_variant = Extra]
+    #[parent_variant(Extra)]
     pub NonEmpty<WithSpan<Chunk>>,
 );
 ```
@@ -159,7 +159,7 @@ After:
 
 ## Types
 
-`ParentConstruction` is unchanged. Its comments name the new spellings.
+`ParentConstruction` comments name the new spellings. `FromParent` is deleted: enum payloads emit `From::from` from `#[parent_from]` directly and never build this enum, and a struct field with `#[parent_from]` is an error. `new_parent_expr` loses that arm.
 
 Before:
 
@@ -191,11 +191,9 @@ enum ParentConstruction {
     /// Bare `#[resolve_field]`: the child's `Parent` type is the container's own
     /// path, and `self.path(parent)` is passed unwrapped.
     ContainerPath,
-    /// `#[parent_variant = V]`: the child's `Parent` type is an enum, and the
+    /// `#[parent_variant(V)]`: the child's `Parent` type is an enum, and the
     /// parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
-    /// `#[parent_from]`: the child's `Parent` is `From` the container's `Parent`.
-    FromParent,
     /// `#[resolve_field(transparent)]`: a bare `ResolvePosition` field, no
     /// path segment, no span check.
     Transparent,
@@ -220,7 +218,7 @@ enum ResolveFieldForm {
 
 ## Collection and parse
 
-Origin: `find_resolve_field_attr` and `parse_parent_construction` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: those two functions are replaced by the functions below. Three attributes are collected, at most one of each. `#[resolve_field]` is `Meta::Path` or `Meta::List` whose only argument is `transparent`. `#[parent_variant = V]` is `Meta::NameValue` whose value is a path ident. `#[parent_from]` is `Meta::Path`.
+Origin: `find_resolve_field_attr` and `parse_parent_construction` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: those two functions are replaced by the functions below. Three attributes are collected, at most one of each. `#[resolve_field]` is `Meta::Path` or `Meta::List` whose only argument is `transparent`. `#[parent_variant(V)]` is `Meta::List` whose only argument is a path ident. `#[parent_from]` is `Meta::Path`.
 
 Before:
 
@@ -324,7 +322,7 @@ fn parse_resolve_field_form(
             Error::new_spanned(
                 attr.meta.reference(),
                 "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
-                 parent wrapping is `#[parent_variant = SomeVariant]`, \
+                 parent wrapping is `#[parent_variant(SomeVariant)]`, \
                  parent conversion is `#[parent_from]`",
             )
             .to_compile_error()
@@ -333,7 +331,7 @@ fn parse_resolve_field_form(
         syn::Meta::NameValue(name_value) => Error::new_spanned(
             name_value,
             "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
-             parent wrapping is `#[parent_variant = SomeVariant]`, \
+             parent wrapping is `#[parent_variant(SomeVariant)]`, \
              parent conversion is `#[parent_from]`",
         )
         .to_compile_error()
@@ -341,21 +339,19 @@ fn parse_resolve_field_form(
     }
 }
 
-fn parse_parent_variant(
-    attr: &syn::Attribute,
-) -> Result<syn::Ident, proc_macro2::TokenStream> {
+fn parse_parent_variant(attr: &syn::Attribute) -> Result<syn::Ident, proc_macro2::TokenStream> {
     match attr.meta.reference() {
-        syn::Meta::NameValue(name_value) => {
-            if let syn::Expr::Path(value) = name_value.value.reference()
-                && let Some(variant) = value.path.get_ident()
+        syn::Meta::List(_) => {
+            if let Ok(path) = attr.parse_args::<syn::Path>()
+                && let Some(variant) = path.get_ident()
             {
                 return variant.clone().wrap_ok();
             }
-            Error::new_spanned(attr, "expected `#[parent_variant = SomeVariant]`")
+            Error::new_spanned(attr, "expected `#[parent_variant(SomeVariant)]`")
                 .to_compile_error()
                 .wrap_err()
         }
-        _ => Error::new_spanned(attr, "expected `#[parent_variant = SomeVariant]`")
+        _ => Error::new_spanned(attr, "expected `#[parent_variant(SomeVariant)]`")
             .to_compile_error()
             .wrap_err(),
     }
@@ -369,6 +365,28 @@ fn parse_parent_from(attr: &syn::Attribute) -> Result<(), proc_macro2::TokenStre
             .wrap_err(),
     }
 }
+```
+
+`new_parent_expr` before:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
+            inner_type,
+            "`parent_from` and `transparent` do not build a field parent",
+        )
+        .to_compile_error(),
+```
+
+After:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::Transparent => Error::new_spanned(
+            inner_type,
+            "`transparent` does not build a field parent",
+        )
+        .to_compile_error(),
 ```
 
 ## Struct fields
@@ -574,7 +592,7 @@ fn get_resolve_field_info(
 
 ## Enum payloads
 
-Origin: `generate_enum_arm` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: it collects the three attributes. `#[resolve_field]` of either form errors (transparent keeps its current message; bare uses the new spelling and names `#[parent_from]`). `#[parent_from]` is the `FromParent` arm. Emissions are unchanged.
+Origin: `generate_enum_arm` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: it collects the three attributes. `#[resolve_field]` of either form errors (transparent keeps its current message; bare uses the new spelling and names `#[parent_from]`). `#[parent_from]` emits `From::from` after `parse_parent_from`. Emissions are unchanged.
 
 Before:
 
@@ -663,7 +681,7 @@ fn generate_enum_arm(
             Ok(ResolveFieldForm::Bare) => Error::new_spanned(
                 resolve_field,
                 "an enum payload always resolves and passes the parent through; annotate \
-                 only to construct the parent: `#[parent_variant = SomeVariant]` or `#[parent_from]`",
+                 only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`",
             )
             .to_compile_error(),
             Err(e) => e,
