@@ -225,6 +225,7 @@ pub enum Expectation {
     Token(NonBracketTokenKind),
     DeclarationKeyword,
     EndOfDeclaration,
+    Separator,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -280,6 +281,7 @@ impl fmt::Display for Expectation {
                 write!(f, "one of `entrypoint`, `field`, or `pointer`")
             }
             Expectation::EndOfDeclaration => write!(f, "the end of the declaration"),
+            Expectation::Separator => write!(f, "a comma or line break"),
         }
     }
 }
@@ -528,6 +530,139 @@ pub struct NonBracketToken(pub NonBracketTokenKind);
 ```
 
 Extra root chunks use `parent_variant = Extra`. Leftover and failed items use `parent_variant = Unparsed`. `ChunkContentItem` is transparent, so `NonBracketToken` and `ChunkedGroup` parent at `ChunkContentItemParent`.
+
+Existing `chunk.rs` resolve tests that walk `token.parent` or `open.parent.parent` change. `ChunkSeparator.parent` is still a `ChunkPath`; `.inner` is still the chunk.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+            IsographResolutionNode::OpenBracket(open) => {
+                assert_eq!(open.parent.inner.closing.item.0, Brace);
+                assert_eq!(render_chunk(text, open.parent.parent.inner), "foo { bar }");
+            }
+            node => panic!("expected the open bracket leaf, got {node:?}"),
+        }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                assert!(matches!(
+                    token.parent.parent.parent,
+                    ChunkedLevelParent::Interior(_)
+                ));
+            }
+            node => panic!("expected the token leaf, got {node:?}"),
+        }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                assert_eq!(render_chunk(text, token.parent.inner), "bar,");
+                match token.parent.parent.parent.reference() {
+                    ChunkedLevelParent::Interior(group) => {
+                        assert_eq!(render_chunk(text, group.parent.inner), "foo { bar, baz }");
+                    }
+                    parent => panic!("expected an interior level, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the token leaf, got {node:?}"),
+        }
+
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+            IsographResolutionNode::OpenBracket(open) => {
+                assert_eq!(
+                    render_chunk(text, open.parent.parent.inner),
+                    "foo { bar, baz }"
+                );
+            }
+            node => panic!("expected the open bracket leaf, got {node:?}"),
+        }
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+            IsographResolutionNode::OpenBracket(open) => {
+                assert_eq!(open.parent.inner.closing.item.0, Brace);
+                match open.parent.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(render_chunk(text, chunk.inner), "foo { bar }");
+                    }
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the open bracket leaf, got {node:?}"),
+        }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                match token.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => match chunk.parent.reference() {
+                        ChunkParent::Level(level) => {
+                            assert!(matches!(level.parent, ChunkedLevelParent::Interior(_)));
+                        }
+                        parent => panic!("expected a level parent, got {parent:?}"),
+                    },
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the token leaf, got {node:?}"),
+        }
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "bar")) {
+            IsographResolutionNode::NonBracketToken(token) => {
+                assert_eq!(token.inner.0, NonBracketTokenKind::Identifier);
+                match token.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(render_chunk(text, chunk.inner), "bar,");
+                        match chunk.parent.reference() {
+                            ChunkParent::Level(level) => match level.parent.reference() {
+                                ChunkedLevelParent::Interior(group) => {
+                                    assert_eq!(
+                                        render_chunk(text, group.parent.inner),
+                                        "foo { bar, baz }"
+                                    );
+                                }
+                                parent => panic!("expected an interior level, got {parent:?}"),
+                            },
+                            parent => panic!("expected a level parent, got {parent:?}"),
+                        }
+                    }
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the token leaf, got {node:?}"),
+        }
+
+        match tree.resolve(ChunkedLevelParent::Root, span_of(text, "{")) {
+            IsographResolutionNode::OpenBracket(open) => {
+                match open.parent.parent.reference() {
+                    ChunkContentItemParent::Chunk(chunk) => {
+                        assert_eq!(render_chunk(text, chunk.inner), "foo { bar, baz }");
+                    }
+                    parent => panic!("expected a chunk parent, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the open bracket leaf, got {node:?}"),
+        }
+```
 
 ## Generated code
 
@@ -928,5 +1063,5 @@ mod tests {
 
 ## Landing checklist
 
-1. parse_iso_literal.rs, the `ParseError` variants this form adds, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes this form needs, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. parse_iso_literal.rs, the `ParseError` variants this form adds, the `IsographResolutionNode`, `ChunkParent`, and `ChunkContentItemParent` changes this form needs, the existing `chunk.rs` parent walks, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

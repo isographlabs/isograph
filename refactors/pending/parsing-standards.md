@@ -23,7 +23,7 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.require_end` and builds a `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra root chunks sit on `IsoLiteralParse.extra_chunks`. `IsoLiteralSlot.item` is `Some` when the form parsed. `IsoLiteralSlot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.remaining_contents` and builds a `Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra root chunks sit on `IsoLiteralParse.extra_chunks`. `IsoLiteralSlot.item` is `Some` when the form parsed. `IsoLiteralSlot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 This pass is `IsoLiteralParse`. Resolve walks that tree only. Artifact generation does not resolve.
 
@@ -99,14 +99,13 @@ impl<'a> ItemCursor<'a> {
         kind: BracketKind,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
         let peek = self.items.peek()?;
-        match peek.view().item.reference() {
-            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {}
-            _ => return None,
-        }
-        let item = peek.commit();
-        self.previous_end = item.location.end;
+        let item = *peek.view();
         match item.item.reference() {
-            ChunkContentItem::Group(group) => WithSpan::new(group, item.location).wrap_some(),
+            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
+                peek.commit();
+                self.previous_end = item.location.end;
+                WithSpan::new(group, item.location).wrap_some()
+            }
             _ => None,
         }
     }
@@ -170,7 +169,7 @@ impl<'a> ItemCursor<'a> {
 }
 ```
 
-`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_*` views to decide, then `commit`s and reads the `'a` item. `expected` only views.
+`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_group_if` copies the `'a` reference from `view`, matches once, then `commit`s. `consume_token_if` views to decide, then `commit`s. `expected` only views.
 
 ### Span sources
 
@@ -317,7 +316,7 @@ A `Chunk` is the whole unit: its chunk items plus the optional trailing separato
 
 `Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover and failed `UnparsedChunkItems` are those items only; a list chunk's comma is not among them. A position on that comma resolves to the list.
 
-`ChunkedLevelParent` stays. Extra root chunks parent a `Chunk` at `ChunkParent::Extra`. Leftover and failed items parent a `ChunkContentItem` at `ChunkContentItemParent::Unparsed`. `ChunkContentItem` is transparent, so `NonBracketToken` and `ChunkedGroup` parent at `ChunkContentItemParent`.
+`ChunkedLevelParent` stays. Extra root chunks parent a `Chunk` at `ChunkParent::Extra`. Leftover and failed items parent a `ChunkContentItem` at `ChunkContentItemParent::Unparsed`. `ChunkContentItem` is transparent, so `NonBracketToken` and `ChunkedGroup` parent at `ChunkContentItemParent`. Existing `chunk.rs` tests that walk `token.parent` or `open.parent.parent` match `ChunkContentItemParent::Chunk` and `ChunkParent::Level`. parse-entrypoint.md writes those tests.
 
 Before:
 
@@ -518,7 +517,7 @@ fn parse_chunk<'a, P>(
 fn parse_one_item<'a, P, F>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
-    leftover_error: impl FnOnce(&mut ItemCursor<'a>) -> WithSpan<ParseError>,
+    leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
     push_error: &mut F,
 ) -> WithSpan<Slot<Option<WithSpan<P>>, Option<WithSpan<UnparsedChunkItems>>>>
@@ -527,43 +526,38 @@ where
 {
     let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
     match result {
-        Ok(item) => {
-            if stream.require_end().is_ok() {
-                return WithSpan::new(
+        Ok(item) => match stream.remaining_contents() {
+            None => WithSpan::new(
+                Slot {
+                    item: item.wrap_some(),
+                    extra_tokens: None,
+                },
+                item.location,
+            ),
+            Some(remaining) => {
+                push_error(WithSpan::new(
+                    ParseError::expected(
+                        leftover,
+                        Found::from(remaining.first().item.reference()),
+                    ),
+                    remaining.first().location,
+                ));
+                let leftover_span =
+                    Span::join(remaining.first().location, remaining.last().location);
+                let location = Span::join(item.location, leftover_span);
+                WithSpan::new(
                     Slot {
                         item: item.wrap_some(),
-                        extra_tokens: None,
+                        extra_tokens: WithSpan::new(
+                            UnparsedChunkItems(remaining),
+                            leftover_span,
+                        )
+                        .wrap_some(),
                     },
-                    item.location,
-                );
+                    location,
+                )
             }
-            push_error(leftover_error(stream.cursor()));
-            match stream.remaining_contents() {
-                Some(remaining) => {
-                    let leftover_span =
-                        Span::join(remaining.first().location, remaining.last().location);
-                    let location = Span::join(item.location, leftover_span);
-                    WithSpan::new(
-                        Slot {
-                            item: item.wrap_some(),
-                            extra_tokens: WithSpan::new(
-                                UnparsedChunkItems(remaining),
-                                leftover_span,
-                            )
-                            .wrap_some(),
-                        },
-                        location,
-                    )
-                }
-                None => WithSpan::new(
-                    Slot {
-                        item: item.wrap_some(),
-                        extra_tokens: None,
-                    },
-                    item.location,
-                ),
-            }
-        }
+        },
         Err(reason) => {
             push_error(reason);
             let location = chunk.item.contents_span();
@@ -598,7 +592,7 @@ impl ChunkedLevel {
                 parse_one_item(
                     chunk,
                     text,
-                    |cursor| cursor.expected(Expectation::Separator),
+                    Expectation::Separator,
                     |cursor, push_error| parse_item(cursor, push_error),
                     push_error,
                 )
@@ -633,7 +627,7 @@ where
     let item = parse_one_item(
         &level.item.0[0],
         text,
-        |cursor| cursor.expected(end),
+        end,
         parse,
         push_error,
     );
@@ -659,9 +653,9 @@ where
 }
 ```
 
-`ChunkStream::remaining_contents` returns the unread chunk items after `require_end` `Err`. That list is nonempty. Leftover `UnparsedChunkItems` is those items.
+`ChunkStream::remaining_contents` returns the unread chunk items. `None` when the cursor is at end. Leftover `UnparsedChunkItems` is those items.
 
-`parse_one_item` is one chunk. Form `Ok` and `require_end` `Ok` is `item: Some`, empty `extra_tokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `extra_tokens`. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item` is `None`. `extra_tokens` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
+`parse_one_item` is one chunk. Form `Ok` and `remaining_contents` `None` is `item: Some`, empty `extra_tokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `extra_tokens`, diagnostic from the first leftover item. Form `Err` is `item: None` and a clone of the source chunk's items. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item` is `None`. `extra_tokens` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
@@ -787,7 +781,7 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
     };
 ```
 
-`parse_one_item` wraps the item parse in `spanning` and then calls `require_end`. Leftover is extra tokens.
+`parse_one_item` wraps the item parse in `spanning` and then `remaining_contents`. Leftover is extra tokens.
 
 ## Narrower types for narrower grammars
 
@@ -833,9 +827,9 @@ pub enum Found {
 }
 ```
 
-One global `Expectation`. An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. Surface lands `ParseError::Expected`, `Expectation::Token`, `Expectation::Separator`, and `Found`. parse-entrypoint.md adds `EmptyLiteral`, `MultipleDeclarations`, `UnsupportedDeclarationType`, `DeclarationKeyword`, and `EndOfDeclaration`. parse-fields.md adds `SelectionSet` and `Selection`. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, and `IntegerDoesNotFitI64`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
-`UnsupportedDeclarationType` is in parse-entrypoint.md and is removed by parse-pointers.md.
+An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
 Diagnostics are not on the tree. `parse_one_item` calls `push_error` for leftover and for a failed form. `parse_iso_literal` calls it for empty. `parse_singleton` calls it for a boundary comma and extra. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
 
@@ -890,7 +884,7 @@ The first implementation step is the shared surface, with tests, before any gram
 - `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
 - `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`
 - `Clone` on `ChunkedLevel`, `Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`. Extra chunks clone for now.
-- `ParseError` / `Expectation` / `Found` as the error types those methods return. `Stage` impls wait for `IsoLiteralItem`.
+- `ParseError::Expected`, `Expectation::{Token, Separator}`, `Found`. `Stage` impls wait for `IsoLiteralItem`.
 
 Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `item: Some` plus extra tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
 
