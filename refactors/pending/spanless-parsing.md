@@ -84,7 +84,7 @@ The parser is generic at the surface and span-based inside: the lexer must track
 pub fn match_brackets<TSpan: SpanAnnotation>(literal: &str) -> BracketTree<String, TSpan>
 ```
 
-with every `WithSpan::new(item, span)` in `resilient-parser.md`'s implementation becoming `WithSpan::new(item, TSpan::from_span(span))`, and `Closing::Real(token.span)` becoming `Closing::Real(TSpan::from_span(token.span))`. Nothing else about the algorithm changes; one function serves both instantiations, so the two trees cannot disagree about structure.
+with every `item.with_span(span)` in `resilient-parser.md`'s implementation becoming `item.with_span(TSpan::from_span(span))`, and `Closing::Real(token.span)` becoming `Closing::Real(TSpan::from_span(token.span))`. Nothing else about the algorithm changes; one function serves both instantiations, so the two trees cannot disagree about structure.
 
 What stays `Span`-only, and what works for any `TSpan`:
 

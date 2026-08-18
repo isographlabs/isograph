@@ -245,20 +245,19 @@ pub(crate) fn consume_variable_declaration_list(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<VariableDeclarationList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    WithSpan::new(
-        VariableDeclarationList(
-            group
-                .item
-                .children
-                .item
-                .parse_items_with_trailing(cursor.text(), parse_variable_declaration)
-                // resolve-position-generic-slot.md: this map is gone.
-                .into_iter()
-                .map(WithSpan::<VariableDeclarationSlot>::from)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_some()
+    VariableDeclarationList(
+        group
+            .item
+            .children
+            .item
+            .parse_items_with_trailing(cursor.text(), parse_variable_declaration)
+            // resolve-position-generic-slot.md: this map is gone.
+            .into_iter()
+            .map(WithSpan::<VariableDeclarationSlot>::from)
+            .collect(),
+    )
+    .with_span(group.location)
+    .wrap_some()
 }
 
 fn parse_variable_declaration(
@@ -279,8 +278,8 @@ fn parse_variable_declaration(
         None => None,
     };
     VariableDeclaration::Declaration(DeclaredVariable {
-        dollar: WithSpan::new(Dollar, dollar),
-        name: WithSpan::new(VariableName, name),
+        dollar: Dollar.with_span(dollar),
+        name: VariableName.with_span(name),
         type_annotation,
         default_value,
     }).wrap_ok()
@@ -293,9 +292,9 @@ pub(crate) fn parse_type_annotation(
         if let Some(name) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
             let exclamation = cursor
                 .consume_token_if(NonBracketTokenKind::Exclamation)
-                .map(|span| WithSpan::new(Exclamation, span));
+                .map(|span| Exclamation.with_span(span));
             return TypeAnnotation::Named(NamedTypeAnnotation {
-                name: WithSpan::new(TypeName, name),
+                name: TypeName.with_span(name),
                 exclamation,
             }).wrap_ok();
         }
@@ -303,9 +302,9 @@ pub(crate) fn parse_type_annotation(
             let inner = parse_bracket_interior_type(cursor.text(), group.item.children.reference())?;
             let exclamation = cursor
                 .consume_token_if(NonBracketTokenKind::Exclamation)
-                .map(|span| WithSpan::new(Exclamation, span));
+                .map(|span| Exclamation.with_span(span));
             return TypeAnnotation::List(ListTypeAnnotation {
-                inner: WithSpan::new(inner.item.boxed(), group.location),
+                inner: inner.item.boxed().with_span(group.location),
                 exclamation,
             }).wrap_ok();
         }
@@ -321,19 +320,15 @@ fn parse_bracket_interior_type(
         level,
         text,
         || {
-            WithSpan::new(
-                ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk),
-                Span::new(level.location.end, level.location.end),
-            )
+            ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
+                .with_span(Span::new(level.location.end, level.location.end))
         },
         |extra| {
-            WithSpan::new(
-                ParseError::expected(
-                    Expectation::EndOfType,
-                    Found::from(extra.item.first_item().item.reference()),
-                ),
-                extra.location,
+            ParseError::expected(
+                Expectation::EndOfType,
+                Found::from(extra.item.first_item().item.reference()),
             )
+            .with_span(extra.location)
         },
         parse_type_annotation,
     )

@@ -118,7 +118,7 @@ pub enum IsoLiteralParse {
             IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
         text if text == "field" || text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
         }
 ```
 
@@ -140,7 +140,7 @@ pub enum IsoLiteralParse {
         }
         text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
         text if text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
         }
 ```
 
@@ -186,9 +186,9 @@ fn parse_field(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
-        field_keyword: WithSpan::new(FieldKeyword, keyword),
-        parent_type: WithSpan::new(EntityName, parent_type),
-        client_field_name: WithSpan::new(ClientFieldName, client_field_name),
+        field_keyword: FieldKeyword.with_span(keyword),
+        parent_type: EntityName.with_span(parent_type),
+        client_field_name: ClientFieldName.with_span(client_field_name),
         selection_set,
     }.wrap_ok()
 }
@@ -367,38 +367,36 @@ pub(crate) fn require_selection_set(
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
-    WithSpan::new(
-        SelectionSet(
-            group
-                .item
-                .children
-                .item
-                .parse_items_with_trailing(cursor.text(), parse_selection)
-                // resolve-position-generic-slot.md: this map is gone.
-                .into_iter()
-                .map(WithSpan::<SelectionSlot>::from)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_ok()
+    SelectionSet(
+        group
+            .item
+            .children
+            .item
+            .parse_items_with_trailing(cursor.text(), parse_selection)
+            // resolve-position-generic-slot.md: this map is gone.
+            .into_iter()
+            .map(WithSpan::<SelectionSlot>::from)
+            .collect(),
+    )
+    .with_span(group.location)
+    .wrap_ok()
 }
 
 fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    WithSpan::new(
-        SelectionSet(
-            group
-                .item
-                .children
-                .item
-                .parse_items_with_trailing(cursor.text(), parse_selection)
-                // resolve-position-generic-slot.md: this map is gone.
-                .into_iter()
-                .map(WithSpan::<SelectionSlot>::from)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_some()
+    SelectionSet(
+        group
+            .item
+            .children
+            .item
+            .parse_items_with_trailing(cursor.text(), parse_selection)
+            // resolve-position-generic-slot.md: this map is gone.
+            .into_iter()
+            .map(WithSpan::<SelectionSlot>::from)
+            .collect(),
+    )
+    .with_span(group.location)
+    .wrap_some()
 }
 
 fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
@@ -411,11 +409,11 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
                 .require_token(NonBracketTokenKind::Identifier)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             (
-                WithSpan::new(SelectionAlias, first).wrap_some(),
-                WithSpan::new(SelectionName, name),
+                SelectionAlias.with_span(first).wrap_some(),
+                SelectionName.with_span(name),
             )
         }
-        None => (None, WithSpan::new(SelectionName, first)),
+        None => (None, SelectionName.with_span(first)),
     };
     let selection_set = consume_selection_set(cursor);
     (match selection_set {

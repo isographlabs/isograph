@@ -50,7 +50,7 @@ pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpa
     let span = cursor
         .consume_token_if(NonBracketTokenKind::StringLiteral)
         .or_else(|| cursor.consume_token_if(NonBracketTokenKind::BlockStringLiteral))?;
-    WithSpan::new(Description, span).wrap_some()
+    Description.with_span(span).wrap_some()
 }
 ```
 

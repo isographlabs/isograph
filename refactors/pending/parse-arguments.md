@@ -314,20 +314,19 @@ pub(crate) fn consume_argument_list(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<ArgumentList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    WithSpan::new(
-        ArgumentList(
-            group
-                .item
-                .children
-                .item
-                .parse_items_with_trailing(cursor.text(), parse_argument)
-                // resolve-position-generic-slot.md: this map is gone.
-                .into_iter()
-                .map(WithSpan::<ArgumentSlot>::from)
-                .collect(),
-        ),
-        group.location,
-    ).wrap_some()
+    ArgumentList(
+        group
+            .item
+            .children
+            .item
+            .parse_items_with_trailing(cursor.text(), parse_argument)
+            // resolve-position-generic-slot.md: this map is gone.
+            .into_iter()
+            .map(WithSpan::<ArgumentSlot>::from)
+            .collect(),
+    )
+    .with_span(group.location)
+    .wrap_some()
 }
 
 fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
@@ -339,7 +338,7 @@ fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<Pars
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     Argument::Named(NamedArgument {
-        name: WithSpan::new(ArgumentName, name),
+        name: ArgumentName.with_span(name),
         value,
     }).wrap_ok()
 }
@@ -353,7 +352,7 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     ObjectEntry::Named(NamedObjectEntry {
-        name: WithSpan::new(ObjectEntryName, name),
+        name: ObjectEntryName.with_span(name),
         value,
     }).wrap_ok()
 }

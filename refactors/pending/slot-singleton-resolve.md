@@ -78,30 +78,26 @@ pub fn parse_iso_literal(
 ) -> WithSpan<IsoLiteralParse> {
     let location = root.location;
     if root.item.len() == 0 {
-        push_error(WithSpan::new(ParseError::EmptyLiteral, location));
-        return WithSpan::new(
-            Singleton {
-                item: WithSpan::new(
-                    Slot {
-                        item: None,
-                        extra_tokens: None,
-                    },
-                    location,
-                ),
-                extra_chunks: None,
-            },
-            location,
-        );
+        push_error(ParseError::EmptyLiteral.with_span(location));
+        return Singleton {
+            item: Slot {
+                item: None,
+                extra_tokens: None,
+            }
+            .with_span(location),
+            extra_chunks: None,
+        }
+        .with_span(location);
     }
     let singleton = parse_singleton(
         root.reference(),
         text,
         Expectation::EndOfDeclaration,
-        |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
+        |extra| ParseError::MultipleDeclarations.with_span(extra.location),
         |cursor, _| parse_iso_literal_item(cursor),
         &mut push_error,
     );
-    WithSpan::new(singleton, location)
+    singleton.with_span(location)
 }
 ```
 

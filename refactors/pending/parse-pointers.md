@@ -45,7 +45,7 @@ pub enum IsoLiteralParse {
         }
         text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
         text if text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
         }
 ```
 
@@ -135,23 +135,22 @@ fn parse_pointer(
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
     if cursor.token_text(to_keyword) != "to" {
-        return WithSpan::new(
-            ParseError::expected(
-                Expectation::ToKeyword,
-                Found::Token(NonBracketTokenKind::Identifier),
-            ),
-            to_keyword,
-        ).wrap_err();
+        return ParseError::expected(
+            Expectation::ToKeyword,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(to_keyword)
+        .wrap_err();
     }
     let target_type = parse_type_annotation(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientPointerDeclaration {
-        pointer_keyword: WithSpan::new(PointerKeyword, keyword),
-        parent_type: WithSpan::new(EntityName, parent_type),
-        client_pointer_name: WithSpan::new(ClientPointerName, client_pointer_name),
+        pointer_keyword: PointerKeyword.with_span(keyword),
+        parent_type: EntityName.with_span(parent_type),
+        client_pointer_name: ClientPointerName.with_span(client_pointer_name),
         variable_definitions,
-        to_keyword: WithSpan::new(ToKeyword, to_keyword),
+        to_keyword: ToKeyword.with_span(to_keyword),
         target_type,
         description,
         selection_set,
