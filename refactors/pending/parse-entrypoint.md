@@ -64,10 +64,22 @@ pub struct EntrypointDeclaration {
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntityName(common_lang_types::EntityName);
 
+impl From<intern::string_key::StringKey> for EntityName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        EntityName(key.to())
+    }
+}
+
 /// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientFieldName(SelectableName);
+
+impl From<intern::string_key::StringKey> for ClientFieldName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        ClientFieldName(key.to())
+    }
+}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
@@ -136,9 +148,15 @@ fn parse_entrypoint(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
         entrypoint_keyword: EntrypointKeyword.with_span(keyword),
-        parent_type: EntityName(cursor.token_text(parent_type).intern().to())
+        parent_type: cursor
+            .token_text(parent_type)
+            .intern()
+            .to::<EntityName>()
             .with_span(parent_type),
-        client_field_name: ClientFieldName(cursor.token_text(client_field_name).intern().to())
+        client_field_name: cursor
+            .token_text(client_field_name)
+            .intern()
+            .to::<ClientFieldName>()
             .with_span(client_field_name),
     }.wrap_ok()
 }

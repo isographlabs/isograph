@@ -173,7 +173,7 @@ impl<'a> ItemCursor<'a> {
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
-`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. A name in the tree is an interned string key (`token_text(span).intern().to()`). The converted scalar is the `i64`. The wrapper span is location only.
+`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. A name in the tree is an interned string key (`token_text(span).intern().to::<EntityName>()`). The converted scalar is the `i64`. The wrapper span is location only.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
