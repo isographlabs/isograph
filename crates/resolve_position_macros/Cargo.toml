@@ -15,5 +15,10 @@ syn = { workspace = true, features = ["visit-mut"] }
 [lib]
 proc-macro = true
 
+[dev-dependencies]
+prelude = { path = "../prelude" }
+resolve_position = { path = "../resolve_position" }
+span = { path = "../span" }
+
 [lints]
 workspace = true

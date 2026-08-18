@@ -1510,6 +1510,8 @@ dependencies = [
  "prelude",
  "proc-macro2",
  "quote",
+ "resolve_position",
+ "span",
  "syn 2.0.98",
 ]
 

@@ -23,9 +23,12 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
             data_struct,
             input.generics,
         ),
-        syn::Data::Enum(data_enum) => {
-            handle_data_enum(struct_name, resolve_position_args, data_enum)
-        }
+        syn::Data::Enum(data_enum) => handle_data_enum(
+            struct_name,
+            resolve_position_args,
+            data_enum,
+            input.generics,
+        ),
         syn::Data::Union(_) => {
             Error::new(input.span(), "This derive only works on structs and enums")
                 .to_compile_error()
@@ -46,46 +49,72 @@ fn handle_data_struct(
         self_type_generics,
     } = resolve_position_args;
 
-    let generics_map = match validate_and_map_generics(input_generics, self_type_generics.clone()) {
-        Ok(map) => map,
-        Err(e) => {
-            return e.to();
-        }
-    };
+    let generics_map =
+        match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
+            Ok(map) => map,
+            Err(e) => {
+                return e.to();
+            }
+        };
 
-    let attributes_to_resolve = match data_struct
+    let field_infos = match data_struct
         .fields
         .iter()
         .enumerate()
         .map(|(index, field)| get_resolve_field_info(field, index, generics_map.reference()))
         .collect::<Result<Vec<_>, _>>()
     {
-        Ok(field_infos) => field_infos
-            .into_iter()
-            .flatten()
-            .map(
-                |ResolveFieldInfo {
-                     field_accessor,
-                     field_type,
-                     parent_construction,
-                 }| {
-                    generate_resolve_code(
-                        field_accessor.reference(),
-                        field_type.reference(),
-                        parent_construction.reference(),
-                    )
-                },
-            )
-            .collect::<Vec<_>>(),
+        Ok(field_infos) => field_infos.into_iter().flatten().collect::<Vec<_>>(),
         Err(e) => {
             return e.to();
         }
     };
 
+    let attributes_to_resolve = field_infos
+        .iter()
+        .map(
+            |ResolveFieldInfo {
+                 field_accessor,
+                 field_type,
+                 parent_construction,
+             }| {
+                generate_resolve_code(
+                    field_accessor.reference(),
+                    field_type.reference(),
+                    parent_construction.reference(),
+                )
+            },
+        )
+        .collect::<Vec<_>>();
+
+    // A transparent field always answers; the container is not a path segment.
+    let fallback = if field_infos
+        .iter()
+        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
+    {
+        quote!()
+    } else {
+        quote! {
+            return Self::ResolvedNode::#struct_name(self.path(parent).into());
+        }
+    };
+
+    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+    let ty_generics = match self_type_generics.reference() {
+        Some(explicit) => quote!(#explicit),
+        None => quote!(#ty_generics),
+    };
+
     let output = quote! {
-        impl ::resolve_position::ResolvePosition for #struct_name #self_type_generics {
-            type Parent<'a> = #parent_type;
-            type ResolvedNode<'a> = #resolved_node;
+        impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
+            type Parent<'a>
+                = #parent_type
+            where
+                Self: 'a;
+            type ResolvedNode<'a>
+                = #resolved_node
+            where
+                Self: 'a;
 
             fn resolve<'a>(
                 &'a self,
@@ -94,7 +123,7 @@ fn handle_data_struct(
             ) -> Self::ResolvedNode<'a> {
                 #(#attributes_to_resolve)*
 
-                return Self::ResolvedNode::#struct_name(self.path(parent).into());
+                #fallback
             }
         }
     };
@@ -106,12 +135,19 @@ fn handle_data_enum(
     enum_name: syn::Ident,
     resolve_position_args: ResolvePositionArgs,
     data_enum: syn::DataEnum,
+    input_generics: syn::Generics,
 ) -> TokenStream {
     let ResolvePositionArgs {
         parent_type,
         resolved_node,
         self_type_generics,
     } = resolve_position_args;
+
+    let _generics_map =
+        match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
+            Ok(map) => map,
+            Err(e) => return e.to(),
+        };
 
     let match_arms = data_enum.variants.iter().map(|variant| {
         let variant_name = variant.ident.reference();
@@ -130,10 +166,22 @@ fn handle_data_enum(
         }
     });
 
+    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+    let ty_generics = match self_type_generics.reference() {
+        Some(explicit) => quote!(#explicit),
+        None => quote!(#ty_generics),
+    };
+
     let output = quote! {
-        impl ::resolve_position::ResolvePosition for #enum_name #self_type_generics {
-            type Parent<'a> = #parent_type;
-            type ResolvedNode<'a> = #resolved_node;
+        impl #impl_generics ::resolve_position::ResolvePosition for #enum_name #ty_generics #where_clause {
+            type Parent<'a>
+                = #parent_type
+            where
+                Self: 'a;
+            type ResolvedNode<'a>
+                = #resolved_node
+            where
+                Self: 'a;
 
             fn resolve<'a>(
                 &'a self,
@@ -179,10 +227,24 @@ fn generate_enum_arm(
                 )
             }
         }
+        Ok(ParentConstruction::FromParent) => {
+            quote! {
+                #enum_name::#variant_name(inner) => inner.resolve(
+                    ::std::convert::From::from(parent),
+                    position,
+                )
+            }
+        }
         Ok(ParentConstruction::ContainerPath) => Error::new_spanned(
             attr,
             "an enum payload always resolves and passes the parent through; annotate \
             only to wrap it: #[resolve_field(parent_variant = SomeVariant)]",
+        )
+        .to_compile_error(),
+        Ok(ParentConstruction::Transparent) => Error::new_spanned(
+            attr,
+            "`#[resolve_field(transparent)]` is a struct-field attribute; \
+            an unmarked payload already forwards `parent`",
         )
         .to_compile_error(),
         Err(e) => e,
@@ -215,6 +277,8 @@ enum ResolveFieldInfoType {
 enum ResolveFieldInfoTypeWrapper {
     None(Box<ResolveFieldInfoType>),
     IteratorWrapper(Box<ResolveFieldInfoTypeWrapper>),
+    #[allow(dead_code)]
+    Transparent(Box<syn::Type>),
 }
 
 /// How an emission builds the value it passes as the child's parent.
@@ -225,6 +289,12 @@ enum ParentConstruction {
     /// `#[resolve_field(parent_variant = V)]`: the child's `Parent` type is an
     /// enum, and the parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
+    /// `#[resolve_field(parent_from)]`: the child's `Parent` is `From` the
+    /// container's `Parent`.
+    FromParent,
+    /// `#[resolve_field(transparent)]`: a bare `ResolvePosition` field, no
+    /// path segment, no span check.
+    Transparent,
 }
 
 struct ResolveFieldInfo {
@@ -253,25 +323,35 @@ fn parse_parent_construction(
     match attr.meta.reference() {
         syn::Meta::Path(_) => ParentConstruction::ContainerPath.wrap_ok(),
         syn::Meta::List(_) => {
+            if let Ok(path) = attr.parse_args::<syn::Path>() {
+                if path.is_ident("parent_from") {
+                    return ParentConstruction::FromParent.wrap_ok();
+                }
+                if path.is_ident("transparent") {
+                    return ParentConstruction::Transparent.wrap_ok();
+                }
+            }
             let name_value = attr
                 .parse_args::<syn::MetaNameValue>()
                 .map_err(|e| e.to_compile_error())?;
-            if let syn::Expr::Path(value) = name_value.value.reference()
-                && name_value.path.is_ident("parent_variant")
+            if name_value.path.is_ident("parent_variant")
+                && let syn::Expr::Path(value) = name_value.value.reference()
                 && let Some(variant) = value.path.get_ident()
             {
                 return ParentConstruction::EnumVariant(variant.clone()).wrap_ok();
             }
             Error::new_spanned(
                 attr.meta.reference(),
-                "expected `#[resolve_field(parent_variant = SomeVariant)]`",
+                "expected `#[resolve_field]`, `#[resolve_field(parent_variant = SomeVariant)]`, \
+                 `#[resolve_field(parent_from)]`, or `#[resolve_field(transparent)]`",
             )
             .to_compile_error()
             .wrap_err()
         }
         syn::Meta::NameValue(name_value) => Error::new_spanned(
             name_value,
-            "expected `#[resolve_field]` or `#[resolve_field(parent_variant = SomeVariant)]`",
+            "expected `#[resolve_field]`, `#[resolve_field(parent_variant = SomeVariant)]`, \
+             `#[resolve_field(parent_from)]`, or `#[resolve_field(transparent)]`",
         )
         .to_compile_error()
         .wrap_err(),
@@ -400,6 +480,34 @@ fn get_resolve_field_info(
         }
     };
 
+    if matches!(parent_construction, ParentConstruction::FromParent) {
+        return Error::new_spanned(
+            attr,
+            "`#[resolve_field(parent_from)]` is an enum-payload attribute",
+        )
+        .to_compile_error()
+        .wrap_err();
+    }
+
+    if matches!(parent_construction, ParentConstruction::Transparent) {
+        if type_is_with_span(field.ty.reference()) {
+            return Error::new_spanned(
+                field.ty.reference(),
+                "`#[resolve_field(transparent)]` on a `WithSpan<T>` field is a compile error: \
+                 span-checked descent is the unmarked `#[resolve_field]` form",
+            )
+            .to_compile_error()
+            .wrap_err();
+        }
+        return ResolveFieldInfo {
+            field_accessor,
+            field_type: ResolveFieldInfoTypeWrapper::Transparent(field.ty.clone().boxed()),
+            parent_construction,
+        }
+        .wrap_some()
+        .wrap_ok();
+    }
+
     if let syn::Type::Path(syn::TypePath { path, .. }) = field.ty.reference() {
         match parse_resolve_field_type(path, generics_map) {
             Ok(field_type) => ResolveFieldInfo {
@@ -440,6 +548,11 @@ fn new_parent_expr(
         ParentConstruction::EnumVariant(variant) => quote!(
             <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
         ),
+        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
+            inner_type,
+            "`parent_from` and `transparent` do not build a field parent",
+        )
+        .to_compile_error(),
     }
 }
 
@@ -500,5 +613,22 @@ fn generate_resolve_code_recursive(
                 }
             }
         }
+
+        ResolveFieldInfoTypeWrapper::Transparent(_) => {
+            quote! {
+                return #field_expr.resolve(parent, position);
+            }
+        }
     }
+}
+
+fn type_is_with_span(ty: &syn::Type) -> bool {
+    let syn::Type::Path(type_path) = ty else {
+        return false;
+    };
+    type_path
+        .path
+        .segments
+        .last()
+        .is_some_and(|segment| segment.ident == "WithSpan")
 }

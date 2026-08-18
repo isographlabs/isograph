@@ -80,10 +80,11 @@ pub(crate) fn validate_and_map_generics(
         })
         .collect::<Vec<_>>();
 
-    // Validate count matches
-    let provided_count = self_type_generics
-        .as_ref()
-        .map_or(0, |generics| generics.args.len());
+    let Some(self_type_generics) = self_type_generics else {
+        return HashMap::new().wrap_ok();
+    };
+
+    let provided_count = self_type_generics.args.len();
     let expected_count = struct_generics.len();
 
     if provided_count != expected_count {
@@ -110,11 +111,7 @@ pub(crate) fn validate_and_map_generics(
 
     struct_generics
         .into_iter()
-        .zip(
-            self_type_generics
-                .expect("Expected self type generics to not be empty at this point")
-                .args,
-        )
+        .zip(self_type_generics.args)
         .collect::<HashMap<_, _>>()
         .wrap_ok()
 }
