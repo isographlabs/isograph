@@ -19,7 +19,11 @@ use crate::{
 /// `CommaWithoutItem` error beside the tree, its boundary dropped.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpan<Chunk>>);
+pub struct ChunkedLevel(
+    #[resolve_field]
+    #[parent_variant(Level)]
+    pub Vec<WithSpan<Chunk>>,
+);
 
 /// A maximal separator-free run of a level's items — tokens and groups — plus the
 /// boundary that ended it when one did: line breaks and at most one comma, a second
@@ -31,7 +35,8 @@ pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpa
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
-    #[resolve_field(parent_variant = Chunk)]
+    #[resolve_field]
+    #[parent_variant(Chunk)]
     contents: NonEmpty<WithSpan<ChunkContentItem>>,
     #[resolve_field]
     trailing_separator: Option<WithSpan<ChunkSeparator>>,
@@ -53,7 +58,8 @@ pub struct ChunkedGroup {
     #[resolve_field]
     pub opening: WithSpan<OpenBracket>,
     /// The wrapping `WithSpan`'s span runs from the opening's end to the closing's start.
-    #[resolve_field(parent_variant = Interior)]
+    #[resolve_field]
+    #[parent_variant(Interior)]
     pub children: WithSpan<ChunkedLevel>,
     #[resolve_field]
     pub closing: WithSpan<CloseBracket>,
@@ -153,13 +159,19 @@ impl ChunkedLevel {
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    #[parent_variant(Unparsed)]
+    pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
 /// Extra root chunks after the first.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
+pub struct ExtraChunks(
+    #[resolve_field]
+    #[parent_variant(Extra)]
+    pub NonEmpty<WithSpan<Chunk>>,
+);
 
 /// One chunk's parse result.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]

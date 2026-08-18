@@ -203,51 +203,66 @@ fn generate_enum_arm(
     variant_name: &syn::Ident,
     payload: &syn::Field,
 ) -> proc_macro2::TokenStream {
-    let attr = match find_resolve_field_attr(payload.attrs.reference()) {
-        Ok(attr) => attr,
+    let FieldAttributes {
+        resolve_field,
+        parent_variant,
+        parent_from,
+    } = match collect_field_attributes(payload.attrs.reference()) {
+        Ok(attrs) => attrs,
         Err(e) => return e,
     };
+
+    if let Some(resolve_field) = resolve_field {
+        return match parse_resolve_field_form(resolve_field) {
+            Ok(ResolveFieldForm::Transparent) => Error::new_spanned(
+                resolve_field,
+                "`#[resolve_field(transparent)]` is a struct-field attribute; \
+                 an unmarked payload already forwards `parent`",
+            )
+            .to_compile_error(),
+            Ok(ResolveFieldForm::Bare) => Error::new_spanned(
+                resolve_field,
+                "an enum payload always resolves and passes the parent through; annotate \
+                 only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`",
+            )
+            .to_compile_error(),
+            Err(e) => e,
+        };
+    }
 
     // An unannotated payload delegates with the parent unchanged, which requires the
     // payload's Parent type to equal the enum's. The payload implements ResolvePosition
     // itself; a located wrapper delegates through the blanket impl in resolve_position.
-    let Some(attr) = attr else {
-        return quote! {
+    match (parent_variant, parent_from) {
+        (None, None) => quote! {
             #enum_name::#variant_name(inner) => inner.resolve(parent, position)
-        };
-    };
-
-    match parse_parent_construction(attr) {
-        Ok(ParentConstruction::EnumVariant(parent_variant)) => {
-            let payload_type = payload.ty.reference();
-            quote! {
-                #enum_name::#variant_name(inner) => inner.resolve(
-                    <#payload_type as ::resolve_position::ResolvePosition>::Parent::#parent_variant(parent.into()),
-                    position,
-                )
+        },
+        (Some(attr), None) => match parse_parent_variant(attr) {
+            Ok(parent_variant) => {
+                let payload_type = payload.ty.reference();
+                quote! {
+                    #enum_name::#variant_name(inner) => inner.resolve(
+                        <#payload_type as ::resolve_position::ResolvePosition>::Parent::#parent_variant(parent.into()),
+                        position,
+                    )
+                }
             }
-        }
-        Ok(ParentConstruction::FromParent) => {
-            quote! {
+            Err(e) => e,
+        },
+        (None, Some(attr)) => match parse_parent_from(attr) {
+            Ok(()) => quote! {
                 #enum_name::#variant_name(inner) => inner.resolve(
                     ::std::convert::From::from(parent),
                     position,
                 )
-            }
-        }
-        Ok(ParentConstruction::ContainerPath) => Error::new_spanned(
+            },
+            Err(e) => e,
+        },
+        (Some(_), Some(attr)) => Error::new_spanned(
             attr,
-            "an enum payload always resolves and passes the parent through; annotate \
-            only to wrap it: #[resolve_field(parent_variant = SomeVariant)]",
+            "cannot combine `#[parent_variant]` and `#[parent_from]`",
         )
         .to_compile_error(),
-        Ok(ParentConstruction::Transparent) => Error::new_spanned(
-            attr,
-            "`#[resolve_field(transparent)]` is a struct-field attribute; \
-            an unmarked payload already forwards `parent`",
-        )
-        .to_compile_error(),
-        Err(e) => e,
     }
 }
 
@@ -286,14 +301,22 @@ enum ParentConstruction {
     /// Bare `#[resolve_field]`: the child's `Parent` type is the container's own
     /// path, and `self.path(parent)` is passed unwrapped.
     ContainerPath,
-    /// `#[resolve_field(parent_variant = V)]`: the child's `Parent` type is an
+    /// `#[parent_variant(V)]`: the child's `Parent` type is an
     /// enum, and the parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
-    /// `#[resolve_field(parent_from)]`: the child's `Parent` is `From` the
-    /// container's `Parent`.
-    FromParent,
     /// `#[resolve_field(transparent)]`: a bare `ResolvePosition` field, no
     /// path segment, no span check.
+    Transparent,
+}
+
+struct FieldAttributes<'a> {
+    resolve_field: Option<&'a syn::Attribute>,
+    parent_variant: Option<&'a syn::Attribute>,
+    parent_from: Option<&'a syn::Attribute>,
+}
+
+enum ResolveFieldForm {
+    Bare,
     Transparent,
 }
 
@@ -303,58 +326,85 @@ struct ResolveFieldInfo {
     parent_construction: ParentConstruction,
 }
 
-fn find_resolve_field_attr(
-    attrs: &[syn::Attribute],
-) -> Result<Option<&syn::Attribute>, proc_macro2::TokenStream> {
-    let mut matching = attrs
-        .iter()
-        .filter(|attr| attr.path().is_ident("resolve_field"));
+fn find_unique_attr<'a>(
+    attrs: &'a [syn::Attribute],
+    name: &str,
+) -> Result<Option<&'a syn::Attribute>, proc_macro2::TokenStream> {
+    let mut matching = attrs.iter().filter(|attr| attr.path().is_ident(name));
     match (matching.next(), matching.next()) {
         (first, None) => first.wrap_ok(),
-        (_, Some(duplicate)) => Error::new_spanned(duplicate, "duplicate #[resolve_field]")
+        (_, Some(duplicate)) => Error::new_spanned(duplicate, format!("duplicate #[{name}]"))
             .to_compile_error()
             .wrap_err(),
     }
 }
 
-fn parse_parent_construction(
+fn collect_field_attributes(
+    attrs: &[syn::Attribute],
+) -> Result<FieldAttributes<'_>, proc_macro2::TokenStream> {
+    FieldAttributes {
+        resolve_field: find_unique_attr(attrs, "resolve_field")?,
+        parent_variant: find_unique_attr(attrs, "parent_variant")?,
+        parent_from: find_unique_attr(attrs, "parent_from")?,
+    }
+    .wrap_ok()
+}
+
+fn parse_resolve_field_form(
     attr: &syn::Attribute,
-) -> Result<ParentConstruction, proc_macro2::TokenStream> {
+) -> Result<ResolveFieldForm, proc_macro2::TokenStream> {
     match attr.meta.reference() {
-        syn::Meta::Path(_) => ParentConstruction::ContainerPath.wrap_ok(),
+        syn::Meta::Path(_) => ResolveFieldForm::Bare.wrap_ok(),
         syn::Meta::List(_) => {
-            if let Ok(path) = attr.parse_args::<syn::Path>() {
-                if path.is_ident("parent_from") {
-                    return ParentConstruction::FromParent.wrap_ok();
-                }
-                if path.is_ident("transparent") {
-                    return ParentConstruction::Transparent.wrap_ok();
-                }
-            }
-            let name_value = attr
-                .parse_args::<syn::MetaNameValue>()
-                .map_err(|e| e.to_compile_error())?;
-            if name_value.path.is_ident("parent_variant")
-                && let syn::Expr::Path(value) = name_value.value.reference()
-                && let Some(variant) = value.path.get_ident()
+            if let Ok(path) = attr.parse_args::<syn::Path>()
+                && path.is_ident("transparent")
             {
-                return ParentConstruction::EnumVariant(variant.clone()).wrap_ok();
+                return ResolveFieldForm::Transparent.wrap_ok();
             }
             Error::new_spanned(
                 attr.meta.reference(),
-                "expected `#[resolve_field]`, `#[resolve_field(parent_variant = SomeVariant)]`, \
-                 `#[resolve_field(parent_from)]`, or `#[resolve_field(transparent)]`",
+                "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
+                 parent wrapping is `#[parent_variant(SomeVariant)]`, \
+                 parent conversion is `#[parent_from]`",
             )
             .to_compile_error()
             .wrap_err()
         }
         syn::Meta::NameValue(name_value) => Error::new_spanned(
             name_value,
-            "expected `#[resolve_field]`, `#[resolve_field(parent_variant = SomeVariant)]`, \
-             `#[resolve_field(parent_from)]`, or `#[resolve_field(transparent)]`",
+            "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
+             parent wrapping is `#[parent_variant(SomeVariant)]`, \
+             parent conversion is `#[parent_from]`",
         )
         .to_compile_error()
         .wrap_err(),
+    }
+}
+
+fn parse_parent_variant(attr: &syn::Attribute) -> Result<syn::Ident, proc_macro2::TokenStream> {
+    match attr.meta.reference() {
+        syn::Meta::List(_) => {
+            if let Ok(path) = attr.parse_args::<syn::Path>()
+                && let Some(variant) = path.get_ident()
+            {
+                return variant.clone().wrap_ok();
+            }
+            Error::new_spanned(attr, "expected `#[parent_variant(SomeVariant)]`")
+                .to_compile_error()
+                .wrap_err()
+        }
+        _ => Error::new_spanned(attr, "expected `#[parent_variant(SomeVariant)]`")
+            .to_compile_error()
+            .wrap_err(),
+    }
+}
+
+fn parse_parent_from(attr: &syn::Attribute) -> Result<(), proc_macro2::TokenStream> {
+    match attr.meta.reference() {
+        syn::Meta::Path(_) => ().wrap_ok(),
+        _ => Error::new_spanned(attr, "expected `#[parent_from]`")
+            .to_compile_error()
+            .wrap_err(),
     }
 }
 
@@ -465,11 +515,69 @@ fn get_resolve_field_info(
     index: usize,
     generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
 ) -> Result<Option<ResolveFieldInfo>, proc_macro2::TokenStream> {
-    let Some(attr) = find_resolve_field_attr(field.attrs.reference())? else {
+    let FieldAttributes {
+        resolve_field,
+        parent_variant,
+        parent_from,
+    } = collect_field_attributes(field.attrs.reference())?;
+
+    let Some(resolve_field) = resolve_field else {
+        if let Some(attr) = parent_variant {
+            return Error::new_spanned(attr, "`#[parent_variant]` requires `#[resolve_field]`")
+                .to_compile_error()
+                .wrap_err();
+        }
+        if let Some(attr) = parent_from {
+            return Error::new_spanned(attr, "`#[parent_from]` requires `#[resolve_field]`")
+                .to_compile_error()
+                .wrap_err();
+        }
         return None.wrap_ok();
     };
 
-    let parent_construction = parse_parent_construction(attr)?;
+    let form = parse_resolve_field_form(resolve_field)?;
+
+    let parent_construction = match form {
+        ResolveFieldForm::Transparent => {
+            if let Some(attr) = parent_variant {
+                return Error::new_spanned(
+                    attr,
+                    "`#[resolve_field(transparent)]` cannot combine with `#[parent_variant]`",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            if let Some(attr) = parent_from {
+                return Error::new_spanned(
+                    attr,
+                    "`#[resolve_field(transparent)]` cannot combine with `#[parent_from]`",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            ParentConstruction::Transparent
+        }
+        ResolveFieldForm::Bare => {
+            if let (Some(_), Some(attr)) = (parent_variant, parent_from) {
+                return Error::new_spanned(
+                    attr,
+                    "cannot combine `#[parent_variant]` and `#[parent_from]`",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            if let Some(attr) = parent_from {
+                parse_parent_from(attr)?;
+                return Error::new_spanned(attr, "`#[parent_from]` is an enum-payload attribute")
+                    .to_compile_error()
+                    .wrap_err();
+            }
+            match parent_variant {
+                Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                None => ParentConstruction::ContainerPath,
+            }
+        }
+    };
 
     // A named field is accessed by name, a tuple field by index.
     let field_accessor = match field.ident.reference() {
@@ -479,15 +587,6 @@ fn get_resolve_field_info(
             quote!(#index)
         }
     };
-
-    if matches!(parent_construction, ParentConstruction::FromParent) {
-        return Error::new_spanned(
-            attr,
-            "`#[resolve_field(parent_from)]` is an enum-payload attribute",
-        )
-        .to_compile_error()
-        .wrap_err();
-    }
 
     if matches!(parent_construction, ParentConstruction::Transparent) {
         if type_is_with_span(field.ty.reference()) {
@@ -548,11 +647,10 @@ fn new_parent_expr(
         ParentConstruction::EnumVariant(variant) => quote!(
             <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
         ),
-        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
-            inner_type,
-            "`parent_from` and `transparent` do not build a field parent",
-        )
-        .to_compile_error(),
+        ParentConstruction::Transparent => {
+            Error::new_spanned(inner_type, "`transparent` does not build a field parent")
+                .to_compile_error()
+        }
     }
 }
 
