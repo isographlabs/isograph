@@ -69,8 +69,8 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     parse_constant_value, parse_singleton, BracketKind, ChunkedLevel, ClientFieldDeclarationPath,
-    Expectation, ExtraChunks, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
-    Slot, UnparsedChunkItems, UnparsedChunkItemsParent, VariableName,
+    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError, Slot,
+    UnparsedChunkItems, UnparsedChunkItemsParent, VariableName,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -218,7 +218,7 @@ where
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     VariableDeclarationList(group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Parenthesis),
         parse_variable_declaration,
         push_error,
     ))
@@ -437,10 +437,9 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(declared.type_annotation.location, span_of(text, "[Pet!]!"));
         let list = match declared.type_annotation.item.reference() {
-            TypeAnnotation::List(list) => list,
+            TypeAnnotation::List(list) => list.as_ref(),
             annotation => panic!("expected a list type, got {annotation:?}"),
         };
-        assert!(list.extra_chunks.is_none());
         let inner = list
             .inner
             .item
@@ -523,21 +522,22 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
     }
 
     #[test]
-    fn a_line_break_inside_a_list_type_is_an_extra_chunk() {
+    fn a_line_break_inside_a_list_type_does_not_parse() {
         let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
         let (parse, errors) = parsed(text);
-        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
-        let list = match declared.type_annotation.item.reference() {
-            TypeAnnotation::List(list) => list,
-            annotation => panic!("expected a list type, got {annotation:?}"),
-        };
-        assert!(list.extra_chunks.is_some());
+        assert!(
+            variables_of(parse.reference()).item.0[0]
+                .item
+                .item
+                .is_none()
+        );
         assert!(errors.iter().any(|error| {
             error.item
                 == expected(
                     Expectation::EndOfType,
                     Found::Token(NonBracketTokenKind::Exclamation),
                 )
+                && error.location == span_of(text, "!")
         }));
     }
 
@@ -548,7 +548,7 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::TypeName(name) => {
                 let list = match name.parent.parent.reference() {
-                    TypeAnnotationParent::List(list) => list,
+                    TypeAnnotationParent::List(list) => list.as_ref(),
                     parent => panic!("expected a list parent, got {parent:?}"),
                 };
                 match list.parent.reference() {
@@ -572,5 +572,5 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
 ## Landing checklist
 
 1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-2. variables.rs, `ExtraChunksParent`, `ConstantValue`, the ClientFieldDeclaration slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. variables.rs, `ConstantValue`, the ClientFieldDeclaration slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

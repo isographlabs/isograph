@@ -58,14 +58,24 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
-    #[error("a comma or line break")]
-    Separator,
+    #[error("a comma, a line break, or {0}")]
+    Separator(ClosingDelimiter),
     #[error("an argument, like 'id: $id'")]
     Argument,
     #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
     Value,
     #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ClosingDelimiter {
+    #[error("'}}'")]
+    Brace,
+    #[error("')'")]
+    Parenthesis,
+    #[error("']'")]
+    Bracket,
 }
 ```
 
@@ -119,6 +129,7 @@ pub struct VariableUse {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+// Quotes included. Unquoting is later.
 pub struct StringValue(common_lang_types::StringLiteralValue);
 
 impl From<intern::string_key::StringKey> for StringValue {
@@ -259,7 +270,7 @@ where
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     ArgumentList(group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Parenthesis),
         parse_argument,
         push_error,
     ))

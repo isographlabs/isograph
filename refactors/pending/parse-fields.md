@@ -223,6 +223,12 @@ pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
 
 Entrypoint tests keep passing. A leftover token still resolves to `NonBracketToken`. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still resolves `Query` / `foo` / `entrypoint` / `.` the same way. `token.parent` inside leftover is `ChunkContentItemParent::Unparsed`; that path's parent is `UnparsedChunkItemsParent::Literal`.
 
+The derive emits one impl per type. `self_type_generics = <IsoLiteralItem, UnparsedChunkItems>` is only `Slot<IsoLiteralItem, UnparsedChunkItems>`. A selection set is `Slot<Selection, UnparsedChunkItems>` and needs the generic impl.
+
+`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent: `SelectionSetPath` for a selection, `IsoLiteralParsePath` for a declaration, `TypeAnnotationParent` for a list-type element. `parent_from` on both fields forwards that parent. `Slot` is not a path segment and is not a `ResolvedNode` variant.
+
+A leftover gap is a position in the slot span but in neither field. `entrypoint Query.foo bar`: if leftover were tight to `bar`, the space after `foo` would be in the slot and in neither field. With no `Slot` fallback, `resolve` would not return. Leftover span starts at `item.location.end`, so that space is inside `extra_tokens`. Form `Ok` with no leftover: slot span is the item span. Form `Err`: extra is the whole chunk. Every position in the slot is in a field.
+
 ## Change 2: `parse_items`
 
 ```rust
@@ -272,12 +278,22 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
-    #[error("a comma or line break")]
-    Separator,
+    #[error("a comma, a line break, or {0}")]
+    Separator(ClosingDelimiter),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ClosingDelimiter {
+    #[error("'}}'")]
+    Brace,
+    #[error("')'")]
+    Parenthesis,
+    #[error("']'")]
+    Bracket,
 }
 ```
 
-`Separator` already exists. `SelectionSet` and `Selection` land here.
+Before, `Separator` is a unit variant (`"a comma or line break"`). This doc gives it the closer. Selection leftover is `Expectation::Separator(ClosingDelimiter::Brace)`.
 
 ## Change 4: `IsoLiteralItem::Field`
 
@@ -531,7 +547,7 @@ where
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
     SelectionSet(group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Brace),
         parse_selection,
         push_error,
     ))
@@ -549,7 +565,7 @@ where
     let group = cursor.consume_group_if(BracketKind::Brace)?;
     SelectionSet(group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Brace),
         parse_selection,
         push_error,
     ))
@@ -854,7 +870,11 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
         assert!(items[0].item.extra_tokens.is_some());
         assert!(errors.iter().any(|error| {
-            error.item == expected(Expectation::Separator, Found::Token(Identifier))
+            error.item
+                == expected(
+                    Expectation::Separator(ClosingDelimiter::Brace),
+                    Found::Token(Identifier),
+                )
                 && error.location == span_of(text, "baz")
         }));
         assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "qux"));
@@ -872,7 +892,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         assert_eq!(
             errors,
             expected(
-                Expectation::Separator,
+                Expectation::Separator(ClosingDelimiter::Brace),
                 Found::Group(BracketKind::Parenthesis)
             )
             .with_span(span_of(text, "(x: 1)"))
@@ -890,7 +910,7 @@ Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with
         assert_eq!(as_scalar(slot).name.location, span_of(text, "bar"));
         assert_eq!(
             errors,
-            expected(Expectation::Separator, Found::Token(At))
+            expected(Expectation::Separator(ClosingDelimiter::Brace), Found::Token(At))
                 .with_span(span_of(text, "@"))
                 .wrap_vec(),
         );

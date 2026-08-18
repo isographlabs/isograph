@@ -254,7 +254,7 @@ where
 }
 ```
 
-`parse_items` leftover is `Expectation::Separator` at a selection set, an argument list, an object literal, and a variable-declaration list. A list trailing comma is legal and is not a diagnostic.
+`parse_items` leftover is `Expectation::Separator(ClosingDelimiter::...)` at a selection set (`}`), an argument list (`)`), an object literal (`}`), and a variable-declaration list (`)`). A list trailing comma is legal and is not a diagnostic.
 
 `parse_singleton` leftover and boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Extra chunks clone. Empty is the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `None`; a `[...]` with zero chunks is `Expected(TypeAnnotation, EndOfChunk)`).
 
@@ -276,7 +276,7 @@ A group plus its interior is `consume_group_if` or `require_group`, then `parse_
     let group = cursor.consume_group_if(BracketKind::Brace)?;
     group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Brace),
         parse_item,
         push_error,
     )
@@ -288,7 +288,7 @@ A group plus its interior is `consume_group_if` or `require_group`, then `parse_
         .map_err(|()| cursor.expected(expectation))?;
     group.item.children.item.parse_items(
         cursor.text(),
-        Expectation::Separator,
+        Expectation::Separator(ClosingDelimiter::Brace),
         parse_item,
         push_error,
     )
@@ -322,6 +322,7 @@ where
             .wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::StringLiteral) {
+            // Quotes included. Unquoting is later.
             return NonConstantValue::String(
                 cursor
                     .token_text(span)
@@ -356,7 +357,7 @@ where
             return NonConstantValue::Object(ObjectLiteral(
                 group.item.children.item.parse_items(
                     cursor.text(),
-                    Expectation::Separator,
+                    Expectation::Separator(ClosingDelimiter::Brace),
                     parse_object_entry,
                     push_error,
                 ),
@@ -434,8 +435,8 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
-    #[error("a comma or line break")]
-    Separator,
+    #[error("a comma, a line break, or {0}")]
+    Separator(ClosingDelimiter),
     #[error("an argument, like 'id: $id'")]
     Argument,
     #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
@@ -452,6 +453,16 @@ pub enum Expectation {
     EndOfType,
     #[error("the keyword `to`")]
     ToKeyword,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+pub enum ClosingDelimiter {
+    #[error("'}}'")]
+    Brace,
+    #[error("')'")]
+    Parenthesis,
+    #[error("']'")]
+    Bracket,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]

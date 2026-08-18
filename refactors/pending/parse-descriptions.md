@@ -16,6 +16,7 @@ A description is one `StringLiteral` token (`"..."`) or one `BlockStringLiteral`
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+// Quotes included. Unquoting and block-string dedent are later.
 pub struct Description(common_lang_types::DescriptionValue);
 
 impl From<intern::string_key::StringKey> for Description {

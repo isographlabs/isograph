@@ -166,3 +166,5 @@ parsing-standards.md governs how every implementation below is written. Each doc
 3. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
 4. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 5. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+
+Later: `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
