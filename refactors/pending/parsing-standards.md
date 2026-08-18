@@ -173,7 +173,7 @@ impl<'a> ItemCursor<'a> {
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
-`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. Names in the tree are spans. The converted scalar is the `i64`.
+`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. A name in the tree is an interned string key (`token_text(span).intern().to()`). The converted scalar is the `i64`. The wrapper span is location only.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -780,7 +780,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` and `Slot.extra_tokens` are `Option<WithSpan<_>>`. `Singleton.item` is `WithSpan<Slot<...>>`, the `parse_one_item` attempt. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
+A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` and `Slot.extra_tokens` are `Option<WithSpan<_>>`. `Singleton.item` is `WithSpan<Slot<...>>`, the `parse_one_item` attempt. Each other struct field that is a node is `WithSpan`. A name is a newtype over an interned key in a `WithSpan`; each role is its own type. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunkItems` and `ExtraChunks`.
 

@@ -59,15 +59,15 @@ pub struct EntrypointDeclaration {
     pub client_field_name: WithSpan<ClientFieldName>,
 }
 
-/// The name of a schema type, `Query` in `entrypoint Query.foo`. Its text is its span.
+/// The name of a schema type, `Query` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName;
+pub struct EntityName(common_lang_types::EntityName);
 
-/// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`. Its text is its span.
+/// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientFieldName;
+pub struct ClientFieldName(SelectableName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct EntrypointKeyword;
@@ -136,8 +136,10 @@ fn parse_entrypoint(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
         entrypoint_keyword: EntrypointKeyword.with_span(keyword),
-        parent_type: EntityName.with_span(parent_type),
-        client_field_name: ClientFieldName.with_span(client_field_name),
+        parent_type: EntityName(cursor.token_text(parent_type).intern().to())
+            .with_span(parent_type),
+        client_field_name: ClientFieldName(cursor.token_text(client_field_name).intern().to())
+            .with_span(client_field_name),
     }.wrap_ok()
 }
 ```
