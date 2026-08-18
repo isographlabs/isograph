@@ -1,5 +1,5 @@
 use logos::Logos;
-use span::WithSpan;
+use span::{WithSpan, WithSpanPostfix};
 
 use crate::IsographLangTokenKind;
 use prelude::Postfix;
@@ -12,7 +12,7 @@ pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
     let mut lexer = IsographLangTokenKind::lexer(literal);
     let mut tokens = Vec::new();
     while let Some(kind) = lexer.next() {
-        tokens.push(WithSpan::new(kind, lexer.span().to()));
+        tokens.push(kind.with_span(lexer.span().to()));
     }
     tokens
 }

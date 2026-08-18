@@ -1,7 +1,7 @@
 use prelude::Postfix;
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 use resolve_position_macros::ResolvePosition;
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
 #[derive(Debug)]
 enum TestResolvedNode<'a> {
@@ -65,8 +65,11 @@ impl<'a> From<ParentPath<'a>> for SlotUnparsedParent<'a> {
 
 #[test]
 fn a_parsed_child_resolves_to_that_child_with_the_list_path() {
-    let list =
-        List(WithSpan::new(Slot::<Child>::Parsed(Parsed(Child)), Span::new(0, 4)).wrap_vec());
+    let list = List(
+        Slot::<Child>::Parsed(Parsed(Child))
+            .with_span(Span::new(0, 4))
+            .wrap_vec(),
+    );
 
     match list.resolve((), Span::new(1, 2)) {
         TestResolvedNode::Child(path) => {
@@ -78,8 +81,11 @@ fn a_parsed_child_resolves_to_that_child_with_the_list_path() {
 
 #[test]
 fn a_position_outside_the_slot_resolves_to_the_list() {
-    let list =
-        List(WithSpan::new(Slot::<Child>::Parsed(Parsed(Child)), Span::new(0, 4)).wrap_vec());
+    let list = List(
+        Slot::<Child>::Parsed(Parsed(Child))
+            .with_span(Span::new(0, 4))
+            .wrap_vec(),
+    );
 
     match list.resolve((), Span::new(10, 11)) {
         TestResolvedNode::List(path) => {
@@ -91,7 +97,11 @@ fn a_position_outside_the_slot_resolves_to_the_list() {
 
 #[test]
 fn an_unparsed_child_resolves_through_from_the_list_path() {
-    let list = List(WithSpan::new(Slot::<Child>::Unparsed(Unparsed), Span::new(0, 4)).wrap_vec());
+    let list = List(
+        Slot::<Child>::Unparsed(Unparsed)
+            .with_span(Span::new(0, 4))
+            .wrap_vec(),
+    );
 
     match list.resolve((), Span::new(1, 2)) {
         TestResolvedNode::Unparsed(path) => match path.parent {

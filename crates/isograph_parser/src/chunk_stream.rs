@@ -3,7 +3,7 @@
 use nonempty::NonEmpty;
 use prelude::Postfix;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
@@ -76,7 +76,7 @@ impl<'a> ItemCursor<'a> {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                WithSpan::new(group, item.location).wrap_some()
+                group.with_span(item.location).wrap_some()
             }
             _ => None,
         }
@@ -84,16 +84,11 @@ impl<'a> ItemCursor<'a> {
 
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
         match self.items.peek() {
-            None => WithSpan::new(
-                ParseError::expected(expected, Found::EndOfChunk),
-                self.end_span(),
-            ),
+            None => ParseError::expected(expected, Found::EndOfChunk).with_span(self.end_span()),
             Some(peek) => {
                 let item = peek.view();
-                WithSpan::new(
-                    ParseError::expected(expected, Found::from(item.item.reference())),
-                    item.location,
-                )
+                ParseError::expected(expected, Found::from(item.item.reference()))
+                    .with_span(item.location)
             }
         }
     }
@@ -132,7 +127,7 @@ impl<'a> ItemCursor<'a> {
         } else {
             Span::new(start, self.previous_end)
         };
-        WithSpan::new(value, span).wrap_ok()
+        value.with_span(span).wrap_ok()
     }
 
     fn end_span(&self) -> Span {
@@ -143,7 +138,7 @@ impl<'a> ItemCursor<'a> {
 #[cfg(test)]
 mod tests {
     use prelude::Postfix;
-    use span::{Span, WithSpan};
+    use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::ChunkStream;
     use crate::{
@@ -261,26 +256,22 @@ mod tests {
         let cursor = stream.cursor();
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Period)),
-            WithSpan::new(
-                expected(
-                    token(NonBracketTokenKind::Period),
-                    Found::Token(NonBracketTokenKind::Identifier)
-                ),
-                span_of(text, "foo"),
-            ),
+            expected(
+                token(NonBracketTokenKind::Period),
+                Found::Token(NonBracketTokenKind::Identifier),
+            )
+            .with_span(span_of(text, "foo")),
         );
         cursor
             .consume_token_if(NonBracketTokenKind::Identifier)
             .expect("foo is present");
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Identifier)),
-            WithSpan::new(
-                expected(
-                    token(NonBracketTokenKind::Identifier),
-                    Found::Group(BracketKind::Brace),
-                ),
-                span_of(text, "{ bar }"),
-            ),
+            expected(
+                token(NonBracketTokenKind::Identifier),
+                Found::Group(BracketKind::Brace),
+            )
+            .with_span(span_of(text, "{ bar }")),
         );
         cursor
             .consume_group_if(BracketKind::Brace)
@@ -288,10 +279,8 @@ mod tests {
         let group_end = span_of(text, "{ bar }").end;
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Identifier)),
-            WithSpan::new(
-                expected(token(NonBracketTokenKind::Identifier), Found::EndOfChunk),
-                Span::new(group_end, group_end),
-            ),
+            expected(token(NonBracketTokenKind::Identifier), Found::EndOfChunk)
+                .with_span(Span::new(group_end, group_end)),
         );
     }
 
@@ -306,10 +295,10 @@ mod tests {
             .expect("foo is present");
         assert_eq!(
             cursor.expected(Expectation::Separator),
-            WithSpan::new(
-                expected(Expectation::Separator, Found::EndOfChunk),
-                Span::new(span_of(text, "foo").end, span_of(text, "foo").end),
-            ),
+            expected(Expectation::Separator, Found::EndOfChunk).with_span(Span::new(
+                span_of(text, "foo").end,
+                span_of(text, "foo").end,
+            )),
         );
     }
 
@@ -412,13 +401,11 @@ mod tests {
             .expect_err("period is not present");
         assert_eq!(
             error,
-            WithSpan::new(
-                expected(
-                    token(NonBracketTokenKind::Period),
-                    Found::Token(NonBracketTokenKind::Identifier)
-                ),
-                span_of(text, "foo"),
-            ),
+            expected(
+                token(NonBracketTokenKind::Period),
+                Found::Token(NonBracketTokenKind::Identifier),
+            )
+            .with_span(span_of(text, "foo")),
         );
         assert_eq!(
             stream

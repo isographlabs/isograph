@@ -2,7 +2,7 @@ use prelude::Postfix;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
 use scoped_stack::Stack;
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     BracketKind, BracketToken, ChunkPath, ChunkedGroupPath, IsographLangTokenKind,
@@ -90,7 +90,7 @@ pub fn match_brackets(
         BracketError::UnmatchedClose(close) => close.location.start,
     });
     (
-        WithSpan::new(MatchedBrackets(items), Span::new(0, literal_length)),
+        MatchedBrackets(items).with_span(Span::new(0, literal_length)),
         errors,
     )
 }
@@ -122,20 +122,17 @@ fn parse_items(
             SplitToken::NonBracket(kind) => {
                 let token = peek.commit();
                 if let Emission::Emitting = emission {
-                    items.push(WithSpan::new(
-                        BracketItem::Raw(NonBracketToken(kind)),
-                        token.location,
-                    ));
+                    items.push(BracketItem::Raw(NonBracketToken(kind)).with_span(token.location));
                 }
             }
             SplitToken::Bracket(BracketToken::Open(kind)) => {
                 let token = peek.commit();
-                let opening = WithSpan::new(OpenBracket(kind), token.location);
+                let opening = OpenBracket(kind).with_span(token.location);
                 match parse_bracketed(tokens, enclosing_stack, errors, opening) {
                     ParsedGroup::Closed(group) => {
                         if let Emission::Emitting = emission {
                             let span = Span::join(group.opening.location, group.closing.location);
-                            items.push(WithSpan::new(BracketItem::Bracketed(group), span));
+                            items.push(BracketItem::Bracketed(group).with_span(span));
                         }
                     }
                     ParsedGroup::Unclosed => {
@@ -151,10 +148,9 @@ fn parse_items(
                     break;
                 }
                 let token = peek.commit();
-                errors.push(BracketError::UnmatchedClose(WithSpan::new(
-                    CloseBracket(kind),
-                    token.location,
-                )));
+                errors.push(BracketError::UnmatchedClose(
+                    CloseBracket(kind).with_span(token.location),
+                ));
                 emission = Emission::Cut;
             }
         }
@@ -180,12 +176,12 @@ fn parse_bracketed(
                 == SplitToken::Bracket(BracketToken::Close(opening.item.0)) =>
         {
             let token = peek.commit();
-            let closing = WithSpan::new(CloseBracket(opening.item.0), token.location);
+            let closing = CloseBracket(opening.item.0).with_span(token.location);
             let interior = Span::between(opening.location, closing.location);
             strip_captured_line_breaks(&mut children);
             ParsedGroup::Closed(Bracketed {
                 opening,
-                children: WithSpan::new(MatchedBrackets(children), interior),
+                children: MatchedBrackets(children).with_span(interior),
                 closing,
             })
         }

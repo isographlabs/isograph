@@ -121,7 +121,7 @@ mod test {
     use std::ops::ControlFlow;
 
     use prelude::Postfix;
-    use span::{Span, WithSpan};
+    use span::{Span, WithSpan, WithSpanPostfix};
 
     use crate::{PositionResolutionPath, ResolvePosition};
 
@@ -221,7 +221,9 @@ mod test {
     #[test]
     fn resolve_parent_with_children() {
         let item = Parent {
-            children: WithSpan::new(Child { children: vec![] }, Span::new(0, 5)).wrap_vec(),
+            children: Child { children: vec![] }
+                .with_span(Span::new(0, 5))
+                .wrap_vec(),
         };
 
         let result = item.resolve((), Span::new(0, 4));
@@ -239,12 +241,12 @@ mod test {
     #[test]
     fn resolve_parent_with_nested_children() {
         let item = Parent {
-            children: WithSpan::new(
-                Child {
-                    children: WithSpan::new(Child { children: vec![] }, Span::new(0, 3)).wrap_vec(),
-                },
-                Span::new(0, 5),
-            )
+            children: Child {
+                children: Child { children: vec![] }
+                    .with_span(Span::new(0, 3))
+                    .wrap_vec(),
+            }
+            .with_span(Span::new(0, 5))
             .wrap_vec(),
         };
 

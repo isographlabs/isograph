@@ -3,7 +3,7 @@ use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     BracketItem, Bracketed, CloseBracket, IsographResolutionNode, MatchedBrackets, NonBracketToken,
@@ -141,7 +141,7 @@ impl ChunkedLevel {
 pub fn chunk(tree: &WithSpan<MatchedBrackets>) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
     let mut errors = Vec::new();
     let level = chunk_level(tree.item.reference(), &mut errors);
-    (WithSpan::new(level, tree.location), errors)
+    (level.with_span(tree.location), errors)
 }
 
 fn chunk_level(level: &MatchedBrackets, errors: &mut Vec<CommaWithoutItem>) -> ChunkedLevel {
@@ -209,14 +209,14 @@ fn absorb_chunk(
     };
     let first_location = peek.commit().location;
     let mut span = first_location;
-    let mut contents = NonEmpty::new(WithSpan::new(first, first_location));
+    let mut contents = NonEmpty::new(first.with_span(first_location));
     while let Some(peek) = items.peek() {
         let Some(content_item) = as_content(peek.view(), errors) else {
             break;
         };
         let item = peek.commit();
         span = Span::join(span, item.location);
-        contents.push(WithSpan::new(content_item, item.location));
+        contents.push(content_item.with_span(item.location));
     }
 
     let mut separators: Option<NonEmpty<WithSpan<SeparatorToken>>> = None;
@@ -234,7 +234,7 @@ fn absorb_chunk(
             break;
         }
         let item = peek.commit();
-        let token = WithSpan::new(separator, item.location);
+        let token = separator.with_span(item.location);
         match &mut separators {
             None => separators = NonEmpty::new(token).wrap_some(),
             Some(absorbed) => absorbed.push(token),
@@ -243,19 +243,19 @@ fn absorb_chunk(
 
     let trailing_separator = separators.map(|separators| {
         let location = Span::join(separators.first().location, separators.last().location);
-        WithSpan::new(ChunkSeparator(separators), location)
+        ChunkSeparator(separators).with_span(location)
     });
     let span = match trailing_separator.reference() {
         Some(separator) => Span::join(span, separator.location),
         None => span,
     };
-    Absorbed::Chunk(WithSpan::new(
+    Absorbed::Chunk(
         Chunk {
             contents,
             trailing_separator,
-        },
-        span,
-    ))
+        }
+        .with_span(span),
+    )
     .wrap_some()
 }
 
@@ -290,10 +290,8 @@ fn drain_dropped_boundary(items: &mut LevelItems<'_>) {
 fn chunk_group(group: &Bracketed, errors: &mut Vec<CommaWithoutItem>) -> ChunkedGroup {
     ChunkedGroup {
         opening: group.opening,
-        children: WithSpan::new(
-            chunk_level(group.children.item.reference(), errors),
-            group.children.location,
-        ),
+        children: chunk_level(group.children.item.reference(), errors)
+            .with_span(group.children.location),
         closing: group.closing,
     }
 }
