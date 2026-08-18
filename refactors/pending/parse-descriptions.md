@@ -36,13 +36,16 @@ Before:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub parent_type: WithSpan<EntityName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -52,15 +55,18 @@ After:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub parent_type: WithSpan<EntityName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```

@@ -58,24 +58,31 @@ pub enum Selection {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ScalarSelection {
-    #[resolve_field(parent_variant = Scalar)]
+    #[resolve_field]
+    #[parent_variant(Scalar)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Scalar)]
+    #[resolve_field]
+    #[parent_variant(Scalar)]
     pub name: WithSpan<SelectionName>,
-    #[resolve_field(parent_variant = Scalar)]
+    #[resolve_field]
+    #[parent_variant(Scalar)]
     pub arguments: Option<WithSpan<ArgumentList>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectSelection {
-    #[resolve_field(parent_variant = Object)]
+    #[resolve_field]
+    #[parent_variant(Object)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Object)]
+    #[resolve_field]
+    #[parent_variant(Object)]
     pub name: WithSpan<SelectionName>,
-    #[resolve_field(parent_variant = Object)]
+    #[resolve_field]
+    #[parent_variant(Object)]
     pub arguments: Option<WithSpan<ArgumentList>>,
-    #[resolve_field(parent_variant = Object)]
+    #[resolve_field]
+    #[parent_variant(Object)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 

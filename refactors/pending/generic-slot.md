@@ -19,9 +19,11 @@ where
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
 {
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     pub item: Option<WithSpan<T>>,
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 ```
@@ -40,7 +42,9 @@ pub enum UnparsedChunkItemsParent<'a> {
 
 #[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    #[parent_variant(Unparsed)]
+    pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -93,7 +97,9 @@ pub struct Slot<T, E> {
 // from crates/isograph_parser/src/chunk.rs
 #[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    #[parent_variant(Unparsed)]
+    pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 ```
 
@@ -123,49 +129,75 @@ pub type EntrypointDeclarationPath<'a> =
 
 ## Macro: `parent_from` on a struct field
 
-`#[resolve_field(parent_from)]` on a struct field is accepted. Emission is `From::from(parent)`. A struct that has a `parent_from` field has no container fallback (same as a `transparent` field).
+`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. A struct that has a `parent_from` field has no container fallback (same as a `transparent` field).
 
-`get_resolve_field_info` no longer rejects `FromParent` on struct fields.
-
-Before:
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-    if matches!(parent_construction, ParentConstruction::FromParent) {
-        return Error::new_spanned(
-            attr,
-            "`#[resolve_field(parent_from)]` is an enum-payload attribute",
-        )
-        .to_compile_error()
-        .wrap_err();
-    }
-```
-
-After: that block is gone. `FromParent` falls through to `parse_resolve_field_type` the way a bare `#[resolve_field]` does. `Option<WithSpan<T>>` is already a legal field type.
-
-The `FromParent` error on struct fields in `new_parent_expr` is deleted.
+Today `ParentConstruction` has no `FromParent`: enum payloads emit `From::from` directly, and a struct field with `#[parent_from]` is an error. This doc puts `FromParent` back for struct fields.
 
 Before:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
-            inner_type,
-            "`parent_from` and `transparent` do not build a field parent",
-        )
-        .to_compile_error(),
+enum ParentConstruction {
+    ContainerPath,
+    EnumVariant(syn::Ident),
+    Transparent,
+}
 ```
 
 After:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
+enum ParentConstruction {
+    ContainerPath,
+    EnumVariant(syn::Ident),
+    /// `#[resolve_field]` + `#[parent_from]`: the child's `Parent` is `From` the
+    /// container's `Parent`.
+    FromParent,
+    Transparent,
+}
+```
+
+Before:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+            if let Some(attr) = parent_from {
+                parse_parent_from(attr)?;
+                return Error::new_spanned(attr, "`#[parent_from]` is an enum-payload attribute")
+                    .to_compile_error()
+                    .wrap_err();
+            }
+            match parent_variant {
+                Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                None => ParentConstruction::ContainerPath,
+            }
+```
+
+After:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+            if let Some(attr) = parent_from {
+                parse_parent_from(attr)?;
+                ParentConstruction::FromParent
+            } else {
+                match parent_variant {
+                    Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                    None => ParentConstruction::ContainerPath,
+                }
+            }
+```
+
+`Option<WithSpan<T>>` is already a legal field type. `new_parent_expr` gains a `FromParent` arm:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
         ParentConstruction::FromParent => quote!(::std::convert::From::from(parent)),
-        ParentConstruction::Transparent => Error::new_spanned(
-            inner_type,
-            "`transparent` does not build a field parent",
-        )
-        .to_compile_error(),
+        ParentConstruction::Transparent => {
+            Error::new_spanned(inner_type, "`transparent` does not build a field parent")
+                .to_compile_error()
+        }
 ```
 
 Fallback suppression treats `FromParent` like `Transparent`:
@@ -297,9 +329,11 @@ where
     for<'a> E: ResolvePosition<ResolvedNode<'a> = TestResolvedNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
 {
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     item: Option<WithSpan<T>>,
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     extra_tokens: Option<WithSpan<E>>,
 }
 

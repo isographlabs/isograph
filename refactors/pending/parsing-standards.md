@@ -90,9 +90,11 @@ where
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
 {
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     pub item: Option<WithSpan<T>>,
-    #[resolve_field(parent_from)]
+    #[resolve_field]
+    #[parent_from]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 
@@ -110,13 +112,19 @@ pub struct Singleton<T, E> {
 }
 
 pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+    #[resolve_field]
+    #[parent_variant(Unparsed)]
+    pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
 
-pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
+pub struct ExtraChunks(
+    #[resolve_field]
+    #[parent_variant(Extra)]
+    pub NonEmpty<WithSpan<Chunk>>,
+);
 ```
 
-`Slot` is not a path segment. `#[resolve_field(parent_from)]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`, the only extra bound. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
+`Slot` is not a path segment. `#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`, the only extra bound. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
 
 Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover, not a third region.
 

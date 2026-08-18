@@ -55,11 +55,14 @@ The test `field_and_pointer_declarations_do_not_parse_yet` narrows to its pointe
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientFieldDeclaration {
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub parent_type: WithSpan<EntityName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
@@ -158,7 +161,7 @@ pub enum EntityNameParent<'a> {
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntityNameParent<'a>>;
 ```
 
-`EntrypointDeclaration`'s two marked fields respell from bare `#[resolve_field]` to `#[resolve_field(parent_variant = Entrypoint)]`.
+`EntrypointDeclaration`'s two marked fields respell from bare `#[resolve_field]` to `#[resolve_field]` + `#[parent_variant(Entrypoint)]`.
 
 The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` matches `name.parent.inner.client_field_name` through `EntityNameParent::Entrypoint`.
 
@@ -196,7 +199,7 @@ pub enum SelectionSetParent<'a> {
 }
 ```
 
-`ClientFieldDeclaration.selection_set` is `#[resolve_field(parent_variant = Field)]`.
+`ClientFieldDeclaration.selection_set` is `#[resolve_field]` + `#[parent_variant(Field)]`.
 
 ## The resolution surface
 

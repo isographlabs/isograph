@@ -122,7 +122,8 @@ pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<NamedArgument, Un
 pub struct NamedArgument {
     #[resolve_field]
     pub name: WithSpan<ArgumentName>,
-    #[resolve_field(parent_variant = Argument)]
+    #[resolve_field]
+    #[parent_variant(Argument)]
     pub value: WithSpan<NonConstantValue>,
 }
 
@@ -184,7 +185,8 @@ pub struct ObjectLiteral(
 pub struct NamedObjectEntry {
     #[resolve_field]
     pub name: WithSpan<ObjectEntryName>,
-    #[resolve_field(parent_variant = ObjectEntry)]
+    #[resolve_field]
+    #[parent_variant(ObjectEntry)]
     pub value: WithSpan<NonConstantValue>,
 }
 

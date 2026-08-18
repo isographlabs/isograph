@@ -82,11 +82,14 @@ pub struct VariableDeclarationList(
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct DeclaredVariable {
-    #[resolve_field(parent_variant = Declaration)]
+    #[resolve_field]
+    #[parent_variant(Declaration)]
     pub name: WithSpan<VariableName>,
-    #[resolve_field(parent_variant = Variable)]
+    #[resolve_field]
+    #[parent_variant(Variable)]
     pub type_annotation: WithSpan<TypeAnnotation>,
-    #[resolve_field(parent_variant = VariableDefault)]
+    #[resolve_field]
+    #[parent_variant(VariableDefault)]
     pub default_value: Option<WithSpan<ConstantValue>>,
 }
 
@@ -107,7 +110,8 @@ pub struct NamedTypeAnnotation {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ListTypeAnnotation {
-    #[resolve_field(parent_variant = List)]
+    #[resolve_field]
+    #[parent_variant(List)]
     pub inner: WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>,
 }
 
@@ -144,7 +148,7 @@ pub type TypeNamePath<'a> = PositionResolutionPath<&'a TypeName, NamedTypeAnnota
 
 A position on `$` answers `DeclaredVariable`. `parse_type_annotation`'s `spanning` covers a trailing `!`. A position on `!` answers `NamedTypeAnnotation` or `ListTypeAnnotation` (the `Foo!` / `[Foo]!` node). Hover uses that node. There is no `Exclamation` field and no `NonNull` variant.
 
-`TypeAnnotation` is the slot item inside `[...]`. `Slot<TypeAnnotation, UnparsedChunkItems>::Parent` is `TypeAnnotation::Parent`, which is `TypeAnnotationParent`. `#[resolve_field(parent_variant = List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover `parent_from` wraps that same parent:
+`TypeAnnotation` is the slot item inside `[...]`. `Slot<TypeAnnotation, UnparsedChunkItems>::Parent` is `TypeAnnotation::Parent`, which is `TypeAnnotationParent`. `#[resolve_field]` + `#[parent_variant(List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover `parent_from` wraps that same parent:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -177,7 +181,7 @@ pub enum VariableNameParent<'a> {
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableNameParent<'a>>;
 ```
 
-`VariableUse`'s `name` field respells to `#[resolve_field(parent_variant = Use)]`.
+`VariableUse`'s `name` field respells to `#[resolve_field]` + `#[parent_variant(Use)]`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -346,11 +350,14 @@ Before:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub parent_type: WithSpan<EntityName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```
@@ -360,13 +367,16 @@ After:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub parent_type: WithSpan<EntityName>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub client_field_name: WithSpan<ClientFieldName>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
-    #[resolve_field(parent_variant = Field)]
+    #[resolve_field]
+    #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 ```

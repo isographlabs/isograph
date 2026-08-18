@@ -64,17 +64,22 @@ The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientPointerDeclaration {
-    #[resolve_field(parent_variant = Pointer)]
+    #[resolve_field]
+    #[parent_variant(Pointer)]
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field]
     pub client_pointer_name: WithSpan<ClientPointerName>,
-    #[resolve_field(parent_variant = Pointer)]
+    #[resolve_field]
+    #[parent_variant(Pointer)]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
-    #[resolve_field(parent_variant = PointerTarget)]
+    #[resolve_field]
+    #[parent_variant(PointerTarget)]
     pub target_type: WithSpan<TypeAnnotation>,
-    #[resolve_field(parent_variant = Pointer)]
+    #[resolve_field]
+    #[parent_variant(Pointer)]
     pub description: Option<WithSpan<Description>>,
-    #[resolve_field(parent_variant = Pointer)]
+    #[resolve_field]
+    #[parent_variant(Pointer)]
     pub selection_set: WithSpan<SelectionSet>,
 }
 
@@ -180,7 +185,7 @@ pub enum DescriptionParent<'a> {
 pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, DescriptionParent<'a>>;
 ```
 
-`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field(parent_variant = Field)]`.
+`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field]` + `#[parent_variant(Field)]`.
 
 ## The resolution surface
 
