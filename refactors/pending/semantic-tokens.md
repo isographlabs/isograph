@@ -2,7 +2,7 @@
 
 The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. Each of those methods takes the `SemanticToken` the call site is consuming. The tree does not mention tokens; they are a sibling of the tree, not a field on it.
 
-Three shippable changes. The first folds every logos error kind into `NonBracketTokenKind::Error`. The second always constructs tokens into a `Vec`. The third makes the collector a type parameter so the parse can be constructed with a noop or a non-noop.
+Two shippable changes. The first always constructs tokens into a `Vec`. The second makes the collector a type parameter so the parse can be constructed with a noop or a non-noop.
 
 ## What a token is
 
@@ -137,193 +137,7 @@ Delta, common to the recording changes below:
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.
 
-## 1. One `Error` kind
-
-`NonBracketTokenKind` has one error variant. Logos still has one variant per error regex. The split folds them.
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum NonBracketTokenKind {
-    Error,
-    ErrorUnterminatedString,
-    ErrorUnsupportedStringCharacter,
-    ErrorUnterminatedBlockString,
-    At,
-    Colon,
-    Dollar,
-    EndOfFile,
-    Equals,
-    Exclamation,
-    Identifier,
-    IntegerLiteral,
-    LineBreak,
-    ErrorNumberLiteralLeadingZero,
-    ErrorNumberLiteralTrailingInvalid,
-    ErrorFloatLiteralMissingZero,
-    Period,
-    Comma,
-    StringLiteral,
-    BlockStringLiteral,
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-/// `IsographLangTokenKind` with the six bracket tokens unrepresentable. Every logos error
-/// kind is `Error`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub enum NonBracketTokenKind {
-    Error,
-    At,
-    Colon,
-    Dollar,
-    EndOfFile,
-    Equals,
-    Exclamation,
-    Identifier,
-    IntegerLiteral,
-    LineBreak,
-    Period,
-    Comma,
-    StringLiteral,
-    BlockStringLiteral,
-}
-```
-
-Before (`From<IsographLangTokenKind> for SplitToken` error arms):
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            IsographLangTokenKind::Error => SplitToken::NonBracket(NonBracketTokenKind::Error),
-            IsographLangTokenKind::ErrorUnterminatedString => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnterminatedString)
-            }
-            IsographLangTokenKind::ErrorUnsupportedStringCharacter => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnsupportedStringCharacter)
-            }
-            IsographLangTokenKind::ErrorUnterminatedBlockString => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorUnterminatedBlockString)
-            }
-```
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            IsographLangTokenKind::ErrorNumberLiteralLeadingZero => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorNumberLiteralLeadingZero)
-            }
-            IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid)
-            }
-            IsographLangTokenKind::ErrorFloatLiteralMissingZero => {
-                SplitToken::NonBracket(NonBracketTokenKind::ErrorFloatLiteralMissingZero)
-            }
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            IsographLangTokenKind::Error
-            | IsographLangTokenKind::ErrorUnterminatedString
-            | IsographLangTokenKind::ErrorUnsupportedStringCharacter
-            | IsographLangTokenKind::ErrorUnterminatedBlockString
-            | IsographLangTokenKind::ErrorNumberLiteralLeadingZero
-            | IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
-            | IsographLangTokenKind::ErrorFloatLiteralMissingZero => {
-                SplitToken::NonBracket(NonBracketTokenKind::Error)
-            }
-```
-
-Before (`From<NonBracketTokenKind> for IsographLangTokenKind` error arms):
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            NonBracketTokenKind::Error => IsographLangTokenKind::Error,
-            NonBracketTokenKind::ErrorUnterminatedString => {
-                IsographLangTokenKind::ErrorUnterminatedString
-            }
-            NonBracketTokenKind::ErrorUnsupportedStringCharacter => {
-                IsographLangTokenKind::ErrorUnsupportedStringCharacter
-            }
-            NonBracketTokenKind::ErrorUnterminatedBlockString => {
-                IsographLangTokenKind::ErrorUnterminatedBlockString
-            }
-```
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            NonBracketTokenKind::ErrorNumberLiteralLeadingZero => {
-                IsographLangTokenKind::ErrorNumberLiteralLeadingZero
-            }
-            NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid => {
-                IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
-            }
-            NonBracketTokenKind::ErrorFloatLiteralMissingZero => {
-                IsographLangTokenKind::ErrorFloatLiteralMissingZero
-            }
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/non_bracket_token.rs
-            NonBracketTokenKind::Error => IsographLangTokenKind::Error,
-```
-
-`Display` still delegates to `IsographLangTokenKind::from(*self)`. `Found::Token(Error)` formats as `error`.
-
-Before (the one grammar test that names a specific error kind):
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    use NonBracketTokenKind::{
-        At, Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
-    };
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-        let numeric = "entrypoint 42.foo";
-        assert_no_declaration(
-            numeric,
-            expected(
-                token(Identifier),
-                Found::Token(ErrorNumberLiteralTrailingInvalid),
-            ),
-            span_of(numeric, "42."),
-        );
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    use NonBracketTokenKind::{At, Comma, Dollar, Error, Identifier, Period};
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-        let numeric = "entrypoint 42.foo";
-        assert_no_declaration(
-            numeric,
-            expected(token(Identifier), Found::Token(Error)),
-            span_of(numeric, "42."),
-        );
-```
-
-### Tests
-
-- `SplitToken::from` on `Error`, `ErrorUnterminatedString`, `ErrorUnsupportedStringCharacter`, `ErrorUnterminatedBlockString`, `ErrorNumberLiteralLeadingZero`, `ErrorNumberLiteralTrailingInvalid`, and `ErrorFloatLiteralMissingZero` is `NonBracket(Error)`.
-- `IsographLangTokenKind::from(NonBracketTokenKind::Error)` is `IsographLangTokenKind::Error`.
-- `a_non_bracket_token_round_trips_through_the_split` still holds for `At`, `Identifier`, `StringLiteral`, and `Error`.
-- `entrypoint 42.foo` is `Found::Token(Error)` at `42.`.
-
-## 2. Always record into a `Vec`
+## 1. Always record into a `Vec`
 
 No trait. No type parameter. The cursor holds `&mut Vec<WithSpan<SemanticToken>>`. Every parse constructs tokens.
 
@@ -1017,7 +831,7 @@ Existing consume tests pass `&mut Vec::new()` and a `SemanticToken` on every `co
 - parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each consume listed above.
 - parsing-plan.md: tokens are recorded during parse into a vec. `require_token` takes the role.
 
-## 3. Construct with a noop or a non-noop
+## 2. Construct with a noop or a non-noop
 
 The collector becomes a type parameter. Two implementors, by design; this seam is the whole of what the trait exists for. The parse is constructed with one or the other.
 
@@ -1058,7 +872,7 @@ impl SemanticTokens for NoSemanticTokens {
 
 ### Cursor and helpers
 
-`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 2 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`. Consume signatures stay `(kind, token)`.
+`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 1 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`. Consume signatures stay `(kind, token)`.
 
 Before:
 
@@ -1177,7 +991,7 @@ The tree is the same either way.
 
 ### Tests
 
-The change-2 facts still hold against `CollectedSemanticTokens`. Added:
+The change-1 facts still hold against `CollectedSemanticTokens`. Added:
 
 - `parse_iso_literal` with `NoSemanticTokens::new()` returns the same tree as with `CollectedSemanticTokens::new()`.
 - `stream_of` is generic. Existing consume tests that do not assert tokens pass `&mut NoSemanticTokens::new()`. Collecting tests pass `&mut CollectedSemanticTokens::new()` and assert on `.0`.
