@@ -116,7 +116,7 @@ if tree.has_errors() {
 }
 ```
 
-The grammar stage's token collector is the same split. `NoSemanticTokens` is the cheap pass; `CollectedSemanticTokens` is the reparse the LSP asks for, and is specified in semantic-tokens.md. The entry point chooses `TSpan` and `TTokens` together. `require_token` names neither.
+The grammar stage's token collector is the same split. The parse is constructed with `NoSemanticTokens::new()` (cheap pass) or `CollectedSemanticTokens::new()` (the reparse the LSP asks for), specified in semantic-tokens.md change 2. The entry point chooses `TSpan` and `TTokens` by which values it constructs. `require_token` names neither.
 
 ## Alternative A: one spanned parse, strip when needed
 
