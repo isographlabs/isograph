@@ -110,15 +110,13 @@ fn parse_iso_literal_item(
             IsoLiteralItem::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
         }
         text if text == "field" || text == "pointer" => {
-            WithSpan::new(ParseError::UnsupportedDeclarationType, keyword).wrap_err()
+            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
         }
-        _ => WithSpan::new(
-            ParseError::expected(
-                Expectation::DeclarationKeyword,
-                Found::Token(NonBracketTokenKind::Identifier),
-            ),
-            keyword,
+        _ => ParseError::expected(
+            Expectation::DeclarationKeyword,
+            Found::Token(NonBracketTokenKind::Identifier),
         )
+        .with_span(keyword)
         .wrap_err(),
     }
 }
@@ -137,9 +135,9 @@ fn parse_entrypoint(
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
-        entrypoint_keyword: WithSpan::new(EntrypointKeyword, keyword),
-        parent_type: WithSpan::new(EntityName, parent_type),
-        client_field_name: WithSpan::new(ClientFieldName, client_field_name),
+        entrypoint_keyword: EntrypointKeyword.with_span(keyword),
+        parent_type: EntityName.with_span(parent_type),
+        client_field_name: ClientFieldName.with_span(client_field_name),
     }.wrap_ok()
 }
 ```
@@ -743,7 +741,9 @@ mod tests {
             assert!(parse.is_none(), "for literal {text:?}");
             assert_eq!(
                 errors,
-                WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
+                ParseError::EmptyLiteral
+                    .with_span(Span::from_usize(0, text.len()))
+                    .wrap_vec(),
                 "for literal {text:?}",
             );
         }
@@ -773,7 +773,9 @@ mod tests {
         assert!(parse.is_none());
         assert_eq!(
             errors,
-            WithSpan::new(ParseError::EmptyLiteral, Span::from_usize(0, text.len())).wrap_vec(),
+            ParseError::EmptyLiteral
+                .with_span(Span::from_usize(0, text.len()))
+                .wrap_vec(),
         );
     }
 
@@ -799,7 +801,9 @@ mod tests {
             as_entrypoint(parse.reference());
             assert_eq!(
                 errors,
-                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")).wrap_vec(),
+                expected(EndOfDeclaration, Found::Token(Comma))
+                    .with_span(span_of(text, ","))
+                    .wrap_vec(),
                 "for literal {text:?}",
             );
         }
@@ -813,8 +817,8 @@ mod tests {
         assert_eq!(
             errors,
             vec![
-                WithSpan::new(expected(EndOfDeclaration, Found::Token(Comma)), span_of(text, ",")),
-                WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")),
+                expected(EndOfDeclaration, Found::Token(Comma)).with_span(span_of(text, ",")),
+                ParseError::MultipleDeclarations.with_span(span_of(text, "field User.name")),
             ],
         );
         assert!(parse.item.extra_chunks.as_ref().is_some());
@@ -827,7 +831,9 @@ mod tests {
         assert_eq!(as_entrypoint(parse.reference()).client_field_name.location, span_of(text, "foo"));
         assert_eq!(
             errors,
-            WithSpan::new(ParseError::MultipleDeclarations, span_of(text, "field User.name")).wrap_vec(),
+            ParseError::MultipleDeclarations
+                .with_span(span_of(text, "field User.name"))
+                .wrap_vec(),
         );
         assert!(parse.item.extra_chunks.as_ref().is_some());
     }
@@ -934,7 +940,9 @@ mod tests {
         assert!(first_slot(parse.reference()).extra_tokens.as_ref().is_some());
         assert_eq!(
             errors,
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(Identifier)), span_of(text, "bar")).wrap_vec(),
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "bar"))
+                .wrap_vec(),
         );
     }
 
@@ -945,11 +953,9 @@ mod tests {
         as_entrypoint(parse.reference());
         assert_eq!(
             errors,
-            WithSpan::new(
-                expected(EndOfDeclaration, Found::Group(BracketKind::Brace)),
-                span_of(text, "{ bar }"),
-            )
-            .wrap_vec(),
+            expected(EndOfDeclaration, Found::Group(BracketKind::Brace))
+                .with_span(span_of(text, "{ bar }"))
+                .wrap_vec(),
         );
     }
 
@@ -960,7 +966,9 @@ mod tests {
         as_entrypoint(parse.reference());
         assert_eq!(
             errors,
-            WithSpan::new(expected(EndOfDeclaration, Found::Token(At)), span_of(text, "@")).wrap_vec(),
+            expected(EndOfDeclaration, Found::Token(At))
+                .with_span(span_of(text, "@"))
+                .wrap_vec(),
         );
     }
 

@@ -104,7 +104,7 @@ impl<'a> ItemCursor<'a> {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
                 peek.commit();
                 self.previous_end = item.location.end;
-                WithSpan::new(group, item.location).wrap_some()
+                group.with_span(item.location).wrap_some()
             }
             _ => None,
         }
@@ -112,16 +112,11 @@ impl<'a> ItemCursor<'a> {
 
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
         match self.items.peek() {
-            None => WithSpan::new(
-                ParseError::expected(expected, Found::EndOfChunk),
-                self.end_span(),
-            ),
+            None => ParseError::expected(expected, Found::EndOfChunk).with_span(self.end_span()),
             Some(peek) => {
                 let item = peek.view();
-                WithSpan::new(
-                    ParseError::expected(expected, Found::from(item.item.reference())),
-                    item.location,
-                )
+                ParseError::expected(expected, Found::from(item.item.reference()))
+                    .with_span(item.location)
             }
         }
     }
@@ -160,7 +155,7 @@ impl<'a> ItemCursor<'a> {
         } else {
             Span::new(start, self.previous_end)
         };
-        WithSpan::new(value, span).wrap_ok()
+        value.with_span(span).wrap_ok()
     }
 
     fn end_span(&self) -> Span {
@@ -189,18 +184,18 @@ pub fn parse_iso_literal(
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
-        push_error(WithSpan::new(ParseError::EmptyLiteral, location));
+        push_error(ParseError::EmptyLiteral.with_span(location));
         return None;
     }
     let singleton = parse_singleton(
         root.reference(),
         text,
         Expectation::EndOfDeclaration,
-        |extra| WithSpan::new(ParseError::MultipleDeclarations, extra.location),
+        |extra| ParseError::MultipleDeclarations.with_span(extra.location),
         |cursor, _| parse_iso_literal_item(cursor),
         &mut push_error,
     );
-    WithSpan::new(singleton, location).wrap_some()
+    singleton.with_span(location).wrap_some()
 }
 ```
 
@@ -484,51 +479,41 @@ where
     let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
     match result {
         Ok(item) => match stream.remaining_contents() {
-            None => WithSpan::new(
-                Slot {
-                    item: item.wrap_some(),
-                    extra_tokens: None,
-                },
-                item.location,
-            ),
+            None => Slot {
+                item: item.wrap_some(),
+                extra_tokens: None,
+            }
+            .with_span(item.location),
             Some(remaining) => {
-                push_error(WithSpan::new(
+                push_error(
                     ParseError::expected(
                         leftover,
                         Found::from(remaining.first().item.reference()),
-                    ),
-                    remaining.first().location,
-                ));
+                    )
+                    .with_span(remaining.first().location),
+                );
                 let leftover_span =
                     Span::join(remaining.first().location, remaining.last().location);
                 let location = Span::join(item.location, leftover_span);
-                WithSpan::new(
-                    Slot {
-                        item: item.wrap_some(),
-                        extra_tokens: WithSpan::new(
-                            UnparsedChunkItems(remaining),
-                            leftover_span,
-                        )
+                Slot {
+                    item: item.wrap_some(),
+                    extra_tokens: UnparsedChunkItems(remaining)
+                        .with_span(leftover_span)
                         .wrap_some(),
-                    },
-                    location,
-                )
+                }
+                .with_span(location)
             }
         },
         Err(reason) => {
             push_error(reason);
             let location = chunk.item.contents_span();
-            WithSpan::new(
-                Slot {
-                    item: None,
-                    extra_tokens: WithSpan::new(
-                        UnparsedChunkItems(chunk.item.contents.clone()),
-                        location,
-                    )
+            Slot {
+                item: None,
+                extra_tokens: UnparsedChunkItems(chunk.item.contents.clone())
+                    .with_span(location)
                     .wrap_some(),
-                },
-                location,
-            )
+            }
+            .with_span(location)
         }
     }
 }
@@ -586,10 +571,9 @@ where
         push_error,
     );
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
-        push_error(WithSpan::new(
-            ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)),
-            comma,
-        ));
+        push_error(
+            ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
+        );
     }
     let extra_chunks = (level.item.len() > 1).then(|| {
         let rest = NonEmpty {
@@ -598,7 +582,7 @@ where
         };
         push_error(extra_chunks(&rest.head));
         let location = Span::join(rest.head.location, rest.last().location);
-        WithSpan::new(ExtraChunks(rest), location)
+        ExtraChunks(rest).with_span(location)
     });
     Singleton {
         item,
@@ -670,8 +654,8 @@ where
                 .require_token(NonBracketTokenKind::Identifier)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse {
-                dollar: WithSpan::new(Dollar, dollar),
-                name: WithSpan::new(VariableName, name),
+                dollar: Dollar.with_span(dollar),
+                name: VariableName.with_span(name),
             }).wrap_ok();
         }
         if cursor
@@ -684,7 +668,7 @@ where
             let value = match cursor.token_text(span).parse() {
                 Ok(value) => value,
                 Err(_) => {
-                    return WithSpan::new(ParseError::IntegerDoesNotFitI64, span).wrap_err();
+                    return ParseError::IntegerDoesNotFitI64.with_span(span).wrap_err();
                 }
             };
             return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
@@ -694,13 +678,12 @@ where
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
-                _ => WithSpan::new(
-                    ParseError::expected(
-                        Expectation::Value,
-                        Found::Token(NonBracketTokenKind::Identifier),
-                    ),
-                    span,
-                ).wrap_err(),
+                _ => ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
+                .with_span(span)
+                .wrap_err(),
             };
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
