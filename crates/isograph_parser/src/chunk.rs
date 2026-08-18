@@ -6,8 +6,9 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketItem, Bracketed, CloseBracket, IsographResolutionNode, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, OpenBracket, chunk_stream::ChunkStream,
+    BracketItem, Bracketed, CloseBracket, Expectation, Found, IsographResolutionNode,
+    MatchedBrackets, NonBracketToken, NonBracketTokenKind, OpenBracket, ParseError,
+    chunk_stream::{ChunkStream, ItemCursor},
 };
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
@@ -98,7 +99,6 @@ pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, Chunked
 type LevelItems<'a> = SafePeekable<std::slice::Iter<'a, WithSpan<BracketItem>>>;
 
 impl Chunk {
-    #[allow(dead_code)]
     pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
         ChunkStream::new(self.contents.reference(), text)
     }
@@ -129,10 +129,122 @@ impl Chunk {
 }
 
 impl ChunkedLevel {
-    #[allow(dead_code)]
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }
+}
+
+/// Unread or failed items from the chunk under parse.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UnparsedChunkItems(pub NonEmpty<WithSpan<ChunkContentItem>>);
+
+/// Extra root chunks after the first.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ExtraChunks(pub NonEmpty<WithSpan<Chunk>>);
+
+/// One chunk's parse result.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Slot<T, E> {
+    pub item: Option<WithSpan<T>>,
+    pub extra_tokens: Option<WithSpan<E>>,
+}
+
+/// One-item level.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Singleton<T, E> {
+    pub item: WithSpan<T>,
+    pub extra_chunks: Option<WithSpan<E>>,
+}
+
+fn parse_chunk<'a, P>(
+    chunk: &'a WithSpan<Chunk>,
+    text: &'a str,
+    parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
+) -> (ChunkStream<'a>, Result<WithSpan<P>, WithSpan<ParseError>>) {
+    let mut stream = chunk.item.stream(text);
+    let result = stream.cursor().spanning(parse_item);
+    (stream, result)
+}
+
+fn parse_one_item<'a, P, F>(
+    chunk: &'a WithSpan<Chunk>,
+    text: &'a str,
+    leftover: Expectation,
+    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
+    push_error: &mut F,
+) -> WithSpan<Slot<P, UnparsedChunkItems>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
+    match result {
+        Ok(item) => match stream.remaining_contents() {
+            None => {
+                let location = item.location;
+                Slot {
+                    item: item.wrap_some(),
+                    extra_tokens: None,
+                }
+                .with_span(location)
+            }
+            Some(remaining) => {
+                push_error(
+                    ParseError::expected(leftover, Found::from(remaining.first().item.reference()))
+                        .with_span(remaining.first().location),
+                );
+                let leftover_span =
+                    Span::join(remaining.first().location, remaining.last().location);
+                let location = Span::join(item.location, leftover_span);
+                Slot {
+                    item: item.wrap_some(),
+                    extra_tokens: UnparsedChunkItems(remaining)
+                        .with_span(leftover_span)
+                        .wrap_some(),
+                }
+                .with_span(location)
+            }
+        },
+        Err(reason) => {
+            push_error(reason);
+            let location = chunk.item.contents_span();
+            Slot {
+                item: None,
+                extra_tokens: UnparsedChunkItems(chunk.item.contents.clone())
+                    .with_span(location)
+                    .wrap_some(),
+            }
+            .with_span(location)
+        }
+    }
+}
+
+pub(crate) fn parse_singleton<'a, T, F>(
+    level: &'a WithSpan<ChunkedLevel>,
+    text: &'a str,
+    end: Expectation,
+    extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
+    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
+    push_error: &mut F,
+) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    let item = parse_one_item(&level.item.0[0], text, end, parse, push_error);
+    if let Some(comma) = level.item.0[0].item.boundary_comma() {
+        push_error(
+            ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
+        );
+    }
+    let extra_chunks = (level.item.len() > 1).then(|| {
+        push_error(extra_chunks(&level.item.0[1]));
+        let rest = NonEmpty {
+            head: level.item.0[1].clone(),
+            tail: level.item.0[2..].to_vec(),
+        };
+        let location = Span::join(rest.head.location, rest.last().location);
+        ExtraChunks(rest).with_span(location)
+    });
+    Singleton { item, extra_chunks }
 }
 
 /// Chunk a matched-brackets tree. Every non-separator token lands in a chunk; a comma

@@ -1,5 +1,3 @@
-#![allow(dead_code)]
-
 use nonempty::NonEmpty;
 use prelude::Postfix;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
@@ -35,6 +33,7 @@ impl<'a> ChunkStream<'a> {
         &mut self.0
     }
 
+    #[allow(dead_code)]
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
         self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
@@ -66,6 +65,7 @@ impl<'a> ItemCursor<'a> {
         item.location.wrap_some()
     }
 
+    #[allow(dead_code)]
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
@@ -97,6 +97,7 @@ impl<'a> ItemCursor<'a> {
         self.consume_token_if(kind).ok_or(())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
@@ -104,6 +105,7 @@ impl<'a> ItemCursor<'a> {
         self.consume_group_if(kind).ok_or(())
     }
 
+    #[allow(dead_code)]
     pub(crate) fn text(&self) -> &'a str {
         self.text
     }

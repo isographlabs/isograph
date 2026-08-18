@@ -949,6 +949,8 @@ dependencies = [
 name = "isograph_parser"
 version = "0.5.3"
 dependencies = [
+ "common_lang_types",
+ "intern",
  "logos",
  "nonempty",
  "prelude",
