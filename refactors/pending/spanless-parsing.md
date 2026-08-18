@@ -116,6 +116,8 @@ if tree.has_errors() {
 }
 ```
 
+The grammar stage's token collector is the same split. `SemanticTokens::Ignore` is the cheap pass; `SemanticTokens::Collect` is the reparse the LSP asks for, and is specified in semantic-tokens.md. The entry point chooses `TSpan` and the collector together. Grammar functions see neither.
+
 ## Alternative A: one spanned parse, strip when needed
 
 Keep `match_brackets` producing `BracketTree<String, Span>` only, and derive the spanless tree by a trivial recursive map:
