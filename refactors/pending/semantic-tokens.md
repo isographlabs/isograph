@@ -1,20 +1,35 @@
 # Semantic tokens
 
-The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. Grammar parse functions (`parse_entrypoint`, `parse_selection`, `parse_value`, ...) keep the signatures they have now. They do not take a token class, a push callback, or a collector.
+The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. `require_token` takes a token kind, not a legend class.
 
-Two modes of the same parse:
+The collector is a type parameter on the cursor. Two implementors, by design; this seam is the whole of what the trait exists for.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
-pub enum SemanticTokens {
-    Collect(Vec<WithSpan<SemanticToken>>),
-    Ignore,
+pub trait SemanticTokens {
+    fn record(&mut self, token: SemanticToken, span: Span);
+}
+
+/// The LSP path. Each `record` appends.
+pub struct CollectedSemanticTokens(pub Vec<WithSpan<SemanticToken>>);
+
+/// The compile path, and the cheap pass in spanless-parsing.md. Each `record` is a no-op.
+pub struct NoSemanticTokens;
+
+impl SemanticTokens for CollectedSemanticTokens {
+    fn record(&mut self, token: SemanticToken, span: Span) {
+        self.0.push(token.with_span(span));
+    }
+}
+
+impl SemanticTokens for NoSemanticTokens {
+    fn record(&mut self, _token: SemanticToken, _span: Span) {}
 }
 ```
 
-`Collect` pushes. `Ignore` does nothing. The compile path uses `Ignore`. The LSP path uses `Collect`. The tree is the same either way: tokens are a sibling of the tree, not a field on it.
+One parse function, two monomorphizations. The tree does not mention `TTokens`. Tokens are a sibling of the tree, not a field on it.
 
-The cheap pass in spanless-parsing.md is this `Ignore` plus `TSpan = NoSpan`. That pass is a later change. This series always produces spanned trees. It only adds the token collector and the `Ignore` mode.
+The cheap pass in spanless-parsing.md is `NoSemanticTokens` plus `TSpan = NoSpan`. That pass is a later change. This series always produces spanned trees. It only adds the collector parameter and the two implementors.
 
 ## What a token is, first pass
 
@@ -86,37 +101,6 @@ impl SemanticToken {
         }
     }
 }
-
-impl SemanticTokens {
-    pub fn collect() -> SemanticTokens {
-        SemanticTokens::Collect(Vec::new())
-    }
-
-    pub fn ignore() -> SemanticTokens {
-        SemanticTokens::Ignore
-    }
-
-    fn push(&mut self, token: WithSpan<SemanticToken>) {
-        match self {
-            SemanticTokens::Collect(tokens) => tokens.push(token),
-            SemanticTokens::Ignore => {}
-        }
-    }
-
-    pub fn collected(&self) -> &[WithSpan<SemanticToken>] {
-        match self {
-            SemanticTokens::Collect(tokens) => tokens,
-            SemanticTokens::Ignore => &[],
-        }
-    }
-
-    pub fn take_collected(&mut self) -> Vec<WithSpan<SemanticToken>> {
-        match self {
-            SemanticTokens::Collect(tokens) => std::mem::take(tokens),
-            SemanticTokens::Ignore => Vec::new(),
-        }
-    }
-}
 ```
 
 `from_non_bracket` is `None` for kinds the grammar stage does not consume (`Comma` and `LineBreak` live on chunk boundaries; `Error*` and `EndOfFile` are not `require_token` targets). Those spans get tokens only in the leftover fill-in change.
@@ -124,6 +108,8 @@ impl SemanticTokens {
 No `line_behavior` / `indent_change` on this type. Upstream puts both on `IsographSemanticToken` and the formatter walks that vec. Formatter metadata is a later change on this same type.
 
 Tokens stay off the tree. Upstream stores `semantic_tokens: Vec<WithEmbeddedLocation<IsographSemanticToken>>` on each declaration (`entrypoint_declaration.rs`, `client_selectable_declaration.rs`). We do not.
+
+`record` takes `(SemanticToken, Span)`, not a pre-built `WithSpan`. `CollectedSemanticTokens` constructs the `WithSpan` inside `record`. `NoSemanticTokens::record` is empty, so that monomorphization does not build a `WithSpan`.
 
 ## Origin: how isograph records during parse
 
@@ -190,31 +176,31 @@ let dot = tokens
 Delta:
 
 - `require_token` / `consume_token_if` take only the token kind. The recorded class is `SemanticToken::from_non_bracket(kind)`. The call site does not name a legend entry.
-- The collector is `SemanticTokens` on the cursor, not a `Vec` field that is always appended to. `Ignore` is a real mode.
+- The collector is `TTokens: SemanticTokens` on the cursor, not a `Vec` field that is always appended to. `NoSemanticTokens` is a real implementor, monomorphized to a no-op `record`.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.
 
 ## The cursor
 
-`ItemCursor` holds `&mut SemanticTokens`. Grammar functions still take `&mut ItemCursor<'_>`. They never mention `SemanticTokens`.
+`ItemCursor` is generic over the collector. Grammar functions take `&mut ItemCursor<'_, TTokens>` and so they are generic over `TTokens` too. They do not take a token class, a push callback, or a collector argument. Recording is `self.tokens.record(...)` inside `consume_*`.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-pub(crate) struct ItemCursor<'a> {
+pub(crate) struct ItemCursor<'a, TTokens> {
     items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     previous_end: u32,
     text: &'a str,
-    tokens: &'a mut SemanticTokens,
+    tokens: &'a mut TTokens,
 }
 
-pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
+pub(crate) struct ChunkStream<'a, TTokens>(ItemCursor<'a, TTokens>);
 
-impl<'a> ChunkStream<'a> {
+impl<'a, TTokens: SemanticTokens> ChunkStream<'a, TTokens> {
     pub(crate) fn new(
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
-        tokens: &'a mut SemanticTokens,
+        tokens: &'a mut TTokens,
     ) -> Self {
         ChunkStream(ItemCursor {
             previous_end: contents.first().location.start,
@@ -226,15 +212,17 @@ impl<'a> ChunkStream<'a> {
 }
 
 impl Chunk {
-    pub(crate) fn stream<'a>(
+    pub(crate) fn stream<'a, TTokens: SemanticTokens>(
         &'a self,
         text: &'a str,
-        tokens: &'a mut SemanticTokens,
-    ) -> ChunkStream<'a> {
+        tokens: &'a mut TTokens,
+    ) -> ChunkStream<'a, TTokens> {
         ChunkStream::new(self.contents.reference(), text, tokens)
     }
 }
 ```
+
+The bound lives on the `impl`, not the struct.
 
 Before (`consume_token_if` / `consume_group_if`):
 
@@ -272,6 +260,7 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+impl<'a, TTokens: SemanticTokens> ItemCursor<'a, TTokens> {
     pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
         let peek = self.items.peek()?;
         match peek.view().item.reference() {
@@ -311,13 +300,34 @@ After:
     }
 
     fn record(&mut self, token: SemanticToken, span: Span) {
-        self.tokens.push(token.with_span(span));
+        self.tokens.record(token, span);
     }
+}
 ```
 
-`require_token` / `require_group` stay `consume_*` or `Err(())`. They inherit the side effect. `expected` only peeks and records nothing.
+`require_token` / `require_group` stay `consume_*` or `Err(())`. They inherit the side effect. `expected` only peeks and records nothing. `text`, `token_text`, `spanning`, `end_span` pick up `TTokens` from the `impl` and are otherwise unchanged.
 
 A consume that does not match records nothing. `from_non_bracket` returning `None` also records nothing.
+
+Grammar functions before:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+fn parse_entrypoint(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<EntrypointDeclaration, WithSpan<ParseError>>
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+fn parse_entrypoint<TTokens: SemanticTokens>(
+    cursor: &mut ItemCursor<'_, TTokens>,
+) -> Result<EntrypointDeclaration, WithSpan<ParseError>>
+```
+
+`parse_iso_literal_item`, `parse_selection`, `parse_value`, and the rest of the grammar functions are the same substitution. The body does not mention `TTokens`.
 
 ## Source order for groups
 
@@ -327,11 +337,11 @@ The group-plus-interior pattern in parsing-standards.md becomes one method on th
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-impl<'a> ItemCursor<'a> {
+impl<'a, TTokens: SemanticTokens> ItemCursor<'a, TTokens> {
     pub(crate) fn parse_group_items<P, F>(
         &mut self,
         group: &ChunkedGroup,
-        parse_item: impl Fn(&mut ItemCursor<'_>, &mut F) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_, TTokens>, &mut F) -> Result<P, WithSpan<ParseError>>,
         push_error: &mut F,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
     where
@@ -351,7 +361,7 @@ impl<'a> ItemCursor<'a> {
         group: &ChunkedGroup,
         end: Expectation,
         extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<ParseError>,
-        parse: impl FnOnce(&mut ItemCursor<'_>, &mut F) -> Result<T, WithSpan<ParseError>>,
+        parse: impl FnOnce(&mut ItemCursor<'_, TTokens>, &mut F) -> Result<T, WithSpan<ParseError>>,
         push_error: &mut F,
     ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>
     where
@@ -414,13 +424,13 @@ After:
     .wrap_ok()
 ```
 
-`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_definitions`, and `[...]` via `parse_group_singleton` are the same substitution. Grammar functions still take only the cursor.
+`parse_value`'s brace arm, `consume_argument_list`, `consume_variable_definitions`, and `[...]` via `parse_group_singleton` are the same substitution. Those functions are generic over `TTokens` the way `parse_entrypoint` is. Their bodies do not mention the collector.
 
 `parse_group_*` is not landed until `parse_items` is (parse-fields.md). This change lands `record_group_close` and the open-on-consume. parse-fields.md and parse-arguments.md / parse-variables.md use the helper in the snippets above.
 
 ## Threading through the list helpers
 
-`parse_chunk`, `parse_one_item`, `parse_singleton`, and (when it lands) `parse_items` take `&mut SemanticTokens` and pass it to `stream`. Grammar closures still receive only `&mut ItemCursor`.
+`parse_chunk`, `parse_one_item`, `parse_singleton`, and (when it lands) `parse_items` are generic over `TTokens` and pass `&mut TTokens` to `stream`. Grammar closures receive `&mut ItemCursor<'_, TTokens>`.
 
 Before:
 
@@ -470,23 +480,26 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-fn parse_chunk<'a, P>(
+fn parse_chunk<'a, P, TTokens: SemanticTokens>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
-    tokens: &'a mut SemanticTokens,
-    parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
-) -> (ChunkStream<'a>, Result<WithSpan<P>, WithSpan<ParseError>>) {
+    tokens: &'a mut TTokens,
+    parse_item: impl FnOnce(&mut ItemCursor<'a, TTokens>) -> Result<P, WithSpan<ParseError>>,
+) -> (
+    ChunkStream<'a, TTokens>,
+    Result<WithSpan<P>, WithSpan<ParseError>>,
+) {
     let mut stream = chunk.item.stream(text, tokens);
     let result = stream.cursor().spanning(parse_item);
     (stream, result)
 }
 
-fn parse_one_item<'a, P, F>(
+fn parse_one_item<'a, P, F, TTokens: SemanticTokens>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
-    tokens: &'a mut SemanticTokens,
+    tokens: &'a mut TTokens,
     leftover: Expectation,
-    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
+    parse: impl FnOnce(&mut ItemCursor<'a, TTokens>, &mut F) -> Result<P, WithSpan<ParseError>>,
     push_error: &mut F,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>>
 where
@@ -497,13 +510,13 @@ where
     /* unchanged match */
 }
 
-pub(crate) fn parse_singleton<'a, T, F>(
+pub(crate) fn parse_singleton<'a, T, F, TTokens: SemanticTokens>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
-    tokens: &mut SemanticTokens,
+    tokens: &mut TTokens,
     end: Expectation,
     extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
-    parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
+    parse: impl FnOnce(&mut ItemCursor<'a, TTokens>, &mut F) -> Result<T, WithSpan<ParseError>>,
     push_error: &mut F,
 ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>
 where
@@ -514,11 +527,11 @@ where
 }
 ```
 
-`parse_items` (parsing-standards.md, lands in parse-fields.md) takes `tokens: &mut SemanticTokens` and passes it to each `parse_one_item`. Sequential chunks: the previous `ChunkStream` is dropped before the next `stream` reborrows `tokens`.
+`parse_items` (parsing-standards.md, lands in parse-fields.md) is generic the same way and passes `tokens` to each `parse_one_item`. Sequential chunks: the previous `ChunkStream` is dropped before the next `stream` reborrows `tokens`.
 
 ## Entry points
 
-`parse_iso_literal` stays the compile-path signature and uses `Ignore`. The LSP path calls `parse_iso_literal_with_tokens`.
+`parse_iso_literal` stays the compile-path signature and instantiates `NoSemanticTokens`. The LSP path calls `parse_iso_literal_with_tokens`. Both call a generic inner.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -527,8 +540,7 @@ pub fn parse_iso_literal(
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
 ) -> Option<WithSpan<IsoLiteralParse>> {
-    let mut tokens = SemanticTokens::ignore();
-    parse_iso_literal_inner(text, root, push_error, &mut tokens)
+    parse_iso_literal_with(text, root, push_error, &mut NoSemanticTokens)
 }
 
 pub fn parse_iso_literal_with_tokens(
@@ -536,16 +548,16 @@ pub fn parse_iso_literal_with_tokens(
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
 ) -> (Option<WithSpan<IsoLiteralParse>>, Vec<WithSpan<SemanticToken>>) {
-    let mut tokens = SemanticTokens::collect();
-    let tree = parse_iso_literal_inner(text, root, push_error, &mut tokens);
-    (tree, tokens.take_collected())
+    let mut tokens = CollectedSemanticTokens(Vec::new());
+    let tree = parse_iso_literal_with(text, root, push_error, &mut tokens);
+    (tree, tokens.0)
 }
 
-fn parse_iso_literal_inner(
+fn parse_iso_literal_with<TTokens: SemanticTokens>(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     mut push_error: impl FnMut(WithSpan<ParseError>),
-    tokens: &mut SemanticTokens,
+    tokens: &mut TTokens,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
@@ -565,20 +577,20 @@ fn parse_iso_literal_inner(
 }
 ```
 
-`parse_iso_literal_item` and `parse_entrypoint` are unchanged: they already call `require_token(Identifier)` / `require_token(Period)`.
+`parse_iso_literal_item` and `parse_entrypoint` pick up `TTokens` on the cursor. Their `require_token(Identifier)` / `require_token(Period)` calls are otherwise unchanged.
 
 ```
 entrypoint Query.foo
 ```
 
-under `Collect` records, in source order:
+under `CollectedSemanticTokens` records, in source order:
 
 - `SemanticToken::Identifier` at `entrypoint`
 - `SemanticToken::Identifier` at `Query`
 - `SemanticToken::Period` at `.`
 - `SemanticToken::Identifier` at `foo`
 
-under `Ignore`, `collected()` is empty and the tree equals the `Collect` tree.
+under `NoSemanticTokens` the tree equals the `CollectedSemanticTokens` tree and there is no vec.
 
 `entrypoint Foo.$ asdf` records `entrypoint`, `Foo`, `.` and then fails at `$`. Those three tokens stay. There is no pop.
 
@@ -598,50 +610,72 @@ So `foo ( asfd`: `foo` is recorded as `Identifier`; `(` is an unmatched-open dia
 
 No snapshots. Facts:
 
-- `require_token(Identifier)` on `foo` under `Collect` yields `[Identifier @ foo]`.
-- The same consume under `Ignore` yields `[]`.
+- `require_token(Identifier)` on `foo` with `CollectedSemanticTokens` yields `[Identifier @ foo]`.
+- The same consume with `NoSemanticTokens` compiles and the tree (when parsed) matches the collecting instantiation.
 - `require_token(Period)` when the next item is an identifier records nothing and returns `Err(())`.
 - `consume_token_if` that does not match records nothing.
 - `consume_group_if(Brace)` on `{ bar }` records `OpenBrace` at `{`. `record_group_close` then records `CloseBrace` at `}`.
 - `parse_iso_literal_with_tokens` on `entrypoint Query.foo` returns the four tokens above and the same tree as `parse_iso_literal`.
-- `parse_iso_literal` on that input leaves `collected()` empty when the inner accumulator is inspected via a test that calls `parse_iso_literal_inner` with `Ignore`, or equivalently: `parse_iso_literal` equals the tree half of `parse_iso_literal_with_tokens`.
 - A failed first chunk that consumed a prefix (`entrypoint Foo.$`) still has the prefix tokens.
 - `expected` does not record.
 
-`stream_of` in `chunk_stream.rs` tests takes `&mut SemanticTokens`. Existing consume tests pass `&mut SemanticTokens::ignore()`.
+`stream_of` in `chunk_stream.rs` tests is generic:
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+    fn stream_of<'a, TTokens: SemanticTokens>(
+        tree: &'a WithSpan<ChunkedLevel>,
+        text: &'a str,
+        tokens: &'a mut TTokens,
+    ) -> ChunkStream<'a, TTokens> {
+        first_chunk(tree).stream(text, tokens)
+    }
+```
+
+Existing consume tests pass `&mut NoSemanticTokens`. Collecting tests pass `&mut CollectedSemanticTokens(Vec::new())` and assert on `.0`.
 
 ## The docs this change amends
 
-- parsing-standards.md: `ItemCursor` gains `tokens`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take `&mut SemanticTokens`. Catalog adds `SemanticTokens::{Collect, Ignore}`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper.
-- parse-fields.md, parse-arguments.md, parse-variables.md: group interiors go through the helper, as in the `require_selection_set` after snippet.
+- parsing-standards.md: `ItemCursor` / `ChunkStream` gain `TTokens`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` are generic over `TTokens: SemanticTokens` and take `&mut TTokens`. Grammar functions take `ItemCursor<'_, TTokens>`. Catalog adds `SemanticTokens`, `CollectedSemanticTokens`, `NoSemanticTokens`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper.
+- parse-fields.md, parse-arguments.md, parse-variables.md: group interiors go through the helper, as in the `require_selection_set` after snippet. Each `parse_*` gains `TTokens: SemanticTokens`.
 - parsing-plan.md: the "Semantic tokens" later-stage bullet points here. Tokens are recorded during parse, not derived by a walk.
-- spanless-parsing.md: the cheap pass is `Ignore` plus `NoSpan`. Collecting tokens is a reason to reparse, the same as needing spans for an error.
+- spanless-parsing.md: the cheap pass is `NoSemanticTokens` plus `NoSpan`. Collecting tokens is a reason to reparse, the same as needing spans for an error.
 
 ## Later changes
 
-Each is independently shippable. None of them change grammar-function signatures.
+Each is independently shippable. `require_token` still takes only a kind.
 
 ### Reclassify
 
-After `token_text` names the role, the cursor overwrites the token it just recorded.
+After `token_text` names the role, the cursor overwrites the token it just recorded. The trait grows one method. `NoSemanticTokens` stays a no-op.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
-impl SemanticTokens {
+pub trait SemanticTokens {
+    fn record(&mut self, token: SemanticToken, span: Span);
+    fn reclassify_last(&mut self, token: SemanticToken);
+}
+
+impl SemanticTokens for CollectedSemanticTokens {
+    fn record(&mut self, token: SemanticToken, span: Span) {
+        self.0.push(token.with_span(span));
+    }
+
     fn reclassify_last(&mut self, token: SemanticToken) {
-        match self {
-            SemanticTokens::Collect(tokens) => {
-                if let Some(last) = tokens.last_mut() {
-                    last.item = token;
-                }
-            }
-            SemanticTokens::Ignore => {}
+        if let Some(last) = self.0.last_mut() {
+            last.item = token;
         }
     }
 }
 
+impl SemanticTokens for NoSemanticTokens {
+    fn record(&mut self, _token: SemanticToken, _span: Span) {}
+
+    fn reclassify_last(&mut self, _token: SemanticToken) {}
+}
+
 // from crates/isograph_parser/src/chunk_stream.rs
-impl ItemCursor<'_> {
+impl<TTokens: SemanticTokens> ItemCursor<'_, TTokens> {
     pub(crate) fn reclassify(&mut self, token: SemanticToken) {
         self.tokens.reclassify_last(token);
     }
@@ -664,11 +698,11 @@ impl ItemCursor<'_> {
     }
 ```
 
-`parse_entrypoint` reclassifies `Query` to `Type` and `foo` to `Field`. Selection names, argument names, variable names, `to`, `true` / `false` / `null` are the same. `reclassify` is called immediately after the consume that recorded. `Ignore` is still a no-op.
+`parse_entrypoint` reclassifies `Query` to `Type` and `foo` to `Field`. Selection names, argument names, variable names, `to`, `true` / `false` / `null` are the same. `reclassify` is called immediately after the consume that recorded.
 
 ### Leftover fill-in
 
-A walk over `tokenize(text)` that emits `from_non_bracket` / `for_open` / `for_close` for every token whose span is not already in the collected vec, in source order. Separators, leftover items, and the matcher's cut get lexical tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path.
+A walk over `tokenize(text)` that emits `from_non_bracket` / `for_open` / `for_close` for every token whose span is not already in the collected vec, in source order. Separators, leftover items, and the matcher's cut get lexical tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs only against `CollectedSemanticTokens`.
 
 ### Formatter metadata
 
@@ -676,16 +710,17 @@ A walk over `tokenize(text)` that emits `from_non_bracket` / `for_open` / `for_c
 
 ### Cheap pass
 
-spanless-parsing.md's `TSpan = NoSpan` parse uses `SemanticTokens::Ignore`. The compile path:
+spanless-parsing.md's `TSpan = NoSpan` parse uses `NoSemanticTokens`. The compile path:
 
 ```rust
-let tree = parse_iso_literal::<NoSpan>(text, root, push_error);
+let tree = parse_iso_literal::<NoSpan, NoSemanticTokens>(text, root, push_error);
 if /* push_error was called, or tree.has_errors() */ {
-    let (spanned, _tokens) = parse_iso_literal_with_tokens::<Span>(text, root, push_error);
+    let (spanned, _tokens) =
+        parse_iso_literal_with_tokens::<Span>(text, root, push_error);
     report(spanned);
 }
 ```
 
-The LSP path always calls `parse_iso_literal_with_tokens::<Span>`. One function, two instantiations, same consume-time recording. The two trees cannot disagree about structure.
+The LSP path always calls `parse_iso_literal_with_tokens::<Span>`. One function, two instantiations of each parameter, same consume-time recording. The two trees cannot disagree about structure.
 
-`SemanticTokens` stays an enum. It does not become a trait. The span parameter is the tree's; the token mode is the collector's. They are chosen together at the entry point and are invisible below it.
+`TSpan` is the tree's parameter. `TTokens` is the cursor's. They are chosen together at the entry point. `require_token` names neither.

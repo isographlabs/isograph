@@ -116,7 +116,7 @@ if tree.has_errors() {
 }
 ```
 
-The grammar stage's token collector is the same split. `SemanticTokens::Ignore` is the cheap pass; `SemanticTokens::Collect` is the reparse the LSP asks for, and is specified in semantic-tokens.md. The entry point chooses `TSpan` and the collector together. Grammar functions see neither.
+The grammar stage's token collector is the same split. `NoSemanticTokens` is the cheap pass; `CollectedSemanticTokens` is the reparse the LSP asks for, and is specified in semantic-tokens.md. The entry point chooses `TSpan` and `TTokens` together. `require_token` names neither.
 
 ## Alternative A: one spanned parse, strip when needed
 

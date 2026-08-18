@@ -97,7 +97,7 @@ Name leaves are fieldless marker structs (`EntityName`, `SelectionName`, `Variab
 ## What later stages own
 
 - Directives, when they return.
-- Semantic tokens. `consume_*` / `require_*` record them as a side effect into a `SemanticTokens::{Collect, Ignore}` collector on the cursor; grammar function signatures do not mention the collector. The compile path uses `Ignore`. The LSP path uses `Collect`. The layering rule (recorded where consumed, lexical fill-in where not, errors as diagnostics) is semantic-tokens.md.
+- Semantic tokens. `consume_*` / `require_*` record them as a side effect into a `TTokens: SemanticTokens` collector on the cursor. `require_token` takes a kind, not a class. The compile path instantiates `NoSemanticTokens`. The LSP path instantiates `CollectedSemanticTokens`. The layering rule (recorded where consumed, lexical fill-in where not, errors as diagnostics) is semantic-tokens.md.
 - Extraction context. `const_export_name`, the definition file path, and the "must be exported" check belong to the stage that extracts literals from files. This stage sees only the text between the backticks, and a missing export is not a malformed literal.
 - Diagnostics rendering: turning `WithSpan<ParseError>` plus the literal text into printed messages, including the contextual suggestions keyed off `(expected, found)` pairs.
 - Smarter recovery, for example treating a top-level `{ ... }` after a failed header as a selection set, and synthetic closing of unclosed groups (unclosed-group-recovery.md), a future optimization over the cut. The series builds the minimal correct version first.
