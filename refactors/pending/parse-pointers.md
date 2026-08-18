@@ -1,6 +1,6 @@
 # parse-pointers: pointer declarations
 
-Sixth and last doc of the series parsing-plan.md orders, after parse-descriptions.md. It lands `pointer Type.name to Type { ... }` and removes `UnsupportedDeclarationType`: every declaration keyword now parses.
+`pointer Type.name to Type { ... }`. Removes `UnsupportedDeclarationType`.
 
 ## The grammar this doc accepts
 
@@ -8,15 +8,14 @@ Sixth and last doc of the series parsing-plan.md orders, after parse-description
 pointer <Identifier> . <Identifier> [<paren group>] to <type> [<description>] <brace group>
 ```
 
-The `to` keyword is an identifier whose text is `to`. The target type is a type annotation (parse-variables.md), read from the declaration chunk's items. Variable definitions, the description, and the selection set behave exactly as on field declarations; the field order above matches upstream's parse order.
+The `to` keyword is an identifier whose text is `to`. The target type is a type annotation. Variable definitions, the description, and the selection set behave as on field declarations.
 
 ## Changes to parse_error.rs
 
-`UnsupportedDeclarationType` and its `Display` arm are deleted; the enum's remaining structural variants are `Expected`, `EmptyLiteral`, `MultipleDeclarations`, and `IntegerDoesNotFitI64`. `Expectation` gains one variant:
+`UnsupportedDeclarationType` and its `Display` arm are deleted. Remaining structural variants: `Expected`, `EmptyLiteral`, `MultipleDeclarations`, `IntegerDoesNotFitI64`.
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-    /// The keyword `to`, between a pointer's name and its target type.
     ToKeyword,
 ```
 
@@ -27,66 +26,54 @@ The `to` keyword is an identifier whose text is `to`. The target type is a type 
 
 ## Changes to parse_iso_literal.rs
 
-The enum and dispatch complete. Before:
+Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum IsoLiteralParse {
+pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
     Field(ClientFieldDeclaration),
-    Unparsed(UnparsedLiteral),
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        text if text == "entrypoint" => {
-            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
-        }
-        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
-        text if text == "pointer" => {
-            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
-        }
+        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
+        "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
 ```
 
 After:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum IsoLiteralParse {
+pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
     Field(ClientFieldDeclaration),
     Pointer(ClientPointerDeclaration),
-    Unparsed(UnparsedLiteral),
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        text if text == "entrypoint" => {
-            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
-        }
-        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
-        text if text == "pointer" => {
-            IsoLiteralParse::Pointer(parse_pointer(keyword, cursor)?).wrap_ok()
-        }
+        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
+        "pointer" => IsoLiteralItem::Pointer(parse_pointer(cursor, push_error)?).wrap_ok(),
 ```
 
-The declaration type, its markers, and its parse function:
+The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientPointerDeclaration {
-    pub pointer_keyword: WithSpan<PointerKeyword>,
     #[resolve_field(parent_variant = Pointer)]
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field]
     pub client_pointer_name: WithSpan<ClientPointerName>,
     #[resolve_field(parent_variant = Pointer)]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
-    pub to_keyword: WithSpan<ToKeyword>,
     #[resolve_field(parent_variant = PointerTarget)]
     pub target_type: WithSpan<TypeAnnotation>,
     #[resolve_field(parent_variant = Pointer)]
@@ -95,32 +82,34 @@ pub struct ClientPointerDeclaration {
     pub selection_set: WithSpan<SelectionSet>,
 }
 
-/// The `pointer` keyword. Positions on it answer the declaration.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct PointerKeyword;
-
-/// The `to` keyword. Positions on it answer the declaration.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct ToKeyword;
-
-/// The name of the client pointer being declared. Its text is its span.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientPointerDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientPointerName;
+pub struct ClientPointerName(common_lang_types::SelectableName);
+
+impl From<intern::string_key::StringKey> for ClientPointerName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        ClientPointerName(key.to())
+    }
+}
 
 pub type ClientPointerDeclarationPath<'a> =
-    PositionResolutionPath<&'a ClientPointerDeclaration, ()>;
+    PositionResolutionPath<&'a ClientPointerDeclaration, IsoLiteralParsePath<'a>>;
 
 pub type ClientPointerNamePath<'a> =
     PositionResolutionPath<&'a ClientPointerName, ClientPointerDeclarationPath<'a>>;
 ```
 
+There is no `PointerKeyword` and no `ToKeyword`. A position on `pointer` or `to` answers `ClientPointerDeclaration`.
+
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-fn parse_pointer(
-    keyword: Span,
+fn parse_pointer<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Result<ClientPointerDeclaration, WithSpan<ParseError>> {
+    push_error: &mut F,
+) -> Result<ClientPointerDeclaration, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let parent_type = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
@@ -130,7 +119,7 @@ fn parse_pointer(
     let client_pointer_name = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    let variable_definitions = consume_variable_declaration_list(cursor);
+    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
     let to_keyword = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
@@ -142,43 +131,35 @@ fn parse_pointer(
         .with_span(to_keyword)
         .wrap_err();
     }
-    let target_type = parse_type_annotation(cursor)?;
+    let target_type = parse_type_annotation(cursor, push_error)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor)?;
+    let selection_set = require_selection_set(cursor, push_error)?;
     ClientPointerDeclaration {
-        pointer_keyword: PointerKeyword.with_span(keyword),
-        parent_type: EntityName.with_span(parent_type),
-        client_pointer_name: ClientPointerName.with_span(client_pointer_name),
+        parent_type: cursor
+            .token_text(parent_type)
+            .intern()
+            .to::<EntityName>()
+            .with_span(parent_type),
+        client_pointer_name: cursor
+            .token_text(client_pointer_name)
+            .intern()
+            .to::<ClientPointerName>()
+            .with_span(client_pointer_name),
         variable_definitions,
-        to_keyword: ToKeyword.with_span(to_keyword),
         target_type,
         description,
         selection_set,
-    }.wrap_ok()
+    }
+    .wrap_ok()
 }
-```
-
-`parse_pointer` does not call `require_end`. `parse_singleton` matches `len()` first, then on one chunk calls `require_end` and `boundary_comma`.
-`errors()` gains the pointer arm, mirroring the field arm (the target type contributes nothing: a bad target fails the header, degrading the whole literal):
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-            IsoLiteralParse::Pointer(declaration) => {
-                let mut errors = Vec::new();
-                collect_variable_errors(&declaration.variable_definitions, &mut errors);
-                collect_selection_set_errors(&declaration.selection_set.item, &mut errors);
-                errors
-            }
 ```
 
 ## The parent-enum conversions
 
-The pointer is a second or third parent for four existing types; each converts per the established pattern, and the fields marked above name the new variants.
-
-1. `EntityNameParent` gains `Pointer(ClientPointerDeclarationPath<'a>)`. (`ClientFieldNameParent` is untouched: a pointer's name is a `ClientPointerName`.)
-2. `SelectionSetParent` in selections.rs gains `Pointer(ClientPointerDeclarationPath<'a>)`.
-3. `TypeAnnotationParent` in variables.rs gains `PointerTarget(ClientPointerDeclarationPath<'a>)`.
-4. `VariableDeclarationList`'s and `Description`'s direct parent aliases become enums:
+1. `EntityNameParent` gains `Pointer(ClientPointerDeclarationPath<'a>)`.
+2. `SelectionSetParent` gains `Pointer(ClientPointerDeclarationPath<'a>)`.
+3. `TypeAnnotationParent` gains `PointerTarget(ClientPointerDeclarationPath<'a>)`.
+4. `VariableDeclarationList` and `Description` parents become enums:
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
@@ -203,11 +184,9 @@ pub enum DescriptionParent<'a> {
 pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, DescriptionParent<'a>>;
 ```
 
-`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell from bare `#[resolve_field]` to `#[resolve_field(parent_variant = Field)]`, and the `#[resolve_position(parent_type = ...)]` attributes on `VariableDeclarationList` and `Description` repoint to the new enums.
+`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field(parent_variant = Field)]`.
 
 ## The resolution surface
-
-`IsographResolutionNode` gains:
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
@@ -215,44 +194,51 @@ pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, Descripti
     ClientPointerName(ClientPointerNamePath<'a>),
 ```
 
-`ClientPointerDeclaration` expands like `ClientFieldDeclaration`; `ClientPointerName` like `EntityName`.
-
 ## Tests
 
-Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `field_and_pointer_declarations_do_not_parse_yet` (already narrowed to pointers by parse-fields.md) is deleted.
-
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs (test module)
+// from crates/isograph_parser/src/parse_iso_literal.rs
     fn as_pointer(parse: &WithSpan<IsoLiteralParse>) -> &ClientPointerDeclaration {
-        match parse.item.reference() {
-            IsoLiteralParse::Pointer(declaration) => declaration,
-            parse => panic!("expected a pointer declaration, got {parse:?}"),
+        match parsed_item(parse).expect("the fixture's literal parsed an item") {
+            IsoLiteralItem::Pointer(declaration) => declaration,
+            item => panic!("expected a pointer declaration, got {item:?}"),
         }
     }
 
     #[test]
     fn a_final_comma_after_the_pointer_declaration_is_an_error() {
         let text = "pointer Pet.BestFriend to Pet { id },";
-        assert_unparsed(
-            text,
-            expected(Expectation::EndOfDeclaration, Found::Token(Comma)),
-            span_of(text, ","),
+        let (parse, errors) = parsed(text);
+        as_pointer(parse.reference());
+        assert_eq!(
+            errors,
+            expected(Expectation::EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
     }
 
     #[test]
     fn a_minimal_pointer_declaration_parses() {
         let text = "pointer Pet.BestFriend to Pet { id }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
         let declaration = as_pointer(parse.reference());
-        assert_eq!(declaration.pointer_keyword.location, span_of(text, "pointer"));
-        assert_eq!(declaration.client_pointer_name.location, span_of(text, "BestFriend"));
-        assert_eq!(declaration.to_keyword.location, span_of(text, "to"));
+        assert_eq!(
+            declaration.client_pointer_name.item,
+            "BestFriend".intern().to()
+        );
+        assert_eq!(
+            declaration.client_pointer_name.location,
+            span_of(text, "BestFriend")
+        );
         let target_anchor = span_of(text, "Pet {");
         match declaration.target_type.item.reference() {
             TypeAnnotation::Named(named) => {
-                assert_eq!(named.name.location, Span::new(target_anchor.start, target_anchor.start + 3));
+                assert_eq!(
+                    named.name.location,
+                    Span::new(target_anchor.start, target_anchor.start + 3)
+                );
             }
             annotation => panic!("expected a named target, got {annotation:?}"),
         }
@@ -262,8 +248,8 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
     #[test]
     fn a_full_pointer_declaration_parses_in_order() {
         let text = "pointer Pet.Owner($limit: Int) to Person! \"the owner\" { name }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
         let declaration = as_pointer(parse.reference());
         assert!(declaration.variable_definitions.is_some());
         assert_eq!(declaration.target_type.location, span_of(text, "Person!"));
@@ -273,15 +259,18 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
     #[test]
     fn a_bracketed_pointer_target_parses() {
         let text = "pointer Pet.Friends to [Pet!]! { id }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
-        assert_eq!(as_pointer(parse.reference()).target_type.location, span_of(text, "[Pet!]!"));
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            as_pointer(parse.reference()).target_type.location,
+            span_of(text, "[Pet!]!")
+        );
     }
 
     #[test]
     fn a_missing_to_keyword_reports_at_the_found_item() {
         let text = "pointer Pet.BestFriend Owner { id }";
-        assert_unparsed(
+        assert_no_declaration(
             text,
             expected(Expectation::ToKeyword, Found::Token(Identifier)),
             span_of(text, "Owner"),
@@ -291,9 +280,12 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
     #[test]
     fn a_missing_target_type_reports_after_to() {
         let text = "pointer Pet.BestFriend to { id }";
-        assert_unparsed(
+        assert_no_declaration(
             text,
-            expected(Expectation::TypeAnnotation, Found::Group(BracketKind::Brace)),
+            expected(
+                Expectation::TypeAnnotation,
+                Found::Group(BracketKind::Brace),
+            ),
             span_of(text, "{ id }"),
         );
     }
@@ -301,20 +293,21 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
     #[test]
     fn pointer_names_and_targets_resolve_with_their_ancestry() {
         let text = "pointer Pet.BestFriend to Owner { id }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "BestFriend")) {
             IsographResolutionNode::ClientPointerName(name) => {
-                assert_eq!(name.parent.inner.to_keyword.location, span_of(text, "to"));
+                assert_eq!(
+                    name.parent.inner.target_type.location,
+                    span_of(text, "Owner")
+                );
             }
             node => panic!("expected the pointer name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "Owner")) {
-            IsographResolutionNode::TypeName(name) => {
-                match name.parent.parent.reference() {
-                    TypeAnnotationParent::PointerTarget(_) => {}
-                    parent => panic!("expected the pointer-target parent, got {parent:?}"),
-                }
-            }
+            IsographResolutionNode::TypeName(name) => match name.parent.parent.reference() {
+                TypeAnnotationParent::PointerTarget(_) => {}
+                parent => panic!("expected the pointer-target parent, got {parent:?}"),
+            },
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "id")) {
@@ -323,7 +316,7 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
                     SelectionNameParent::Scalar(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
-                match scalar.parent.parent {
+                match scalar.parent {
                     SelectionSetParent::Pointer(_) => {}
                     parent => panic!("expected the pointer at the top, got {parent:?}"),
                 }
@@ -335,5 +328,5 @@ Extending the parse_iso_literal.rs test module. The parse-entrypoint.md test `fi
 
 ## Landing checklist
 
-1. The parse_iso_literal.rs, parse_error.rs, selections.rs, and variables.rs changes, the resolution-node variants, the test deletions, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
-2. Move this doc to refactors/past. The series is complete: every isograph literal form parses, and `UnsupportedDeclarationType` no longer exists.
+1. The parse_iso_literal.rs, parse_error.rs, selections.rs, and variables.rs changes, the resolution-node variants, the test deletion, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. Move this doc to refactors/past.

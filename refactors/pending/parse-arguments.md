@@ -1,10 +1,8 @@
 # parse-arguments: argument lists and values
 
-Third doc of the series parsing-plan.md orders, after parse-fields.md. Selections gain argument lists, and the value grammar arrives: variables, strings, integers, booleans, null, and object literals. parse-variables.md reuses the value grammar for defaults.
+Selections gain argument lists. Values: variables, strings, integers, booleans, null, object literals. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
-
-A selection may carry a paren group between its name and its optional selection set:
 
 ```
 [<Identifier> :] <Identifier> [<paren group>] [<brace group>]
@@ -20,18 +18,14 @@ A value is one of:
 
 ```
 $ <Identifier>          a variable
-"..."                   a string literal (the span includes the quotes)
+"..."                   a string literal (interned source slice, quotes included)
 42, -7                  an integer literal, converted to i64
 true, false             a boolean
 null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-An argument or entry chunk that fails becomes `ArgumentSlot::Unparsed` or `ObjectEntrySlot::Unparsed`; leftover after a successful argument is `ParsedArgument::trailing`. resolve-position-generic-slot.md: `LevelSlot::Unparsed` and `ParsedSlot::trailing`. Siblings parse normally.
-
 ## Changes to parse_error.rs
-
-`ParseError` gains the integer variant, `Expectation` gains three:
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -39,9 +33,7 @@ pub enum ParseError {
     Expected(ExpectedFound),
     EmptyLiteral,
     MultipleDeclarations,
-    /// Temporary: parse-pointers.md removes this variant.
     UnsupportedDeclarationType,
-    /// `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) failed.
     IntegerDoesNotFitI64,
 }
 ```
@@ -49,27 +41,23 @@ pub enum ParseError {
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
 pub enum Expectation {
-    // ... the parse-fields.md variants ...
-    /// One argument: `name: value`.
+    Token(NonBracketTokenKind),
+    DeclarationKeyword,
+    EndOfDeclaration,
+    SelectionSet,
+    Selection,
+    Separator,
     Argument,
-    /// One value: a variable, string, integer, boolean, null, or object literal.
     Value,
-    /// One object-literal entry: `name: value`.
     ObjectEntry,
 }
 ```
-
-The new `Display` arms:
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
             ParseError::IntegerDoesNotFitI64 => {
                 write!(f, "This integer does not fit in a 64-bit signed integer.")
             }
-```
-
-```rust
-// from crates/isograph_parser/src/parse_error.rs
             Expectation::Argument => write!(f, "an argument, like 'id: $id'"),
             Expectation::Value => {
                 write!(f, "a value, like $foo, 42, \"bar\", true, false, null, or an object literal")
@@ -81,50 +69,25 @@ The new `Display` arms:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+use intern::string_key::Intern;
+use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::{Span, WithSpan};
+use span::{WithSpan, WithSpanPostfix};
 
+use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, ItemCursor,
-    ArgumentSlot, LevelSlot, NonBracketTokenKind, ObjectSelectionPath, ParseError,
-    ScalarSelectionPath, SelectionSlot,
+    BracketKind, Expectation, Found, IsographResolutionNode, NonBracketTokenKind,
+    ObjectSelectionPath, ParseError, ScalarSelectionPath, Slot, UnparsedChunkItems,
+    UnparsedChunkItemsParent,
 };
 
-/// The arguments a `( ... )` group holds, one per contentful chunk of its interior.
-/// The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Argument>>>.
-pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<ArgumentSlot>>);
+pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>);
 
-/// Derived stand-in for `LevelSlot<Argument>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ArgumentSlot {
-    Parsed(ParsedArgument),
-    Unparsed(#[resolve_field(parent_variant = ArgumentList)] UnparsedItem),
-}
-
-// resolve-position-generic-slot.md: this is ParsedSlot<Argument>; not a path segment or ResolvedNode variant.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ArgumentListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ParsedArgument {
-    #[resolve_field]
-    pub item: WithSpan<Argument>,
-    pub trailing: Option<WithSpan<ParseError>>,
-}
-
-// resolve-position-generic-slot.md: parent is ArgumentListPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum Argument {
-    Named(NamedArgument),
-}
-
-// resolve-position-generic-slot.md: parent is ArgumentListPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedArgument {
     #[resolve_field]
     pub name: WithSpan<ArgumentName>,
@@ -132,8 +95,6 @@ pub struct NamedArgument {
     pub value: WithSpan<NonConstantValue>,
 }
 
-/// A value in an argument position. The wrapping `WithSpan`'s span covers the whole
-/// value: `$id`, `"..."` with its quotes, `{ ... }` with its braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum NonConstantValue {
@@ -145,29 +106,29 @@ pub enum NonConstantValue {
     Object(ObjectLiteral),
 }
 
-/// `$name`. The dollar's position answers this node; the name is its own leaf.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableUse {
-    pub dollar: WithSpan<Dollar>,
     #[resolve_field]
     pub name: WithSpan<VariableName>,
 }
 
-/// A string literal value; its text, quotes included, is its span.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct StringValue;
+pub struct StringValue(common_lang_types::StringLiteralValue);
 
-/// An integer literal value, converted; the source text is the span.
+impl From<intern::string_key::StringKey> for StringValue {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        StringValue(key.to())
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct IntegerValue(pub i64);
 
-/// `true` or `false`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-/// `true` or `false`. Positions on either keyword answer this leaf.
 pub struct BooleanValue(pub Boolean);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -176,45 +137,18 @@ pub enum Boolean {
     False,
 }
 
-/// `null`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NullValue;
 
-/// The entries a `{ ... }` value holds, one per contentful chunk of its interior.
-/// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<ObjectEntry>>>.
-pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<ObjectEntrySlot>>);
+pub struct ObjectLiteral(
+    #[resolve_field] pub Vec<WithSpan<Slot<NamedObjectEntry, UnparsedChunkItems>>>,
+);
 
-/// Derived stand-in for `LevelSlot<ObjectEntry>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ObjectEntrySlot {
-    Parsed(ParsedObjectEntry),
-    Unparsed(#[resolve_field(parent_variant = ObjectLiteral)] UnparsedItem),
-}
-
-// resolve-position-generic-slot.md: this is ParsedSlot<ObjectEntry>; not a path segment or ResolvedNode variant.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ObjectLiteralPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ParsedObjectEntry {
-    #[resolve_field]
-    pub item: WithSpan<ObjectEntry>,
-    pub trailing: Option<WithSpan<ParseError>>,
-}
-
-// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ObjectEntry {
-    Named(NamedObjectEntry),
-}
-
-// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedObjectEntry {
     #[resolve_field]
     pub name: WithSpan<ObjectEntryName>,
@@ -222,24 +156,35 @@ pub struct NamedObjectEntry {
     pub value: WithSpan<NonConstantValue>,
 }
 
-/// An argument's name. Its text is its span.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NamedArgumentPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ArgumentName;
+pub struct ArgumentName(common_lang_types::FieldArgumentName);
 
-/// A used variable's name, without its dollar. Its text is its span.
+impl From<intern::string_key::StringKey> for ArgumentName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        ArgumentName(key.to())
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableName;
+pub struct VariableName(common_lang_types::VariableName);
 
-/// An object-literal entry's name. Its text is its span.
+impl From<intern::string_key::StringKey> for VariableName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        VariableName(key.to())
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NamedObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ObjectEntryName;
+pub struct ObjectEntryName(common_lang_types::ValueKeyName);
 
-/// The `$` of a variable use. Positions on it answer the variable.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Dollar;
+impl From<intern::string_key::StringKey> for ObjectEntryName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        ObjectEntryName(key.to())
+    }
+}
 
 #[derive(Debug)]
 pub enum ArgumentListParent<'a> {
@@ -251,19 +196,11 @@ pub enum ArgumentListParent<'a> {
 pub enum NonConstantValueParent<'a> {
     Argument(NamedArgumentPath<'a>),
     ObjectEntry(Box<NamedObjectEntryPath<'a>>),
-    // parse-variables.md adds VariableDefault
 }
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
 
-// resolve-position-generic-slot.md: deleted.
-pub type ArgumentSlotPath<'a> = PositionResolutionPath<&'a ArgumentSlot, ArgumentListPath<'a>>;
-
-// resolve-position-generic-slot.md: deleted.
-pub type ParsedArgumentPath<'a> = PositionResolutionPath<&'a ParsedArgument, ArgumentSlotPath<'a>>;
-
-// resolve-position-generic-slot.md: parent is ArgumentListPath.
-pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ParsedArgumentPath<'a>>;
+pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ArgumentListPath<'a>>;
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
 
@@ -277,104 +214,130 @@ pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantVa
 
 pub type ObjectLiteralPath<'a> = PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
-// resolve-position-generic-slot.md: deleted.
-pub type ObjectEntrySlotPath<'a> = PositionResolutionPath<&'a ObjectEntrySlot, ObjectLiteralPath<'a>>;
-
-// resolve-position-generic-slot.md: deleted.
-pub type ParsedObjectEntryPath<'a> = PositionResolutionPath<&'a ParsedObjectEntry, ObjectEntrySlotPath<'a>>;
-
-// resolve-position-generic-slot.md: parent is ObjectLiteralPath.
-pub type NamedObjectEntryPath<'a> = PositionResolutionPath<&'a NamedObjectEntry, ParsedObjectEntryPath<'a>>;
+pub type NamedObjectEntryPath<'a> =
+    PositionResolutionPath<&'a NamedObjectEntry, ObjectLiteralPath<'a>>;
 
 pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, NamedArgumentPath<'a>>;
 
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
 
-pub type ObjectEntryNamePath<'a> = PositionResolutionPath<&'a ObjectEntryName, NamedObjectEntryPath<'a>>;
+pub type ObjectEntryNamePath<'a> =
+    PositionResolutionPath<&'a ObjectEntryName, NamedObjectEntryPath<'a>>;
 ```
 
-`NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`. `UnparsedItemParent` in chunk.rs gains the two new list contexts:
+A position on `$` answers `VariableUse`. There is no `Dollar` field.
+
+`NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-// resolve-position-generic-slot.md: each variant is From the list path for parent_from.
-pub enum UnparsedItemParent<'a> {
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
     SelectionSet(SelectionSetPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
-    // parse-variables.md adds VariableDeclarationList
 }
 ```
 
-The parse functions:
+`From<ArgumentListPath>` and `From<ObjectLiteralPath>` join the existing impls.
+
+`parse_value` is the listing in parsing-standards.md.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn consume_argument_list(
+pub(crate) fn consume_argument_list<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Option<WithSpan<ArgumentList>> {
+    push_error: &mut F,
+) -> Option<WithSpan<ArgumentList>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    ArgumentList(
-        group
-            .item
-            .children
-            .item
-            .parse_items_with_trailing(cursor.text(), parse_argument)
-            // resolve-position-generic-slot.md: this map is gone.
-            .into_iter()
-            .map(WithSpan::<ArgumentSlot>::from)
-            .collect(),
-    )
+    ArgumentList(group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_argument,
+        push_error,
+    ))
     .with_span(group.location)
     .wrap_some()
 }
 
-fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
+fn parse_argument<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<NamedArgument, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Argument))?;
     cursor
         .require_token(NonBracketTokenKind::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let value = parse_value(cursor)?;
-    Argument::Named(NamedArgument {
-        name: ArgumentName.with_span(name),
+    let value = parse_value(cursor, push_error)?;
+    NamedArgument {
+        name: cursor
+            .token_text(name)
+            .intern()
+            .to::<ArgumentName>()
+            .with_span(name),
         value,
-    }).wrap_ok()
+    }
+    .wrap_ok()
 }
 
-fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
+fn parse_object_entry<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<NamedObjectEntry, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::ObjectEntry))?;
     cursor
         .require_token(NonBracketTokenKind::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let value = parse_value(cursor)?;
-    ObjectEntry::Named(NamedObjectEntry {
-        name: ObjectEntryName.with_span(name),
+    let value = parse_value(cursor, push_error)?;
+    NamedObjectEntry {
+        name: cursor
+            .token_text(name)
+            .intern()
+            .to::<ObjectEntryName>()
+            .with_span(name),
         value,
-    }).wrap_ok()
+    }
+    .wrap_ok()
 }
 ```
-
-`parse_value` is the listing in parsing-standards.md (`consume_*` ladder inside `spanning`, `token_text(span).parse()` on the `IntegerLiteral` span, `BooleanValue(Boolean::True)` / `False`).
-
-```rust
-// from crates/isograph_parser/src/chunk_stream.rs
-impl<'a> ItemCursor<'a> {
-    pub(crate) fn spanning<T>(
-        &mut self,
-        parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
-    ) -> Result<WithSpan<T>, WithSpan<ParseError>> { /* parsing-standards.md */ }
-}
-```
-
-`parse_selection` threads the cursor into `consume_argument_list(cursor)` between the name and the selection set. The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted; the suite below replaces it.
 
 ## Changes to selections.rs
 
-Both selection structs gain the argument slot, wrapped for the two containers:
+Before:
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub struct ScalarSelection {
+    #[resolve_field(parent_variant = Scalar)]
+    pub reader_alias: Option<WithSpan<SelectionAlias>>,
+    #[resolve_field(parent_variant = Scalar)]
+    pub name: WithSpan<SelectionName>,
+}
+
+pub struct ObjectSelection {
+    #[resolve_field(parent_variant = Object)]
+    pub reader_alias: Option<WithSpan<SelectionAlias>>,
+    #[resolve_field(parent_variant = Object)]
+    pub name: WithSpan<SelectionName>,
+    #[resolve_field(parent_variant = Object)]
+    pub selection_set: WithSpan<SelectionSet>,
+}
+```
+
+After:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
@@ -399,77 +362,21 @@ pub struct ObjectSelection {
 }
 ```
 
-`parse_selection` consumes the arguments between the name and the selection set:
-
 ```rust
 // from crates/isograph_parser/src/selections.rs
-    let arguments = consume_argument_list(cursor);
-    let selection_set = consume_selection_set(cursor);
+    let arguments = consume_argument_list(cursor, push_error);
+    let selection_set = consume_selection_set(cursor, push_error);
 ```
 
-The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted; the suite below replaces it.
+The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted.
 
-## The errors
-
-The walk extends into arguments and values; an argument list's errors precede the nested selection set's, matching source order.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub(crate) fn collect_selection_set_errors(
-    selection_set: &SelectionSet,
-    errors: &mut Vec<WithSpan<ParseError>>,
-) {
-    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
-    collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
-        Selection::Scalar(scalar) => {
-            collect_argument_errors(scalar.arguments.reference(), errors);
-        }
-        Selection::Object(object) => {
-            collect_argument_errors(object.arguments.reference(), errors);
-            collect_selection_set_errors(object.selection_set.item.reference(), errors);
-        }
-    }, errors);
-}
-```
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-pub(crate) fn collect_argument_errors(
-    arguments: &Option<WithSpan<ArgumentList>>,
-    errors: &mut Vec<WithSpan<ParseError>>,
-) {
-    let Some(arguments) = arguments else {
-        return;
-    };
-    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
-    collect_argument_slot_errors(arguments.item.0.reference(), |argument, errors| match argument {
-        Argument::Named(named) => collect_value_errors(named.value.item.reference(), errors),
-    }, errors);
-}
-
-pub(crate) fn collect_value_errors(
-    value: &NonConstantValue,
-    errors: &mut Vec<WithSpan<ParseError>>,
-) {
-    let NonConstantValue::Object(object) = value else {
-        return;
-    };
-    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
-    collect_object_entry_slot_errors(object.0.reference(), |entry, errors| match entry {
-        ObjectEntry::Named(named) => collect_value_errors(named.value.item.reference(), errors),
-    }, errors);
-}
-```
+`lib.rs` adds `mod arguments;` and `pub use arguments::*;`.
 
 ## The resolution surface
-
-`IsographResolutionNode` gains:
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     ArgumentList(ArgumentListPath<'a>),
-    // resolve-position-generic-slot.md: deleted.
-    ParsedArgument(ParsedArgumentPath<'a>),
     NamedArgument(NamedArgumentPath<'a>),
     ArgumentName(ArgumentNamePath<'a>),
     VariableUse(VariableUsePath<'a>),
@@ -479,111 +386,60 @@ pub(crate) fn collect_value_errors(
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
-    // resolve-position-generic-slot.md: deleted.
-    ParsedObjectEntry(ParsedObjectEntryPath<'a>),
     NamedObjectEntry(NamedObjectEntryPath<'a>),
     ObjectEntryName(ObjectEntryNamePath<'a>),
 ```
 
-## Generated code
-
-The value enum delegates every variant with the parent passed through:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for NonConstantValue {
-    type Parent<'a> = NonConstantValueParent<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        match self {
-            NonConstantValue::Variable(inner) => inner.resolve(parent, position),
-            NonConstantValue::String(inner) => inner.resolve(parent, position),
-            NonConstantValue::Integer(inner) => inner.resolve(parent, position),
-            NonConstantValue::Boolean(inner) => inner.resolve(parent, position),
-            NonConstantValue::Null(inner) => inner.resolve(parent, position),
-            NonConstantValue::Object(inner) => inner.resolve(parent, position),
-        }
-    }
-}
-```
-
-A named argument mixes a bare descent (the name's parent is the argument's own path) with a wrapped one (the value's parent enum names its context):
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for NamedArgument {
-    type Parent<'a> = ArgumentListPath<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        if self.name.location.contains(position) {
-            let new_parent = self.path(parent);
-            return self.name.item.resolve(new_parent, position);
-        }
-        if self.value.location.contains(position) {
-            let new_parent = <NonConstantValue as ::resolve_position::ResolvePosition>::Parent::Argument(self.path(parent).to());
-            return self.value.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::NamedArgument(self.path(parent).to());
-    }
-}
-```
-
-A payload-carrying leaf resolves to itself, its unmarked payload never descended into:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for IntegerValue {
-    type Parent<'a> = NonConstantValueParent<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        return Self::ResolvedNode::IntegerValue(self.path(parent).to());
-    }
-}
-```
-
-`ArgumentList`, `ObjectLiteral`, and the enums `Argument` and `ObjectEntry` expand like parse-fields.md's `SelectionSet` and `Selection`; `VariableUse` like `EntrypointDeclaration` (one marked field); `NamedObjectEntry` like `NamedArgument` with the `ObjectEntry` variant, whose payload boxes through `From<T> for Box<T>`; the remaining leaves like `EntityName`.
+`ArgumentList` and `ObjectLiteral` expand like `SelectionSet`. `NamedArgument` mixes a bare name descent with a wrapped value descent (`parent_variant = Argument`). `NamedObjectEntry` is the same with `ObjectEntry`, boxed through `From<T> for Box<T>`. `NonConstantValue` delegates. `VariableUse` has one marked field. `IntegerValue` / `BooleanValue` / `StringValue` / `NullValue` are leaves. A position on `$` answers `VariableUse`.
 
 ## Tests
 
-Extending the parse_iso_literal.rs test module, with its existing helpers.
-
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs (test module)
-    // resolve-position-generic-slot.md: helpers and matches below take LevelSlot<T>.
-    fn arguments_of(slot: &SelectionSlot) -> &WithSpan<ArgumentList> {
-        let arguments = match slot {
-            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
-                Selection::Scalar(scalar) => scalar.arguments.reference(),
-                Selection::Object(object) => object.arguments.reference(),
-            },
-            slot => panic!("expected a parsed selection, got {slot:?}"),
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    fn arguments_of(slot: &Slot<Selection, UnparsedChunkItems>) -> &WithSpan<ArgumentList> {
+        let arguments = match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
+            Some(Selection::Scalar(scalar)) => scalar.arguments.reference(),
+            Some(Selection::Object(object)) => object.arguments.reference(),
+            None => panic!("expected a parsed selection"),
         };
-        arguments.as_ref().expect("the fixture's selection carries arguments")
+        arguments
+            .as_ref()
+            .expect("the fixture's selection carries arguments")
     }
 
-    fn as_named_argument(slot: &ArgumentSlot) -> &NamedArgument {
-        match slot {
-            ArgumentSlot::Parsed(parsed) => match parsed.item.item.reference() {
-                Argument::Named(named) => named,
-            },
-            slot => panic!("expected a named argument, got {slot:?}"),
-        }
+    fn as_named_argument(slot: &Slot<NamedArgument, UnparsedChunkItems>) -> &NamedArgument {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a named argument")
     }
 
     #[test]
     fn arguments_parse_on_scalar_and_object_selections() {
         let text = "field Query.Foo { pet(id: $petId) { name(shouted: true) } }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
-        let outer_selection = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let outer_selection = selections(as_field(parse.reference()).selection_set.reference())[0]
+            .item
+            .reference();
         let outer = arguments_of(outer_selection);
         assert_eq!(outer.location, span_of(text, "(id: $petId)"));
-        assert_eq!(as_named_argument(outer.item.0[0].item.reference()).name.location, span_of(text, "id"));
+        assert_eq!(
+            as_named_argument(outer.item.0[0].item.reference())
+                .name
+                .location,
+            span_of(text, "id")
+        );
+        assert_eq!(
+            as_named_argument(outer.item.0[0].item.reference())
+                .name
+                .item,
+            "id".intern().to()
+        );
         let object = as_object(outer_selection);
-        let inner_selection = selections(object.selection_set.reference())[0].item.reference();
+        let inner_selection = selections(object.selection_set.reference())[0]
+            .item
+            .reference();
         let inner = arguments_of(inner_selection);
         assert_eq!(inner.location, span_of(text, "(shouted: true)"));
     }
@@ -591,9 +447,13 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
     #[test]
     fn each_value_kind_parses() {
         let text = r#"field Query.Foo { bar(a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null) }"#;
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let arguments = arguments_of(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
         let values: Vec<&NonConstantValue> = arguments
             .item
             .0
@@ -602,13 +462,27 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
             .collect();
         assert!(matches!(values[0], NonConstantValue::Variable(_)));
         assert!(matches!(values[1], NonConstantValue::String(_)));
-        assert!(matches!(values[2], NonConstantValue::Integer(IntegerValue(42))));
-        assert!(matches!(values[3], NonConstantValue::Integer(IntegerValue(-7))));
-        assert!(matches!(values[4], NonConstantValue::Boolean(BooleanValue(Boolean::True))));
-        assert!(matches!(values[5], NonConstantValue::Boolean(BooleanValue(Boolean::False))));
+        assert!(matches!(
+            values[2],
+            NonConstantValue::Integer(IntegerValue(42))
+        ));
+        assert!(matches!(
+            values[3],
+            NonConstantValue::Integer(IntegerValue(-7))
+        ));
+        assert!(matches!(
+            values[4],
+            NonConstantValue::Boolean(BooleanValue(Boolean::True))
+        ));
+        assert!(matches!(
+            values[5],
+            NonConstantValue::Boolean(BooleanValue(Boolean::False))
+        ));
         assert!(matches!(values[6], NonConstantValue::Null(_)));
         assert_eq!(
-            as_named_argument(arguments.item.0[0].item.reference()).value.location,
+            as_named_argument(arguments.item.0[0].item.reference())
+                .value
+                .location,
             span_of(text, "$x")
         );
     }
@@ -616,128 +490,114 @@ Extending the parse_iso_literal.rs test module, with its existing helpers.
     #[test]
     fn object_literal_values_nest() {
         let text = "field Query.Foo { bar(input: { id: 4, nested: { on: true } }) }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let arguments = arguments_of(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
         let value = as_named_argument(arguments.item.0[0].item.reference()).value.reference();
-        assert_eq!(value.location, span_of(text, "{ id: 4, nested: { on: true } }"));
+        assert_eq!(
+            value.location,
+            span_of(text, "{ id: 4, nested: { on: true } }")
+        );
         let object = match value.item.reference() {
             NonConstantValue::Object(object) => object,
             value => panic!("expected an object literal, got {value:?}"),
         };
         assert_eq!(object.0.len(), 2);
-        let nested = match object.0[1].item.reference() {
-            ObjectEntrySlot::Parsed(parsed) => match parsed.item.item.reference() {
-                ObjectEntry::Named(named) => named,
-            },
-            entry => panic!("expected a named entry, got {entry:?}"),
-        };
+        let nested = as_named_object_entry(object.0[1].item.reference());
         assert_eq!(nested.name.location, span_of(text, "nested"));
+    }
+
+    fn as_named_object_entry(slot: &Slot<NamedObjectEntry, UnparsedChunkItems>) -> &NamedObjectEntry {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a named object entry")
     }
 
     #[test]
     fn empty_argument_lists_parse() {
         let text = "field Query.Foo { bar() }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
-        assert_eq!(arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference()).item.0.len(), 0);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            arguments_of(
+                selections(as_field(parse.reference()).selection_set.reference())[0]
+                    .item
+                    .reference()
+            )
+            .item
+            .0
+            .len(),
+            0
+        );
     }
 
     #[test]
     fn integer_overflow_is_a_typed_error_on_that_argument() {
         let text = "field Query.Foo { bar(a: 99999999999999999999, b: 1) }";
-        let parse = parsed(text);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        let unparsed = match arguments.item.0[0].item.reference() {
-            ArgumentSlot::Unparsed(unparsed) => unparsed,
-            argument => panic!("expected an unparsed argument, got {argument:?}"),
-        };
-        assert_eq!(unparsed.reason.item, ParseError::IntegerDoesNotFitI64);
-        assert_eq!(unparsed.reason.location, span_of(text, "99999999999999999999"));
+        let (parse, errors) = parsed(text);
+        let arguments = arguments_of(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
+        assert!(arguments.item.0[0].item.item.is_none());
         as_named_argument(arguments.item.0[1].item.reference());
-        assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
+        assert!(errors.iter().any(|error| {
+            error.item == ParseError::IntegerDoesNotFitI64
+                && error.location == span_of(text, "99999999999999999999")
+        }));
     }
 
     #[test]
     fn a_malformed_argument_degrades_that_argument_alone() {
         let text = "field Query.Foo { bar(a 1, b: 2) }";
-        let parse = parsed(text);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        let unparsed = match arguments.item.0[0].item.reference() {
-            ArgumentSlot::Unparsed(unparsed) => unparsed,
-            argument => panic!("expected an unparsed argument, got {argument:?}"),
-        };
-        assert_eq!(
-            unparsed.reason.item,
-            expected(token(NonBracketTokenKind::Colon), Found::Token(IntegerLiteral))
+        let (parse, errors) = parsed(text);
+        let arguments = arguments_of(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
         );
-        assert_eq!(as_named_argument(arguments.item.0[1].item.reference()).name.location, span_of(text, "b"));
+        assert!(arguments.item.0[0].item.item.is_none());
+        assert_eq!(
+            as_named_argument(arguments.item.0[1].item.reference())
+                .name
+                .location,
+            span_of(text, "b")
+        );
+        assert!(errors.iter().any(|error| {
+            error.item
+                == expected(
+                    token(NonBracketTokenKind::Colon),
+                    Found::Token(IntegerLiteral),
+                )
+        }));
     }
 
     #[test]
     fn a_non_value_identifier_is_an_error_at_the_value() {
         let text = "field Query.Foo { bar(a: yes) }";
-        let parse = parsed(text);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        let unparsed = match arguments.item.0[0].item.reference() {
-            ArgumentSlot::Unparsed(unparsed) => unparsed,
-            argument => panic!("expected an unparsed argument, got {argument:?}"),
-        };
-        assert_eq!(
-            unparsed.reason.item,
-            expected(Expectation::Value, Found::Token(Identifier))
+        let (parse, errors) = parsed(text);
+        let arguments = arguments_of(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
         );
-        assert_eq!(unparsed.reason.location, span_of(text, "yes"));
-    }
-
-    #[test]
-    fn a_doubled_comma_between_arguments_is_chunkings_error() {
-        let text = "field Query.Foo { bar(a: 1,, b: 2) }";
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
-        assert!(bracket_errors.is_empty());
-        assert_eq!(comma_errors.len(), 1);
-        let arguments = arguments_of(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        assert_eq!(arguments.item.0.len(), 2);
-        as_named_argument(arguments.item.0[0].item.reference());
-        as_named_argument(arguments.item.0[1].item.reference());
-        assert_eq!(parse.item.errors(), vec![]);
-    }
-
-    #[test]
-    fn value_positions_resolve_to_value_leaves() {
-        let text = "field Query.Foo { bar(a: $petId, input: { id: 4 }) }";
-        let parse = parsed(text);
-        match parse.resolve((), span_of(text, "petId")) {
-            IsographResolutionNode::VariableName(name) => {
-                match name.parent.parent.reference() {
-                    NonConstantValueParent::Argument(argument) => {
-                        assert_eq!(argument.inner.name.location, span_of(text, "a"));
-                    }
-                    parent => panic!("expected an argument parent, got {parent:?}"),
-                }
-            }
-            node => panic!("expected the variable name leaf, got {node:?}"),
-        }
-        match parse.resolve((), span_of(text, "4")) {
-            IsographResolutionNode::IntegerValue(value) => {
-                assert_eq!(value.inner.0, 4);
-                match value.parent.reference() {
-                    NonConstantValueParent::ObjectEntry(entry) => {
-                        assert_eq!(entry.inner.name.location, span_of(text, "id"));
-                    }
-                    parent => panic!("expected an object-entry parent, got {parent:?}"),
-                }
-            }
-            node => panic!("expected the integer leaf, got {node:?}"),
-        }
-        match parse.resolve((), span_of(text, "$")) {
-            IsographResolutionNode::VariableUse(_) => {}
-            node => panic!("expected the variable use, got {node:?}"),
-        }
+        assert!(arguments.item.0[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item == expected(Expectation::Value, Found::Token(Identifier))
+                && error.location == span_of(text, "yes")
+        }));
     }
 ```
 
+A doubled comma between arguments is chunking's error, same shape as the selection-set test. A leftover token after a complete argument is `extra_tokens` plus `Expected(Separator, ...)`. A position on `$` in `$petId` answers `VariableUse`. A position on `petId` answers `VariableName`.
+
 ## Landing checklist
 
-1. arguments.rs, the selections.rs and parse_iso_literal.rs and parse_error.rs changes, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. arguments.rs, the selections.rs and parse_error.rs changes, the resolution-node variants, the deleted leftover-arguments test, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

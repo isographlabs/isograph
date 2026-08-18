@@ -1,10 +1,8 @@
 # parse-variables: variable declarations and type annotations
 
-Fourth doc of the series parsing-plan.md orders, after parse-arguments.md. Field declarations gain variable-declaration lists, and the type-annotation grammar arrives; parse-pointers.md reuses it for `to` targets. Defaults reuse parse-arguments.md's value grammar with variables rejected.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults reuse parse-arguments.md's value grammar with variables rejected.
 
 ## The grammar this doc accepts
-
-The declaration header may carry a paren group between the field name and the selection set:
 
 ```
 field <Identifier> . <Identifier> [<paren group>] <brace group>
@@ -22,15 +20,12 @@ A type is a name with an optional `!`, or a bracket group holding exactly one ty
 Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
 ```
 
-A default value is a `ConstantValue` (parsing-standards.md): the same scalar and object forms as a value, with `$` rejected at the `$`. `DeclaredVariable::default_value` cannot hold a variable.
+A default value is a `ConstantValue`: the same scalar and object forms as a value, with `$` rejected at the `$`.
 
 ## Change 1: `Box` delegation in resolve_position
 
-`ListTypeAnnotation` stores its element type boxed, so the blanket the located wrapper already has extends to boxes. This is a crate feature, per the no-manual-impls invariant:
-
 ```rust
 // from crates/resolve_position/src/lib.rs
-/// A boxed node resolves as the node: recursion in a tree boxes storage, never meaning.
 impl<T: ResolvePosition> ResolvePosition for Box<T> {
     type Parent<'a>
         = T::Parent<'a>
@@ -47,23 +42,14 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 }
 ```
 
-## Changes to parse_error.rs
-
-`Expectation` gains four variants and their `Display` arms:
+## Change 2: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-pub enum Expectation {
-    // ... the earlier docs' variants ...
-    /// One variable declaration: `$name: Type`, with an optional default.
     VariableDeclaration,
-    /// One type: a name, a name with `!`, or a bracketed list type.
     TypeAnnotation,
-    /// A value containing no variable, at any depth.
     ConstantValue,
-    /// The type is complete; nothing further belongs to it.
     EndOfType,
-}
 ```
 
 ```rust
@@ -80,58 +66,74 @@ pub enum Expectation {
             Expectation::EndOfType => write!(f, "the end of the type"),
 ```
 
+## Change 3: `ExtraChunksParent`
+
+`ExtraChunks` sits on the root singleton and on a `[...]` type. Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
+
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug)]
+pub enum ExtraChunksParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
+    ListType(ListTypeAnnotationPath<'a>),
+}
+
+#[resolve_position(parent_type = ExtraChunksParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
+
+pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, ExtraChunksParent<'a>>;
+
+impl<'a> From<IsoLiteralParsePath<'a>> for ExtraChunksParent<'a> {
+    fn from(parent: IsoLiteralParsePath<'a>) -> Self {
+        ExtraChunksParent::Literal(parent)
+    }
+}
+
+impl<'a> From<ListTypeAnnotationPath<'a>> for ExtraChunksParent<'a> {
+    fn from(parent: ListTypeAnnotationPath<'a>) -> Self {
+        ExtraChunksParent::ListType(parent)
+    }
+}
+```
+
+Root `Singleton.extra_chunks` respells to `#[resolve_field(parent_from)]`.
+
 ## New module: variables.rs
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
+use intern::string_key::Intern;
+use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use safe_peekable::IntoSafePeekable;
-use span::{Span, WithSpan};
+use span::{Span, WithSpan, WithSpanPostfix};
 
+use crate::chunk_stream::ItemCursor;
 use crate::{
-    parse_constant_value, parse_singleton, BracketKind, ChunkContentItem, ChunkedLevel,
-    ClientFieldDeclarationPath, Dollar, Expectation, Found, IsographResolutionNode, ItemCursor,
-    LevelSlot, NonBracketTokenKind, ParseError, VariableName,
+    parse_constant_value, parse_singleton, BracketKind, ChunkedLevel, ClientFieldDeclarationPath,
+    Expectation, ExtraChunks, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
+    Slot, UnparsedChunkItems, UnparsedChunkItemsParent, VariableName,
 };
 
-/// The variable declarations a header's `( ... )` group holds, one per contentful chunk
-/// of its interior. The wrapping `WithSpan`'s span covers the parens.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<VariableDeclaration>>>.
-pub struct VariableDeclarationList(#[resolve_field] pub Vec<WithSpan<VariableDeclarationSlot>>);
+pub struct VariableDeclarationList(
+    #[resolve_field] pub Vec<WithSpan<Slot<DeclaredVariable, UnparsedChunkItems>>>,
+);
 
-/// Derived stand-in for `LevelSlot<VariableDeclaration>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum VariableDeclarationSlot {
-    Parsed(ParsedVariableDeclaration),
-    Unparsed(#[resolve_field(parent_variant = VariableDeclarationList)] UnparsedItem),
-}
-
-// resolve-position-generic-slot.md: this is ParsedSlot<VariableDeclaration>; not a path segment or ResolvedNode variant.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ParsedVariableDeclaration {
-    #[resolve_field]
-    pub item: WithSpan<VariableDeclaration>,
-    pub trailing: Option<WithSpan<ParseError>>,
-}
-
-// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum VariableDeclaration {
-    Declaration(DeclaredVariable),
-}
-
-/// `$name: Type = default`. The dollar's position answers this node.
-// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedVariableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct DeclaredVariable {
-    pub dollar: WithSpan<Dollar>,
     #[resolve_field(parent_variant = Declaration)]
     pub name: WithSpan<VariableName>,
     #[resolve_field(parent_variant = Variable)]
@@ -140,7 +142,6 @@ pub struct DeclaredVariable {
     pub default_value: Option<WithSpan<ConstantValue>>,
 }
 
-/// A type. The wrapping `WithSpan`'s span covers the name or brackets plus any `!`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum TypeAnnotation {
@@ -153,48 +154,38 @@ pub enum TypeAnnotation {
 pub struct NamedTypeAnnotation {
     #[resolve_field]
     pub name: WithSpan<TypeName>,
-    pub exclamation: Option<WithSpan<Exclamation>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ListTypeAnnotation {
-    /// The wrapped span covers the bracket group.
     #[resolve_field(parent_variant = List)]
-    pub inner: WithSpan<Box<TypeAnnotation>>,
-    pub exclamation: Option<WithSpan<Exclamation>>,
+    pub inner: WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>,
+    #[resolve_field(parent_from)]
+    pub extra_chunks: Option<WithSpan<ExtraChunks>>,
 }
 
-/// A type's name. Its text is its span.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NamedTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct TypeName;
+pub struct TypeName(common_lang_types::EntityName);
 
-/// A `!` on a type. Positions on it answer the annotation.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct Exclamation;
+impl From<intern::string_key::StringKey> for TypeName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        TypeName(key.to())
+    }
+}
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
     Variable(DeclaredVariablePath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
-    // parse-pointers.md adds PointerTarget
 }
 
 pub type VariableDeclarationListPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationList, ClientFieldDeclarationPath<'a>>;
 
-// resolve-position-generic-slot.md: deleted.
-pub type VariableDeclarationSlotPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationSlot, VariableDeclarationListPath<'a>>;
-
-// resolve-position-generic-slot.md: deleted.
-pub type ParsedVariableDeclarationPath<'a> =
-    PositionResolutionPath<&'a ParsedVariableDeclaration, VariableDeclarationSlotPath<'a>>;
-
-// resolve-position-generic-slot.md: parent is VariableDeclarationListPath.
 pub type DeclaredVariablePath<'a> =
-    PositionResolutionPath<&'a DeclaredVariable, ParsedVariableDeclarationPath<'a>>;
+    PositionResolutionPath<&'a DeclaredVariable, VariableDeclarationListPath<'a>>;
 
 pub type NamedTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NamedTypeAnnotation, TypeAnnotationParent<'a>>;
@@ -205,9 +196,11 @@ pub type ListTypeAnnotationPath<'a> =
 pub type TypeNamePath<'a> = PositionResolutionPath<&'a TypeName, NamedTypeAnnotationPath<'a>>;
 ```
 
-`TypeAnnotationParent::List` is boxed to break the cycle `TypeAnnotationParent -> ListTypeAnnotationPath -> TypeAnnotationParent`. `VariableDeclarationList`'s parent stays a direct alias until parse-pointers.md adds the second parent.
+A position on `$` answers `DeclaredVariable`. A position on `!` answers the annotation (`NamedTypeAnnotation` or `ListTypeAnnotation`). There is no `Exclamation` field. Non-null is part of the annotation's spanning span, not a stored marker.
 
-`VariableName` moves from a direct parent to an enum, since a variable name is now a use or a declaration; in arguments.rs, `VariableUse`'s `name` field respells to `#[resolve_field(parent_variant = Use)]`. Before:
+`TypeAnnotationParent::List` is boxed to break the cycle.
+
+`VariableName` gains a second parent. Before:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -227,43 +220,63 @@ pub enum VariableNameParent<'a> {
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableNameParent<'a>>;
 ```
 
-`UnparsedItemParent` in chunk.rs gains `VariableDeclarationList(VariableDeclarationListPath<'a>)`. resolve-position-generic-slot.md: that variant is `From` the list path for `parent_from`. `ConstantValue` and `parse_constant_value` land in arguments.rs (parsing-standards.md). `ConstantValueParent` is:
+`VariableUse`'s `name` field respells to `#[resolve_field(parent_variant = Use)]`.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
+    SelectionSet(SelectionSetPath<'a>),
+    ArgumentList(ArgumentListPath<'a>),
+    ObjectLiteral(ObjectLiteralPath<'a>),
+    VariableDeclarationList(VariableDeclarationListPath<'a>),
+    ListType(ListTypeAnnotationPath<'a>),
+}
+```
+
+`From` impls for the two new variants.
+
+`ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+#[derive(Debug)]
 pub enum ConstantValueParent<'a> {
     VariableDefault(DeclaredVariablePath<'a>),
     ConstantObjectEntry(Box<NamedConstantObjectEntryPath<'a>>),
 }
 ```
 
-The parse functions:
+`ConstantValue` mirrors `NonConstantValue` without `Variable`. An object default uses `Slot<NamedConstantObjectEntry, UnparsedChunkItems>`.
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-pub(crate) fn consume_variable_declaration_list(
+pub(crate) fn consume_variable_declaration_list<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Option<WithSpan<VariableDeclarationList>> {
+    push_error: &mut F,
+) -> Option<WithSpan<VariableDeclarationList>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    VariableDeclarationList(
-        group
-            .item
-            .children
-            .item
-            .parse_items_with_trailing(cursor.text(), parse_variable_declaration)
-            // resolve-position-generic-slot.md: this map is gone.
-            .into_iter()
-            .map(WithSpan::<VariableDeclarationSlot>::from)
-            .collect(),
-    )
+    VariableDeclarationList(group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_variable_declaration,
+        push_error,
+    ))
     .with_span(group.location)
     .wrap_some()
 }
 
-fn parse_variable_declaration(
+fn parse_variable_declaration<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Result<VariableDeclaration, WithSpan<ParseError>> {
-    let dollar = cursor
+    push_error: &mut F,
+) -> Result<DeclaredVariable, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    cursor
         .require_token(NonBracketTokenKind::Dollar)
         .map_err(|()| cursor.expected(Expectation::VariableDeclaration))?;
     let name = cursor
@@ -272,57 +285,79 @@ fn parse_variable_declaration(
     cursor
         .require_token(NonBracketTokenKind::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let type_annotation = parse_type_annotation(cursor)?;
+    let type_annotation = parse_type_annotation(cursor, push_error)?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals) {
-        Some(_) => parse_constant_value(cursor)?.wrap_some(),
+        Some(_) => parse_constant_value(cursor, push_error)?.wrap_some(),
         None => None,
     };
-    VariableDeclaration::Declaration(DeclaredVariable {
-        dollar: Dollar.with_span(dollar),
-        name: VariableName.with_span(name),
+    DeclaredVariable {
+        name: cursor
+            .token_text(name)
+            .intern()
+            .to::<VariableName>()
+            .with_span(name),
         type_annotation,
         default_value,
-    }).wrap_ok()
+    }
+    .wrap_ok()
 }
 
-pub(crate) fn parse_type_annotation(
+pub(crate) fn parse_type_annotation<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
+    push_error: &mut F,
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     cursor.spanning(|cursor| {
         if let Some(name) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
-            let exclamation = cursor
-                .consume_token_if(NonBracketTokenKind::Exclamation)
-                .map(|span| Exclamation.with_span(span));
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation);
             return TypeAnnotation::Named(NamedTypeAnnotation {
-                name: TypeName.with_span(name),
-                exclamation,
-            }).wrap_ok();
+                name: cursor
+                    .token_text(name)
+                    .intern()
+                    .to::<TypeName>()
+                    .with_span(name),
+            })
+            .wrap_ok();
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
-            let inner = parse_bracket_interior_type(cursor.text(), group.item.children.reference())?;
-            let exclamation = cursor
-                .consume_token_if(NonBracketTokenKind::Exclamation)
-                .map(|span| Exclamation.with_span(span));
+            let (inner, extra_chunks) =
+                parse_bracket_interior_type(cursor.text(), group.item.children.reference(), push_error)?;
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation);
             return TypeAnnotation::List(ListTypeAnnotation {
-                inner: inner.item.boxed().with_span(group.location),
-                exclamation,
-            }).wrap_ok();
+                inner,
+                extra_chunks,
+            })
+            .wrap_ok();
         }
         cursor.expected(Expectation::TypeAnnotation).wrap_err()
     })
 }
 
-fn parse_bracket_interior_type(
+fn parse_bracket_interior_type<F>(
     text: &str,
     level: &WithSpan<ChunkedLevel>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
-    parse_singleton(
+    push_error: &mut F,
+) -> Result<
+    (
+        WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>,
+        Option<WithSpan<ExtraChunks>>,
+    ),
+    WithSpan<ParseError>,
+>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    if level.item.len() == 0 {
+        return ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
+            .with_span(Span::new(level.location.end, level.location.end))
+            .wrap_err();
+    }
+    let singleton = parse_singleton(
         level,
         text,
-        || {
-            ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
-                .with_span(Span::new(level.location.end, level.location.end))
-        },
+        Expectation::EndOfType,
         |extra| {
             ParseError::expected(
                 Expectation::EndOfType,
@@ -330,21 +365,42 @@ fn parse_bracket_interior_type(
             )
             .with_span(extra.location)
         },
-        parse_type_annotation,
-    )
+        |cursor, push_error| parse_type_annotation(cursor, push_error).map(|wrapped| wrapped.item),
+        push_error,
+    );
+    (singleton.item, singleton.extra_chunks).wrap_ok()
 }
 ```
 
-`Chunk::first_item` lands here, the listing in parsing-standards.md.
+`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_one_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt. Extra interior chunks sit on `extra_chunks`.
+
+`[Pet,]` is `inner.item: Some(Pet)` plus `push_error(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
+
+`[Pet\n!]` is `inner.item: Some(Pet)` plus `extra_chunks` for `!` and `push_error(Expected(EndOfType, ...))`. The `!` does not attach to `Pet`.
+
+Empty `[]` is `Expected(TypeAnnotation, EndOfChunk)` and fails `parse_type_annotation`, so the enclosing variable declaration is `item: None`.
 
 ## Changes to parse_iso_literal.rs
 
-`ClientFieldDeclaration` gains the slot between the name and the selection set, bare-marked because the list's parent is the declaration's own path:
+Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub struct ClientFieldDeclaration {
-    pub field_keyword: WithSpan<FieldKeyword>,
+    #[resolve_field(parent_variant = Field)]
+    pub parent_type: WithSpan<EntityName>,
+    #[resolve_field(parent_variant = Field)]
+    pub client_field_name: WithSpan<ClientFieldName>,
+    #[resolve_field(parent_variant = Field)]
+    pub selection_set: WithSpan<SelectionSet>,
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub struct ClientFieldDeclaration {
     #[resolve_field(parent_variant = Field)]
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field(parent_variant = Field)]
@@ -356,91 +412,31 @@ pub struct ClientFieldDeclaration {
 }
 ```
 
-`parse_field`, between the name and the selection set:
-
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    let variable_definitions = consume_variable_declaration_list(cursor);
-    let selection_set = require_selection_set(cursor)?;
+    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
+    let selection_set = require_selection_set(cursor, push_error)?;
 ```
 
-`errors()`'s field arm walks the variables before the selection set, matching source order:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-            IsoLiteralParse::Field(declaration) => {
-                let mut errors = Vec::new();
-                collect_variable_errors(&declaration.variable_definitions, &mut errors);
-                collect_selection_set_errors(&declaration.selection_set.item, &mut errors);
-                errors
-            }
-```
-
-```rust
-// from crates/isograph_parser/src/variables.rs
-pub(crate) fn collect_variable_errors(
-    declarations: &Option<WithSpan<VariableDeclarationList>>,
-    errors: &mut Vec<WithSpan<ParseError>>,
-) {
-    let Some(declarations) = declarations else {
-        return;
-    };
-    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
-    collect_variable_declaration_slot_errors(declarations.item.0.reference(), |declaration, errors| {
-        match declaration {
-            VariableDeclaration::Declaration(declared) => {
-                if let Some(default) = declared.default_value.reference() {
-                    crate::collect_constant_value_errors(default.item.reference(), errors);
-                }
-            }
-        }
-    }, errors);
-}
-```
+`lib.rs` adds `mod variables;` and `pub use variables::*;`.
 
 ## The resolution surface
-
-`IsographResolutionNode` gains:
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     VariableDeclarationList(VariableDeclarationListPath<'a>),
-    // resolve-position-generic-slot.md: deleted.
-    ParsedVariableDeclaration(ParsedVariableDeclarationPath<'a>),
     DeclaredVariable(DeclaredVariablePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
     TypeName(TypeNamePath<'a>),
 ```
 
-## Generated code
-
-The novel expansion is the boxed recursive field; the blanket impl from Change 1 carries the delegation:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for ListTypeAnnotation {
-    type Parent<'a> = TypeAnnotationParent<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        if self.inner.location.contains(position) {
-            let new_parent = <Box<TypeAnnotation> as ::resolve_position::ResolvePosition>::Parent::List(self.path(parent).to());
-            return self.inner.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::ListTypeAnnotation(self.path(parent).to());
-    }
-}
-```
-
-`<Box<TypeAnnotation>>::Parent` is `TypeAnnotation`'s parent through the blanket, and `self.path(parent).into()` boxes through `From<T> for Box<T>`. Every other new type expands per the earlier docs' patterns: `VariableDeclarationList` like `SelectionSet`, `VariableDeclaration` like `Selection`, `DeclaredVariable` and `NamedTypeAnnotation` like `NamedArgument` (bare and wrapped descents; the unmarked `dollar` and `exclamation` fields answer their containers), `TypeAnnotation` like `NonConstantValue`, `TypeName` like `EntityName`.
+The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` expands like `SelectionSet`. `DeclaredVariable` like `NamedArgument`. `TypeAnnotation` like `NonConstantValue`. `TypeName` like `EntityName`.
 
 ## Tests
 
-Extending the parse_iso_literal.rs test module.
-
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs (test module)
+// from crates/isograph_parser/src/parse_iso_literal.rs
     fn variables_of(parse: &WithSpan<IsoLiteralParse>) -> &WithSpan<VariableDeclarationList> {
         as_field(parse)
             .variable_definitions
@@ -448,29 +444,27 @@ Extending the parse_iso_literal.rs test module.
             .expect("the fixture's declaration carries variable definitions")
     }
 
-    // resolve-position-generic-slot.md: helpers and matches below take LevelSlot<VariableDeclaration>.
-    fn as_declared(slot: &VariableDeclarationSlot) -> &DeclaredVariable {
-        match slot {
-            VariableDeclarationSlot::Parsed(parsed) => match parsed.item.item.reference() {
-                VariableDeclaration::Declaration(declared) => declared,
-            },
-            slot => panic!("expected a declared variable, got {slot:?}"),
-        }
+    fn as_declared(slot: &Slot<DeclaredVariable, UnparsedChunkItems>) -> &DeclaredVariable {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a declared variable")
     }
 
     #[test]
     fn a_multi_line_variable_list_parses_in_the_demo_style() {
         let text = "field Query.PetCheckinListRoute(\n  $id: ID !\n) {\n  pets\n}";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 1);
         let declared = as_declared(variables.item.0[0].item.reference());
+        assert_eq!(declared.name.item, "id".intern().to());
         assert_eq!(declared.name.location, span_of(text, "id"));
         match declared.type_annotation.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "ID"));
-                assert!(named.exclamation.is_some());
+                assert_eq!(declared.type_annotation.location, span_of(text, "ID !"));
             }
             annotation => panic!("expected a named type, got {annotation:?}"),
         }
@@ -479,20 +473,25 @@ Extending the parse_iso_literal.rs test module.
     #[test]
     fn list_types_nest_with_non_null_markers() {
         let text = "field Query.Foo($pets: [Pet!]!) { bar }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(declared.type_annotation.location, span_of(text, "[Pet!]!"));
         let list = match declared.type_annotation.item.reference() {
             TypeAnnotation::List(list) => list,
             annotation => panic!("expected a list type, got {annotation:?}"),
         };
-        assert!(list.exclamation.is_some());
-        assert_eq!(list.inner.location, span_of(text, "[Pet!]"));
-        match list.inner.item.as_ref() {
+        assert!(list.extra_chunks.is_none());
+        let inner = list
+            .inner
+            .item
+            .item
+            .as_ref()
+            .expect("the list holds an element type");
+        match inner.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "Pet"));
-                assert!(named.exclamation.is_some());
+                assert_eq!(inner.location, span_of(text, "Pet!"));
             }
             annotation => panic!("expected the named element type, got {annotation:?}"),
         }
@@ -501,101 +500,92 @@ Extending the parse_iso_literal.rs test module.
     #[test]
     fn defaults_parse_and_reject_variables_at_any_depth() {
         let text = "field Query.Foo($limit: Int = 10) { bar }";
-        let parse = parsed(text);
-        assert_eq!(parse.item.errors(), vec![]);
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
-        let default = declared.default_value.as_ref().expect("the fixture declares a default");
-        assert!(matches!(default.item, ConstantValue::Integer(IntegerValue(10))));
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        assert!(matches!(
+            default.item,
+            ConstantValue::Integer(IntegerValue(10))
+        ));
 
         let shallow = "field Query.Foo($limit: Int = $other) { bar }";
-        let parse = parsed(shallow);
-        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(
-            unparsed.item,
-            expected(Expectation::ConstantValue, Found::Token(NonBracketTokenKind::Dollar))
+        let (parse, errors) = parsed(shallow);
+        assert!(
+            variables_of(parse.reference()).item.0[0]
+                .item
+                .item
+                .is_none()
         );
-        assert_eq!(unparsed.location, span_of(shallow, "$other"));
+        assert!(errors.iter().any(|error| {
+            error.item
+                == expected(
+                    Expectation::ConstantValue,
+                    Found::Token(NonBracketTokenKind::Dollar),
+                )
+                && error.location == span_of(shallow, "$")
+        }));
 
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
-        let parse = parsed(deep);
-        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(unparsed.location, span_of(deep, "$pet"));
+        let (parse, errors) = parsed(deep);
+        assert!(errors.iter().any(|error| error.location == span_of(deep, "$")));
     }
 
     #[test]
     fn each_malformed_variable_declaration_degrades_alone() {
         let text = "field Query.Foo($a Int, $b: , id: ID, $c: Float) { bar }";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 4);
-        let missing_colon = match variables.item.0[0].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(
-            missing_colon.item,
-            expected(token(NonBracketTokenKind::Colon), Found::Token(Identifier))
-        );
-        assert_eq!(missing_colon.location, span_of(text, "Int"));
-        let missing_type = match variables.item.0[1].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(
-            missing_type.item,
-            expected(Expectation::TypeAnnotation, Found::EndOfChunk)
-        );
-        let dollarless = match variables.item.0[2].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
-        assert_eq!(
-            dollarless.item,
-            expected(Expectation::VariableDeclaration, Found::Token(Identifier))
-        );
+        assert!(variables.item.0[0].item.item.is_none());
+        assert!(variables.item.0[1].item.item.is_none());
+        assert!(variables.item.0[2].item.item.is_none());
         as_declared(variables.item.0[3].item.reference());
-        assert_eq!(parse.item.errors().len(), 3);
+        assert_eq!(errors.len(), 3);
+        assert_eq!(errors[0].location, span_of(text, "Int"));
+        assert!(errors[1].item == expected(Expectation::TypeAnnotation, Found::EndOfChunk));
+        assert_eq!(errors[2].location, span_of(text, "id"));
     }
 
     #[test]
-    fn a_final_comma_inside_a_list_type_degrades_that_declaration() {
+    fn a_final_comma_inside_a_list_type_is_end_of_type() {
         let text = "field Query.Foo($pets: [Pet,]) { bar }";
-        let parse = parsed(text);
-        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
-        };
+        let (parse, errors) = parsed(text);
+        as_declared(variables_of(parse.reference()).item.0[0].item.reference());
         assert_eq!(
-            unparsed.item,
-            expected(Expectation::EndOfDeclaration, Found::Token(Comma))
+            errors,
+            expected(Expectation::EndOfType, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
-        assert_eq!(unparsed.location, span_of(text, ","));
     }
 
     #[test]
-    fn a_line_break_inside_a_list_type_degrades_that_declaration() {
+    fn a_line_break_inside_a_list_type_is_an_extra_chunk() {
         let text = "field Query.Foo($pets: [Pet\n!]) { bar }";
-        let parse = parsed(text);
-        let unparsed = match variables_of(parse.reference()).item.0[0].item.reference() {
-            VariableDeclarationSlot::Unparsed(unparsed) => unparsed.reason,
-            declaration => panic!("expected an unparsed declaration, got {declaration:?}"),
+        let (parse, errors) = parsed(text);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let list = match declared.type_annotation.item.reference() {
+            TypeAnnotation::List(list) => list,
+            annotation => panic!("expected a list type, got {annotation:?}"),
         };
-        assert_eq!(
-            unparsed.item,
-            expected(Expectation::EndOfType, Found::Token(NonBracketTokenKind::Exclamation))
-        );
+        assert!(list.extra_chunks.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == expected(
+                    Expectation::EndOfType,
+                    Found::Token(NonBracketTokenKind::Exclamation),
+                )
+        }));
     }
 
     #[test]
     fn type_names_resolve_through_their_annotation_ancestry() {
         let text = "field Query.Foo($pets: [Pet]) { bar }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Pet")) {
             IsographResolutionNode::TypeName(name) => {
                 let list = match name.parent.parent.reference() {
@@ -622,6 +612,6 @@ Extending the parse_iso_literal.rs test module.
 
 ## Landing checklist
 
-1. The resolve_position blanket impl; `cargo test -p resolve_position` passes.
-2. variables.rs, the arguments.rs, selections.rs, parse_iso_literal.rs, and parse_error.rs changes, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
+2. variables.rs, `ExtraChunksParent`, `ConstantValue`, the ClientFieldDeclaration slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

@@ -1,10 +1,8 @@
 # parse-fields: field declarations and selection sets
 
-Second doc of the series parsing-plan.md orders, after parse-entrypoint.md. It lands `field Type.name { ... }` declarations, selection sets with scalar and object selections and aliases, per-item degradation via `SelectionSlot` / `UnparsedItem` (resolve-position-generic-slot.md: `LevelSlot<Selection>`), `parse_items` / `parse_items_with_trailing`, `require_group` / `consume_group_if`, `spanning`, and the parent-enum conversions that second parents force. The alias colon is `consume_token_if`, already on `ItemCursor` from parse-entrypoint.md. Arguments are not parsed until parse-arguments.md: a paren group after a selection name is that selection's trailing leftover.
+`field Type.name { ... }` declarations and selection sets. Lands `parse_items` and the generic `Slot` impl the lists use.
 
 ## The grammar this doc accepts
-
-The declaration chunk:
 
 ```
 field <Identifier> . <Identifier> <brace group>
@@ -16,144 +14,315 @@ The brace group is required and is the last item of the chunk. Each contentful c
 [<Identifier> :] <Identifier> [<brace group>]
 ```
 
-The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. A selection chunk that fails to parse becomes `SelectionSlot::Unparsed`, holding the reason and its chunk; leftover after a successful selection is `ParsedSelection::trailing`. resolve-position-generic-slot.md: `LevelSlot::Unparsed` and `ParsedSlot::trailing`. Sibling selections and the declaration parse normally. Declaration-header failures still degrade the whole literal, as in parse-entrypoint.md.
+The leading identifier is the alias when a colon follows, the name otherwise. A selection with a brace group is an object selection whose interior recurses; without one it is a scalar selection. Arguments are not parsed: a paren group after a selection name is that selection's leftover.
 
-## Changes to chunk.rs
+## Change 1: generic `Slot`
 
-Three changes, all listed here because parse code and resolution depend on them.
+`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<Selection, UnparsedChunkItems>`. Drop `self_type_generics`. Both fields use `parent_from`. `Slot` is not a path segment and is not a `ResolvedNode` variant.
 
-1. The chunk tree becomes cloneable, so an unparsed item can own the chunk it covers while the rest of the tree is dropped. `Clone` joins the derive lists of `ChunkedLevel`, `Chunk`, `ChunkContentItem`, `ChunkedGroup`, and `ChunkSeparator` (their contents are already `Copy`).
-
-2. `Chunk`'s parent becomes an enum: a chunk sits in a level, or it is the payload of an unparsed item. Before:
-
-   ```rust
-   // from crates/isograph_parser/src/chunk.rs
-   pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
-   ```
-
-   After:
-
-   ```rust
-   // from crates/isograph_parser/src/chunk.rs
-   #[derive(Debug)]
-   pub enum ChunkParent<'a> {
-       Level(ChunkedLevelPath<'a>),
-       UnparsedItem(UnparsedItemPath<'a>),
-   }
-
-   pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
-   ```
-
-   No box: `UnparsedItemPath` reaches `ChunkPath` only through `SelectionSetParent::Object`, which is already boxed.
-
-3. `ChunkedLevel`'s field wraps the parent in the new variant. Before:
-
-   ```rust
-   // from crates/isograph_parser/src/chunk.rs
-   pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
-   ```
-
-   After:
-
-   ```rust
-   // from crates/isograph_parser/src/chunk.rs
-   pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] pub Vec<WithSpan<Chunk>>);
-   ```
-
-Every other derive site names `ChunkPath` through the alias and is untouched. The chunk.rs and parse_iso_literal.rs tests that walked `chunk_path.parent.parent` now pattern through `ChunkParent::Level`; the test modules gain one helper and the affected matches respell:
+Before:
 
 ```rust
-// from crates/isograph_parser/src/chunk.rs (test module; parse_iso_literal.rs gets the same helper)
-    fn level_of<'a>(parent: &'a ChunkParent<'a>) -> &'a ChunkedLevelPath<'a> {
-        match parent {
-            ChunkParent::Level(level) => level,
-            parent => panic!("expected a level parent, got {parent:?}"),
-        }
-    }
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = IsoLiteralParsePath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+)]
+pub struct Slot<T, E> {
+    #[resolve_field]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field]
+    pub extra_tokens: Option<WithSpan<E>>,
+}
 ```
 
-The affected tests are `an_unmatched_open_resolves_with_the_host_chunk_as_parent`, `an_unmatched_close_at_the_root_resolves_with_the_root_level`, `an_ordinary_token_resolves_to_its_own_leaf`, and `resolution_walks_ancestry_against_source_text` in chunk.rs, and the two `..._resolve_through_the_chunk_tree` / `..._resolves_under_the_unparsed_literal` tests in parse_iso_literal.rs, whose `token.parent.parent.parent` becomes `level_of(&token.parent.parent).parent`.
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum IsoLiteralItem {
+    Entrypoint(EntrypointDeclaration),
+}
 
-## Changes to parse_error.rs
+#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntrypointDeclaration { /* ... */ }
 
-`Expectation` gains three variants and their `Display` arms:
+pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
+
+pub type SlotPath<'a> =
+    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    Slot(SlotPath<'a>),
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = <T as ResolvePosition>::Parent<'a>,
+    resolved_node = IsographResolutionNode<'a>
+)]
+pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
+    #[resolve_field(parent_from)]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field(parent_from)]
+    pub extra_tokens: Option<WithSpan<E>>,
+}
+
+#[derive(Debug)]
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
+}
+
+#[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnparsedChunkItems(
+    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+);
+
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+
+impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: IsoLiteralParsePath<'a>) -> Self {
+        UnparsedChunkItemsParent::Literal(parent)
+    }
+}
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum IsoLiteralItem {
+    Entrypoint(EntrypointDeclaration),
+}
+
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct EntrypointDeclaration { /* fields unchanged */ }
+
+pub type EntrypointDeclarationPath<'a> =
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
+```
+
+`SlotPath` is deleted. `IsographResolutionNode::Slot` is deleted. `IsoLiteralItem` and `UnparsedChunkItems` import `UnparsedChunkItemsParent` in place of `SlotPath`.
+
+`#[resolve_field(parent_from)]` on a struct field is accepted. Emission is `From::from(parent)`. A struct that has a `parent_from` field has no container fallback (same as a `transparent` field).
+
+The `FromParent` error on struct fields is deleted.
+
+Before:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::FromParent | ParentConstruction::Transparent => Error::new_spanned(
+            inner_type,
+            "`parent_from` and `transparent` do not build a field parent",
+        )
+        .to_compile_error(),
+```
+
+After:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::FromParent => quote!(::std::convert::From::from(parent)),
+        ParentConstruction::Transparent => Error::new_spanned(
+            inner_type,
+            "`transparent` does not build a field parent",
+        )
+        .to_compile_error(),
+```
+
+Fallback suppression treats `FromParent` like `Transparent`:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let fallback = if field_infos.iter().any(|info| {
+        matches!(
+            info.parent_construction,
+            ParentConstruction::Transparent | ParentConstruction::FromParent
+        )
+    }) {
+        quote!()
+    } else {
+        quote! {
+            return Self::ResolvedNode::#struct_name(self.path(parent).into());
+        }
+    };
+```
+
+Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+                let leftover_span =
+                    Span::join(remaining.first().location, remaining.last().location);
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+                let leftover_span = Span::new(item.location.end, remaining.last().location.end);
+```
+
+Generated `Slot`:
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl<T, E> ::resolve_position::ResolvePosition for Slot<T, E>
+where
+    T: ::resolve_position::ResolvePosition<ResolvedNode<'static> = IsographResolutionNode<'static>>,
+    E: ::resolve_position::ResolvePosition<ResolvedNode<'static> = IsographResolutionNode<'static>>,
+{
+    type Parent<'a>
+        = <T as ::resolve_position::ResolvePosition>::Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+        = IsographResolutionNode<'a>
+    where
+        Self: 'a;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        for item in self.item.iter() {
+            if item.location.contains(position) {
+                let new_parent = ::std::convert::From::from(parent);
+                return item.item.resolve(new_parent, position);
+            }
+        }
+        for item in self.extra_tokens.iter() {
+            if item.location.contains(position) {
+                let new_parent = ::std::convert::From::from(parent);
+                return item.item.resolve(new_parent, position);
+            }
+        }
+    }
+}
+```
+
+The derive does not write `'static`. It writes `type ResolvedNode<'a> = IsographResolutionNode<'a> where Self: 'a` and keeps `T: ResolvePosition` / `E: ResolvePosition` only if the type states those bounds. Add the bounds on `Slot`:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
+```
+
+`where Self: 'a` on the associated types makes `parent_type = <T as ResolvePosition>::Parent<'a>` legal.
+
+Entrypoint tests keep passing. A leftover token still resolves to `NonBracketToken`. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still resolves `Query` / `foo` / `entrypoint` / `.` the same way. `token.parent` inside leftover is `ChunkContentItemParent::Unparsed`; that path's parent is `UnparsedChunkItemsParent::Literal`.
+
+## Change 2: `parse_items`
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+impl ChunkedLevel {
+    pub(crate) fn parse_items<'a, P, F>(
+        &'a self,
+        text: &'a str,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
+        push_error: &mut F,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
+    where
+        F: FnMut(WithSpan<ParseError>),
+    {
+        self.0
+            .iter()
+            .map(|chunk| {
+                parse_one_item(
+                    chunk,
+                    text,
+                    leftover,
+                    |cursor, push_error| parse_item(cursor, push_error),
+                    push_error,
+                )
+            })
+            .collect()
+    }
+}
+```
+
+A list trailing comma is legal and is not a diagnostic. Length equals chunk count.
+
+## Change 3: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
 pub enum Expectation {
+    #[error("{0}")]
     Token(NonBracketTokenKind),
+    #[error("one of `entrypoint`, `field`, or `pointer`")]
     DeclarationKeyword,
+    #[error("the end of the declaration")]
     EndOfDeclaration,
-    /// A `{ ... }` group holding selections.
+    #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
-    /// One selection: `name`, `alias: name`, with or without a nested selection set.
+    #[error("a field selection")]
     Selection,
-    /// The item is complete; only a comma or line break may follow.
+    #[error("a comma or line break")]
     Separator,
 }
 ```
 
-```rust
-// from crates/isograph_parser/src/parse_error.rs
-            Expectation::SelectionSet => write!(f, "a selection set, like '{{ id, name }}'"),
-            Expectation::Selection => write!(f, "a field selection"),
-            Expectation::Separator => write!(f, "a comma or line break"),
-```
+`Separator` already exists. `SelectionSet` and `Selection` land here.
 
-## Changes to parse_iso_literal.rs
+## Change 4: `IsoLiteralItem::Field`
 
-`IsoLiteralParse` gains the field variant; dispatch stops treating `field` as unsupported. Before:
+Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum IsoLiteralParse {
+pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
-    Unparsed(UnparsedLiteral),
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        text if text == "entrypoint" => {
-            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
-        }
-        text if text == "field" || text == "pointer" => {
-            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
-        }
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" | "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
 ```
 
 After:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum IsoLiteralParse {
+pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
     Field(ClientFieldDeclaration),
-    Unparsed(UnparsedLiteral),
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-        text if text == "entrypoint" => {
-            IsoLiteralParse::Entrypoint(parse_entrypoint(keyword, cursor)?).wrap_ok()
-        }
-        text if text == "field" => IsoLiteralParse::Field(parse_field(keyword, cursor)?).wrap_ok(),
-        text if text == "pointer" => {
-            ParseError::UnsupportedDeclarationType.with_span(keyword).wrap_err()
-        }
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
+        "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
 ```
 
-The parse-entrypoint.md test `field_and_pointer_declarations_do_not_parse_yet` narrows to its pointer case (parse-pointers.md deletes it entirely).
-
-The declaration type and its parse function live here beside the entrypoint's:
+The test `field_and_pointer_declarations_do_not_parse_yet` narrows to its pointer case.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = (), resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ClientFieldDeclaration {
-    pub field_keyword: WithSpan<FieldKeyword>,
     #[resolve_field(parent_variant = Field)]
     pub parent_type: WithSpan<EntityName>,
     #[resolve_field(parent_variant = Field)]
@@ -162,17 +331,15 @@ pub struct ClientFieldDeclaration {
     pub selection_set: WithSpan<SelectionSet>,
 }
 
-/// The `field` keyword. Positions on it answer the declaration.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub struct FieldKeyword;
-
-pub type ClientFieldDeclarationPath<'a> = PositionResolutionPath<&'a ClientFieldDeclaration, ()>;
+pub type ClientFieldDeclarationPath<'a> =
+    PositionResolutionPath<&'a ClientFieldDeclaration, IsoLiteralParsePath<'a>>;
 ```
+
+There is no `FieldKeyword`. A position on `field` answers `ClientFieldDeclaration`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 fn parse_field(
-    keyword: Span,
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
     let parent_type = cursor
@@ -186,22 +353,28 @@ fn parse_field(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
-        field_keyword: FieldKeyword.with_span(keyword),
-        parent_type: EntityName.with_span(parent_type),
-        client_field_name: ClientFieldName.with_span(client_field_name),
+        parent_type: cursor
+            .token_text(parent_type)
+            .intern()
+            .to::<EntityName>()
+            .with_span(parent_type),
+        client_field_name: cursor
+            .token_text(client_field_name)
+            .intern()
+            .to::<ClientFieldName>()
+            .with_span(client_field_name),
         selection_set,
-    }.wrap_ok()
+    }
+    .wrap_ok()
 }
 ```
 
-`parse_field` does not call `require_end`. `parse_singleton` matches `len()` first, then on one chunk calls `require_end` and `boundary_comma`. `errors()` gains the field arm (listed with `collect_selection_set_errors` below).
-
-The two names' parents become enums, since a name now sits under an entrypoint or a field declaration. Before:
+`EntityName` and `ClientFieldName` gain a second parent. Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName;
+pub struct EntityName(common_lang_types::EntityName);
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 ```
@@ -211,7 +384,7 @@ After (and identically for `ClientFieldName` with `ClientFieldNameParent`):
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 #[resolve_position(parent_type = EntityNameParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName;
+pub struct EntityName(common_lang_types::EntityName);
 
 #[derive(Debug)]
 pub enum EntityNameParent<'a> {
@@ -224,55 +397,40 @@ pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntityNameP
 
 `EntrypointDeclaration`'s two marked fields respell from bare `#[resolve_field]` to `#[resolve_field(parent_variant = Entrypoint)]`.
 
-## New module: selections.rs
+The resolve test `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` matches `name.parent.inner.client_field_name` through `EntityNameParent::Entrypoint`.
+
+## Change 5: `selections.rs`
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
+use intern::string_key::Intern;
+use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
-use span::{Span, WithSpan};
+use span::{WithSpan, WithSpanPostfix};
 
+use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, Chunk, ClientFieldDeclarationPath, Expectation, IsographResolutionNode,
-    ItemCursor, LevelSlot, NonBracketTokenKind, ParseError, ParsedSlot, SelectionSlot,
-    UnparsedItem, UnparsedItemParent,
+    BracketKind, ClientFieldDeclarationPath, Expectation, ExtraChunks, IsoLiteralParsePath,
+    IsographResolutionNode, NonBracketTokenKind, ParseError, Slot, UnparsedChunkItems,
+    UnparsedChunkItemsParent,
 };
 
-/// The selections a `{ ... }` group holds, one per chunk of its interior.
-/// The wrapping `WithSpan`'s span covers the braces.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-// resolve-position-generic-slot.md: the field is Vec<WithSpan<LevelSlot<Selection>>>.
-pub struct SelectionSet(#[resolve_field] pub Vec<WithSpan<SelectionSlot>>);
+pub struct SelectionSet(
+    #[resolve_field] pub Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
+);
 
-/// Derived stand-in for `LevelSlot<Selection>`. resolve-position-generic-slot.md.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum SelectionSlot {
-    Parsed(ParsedSelection),
-    Unparsed(#[resolve_field(parent_variant = SelectionSet)] UnparsedItem),
-}
-
-// resolve-position-generic-slot.md: this is ParsedSlot<Selection>; not a path segment or ResolvedNode variant.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ParsedSelection {
-    #[resolve_field]
-    pub item: WithSpan<Selection>,
-    pub trailing: Option<WithSpan<ParseError>>,
-}
-
-// resolve-position-generic-slot.md: parent is SelectionSetPath.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum Selection {
     Scalar(ScalarSelection),
     Object(ObjectSelection),
 }
 
-// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ScalarSelection {
     #[resolve_field(parent_variant = Scalar)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
@@ -280,9 +438,8 @@ pub struct ScalarSelection {
     pub name: WithSpan<SelectionName>,
 }
 
-// resolve-position-generic-slot.md: parent is SelectionSetPath.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ParsedSelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = SelectionSetPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectSelection {
     #[resolve_field(parent_variant = Object)]
     pub reader_alias: Option<WithSpan<SelectionAlias>>,
@@ -292,21 +449,30 @@ pub struct ObjectSelection {
     pub selection_set: WithSpan<SelectionSet>,
 }
 
-/// The name a selection selects. Its text is its span.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionNameParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionName;
+pub struct SelectionName(common_lang_types::SelectableName);
 
-/// The alias before the colon in `alias: name`. Its text is its span.
+impl From<intern::string_key::StringKey> for SelectionName {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        SelectionName(key.to())
+    }
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionAliasParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionAlias;
+pub struct SelectionAlias(common_lang_types::SelectableAlias);
+
+impl From<intern::string_key::StringKey> for SelectionAlias {
+    fn from(key: intern::string_key::StringKey) -> Self {
+        SelectionAlias(key.to())
+    }
+}
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
     Field(ClientFieldDeclarationPath<'a>),
     Object(Box<ObjectSelectionPath<'a>>),
-    // parse-pointers.md adds Pointer
 }
 
 #[derive(Debug)]
@@ -323,83 +489,80 @@ pub enum SelectionAliasParent<'a> {
 
 pub type SelectionSetPath<'a> = PositionResolutionPath<&'a SelectionSet, SelectionSetParent<'a>>;
 
-// resolve-position-generic-slot.md: deleted.
-pub type SelectionSlotPath<'a> = PositionResolutionPath<&'a SelectionSlot, SelectionSetPath<'a>>;
+pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, SelectionSetPath<'a>>;
 
-// resolve-position-generic-slot.md: deleted.
-pub type ParsedSelectionPath<'a> = PositionResolutionPath<&'a ParsedSelection, SelectionSlotPath<'a>>;
-
-// resolve-position-generic-slot.md: parent is SelectionSetPath.
-pub type ScalarSelectionPath<'a> = PositionResolutionPath<&'a ScalarSelection, ParsedSelectionPath<'a>>;
-
-// resolve-position-generic-slot.md: parent is SelectionSetPath.
-pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, ParsedSelectionPath<'a>>;
-
-pub type UnparsedItemPath<'a> = PositionResolutionPath<&'a UnparsedItem, UnparsedItemParent<'a>>;
+pub type ObjectSelectionPath<'a> = PositionResolutionPath<&'a ObjectSelection, SelectionSetPath<'a>>;
 
 pub type SelectionNamePath<'a> = PositionResolutionPath<&'a SelectionName, SelectionNameParent<'a>>;
 
 pub type SelectionAliasPath<'a> = PositionResolutionPath<&'a SelectionAlias, SelectionAliasParent<'a>>;
 ```
 
-`LevelSlot`, `ParsedSlot`, `UnparsedItem`, `UnparsedItemParent`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `SelectionSlot`, `ParsedSelection`, and the `From<WithSpan<LevelSlot<Selection>>>` conversion are the listings in parsing-standards.md; they land here. resolve-position-generic-slot.md: the slot, wrapper, and `From` go away.
+`SelectionSetParent::Object` is boxed to break the cycle `SelectionSetPath -> ObjectSelectionPath -> SelectionSetPath`. The derive's `parent.into()` converts through `From<T> for Box<T>`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-#[derive(Debug)]
-// resolve-position-generic-slot.md: each variant is From the list path for parent_from.
-pub enum UnparsedItemParent<'a> {
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
     SelectionSet(SelectionSetPath<'a>),
-    // parse-arguments.md adds ArgumentList and ObjectLiteral,
-    // parse-variables.md adds VariableDeclarationList
+}
+
+impl<'a> From<SelectionSetPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: SelectionSetPath<'a>) -> Self {
+        UnparsedChunkItemsParent::SelectionSet(parent)
+    }
 }
 ```
 
-The `SelectionSetParent::Object` payload is boxed to break the cycle `SelectionSetPath -> ObjectSelectionPath -> SelectionSetPath`, exactly as `ChunkedLevelParent::Interior` does; the derive's `parent.into()` converts through the std `From<T> for Box<T>`.
-
-The parse functions (the shapes parsing-standards.md writes):
+`Selection: ResolvePosition<Parent = SelectionSetPath>`, so `Slot<Selection, UnparsedChunkItems>::Parent` is `SelectionSetPath`. `From<SelectionSetPath> for SelectionSetPath` is identity (the `item` field). `From<SelectionSetPath> for UnparsedChunkItemsParent` is the `SelectionSet` variant (the `extra_tokens` field).
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-pub(crate) fn require_selection_set(
+pub(crate) fn require_selection_set<F>(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
+    push_error: &mut F,
+) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
-    SelectionSet(
-        group
-            .item
-            .children
-            .item
-            .parse_items_with_trailing(cursor.text(), parse_selection)
-            // resolve-position-generic-slot.md: this map is gone.
-            .into_iter()
-            .map(WithSpan::<SelectionSlot>::from)
-            .collect(),
-    )
+    SelectionSet(group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_selection,
+        push_error,
+    ))
     .with_span(group.location)
     .wrap_ok()
 }
 
-fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
+fn consume_selection_set<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Option<WithSpan<SelectionSet>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    SelectionSet(
-        group
-            .item
-            .children
-            .item
-            .parse_items_with_trailing(cursor.text(), parse_selection)
-            // resolve-position-generic-slot.md: this map is gone.
-            .into_iter()
-            .map(WithSpan::<SelectionSlot>::from)
-            .collect(),
-    )
+    SelectionSet(group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_selection,
+        push_error,
+    ))
     .with_span(group.location)
     .wrap_some()
 }
 
-fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
+fn parse_selection<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<Selection, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
     let first = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Selection))?;
@@ -407,69 +570,90 @@ fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<Pa
         Some(_) => {
             let name = cursor
                 .require_token(NonBracketTokenKind::Identifier)
-                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+                .map_err(|()| {
+                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+                })?;
             (
-                SelectionAlias.with_span(first).wrap_some(),
-                SelectionName.with_span(name),
+                cursor
+                    .token_text(first)
+                    .intern()
+                    .to::<SelectionAlias>()
+                    .with_span(first)
+                    .wrap_some(),
+                cursor
+                    .token_text(name)
+                    .intern()
+                    .to::<SelectionName>()
+                    .with_span(name),
             )
         }
-        None => (None, SelectionName.with_span(first)),
+        None => (
+            None,
+            cursor
+                .token_text(first)
+                .intern()
+                .to::<SelectionName>()
+                .with_span(first),
+        ),
     };
-    let selection_set = consume_selection_set(cursor);
-    (match selection_set {
+    let selection_set = consume_selection_set(cursor, push_error);
+    match selection_set {
         Some(selection_set) => Selection::Object(ObjectSelection {
             reader_alias,
             name,
             selection_set,
         }),
         None => Selection::Scalar(ScalarSelection { reader_alias, name }),
-    }).wrap_ok()
+    }
+    .wrap_ok()
 }
 ```
 
-`parse_selection` does not call `require_end`. `parse_items_with_trailing` wraps it in `spanning` and records leftover as `ParsedSelection::trailing`. resolve-position-generic-slot.md: `ParsedSlot::trailing`.
-
-## The errors
-
-`errors()` walks the field declaration's tree; nested selection sets recurse. In source order, because selections are stored in source order.
+`parse_field` threads `push_error` into `require_selection_set`. `parse_iso_literal_item` already receives `push_error` from `parse_singleton` and ignores it (`|cursor, _|`). After this doc it is `|cursor, push_error| parse_iso_literal_item(cursor, push_error)`, and `parse_field` / `parse_entrypoint` take `&mut F` only as far as they call a nested list. `parse_entrypoint` stays `|cursor, _|`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-impl IsoLiteralParse {
-    /// Every error the pass produced, in source order.
-    pub fn errors(&self) -> Vec<WithSpan<ParseError>> {
-        match self {
-            IsoLiteralParse::Entrypoint(_) => vec![],
-            IsoLiteralParse::Field(declaration) => {
-                let mut errors = Vec::new();
-                collect_selection_set_errors(declaration.selection_set.item.reference(), &mut errors);
-                errors
-            }
-            IsoLiteralParse::Unparsed(unparsed) => unparsed.reason.wrap_vec(),
-        }
+fn parse_iso_literal_item<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<IsoLiteralItem, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    let keyword = cursor
+        .require_token(NonBracketTokenKind::Identifier)
+        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
+    match cursor.token_text(keyword) {
+        "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
+        "field" => IsoLiteralItem::Field(parse_field(cursor, push_error)?).wrap_ok(),
+        "pointer" => ParseError::UnsupportedDeclarationType
+            .with_span(keyword)
+            .wrap_err(),
+        _ => ParseError::expected(
+            Expectation::DeclarationKeyword,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(keyword)
+        .wrap_err(),
     }
 }
-```
 
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub(crate) fn collect_selection_set_errors(
-    selection_set: &SelectionSet,
-    errors: &mut Vec<WithSpan<ParseError>>,
-) {
-    // resolve-position-generic-slot.md: one walk over LevelSlot; the per-list copies go away.
-    collect_selection_slot_errors(selection_set.0.reference(), |selection, errors| match selection {
-        Selection::Scalar(_) => {}
-        Selection::Object(object) => {
-            collect_selection_set_errors(object.selection_set.item.reference(), errors)
-        }
-    }, errors);
+fn parse_field<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<ClientFieldDeclaration, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    /* header tokens as above */
+    let selection_set = require_selection_set(cursor, push_error)?;
+    /* interned names as above */
 }
 ```
 
-## The resolution surface
+`lib.rs` adds `mod selections;` and `pub use selections::*;`.
 
-`IsographResolutionNode` gains the new leaves:
+## The resolution surface
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
@@ -479,202 +663,75 @@ pub(crate) fn collect_selection_set_errors(
     ObjectSelection(ObjectSelectionPath<'a>),
     SelectionName(SelectionNamePath<'a>),
     SelectionAlias(SelectionAliasPath<'a>),
-    UnparsedItem(UnparsedItemPath<'a>),
-    // resolve-position-generic-slot.md: deleted.
-    ParsedSelection(ParsedSelectionPath<'a>),
 ```
 
-Positions on a chunk's trailing separator inside a parsed selection set answer the `SelectionSet` leaf: a parsed item's span covers only its chunk's contents, so the separator falls through to the container. The chunk-stage `ChunkSeparator` leaf remains reachable only inside unparsed regions.
+`Slot` is gone. A position on a list comma or on whitespace inside a selection set answers `SelectionSet`. A leftover token answers `NonBracketToken` through `UnparsedChunkItemsParent::SelectionSet`. A failed selection chunk is the same walk; the whole chunk's items sit in `extra_tokens`.
 
-## Generated code
-
-The novel shapes, expanded. `SelectionSlot` delegates `Parsed` and wraps `Unparsed`'s parent:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-// resolve-position-generic-slot.md: this impl is the generic LevelSlot emit.
-impl ::resolve_position::ResolvePosition for SelectionSlot {
-    type Parent<'a> = SelectionSetPath<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        match self {
-            SelectionSlot::Parsed(inner) => inner.resolve(parent, position),
-            SelectionSlot::Unparsed(inner) => inner.resolve(
-                <UnparsedItem as ::resolve_position::ResolvePosition>::Parent::SelectionSet(parent.to()),
-                position,
-            ),
-        }
-    }
-}
-```
-
-The enum delegates two variants:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for Selection {
-    // resolve-position-generic-slot.md: Parent is SelectionSetPath.
-    type Parent<'a> = ParsedSelectionPath<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        match self {
-            Selection::Scalar(inner) => inner.resolve(parent, position),
-            Selection::Object(inner) => inner.resolve(parent, position),
-        }
-    }
-}
-```
-
-The vec field iterates, each hit descending with the container's path:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for SelectionSet {
-    type Parent<'a> = SelectionSetParent<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        for item in self.0.iter() {
-            if item.location.contains(position) {
-                let new_parent = self.path(parent);
-                return item.item.resolve(new_parent, position);
-            }
-        }
-        return Self::ResolvedNode::SelectionSet(self.path(parent).to());
-    }
-}
-```
-
-The unparsed item descends into its chunk through the chunk tree's new parent variant:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for UnparsedItem {
-    type Parent<'a> = UnparsedItemParent<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        if self.chunk.location.contains(position) {
-            let new_parent = <Chunk as ::resolve_position::ResolvePosition>::Parent::UnparsedItem(self.path(parent).to());
-            return self.chunk.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::UnparsedItem(self.path(parent).to());
-    }
-}
-```
-
-The object selection's set field boxes on the way in:
-
-```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl ::resolve_position::ResolvePosition for ObjectSelection {
-    // resolve-position-generic-slot.md: Parent is SelectionSetPath.
-    type Parent<'a> = ParsedSelectionPath<'a>;
-    type ResolvedNode<'a> = IsographResolutionNode<'a>;
-
-    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: ::span::Span) -> Self::ResolvedNode<'a> {
-        for item in self.reader_alias.iter() {
-            if item.location.contains(position) {
-                let new_parent = <SelectionAlias as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
-                return item.item.resolve(new_parent, position);
-            }
-        }
-        if self.name.location.contains(position) {
-            let new_parent = <SelectionName as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
-            return self.name.item.resolve(new_parent, position);
-        }
-        if self.selection_set.location.contains(position) {
-            let new_parent = <SelectionSet as ::resolve_position::ResolvePosition>::Parent::Object(self.path(parent).to());
-            return self.selection_set.item.resolve(new_parent, position);
-        }
-        return Self::ResolvedNode::ObjectSelection(self.path(parent).to());
-    }
-}
-```
-
-`ClientFieldDeclaration` and `ScalarSelection` expand like `EntrypointDeclaration` with `parent_variant` wrapping; `SelectionName` and `SelectionAlias` are fieldless leaves like `EntityName`. All follow parse-entrypoint.md's expansions with the names substituted.
+`SelectionSet` iterates the vec, each hit descending with the container's path. `Selection` delegates. `ObjectSelection` / `ScalarSelection` / `ClientFieldDeclaration` expand like `EntrypointDeclaration` with `parent_variant` wrapping. `SelectionName` and `SelectionAlias` are interned-key leaves like `EntityName`.
 
 ## Tests
 
-The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expected`, `assert_unparsed`, `level_of`) are shared.
+Extending the `parse_iso_literal.rs` test module. Helpers `parsed`, `parsed_with_errors`, `span_of`, `expected`, `token`, `first_slot`, `parsed_item` stay.
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs (test module)
+// from crates/isograph_parser/src/parse_iso_literal.rs
     fn as_field(parse: &WithSpan<IsoLiteralParse>) -> &ClientFieldDeclaration {
-        match parse.item.reference() {
-            IsoLiteralParse::Field(declaration) => declaration,
-            parse => panic!("expected a field declaration, got {parse:?}"),
+        match parsed_item(parse).expect("the fixture's literal parsed an item") {
+            IsoLiteralItem::Field(declaration) => declaration,
+            item => panic!("expected a field declaration, got {item:?}"),
         }
     }
 
-    // resolve-position-generic-slot.md: these take LevelSlot<Selection>.
-    fn selections(selection_set: &WithSpan<SelectionSet>) -> &[WithSpan<SelectionSlot>] {
+    fn selections(
+        selection_set: &WithSpan<SelectionSet>,
+    ) -> &[WithSpan<Slot<Selection, UnparsedChunkItems>>] {
         selection_set.item.0.reference()
     }
 
-    fn as_scalar(slot: &SelectionSlot) -> &ScalarSelection {
-        match slot {
-            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
-                Selection::Scalar(scalar) => scalar,
-                selection => panic!("expected a scalar selection, got {selection:?}"),
-            },
-            slot => panic!("expected a parsed scalar, got {slot:?}"),
+    fn as_scalar(slot: &Slot<Selection, UnparsedChunkItems>) -> &ScalarSelection {
+        match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
+            Some(Selection::Scalar(scalar)) => scalar,
+            other => panic!("expected a scalar selection, got {other:?}"),
         }
     }
 
-    fn as_object(slot: &SelectionSlot) -> &ObjectSelection {
-        match slot {
-            SelectionSlot::Parsed(parsed) => match parsed.item.item.reference() {
-                Selection::Object(object) => object,
-                selection => panic!("expected an object selection, got {selection:?}"),
-            },
-            slot => panic!("expected a parsed object, got {slot:?}"),
-        }
-    }
-
-    fn as_unparsed_item(slot: &SelectionSlot) -> &UnparsedItem {
-        match slot {
-            SelectionSlot::Unparsed(unparsed) => unparsed,
-            slot => panic!("expected an unparsed item, got {slot:?}"),
-        }
-    }
-
-    fn trailing_of(slot: &SelectionSlot) -> WithSpan<ParseError> {
-        match slot {
-            SelectionSlot::Parsed(parsed) => parsed
-                .trailing
-                .expect("the fixture's selection carries trailing leftover"),
-            slot => panic!("expected a parsed slot with trailing, got {slot:?}"),
+    fn as_object(slot: &Slot<Selection, UnparsedChunkItems>) -> &ObjectSelection {
+        match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
+            Some(Selection::Object(object)) => object,
+            other => panic!("expected an object selection, got {other:?}"),
         }
     }
 
     #[test]
     fn a_field_declaration_parses_with_scalar_selections() {
         let text = "field Query.Foo {\n  bar,\n  baz\n}";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let declaration = as_field(parse.reference());
-        assert_eq!(declaration.field_keyword.location, span_of(text, "field"));
+        assert_eq!(declaration.parent_type.item, "Query".intern().to());
+        assert_eq!(declaration.client_field_name.item, "Foo".intern().to());
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "Foo"));
-        assert_eq!(declaration.selection_set.location, Span::new(span_of(text, "{").start, span_of(text, "}").end));
+        assert_eq!(
+            declaration.selection_set.location,
+            Span::new(span_of(text, "{").start, span_of(text, "}").end)
+        );
         let items = selections(declaration.selection_set.reference());
         assert_eq!(items.len(), 2);
+        assert_eq!(as_scalar(items[0].item.reference()).name.item, "bar".intern().to());
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
         assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "baz"));
         assert_eq!(items[0].location, span_of(text, "bar"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
     fn a_single_line_selection_set_parses_without_a_trailing_separator() {
         let text = "field Query.Foo { bar }";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 1);
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
@@ -684,134 +741,165 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
             "field Query.Foo { }",
             "field Query.Foo {\n}",
         ] {
-            let parse = parsed(text);
-            assert_eq!(selections(as_field(parse.reference()).selection_set.reference()).len(), 0, "for literal {text:?}");
-            assert_eq!(parse.item.errors(), vec![], "for literal {text:?}");
+            let (parse, errors) = parsed(text);
+            assert_eq!(
+                selections(as_field(parse.reference()).selection_set.reference()).len(),
+                0,
+                "for literal {text:?}"
+            );
+            assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
     #[test]
     fn a_comma_before_the_first_selection_is_chunkings_error() {
         let text = "field Query.Foo {, bar }";
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
+        let parse = parse.expect("the fixture is not an empty literal");
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 1);
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
 
         let lone = "field Query.Foo {,}";
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(lone);
+        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(lone);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
-        assert_eq!(selections(as_field(parse.reference()).selection_set.reference()).len(), 0);
-        assert_eq!(parse.item.errors(), vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        assert_eq!(
+            selections(as_field(parse.reference()).selection_set.reference()).len(),
+            0
+        );
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
     fn an_alias_splits_from_the_name_at_the_colon() {
         let text = "field Query.Foo { b: bar }";
-        let parse = parsed(text);
-        let scalar = as_scalar(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
-        let alias = scalar.reader_alias.as_ref().expect("the fixture selects with an alias");
+        let (parse, errors) = parsed(text);
+        let scalar = as_scalar(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
+        let alias = scalar
+            .reader_alias
+            .as_ref()
+            .expect("the fixture selects with an alias");
         let alias_anchor = span_of(text, "b:");
-        assert_eq!(alias.location, Span::new(alias_anchor.start, alias_anchor.start + 1));
+        assert_eq!(alias.item, "b".intern().to());
+        assert_eq!(
+            alias.location,
+            Span::new(alias_anchor.start, alias_anchor.start + 1)
+        );
         assert_eq!(scalar.name.location, span_of(text, "bar"));
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
     fn object_selections_nest() {
         let text = "field Query.Foo { pet { name, age } }";
-        let parse = parsed(text);
-        let object = as_object(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let (parse, errors) = parsed(text);
+        let object = as_object(
+            selections(as_field(parse.reference()).selection_set.reference())[0]
+                .item
+                .reference(),
+        );
         assert_eq!(object.name.location, span_of(text, "pet"));
         let inner = selections(object.selection_set.reference());
         assert_eq!(inner.len(), 2);
         assert_eq!(as_scalar(inner[0].item.reference()).name.location, span_of(text, "name"));
         assert_eq!(as_scalar(inner[1].item.reference()).name.location, span_of(text, "age"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
-    fn an_orphaned_group_after_a_line_break_is_an_unparsed_selection() {
+    fn an_orphaned_group_after_a_line_break_is_a_failed_selection() {
         let text = "field Query.Foo {\n  bar\n  { baz }\n}";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
-        let unparsed = as_unparsed_item(items[1].item.reference());
-        assert_eq!(
-            unparsed.reason.item,
-            expected(Expectation::Selection, Found::Group(BracketKind::Brace))
-        );
-        assert_eq!(unparsed.reason.location, span_of(text, "{ baz }"));
-        assert_eq!(parse.item.errors(), unparsed.reason.wrap_vec());
+        assert!(items[1].item.item.is_none());
+        assert!(items[1].item.extra_tokens.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item == expected(Expectation::Selection, Found::Group(BracketKind::Brace))
+                && error.location == span_of(text, "{ baz }")
+        }));
     }
 
     #[test]
     fn a_doubled_comma_between_selections_is_chunkings_error() {
         let text = "field Query.Foo { a,, b }";
-        let (parse, bracket_errors, comma_errors) = parsed_with_errors(text);
+        let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors.len(), 1);
+        let parse = parse.expect("the fixture is not an empty literal");
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "a"));
         assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "b"));
-        assert_eq!(parse.item.errors(), vec![]);
+        assert_eq!(errors, vec![]);
     }
 
     #[test]
     fn leftover_after_a_selection_keeps_the_item() {
         let text = "field Query.Foo {\n  bar baz\n  qux\n}";
-        let parse = parsed(text);
+        let (parse, errors) = parsed(text);
         let items = selections(as_field(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
         assert_eq!(as_scalar(items[0].item.reference()).name.location, span_of(text, "bar"));
-        let trailing = trailing_of(items[0].item.reference());
-        assert_eq!(
-            trailing.item,
-            expected(Expectation::Separator, Found::Token(Identifier))
-        );
-        assert_eq!(trailing.location, span_of(text, "baz"));
+        assert!(items[0].item.extra_tokens.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item == expected(Expectation::Separator, Found::Token(Identifier))
+                && error.location == span_of(text, "baz")
+        }));
         assert_eq!(as_scalar(items[1].item.reference()).name.location, span_of(text, "qux"));
-        assert_eq!(parse.item.errors(), trailing.wrap_vec());
     }
 
     #[test]
     fn arguments_are_trailing_leftover_until_parse_arguments() {
         let text = "field Query.Foo { bar(x: 1) }";
-        let parse = parsed(text);
-        let slot = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
+        let (parse, errors) = parsed(text);
+        let slot = selections(as_field(parse.reference()).selection_set.reference())[0]
+            .item
+            .reference();
         assert_eq!(as_scalar(slot).name.location, span_of(text, "bar"));
-        let trailing = trailing_of(slot);
+        assert!(slot.extra_tokens.is_some());
         assert_eq!(
-            trailing.item,
-            expected(Expectation::Separator, Found::Group(BracketKind::Parenthesis))
+            errors,
+            expected(
+                Expectation::Separator,
+                Found::Group(BracketKind::Parenthesis)
+            )
+            .with_span(span_of(text, "(x: 1)"))
+            .wrap_vec(),
         );
-        assert_eq!(trailing.location, span_of(text, "(x: 1)"));
     }
 
     #[test]
     fn a_directive_on_a_selection_is_trailing_leftover() {
         let text = "field Query.Foo { bar @loadable }";
-        let parse = parsed(text);
-        let slot = selections(as_field(parse.reference()).selection_set.reference())[0].item.reference();
+        let (parse, errors) = parsed(text);
+        let slot = selections(as_field(parse.reference()).selection_set.reference())[0]
+            .item
+            .reference();
         assert_eq!(as_scalar(slot).name.location, span_of(text, "bar"));
-        let trailing = trailing_of(slot);
         assert_eq!(
-            trailing.item,
+            errors,
             expected(Expectation::Separator, Found::Token(At))
+                .with_span(span_of(text, "@"))
+                .wrap_vec(),
         );
-        assert_eq!(trailing.location, span_of(text, "@"));
     }
 
     #[test]
-    fn a_field_declaration_without_a_selection_set_degrades_the_literal() {
+    fn a_field_declaration_without_a_selection_set_is_a_failed_item() {
         let text = "field Query.Foo";
         let end = span_of(text, "Foo").end;
-        assert_unparsed(
+        assert_no_declaration(
             text,
             expected(Expectation::SelectionSet, Found::EndOfChunk),
             Span::new(end, end),
@@ -819,10 +907,10 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     }
 
     #[test]
-    fn a_selection_set_split_onto_its_own_line_degrades_the_literal() {
+    fn a_selection_set_split_onto_its_own_line_is_a_failed_item() {
         let text = "field Query.Foo\n{ bar }";
         let end = span_of(text, "Foo").end;
-        assert_unparsed(
+        assert_no_declaration(
             text,
             expected(Expectation::SelectionSet, Found::EndOfChunk),
             Span::new(end, end),
@@ -832,53 +920,71 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     #[test]
     fn a_final_comma_after_the_field_declaration_is_an_error() {
         let text = "field Query.Foo { bar },";
-        assert_unparsed(
-            text,
-            expected(Expectation::EndOfDeclaration, Found::Token(Comma)),
-            span_of(text, ","),
+        let (parse, errors) = parsed(text);
+        as_field(parse.reference());
+        assert_eq!(
+            errors,
+            expected(Expectation::EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
         );
     }
 
     #[test]
     fn tokens_after_the_selection_set_are_leftover() {
         let text = "field Query.Foo { bar } junk";
-        assert_unparsed(
-            text,
-            expected(Expectation::EndOfDeclaration, Found::Token(Identifier)),
-            span_of(text, "junk"),
+        let (parse, errors) = parsed(text);
+        as_field(parse.reference());
+        assert!(first_slot(parse.reference()).extra_tokens.is_some());
+        assert_eq!(
+            errors,
+            expected(Expectation::EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "junk"))
+                .wrap_vec(),
         );
     }
 
     #[test]
     fn errors_collect_in_source_order_across_nesting() {
         let text = "field Query.Foo {\n  a b\n  pet { c d }\n  e f\n}";
-        let parse = parsed(text);
-        let errors = parse.item.errors();
+        let (parse, errors) = parsed(text);
         assert_eq!(errors.len(), 3);
         assert_eq!(errors[0].location, span_of(text, "b"));
         assert_eq!(errors[1].location, span_of(text, "d"));
         assert_eq!(errors[2].location, span_of(text, "f"));
-        assert_eq!(as_scalar(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference()).name.location, span_of(text, "a"));
+        assert_eq!(
+            as_scalar(
+                selections(as_field(parse.reference()).selection_set.reference())[0]
+                    .item
+                    .reference()
+            )
+            .name
+            .location,
+            span_of(text, "a")
+        );
     }
 
     #[test]
     fn selection_names_resolve_with_their_ancestry() {
         let text = "field Query.Foo { pet { name } }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "name")) {
             IsographResolutionNode::SelectionName(name) => {
                 let scalar = match name.parent {
                     SelectionNameParent::Scalar(scalar) => scalar,
                     parent => panic!("expected a scalar parent, got {parent:?}"),
                 };
-                let object = match scalar.parent.parent {
+                let object = match scalar.parent {
                     SelectionSetParent::Object(object) => object,
                     parent => panic!("expected an object-selection parent, got {parent:?}"),
                 };
                 assert_eq!(object.inner.name.location, span_of(text, "pet"));
-                match object.parent.parent {
+                match object.parent {
                     SelectionSetParent::Field(declaration) => {
-                        assert_eq!(declaration.inner.client_field_name.location, span_of(text, "Foo"));
+                        assert_eq!(
+                            declaration.inner.client_field_name.location,
+                            span_of(text, "Foo")
+                        );
                     }
                     parent => panic!("expected the declaration at the top, got {parent:?}"),
                 }
@@ -888,12 +994,12 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     }
 
     #[test]
-    fn leftover_positions_answer_the_selection_set() {
+    fn leftover_positions_resolve_to_the_leftover_token() {
         let text = "field Query.Foo { bar baz }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "baz")) {
-            IsographResolutionNode::SelectionSet(_) => {}
-            node => panic!("expected the selection set, got {node:?}"),
+            IsographResolutionNode::NonBracketToken(_) => {}
+            node => panic!("expected the leftover token, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::SelectionName(_) => {}
@@ -902,24 +1008,17 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     }
 
     #[test]
-    fn positions_inside_an_unparsed_selection_resolve_through_its_chunk() {
+    fn positions_inside_a_failed_selection_resolve_through_unparsed_items() {
         let text = "field Query.Foo { 42 }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "42")) {
             IsographResolutionNode::NonBracketToken(token) => {
-                let chunk_parent = token.parent.parent.reference();
-                match chunk_parent {
-                    ChunkParent::UnparsedItem(unparsed) => {
-                        assert_eq!(
-                            unparsed.inner.reason.item,
-                            expected(Expectation::Selection, Found::Token(IntegerLiteral))
-                        );
-                        match unparsed.parent.reference() {
-                            UnparsedItemParent::SelectionSet(_) => {}
-                            parent => panic!("expected a selection-set parent, got {parent:?}"),
-                        }
-                    }
-                    parent => panic!("expected an unparsed-item parent, got {parent:?}"),
+                match token.parent {
+                    ChunkContentItemParent::Unparsed(unparsed) => match unparsed.parent {
+                        UnparsedChunkItemsParent::SelectionSet(_) => {}
+                        parent => panic!("expected a selection-set parent, got {parent:?}"),
+                    },
+                    parent => panic!("expected an unparsed parent, got {parent:?}"),
                 }
             }
             node => panic!("expected the token leaf, got {node:?}"),
@@ -929,7 +1028,7 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     #[test]
     fn whitespace_and_separators_inside_a_selection_set_resolve_to_the_set() {
         let text = "field Query.Foo { bar, baz }";
-        let parse = parsed(text);
+        let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, ",")) {
             IsographResolutionNode::SelectionSet(_) => {}
             node => panic!("expected the selection set, got {node:?}"),
@@ -937,8 +1036,10 @@ The parse_iso_literal.rs test module grows; helpers (`parsed`, `span_of`, `expec
     }
 ```
 
+`field_and_pointer_declarations_do_not_parse_yet` keeps only the pointer fixture.
+
 ## Landing checklist
 
-1. The chunk.rs changes (`Clone`, `ChunkParent`, `LevelSlot`, `ParsedSlot`, `parse_chunk`, `parse_items`, `parse_items_with_trailing`, `contents_span`, `UnparsedItem`) and their test respellings; `cargo test -p isograph_parser` passes before the rest lands.
-2. selections.rs, the parse_iso_literal.rs and parse_error.rs changes, the `ItemCursor` methods this doc adds (`consume_group_if`, `require_group`, `spanning`), the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. Macro: `parent_from` on struct fields, fallback suppression, generic `Slot`, `UnparsedChunkItemsParent`, leftover span, deleted `Slot` / `SlotPath`, entrypoint parent paths. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+2. `parse_items`, `selections.rs`, `IsoLiteralItem::Field`, `Expectation::{SelectionSet, Selection}`, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.

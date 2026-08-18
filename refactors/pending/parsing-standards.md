@@ -1,6 +1,6 @@
 # Parsing standards
 
-Rules for grammar-stage code. Feature docs define each form (a selection, a value, a type) and the items that make it up. This doc lists the functions that implement those forms. If an implementation disagrees with this doc, the same review amends the doc or changes the code.
+Rules for grammar-stage code. Feature docs define each form. This doc lists the functions those forms call. If an implementation disagrees with this doc, the same review amends the doc or changes the code.
 
 Every call a parse function makes on a chunk is a method or free function listed here. A new call is a new listing here.
 
@@ -15,7 +15,7 @@ pub fn parse_iso_literal(
 ) -> Option<WithSpan<IsoLiteralParse>>
 ```
 
-`parse_iso_literal` takes `text: &str`, the chunked literal, and `push_error`. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`. A `ChunkStream` is built from one chunk.
+`parse_iso_literal` takes `text: &str`, the chunked literal, and `push_error`. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`.
 
 A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
@@ -23,148 +23,39 @@ Each token and group has a span. A parse function assigns a span to a value made
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.remaining_contents` and builds a `Slot<P, UnparsedChunkItems>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra root chunks sit on `IsoLiteralParse.extra_chunks`. `Slot.item` is `Some` when the form parsed. `Slot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.remaining_contents` and builds a `Slot<P, UnparsedChunkItems>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra chunks sit on `Singleton.extra_chunks`. `Slot.item` is `Some` when the form parsed. `Slot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 This pass is `IsoLiteralParse`. Resolve walks that tree only. Artifact generation does not resolve.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
-use nonempty::NonEmpty;
-use safe_peekable::{IntoSafePeekable, SafePeekable};
-use span::{Span, WithSpan};
+pub(crate) struct ItemCursor<'a> { /* ... */ }
 
-use crate::{
-    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
-    ParseError,
-};
-
-/// Sequential reader of one chunk. Parameter of a parse function.
-pub(crate) struct ItemCursor<'a> {
-    items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
-    /// The end of the last item this cursor advanced past (the chunk's start before
-    /// any). An `Expected(_, EndOfChunk)` error uses this offset.
-    previous_end: u32,
-    text: &'a str,
-}
-
-/// Sequential reader of one chunk, plus `require_end`.
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
-    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self {
-        ChunkStream(ItemCursor {
-            previous_end: contents.first().location.start,
-            items: contents.iter().safe_peekable(),
-            text,
-        })
-    }
-
-    pub(crate) fn cursor(&mut self) -> &mut ItemCursor<'a> {
-        &mut self.0
-    }
-
-    pub(crate) fn require_end(&mut self) -> Result<(), ()> {
-        self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
-    }
-
-    /// Unread content items. `None` when the cursor is at end.
-    pub(crate) fn remaining_contents(&mut self) -> Option<NonEmpty<WithSpan<ChunkContentItem>>> {
-        let first = self.0.items.next()?;
-        let mut tail = Vec::new();
-        while let Some(item) = self.0.items.next() {
-            tail.push(item.clone());
-        }
-        NonEmpty {
-            head: first.clone(),
-            tail,
-        }
-        .wrap_some()
-    }
+    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self;
+    pub(crate) fn cursor(&mut self) -> &mut ItemCursor<'a>;
+    pub(crate) fn require_end(&mut self) -> Result<(), ()>;
+    pub(crate) fn remaining_contents(&mut self) -> Option<NonEmpty<WithSpan<ChunkContentItem>>>;
 }
 
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
-        let peek = self.items.peek()?;
-        match peek.view().item.reference() {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {}
-            _ => return None,
-        }
-        let item = peek.commit();
-        self.previous_end = item.location.end;
-        item.location.wrap_some()
-    }
-
-    pub(crate) fn consume_group_if(
-        &mut self,
-        kind: BracketKind,
-    ) -> Option<WithSpan<&'a ChunkedGroup>> {
-        let peek = self.items.peek()?;
-        let item = *peek.view();
-        match item.item.reference() {
-            ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                group.with_span(item.location).wrap_some()
-            }
-            _ => None,
-        }
-    }
-
-    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
-        match self.items.peek() {
-            None => ParseError::expected(expected, Found::EndOfChunk).with_span(self.end_span()),
-            Some(peek) => {
-                let item = peek.view();
-                ParseError::expected(expected, Found::from(item.item.reference()))
-                    .with_span(item.location)
-            }
-        }
-    }
-
-    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()> {
-        self.consume_token_if(kind).ok_or(())
-    }
-
-    pub(crate) fn require_group(
-        &mut self,
-        kind: BracketKind,
-    ) -> Result<WithSpan<&'a ChunkedGroup>, ()> {
-        self.consume_group_if(kind).ok_or(())
-    }
-
-    pub(crate) fn text(&self) -> &'a str {
-        self.text
-    }
-
-    pub(crate) fn token_text(&self, span: Span) -> &'a str {
-        &self.text[span.as_usize_range()]
-    }
-
+    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span>;
+    pub(crate) fn consume_group_if(&mut self, kind: BracketKind) -> Option<WithSpan<&'a ChunkedGroup>>;
+    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError>;
+    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()>;
+    pub(crate) fn require_group(&mut self, kind: BracketKind) -> Result<WithSpan<&'a ChunkedGroup>, ()>;
+    pub(crate) fn text(&self) -> &'a str;
+    pub(crate) fn token_text(&self, span: Span) -> &'a str;
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
-    ) -> Result<WithSpan<T>, WithSpan<ParseError>> {
-        let start = match self.items.peek() {
-            Some(peek) => peek.view().location.start,
-            None => self.previous_end,
-        };
-        let before = self.previous_end;
-        let value = parse(self)?;
-        let span = if self.previous_end == before {
-            Span::new(before, before)
-        } else {
-            Span::new(start, self.previous_end)
-        };
-        value.with_span(span).wrap_ok()
-    }
-
-    fn end_span(&self) -> Span {
-        Span::new(self.previous_end, self.previous_end)
-    }
+    ) -> Result<WithSpan<T>, WithSpan<ParseError>>;
 }
 ```
 
-`nonempty::Iter` yields `&'a WithSpan<ChunkContentItem>`. `view` returns that reference. `consume_group_if` copies the `'a` reference from `view`, matches once, then `commit`s. `consume_token_if` views to decide, then `commit`s. `expected` only views.
+`require_*` is `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
 
 ### Span sources
 
@@ -173,273 +64,33 @@ impl<'a> ItemCursor<'a> {
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
-`token_text` is `&self.text[span.as_usize_range()]`. A span that is not a range of that string panics, the same as any `&str` index. A name in the tree is an interned string key (`token_text(span).intern().to::<EntityName>()`). The converted scalar is the `i64`. The wrapper span is location only.
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub fn parse_iso_literal(
-    text: &str,
-    root: WithSpan<ChunkedLevel>,
-    mut push_error: impl FnMut(WithSpan<ParseError>),
-) -> Option<WithSpan<IsoLiteralParse>> {
-    let location = root.location;
-    if root.item.len() == 0 {
-        push_error(ParseError::EmptyLiteral.with_span(location));
-        return None;
-    }
-    let singleton = parse_singleton(
-        root.reference(),
-        text,
-        Expectation::EndOfDeclaration,
-        |extra| ParseError::MultipleDeclarations.with_span(extra.location),
-        |cursor, _| parse_iso_literal_item(cursor),
-        &mut push_error,
-    );
-    singleton.with_span(location).wrap_some()
-}
-```
-
-`parse_iso_literal_item` is the first-chunk form. parse-entrypoint.md writes it.
+`token_text` is `&self.text[span.as_usize_range()]`. A name in the tree is an interned string key (`token_text(span).intern().to::<EntityName>()`). The converted scalar is the `i64`. The wrapper span is location only.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
-
-pub type SlotPath<'a> = PositionResolutionPath<
-    &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-    IsoLiteralParsePath<'a>,
->;
 ```
 
-`IsoLiteralItem` is the declaration enum. parse-entrypoint.md writes it. `parse_singleton` returns `IsoLiteralParse`. That value is the tree.
+`IsoLiteralItem` is the declaration enum. `parse_singleton` returns `IsoLiteralParse`. That value is the tree. Empty is `None` from `parse_iso_literal`.
 
-## `Chunk`
+## The tree
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-impl Chunk {
-    pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
-        ChunkStream::new(self.contents.reference(), text)
-    }
-
-    /// First content item through last content item. `WithSpan<Chunk>` also covers
-    /// the trailing separator.
-    pub fn contents_span(&self) -> Span {
-        Span::join(
-            self.contents.first().location,
-            self.contents.last().location,
-        )
-    }
-
-    pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
-        self.contents.first()
-    }
-
-    pub fn boundary_comma(&self) -> Option<Span> {
-        let separator = self.trailing_separator.as_ref()?;
-        separator
-            .item
-            .0
-            .iter()
-            .find(|token| token.item == SeparatorToken::Comma)
-            .map(|token| token.location)
-    }
-}
-```
-
-A `Chunk` is the whole unit: its chunk items plus the optional trailing separator. A chunk item is a `ChunkContentItem` (a token or a group). `UnparsedChunkItems` is unread or failed items from the chunk under parse, not a chunk. `ExtraChunks` is whole extra chunks after chunk 0.
-
-`Chunk`'s fields are private to the `chunk` module. `contents` is a `NonEmpty<WithSpan<ChunkContentItem>>` (chunk-contents-nonempty.md). `Chunk` is `pub`; `stream` is `pub(crate)`. `WithSpan<Chunk>` runs from the first content item through the trailing separator. `contents_span` stops at the last content item. Leftover and failed `UnparsedChunkItems` are those items only; a list chunk's comma is not among them. A position on that comma resolves to the list.
-
-`ChunkedLevelParent` stays. Extra root chunks parent a `Chunk` at `ChunkParent::Extra`. Leftover and failed items parent a `ChunkContentItem` at `ChunkContentItemParent::Unparsed`. `ChunkContentItem` is transparent, so `NonBracketToken` and `ChunkedGroup` parent at `ChunkContentItemParent`. Existing `chunk.rs` tests that walk `token.parent` or `open.parent.parent` match `ChunkContentItemParent::Chunk` and `ChunkParent::Level`. parse-entrypoint.md writes those tests.
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug)]
-pub enum ChunkedLevelParent<'a> {
-    Root,
-    Interior(Box<ChunkedGroupPath<'a>>),
-}
-
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkedLevelPath<'a>>;
-
-pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
-
-#[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct Chunk {
-    #[resolve_field]
-    contents: NonEmpty<WithSpan<ChunkContentItem>>,
-    #[resolve_field]
-    trailing_separator: Option<WithSpan<ChunkSeparator>>,
-}
-
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ChunkContentItem {
-    NonBracket(NonBracketToken),
-    Group(ChunkedGroup),
-}
-
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedGroup {
-    #[resolve_field]
-    pub opening: WithSpan<OpenBracket>,
-    #[resolve_field(parent_variant = Interior)]
-    pub children: WithSpan<ChunkedLevel>,
-    #[resolve_field]
-    pub closing: WithSpan<CloseBracket>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct NonBracketToken(pub NonBracketTokenKind);
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug)]
-pub enum ChunkedLevelParent<'a> {
-    Root,
-    Interior(Box<ChunkedGroupPath<'a>>),
-}
-
-#[derive(Debug)]
-pub enum ChunkParent<'a> {
-    Level(ChunkedLevelPath<'a>),
-    Extra(ExtraChunksPath<'a>),
-}
-
-#[derive(Debug)]
-pub enum ChunkContentItemParent<'a> {
-    Chunk(ChunkPath<'a>),
-    Unparsed(UnparsedChunkItemsPath<'a>),
-}
-
-pub type ChunkedLevelPath<'a> = PositionResolutionPath<&'a ChunkedLevel, ChunkedLevelParent<'a>>;
-
-pub type ChunkPath<'a> = PositionResolutionPath<&'a Chunk, ChunkParent<'a>>;
-
-pub type ChunkedGroupPath<'a> = PositionResolutionPath<&'a ChunkedGroup, ChunkContentItemParent<'a>>;
-
-pub type NonBracketTokenPath<'a> =
-    PositionResolutionPath<&'a NonBracketToken, ChunkContentItemParent<'a>>;
-
-pub struct ChunkedLevel(#[resolve_field(parent_variant = Level)] Vec<WithSpan<Chunk>>);
-
-#[resolve_position(parent_type = ChunkParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct Chunk {
-    #[resolve_field(parent_variant = Chunk)]
-    contents: NonEmpty<WithSpan<ChunkContentItem>>,
-    #[resolve_field]
-    trailing_separator: Option<WithSpan<ChunkSeparator>>,
-}
-
-#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ChunkContentItem {
-    NonBracket(NonBracketToken),
-    Group(ChunkedGroup),
-}
-
-#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ChunkedGroup {
-    #[resolve_field]
-    pub opening: WithSpan<OpenBracket>,
-    #[resolve_field(parent_variant = Interior)]
-    pub children: WithSpan<ChunkedLevel>,
-    #[resolve_field]
-    pub closing: WithSpan<CloseBracket>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/matched_brackets.rs
-#[resolve_position(parent_type = ChunkContentItemParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct NonBracketToken(pub NonBracketTokenKind);
-```
-
-## Lists and one-item levels
-
-`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk through `parse_one_item` (a selection set, an argument list, an object literal, a variable-declaration list). `parse_singleton` is a one-item level (the root, a `[...]` interior) with at least one chunk: chunk 0 through `parse_one_item`, then extra chunks and, at the root, a boundary comma. Empty is the caller's. Tests call `#[cfg(test)] ChunkedLevel::chunks`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-use nonempty::NonEmpty;
-use resolve_position::ResolvePosition;
-use resolve_position_macros::ResolvePosition;
-use span::{Span, WithSpan};
-
-use crate::{
-    Chunk, ChunkContentItem, ChunkStream, Expectation, Found, ItemCursor, NonBracketTokenKind,
-    ParseError,
-};
-
-/// Unread or failed items from the chunk under parse. Parent is `SlotPath`.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct UnparsedChunkItems(
-    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
-);
-
-pub type UnparsedChunkItemsPath<'a> =
-    PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
-
-/// Extra root chunks after the first. Resolve walks each chunk. Parent is
-/// `IsoLiteralParsePath`.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralParsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
-
-pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
-
-/// How far along the tree is. Associated types are the entrypoint root's
-/// fail-able pieces; feature docs add one when they introduce a new one.
-/// Optimistic types carry the failure. Artifact types do not.
-pub trait Stage {
-    type IsoLiteral;
-    type UnparsedTokens;
-    type ExtraChunks;
-}
-
-pub struct OptimisticStage;
-
-pub struct ArtifactGenerationStage;
-
-impl Stage for OptimisticStage {
-    type IsoLiteral = IsoLiteralItem;
-    type UnparsedTokens = UnparsedChunkItems;
-    type ExtraChunks = ExtraChunks;
-}
-
-impl Stage for ArtifactGenerationStage {
-    type IsoLiteral = IsoLiteralItem;
-    type UnparsedTokens = ();
-    type ExtraChunks = ();
-}
-
-/// One chunk's parse result. The optimistic tree. `Option<WithSpan<_>>` is on
-/// the fields so the derive walks them. `self_type_generics` pins the root
-/// monomorph; a list slot is a later impl.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+    parent_type = <T as ResolvePosition>::Parent<'a>,
+    resolved_node = IsographResolutionNode<'a>
 )]
-pub struct Slot<T, E> {
-    #[resolve_field]
+pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
+    #[resolve_field(parent_from)]
     pub item: Option<WithSpan<T>>,
-    #[resolve_field]
+    #[resolve_field(parent_from)]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 
-/// One-item level. The optimistic tree. Root fallback is `Singleton`.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = (),
@@ -453,19 +104,48 @@ pub struct Singleton<T, E> {
     pub extra_chunks: Option<WithSpan<E>>,
 }
 
-fn parse_chunk<'a, P>(
-    chunk: &'a WithSpan<Chunk>,
-    text: &'a str,
-    parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
-) -> (
-    ChunkStream<'a>,
-    Result<WithSpan<P>, WithSpan<ParseError>>,
-) {
-    let mut stream = chunk.item.stream(text);
-    let result = stream.cursor().spanning(parse_item);
-    (stream, result)
+pub struct UnparsedChunkItems(
+    #[resolve_field(parent_variant = Unparsed)] pub NonEmpty<WithSpan<ChunkContentItem>>,
+);
+
+pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
+```
+
+`Slot` is not a path segment. `#[resolve_field(parent_from)]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
+
+Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover, not a third region.
+
+`UnparsedChunkItems`'s parent is an enum. Each list that stores a `Slot` adds a variant and a `From`:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug)]
+pub enum UnparsedChunkItemsParent<'a> {
+    Literal(IsoLiteralParsePath<'a>),
 }
 
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+
+impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: IsoLiteralParsePath<'a>) -> Self {
+        UnparsedChunkItemsParent::Literal(parent)
+    }
+}
+```
+
+`IsoLiteralItem`'s `parent_type` is `IsoLiteralParsePath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralParsePath<'a>`.
+
+`Singleton` at the root stays pinned (`parent_type = ()`, `self_type_generics` as above). parse-variables.md adds a generic `Singleton` impl when `[...]` stores one.
+
+`item: None` and `extra_tokens: None` together is representable and never constructed.
+
+## Lists and one-item levels
+
+`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk through `parse_one_item`. `parse_singleton` is a one-item level with at least one chunk: chunk 0 through `parse_one_item`, then extra chunks and a boundary comma. Empty is the caller's.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
 fn parse_one_item<'a, P, F>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
@@ -479,21 +159,21 @@ where
     let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
     match result {
         Ok(item) => match stream.remaining_contents() {
-            None => Slot {
-                item: item.wrap_some(),
-                extra_tokens: None,
+            None => {
+                let location = item.location;
+                Slot {
+                    item: item.wrap_some(),
+                    extra_tokens: None,
+                }
+                .with_span(location)
             }
-            .with_span(item.location),
             Some(remaining) => {
                 push_error(
-                    ParseError::expected(
-                        leftover,
-                        Found::from(remaining.first().item.reference()),
-                    )
-                    .with_span(remaining.first().location),
+                    ParseError::expected(leftover, Found::from(remaining.first().item.reference()))
+                        .with_span(remaining.first().location),
                 );
                 let leftover_span =
-                    Span::join(remaining.first().location, remaining.last().location);
+                    Span::new(item.location.end, remaining.last().location.end);
                 let location = Span::join(item.location, leftover_span);
                 Slot {
                     item: item.wrap_some(),
@@ -522,6 +202,7 @@ impl ChunkedLevel {
     pub(crate) fn parse_items<'a, P, F>(
         &'a self,
         text: &'a str,
+        leftover: Expectation,
         parse_item: impl Fn(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
         push_error: &mut F,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
@@ -534,21 +215,12 @@ impl ChunkedLevel {
                 parse_one_item(
                     chunk,
                     text,
-                    Expectation::Separator,
+                    leftover,
                     |cursor, push_error| parse_item(cursor, push_error),
                     push_error,
                 )
             })
             .collect()
-    }
-
-    pub(crate) fn len(&self) -> usize {
-        self.0.len()
-    }
-
-    #[cfg(test)]
-    pub(crate) fn chunks(&self) -> &[WithSpan<Chunk>] {
-        self.0.reference()
     }
 }
 
@@ -563,47 +235,32 @@ pub(crate) fn parse_singleton<'a, T, F>(
 where
     F: FnMut(WithSpan<ParseError>),
 {
-    let item = parse_one_item(
-        &level.item.0[0],
-        text,
-        end,
-        parse,
-        push_error,
-    );
+    let item = parse_one_item(&level.item.0[0], text, end, parse, push_error);
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         push_error(
             ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
         );
     }
     let extra_chunks = (level.item.len() > 1).then(|| {
+        push_error(extra_chunks(&level.item.0[1]));
         let rest = NonEmpty {
             head: level.item.0[1].clone(),
             tail: level.item.0[2..].to_vec(),
         };
-        push_error(extra_chunks(&rest.head));
         let location = Span::join(rest.head.location, rest.last().location);
         ExtraChunks(rest).with_span(location)
     });
-    Singleton {
-        item,
-        extra_chunks,
-    }
+    Singleton { item, extra_chunks }
 }
 ```
 
-`ChunkStream::remaining_contents` returns the unread chunk items. `None` when the cursor is at end. Leftover `UnparsedChunkItems` is those items.
+`parse_items` leftover is `Expectation::Separator` at a selection set, an argument list, an object literal, and a variable-declaration list. A list trailing comma is legal and is not a diagnostic.
 
-`parse_one_item` is one chunk. Form `Ok` and `remaining_contents` `None` is `item: Some`, empty `extra_tokens`. Form `Ok` and leftover is `item: Some` plus leftover items in `extra_tokens`, diagnostic from the first leftover item. Form `Err` is `item: None` and a clone of the source chunk's items. A chunk's contents are nonempty, so `Err` always has `extra_tokens: Some`. `item: None` and `extra_tokens: None` together is representable and never constructed. `parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$` (`Expected(Identifier, Dollar)`). `item` is `None`. `extra_tokens` is the whole chunk `entrypoint Foo.$ asdf`, not `$ asdf` and not `asdf`.
+`parse_singleton` leftover and boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Extra chunks clone. Empty is the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `None`; a `[...]` with zero chunks is `Expected(TypeAnnotation, EndOfChunk)`).
 
-`parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
+`parse_*` is all-or-nothing. There is no recovered prefix of a selection. `entrypoint Foo.$ asdf` fails at `$`. `item` is `None`. `extra_tokens` is the whole chunk.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) and sit on `IsoLiteralParse.extra_chunks`. At the root, the `extra_chunks` callback pushes `MultipleDeclarations` on the first extra chunk. Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `None`). There is no `Singleton` and no `Slot`. `item` on the first slot is `Some` when the form parsed.
-
-`Slot<T, E>` is `item: Option<WithSpan<T>>` and `extra_tokens: Option<WithSpan<E>>`. `parse_one_item` returns `WithSpan<Slot<...>>` (the first-chunk attempt). It never returns `item: None` and `extra_tokens: None`. `Singleton<T, E>` is `item: WithSpan<T>` and `extra_chunks: Option<WithSpan<E>>`. `parse_singleton` always has a first chunk, so `item` is that attempt. Extra chunks sit on `IsoLiteralParse.extra_chunks`. Resolve walks `IsoLiteralParse` only. An empty literal is `None` from `parse_iso_literal`; there is no grammar tree. A position on the boundary comma is outside the attempt and is `Singleton`.
-
-A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
-
-`UnparsedChunkItems` sits on `Slot.extra_tokens`. Chunk items in `UnparsedChunkItems` use `parent_variant = Unparsed`. Extra chunks use `Chunk`'s parent variant `Extra`.
+A type that contains a group stores `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>` or a `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`. Feature docs write those types.
 
 ## Function shapes
 
@@ -617,22 +274,24 @@ A group plus its interior is `consume_group_if` or `require_group`, then `parse_
 
 ```rust
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    group
-        .item
-        .children
-        .item
-        .parse_items(cursor.text(), parse_item, push_error)
+    group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_item,
+        push_error,
+    )
 ```
 
 ```rust
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(expectation))?;
-    group
-        .item
-        .children
-        .item
-        .parse_items(cursor.text(), parse_item, push_error)
+    group.item.children.item.parse_items(
+        cursor.text(),
+        Expectation::Separator,
+        parse_item,
+        push_error,
+    )
 ```
 
 ## Dispatch
@@ -654,15 +313,22 @@ where
                 .require_token(NonBracketTokenKind::Identifier)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse {
-                dollar: Dollar.with_span(dollar),
-                name: VariableName.with_span(name),
-            }).wrap_ok();
+                name: cursor
+                    .token_text(name)
+                    .intern()
+                    .to::<VariableName>()
+                    .with_span(name),
+            })
+            .wrap_ok();
         }
-        if cursor
-            .consume_token_if(NonBracketTokenKind::StringLiteral)
-            .is_some()
-        {
-            return NonConstantValue::String(StringValue).wrap_ok();
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::StringLiteral) {
+            return NonConstantValue::String(
+                cursor
+                    .token_text(span)
+                    .intern()
+                    .to::<StringValue>(),
+            )
+            .wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
             let value = match cursor.token_text(span).parse() {
@@ -687,19 +353,24 @@ where
             };
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return group
-                .item
-                .children
-                .item
-                .parse_items(cursor.text(), parse_object_entry, push_error)
-                .wrap_ok();
+            return NonConstantValue::Object(ObjectLiteral(
+                group.item.children.item.parse_items(
+                    cursor.text(),
+                    Expectation::Separator,
+                    parse_object_entry,
+                    push_error,
+                ),
+            ))
+            .wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
 }
 ```
 
-Keyword text after `require_token(Identifier, ...)` or `consume_token_if(Identifier)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field.
+
+Keyword text after `require_token(Identifier)` or `consume_token_if(Identifier)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
 One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar)` then `require_token(Identifier)`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
 
@@ -711,14 +382,14 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
         Some(_) => {
             let name = cursor
                 .require_token(NonBracketTokenKind::Identifier)
-                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+                .map_err(|()| {
+                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+                })?;
             (first.wrap_some(), name)
         }
         None => (None, first),
     };
 ```
-
-`parse_one_item` wraps the item parse in `spanning` and then `remaining_contents`. Leftover is extra tokens.
 
 ## Narrower types for narrower grammars
 
@@ -728,49 +399,81 @@ Variable defaults are constant values. The constant-value ladder is the value la
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+use thiserror::Error;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
+    #[error("{0}")]
     Expected(ExpectedFound),
+    #[error("Expected a declaration. An isograph literal cannot be empty.")]
     EmptyLiteral,
+    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
     MultipleDeclarations,
+    #[error("This declaration type is not supported yet.")]
+    UnsupportedDeclarationType,
+    #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("Expected {expected}, found {found}.")]
 pub struct ExpectedFound {
     pub expected: Expectation,
     pub found: Found,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum Expectation {
+    #[error("{0}")]
     Token(NonBracketTokenKind),
+    #[error("one of `entrypoint`, `field`, or `pointer`")]
     DeclarationKeyword,
+    #[error("the end of the declaration")]
     EndOfDeclaration,
+    #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
+    #[error("a field selection")]
     Selection,
+    #[error("a comma or line break")]
     Separator,
+    #[error("an argument, like 'id: $id'")]
     Argument,
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
     Value,
+    #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
+    #[error("a variable declaration, like '$id: ID!'")]
     VariableDeclaration,
+    #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
+    #[error("a constant value; variables are not allowed here")]
     ConstantValue,
+    #[error("the end of the type")]
     EndOfType,
+    #[error("the keyword `to`")]
     ToKeyword,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum Found {
+    #[error("{0}")]
     Token(NonBracketTokenKind),
+    #[error("a group opened by {}", opening_bracket_text(*.0))]
     Group(BracketKind),
+    #[error("nothing more")]
     EndOfChunk,
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. Surface lands `ParseError::Expected`, `Expectation::Token`, `Expectation::Separator`, and `Found`. parse-entrypoint.md adds `EmptyLiteral`, `MultipleDeclarations`, `UnsupportedDeclarationType`, `DeclarationKeyword`, and `EndOfDeclaration`. parse-fields.md adds `SelectionSet` and `Selection`. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, and `IntegerDoesNotFitI64`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-fields.md adds `SelectionSet` and `Selection`. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, and `IntegerDoesNotFitI64`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
-Diagnostics are not on the tree. `parse_one_item` calls `push_error` for leftover and for a failed form. `parse_iso_literal` calls it for empty. `parse_singleton` calls it for a boundary comma and extra. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
+Diagnostics are not on the tree. Nested lists push as they parse, inner first. Resolve walks leftover and failed items, not diagnostics. Bracket errors are the matcher's vec. Comma-without-item errors are chunking's vec. Grammar diagnostics go through `push_error`. Artifact generation runs only when those three lists are empty.
 
-A failed list chunk is `item: None` plus the chunk's items in `Slot.extra_tokens`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `IsoLiteralParse.extra_chunks` plus `push_error(MultipleDeclarations)`. `Display` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+A failed list chunk is `item: None` plus the chunk's items in `Slot.extra_tokens`. Leftover after a successful list item is `item: Some` plus leftover items and `push_error(Expected(Separator, ...))`. Tokenless diagnostics (empty literal, a root comma) go through `push_error` with no `UnparsedChunkItems`. Extra root chunks are `IsoLiteralParse.extra_chunks` plus `push_error(MultipleDeclarations)`. `thiserror` formats `ParseError`. Suggestions are produced later from `(expected, found)`.
+
+There is no `errors()` walk on the tree. Tests read the `push_error` vec.
 
 ## Totality
 
@@ -780,13 +483,13 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` and `Slot.extra_tokens` are `Option<WithSpan<_>>`. `Singleton.item` is `WithSpan<Slot<...>>`, the `parse_one_item` attempt. Each other struct field that is a node is `WithSpan`. A name is a newtype over an interned key in a `WithSpan`; each role is its own type. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
+A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` and `Slot.extra_tokens` are `Option<WithSpan<_>>`. `Singleton.item` is `WithSpan<Slot<...>>`, the `parse_one_item` attempt. Each other struct field that is a node is `WithSpan`. A name is a newtype over an interned key in a `WithSpan`; each role is its own type. The converted scalar is the `i64`. A position on `.`, `$`, `!`, `:`, or `to` resolves to the containing node. There is no keyword-marker type. Resolve walks the optimistic tree only.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunkItems` and `ExtraChunks`.
 
 ## Performance
 
-One pass by reference. The output copies spans and `Copy` tokens. Leftover and failed items clone. Extra chunks clone for now. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
+One pass by reference. The output copies spans and `Copy` tokens. Leftover and failed items clone. Extra chunks clone. A later change can store a range into the original chunk instead. Each item is advanced past at most once. The functions take `&str` and the chunk tree.
 
 ## Catalog of parsing tasks
 
@@ -798,6 +501,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Multi-form position: `consume_*` ladder, last arm `expected`
 - Keyword / boolean / null text: `token_text` after an identifier
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
+- Interned name: `token_text(span).intern().to::<EntityName>()`
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`
@@ -809,26 +513,15 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Leftover after a list item: `item: Some` plus extra tokens and `push_error(Expected(Separator, ...))`
 - Leftover after a singleton first chunk: `item: Some` plus extra tokens and `push_error(Expected(end, ...))`
 - Extra root chunks: `ExtraChunks` plus `push_error(MultipleDeclarations)`
-- Diagnostic: `push_error` on `parse_one_item` / `parse_singleton` / `parse_iso_literal`
+- Diagnostic: `push_error` on `parse_one_item` / `parse_items` / `parse_singleton` / `parse_iso_literal`
 - Group interior: `require_group` / `consume_group_if`, then `parse_items` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
 
 ## Shipping and amending
 
-The first implementation step is the shared surface, with tests, before any grammar feature. That step lands:
+Each grammar feature lands on this surface.
 
-- `ItemCursor` / `ChunkStream`: `new`, `cursor`, `require_end`, `remaining_contents`, `consume_token_if`, `require_token`, `consume_group_if`, `require_group`, `expected`, `text`, `token_text`, `end_span`, `spanning`
-- `Chunk::stream`, `Chunk::contents_span`, `Chunk::first_item`, `Chunk::boundary_comma`, `ChunkedLevel::len`
-- `Slot`, `Stage`, `OptimisticStage`, `ArtifactGenerationStage`, `UnparsedChunkItems`, `ExtraChunks`, `Singleton`, `parse_chunk`, `parse_one_item`, `parse_items`, `parse_singleton`, `push_error`
-- `Clone` on `ChunkedLevel`, `Chunk`, `ChunkContentItem`, `ChunkedGroup`, `ChunkSeparator`. Extra chunks clone for now.
-- `ParseError::Expected`, `Expectation::{Token, Separator}`, `Found`. `Stage` impls wait for `IsoLiteralItem`.
-
-Tests assert facts about that surface: `require_*` / `consume_*` match and mismatch, `expected` names the next item or `EndOfChunk`, `require_end` is `Ok` only on an empty remainder, `spanning` covers what the closure advanced past, `parse_one_item` leftover is `item: Some` plus extra tokens, `parse_singleton` extra is `ExtraChunks`. No grammar tree, no `parse_iso_literal`.
-
-Each grammar feature then lands on that surface.
-
-- parse-entrypoint.md: `parse_iso_literal`, `Slot` / `Singleton` `ResolvePosition`, `IsoLiteralParse` alias, `Stage` impls, `UnparsedChunkItems` / `ExtraChunks` `ResolvePosition`, `ChunkParent`, `ChunkContentItemParent`, `entrypoint Type.field`
-- parse-fields.md: field declarations and selection sets via `parse_items`, `push_error` through `parse_items`
+- parse-fields.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `parse_items`, field declarations and selection sets
 - parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
