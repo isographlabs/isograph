@@ -15,7 +15,7 @@ use crate::{
 /// order, and nothing else: line breaks at a level's start were captured by the opening
 /// bracket (or the literal's start), and a comma no item precedes is a
 /// `CommaWithoutItem` error beside the tree, its boundary dropped.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkedLevelParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 
@@ -26,7 +26,7 @@ pub struct ChunkedLevel(#[resolve_field] pub Vec<WithSpan<Chunk>>);
 /// is the optional trailing delimiter.
 /// The wrapping `WithSpan`'s span runs from the first part's start to the last part's
 /// end.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkedLevelPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct Chunk {
     #[resolve_field]
@@ -36,7 +36,7 @@ pub struct Chunk {
 }
 
 /// What a chunk holds: every non-separator item of its level, groups included.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum ChunkContentItem {
     NonBracket(NonBracketToken),
@@ -45,7 +45,7 @@ pub enum ChunkContentItem {
 
 /// A matched group re-chunked: the bracket tree's opening and closing are kept, and the
 /// interior is a `ChunkedLevel` — same layout as `Bracketed` / `MatchedBrackets`.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkedGroup {
     #[resolve_field]
@@ -60,7 +60,7 @@ pub struct ChunkedGroup {
 /// The boundary that ended its chunk: its line-break tokens and at most one comma, in
 /// order. A second comma is never absorbed; it opens the next chunk's boundary. Its
 /// tokens are not resolution leaves; a position on any of them answers the separator.
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ChunkPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ChunkSeparator(pub NonEmpty<WithSpan<SeparatorToken>>);
 
