@@ -114,7 +114,6 @@ pub fn parse_iso_literal(
 pub enum IsographResolutionNode<'a> {
     IsoLiteralParse(IsoLiteralParsePath<'a>),
     Slot(SlotPath<'a>),
-    IsoLiteralItem(IsoLiteralItemPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),

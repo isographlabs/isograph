@@ -91,9 +91,6 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 pub type IsoLiteralSlotPath<'a> =
     PositionResolutionPath<&'a IsoLiteralSlot, IsoLiteralParsePath<'a>>;
 
-pub type IsoLiteralItemPath<'a> =
-    PositionResolutionPath<&'a IsoLiteralItem, IsoLiteralSlotPath<'a>>;
-
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
@@ -389,8 +386,8 @@ After:
 use crate::{
     ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
     CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
-    IsoLiteralItemPath, IsoLiteralParsePath, IsoLiteralSlotPath, NonBracketTokenPath,
-    OpenBracketPath, UnparsedChunkItemsPath,
+    IsoLiteralParsePath, IsoLiteralSlotPath, NonBracketTokenPath, OpenBracketPath,
+    UnparsedChunkItemsPath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -401,7 +398,6 @@ use crate::{
 pub enum IsographResolutionNode<'a> {
     IsoLiteralParse(IsoLiteralParsePath<'a>),
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    IsoLiteralItem(IsoLiteralItemPath<'a>),
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     EntityName(EntityNamePath<'a>),
     ClientFieldName(ClientFieldNamePath<'a>),
