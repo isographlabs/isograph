@@ -1,15 +1,8 @@
 # generic-slot: one impl for every `Slot<T, E>`
 
-`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<Selection, UnparsedChunkItems>`. Drop `self_type_generics`. Both fields use `parent_from`. `Slot` is not a path segment and is not a `ResolvedNode` variant.
+`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. `Slot` is not a path segment and is not a `ResolvedNode` variant.
 
-Extracted from parse-fields.md Change 1. Deltas from that extraction:
-
-- `get_resolve_field_info` no longer rejects `parent_from` on struct fields. parse-fields only deleted the `new_parent_expr` error; the reject sits earlier.
-- `Slot` states the `ResolvedNode` equality and leftover `From` bounds the generic impl body needs.
-- The leftover-gap resolve test and the leftover parent-chain test are written out.
-- The generated `Slot` impl does not write `'static`.
-
-parse-fields.md lands after this doc.
+Origin: the generic-Slot change previously in parse-fields.md. Deltas from that origin: `Slot` states the `ResolvedNode` equality and leftover `From` bounds the generic impl body needs; leftover-gap and leftover parent-chain tests are written out; the generated impl does not write `'static`.
 
 ## After
 
@@ -31,7 +24,15 @@ where
     #[resolve_field(parent_from)]
     pub extra_tokens: Option<WithSpan<E>>,
 }
+```
 
+`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`:
+
+- `item` converts `T::Parent` to `T::Parent`. The blanket `From<P> for P` is identity. No bound.
+- `extra_tokens` converts `T::Parent` to `E::Parent`. That is `From<T::Parent> for E::Parent`, the leftover wrap. Only `E` needs the bound.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     Literal(IsoLiteralParsePath<'a>),
@@ -259,13 +260,7 @@ The derive does not write `'static`. It writes `type ResolvedNode<'a> = Isograph
 
 `where Self: 'a` on the associated types makes `parent_type = <T as ResolvePosition>::Parent<'a>` legal.
 
-`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent. That parent is the container the slot sits in:
-
-- `Slot<IsoLiteralItem, _>` sits in the root singleton, and `IsoLiteralItem::Parent` is `IsoLiteralParsePath`
-- `Slot<Selection, _>` sits in a `SelectionSet`, and `Selection::Parent` is `SelectionSetPath`
-- `Slot<TypeAnnotation, _>` sits in a `ListTypeAnnotation`, and `TypeAnnotation::Parent` is `TypeAnnotationParent` (`List` wraps that list-type path)
-
-`parent_from` on both fields forwards that parent into the child. `From<P> for P` is identity for the item. `From<P> for UnparsedChunkItemsParent` wraps leftover. `Slot` is not a path segment and is not a `ResolvedNode` variant.
+`parent_type = <T as ResolvePosition>::Parent<'a>` makes `Slot`'s parent the same type as `T`'s parent. That parent is the container the slot sits in. `parent_from` on both fields forwards it. `Slot` is not a path segment and is not a `ResolvedNode` variant.
 
 ## Tests
 

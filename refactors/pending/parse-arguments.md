@@ -1,14 +1,10 @@
 # parse-arguments: argument lists and values
 
-Selections gain argument lists. Values: variables, strings, integers, booleans, null, object literals. parse-variables.md reuses the value grammar for defaults.
+Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_items` and `ClosingDelimiter`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
 
-```
-[<Identifier> :] <Identifier> [<paren group>] [<brace group>]
-```
-
-Each contentful chunk of the paren group's interior is one argument:
+Each contentful chunk of an argument list is one argument:
 
 ```
 <Identifier> : <value>
@@ -25,24 +21,42 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-## Changes to parse_error.rs
+Tests feed a list's interior to `parse_items`. The wrapping paren group lands with the host that consumes it.
+
+## Change 1: `parse_items`
 
 ```rust
-// from crates/isograph_parser/src/parse_error.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ParseError {
-    #[error("{0}")]
-    Expected(ExpectedFound),
-    #[error("Expected a declaration. An isograph literal cannot be empty.")]
-    EmptyLiteral,
-    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
-    MultipleDeclarations,
-    #[error("This declaration type is not supported yet.")]
-    UnsupportedDeclarationType,
-    #[error("This integer does not fit in a 64-bit signed integer.")]
-    IntegerDoesNotFitI64,
+// from crates/isograph_parser/src/chunk.rs
+impl ChunkedLevel {
+    pub(crate) fn parse_items<'a, P, F>(
+        &'a self,
+        text: &'a str,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
+        push_error: &mut F,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
+    where
+        F: FnMut(WithSpan<ParseError>),
+    {
+        self.0
+            .iter()
+            .map(|chunk| {
+                parse_one_item(
+                    chunk,
+                    text,
+                    leftover,
+                    |cursor, push_error| parse_item(cursor, push_error),
+                    push_error,
+                )
+            })
+            .collect()
+    }
 }
 ```
+
+A list trailing comma is legal and is not a diagnostic. Length equals chunk count.
+
+## Change 2: `Expectation`
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -54,10 +68,6 @@ pub enum Expectation {
     DeclarationKeyword,
     #[error("the end of the declaration")]
     EndOfDeclaration,
-    #[error("a selection set, like '{{ id, name }}'")]
-    SelectionSet,
-    #[error("a field selection")]
-    Selection,
     #[error("a comma, a line break, or {0}")]
     Separator(ClosingDelimiter),
     #[error("an argument, like 'id: $id'")]
@@ -79,7 +89,15 @@ pub enum ClosingDelimiter {
 }
 ```
 
-## New module: arguments.rs
+Before, `Separator` is a unit variant (`"a comma or line break"`). This doc gives it the closer. Argument leftover is `Expectation::Separator(ClosingDelimiter::Parenthesis)`. Object-literal leftover is `Expectation::Separator(ClosingDelimiter::Brace)`.
+
+```rust
+// from crates/isograph_parser/src/parse_error.rs
+    #[error("This integer does not fit in a 64-bit signed integer.")]
+    IntegerDoesNotFitI64,
+```
+
+## Change 3: `arguments.rs`
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -91,13 +109,12 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, Expectation, Found, IsographResolutionNode, NonBracketTokenKind,
-    ObjectSelectionPath, ParseError, ScalarSelectionPath, Slot, UnparsedChunkItems,
-    UnparsedChunkItemsParent,
+    BracketKind, Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
+    Slot, UnparsedChunkItems,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ArgumentListParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ArgumentListParent, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(#[resolve_field] pub Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -202,10 +219,7 @@ impl From<intern::string_key::StringKey> for ObjectEntryName {
 }
 
 #[derive(Debug)]
-pub enum ArgumentListParent<'a> {
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
-}
+pub enum ArgumentListParent {}
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
@@ -213,7 +227,7 @@ pub enum NonConstantValueParent<'a> {
     ObjectEntry(Box<NamedObjectEntryPath<'a>>),
 }
 
-pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent<'a>>;
+pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent>;
 
 pub type NamedArgumentPath<'a> = PositionResolutionPath<&'a NamedArgument, ArgumentListPath<'a>>;
 
@@ -240,7 +254,7 @@ pub type ObjectEntryNamePath<'a> =
     PositionResolutionPath<&'a ObjectEntryName, NamedObjectEntryPath<'a>>;
 ```
 
-A position on `$` answers `VariableUse`. There is no `Dollar` field.
+`ArgumentListParent` has no variants. parse-selection-sets.md adds `Scalar` and `Object`. A position on `$` answers `VariableUse`. There is no `Dollar` field.
 
 `NonConstantValueParent::ObjectEntry` is boxed to break the cycle `NonConstantValueParent -> NamedObjectEntryPath -> ObjectLiteralPath -> NonConstantValueParent`.
 
@@ -248,13 +262,24 @@ A position on `$` answers `VariableUse`. There is no `Dollar` field.
 // from crates/isograph_parser/src/chunk.rs
 pub enum UnparsedChunkItemsParent<'a> {
     Literal(IsoLiteralParsePath<'a>),
-    SelectionSet(SelectionSetPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
 }
+
+impl<'a> From<ArgumentListPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: ArgumentListPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ArgumentList(parent)
+    }
+}
+
+impl<'a> From<ObjectLiteralPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(parent: ObjectLiteralPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ObjectLiteral(parent)
+    }
+}
 ```
 
-`From<ArgumentListPath>` and `From<ObjectLiteralPath>` join the existing impls.
+`From<IsoLiteralParsePath>` stays.
 
 `parse_value` is the listing in parsing-standards.md.
 
@@ -329,62 +354,6 @@ where
 }
 ```
 
-## Changes to selections.rs
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub struct ScalarSelection {
-    #[resolve_field(parent_variant = Scalar)]
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Scalar)]
-    pub name: WithSpan<SelectionName>,
-}
-
-pub struct ObjectSelection {
-    #[resolve_field(parent_variant = Object)]
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Object)]
-    pub name: WithSpan<SelectionName>,
-    #[resolve_field(parent_variant = Object)]
-    pub selection_set: WithSpan<SelectionSet>,
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-pub struct ScalarSelection {
-    #[resolve_field(parent_variant = Scalar)]
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Scalar)]
-    pub name: WithSpan<SelectionName>,
-    #[resolve_field(parent_variant = Scalar)]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-}
-
-pub struct ObjectSelection {
-    #[resolve_field(parent_variant = Object)]
-    pub reader_alias: Option<WithSpan<SelectionAlias>>,
-    #[resolve_field(parent_variant = Object)]
-    pub name: WithSpan<SelectionName>,
-    #[resolve_field(parent_variant = Object)]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-    #[resolve_field(parent_variant = Object)]
-    pub selection_set: WithSpan<SelectionSet>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-    let arguments = consume_argument_list(cursor, push_error);
-    let selection_set = consume_selection_set(cursor, push_error);
-```
-
-The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments` is deleted.
-
 `lib.rs` adds `mod arguments;` and `pub use arguments::*;`.
 
 ## The resolution surface
@@ -405,21 +374,49 @@ The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments`
     ObjectEntryName(ObjectEntryNamePath<'a>),
 ```
 
-`ArgumentList` and `ObjectLiteral` expand like `SelectionSet`. `NamedArgument` mixes a bare name descent with a wrapped value descent (`parent_variant = Argument`). `NamedObjectEntry` is the same with `ObjectEntry`, boxed through `From<T> for Box<T>`. `NonConstantValue` delegates. `VariableUse` has one marked field. `IntegerValue` / `BooleanValue` / `StringValue` / `NullValue` are leaves. A position on `$` answers `VariableUse`.
+`ArgumentList` and `ObjectLiteral` expand like a vec of slots. `NamedArgument` mixes a bare name descent with a wrapped value descent (`parent_variant = Argument`). `NamedObjectEntry` is the same with `ObjectEntry`, boxed through `From<T> for Box<T>`. `NonConstantValue` delegates. `VariableUse` has one marked field. `IntegerValue` / `BooleanValue` / `StringValue` / `NullValue` are leaves.
+
+Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts parse structure.
 
 ## Tests
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    fn arguments_of(slot: &Slot<Selection, UnparsedChunkItems>) -> &WithSpan<ArgumentList> {
-        let arguments = match slot.item.as_ref().map(|wrapped| wrapped.item.reference()) {
-            Some(Selection::Scalar(scalar)) => scalar.arguments.reference(),
-            Some(Selection::Object(object)) => object.arguments.reference(),
-            None => panic!("expected a parsed selection"),
-        };
-        arguments
-            .as_ref()
-            .expect("the fixture's selection carries arguments")
+// from crates/isograph_parser/src/arguments.rs
+    fn parsed_items<P>(
+        text: &str,
+        leftover: Expectation,
+        parse_item: impl Fn(
+            &mut ItemCursor<'_>,
+            &mut Vec<WithSpan<ParseError>>,
+        ) -> Result<P, WithSpan<ParseError>>,
+    ) -> (
+        Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
+        Vec<WithSpan<ParseError>>,
+        Vec<CommaWithoutItem>,
+    ) {
+        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
+        assert!(bracket_errors.is_empty(), "for literal {text:?}");
+        let (tree, comma_errors) = chunk(brackets.reference());
+        let mut errors = Vec::new();
+        let items = tree
+            .item
+            .parse_items(text, leftover, parse_item, &mut errors);
+        (items, errors, comma_errors)
+    }
+
+    fn parsed_arguments(
+        text: &str,
+    ) -> (
+        Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>,
+        Vec<WithSpan<ParseError>>,
+    ) {
+        let (items, errors, comma_errors) = parsed_items(
+            text,
+            Expectation::Separator(ClosingDelimiter::Parenthesis),
+            parse_argument,
+        );
+        assert_eq!(comma_errors, vec![], "for literal {text:?}");
+        (items, errors)
     }
 
     fn as_named_argument(slot: &Slot<NamedArgument, UnparsedChunkItems>) -> &NamedArgument {
@@ -429,49 +426,55 @@ The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments`
             .expect("expected a named argument")
     }
 
+    fn as_named_object_entry(slot: &Slot<NamedObjectEntry, UnparsedChunkItems>) -> &NamedObjectEntry {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected a named object entry")
+    }
+
+    fn span_of(text: &str, pattern: &str) -> Span {
+        let mut occurrences = text.match_indices(pattern);
+        let (offset, _) = occurrences
+            .next()
+            .expect("the pattern the test anchors on occurs in the literal");
+        assert!(
+            occurrences.next().is_none(),
+            "the pattern the test anchors on occurs exactly once in the literal"
+        );
+        Span::from_usize(offset, offset + pattern.len())
+    }
+
     #[test]
-    fn arguments_parse_on_scalar_and_object_selections() {
-        let text = "field Query.Foo { pet(id: $petId) { name(shouted: true) } }";
-        let (parse, errors) = parsed(text);
+    fn arguments_parse_as_name_colon_value() {
+        let text = "id: $petId, shouted: true";
+        let (items, errors) = parsed_arguments(text);
         assert_eq!(errors, vec![]);
-        let outer_selection = selections(as_field(parse.reference()).selection_set.reference())[0]
-            .item
-            .reference();
-        let outer = arguments_of(outer_selection);
-        assert_eq!(outer.location, span_of(text, "(id: $petId)"));
+        assert_eq!(items.len(), 2);
         assert_eq!(
-            as_named_argument(outer.item.0[0].item.reference())
-                .name
-                .location,
+            as_named_argument(items[0].item.reference()).name.location,
             span_of(text, "id")
         );
         assert_eq!(
-            as_named_argument(outer.item.0[0].item.reference())
-                .name
-                .item,
+            as_named_argument(items[0].item.reference()).name.item,
             "id".intern().to()
         );
-        let object = as_object(outer_selection);
-        let inner_selection = selections(object.selection_set.reference())[0]
-            .item
-            .reference();
-        let inner = arguments_of(inner_selection);
-        assert_eq!(inner.location, span_of(text, "(shouted: true)"));
+        assert_eq!(
+            as_named_argument(items[0].item.reference()).value.location,
+            span_of(text, "$petId")
+        );
+        assert_eq!(
+            as_named_argument(items[1].item.reference()).name.location,
+            span_of(text, "shouted")
+        );
     }
 
     #[test]
     fn each_value_kind_parses() {
-        let text = r#"field Query.Foo { bar(a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null) }"#;
-        let (parse, errors) = parsed(text);
+        let text = r#"a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null"#;
+        let (items, errors) = parsed_arguments(text);
         assert_eq!(errors, vec![]);
-        let arguments = arguments_of(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
-                .item
-                .reference(),
-        );
-        let values: Vec<&NonConstantValue> = arguments
-            .item
-            .0
+        let values: Vec<&NonConstantValue> = items
             .iter()
             .map(|argument| as_named_argument(argument.item.reference()).value.item.reference())
             .collect();
@@ -495,24 +498,17 @@ The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments`
         ));
         assert!(matches!(values[6], NonConstantValue::Null(_)));
         assert_eq!(
-            as_named_argument(arguments.item.0[0].item.reference())
-                .value
-                .location,
+            as_named_argument(items[0].item.reference()).value.location,
             span_of(text, "$x")
         );
     }
 
     #[test]
     fn object_literal_values_nest() {
-        let text = "field Query.Foo { bar(input: { id: 4, nested: { on: true } }) }";
-        let (parse, errors) = parsed(text);
+        let text = "input: { id: 4, nested: { on: true } }";
+        let (items, errors) = parsed_arguments(text);
         assert_eq!(errors, vec![]);
-        let arguments = arguments_of(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
-                .item
-                .reference(),
-        );
-        let value = as_named_argument(arguments.item.0[0].item.reference()).value.reference();
+        let value = as_named_argument(items[0].item.reference()).value.reference();
         assert_eq!(
             value.location,
             span_of(text, "{ id: 4, nested: { on: true } }")
@@ -526,42 +522,30 @@ The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments`
         assert_eq!(nested.name.location, span_of(text, "nested"));
     }
 
-    fn as_named_object_entry(slot: &Slot<NamedObjectEntry, UnparsedChunkItems>) -> &NamedObjectEntry {
-        slot.item
-            .as_ref()
-            .map(|wrapped| wrapped.item.reference())
-            .expect("expected a named object entry")
+    #[test]
+    fn empty_and_whitespace_levels_hold_zero_arguments() {
+        for text in ["", "   ", "\n"] {
+            let (items, errors) = parsed_arguments(text);
+            assert_eq!(items.len(), 0, "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
+        }
     }
 
     #[test]
-    fn empty_argument_lists_parse() {
-        let text = "field Query.Foo { bar() }";
-        let (parse, errors) = parsed(text);
+    fn a_list_trailing_comma_is_not_a_diagnostic() {
+        let text = "id: 1,";
+        let (items, errors) = parsed_arguments(text);
+        assert_eq!(items.len(), 1);
+        assert_eq!(as_named_argument(items[0].item.reference()).name.item, "id".intern().to());
         assert_eq!(errors, vec![]);
-        assert_eq!(
-            arguments_of(
-                selections(as_field(parse.reference()).selection_set.reference())[0]
-                    .item
-                    .reference()
-            )
-            .item
-            .0
-            .len(),
-            0
-        );
     }
 
     #[test]
     fn integer_overflow_is_a_typed_error_on_that_argument() {
-        let text = "field Query.Foo { bar(a: 99999999999999999999, b: 1) }";
-        let (parse, errors) = parsed(text);
-        let arguments = arguments_of(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
-                .item
-                .reference(),
-        );
-        assert!(arguments.item.0[0].item.item.is_none());
-        as_named_argument(arguments.item.0[1].item.reference());
+        let text = "a: 99999999999999999999, b: 1";
+        let (items, errors) = parsed_arguments(text);
+        assert!(items[0].item.item.is_none());
+        as_named_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
             error.item == ParseError::IntegerDoesNotFitI64
                 && error.location == span_of(text, "99999999999999999999")
@@ -570,49 +554,74 @@ The parse-fields.md test `arguments_are_trailing_leftover_until_parse_arguments`
 
     #[test]
     fn a_malformed_argument_degrades_that_argument_alone() {
-        let text = "field Query.Foo { bar(a 1, b: 2) }";
-        let (parse, errors) = parsed(text);
-        let arguments = arguments_of(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
-                .item
-                .reference(),
-        );
-        assert!(arguments.item.0[0].item.item.is_none());
+        let text = "a 1, b: 2";
+        let (items, errors) = parsed_arguments(text);
+        assert!(items[0].item.item.is_none());
         assert_eq!(
-            as_named_argument(arguments.item.0[1].item.reference())
-                .name
-                .location,
+            as_named_argument(items[1].item.reference()).name.location,
             span_of(text, "b")
         );
         assert!(errors.iter().any(|error| {
             error.item
-                == expected(
-                    token(NonBracketTokenKind::Colon),
-                    Found::Token(IntegerLiteral),
+                == ParseError::expected(
+                    Expectation::Token(NonBracketTokenKind::Colon),
+                    Found::Token(NonBracketTokenKind::IntegerLiteral),
                 )
         }));
     }
 
     #[test]
     fn a_non_value_identifier_is_an_error_at_the_value() {
-        let text = "field Query.Foo { bar(a: yes) }";
-        let (parse, errors) = parsed(text);
-        let arguments = arguments_of(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
-                .item
-                .reference(),
-        );
-        assert!(arguments.item.0[0].item.item.is_none());
+        let text = "a: yes";
+        let (items, errors) = parsed_arguments(text);
+        assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
-            error.item == expected(Expectation::Value, Found::Token(Identifier))
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
                 && error.location == span_of(text, "yes")
         }));
     }
-```
 
-A doubled comma between arguments is chunking's error, same shape as the selection-set test. A leftover token after a complete argument is `extra_tokens` plus `Expected(Separator, ...)`. A position on `$` in `$petId` answers `VariableUse`. A position on `petId` answers `VariableName`.
+    #[test]
+    fn leftover_after_an_argument_keeps_the_item() {
+        let text = "id: $x junk";
+        let (items, errors) = parsed_arguments(text);
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            as_named_argument(items[0].item.reference()).name.location,
+            span_of(text, "id")
+        );
+        assert!(items[0].item.extra_tokens.is_some());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Separator(ClosingDelimiter::Parenthesis),
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
+                && error.location == span_of(text, "junk")
+        }));
+    }
+
+    #[test]
+    fn a_doubled_comma_between_arguments_is_chunkings_error() {
+        let text = "a: 1,, b: 2";
+        let (items, errors, comma_errors) = parsed_items(
+            text,
+            Expectation::Separator(ClosingDelimiter::Parenthesis),
+            parse_argument,
+        );
+        assert_eq!(comma_errors.len(), 1);
+        assert_eq!(items.len(), 2);
+        assert_eq!(as_named_argument(items[0].item.reference()).name.location, span_of(text, "a"));
+        assert_eq!(as_named_argument(items[1].item.reference()).name.location, span_of(text, "b"));
+        assert_eq!(errors, vec![]);
+    }
+```
 
 ## Landing checklist
 
-1. arguments.rs, the selections.rs and parse_error.rs changes, the resolution-node variants, the deleted leftover-arguments test, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `parse_items`, `ClosingDelimiter`, `IntegerDoesNotFitI64`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

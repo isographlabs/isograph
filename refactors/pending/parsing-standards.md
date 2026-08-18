@@ -84,7 +84,12 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
     parent_type = <T as ResolvePosition>::Parent<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
+pub struct Slot<T: ResolvePosition, E: ResolvePosition>
+where
+    for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
+    for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
+    for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
+{
     #[resolve_field(parent_from)]
     pub item: Option<WithSpan<T>>,
     #[resolve_field(parent_from)]
@@ -111,7 +116,7 @@ pub struct UnparsedChunkItems(
 pub struct ExtraChunks(#[resolve_field(parent_variant = Extra)] pub NonEmpty<WithSpan<Chunk>>);
 ```
 
-`Slot` is not a path segment. `#[resolve_field(parent_from)]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
+`Slot` is not a path segment. `#[resolve_field(parent_from)]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`, the only extra bound. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
 
 Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover, not a third region.
 
@@ -487,7 +492,7 @@ pub enum BracketKind {
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-fields.md adds `SelectionSet` and `Selection`. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, and `IntegerDoesNotFitI64`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(ClosingDelimiter)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
@@ -544,8 +549,9 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 Each grammar feature lands on this surface.
 
 - generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, leftover span
-- parse-fields.md: `parse_items`, field declarations and selection sets
-- parse-arguments.md: `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- parse-selection-sets.md: selections, selection sets, arguments on selections
+- parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
