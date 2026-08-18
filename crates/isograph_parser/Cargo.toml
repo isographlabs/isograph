@@ -15,6 +15,7 @@ resolve_position_macros = { path = "../resolve_position_macros" }
 safe_peekable = { path = "../safe_peekable" }
 scoped_stack = { path = "../scoped_stack" }
 span = { path = "../span" }
+strum = { workspace = true }
 thiserror = { workspace = true }
 
 [lints]

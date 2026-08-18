@@ -37,7 +37,7 @@ pub enum Expectation {
 pub enum Found {
     #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("a group opened by {}", opening_bracket_text(*.0))]
+    #[error("a group opened by {0}")]
     Group(BracketKind),
     #[error("nothing more")]
     EndOfChunk,
@@ -55,13 +55,5 @@ impl From<&ChunkContentItem> for Found {
             ChunkContentItem::NonBracket(token) => Found::Token(token.0),
             ChunkContentItem::Group(group) => Found::Group(group.opening.item.0),
         }
-    }
-}
-
-fn opening_bracket_text(kind: BracketKind) -> &'static str {
-    match kind {
-        BracketKind::Parenthesis => "'('",
-        BracketKind::Brace => "'{'",
-        BracketKind::Bracket => "'['",
     }
 }

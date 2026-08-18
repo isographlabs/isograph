@@ -31,10 +31,13 @@ pub enum NonBracketTokenKind {
 
 /// The bracket kinds, named as isograph names its tokens: paren `()`, brace `{}`,
 /// bracket `[]`.
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Ord, PartialOrd, Hash, strum::Display)]
 pub enum BracketKind {
+    #[strum(to_string = "'('")]
     Parenthesis,
+    #[strum(to_string = "'{'")]
     Brace,
+    #[strum(to_string = "'['")]
     Bracket,
 }
 
