@@ -1,4 +1,5 @@
 mod chunk;
+mod chunk_stream;
 mod isograph_resolution_node;
 mod matched_brackets;
 mod non_bracket_token;

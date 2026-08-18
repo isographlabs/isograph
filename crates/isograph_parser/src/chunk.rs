@@ -7,7 +7,7 @@ use span::{Span, WithSpan};
 
 use crate::{
     BracketItem, Bracketed, CloseBracket, IsographResolutionNode, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, OpenBracket,
+    NonBracketTokenKind, OpenBracket, chunk_stream::ChunkStream,
 };
 
 /// One level of the chunk tree: the whole literal at the root, a group's interior
@@ -96,6 +96,44 @@ pub type OpenBracketPath<'a> = PositionResolutionPath<&'a OpenBracket, ChunkedGr
 pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, ChunkedGroupPath<'a>>;
 
 type LevelItems<'a> = SafePeekable<std::slice::Iter<'a, WithSpan<BracketItem>>>;
+
+impl Chunk {
+    #[allow(dead_code)]
+    pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
+        ChunkStream::new(self.contents.reference(), text)
+    }
+
+    /// First content item through last content item. `WithSpan<Chunk>` also covers
+    /// the trailing separator.
+    pub fn contents_span(&self) -> Span {
+        Span::join(
+            self.contents.first().location,
+            self.contents.last().location,
+        )
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
+        self.contents.first()
+    }
+
+    pub fn boundary_comma(&self) -> Option<Span> {
+        let separator = self.trailing_separator.as_ref()?;
+        separator
+            .item
+            .0
+            .iter()
+            .find(|token| token.item == SeparatorToken::Comma)
+            .map(|token| token.location)
+    }
+}
+
+impl ChunkedLevel {
+    #[allow(dead_code)]
+    pub(crate) fn len(&self) -> usize {
+        self.0.len()
+    }
+}
 
 /// Chunk a matched-brackets tree. Every non-separator token lands in a chunk; a comma
 /// no item precedes is the pass's one error, returned beside the tree; no grammar is
@@ -691,9 +729,34 @@ mod tests {
     fn whitespace_only_and_empty_literals_are_empty_levels() {
         for text in ["   ", "", "\n\n"] {
             let tree = chunked(text);
-            assert_eq!(tree.item.0.len(), 0);
+            assert_eq!(tree.item.len(), 0);
             assert_eq!(tree.location, Span::from_usize(0, text.len()));
         }
+    }
+
+    #[test]
+    fn contents_span_stops_at_the_last_content_item() {
+        let text = "foo,";
+        let tree = chunked(text);
+        let top = tree.item.0[0].item.reference();
+        assert_eq!(top.contents_span(), span_of(text, "foo"));
+        assert_eq!(top.boundary_comma(), span_of(text, ",").wrap_some());
+        assert_eq!(top.first_item().location, span_of(text, "foo"));
+        match top.first_item().item.reference() {
+            ChunkContentItem::NonBracket(token) => {
+                assert_eq!(token.0, NonBracketTokenKind::Identifier);
+            }
+            other => panic!("expected the identifier, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_chunk_without_a_comma_has_no_boundary_comma() {
+        let text = "foo\nbar";
+        let tree = chunked(text);
+        assert_eq!(tree.item.len(), 2);
+        assert_eq!(tree.item.0[0].item.boundary_comma(), None);
+        assert_eq!(tree.item.0[1].item.boundary_comma(), None);
     }
 
     #[test]
