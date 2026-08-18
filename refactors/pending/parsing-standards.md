@@ -192,13 +192,7 @@ pub fn parse_iso_literal(
         push_error(WithSpan::new(ParseError::EmptyLiteral, location));
         return WithSpan::new(
             Singleton {
-                item: WithSpan::new(
-                    Slot {
-                        item: None,
-                        extra_tokens: None,
-                    },
-                    location,
-                ),
+                item: None,
                 extra_chunks: None,
             },
             location,
@@ -465,7 +459,7 @@ pub struct Slot<T, E> {
 )]
 pub struct Singleton<T, E> {
     #[resolve_field]
-    pub item: WithSpan<T>,
+    pub item: Option<WithSpan<T>>,
     #[resolve_field]
     pub extra_chunks: Option<WithSpan<E>>,
 }
@@ -613,7 +607,7 @@ where
         WithSpan::new(ExtraChunks(rest), location)
     });
     Singleton {
-        item,
+        item: item.wrap_some(),
         extra_chunks,
     }
 }
@@ -625,9 +619,9 @@ where
 
 `parse_items` is `parse_one_item` per chunk. Length equals chunk count. A list trailing comma is legal and is not a diagnostic. `foo { bar } asdf` is `item: Some` (the object selection `foo { bar }`) and leftover items `asdf`. A position on `asdf` resolves through `UnparsedChunkItems`, not the selection set.
 
-`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) and sit on `IsoLiteralParse.extra_chunks`. At the root, the `extra_chunks` callback pushes `MultipleDeclarations` on the first extra chunk. Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns a `Slot` with `item: None` and `extra_tokens: None`, plus `extra_chunks: None`). `item` on the first slot is `Some` when the form parsed.
+`parse_singleton` is not a vec of slots. The level has at least one chunk. Chunk 0 is `parse_one_item`. Remaining chunks are cloned into `ExtraChunks` (every chunk after the first) and sit on `IsoLiteralParse.extra_chunks`. At the root, the `extra_chunks` callback pushes `MultipleDeclarations` on the first extra chunk. Extra chunks clone for now. Leftover in the first chunk and a boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Empty is handled by the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `item: None` plus `extra_chunks: None`). There is no `Slot`. `item` on the first slot is `Some` when the form parsed.
 
-`Slot<T, E>` is `item: Option<WithSpan<T>>` and `extra_tokens: Option<WithSpan<E>>`. `parse_one_item` returns it. `Singleton<T, E>` is `item: WithSpan<T>` and `extra_chunks: Option<WithSpan<E>>`. `parse_singleton` returns it. Extra chunks sit on `IsoLiteralParse.extra_chunks`. Resolve walks `IsoLiteralParse` only.
+`Slot<T, E>` is `item: Option<WithSpan<T>>` and `extra_tokens: Option<WithSpan<E>>`. `parse_one_item` returns `WithSpan<Slot<...>>` (the first-chunk attempt). `Singleton<T, E>` is `item: Option<WithSpan<T>>` and `extra_chunks: Option<WithSpan<E>>`. `parse_singleton` wraps that attempt in `Some`. Extra chunks sit on `IsoLiteralParse.extra_chunks`. Resolve walks `IsoLiteralParse` only. An empty literal has no attempt span; a position in it is `Singleton`. A position on the boundary comma is outside the attempt and is `Singleton`.
 
 A list is `parse_items`. A type that contains a group is generic over `Stage`. That includes a selection set, an argument list, an object literal, a `[...]` type, and a scalar selection (it may hold an argument list). Feature docs write those types.
 
@@ -809,7 +803,7 @@ Find-references, rename, and go-to-definition run when the resolved leaf is a na
 
 ## Trees and spans
 
-A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` is `Option<WithSpan<T>>`. The slot's `WithSpan` is on `Singleton.item`. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
+A tree enum is wrapped in `WithSpan` at its slot. `Slot.item` and `Slot.extra_tokens` are `Option<WithSpan<_>>`. `Singleton.item` is `Option<WithSpan<Slot<...>>>`: `None` when there is no first chunk, `Some` for the `parse_one_item` attempt. Each other struct field that is a node is `WithSpan`. A name is a fieldless marker struct in a `WithSpan`; each role is its own type. The name's text is the wrapper's span. The converted scalar is the `i64`. A position on `.`, `$`, `!`, or `to` resolves to the containing node. Resolve walks the optimistic tree only.
 
 `ResolvePosition` is derived. The one blanket delegation is `Box<T>` (parse-variables.md). A parent is a path alias at one parent, an enum at the second. Chunk-stage `IsographResolutionNode` variants resolve inside `UnparsedChunkItems` and `ExtraChunks`.
 
