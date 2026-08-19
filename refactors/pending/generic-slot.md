@@ -4,7 +4,7 @@ Lands after resolve-position-on-unmatched-span.md (refactors/past). GAT predicat
 
 A generic `impl<T, E> ResolvePosition for Slot<T, E>` does not compile (E0276 on extra GAT bounds; `for<'a> T: ResolvePosition<Parent<'a> = Path<&'a Slot<T, E>, …>>` overflows or implies `'static`). `Slot<IsoLiteralItem, UnparsedChunkItems>` and `Slot<Selection, UnparsedChunkItems>` are different types. Each gets its own concrete impl. `self_type_generics` becomes a list of pins. Each pin is type arguments plus that impl’s `parent_type`. The derive emits one `impl ResolvePosition for Slot<…>` per pin.
 
-This doc’s list has the root pin. A later list appends `(<Selection, UnparsedChunkItems>, SelectionSetPath<'a>)`. `resolved_node` and `on_unmatched_span` stay on the container (every pin uses `IsographResolutionNode` and `from_path`).
+This doc’s list has the root pin. A later list appends `(<Selection, UnparsedChunkItems>, SelectionSetPath<'a>)`. `resolved_node` stays on the container. One pin may use `on_unmatched_span = struct_name` (the default). Two or more pins require `from_path`: `struct_name` would emit `ResolvedNode::#struct_name` in every impl.
 
 `UnparsedChunkItems` is `E` on every pin. One pin: its `parent_type` is `IsoLiteralSlotPath` (live `SlotPath`). Another pin: that parent is an enum of the slot paths (`IsoLiteralSlot(IsoLiteralSlotPath)`, `SelectionSlot(SelectionSlotPath)`, an argument slot, …). `T` is not shared; `IsoLiteralItem`’s parent stays `IsoLiteralSlotPath`, `Selection`’s stays `SelectionSlotPath`.
 
@@ -77,7 +77,6 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
-    on_unmatched_span = from_path,
     self_type_generics = [
         (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
     ]
@@ -87,15 +86,6 @@ pub struct Singleton<T, E> {
     pub item: WithSpan<T>,
     #[resolve_field]
     pub extra_chunks: Option<WithSpan<E>>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-impl<'a> From<IsoLiteralParsePath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: IsoLiteralParsePath<'a>) -> Self {
-        IsographResolutionNode::Singleton(path)
-    }
 }
 ```
 
@@ -178,7 +168,7 @@ After: those three gone. The test-module import is `use crate::{PositionResoluti
 
 ## Change 2: `self_type_generics` is a list of pins, or omitted
 
-Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` is omitted or a list of 2-tuples `[ (<A, B>, ParentTy), ... ]`. `<A, B>` is a parse error. `handle_data_struct` and `handle_data_enum` emit one impl per pin. Container `parent_type` is required when omitted, forbidden when the list is present. A list requires `on_unmatched_span = from_path`. `struct_name` and an omitted unmatched arm are compile errors. Slot and Singleton convert to one-element lists with `from_path` and `From` impls.
+Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` is omitted or a list of 2-tuples `[ (<A, B>, ParentTy), ... ]`. `<A, B>` is a parse error. `handle_data_struct` and `handle_data_enum` emit one impl per pin. Container `parent_type` is required when omitted, forbidden when the list is present. One pin may use `struct_name` (the default unmatched arm). Two or more pins require `on_unmatched_span = from_path`; `struct_name` and an omitted unmatched arm are compile errors. Slot and Singleton convert to one-element lists and keep `struct_name`.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
@@ -219,7 +209,7 @@ Omitted is the live generic impl: `parent_type` required, `ty_generics` from `sp
                 .to_compile_error()
                 .to();
             }
-            require_from_path_with_pins(args.on_unmatched_span.reference())?;
+            require_from_path_with_pins(pins.0.len(), args.on_unmatched_span.reference())?;
             let mut impls = Vec::new();
             for pin in pins.0.iter() {
                 let generics_map = validate_and_map_generics(
@@ -251,19 +241,23 @@ fn require_parent_type(
 }
 
 fn require_from_path_with_pins(
+    pin_count: usize,
     on_unmatched_span: Option<&syn::Ident>,
 ) -> Result<(), proc_macro2::TokenStream> {
+    if pin_count < 2 {
+        return ().wrap_ok();
+    }
     match on_unmatched_span {
         Some(ident) if ident == "from_path" => ().wrap_ok(),
         Some(ident) => Error::new_spanned(
             ident,
-            "`on_unmatched_span = from_path` is required when `self_type_generics` is a list",
+            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
         )
         .to_compile_error()
         .wrap_err(),
         None => Error::new(
             proc_macro2::Span::call_site(),
-            "`on_unmatched_span = from_path` is required when `self_type_generics` is a list",
+            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
         )
         .to_compile_error()
         .wrap_err(),
@@ -310,7 +304,6 @@ impl syn::parse::Parse for SelfTypeGenerics {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
-    on_unmatched_span = from_path,
     self_type_generics = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
     ]
@@ -325,7 +318,6 @@ pub struct Slot<T, E> {
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
-    on_unmatched_span = from_path,
     self_type_generics = [
         (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
     ]
@@ -338,22 +330,7 @@ pub struct Singleton<T, E> {
 }
 ```
 
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-impl<'a> From<SlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: SlotPath<'a>) -> Self {
-        IsographResolutionNode::Slot(path)
-    }
-}
-
-impl<'a> From<IsoLiteralParsePath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: IsoLiteralParsePath<'a>) -> Self {
-        IsographResolutionNode::Singleton(path)
-    }
-}
-```
-
-Names are still `Slot` / `SlotPath`.
+Unmatched is still `struct_name`. Names are still `Slot` / `SlotPath`.
 
 ### Macro test: two pins on one `Slot`
 
@@ -482,9 +459,9 @@ fn pin_b_item_and_gap() {
 
 `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 
-## Change 3: `IsoLiteralSlot`
+## Change 3: `from_path`, `IsoLiteralSlot`
 
-Origin: `Slot` in `chunk.rs` after change 2. Delta: `SlotPath` → `IsoLiteralSlotPath`, `Slot` → `IsoLiteralSlot`, the `From` impl’s variant. `from_path` is already there.
+Origin: `Slot` in `chunk.rs` after change 2. Delta: `on_unmatched_span = from_path`, `SlotPath` → `IsoLiteralSlotPath`, `Slot` → `IsoLiteralSlot`, the `From` impl. One pin still allows `struct_name`; the variant is no longer `Slot`, so unmatched cannot stay `struct_name`.
 
 The After listings. Generated root impl (predicates already emitted by the derive):
 
@@ -574,6 +551,6 @@ Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_th
 ## Landing checklist
 
 1. Change 1: delete `PathParent`, the impl, the test. `cargo test -p resolve_position` passes.
-2. Change 2: `self_type_generics` is a list or omitted. A list requires `from_path`; `struct_name` is a compile error. Slot and Singleton convert to one-element lists with `from_path` and `From` impls. Two-pin macro test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-3. Change 3: `IsoLiteralSlot`, `SlotPath` renamed, `From` variant updated, gap test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+2. Change 2: `self_type_generics` is a list or omitted. One pin may use `struct_name`. Two or more pins require `from_path`. Slot and Singleton convert to one-element lists. Two-pin macro test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+3. Change 3: `from_path`, `From<IsoLiteralSlotPath>`, `IsoLiteralSlot`, `SlotPath` renamed, gap test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 4. Move this doc to refactors/past.
