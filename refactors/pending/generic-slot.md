@@ -168,7 +168,7 @@ After: those three gone. The test-module import is `use crate::{PositionResoluti
 
 ## Change 2: `self_type_generics` is a list of pins, or omitted
 
-Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` is omitted or `[ (<A, B>, ParentTy), ... ]`. `<A, B>` is a parse error. `handle_data_struct` and `handle_data_enum` emit one impl per pin. Container `parent_type` is required when omitted, forbidden when the list is present. Slot and Singleton convert to one-element lists.
+Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` is omitted or a list of 2-tuples `[ (<A, B>, ParentTy), ... ]`. `<A, B>` is a parse error. `handle_data_struct` and `handle_data_enum` emit one impl per pin. Container `parent_type` is required when omitted, forbidden when the list is present. Slot and Singleton convert to one-element lists.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
@@ -182,12 +182,14 @@ struct ResolvePositionArgs {
 struct SelfTypeGenerics(Vec<SelfTypePin>);
 
 struct SelfTypePin {
+    /// One argument per generic parameter of the struct, in declaration order.
+    /// `validate_and_map_generics` errors if the counts differ.
     args: syn::AngleBracketedGenericArguments,
     parent_type: syn::Type,
 }
 ```
 
-Omitted is the live generic impl: `parent_type` required, `ty_generics` from `split_for_impl`.
+Omitted is the live generic impl: `parent_type` required, `ty_generics` from `split_for_impl`. Non-generic structs omit it. A generic struct omits it when `#[resolve_field]` does not force a concrete `Parent` equality on a type parameter (the bound that E0276's on `Slot`). `item: Option<WithSpan<T>>` with bare `#[resolve_field]` is that bound; a generic field that is not `#[resolve_field]` is not.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
