@@ -55,9 +55,9 @@ After:
 pub(crate) struct ItemCursor<'a> {
     items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     previous_end: u32,
-    pub(crate) text: &'a str,
-    pub(crate) tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    pub(crate) errors: &'a mut Vec<WithSpan<ParseError>>,
+    text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    errors: &'a mut Vec<WithSpan<ParseError>>,
 }
 
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
@@ -82,6 +82,10 @@ impl<'a> ChunkStream<'a> {
 impl<'a> ItemCursor<'a> {
     pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
         self.errors.push(error);
+    }
+
+    pub(crate) fn stream_chunk<'c>(&'c mut self, chunk: &'c Chunk) -> ChunkStream<'c> {
+        chunk.stream(self.text, self.tokens, self.errors)
     }
 
     pub(crate) fn text(&self) -> &'a str {
@@ -110,7 +114,7 @@ impl<'a> ItemCursor<'a> {
     }
 ```
 
-`text`, `tokens`, and `errors` are `pub(crate)` so `parse_one_chunk` / `parse_each_chunk` / `parse_singleton` can split-borrow them onto a child stream. `text()` stays for call sites that only read the source.
+Fields stay private. `stream_chunk` is the split-borrow onto a child stream: it lives on `ItemCursor`, so `chunk.rs` never names the fields. `text()` stays for call sites that only read the source.
 
 `CursorPeek` still holds `tokens: &'c mut Vec<WithSpan<SemanticToken>>`, taken from `self.tokens` in `peek`. It does not report.
 
@@ -221,27 +225,13 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-fn parse_chunk<'a, P>(
-    chunk: &'a WithSpan<Chunk>,
-    text: &'a str,
-    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    errors: &'a mut Vec<WithSpan<ParseError>>,
-    parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
-) -> (ChunkStream<'a>, Result<WithSpan<P>, WithSpan<ParseError>>) {
-    let mut stream = chunk.item.stream(text, tokens, errors);
-    let result = stream.cursor().spanning(parse_item);
-    (stream, result)
-}
-
 fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
-    text: &'a str,
-    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    errors: &'a mut Vec<WithSpan<ParseError>>,
+    mut stream: ChunkStream<'a>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
-    let (mut stream, result) = parse_chunk(chunk, text, tokens, errors, parse);
+    let result = stream.cursor().spanning(parse);
     match result {
         Ok(item) => match stream.remaining_contents() {
             None => {
@@ -292,7 +282,12 @@ pub(crate) fn parse_singleton<'a, T>(
     extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
 ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
-    let item = parse_one_chunk(&level.item.0[0], text, tokens, errors, end, parse);
+    let item = parse_one_chunk(
+        &level.item.0[0],
+        level.item.0[0].item.stream(text, tokens, errors),
+        end,
+        parse,
+    );
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         errors.push(
             ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
@@ -311,7 +306,7 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-The root has no cursor yet. `parse_iso_literal` holds `text`, `tokens`, and `errors` and passes them into `parse_singleton`. `parse_one_chunk` builds the child cursor with `stream`. Leftover and failed-form diagnostics go through that child (`stream.cursor().report_error`). After the stream drops, `parse_singleton` pushes the boundary comma and extra chunks onto `errors` directly.
+The root has no cursor yet. `parse_iso_literal` holds `text`, `tokens`, and `errors` and passes them into `parse_singleton`, which builds the first stream with `Chunk::stream`. A nested list builds the child stream with `parent.stream_chunk`. `parse_one_chunk` takes that stream. Leftover and failed-form diagnostics go through the child (`stream.cursor().report_error`). After the stream drops, `parse_singleton` pushes the boundary comma and extra chunks onto `errors` directly.
 
 Who reports:
 
@@ -319,7 +314,7 @@ Who reports:
 - `parse_one_chunk`: leftover after `Ok`, failed form, `cursor.report_error`
 - `parse_singleton`: boundary comma, extra chunks, `errors.push`
 
-`parse_each_chunk` (parse-arguments.md) takes the parent cursor. It split-borrows `text` / `tokens` / `errors` onto each child. That function is not landed by this doc. The listing is the shape parse-arguments.md lands:
+`parse_each_chunk` (parse-arguments.md) takes the parent cursor. Each child stream is `parent.stream_chunk`. That function is not landed by this doc. The listing is the shape parse-arguments.md lands:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -335,9 +330,7 @@ impl ChunkedLevel {
             .map(|chunk| {
                 parse_one_chunk(
                     chunk,
-                    parent.text,
-                    parent.tokens,
-                    parent.errors,
+                    parent.stream_chunk(&chunk.item),
                     leftover,
                     &parse_item,
                 )
@@ -369,7 +362,7 @@ A nested list from a grammar function is the cursor they already hold. That call
     )
 ```
 
-A nested `parse_singleton` (`[...]` in parse-variables.md) unpacks the same way: `parse_singleton(level, cursor.text, cursor.tokens, cursor.errors, ...)`.
+A nested `parse_singleton` (`[...]` in parse-variables.md) takes the parent cursor the same way: `stream_chunk` for chunk 0, then `parent.report_error` for the boundary comma and extra chunks after that stream drops.
 
 The nest site today is `cursor.text()` (`&self`) plus a separate `push_error`. After this it is `parse_each_chunk(cursor, ...)` (`&mut ItemCursor`). The grammar function already holds `&mut ItemCursor`; the nested list now uses that mutable borrow instead of a shared one. `ChunkedLevel::parse_each_chunk` stays `&self` on the level. The level is not the sink.
 
@@ -486,7 +479,7 @@ parse-arguments.md tests feed a list interior and have no parent parse. They con
 
 `parse_iso_literal`'s listing takes `errors: &mut Vec<WithSpan<ParseError>>` instead of `push_error: impl FnMut(...)`.
 
-`ItemCursor` / `ChunkStream` listings gain `errors` and `report_error`. `ChunkStream::new` and `Chunk::stream` take `errors`.
+`ItemCursor` / `ChunkStream` listings gain `errors`, `report_error`, and `stream_chunk`. `ChunkStream::new` and `Chunk::stream` take `errors`.
 
 The `parse_one_chunk` / `parse_each_chunk` / `parse_singleton` listings are Change 2. `parse_*` does not take a sink. A nested list is `parse_each_chunk(cursor, ...)`.
 
@@ -497,7 +490,7 @@ Function shapes:
 - `parse_*`: parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list takes the cursor.
 - Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` and `parse_iso_literal`. Not stored on the tree.
 
-Catalog: the `push_error` rows become `report_error` / `errors.push`. `ItemCursor::report_error` is a catalog entry.
+Catalog: the `push_error` rows become `report_error` / `errors.push`. `ItemCursor::report_error` and `ItemCursor::stream_chunk` are catalog entries.
 
 `parse_value` in the standards (and every grammar function in the feature docs, when next opened) drops `F` and `push_error`. Object / array / argument-list / selection-set / variable-list interiors pass `cursor`.
 
@@ -505,6 +498,6 @@ semantic-tokens.md's `TTokens` lands on `ItemCursor.tokens` (`&'a mut TTokens`) 
 
 ## Landing checklist
 
-1. `errors` on `ItemCursor`, `report_error`, `Chunk::stream` / `ChunkStream::new` taking `errors`, `parse_one_chunk` / `parse_chunk` / `parse_singleton` without `F`, `parse_iso_literal` taking the error vec, the test helper and `stream_of` updates, the `report_error_appends_to_the_vec` test. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `errors` on `ItemCursor`, `report_error`, `stream_chunk`, `Chunk::stream` / `ChunkStream::new` taking `errors`, `parse_one_chunk` taking a `ChunkStream`, `parse_singleton` without `F`, `parse_iso_literal` taking the error vec, the test helper and `stream_of` updates, the `report_error_appends_to_the_vec` test. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. parsing-standards.md and parsing-plan.md match Change 5.
 3. Move this doc to refactors/past.
