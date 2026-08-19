@@ -358,7 +358,9 @@ fn leftover_parent_is_the_slot_path_through_from() {
 
 Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs` after generic-slot.md. Delta: two pins, leftover's parent is an enum of slot paths, `extra_tokens` takes `#[from_container_parent]`. `UnparsedChunkItemsPath` moves next to that enum.
 
-`Slot<T, E>` has one `Parent`. A pin `(<KeyValuePair, UnparsedChunkItems>, ArgumentListPath)` and a pin `(<KeyValuePair, UnparsedChunkItems>, ObjectLiteralPath)` are two impls of the same type. The lists are vanilla: each pin's parent is that list's path, each vec is bare `#[resolve_field]`. The slot items are therefore two types. `ArgumentName` and `NonConstantValue` sit on both and take the enum parents.
+`Slot<T, E>` has one `Parent`. The lists are vanilla: each pin's parent is that list's path, each vec is bare `#[resolve_field]`. The slot items are therefore two types, `NamedArgument` and `ObjectEntry`.
+
+Bare `#[resolve_field]` passes `self.path(parent)`. `#[parent_variant(V)]` wraps that path in variant `V` of the child's `Parent` enum. The child's `Parent` is an enum when that child appears under more than one parent. `ChunkContentItem` appears under `Chunk` and under `UnparsedChunkItems`. `ArgumentName` and `NonConstantValue` appear under `NamedArgument` and under `ObjectEntry`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -419,6 +421,19 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 ```
+
+`UnparsedChunkItems` keeps `#[parent_variant(Unparsed)]`. That variant is on `ChunkContentItemParent`. The path type inside it is `UnparsedChunkItemsPath`, whose parent type is now `UnparsedChunkItemsParent`.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug)]
+pub enum ChunkContentItemParent<'a> {
+    Chunk(ChunkPath<'a>),
+    Unparsed(UnparsedChunkItemsPath<'a>),
+}
+```
+
+Before: `UnparsedChunkItemsPath` is `PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>`. After: `PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>`. The `Unparsed` variant stays.
 
 Before:
 
@@ -525,7 +540,7 @@ pub enum NonConstantValue {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableUse(#[resolve_field] pub WithSpan<VariableName>);
+pub struct VariableUse(#[resolve_field] pub WithSpan<VariableNameWrapper>);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -555,7 +570,7 @@ pub struct ArgumentName(common_lang_types::FieldArgumentName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableName(common_lang_types::VariableName);
+pub struct VariableNameWrapper(common_lang_types::VariableName);
 
 #[derive(Debug)]
 pub enum ArgumentListParent {}
@@ -604,12 +619,13 @@ pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantVa
 
 pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, ArgumentNameParent<'a>>;
 
-pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
+pub type VariableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a VariableNameWrapper, VariableUsePath<'a>>;
 ```
 
-`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `name.interned().map(ArgumentName)`.
+`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `name.interned().map(ArgumentName)` and `name.interned().map(VariableNameWrapper)`.
 
-`NonConstantValueParent` variants are boxed to break `NamedArgumentPath` / `ObjectEntryPath` through `ObjectLiteral` back to a pair. A position on `$` answers `VariableUse`.
+`NonConstantValueParent` variants are boxed to break `NamedArgumentPath` / `ObjectEntryPath` through `ObjectLiteral` back to a pair. A position on `$` answers `VariableUse`. `VariableNameWrapper` has one parent, `VariableUsePath`, so that field is bare `#[resolve_field]`.
 
 `ArgumentList` and `ObjectLiteral` vecs are bare `#[resolve_field]`. `NamedArgument`'s parent is `NamedArgumentSlotPath`. `ObjectEntry`'s parent is `ObjectEntrySlotPath`. `ArgumentName` and `NonConstantValue` have two parents, so those fields take `#[parent_variant]`.
 
@@ -688,7 +704,7 @@ use crate::{
     EntrypointDeclarationPath, ExtraChunksPath, IntegerValuePath, IsoLiteralParsePath,
     IsoLiteralSlotPath, NamedArgumentPath, NamedArgumentSlotPath, NonBracketTokenPath,
     NullValuePath, ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath,
-    StringValuePath, UnparsedChunkItemsPath, VariableNamePath, VariableUsePath,
+    StringValuePath, UnparsedChunkItemsPath, VariableNameWrapperPath, VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -722,7 +738,7 @@ pub enum IsographResolutionNode<'a> {
     ObjectEntry(ObjectEntryPath<'a>),
     ArgumentName(ArgumentNamePath<'a>),
     VariableUse(VariableUsePath<'a>),
-    VariableName(VariableNamePath<'a>),
+    VariableNameWrapper(VariableNameWrapperPath<'a>),
     StringValue(StringValuePath<'a>),
     IntegerValue(IntegerValuePath<'a>),
     BooleanValue(BooleanValuePath<'a>),
@@ -800,14 +816,14 @@ pub(crate) fn parse_value(
                 .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                name.interned().map(VariableName),
+                name.interned().map(VariableNameWrapper),
             ))
             .wrap_ok();
         }
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(StringValue(span.token_text().intern().to()))
+            return NonConstantValue::String(span.interned().map(StringValue).item)
                 .wrap_ok();
         }
         if let Some(span) = cursor

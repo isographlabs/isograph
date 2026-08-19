@@ -306,14 +306,14 @@ pub(crate) fn parse_value(
                 .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                name.interned().map(VariableName),
+                name.interned().map(VariableNameWrapper),
             ))
             .wrap_ok();
         }
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(StringValue(span.token_text().intern().to()))
+            return NonConstantValue::String(span.interned().map(StringValue).item)
                 .wrap_ok();
         }
         if let Some(span) = cursor
@@ -357,7 +357,7 @@ pub(crate) fn parse_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers that do not add a second `From` construct `name.interned().map(VariableName)`.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers that do not add a second `From` construct `name.interned().map(VariableNameWrapper)`.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 

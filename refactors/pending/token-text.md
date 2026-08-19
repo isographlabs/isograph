@@ -1,6 +1,6 @@
 # token-text: source slice on a consumed token
 
-`consume_token_if` and `require_token` return `TokenText`. The source slice is `token_text` on that value. `ItemCursor::text` is still the whole literal.
+`consume_token_if` and `require_token` return `TokenText`. The source slice is `token_text` on that value. An interned name is `interned` on that value: intern, `From<StringKey>`, and the token's span. `ItemCursor::text` is still the whole literal.
 
 ## Change 1: `TokenText`
 
@@ -16,10 +16,14 @@ impl<'a> TokenText<'a> {
     pub(crate) fn token_text(self) -> &'a str {
         self.text
     }
+
+    pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
+        self.text.intern().to::<T>().with_span(self.location)
+    }
 }
 ```
 
-`text` is the slice of `ItemCursor`'s source at `location`. `'a` is that source, not the cursor borrow.
+`text` is the slice of `ItemCursor`'s source at `location`. `'a` is that source, not the cursor borrow. `interned` needs `use intern::string_key::Intern` in `chunk_stream.rs`. A parser wrapper that implements `From<StringKey>` is `token.interned()`. A parser wrapper that does not is `token.interned().map(ArgumentName)`, and `interned` infers the inner lang type.
 
 Before:
 
@@ -175,16 +179,8 @@ fn parse_entrypoint(
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
-        parent_type: parent_type
-            .token_text()
-            .intern()
-            .to::<EntityName>()
-            .with_span(parent_type.location),
-        client_field_name: client_field_name
-            .token_text()
-            .intern()
-            .to::<ClientFieldName>()
-            .with_span(client_field_name.location),
+        parent_type: parent_type.interned(),
+        client_field_name: client_field_name.interned(),
     }
     .wrap_ok()
 }
@@ -249,6 +245,7 @@ pub(crate) struct TokenText<'a> {
 
 impl<'a> TokenText<'a> {
     pub(crate) fn token_text(self) -> &'a str;
+    pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T>;
 }
 
 impl<'a> ItemCursor<'a> {
@@ -286,24 +283,24 @@ impl<'a> ItemCursor<'a> {
 ```
 
 - Leaf: the `location` of the `TokenText` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
-- `token_text` is the source slice on that `TokenText`. A name in the tree is an interned string key (`name.token_text().intern().to::<EntityName>().with_span(name.location)`). The converted scalar is the `i64`. The wrapper span is location only.
+- `token_text` is the source slice on that `TokenText`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
 - Keyword / boolean / null text: `token.token_text()` after an identifier
 - Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
-- Interned name: `name.token_text().intern().to::<EntityName>().with_span(name.location)`
+- Interned name: `token.interned()` when the wrapper implements `From<StringKey>`; `token.interned().map(ArgumentName)` when it does not
 
 The `parse_value` ladder and the interned-name sentence in that file:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
             return NonConstantValue::Variable(VariableUse(
-                VariableName(name.token_text().intern().to()).with_span(name.location),
+                name.interned().map(VariableNameWrapper),
             ))
             .wrap_ok();
         }
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(StringValue(span.token_text().intern().to()))
+            return NonConstantValue::String(span.interned().map(StringValue).item)
                 .wrap_ok();
         }
         if let Some(span) = cursor
@@ -335,7 +332,7 @@ The `parse_value` ladder and the interned-name sentence in that file:
         }
 ```
 
-Parser wrappers construct `VariableName(name.token_text().intern().to())`. The integer arm is `token.token_text().parse()`; that token is the one `consume_token_if(IntegerLiteral)` just returned.
+Parser wrappers that do not implement `From<StringKey>` construct `name.interned().map(VariableNameWrapper)`. The integer arm is `token.token_text().parse()`; that token is the one `consume_token_if(IntegerLiteral)` just returned.
 
 ## Change 4: tests
 
@@ -570,5 +567,5 @@ After:
 
 ## Landing checklist
 
-1. `TokenText`, `consume_token_if` / `require_token` return it, `parse_iso_literal` and the tests, `parsing-standards.md`. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `TokenText` with `token_text` and `interned`, `consume_token_if` / `require_token` return it, `parse_iso_literal` uses `interned` for names, the tests, `parsing-standards.md`. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
