@@ -27,7 +27,7 @@ where
     for<'a> Unparsed: ResolvePosition<ResolvedNode<'a> = <T as ResolvePosition>::ResolvedNode<'a>>,
 {
     Parsed(Parsed<T>),
-    Unparsed(#[parent_from] Unparsed),
+    Unparsed(#[from_container_parent] Unparsed),
 }
 
 #[derive(Debug, ResolvePosition)]

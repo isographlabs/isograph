@@ -2,7 +2,7 @@
 
 Lands after resolve-position-on-unmatched-span.md (refactors/past).
 
-`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
+`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `from_container_parent`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
 `IsographResolutionNode` has one variant per `Slot<T, E>`. The root is `IsoLiteralSlot(IsoLiteralSlotPath<'a>)`. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`. `IsoLiteralSlotPath` is `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`. Live `SlotPath` is this alias renamed. There is no `IsographResolutionNode::Slot`.
 
@@ -19,9 +19,9 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 /// is `T::Parent` and the owned tree does not carry a lifetime.
 ///
 /// Walk, given that parent:
-/// - Position in `item`: `parent_from` passes `From::from(parent)` as `T::Parent`
+/// - Position in `item`: `from_container_parent` passes `From::from(parent)` as `T::Parent`
 ///   (identity). `Slot` is not a path segment.
-/// - Position in `extra_tokens`: `parent_from` passes `From::from(parent)` as
+/// - Position in `extra_tokens`: `from_container_parent` passes `From::from(parent)` as
 ///   `E::Parent` (wrap, `UnparsedChunkItemsParent::Literal` at the root).
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each `Slot<T, E>` supplies a `From` that
@@ -45,11 +45,11 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 pub struct Slot<T: ResolvePosition, E: ResolvePosition> {
     /// `Some` when the form parsed.
     #[resolve_field]
-    #[parent_from]
+    #[from_container_parent]
     pub item: Option<WithSpan<T>>,
     /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
-    #[parent_from]
+    #[from_container_parent]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 ```
@@ -184,13 +184,13 @@ pub type EntrypointDeclarationPath<'a> =
     Slot(SlotPath<'a>),
 ```
 
-## Macro: `parent_from` on a struct field
+## Macro: `from_container_parent` on a struct field
 
-`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. The unmatched-span arm is unchanged.
+`#[resolve_field]` + `#[from_container_parent]` on a struct field is accepted. Emission is `From::from(parent)`. The unmatched-span arm is unchanged.
 
 `on_unmatched_span = from_path` is shipped (refactors/past/resolve-position-on-unmatched-span.md). This doc uses it.
 
-Today `ParentConstruction` has no `FromParent`: enum payloads emit `From::from` directly, and a struct field with `#[parent_from]` is an error. This doc puts `FromParent` back for struct fields.
+Today `ParentConstruction` has no `FromContainerParent`: enum payloads emit `From::from` directly, and a struct field with `#[from_container_parent]` is an error. This doc puts `FromContainerParent` back for struct fields.
 
 Before:
 
@@ -210,9 +210,9 @@ After:
 enum ParentConstruction {
     ContainerPath,
     EnumVariant(syn::Ident),
-    /// `#[resolve_field]` + `#[parent_from]`: the child's `Parent` is `From` the
+    /// `#[resolve_field]` + `#[from_container_parent]`: the child's `Parent` is `From` the
     /// container's `Parent`.
-    FromParent,
+    FromContainerParent,
     Transparent,
 }
 ```
@@ -221,9 +221,9 @@ Before:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-            if let Some(attr) = parent_from {
-                parse_parent_from(attr)?;
-                return Error::new_spanned(attr, "`#[parent_from]` is an enum-payload attribute")
+            if let Some(attr) = from_container_parent {
+                parse_from_container_parent(attr)?;
+                return Error::new_spanned(attr, "`#[from_container_parent]` is an enum-payload attribute")
                     .to_compile_error()
                     .wrap_err();
             }
@@ -237,9 +237,9 @@ After:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-            if let Some(attr) = parent_from {
-                parse_parent_from(attr)?;
-                ParentConstruction::FromParent
+            if let Some(attr) = from_container_parent {
+                parse_from_container_parent(attr)?;
+                ParentConstruction::FromContainerParent
             } else {
                 match parent_variant {
                     Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
@@ -248,11 +248,11 @@ After:
             }
 ```
 
-`Option<WithSpan<T>>` is already a legal field type. `new_parent_expr` gains a `FromParent` arm:
+`Option<WithSpan<T>>` is already a legal field type. `new_parent_expr` gains a `FromContainerParent` arm:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-        ParentConstruction::FromParent => quote!(::std::convert::From::from(parent)),
+        ParentConstruction::FromContainerParent => quote!(::std::convert::From::from(parent)),
         ParentConstruction::Transparent => {
             Error::new_spanned(inner_type, "`transparent` does not build a field parent")
                 .to_compile_error()
@@ -317,7 +317,7 @@ That space answers `IsographResolutionNode::IsoLiteralSlot(path)` with `path.inn
 ### Macro
 
 ```rust
-// from crates/resolve_position_macros/tests/parent_from_struct.rs
+// from crates/resolve_position_macros/tests/from_container_parent_struct.rs
 use prelude::Postfix;
 use resolve_position::{PositionResolutionPath, ResolvePosition};
 use resolve_position_macros::ResolvePosition;
@@ -351,10 +351,10 @@ type ParentPath<'a> = PositionResolutionPath<&'a List, ()>;
 )]
 struct Slot<T: ResolvePosition, E: ResolvePosition> {
     #[resolve_field]
-    #[parent_from]
+    #[from_container_parent]
     item: Option<WithSpan<T>>,
     #[resolve_field]
-    #[parent_from]
+    #[from_container_parent]
     extra_tokens: Option<WithSpan<E>>,
 }
 
@@ -520,5 +520,5 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 ## Landing checklist
 
-1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `IsoLiteralSlot` replaces `Slot`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+1. Macro: `from_container_parent` on struct fields, `FromContainerParent` on `ParentConstruction`, generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `IsoLiteralSlot` replaces `Slot`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 2. Move this doc to refactors/past.

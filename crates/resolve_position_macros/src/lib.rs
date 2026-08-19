@@ -8,7 +8,7 @@ use crate::resolve_position_macro::resolve_position_macro;
 #[proc_macro_derive(
     ResolvePosition,
     attributes(
-        parent_from,
+        from_container_parent,
         parent_variant,
         resolve_field,
         resolve_position,

@@ -230,7 +230,7 @@ fn generate_enum_arm(
     let FieldAttributes {
         resolve_field,
         parent_variant,
-        parent_from,
+        from_container_parent,
     } = match collect_field_attributes(payload.attrs.reference()) {
         Ok(attrs) => attrs,
         Err(e) => return e,
@@ -247,7 +247,7 @@ fn generate_enum_arm(
             Ok(ResolveFieldForm::Bare) => Error::new_spanned(
                 resolve_field,
                 "an enum payload always resolves and passes the parent through; annotate \
-                 only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[parent_from]`",
+                 only to construct the parent: `#[parent_variant(SomeVariant)]` or `#[from_container_parent]`",
             )
             .to_compile_error(),
             Err(e) => e,
@@ -257,7 +257,7 @@ fn generate_enum_arm(
     // An unannotated payload delegates with the parent unchanged, which requires the
     // payload's Parent type to equal the enum's. The payload implements ResolvePosition
     // itself; a located wrapper delegates through the blanket impl in resolve_position.
-    match (parent_variant, parent_from) {
+    match (parent_variant, from_container_parent) {
         (None, None) => quote! {
             #enum_name::#variant_name(inner) => inner.resolve(parent, position)
         },
@@ -273,7 +273,7 @@ fn generate_enum_arm(
             }
             Err(e) => e,
         },
-        (None, Some(attr)) => match parse_parent_from(attr) {
+        (None, Some(attr)) => match parse_from_container_parent(attr) {
             Ok(()) => quote! {
                 #enum_name::#variant_name(inner) => inner.resolve(
                     ::std::convert::From::from(parent),
@@ -284,7 +284,7 @@ fn generate_enum_arm(
         },
         (Some(_), Some(attr)) => Error::new_spanned(
             attr,
-            "cannot combine `#[parent_variant]` and `#[parent_from]`",
+            "cannot combine `#[parent_variant]` and `#[from_container_parent]`",
         )
         .to_compile_error(),
     }
@@ -329,6 +329,9 @@ enum ParentConstruction {
     /// `#[parent_variant(V)]`: the child's `Parent` type is an
     /// enum, and the parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
+    /// `#[resolve_field]` + `#[from_container_parent]`: the child's `Parent` is `From` the
+    /// container's `Parent`.
+    FromContainerParent,
     /// `#[resolve_field(transparent)]`: a bare `ResolvePosition` field, no
     /// path segment, no span check.
     Transparent,
@@ -337,7 +340,7 @@ enum ParentConstruction {
 struct FieldAttributes<'a> {
     resolve_field: Option<&'a syn::Attribute>,
     parent_variant: Option<&'a syn::Attribute>,
-    parent_from: Option<&'a syn::Attribute>,
+    from_container_parent: Option<&'a syn::Attribute>,
 }
 
 enum ResolveFieldForm {
@@ -370,7 +373,7 @@ fn collect_field_attributes(
     FieldAttributes {
         resolve_field: find_unique_attr(attrs, "resolve_field")?,
         parent_variant: find_unique_attr(attrs, "parent_variant")?,
-        parent_from: find_unique_attr(attrs, "parent_from")?,
+        from_container_parent: find_unique_attr(attrs, "from_container_parent")?,
     }
     .wrap_ok()
 }
@@ -390,7 +393,7 @@ fn parse_resolve_field_form(
                 attr.meta.reference(),
                 "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
                  parent wrapping is `#[parent_variant(SomeVariant)]`, \
-                 parent conversion is `#[parent_from]`",
+                 parent conversion is `#[from_container_parent]`",
             )
             .to_compile_error()
             .wrap_err()
@@ -399,7 +402,7 @@ fn parse_resolve_field_form(
             name_value,
             "expected bare `#[resolve_field]` or `#[resolve_field(transparent)]`; \
              parent wrapping is `#[parent_variant(SomeVariant)]`, \
-             parent conversion is `#[parent_from]`",
+             parent conversion is `#[from_container_parent]`",
         )
         .to_compile_error()
         .wrap_err(),
@@ -424,10 +427,10 @@ fn parse_parent_variant(attr: &syn::Attribute) -> Result<syn::Ident, proc_macro2
     }
 }
 
-fn parse_parent_from(attr: &syn::Attribute) -> Result<(), proc_macro2::TokenStream> {
+fn parse_from_container_parent(attr: &syn::Attribute) -> Result<(), proc_macro2::TokenStream> {
     match attr.meta.reference() {
         syn::Meta::Path(_) => ().wrap_ok(),
-        _ => Error::new_spanned(attr, "expected `#[parent_from]`")
+        _ => Error::new_spanned(attr, "expected `#[from_container_parent]`")
             .to_compile_error()
             .wrap_err(),
     }
@@ -543,7 +546,7 @@ fn get_resolve_field_info(
     let FieldAttributes {
         resolve_field,
         parent_variant,
-        parent_from,
+        from_container_parent,
     } = collect_field_attributes(field.attrs.reference())?;
 
     let Some(resolve_field) = resolve_field else {
@@ -552,10 +555,13 @@ fn get_resolve_field_info(
                 .to_compile_error()
                 .wrap_err();
         }
-        if let Some(attr) = parent_from {
-            return Error::new_spanned(attr, "`#[parent_from]` requires `#[resolve_field]`")
-                .to_compile_error()
-                .wrap_err();
+        if let Some(attr) = from_container_parent {
+            return Error::new_spanned(
+                attr,
+                "`#[from_container_parent]` requires `#[resolve_field]`",
+            )
+            .to_compile_error()
+            .wrap_err();
         }
         return None.wrap_ok();
     };
@@ -572,10 +578,10 @@ fn get_resolve_field_info(
                 .to_compile_error()
                 .wrap_err();
             }
-            if let Some(attr) = parent_from {
+            if let Some(attr) = from_container_parent {
                 return Error::new_spanned(
                     attr,
-                    "`#[resolve_field(transparent)]` cannot combine with `#[parent_from]`",
+                    "`#[resolve_field(transparent)]` cannot combine with `#[from_container_parent]`",
                 )
                 .to_compile_error()
                 .wrap_err();
@@ -583,23 +589,22 @@ fn get_resolve_field_info(
             ParentConstruction::Transparent
         }
         ResolveFieldForm::Bare => {
-            if let (Some(_), Some(attr)) = (parent_variant, parent_from) {
+            if let (Some(_), Some(attr)) = (parent_variant, from_container_parent) {
                 return Error::new_spanned(
                     attr,
-                    "cannot combine `#[parent_variant]` and `#[parent_from]`",
+                    "cannot combine `#[parent_variant]` and `#[from_container_parent]`",
                 )
                 .to_compile_error()
                 .wrap_err();
             }
-            if let Some(attr) = parent_from {
-                parse_parent_from(attr)?;
-                return Error::new_spanned(attr, "`#[parent_from]` is an enum-payload attribute")
-                    .to_compile_error()
-                    .wrap_err();
-            }
-            match parent_variant {
-                Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
-                None => ParentConstruction::ContainerPath,
+            if let Some(attr) = from_container_parent {
+                parse_from_container_parent(attr)?;
+                ParentConstruction::FromContainerParent
+            } else {
+                match parent_variant {
+                    Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                    None => ParentConstruction::ContainerPath,
+                }
             }
         }
     };
@@ -662,7 +667,7 @@ fn generate_resolve_code(
 }
 
 /// The expression passed as the child's parent. `self.path(parent)` is the
-/// container's own path in both arms; the variant wrapping is the only difference.
+/// container's own path; wrapping and `From` conversion are the other constructions.
 fn new_parent_expr(
     parent_construction: &ParentConstruction,
     inner_type: &syn::Type,
@@ -672,6 +677,7 @@ fn new_parent_expr(
         ParentConstruction::EnumVariant(variant) => quote!(
             <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
         ),
+        ParentConstruction::FromContainerParent => quote!(::std::convert::From::from(parent)),
         ParentConstruction::Transparent => {
             Error::new_spanned(inner_type, "`transparent` does not build a field parent")
                 .to_compile_error()
