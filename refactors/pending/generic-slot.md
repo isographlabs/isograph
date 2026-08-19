@@ -212,9 +212,53 @@ fn parse_from_container_parent(attr: &syn::Attribute) -> Result<(), proc_macro2:
 
 ## Change 2: extra predicates on `type ResolvedNode<'a>`
 
-Live `handle_data_struct` emits only `where Self: 'a` on both associated types. A generic struct whose field `resolve` returns a different `ResolvedNode` than the container, or whose unmatched arm is `self.path(parent).to()`, does not type-check without more predicates. `for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the impl is `E: 'static` on rustc 1.97. The predicates go on `type ResolvedNode<'a>` for that `'a`. `handle_data_enum` is unchanged.
+The generated `resolve` body returns a field's `resolve`, or on a miss `self.path(parent).to()`. The function's return type is `Self::ResolvedNode<'a>`, which is `#resolved_node`.
 
-The derive synthesizes those predicates from the same field walk that emits the body. Every derived struct gets the predicates its fields and unmatched arm imply. There are no `T` / `E` names in the derive; Slot's expansion is this rule with those parameters.
+```
+return item.item.resolve(new_parent, position);
+return extra.item.resolve(new_parent, position);
+return self.path(parent).to();
+```
+
+Those three expressions must be `#resolved_node`. On a concrete struct rustc checks the concrete associated types. On `Slot<T, E>` it cannot, unless the impl states the facts. Five of them; 3 lands in change 3, 5 is not a bound.
+
+1. `T: ResolvePosition<ResolvedNode<'a> = #resolved_node>`
+
+`item.resolve` returns `T::ResolvedNode<'a>`. `Slot::resolve` returns `#resolved_node`. Those are the same type. At the root `#resolved_node` is `T::ResolvedNode`, so this is identity. The derive still writes it: the inner type is `T`, not a special case.
+
+2. `E: ResolvePosition<ResolvedNode<'a> = #resolved_node>`
+
+Same return-type identity for leftover. `extra.resolve` returns `E::ResolvedNode<'a>`. That must be `T::ResolvedNode<'a>`. At the root both are `IsographResolutionNode`. A `Slot<Foo, Bar>` where `Bar` resolves to a different enum does not compile.
+
+3. `E::Parent<'a>: From<T::Parent<'a>>`
+
+Leftover does `From::from(parent)` with `parent: Slot::Parent`, which is `T::Parent`. Change 3 adds this when the field is `from_container_parent`. Change 2 does not emit it.
+
+4. `#resolved_node: From<PositionResolutionPath<&'a Slot<T, E>, T::Parent<'a>>>`
+
+The unmatched arm is `self.path(parent).to()`. `parent` is `Slot::Parent<'a>`, which is `T::Parent<'a>`. `path` builds `&Slot<T, E>` plus that parent. `.to()` is `From` into `#resolved_node`. Each `Slot<T, E>` writes that `From`. At the root the path type is `IsoLiteralSlotPath` and the impl builds `IsographResolutionNode::IsoLiteralSlot`. A later `Slot<Selection, UnparsedChunkItems>` writes a different impl that builds `SelectionSlot`. The generic body never names the variant. Syntactically the bound is on `#resolved_node`. The input type contains `T` and `E`, so instantiating `Slot<Foo, Bar>` without that `From` does not compile.
+
+5. There is no `From<PositionResolutionPath<&'a Slot<T, E>, E::Parent<'a>>>`.
+
+`path` is always called with `Self::Parent`, which is `T::Parent`. Leftover never builds a `Slot` path. Leftover converts `T::Parent` into `E::Parent` (bound 3) and calls `E::resolve`. The leftover leaf's path is `UnparsedChunkItemsPath`: `&UnparsedChunkItems` plus `E::Parent`. Bound 3 is that conversion. It does not produce a `Slot` path whose parent is `E::Parent`. That path type does not occur.
+
+```
+// leftover
+let new_parent = From::from(parent);
+return extra.item.resolve(new_parent, position);
+
+// unmatched
+return self.path(parent).to();
+```
+
+`for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the impl is `E: 'static` on rustc 1.97. The predicates go on `type ResolvedNode<'a>` for that `'a`. `fn resolve` returns `Self::ResolvedNode<'a>`, so projecting that GAT brings them into scope for the body. `handle_data_enum` is unchanged.
+
+The derive does not name `T` and `E`. It walks the same fields that emit the body. Every derived struct gets the predicates its fields and unmatched arm imply.
+
+- Each non-transparent resolve field `F` contributes 1 / 2: `F: ResolvePosition<ResolvedNode<'a> = #resolved_node>`.
+- The `from_path` unmatched arm contributes 4: `#resolved_node: From<PositionResolutionPath<&'a #struct_name #ty_generics, #parent_type>>`. `#parent_type` is `Self::Parent`, which for `Slot` is `T::Parent`.
+
+`EntrypointDeclaration` gets an `F` equality per resolve field. Rustc already knew those from the concrete types. Live pinned `Slot` is the same: `self_type_generics` replaces `T` / `E` with `IsoLiteralItem` / `UnparsedChunkItems`, unmatched is still `struct_name`, so this change adds 1 and 2 as concrete equalities and does not add 4.
 
 Origin: `handle_data_struct` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: `has_transparent` is named once. `split_for_impl` moves above the unmatched arm so `ty_generics` is in scope. `type ResolvedNode<'a>` uses `field_resolved_node_predicates`. The `from_path` unmatched arm also pushes `from_path_predicate`.
 
@@ -370,9 +414,9 @@ fn from_path_predicate(
 }
 ```
 
-`Option` / `Vec` / `NonEmpty` unwrap to the inner `WithSpan` type, same as the resolve walk. `transparent` fields are skipped. Tautological equalities stay.
+`Option` / `Vec` / `NonEmpty` unwrap to the inner `WithSpan` type, same as the resolve walk. `transparent` fields are skipped. Tautological equalities stay (bound 1 on `T` when `#resolved_node` is `T::ResolvedNode`).
 
-Live pinned `Slot` after this change, `self_type_generics` still in place, unmatched still `struct_name`:
+Live pinned `Slot` after this change, `self_type_generics` still in place, unmatched still `struct_name`. Bounds 1 and 2, concrete. No bound 4:
 
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
@@ -393,7 +437,7 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
         >;
 ```
 
-`on_unmatched_span.rs` `Slot` is concrete, `from_path`. Its `type ResolvedNode<'a>` gains `Child: ResolvePosition<ResolvedNode<'a> = TestResolvedNode<'a>>` and `TestResolvedNode<'a>: From<PositionResolutionPath<&'a Slot, ParentPath<'a>>>`. The `From` impl in that file satisfies the second.
+`on_unmatched_span.rs` `Slot` is concrete, `from_path`. Bound 1 for `Child`, bound 4 for `TestResolvedNode<'a>: From<PositionResolutionPath<&'a Slot, ParentPath<'a>>>`. The `From` impl in that file is bound 4.
 
 `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 
