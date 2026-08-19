@@ -46,7 +46,7 @@ impl ChunkedLevel {
                     chunk,
                     text,
                     leftover,
-                    |cursor, push_error| parse_item(cursor, push_error),
+                    &parse_item,
                     push_error,
                 )
             })
@@ -71,7 +71,7 @@ pub enum Expectation {
     EndOfDeclaration,
     #[error("a comma, a line break, or {}", .0.closing())]
     Separator(BracketKind),
-    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object")]
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, an object literal, or an array literal")]
     Value,
 }
 ```
