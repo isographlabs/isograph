@@ -1,6 +1,6 @@
 # generic-slot: one impl for every `Slot<T, E>`
 
-Lands after resolve-position-fallback-from.md.
+Lands after resolve-position-on-unmatched-span.md.
 
 `Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
@@ -16,7 +16,7 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
     resolved_node = IsographResolutionNode<'a>,
-    fallback = from_path
+    on_unmatched_span = from_path
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
@@ -36,7 +36,7 @@ where
 }
 ```
 
-`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. `fallback = from_path` means the no-hit arm is `return self.path(parent).to()`, not `ResolvedNode::Slot(...)`. Each monomorph writes a `From` into `IsographResolutionNode` that builds its own variant.
+`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. `on_unmatched_span = from_path` means the no-hit arm is `return self.path(parent).to()`, not `ResolvedNode::Slot(...)`. Each monomorph writes a `From` into `IsographResolutionNode` that builds its own variant.
 
 At the root, `T` is `IsoLiteralItem` and `E` is `UnparsedChunkItems`. After this doc, `IsoLiteralItem::Parent` is `IsoLiteralParsePath`. The generated leftover arm is:
 
@@ -51,7 +51,7 @@ The item arm is the same `From::from(parent)`, but the target is `IsoLiteralItem
 
 The generic leftover bound is that fact for any `T` / `E`: `E::Parent: From<T::Parent>`.
 
-The last bound is the fallback. `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `.to()` requires `IsographResolutionNode: From<that path>`.
+The last bound is the unmatched-span arm. `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `.to()` requires `IsographResolutionNode: From<that path>`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -158,19 +158,9 @@ pub type EntrypointDeclarationPath<'a> =
 
 ## Macro: `parent_from` on a struct field
 
-`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. Fallback is not suppressed.
+`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. The unmatched-span arm is unchanged.
 
-`ResolvePositionArgs` gains `fallback: Option<syn::Ident>`. `fallback = from_path` emits `return self.path(parent).to()`. Absent, the emit stays `Self::ResolvedNode::#struct_name(self.path(parent).to())`. `from_path` is the only accepted ident. `transparent` still suppresses fallback entirely.
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-struct ResolvePositionArgs {
-    parent_type: syn::Type,
-    resolved_node: syn::Type,
-    self_type_generics: Option<syn::AngleBracketedGenericArguments>,
-    fallback: Option<syn::Ident>,
-}
-```
+`on_unmatched_span = from_path` is resolve-position-on-unmatched-span.md. This doc uses it.
 
 Today `ParentConstruction` has no `FromParent`: enum payloads emit `From::from` directly, and a struct field with `#[parent_from]` is an error. This doc puts `FromParent` back for struct fields.
 
@@ -241,36 +231,6 @@ After:
         }
 ```
 
-Default fallback stays the struct-name variant. `fallback = from_path` uses `self.path(parent).to()`. `transparent` still suppresses fallback. `parent_from` does not. An unknown `fallback` ident is a compile error. `handle_data_enum` binds `fallback` and errors if it is `Some`: enums have no container fallback.
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-    let ResolvePositionArgs {
-        parent_type,
-        resolved_node,
-        self_type_generics,
-        fallback,
-    } = resolve_position_args;
-```
-
-```rust
-// from crates/resolve_position_macros/src/resolve_position_macro.rs
-    let fallback = if field_infos
-        .iter()
-        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
-    {
-        quote!()
-    } else if fallback.as_ref().is_some_and(|ident| ident == "from_path") {
-        quote! {
-            return self.path(parent).to();
-        }
-    } else {
-        quote! {
-            return Self::ResolvedNode::#struct_name(self.path(parent).to());
-        }
-    };
-```
-
 ## Generated `Slot`
 
 ```rust
@@ -325,7 +285,7 @@ Take `entrypoint Query.foo bar`:
 - leftover span is tight to `bar`
 - the space after `foo` is in the slot span and in neither field
 
-That space answers `IsographResolutionNode::Slot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same fallback answers `Slot`.
+That space answers `IsographResolutionNode::Slot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `Slot`.
 
 ## Tests
 
@@ -362,7 +322,7 @@ type ParentPath<'a> = PositionResolutionPath<&'a List, ()>;
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
     resolved_node = TestResolvedNode<'a>,
-    fallback = from_path
+    on_unmatched_span = from_path
 )]
 struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
@@ -542,5 +502,5 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 ## Landing checklist
 
-1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, `fallback = from_path`, generic `Slot`, `From<SlotPath> for IsographResolutionNode`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, generic `Slot`, `From<SlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 2. Move this doc to refactors/past.

@@ -111,7 +111,7 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
     resolved_node = IsographResolutionNode<'a>,
-    fallback = from_path
+    on_unmatched_span = from_path
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
@@ -156,7 +156,7 @@ pub struct ExtraChunks(
 );
 ```
 
-`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. Fallback is not suppressed. `fallback = from_path` makes the no-hit arm `self.path(parent).to()`. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same fallback.
+`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
 
 Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
@@ -590,7 +590,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 Each grammar feature lands on this surface.
 
-- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `fallback = from_path`, one `ResolvedNode` variant per slot monomorph
+- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`, one `ResolvedNode` variant per slot monomorph
 - parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`

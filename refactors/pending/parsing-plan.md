@@ -172,8 +172,8 @@ pub enum BracketKind {
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `resolve-position-fallback-from.md`. Struct `fallback = from_path` / `from_parent`: no-hit arm is `From` into `ResolvedNode`.
-2. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `fallback = from_path`. A gap answers that monomorph's `ResolvedNode` variant (`Slot` at the root). Leftover span stays tight.
+1. `resolve-position-on-unmatched-span.md`. Struct `on_unmatched_span = from_path` / `from_parent`: unmatched field spans return `From` into `ResolvedNode`.
+2. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that monomorph's `ResolvedNode` variant (`Slot` at the root). Leftover span stays tight.
 3. `parse-arguments.md`. `parse_items`, `ClosingDelimiter`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_items`.
 4. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_items`.
 5. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
