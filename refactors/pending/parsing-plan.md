@@ -172,13 +172,12 @@ pub enum BracketKind {
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `resolve-position-on-unmatched-span.md`. Struct `on_unmatched_span = from_path` / `from_parent`: unmatched field spans return `From` into `ResolvedNode`.
-2. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that monomorph's `ResolvedNode` variant (`Slot` at the root). Leftover span stays tight.
-3. `parse-arguments.md`. `parse_items`, `ClosingDelimiter`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_items`.
-4. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_items`.
-5. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
-6. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
-7. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
-8. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+1. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that `Slot<T, E>`'s `ResolvedNode` variant (`Slot` at the root). Leftover span stays tight.
+2. `parse-arguments.md`. `parse_items`, `ClosingDelimiter`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_items`.
+3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_items`.
+4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
+5. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
+6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
+7. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 
 Later: `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.

@@ -1,6 +1,6 @@
 # generic-slot: one impl for every `Slot<T, E>`
 
-Lands after resolve-position-on-unmatched-span.md.
+Lands after resolve-position-on-unmatched-span.md (refactors/past).
 
 `Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
@@ -160,7 +160,7 @@ pub type EntrypointDeclarationPath<'a> =
 
 `#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. The unmatched-span arm is unchanged.
 
-`on_unmatched_span = from_path` is resolve-position-on-unmatched-span.md. This doc uses it.
+`on_unmatched_span = from_path` is shipped (refactors/past/resolve-position-on-unmatched-span.md). This doc uses it.
 
 Today `ParentConstruction` has no `FromParent`: enum payloads emit `From::from` directly, and a struct field with `#[parent_from]` is an error. This doc puts `FromParent` back for struct fields.
 
