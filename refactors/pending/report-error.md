@@ -2,38 +2,11 @@
 
 `push_error: impl FnMut(WithSpan<ParseError>)` is a parameter of `parse_iso_literal`, `parse_one_chunk`, `parse_singleton`, and (in the feature docs) every grammar function that parses a nested list. Grammar functions do not report; they return `Result`. The helpers report. The callback is threaded so a nested `parse_each_chunk` / `parse_singleton` can report.
 
-This doc puts the sink on the cursor. Grammar functions already take `&mut ItemCursor`; that does not change. Nested lists reborrow the cursor's env. Reporting is `report_error`. `report_error` and `env_mut` are `&mut self`. That is expected: they write the error vec (and `env_mut` reborrows the token vec). `text` and `token_text` stay `&self`.
+This doc puts `errors` on `ItemCursor` next to `text` and `tokens`. Reporting is `self.report_error`. Grammar functions already take `&mut ItemCursor`; that does not change. Nested lists take that same cursor. `report_error` is `&mut self`. That is expected: it writes the error vec. `text` and `token_text` stay `&self`.
 
 Inner `parse_*` stays `Result`. The first `Err` of a form is returned. `parse_one_chunk` reports it. Grammar functions never call `report_error`.
 
-## Change 1: `ParseEnv`
-
-The text, the token vec, and the error vec of one `parse_iso_literal` call. `ItemCursor` holds one. Helpers that have no cursor (the root, a test feeding a list interior) construct one and pass it.
-
-```rust
-// from crates/isograph_parser/src/chunk_stream.rs
-pub(crate) struct ParseEnv<'a> {
-    pub(crate) text: &'a str,
-    pub(crate) tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    pub(crate) errors: &'a mut Vec<WithSpan<ParseError>>,
-}
-
-impl ParseEnv<'_> {
-    pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
-        self.errors.push(error);
-    }
-
-    pub(crate) fn reborrow(&mut self) -> ParseEnv<'_> {
-        ParseEnv {
-            text: self.text,
-            tokens: self.tokens,
-            errors: self.errors,
-        }
-    }
-}
-```
-
-`reborrow` is the disjoint-field reborrow of `tokens` and `errors`. A nested chunk parse takes `env.reborrow()` (or `cursor.env_mut()`), reports through that child cursor, and drops it before the parent env is used again.
+## Change 1: `errors` on `ItemCursor`
 
 Before:
 
@@ -82,7 +55,9 @@ After:
 pub(crate) struct ItemCursor<'a> {
     items: SafePeekable<nonempty::Iter<'a, WithSpan<ChunkContentItem>>>,
     previous_end: u32,
-    env: ParseEnv<'a>,
+    pub(crate) text: &'a str,
+    pub(crate) tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    pub(crate) errors: &'a mut Vec<WithSpan<ParseError>>,
 }
 
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
@@ -90,51 +65,58 @@ pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 impl<'a> ChunkStream<'a> {
     pub(crate) fn new(
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
-        env: ParseEnv<'a>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        errors: &'a mut Vec<WithSpan<ParseError>>,
     ) -> Self {
         ChunkStream(ItemCursor {
             previous_end: contents.first().location.start,
             items: contents.iter().safe_peekable(),
-            env,
+            text,
+            tokens,
+            errors,
         })
     }
 }
 
 impl<'a> ItemCursor<'a> {
     pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
-        self.env.report_error(error);
-    }
-
-    pub(crate) fn env_mut(&mut self) -> ParseEnv<'_> {
-        self.env.reborrow()
+        self.errors.push(error);
     }
 
     pub(crate) fn text(&self) -> &'a str {
-        self.env.text
+        self.text
     }
 
     pub(crate) fn token_text(&self, span: Span) -> &'a str {
-        &self.env.text[span.as_usize_range()]
+        &self.text[span.as_usize_range()]
     }
 
     fn record(&mut self, token: SemanticToken, span: Span) {
-        self.env.tokens.push(token.with_span(span));
+        self.tokens.push(token.with_span(span));
     }
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-    pub(crate) fn stream<'a>(&'a self, env: ParseEnv<'a>) -> ChunkStream<'a> {
-        ChunkStream::new(self.contents.reference(), env)
+    pub(crate) fn stream<'a>(
+        &'a self,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        errors: &'a mut Vec<WithSpan<ParseError>>,
+    ) -> ChunkStream<'a> {
+        ChunkStream::new(self.contents.reference(), text, tokens, errors)
     }
 ```
 
-`CursorPeek` still holds `tokens: &'c mut Vec<WithSpan<SemanticToken>>`, taken from `self.env.tokens` in `peek`. It does not report.
+`text`, `tokens`, and `errors` are `pub(crate)` so `parse_one_chunk` / `parse_each_chunk` / `parse_singleton` can split-borrow them onto a child stream. `text()` stays for call sites that only read the source.
+
+`CursorPeek` still holds `tokens: &'c mut Vec<WithSpan<SemanticToken>>`, taken from `self.tokens` in `peek`. It does not report.
 
 `parse_*` is still `fn parse_entrypoint(cursor: &mut ItemCursor<'_>)`. No `F`.
 
-## Change 2: helpers take `ParseEnv`; parse closures drop `F`
+## Change 2: helpers drop `F`; nested lists take the parent cursor
 
 Before:
 
@@ -241,21 +223,25 @@ After:
 // from crates/isograph_parser/src/chunk.rs
 fn parse_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
-    env: ParseEnv<'a>,
+    text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    errors: &'a mut Vec<WithSpan<ParseError>>,
     parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
 ) -> (ChunkStream<'a>, Result<WithSpan<P>, WithSpan<ParseError>>) {
-    let mut stream = chunk.item.stream(env);
+    let mut stream = chunk.item.stream(text, tokens, errors);
     let result = stream.cursor().spanning(parse_item);
     (stream, result)
 }
 
 fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
-    env: &mut ParseEnv<'_>,
+    text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    errors: &'a mut Vec<WithSpan<ParseError>>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
-    let (mut stream, result) = parse_chunk(chunk, env.reborrow(), parse);
+    let (mut stream, result) = parse_chunk(chunk, text, tokens, errors, parse);
     match result {
         Ok(item) => match stream.remaining_contents() {
             None => {
@@ -299,19 +285,21 @@ fn parse_one_chunk<'a, P>(
 
 pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
-    env: &mut ParseEnv<'_>,
+    text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    errors: &'a mut Vec<WithSpan<ParseError>>,
     end: Expectation,
     extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
 ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
-    let item = parse_one_chunk(&level.item.0[0], env, end, parse);
+    let item = parse_one_chunk(&level.item.0[0], text, tokens, errors, end, parse);
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
-        env.report_error(
+        errors.push(
             ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
         );
     }
     let extra_chunks = (level.item.len() > 1).then(|| {
-        env.report_error(extra_chunks(&level.item.0[1]));
+        errors.push(extra_chunks(&level.item.0[1]));
         let rest = NonEmpty {
             head: level.item.0[1].clone(),
             tail: level.item.0[2..].to_vec(),
@@ -323,39 +311,48 @@ pub(crate) fn parse_singleton<'a, T>(
 }
 ```
 
-`parse_one_chunk` leftover and failed-form diagnostics go through the child cursor (`stream.cursor().report_error`). The child stream holds the reborrow; after it drops, `parse_singleton` uses `env.report_error` for the boundary comma and extra chunks.
+The root has no cursor yet. `parse_iso_literal` holds `text`, `tokens`, and `errors` and passes them into `parse_singleton`. `parse_one_chunk` builds the child cursor with `stream`. Leftover and failed-form diagnostics go through that child (`stream.cursor().report_error`). After the stream drops, `parse_singleton` pushes the boundary comma and extra chunks onto `errors` directly.
 
 Who reports:
 
-- `parse_iso_literal`: empty literal
-- `parse_one_chunk`: leftover after `Ok`, failed form
-- `parse_singleton`: boundary comma, extra chunks
+- `parse_iso_literal`: empty literal, `errors.push`
+- `parse_one_chunk`: leftover after `Ok`, failed form, `cursor.report_error`
+- `parse_singleton`: boundary comma, extra chunks, `errors.push`
 
-`parse_each_chunk` (parse-arguments.md) takes `ParseEnv` by value, reborrows per chunk:
+`parse_each_chunk` (parse-arguments.md) takes the parent cursor. It split-borrows `text` / `tokens` / `errors` onto each child. That function is not landed by this doc. The listing is the shape parse-arguments.md lands:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
     pub(crate) fn parse_each_chunk<'a, P>(
         &'a self,
-        mut env: ParseEnv<'_>,
+        parent: &mut ItemCursor<'_>,
         leftover: Expectation,
         parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
         self.0
             .iter()
-            .map(|chunk| parse_one_chunk(chunk, &mut env, leftover, &parse_item))
+            .map(|chunk| {
+                parse_one_chunk(
+                    chunk,
+                    parent.text,
+                    parent.tokens,
+                    parent.errors,
+                    leftover,
+                    &parse_item,
+                )
+            })
             .collect()
     }
 }
 ```
 
-That function is not landed by this doc. The listing is the shape parse-arguments.md lands. A nested list from a grammar function is `cursor.env_mut()`:
+A nested list from a grammar function is the cursor they already hold. That call is `&mut self` on the parent cursor. Expected: the child parse writes the same token vec and error vec.
 
 ```rust
     let group = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace)?;
     group.item.children.item.parse_each_chunk(
-        cursor.env_mut(),
+        cursor,
         Expectation::Separator(BracketKind::Brace),
         parse_item,
     )
@@ -366,15 +363,15 @@ That function is not landed by this doc. The listing is the shape parse-argument
         .require_group(BracketKind::Brace, SemanticToken::Brace)
         .map_err(|()| cursor.expected(expectation))?;
     group.item.children.item.parse_each_chunk(
-        cursor.env_mut(),
+        cursor,
         Expectation::Separator(BracketKind::Brace),
         parse_item,
     )
 ```
 
-A nested `parse_singleton` (`[...]` in parse-variables.md) is `parse_singleton(level, &mut cursor.env_mut(), ...)`. Same reborrow: the `ParseEnv` value is a local, passed as `&mut`.
+A nested `parse_singleton` (`[...]` in parse-variables.md) unpacks the same way: `parse_singleton(level, cursor.text, cursor.tokens, cursor.errors, ...)`.
 
-The nest site today is `cursor.text()` (`&self`) plus a separate `push_error`. After this it is `cursor.env_mut()` (`&mut self`). The grammar function already holds `&mut ItemCursor`; the nested list now uses that mutable borrow instead of a shared one. `ChunkedLevel::parse_each_chunk` stays `&self` on the level. The level is not the sink.
+The nest site today is `cursor.text()` (`&self`) plus a separate `push_error`. After this it is `parse_each_chunk(cursor, ...)` (`&mut ItemCursor`). The grammar function already holds `&mut ItemCursor`; the nested list now uses that mutable borrow instead of a shared one. `ChunkedLevel::parse_each_chunk` stays `&self` on the level. The level is not the sink.
 
 ## Change 3: `parse_iso_literal` takes the error vec
 
@@ -416,19 +413,16 @@ pub fn parse_iso_literal(
     errors: &mut Vec<WithSpan<ParseError>>,
     tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
-    let mut env = ParseEnv {
-        text,
-        tokens,
-        errors,
-    };
     let location = root.location;
     if root.item.len() == 0 {
-        env.report_error(ParseError::EmptyLiteral.with_span(location));
+        errors.push(ParseError::EmptyLiteral.with_span(location));
         return None;
     }
     let singleton = parse_singleton(
         root.reference(),
-        &mut env,
+        text,
+        tokens,
+        errors,
         Expectation::EndOfDeclaration,
         |extra| ParseError::MultipleDeclarations.with_span(extra.location),
         parse_iso_literal_item,
@@ -462,11 +456,7 @@ The entry point takes `&mut Vec<WithSpan<ParseError>>`, same shape as `tokens`. 
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
         errors: &'a mut Vec<WithSpan<ParseError>>,
     ) -> ChunkStream<'a> {
-        first_chunk(tree).stream(ParseEnv {
-            text,
-            tokens,
-            errors,
-        })
+        first_chunk(tree).stream(text, tokens, errors)
     }
 ```
 
@@ -490,29 +480,31 @@ Added:
 
 The existing leftover / empty-literal / extra-chunk / boundary-comma tests in `parse_iso_literal.rs` already assert the vec contents. They cover the helper call sites. `report_error` does not record a semantic token.
 
+parse-arguments.md tests feed a list interior and have no parent parse. They construct a stream from the first chunk of the subject when it has one and pass that cursor into `parse_each_chunk`. An empty interior never split-borrows the parent; the test helper still passes a cursor whose `text` / `tokens` / `errors` are the fixture's. That helper lives with those tests.
+
 ## Change 5: parsing-standards.md and parsing-plan.md
 
 `parse_iso_literal`'s listing takes `errors: &mut Vec<WithSpan<ParseError>>` instead of `push_error: impl FnMut(...)`.
 
-`ItemCursor` / `ChunkStream` listings gain `ParseEnv`, `report_error`, `env_mut`. `ChunkStream::new` and `Chunk::stream` take `ParseEnv`.
+`ItemCursor` / `ChunkStream` listings gain `errors` and `report_error`. `ChunkStream::new` and `Chunk::stream` take `errors`.
 
-The `parse_one_chunk` / `parse_each_chunk` / `parse_singleton` listings are Change 2. `parse_*` does not take a sink. A nested list is `cursor.env_mut()`.
+The `parse_one_chunk` / `parse_each_chunk` / `parse_singleton` listings are Change 2. `parse_*` does not take a sink. A nested list is `parse_each_chunk(cursor, ...)`.
 
-Prose that currently says diagnostics go through `push_error` says they go through `report_error`. Artifact generation is `errors.is_empty()`. Tests read the vec `parse_iso_literal` was passed.
+Prose that currently says diagnostics go through `push_error` says they go through `report_error` (on a cursor) or `errors.push` (at the root, where there is no cursor). Artifact generation is `errors.is_empty()`. Tests read the vec `parse_iso_literal` was passed.
 
 Function shapes:
 
-- `parse_*`: parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list is `cursor.env_mut()`.
-- Diagnostic: `report_error` on `parse_one_chunk`, `parse_each_chunk`, `parse_singleton`, `parse_iso_literal`. Not stored on the tree.
+- `parse_*`: parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list takes the cursor.
+- Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` and `parse_iso_literal`. Not stored on the tree.
 
-Catalog: the `push_error` rows become `report_error`. `ParseEnv`, `ItemCursor::report_error`, `ItemCursor::env_mut` are catalog entries.
+Catalog: the `push_error` rows become `report_error` / `errors.push`. `ItemCursor::report_error` is a catalog entry.
 
-`parse_value` in the standards (and every grammar function in the feature docs, when next opened) drops `F` and `push_error`. Object / array / argument-list / selection-set / variable-list interiors pass `cursor.env_mut()`.
+`parse_value` in the standards (and every grammar function in the feature docs, when next opened) drops `F` and `push_error`. Object / array / argument-list / selection-set / variable-list interiors pass `cursor`.
 
-semantic-tokens.md's `TTokens` lands on `ParseEnv.tokens` (`&'a mut TTokens`) and on `ItemCursor` / `ChunkStream` as today. Grammar functions stay free of a sink parameter; they pick up `TTokens` from the cursor.
+semantic-tokens.md's `TTokens` lands on `ItemCursor.tokens` (`&'a mut TTokens`) as today. Grammar functions stay free of a sink parameter.
 
 ## Landing checklist
 
-1. `ParseEnv`, the `ItemCursor` / `ChunkStream` / `Chunk::stream` changes, `parse_one_chunk` / `parse_chunk` / `parse_singleton` without `F`, `parse_iso_literal` taking the error vec, the test helper and `stream_of` updates, the `report_error_appends_to_the_vec` test. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `errors` on `ItemCursor`, `report_error`, `Chunk::stream` / `ChunkStream::new` taking `errors`, `parse_one_chunk` / `parse_chunk` / `parse_singleton` without `F`, `parse_iso_literal` taking the error vec, the test helper and `stream_of` updates, the `report_error_appends_to_the_vec` test. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. parsing-standards.md and parsing-plan.md match Change 5.
 3. Move this doc to refactors/past.
