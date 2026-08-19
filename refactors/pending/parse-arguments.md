@@ -310,7 +310,7 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
 ```
 
-A gap in an argument slot answers `IsographResolutionNode::ArgumentSlot`. `SlotPath` stays the root alias.
+A gap in an argument slot answers `IsographResolutionNode::ArgumentSlot`. The root leaf is `IsoLiteralSlot(IsoLiteralSlotPath)`.
 
 `parse_value` is the listing in parsing-standards.md.
 
