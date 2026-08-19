@@ -1,6 +1,10 @@
 # parse-arguments: argument lists and values
 
-`name : value` is `parse_key_value_pair`. A list of those is `parse_each_chunk`. `( ... )` is an argument list. `{ ... }` is an object value. Lands after generic-slot.md. parse-selection-sets.md attaches the paren list to selections. parse-variables.md reuses `parse_value`.
+`parse_key_value_pair` reads `name : value`. `consume_argument_list` reads a paren group and runs `parse_each_chunk` on its interior with `parse_argument`. An object value is a brace group whose interior uses `parse_object_entry`. Both wrappers call `parse_key_value_pair`. `parse_value` reads a variable, a string, an integer, a boolean, null, or an object.
+
+`consume_argument_list` has no production caller. parse-selection-sets.md is the first. Tests in `arguments.rs` call `parse_each_chunk` on a list interior and call `consume_argument_list` on a paren group. Production-only unused items take `#[cfg_attr(not(test), expect(dead_code))]`.
+
+`ArgumentListParent` has no variants. parse-selection-sets.md adds `Scalar` and `Object`. A parent value cannot be constructed until then, so this doc's tests assert parse structure and do not resolve from an `ArgumentList`.
 
 ## Grammar
 
@@ -22,30 +26,26 @@ null
 { <pairs> }             object value
 ```
 
-Tests feed a list interior to `parse_each_chunk`.
+## Change 1: `Separator(BracketKind)`, `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`
 
-## Change 1: `parse_each_chunk`
-
-Already on `ChunkedLevel`. Nested lists pass the parent cursor. Tests that feed a list interior construct a parent stream to hold `text` / `tokens` / `errors`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-impl ChunkedLevel {
-    pub(crate) fn parse_each_chunk<'a, P>(
-        &'a self,
-        parent: &mut ItemCursor<'_>,
-        leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
-    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
-}
-```
-
-A list trailing comma is not a diagnostic. Length equals chunk count.
-
-## Change 2: `Expectation`
+Origin: `crates/isograph_parser/src/parse_error.rs` and `crates/isograph_parser/src/non_bracket_token.rs`. Delta: `Separator` carries the group's `BracketKind` so leftover can name the closer. `Argument`, `Value`, and `ObjectEntry` land for `parse_key_value_pair` and `parse_value`. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token. `BracketKind::closing` is the closer string.
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+pub enum ParseError {
+    #[error("{0}")]
+    Expected(ExpectedFound),
+    #[error("Expected a declaration. An isograph literal cannot be empty.")]
+    EmptyLiteral,
+    #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
+    MultipleDeclarations,
+    #[error("This declaration type is not supported yet.")]
+    UnsupportedDeclarationType,
+    #[error("This integer does not fit in a 64-bit signed integer.")]
+    IntegerDoesNotFitI64,
+}
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
 pub enum Expectation {
     #[error("{0}")]
@@ -56,8 +56,12 @@ pub enum Expectation {
     EndOfDeclaration,
     #[error("a comma, a line break, or {}", .0.closing())]
     Separator(BracketKind),
-    #[error("a value, like $foo, 42, \"bar\", true, false, null, an object literal, or an array literal")]
+    #[error("an argument, like 'id: $id'")]
+    Argument,
+    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
     Value,
+    #[error("an object entry, like 'id: 4'")]
+    ObjectEntry,
 }
 ```
 
@@ -74,15 +78,377 @@ impl BracketKind {
 }
 ```
 
+Before:
+
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-    #[error("This integer does not fit in a 64-bit signed integer.")]
-    IntegerDoesNotFitI64,
+    #[error("a comma or line break")]
+    Separator,
 ```
 
-A missing pair name is `Expectation::Token(Identifier)`.
+`BracketKind` has no `closing`. `ParseError` has no `IntegerDoesNotFitI64`.
 
-## Change 3: `arguments.rs`
+Call sites that construct `Expectation::Separator` pass a `BracketKind`. `parse_each_chunk` leftover in `chunk.rs` tests is `Separator(BracketKind::Parenthesis)`. The `chunk_stream.rs` end-span test is the same.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+        let items = tree
+            .item
+            .parse_each_chunk(
+                parent.cursor(),
+                Separator(BracketKind::Parenthesis),
+                parse_identifier,
+            );
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+            expected(Separator(BracketKind::Parenthesis), Found::Token(Identifier))
+```
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+            cursor.expected(Expectation::Separator(BracketKind::Parenthesis)),
+            expected(
+                Expectation::Separator(BracketKind::Parenthesis),
+                Found::EndOfChunk,
+            )
+```
+
+Before those three call sites used `Separator` with no payload.
+
+A missing pair name is `Expectation::Argument` in a paren list and `Expectation::ObjectEntry` in an object. Pair leftover is `Expectation::Separator` of that group's kind. `parse_each_chunk` does not report a trailing comma; chunking already absorbed it.
+
+## Change 2: `#[from_container_parent]` on a struct field
+
+Origin: `get_resolve_field_info` and `new_parent_expr` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: a struct field may take `#[from_container_parent]`. The child's parent is `From::from(self.path(parent))`. Enum payloads keep the live emission.
+
+Before, a struct field with that attribute is a compile error:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+            if let Some(attr) = from_container_parent {
+                parse_from_container_parent(attr)?;
+                return Error::new_spanned(
+                    attr,
+                    "`#[from_container_parent]` is an enum-payload attribute",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            match parent_variant {
+                Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                None => ParentConstruction::ContainerPath,
+            }
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+enum ParentConstruction {
+    ContainerPath,
+    EnumVariant(syn::Ident),
+    Transparent,
+}
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::ContainerPath => quote!(self.path(parent)),
+        ParentConstruction::EnumVariant(variant) => quote!(
+            <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
+        ),
+        ParentConstruction::Transparent => {
+            Error::new_spanned(inner_type, "`transparent` does not build a field parent")
+                .to_compile_error()
+        }
+```
+
+After:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+enum ParentConstruction {
+    ContainerPath,
+    EnumVariant(syn::Ident),
+    FromContainer,
+    Transparent,
+}
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+            if let Some(attr) = from_container_parent {
+                parse_from_container_parent(attr)?;
+                ParentConstruction::FromContainer
+            } else {
+                match parent_variant {
+                    Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                    None => ParentConstruction::ContainerPath,
+                }
+            }
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        ParentConstruction::ContainerPath => quote!(self.path(parent)),
+        ParentConstruction::EnumVariant(variant) => quote!(
+            <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
+        ),
+        ParentConstruction::FromContainer => {
+            quote!(::std::convert::From::from(self.path(parent)))
+        }
+        ParentConstruction::Transparent => {
+            Error::new_spanned(inner_type, "`transparent` does not build a field parent")
+                .to_compile_error()
+        }
+```
+
+`field_resolved_node_predicates` adds a `From` bound for `FromContainer` and does not add the `Parent` equality that `ContainerPath` uses:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+        if matches!(info.parent_construction, ParentConstruction::ContainerPath) {
+            predicates.push(quote! {
+                #inner_type: ::resolve_position::ResolvePosition<
+                    Parent<'a> = ::resolve_position::PositionResolutionPath<
+                        &'a #struct_name #ty_generics,
+                        #parent_type
+                    >
+                >
+            });
+        }
+        if matches!(info.parent_construction, ParentConstruction::FromContainer) {
+            predicates.push(quote! {
+                <#inner_type as ::resolve_position::ResolvePosition>::Parent<'a>:
+                    ::std::convert::From<
+                        ::resolve_position::PositionResolutionPath<
+                            &'a #struct_name #ty_generics,
+                            #parent_type
+                        >
+                    >
+            });
+        }
+```
+
+Origin for the test: `crates/resolve_position_macros/tests/self_type_generics_pins.rs`. Delta: `E` is one type whose parent is an enum of the two slot paths, and `extra_tokens` takes `#[from_container_parent]`.
+
+```rust
+// from crates/resolve_position_macros/tests/from_container_parent_field.rs
+#![expect(dead_code)]
+
+use prelude::Postfix;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
+use resolve_position_macros::ResolvePosition;
+use span::{Span, WithSpan, WithSpanPostfix};
+
+#[derive(Debug)]
+enum TestResolvedNode<'a> {
+    ListA(PathA<'a>),
+    ListB(PathB<'a>),
+    SlotA(SlotAPath<'a>),
+    SlotB(SlotBPath<'a>),
+    ChildA(PositionResolutionPath<&'a ChildA, SlotAPath<'a>>),
+    ChildB(PositionResolutionPath<&'a ChildB, SlotBPath<'a>>),
+    Extra(PositionResolutionPath<&'a Extra, ExtraParent<'a>>),
+}
+
+impl<'a> From<SlotAPath<'a>> for TestResolvedNode<'a> {
+    fn from(path: SlotAPath<'a>) -> Self {
+        TestResolvedNode::SlotA(path)
+    }
+}
+
+impl<'a> From<SlotBPath<'a>> for TestResolvedNode<'a> {
+    fn from(path: SlotBPath<'a>) -> Self {
+        TestResolvedNode::SlotB(path)
+    }
+}
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = TestResolvedNode<'a>)]
+struct ListA(#[resolve_field] Vec<WithSpan<Slot<ChildA, Extra>>>);
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = TestResolvedNode<'a>)]
+struct ListB(#[resolve_field] Vec<WithSpan<Slot<ChildB, Extra>>>);
+
+type PathA<'a> = PositionResolutionPath<&'a ListA, ()>;
+type PathB<'a> = PositionResolutionPath<&'a ListB, ()>;
+type SlotAPath<'a> = PositionResolutionPath<&'a Slot<ChildA, Extra>, PathA<'a>>;
+type SlotBPath<'a> = PositionResolutionPath<&'a Slot<ChildB, Extra>, PathB<'a>>;
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(
+    resolved_node = TestResolvedNode<'a>,
+    on_unmatched_span = from_path,
+    self_type_generics = [
+        (<ChildA, Extra>, PathA<'a>),
+        (<ChildB, Extra>, PathB<'a>),
+    ]
+)]
+struct Slot<T, E> {
+    #[resolve_field]
+    item: Option<WithSpan<T>>,
+    #[resolve_field]
+    #[from_container_parent]
+    extra_tokens: Option<WithSpan<E>>,
+}
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotAPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ChildA;
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotBPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ChildB;
+
+#[derive(Debug)]
+enum ExtraParent<'a> {
+    SlotA(SlotAPath<'a>),
+    SlotB(SlotBPath<'a>),
+}
+
+impl<'a> From<SlotAPath<'a>> for ExtraParent<'a> {
+    fn from(path: SlotAPath<'a>) -> Self {
+        ExtraParent::SlotA(path)
+    }
+}
+
+impl<'a> From<SlotBPath<'a>> for ExtraParent<'a> {
+    fn from(path: SlotBPath<'a>) -> Self {
+        ExtraParent::SlotB(path)
+    }
+}
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = ExtraParent<'a>, resolved_node = TestResolvedNode<'a>)]
+struct Extra;
+
+#[test]
+fn leftover_parent_is_the_slot_path_through_from() {
+    let list = ListA(
+        Slot {
+            item: ChildA.with_span(Span::new(0, 4)).wrap_some(),
+            extra_tokens: Extra.with_span(Span::new(6, 8)).wrap_some(),
+        }
+        .with_span(Span::new(0, 8))
+        .wrap_vec(),
+    );
+    match list.resolve((), Span::new(6, 7)) {
+        TestResolvedNode::Extra(path) => match path.parent {
+            ExtraParent::SlotA(slot) => {
+                assert!(std::ptr::eq(slot.inner, list.0[0].item.reference()));
+            }
+            parent => panic!("expected ExtraParent::SlotA, got {parent:?}"),
+        },
+        node => panic!("expected Extra, got {node:?}"),
+    }
+    match list.resolve((), Span::new(4, 5)) {
+        TestResolvedNode::SlotA(_) => {}
+        node => panic!("expected SlotA, got {node:?}"),
+    }
+}
+```
+
+`cargo test -p resolve_position_macros` passes.
+
+## Change 3: the `KeyValuePair` pin, `arguments.rs`
+
+Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs` after generic-slot.md. Delta: a second pin, leftover's parent is an enum of slot paths, `extra_tokens` takes `#[from_container_parent]`. `UnparsedChunkItemsPath` moves next to that enum.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    resolved_node = IsographResolutionNode<'a>,
+    on_unmatched_span = from_path,
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+        (<KeyValuePair, UnparsedChunkItems>, KeyValuePairParent<'a>),
+    ]
+)]
+pub struct Slot<T, E> {
+    #[resolve_field]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field]
+    #[from_container_parent]
+    pub extra_tokens: Option<WithSpan<E>>,
+}
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnparsedChunkItems(
+    #[resolve_field]
+    #[parent_variant(Unparsed)]
+    pub NonEmpty<WithSpan<ChunkContentItem>>,
+);
+
+#[derive(Debug)]
+pub enum UnparsedChunkItemsParent<'a> {
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    KeyValuePairSlot(KeyValuePairSlotPath<'a>),
+}
+
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+
+impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::IsoLiteralSlot(path)
+    }
+}
+
+impl<'a> From<KeyValuePairSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: KeyValuePairSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::KeyValuePairSlot(path)
+    }
+}
+```
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+    ]
+)]
+pub struct Slot<T, E> {
+    #[resolve_field]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field]
+    pub extra_tokens: Option<WithSpan<E>>,
+}
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct UnparsedChunkItems(
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
+```
+
+`IsoLiteralItem` and `EntrypointDeclaration` keep `parent_type = IsoLiteralSlotPath<'a>`. `parse_iso_literal.rs` drops the `UnparsedChunkItemsPath` alias.
+
+The generated `extra_tokens` arm (the item arm still passes `self.path(parent)`):
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+        for item in self.extra_tokens.iter() {
+            if item.location.contains(position) {
+                let new_parent = ::std::convert::From::from(self.path(parent));
+                return item.item.resolve(new_parent, position);
+            }
+        }
+```
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -95,7 +461,7 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
-    Slot, UnparsedChunkItems,
+    SemanticToken, Slot, UnparsedChunkItems,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -115,7 +481,7 @@ pub struct ObjectLiteral(
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = KeyValuePairParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = KeyValuePairSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct KeyValuePair {
     #[resolve_field]
     pub name: WithSpan<ArgumentName>,
@@ -137,20 +503,11 @@ pub enum NonConstantValue {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableUse(
-    #[resolve_field]
-    pub WithSpan<VariableName>,
-);
+pub struct VariableUse(#[resolve_field] pub WithSpan<VariableName>);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct StringValue(common_lang_types::StringLiteralValue);
-
-impl From<intern::string_key::StringKey> for StringValue {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        StringValue(key.to())
-    }
-}
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -174,21 +531,9 @@ pub struct NullValue;
 #[resolve_position(parent_type = KeyValuePairPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentName(common_lang_types::FieldArgumentName);
 
-impl From<intern::string_key::StringKey> for ArgumentName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        ArgumentName(key.to())
-    }
-}
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct VariableName(common_lang_types::VariableName);
-
-impl From<intern::string_key::StringKey> for VariableName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        VariableName(key.to())
-    }
-}
 
 #[derive(Debug)]
 pub enum ArgumentListParent {}
@@ -209,13 +554,13 @@ pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, Argumen
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
-pub type KeyValuePairPath<'a> =
-    PositionResolutionPath<&'a KeyValuePair, KeyValuePairParent<'a>>;
-
 pub type KeyValuePairSlotPath<'a> = PositionResolutionPath<
     &'a Slot<KeyValuePair, UnparsedChunkItems>,
     KeyValuePairParent<'a>,
 >;
+
+pub type KeyValuePairPath<'a> =
+    PositionResolutionPath<&'a KeyValuePair, KeyValuePairSlotPath<'a>>;
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
 
@@ -232,33 +577,11 @@ pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, KeyValu
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
 ```
 
-`ArgumentListParent` has no variants. parse-selection-sets.md adds `Scalar` and `Object`. A position on `$` answers `VariableUse`.
+`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `ArgumentName(cursor.token_text(span).intern().to())`.
 
-`NonConstantValueParent::KeyValue` is boxed to break `KeyValuePairPath -> NonConstantValue -> ObjectLiteral -> KeyValuePair`.
+`NonConstantValueParent::KeyValue` is boxed to break `KeyValuePairPath -> NonConstantValue -> ObjectLiteral -> KeyValuePair`. A position on `$` answers `VariableUse`.
 
-```rust
-// from crates/isograph_parser/src/chunk.rs
-pub enum UnparsedChunkItemsParent<'a> {
-    Literal(IsoLiteralParsePath<'a>),
-    ArgumentList(ArgumentListPath<'a>),
-    ObjectLiteral(ObjectLiteralPath<'a>),
-}
-
-impl<'a> From<KeyValuePairParent<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(parent: KeyValuePairParent<'a>) -> Self {
-        match parent {
-            KeyValuePairParent::ArgumentList(parent) => {
-                UnparsedChunkItemsParent::ArgumentList(parent)
-            }
-            KeyValuePairParent::ObjectLiteral(parent) => {
-                UnparsedChunkItemsParent::ObjectLiteral(parent)
-            }
-        }
-    }
-}
-```
-
-`From<IsoLiteralParsePath>` stays.
+`Slot<KeyValuePair, UnparsedChunkItems>::Parent` is `KeyValuePairParent`. `ArgumentList` and `ObjectLiteral` wrap their path in that enum, so the vec fields take `#[parent_variant]`. `KeyValuePair`'s parent is the slot path, the same way `IsoLiteralItem`'s parent is `IsoLiteralSlotPath`.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -286,72 +609,80 @@ impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+#[cfg_attr(not(test), expect(dead_code))]
 fn parse_key_value_pair(
     cursor: &mut ItemCursor<'_>,
+    name_token: SemanticToken,
+    missing_name: Expectation,
 ) -> Result<KeyValuePair, WithSpan<ParseError>> {
     let name = cursor
-        .require_token(NonBracketTokenKind::Identifier)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+        .require_token(NonBracketTokenKind::Identifier, name_token)
+        .map_err(|()| cursor.expected(missing_name))?;
     cursor
-        .require_token(NonBracketTokenKind::Colon)
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     KeyValuePair {
-        name: cursor
-            .token_text(name)
-            .intern()
-            .to::<ArgumentName>()
-            .with_span(name),
+        name: ArgumentName(cursor.token_text(name).intern().to()).with_span(name),
         value,
     }
     .wrap_ok()
 }
 
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_argument(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<KeyValuePair, WithSpan<ParseError>> {
+    parse_key_value_pair(cursor, SemanticToken::Argument, Expectation::Argument)
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
+fn parse_object_entry(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<KeyValuePair, WithSpan<ParseError>> {
+    parse_key_value_pair(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)
+}
+
+#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_argument_list(
     cursor: &mut ItemCursor<'_>,
 ) -> Option<WithSpan<ArgumentList>> {
-    let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    ArgumentList(group.item.children.item.parse_each_chunk(
+    let group = cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis)?;
+    let list = ArgumentList(group.item.children.item.parse_each_chunk(
         cursor,
         Expectation::Separator(BracketKind::Parenthesis),
-        parse_key_value_pair,
-    ))
-    .with_span(group.location)
-    .wrap_some()
+        parse_argument,
+    ));
+    cursor.record_group_close(group.item, SemanticToken::Parenthesis);
+    list.with_span(group.location).wrap_some()
 }
-```
 
-```rust
-// from crates/isograph_parser/src/arguments.rs
+#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn parse_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
-        if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar) {
+        if cursor
+            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .is_some()
+        {
             let name = cursor
-                .require_token(NonBracketTokenKind::Identifier)
+                .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                cursor
-                    .token_text(name)
-                    .intern()
-                    .to::<VariableName>()
-                    .with_span(name),
-             )
+                VariableName(cursor.token_text(name).intern().to()).with_span(name),
+            ))
             .wrap_ok();
         }
-        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::StringLiteral) {
-            // Quotes included. Unquoting is later.
-            return NonConstantValue::String(
-                cursor
-                    .token_text(span)
-                    .intern()
-                    .to::<StringValue>(),
-            )
-            .wrap_ok();
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        {
+            return NonConstantValue::String(StringValue(cursor.token_text(span).intern().to()))
+                .wrap_ok();
         }
-        // BlockStringLiteral is not consumed.
-        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
+        if let Some(span) = cursor
+            .consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
+        {
             let value = match cursor.token_text(span).parse() {
                 Ok(value) => value,
                 Err(_) => {
@@ -360,13 +691,14 @@ pub(crate) fn parse_value(
             };
             return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
         }
-        // No FloatLiteral token. `1.5` does not parse as a value.
-        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
+        if let Some(span) = cursor.consume_token_if(
+            NonBracketTokenKind::Identifier,
+            SemanticToken::BooleanOrNull,
+        ) {
             return match cursor.token_text(span) {
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
-                // Enum values (bare identifiers) are not parsed.
                 _ => ParseError::expected(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::Identifier),
@@ -375,17 +707,17 @@ pub(crate) fn parse_value(
                 .wrap_err(),
             };
         }
-        if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
-            return NonConstantValue::Object(ObjectLiteral(
-                group.item.children.item.parse_each_chunk(
-                    cursor,
-                    Expectation::Separator(BracketKind::Brace),
-                    parse_key_value_pair,
-                ),
-            ))
-            .wrap_ok();
+        if let Some(group) =
+            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace)
+        {
+            let object = ObjectLiteral(group.item.children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Brace),
+                parse_object_entry,
+            ));
+            cursor.record_group_close(group.item, SemanticToken::Brace);
+            return NonConstantValue::Object(object).wrap_ok();
         }
-        // `[ ... ]` is parse-arrays.md.
         cursor.expected(Expectation::Value).wrap_err()
     })
 }
@@ -393,18 +725,21 @@ pub(crate) fn parse_value(
 
 `lib.rs` adds `mod arguments;` and `pub use arguments::*;`.
 
+An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an_entrypoint_resolves_to_the_leftover_token` and `a_gap_after_the_item_resolves_to_the_slot` keep passing.
+
 ## Tests
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-    fn parsed_items<P>(
+    fn parsed_items(
         text: &str,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<KeyValuePair, WithSpan<ParseError>>,
     ) -> (
-        Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
+        Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<CommaWithoutItem>,
+        Vec<WithSpan<SemanticToken>>,
     ) {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -419,7 +754,7 @@ pub(crate) fn parse_value(
         let items = tree
             .item
             .parse_each_chunk(parent.cursor(), leftover, parse_item);
-        (items, errors, comma_errors)
+        (items, errors, comma_errors, tokens)
     }
 
     fn parsed_pairs(
@@ -427,14 +762,35 @@ pub(crate) fn parse_value(
     ) -> (
         Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<SemanticToken>>,
     ) {
-        let (items, errors, comma_errors) = parsed_items(
+        let (items, errors, comma_errors, tokens) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Parenthesis),
-            parse_key_value_pair,
+            parse_argument,
         );
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
-        (items, errors)
+        (items, errors, tokens)
+    }
+
+    fn parsed_argument_list(
+        text: &str,
+    ) -> (
+        Option<WithSpan<ArgumentList>>,
+        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<SemanticToken>>,
+    ) {
+        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
+        assert!(bracket_errors.is_empty(), "for literal {text:?}");
+        let (tree, comma_errors) = chunk(brackets.reference());
+        assert_eq!(comma_errors, vec![], "for literal {text:?}");
+        let mut errors = Vec::new();
+        let mut tokens = Vec::new();
+        let mut stream = tree.item.0[0]
+            .item
+            .stream(text, &mut tokens, &mut errors);
+        let list = consume_argument_list(stream.cursor());
+        (list, errors, tokens)
     }
 
     fn as_pair(slot: &Slot<KeyValuePair, UnparsedChunkItems>) -> &KeyValuePair {
@@ -459,11 +815,17 @@ pub(crate) fn parse_value(
     #[test]
     fn pairs_parse_as_name_colon_value() {
         let text = "id: $petId, shouted: true";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
-        assert_eq!(as_pair(items[0].item.reference()).name.location, span_of(text, "id"));
-        assert_eq!(as_pair(items[0].item.reference()).name.item, "id".intern().to());
+        assert_eq!(
+            as_pair(items[0].item.reference()).name.location,
+            span_of(text, "id")
+        );
+        assert_eq!(
+            as_pair(items[0].item.reference()).name.item,
+            ArgumentName("id".intern().to())
+        );
         assert_eq!(
             as_pair(items[0].item.reference()).value.location,
             span_of(text, "$petId")
@@ -477,7 +839,7 @@ pub(crate) fn parse_value(
     #[test]
     fn each_value_kind_parses() {
         let text = r#"a: $x, b: "hi", c: 42, d: -7, e: true, f: false, g: null"#;
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
         let values: Vec<&NonConstantValue> = items
             .iter()
@@ -501,7 +863,7 @@ pub(crate) fn parse_value(
     #[test]
     fn object_values_use_braces() {
         let text = "input: { id: 4, nested: { on: true } }";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
         let value = as_pair(items[0].item.reference()).value.reference();
         assert_eq!(
@@ -522,25 +884,28 @@ pub(crate) fn parse_value(
     #[test]
     fn empty_and_whitespace_levels_hold_zero_pairs() {
         for text in ["", "   ", "\n"] {
-            let (items, errors) = parsed_pairs(text);
+            let (items, errors, _) = parsed_pairs(text);
             assert_eq!(items.len(), 0, "for literal {text:?}");
             assert_eq!(errors, vec![], "for literal {text:?}");
         }
     }
 
     #[test]
-    fn a_list_trailing_comma_is_not_a_diagnostic() {
+    fn a_trailing_comma_after_a_pair_is_not_a_parse_error() {
         let text = "id: 1,";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert_eq!(items.len(), 1);
-        assert_eq!(as_pair(items[0].item.reference()).name.item, "id".intern().to());
+        assert_eq!(
+            as_pair(items[0].item.reference()).name.item,
+            ArgumentName("id".intern().to())
+        );
         assert_eq!(errors, vec![]);
     }
 
     #[test]
     fn integer_overflow_is_a_typed_error_on_that_pair() {
         let text = "a: 99999999999999999999, b: 1";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
         as_pair(items[1].item.reference());
         assert!(errors.iter().any(|error| {
@@ -552,9 +917,12 @@ pub(crate) fn parse_value(
     #[test]
     fn a_malformed_pair_degrades_that_pair_alone() {
         let text = "a 1, b: 2";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
-        assert_eq!(as_pair(items[1].item.reference()).name.location, span_of(text, "b"));
+        assert_eq!(
+            as_pair(items[1].item.reference()).name.location,
+            span_of(text, "b")
+        );
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(
@@ -567,7 +935,7 @@ pub(crate) fn parse_value(
     #[test]
     fn a_non_value_identifier_is_an_error_at_the_value() {
         let text = "a: yes";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
@@ -580,11 +948,29 @@ pub(crate) fn parse_value(
     }
 
     #[test]
+    fn a_pair_that_does_not_start_with_a_name_is_an_argument_error() {
+        let text = "42: 1";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Argument,
+                    Found::Token(NonBracketTokenKind::IntegerLiteral),
+                )
+                && error.location == span_of(text, "42")
+        }));
+    }
+
+    #[test]
     fn leftover_after_a_pair_keeps_the_item() {
         let text = "id: $x junk";
-        let (items, errors) = parsed_pairs(text);
+        let (items, errors, _) = parsed_pairs(text);
         assert_eq!(items.len(), 1);
-        assert_eq!(as_pair(items[0].item.reference()).name.location, span_of(text, "id"));
+        assert_eq!(
+            as_pair(items[0].item.reference()).name.location,
+            span_of(text, "id")
+        );
         assert!(items[0].item.extra_tokens.is_some());
         assert!(errors.iter().any(|error| {
             error.item
@@ -599,20 +985,78 @@ pub(crate) fn parse_value(
     #[test]
     fn a_doubled_comma_between_pairs_is_chunkings_error() {
         let text = "a: 1,, b: 2";
-        let (items, errors, comma_errors) = parsed_items(
+        let (items, errors, comma_errors, _) = parsed_items(
             text,
             Expectation::Separator(BracketKind::Parenthesis),
-            parse_key_value_pair,
+            parse_argument,
         );
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
-        assert_eq!(as_pair(items[0].item.reference()).name.location, span_of(text, "a"));
-        assert_eq!(as_pair(items[1].item.reference()).name.location, span_of(text, "b"));
+        assert_eq!(
+            as_pair(items[0].item.reference()).name.location,
+            span_of(text, "a")
+        );
+        assert_eq!(
+            as_pair(items[1].item.reference()).name.location,
+            span_of(text, "b")
+        );
         assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn consume_argument_list_reads_a_paren_group() {
+        let text = "(id: $petId)";
+        let (list, errors, tokens) = parsed_argument_list(text);
+        let list = list.expect("the fixture opens with a paren group");
+        assert_eq!(errors, vec![]);
+        assert_eq!(list.location, span_of(text, "(id: $petId)"));
+        assert_eq!(list.item.0.len(), 1);
+        assert_eq!(
+            as_pair(list.item.0[0].item.reference()).name.item,
+            ArgumentName("id".intern().to())
+        );
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Parenthesis.with_span(span_of(text, "(")),
+                SemanticToken::Argument.with_span(span_of(text, "id")),
+                SemanticToken::Colon.with_span(span_of(text, ":")),
+                SemanticToken::Variable.with_span(span_of(text, "$")),
+                SemanticToken::Variable.with_span(span_of(text, "petId")),
+                SemanticToken::Parenthesis.with_span(span_of(text, ")")),
+            ],
+        );
+    }
+
+    #[test]
+    fn an_empty_paren_group_is_zero_pairs() {
+        let text = "()";
+        let (list, errors, _) = parsed_argument_list(text);
+        let list = list.expect("the fixture opens with a paren group");
+        assert_eq!(list.item.0.len(), 0);
+        assert_eq!(errors, vec![]);
+    }
+
+    #[test]
+    fn a_pair_records_argument_colon_and_value_tokens() {
+        let text = "id: $petId";
+        let (_, errors, tokens) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Argument.with_span(span_of(text, "id")),
+                SemanticToken::Colon.with_span(span_of(text, ":")),
+                SemanticToken::Variable.with_span(span_of(text, "$")),
+                SemanticToken::Variable.with_span(span_of(text, "petId")),
+            ],
+        );
     }
 ```
 
 ## Landing checklist
 
-1. `parse_each_chunk`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `parse_key_value_pair`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
-2. Move this doc to refactors/past.
+1. `Separator(BracketKind)`, `closing`, `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`. Existing `Separator` call sites take a `BracketKind`. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. Struct-field `#[from_container_parent]`, the macro test. `cargo test -p resolve_position_macros` passes.
+3. The `KeyValuePair` pin, `UnparsedChunkItemsParent`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+4. Move this doc to refactors/past.
