@@ -1,6 +1,6 @@
 # parse-arguments: argument lists and values
 
-`parse_key_value_pair` reads `name : value`. `consume_argument_list` reads a paren group and runs `parse_each_chunk` on its interior with `parse_argument`. An object value is a brace group whose interior uses `parse_object_entry`. Both wrappers call `parse_key_value_pair`. `parse_value` reads a variable, a string, an integer, a boolean, null, or an object.
+`parse_name_colon_value` reads `name : value`. `parse_argument` builds a `NamedArgument`. `parse_object_entry` builds an `ObjectEntry`. `consume_argument_list` reads a paren group and runs `parse_each_chunk` on its interior with `parse_argument`. An object value is a brace group whose interior uses `parse_object_entry`. `parse_value` reads a variable, a string, an integer, a boolean, null, or an object.
 
 `consume_argument_list` has no production caller. parse-selection-sets.md is the first. Tests in `arguments.rs` call `parse_each_chunk` on a list interior and call `consume_argument_list` on a paren group. Production-only unused items take `#[cfg_attr(not(test), expect(dead_code))]`.
 
@@ -28,7 +28,7 @@ null
 
 ## Change 1: `Separator(BracketKind)`, `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`
 
-Origin: `crates/isograph_parser/src/parse_error.rs` and `crates/isograph_parser/src/non_bracket_token.rs`. Delta: `Separator` carries the group's `BracketKind` so leftover can name the closer. `Argument`, `Value`, and `ObjectEntry` land for `parse_key_value_pair` and `parse_value`. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token. `BracketKind::closing` is the closer string.
+Origin: `crates/isograph_parser/src/parse_error.rs` and `crates/isograph_parser/src/non_bracket_token.rs`. Delta: `Separator` carries the group's `BracketKind` so leftover can name the closer. `Argument`, `Value`, and `ObjectEntry` land for `parse_name_colon_value` and `parse_value`. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token. `BracketKind::closing` is the closer string.
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -354,9 +354,11 @@ fn leftover_parent_is_the_slot_path_through_from() {
 
 `cargo test -p resolve_position_macros` passes.
 
-## Change 3: the `KeyValuePair` pin, `arguments.rs`
+## Change 3: the `NamedArgument` and `ObjectEntry` pins, `arguments.rs`
 
-Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs` after generic-slot.md. Delta: a second pin, leftover's parent is an enum of slot paths, `extra_tokens` takes `#[from_container_parent]`. `UnparsedChunkItemsPath` moves next to that enum.
+Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs` after generic-slot.md. Delta: two pins, leftover's parent is an enum of slot paths, `extra_tokens` takes `#[from_container_parent]`. `UnparsedChunkItemsPath` moves next to that enum.
+
+`Slot<T, E>` has one `Parent`. A pin `(<KeyValuePair, UnparsedChunkItems>, ArgumentListPath)` and a pin `(<KeyValuePair, UnparsedChunkItems>, ObjectLiteralPath)` are two impls of the same type. The lists are vanilla: each pin's parent is that list's path, each vec is bare `#[resolve_field]`. The slot items are therefore two types. `ArgumentName` and `NonConstantValue` sit on both and take the enum parents.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -366,7 +368,8 @@ Origin: `Slot` and `UnparsedChunkItems` in `crates/isograph_parser/src/chunk.rs`
     on_unmatched_span = from_path,
     self_type_generics = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<KeyValuePair, UnparsedChunkItems>, KeyValuePairParent<'a>),
+        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {
@@ -391,7 +394,8 @@ pub struct UnparsedChunkItems(
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    KeyValuePairSlot(KeyValuePairSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
 }
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -403,9 +407,15 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<KeyValuePairSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: KeyValuePairSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::KeyValuePairSlot(path)
+impl<'a> From<NamedArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::NamedArgumentSlot(path)
+    }
+}
+
+impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ObjectEntrySlot(path)
     }
 }
 ```
@@ -470,25 +480,35 @@ use crate::{
 #[resolve_position(parent_type = ArgumentListParent, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(
     #[resolve_field]
-    #[parent_variant(ArgumentList)]
-    pub Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
+    pub Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>,
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectLiteral(
     #[resolve_field]
-    #[parent_variant(ObjectLiteral)]
-    pub Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
+    pub Vec<WithSpan<Slot<ObjectEntry, UnparsedChunkItems>>>,
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = KeyValuePairSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct KeyValuePair {
+#[resolve_position(parent_type = NamedArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NamedArgument {
     #[resolve_field]
+    #[parent_variant(NamedArgument)]
     pub name: WithSpan<ArgumentName>,
     #[resolve_field]
-    #[parent_variant(KeyValue)]
+    #[parent_variant(NamedArgument)]
+    pub value: WithSpan<NonConstantValue>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ObjectEntrySlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ObjectEntry {
+    #[resolve_field]
+    #[parent_variant(ObjectEntry)]
+    pub name: WithSpan<ArgumentName>,
+    #[resolve_field]
+    #[parent_variant(ObjectEntry)]
     pub value: WithSpan<NonConstantValue>,
 }
 
@@ -530,7 +550,7 @@ pub enum Boolean {
 pub struct NullValue;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = KeyValuePairPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = ArgumentNameParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentName(common_lang_types::FieldArgumentName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -541,14 +561,15 @@ pub struct VariableName(common_lang_types::VariableName);
 pub enum ArgumentListParent {}
 
 #[derive(Debug)]
-pub enum KeyValuePairParent<'a> {
-    ArgumentList(ArgumentListPath<'a>),
-    ObjectLiteral(ObjectLiteralPath<'a>),
+pub enum ArgumentNameParent<'a> {
+    NamedArgument(NamedArgumentPath<'a>),
+    ObjectEntry(ObjectEntryPath<'a>),
 }
 
 #[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
-    KeyValue(Box<KeyValuePairPath<'a>>),
+    NamedArgument(Box<NamedArgumentPath<'a>>),
+    ObjectEntry(Box<ObjectEntryPath<'a>>),
 }
 
 pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, ArgumentListParent>;
@@ -556,13 +577,20 @@ pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, Argumen
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
-pub type KeyValuePairSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<KeyValuePair, UnparsedChunkItems>,
-    KeyValuePairParent<'a>,
+pub type NamedArgumentSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<NamedArgument, UnparsedChunkItems>,
+    ArgumentListPath<'a>,
 >;
 
-pub type KeyValuePairPath<'a> =
-    PositionResolutionPath<&'a KeyValuePair, KeyValuePairSlotPath<'a>>;
+pub type ObjectEntrySlotPath<'a> = PositionResolutionPath<
+    &'a Slot<ObjectEntry, UnparsedChunkItems>,
+    ObjectLiteralPath<'a>,
+>;
+
+pub type NamedArgumentPath<'a> =
+    PositionResolutionPath<&'a NamedArgument, NamedArgumentSlotPath<'a>>;
+
+pub type ObjectEntryPath<'a> = PositionResolutionPath<&'a ObjectEntry, ObjectEntrySlotPath<'a>>;
 
 pub type VariableUsePath<'a> = PositionResolutionPath<&'a VariableUse, NonConstantValueParent<'a>>;
 
@@ -574,18 +602,18 @@ pub type BooleanValuePath<'a> = PositionResolutionPath<&'a BooleanValue, NonCons
 
 pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantValueParent<'a>>;
 
-pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, KeyValuePairPath<'a>>;
+pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, ArgumentNameParent<'a>>;
 
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
 ```
 
-`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `ArgumentName(name.token_text().intern().to())`.
+`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `name.interned().map(ArgumentName)`.
 
-`NonConstantValueParent::KeyValue` is boxed to break `KeyValuePairPath -> NonConstantValue -> ObjectLiteral -> KeyValuePair`. A position on `$` answers `VariableUse`.
+`NonConstantValueParent` variants are boxed to break `NamedArgumentPath` / `ObjectEntryPath` through `ObjectLiteral` back to a pair. A position on `$` answers `VariableUse`.
 
-`Slot<KeyValuePair, UnparsedChunkItems>::Parent` is `KeyValuePairParent`. `ArgumentList` and `ObjectLiteral` wrap their path in that enum, so the vec fields take `#[parent_variant]`. `KeyValuePair`'s parent is the slot path, the same way `IsoLiteralItem`'s parent is `IsoLiteralSlotPath`.
+`ArgumentList` and `ObjectLiteral` vecs are bare `#[resolve_field]`. `NamedArgument`'s parent is `NamedArgumentSlotPath`. `ObjectEntry`'s parent is `ObjectEntrySlotPath`. `ArgumentName` and `NonConstantValue` have two parents, so those fields take `#[parent_variant]`.
 
-`Slot`'s unmatched arm is `on_unmatched_span = from_path`: `self.path(parent).to()`. Each pin has a `From` into `IsographResolutionNode`. The root pin is live. This pin adds the second `From`.
+`Slot`'s unmatched arm is `on_unmatched_span = from_path`: `self.path(parent).to()`. Each pin has a `From` into `IsographResolutionNode`. The root pin is live. These pins add two more.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -598,9 +626,15 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: KeyValuePairSlotPath<'a>) -> Self {
-        IsographResolutionNode::KeyValuePairSlot(path)
+impl<'a> From<NamedArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
+        IsographResolutionNode::NamedArgumentSlot(path)
+    }
+}
+
+impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
+        IsographResolutionNode::ObjectEntrySlot(path)
     }
 }
 ```
@@ -652,9 +686,9 @@ use crate::{
     ArgumentListPath, ArgumentNamePath, BooleanValuePath, ChunkPath, ChunkSeparatorPath,
     ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath, CloseBracketPath, EntityNamePath,
     EntrypointDeclarationPath, ExtraChunksPath, IntegerValuePath, IsoLiteralParsePath,
-    IsoLiteralSlotPath, KeyValuePairPath, KeyValuePairSlotPath, NonBracketTokenPath,
-    NullValuePath, ObjectLiteralPath, OpenBracketPath, StringValuePath, UnparsedChunkItemsPath,
-    VariableNamePath, VariableUsePath,
+    IsoLiteralSlotPath, NamedArgumentPath, NamedArgumentSlotPath, NonBracketTokenPath,
+    NullValuePath, ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath,
+    StringValuePath, UnparsedChunkItemsPath, VariableNamePath, VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -680,10 +714,12 @@ pub enum IsographResolutionNode<'a> {
     NonBracketToken(NonBracketTokenPath<'a>),
     OpenBracket(OpenBracketPath<'a>),
     CloseBracket(CloseBracketPath<'a>),
-    KeyValuePairSlot(KeyValuePairSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
-    KeyValuePair(KeyValuePairPath<'a>),
+    NamedArgument(NamedArgumentPath<'a>),
+    ObjectEntry(ObjectEntryPath<'a>),
     ArgumentName(ArgumentNamePath<'a>),
     VariableUse(VariableUsePath<'a>),
     VariableName(VariableNamePath<'a>),
@@ -697,11 +733,11 @@ pub enum IsographResolutionNode<'a> {
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 #[cfg_attr(not(test), expect(dead_code))]
-fn parse_key_value_pair(
+fn parse_name_colon_value(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
     missing_name: Expectation,
-) -> Result<KeyValuePair, WithSpan<ParseError>> {
+) -> Result<(WithSpan<ArgumentName>, WithSpan<NonConstantValue>), WithSpan<ParseError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, name_token)
         .map_err(|()| cursor.expected(missing_name))?;
@@ -709,25 +745,32 @@ fn parse_key_value_pair(
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
-    KeyValuePair {
-        name: ArgumentName(name.token_text().intern().to()).with_span(name.location),
+    (
+        name.interned().map(ArgumentName),
         value,
-    }
-    .wrap_ok()
+    )
+        .wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
 fn parse_argument(
     cursor: &mut ItemCursor<'_>,
-) -> Result<KeyValuePair, WithSpan<ParseError>> {
-    parse_key_value_pair(cursor, SemanticToken::Argument, Expectation::Argument)
+) -> Result<NamedArgument, WithSpan<ParseError>> {
+    let (name, value) =
+        parse_name_colon_value(cursor, SemanticToken::Argument, Expectation::Argument)?;
+    NamedArgument { name, value }.wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
 fn parse_object_entry(
     cursor: &mut ItemCursor<'_>,
-) -> Result<KeyValuePair, WithSpan<ParseError>> {
-    parse_key_value_pair(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)
+) -> Result<ObjectEntry, WithSpan<ParseError>> {
+    let (name, value) = parse_name_colon_value(
+        cursor,
+        SemanticToken::ObjectKey,
+        Expectation::ObjectEntry,
+    )?;
+    ObjectEntry { name, value }.wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
@@ -757,7 +800,7 @@ pub(crate) fn parse_value(
                 .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                VariableName(name.token_text().intern().to()).with_span(name.location),
+                name.interned().map(VariableName),
             ))
             .wrap_ok();
         }
@@ -818,12 +861,12 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-    fn parsed_items(
+    fn parsed_items<P>(
         text: &str,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<KeyValuePair, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
     ) -> (
-        Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
+        Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<CommaWithoutItem>,
         Vec<WithSpan<SemanticToken>>,
@@ -847,7 +890,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
     fn parsed_pairs(
         text: &str,
     ) -> (
-        Vec<WithSpan<Slot<KeyValuePair, UnparsedChunkItems>>>,
+        Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<WithSpan<SemanticToken>>,
     ) {
@@ -880,11 +923,18 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         (list, errors, tokens)
     }
 
-    fn as_pair(slot: &Slot<KeyValuePair, UnparsedChunkItems>) -> &KeyValuePair {
+    fn as_argument(slot: &Slot<NamedArgument, UnparsedChunkItems>) -> &NamedArgument {
         slot.item
             .as_ref()
             .map(|wrapped| wrapped.item.reference())
-            .expect("expected a key-value pair")
+            .expect("expected a named argument")
+    }
+
+    fn as_entry(slot: &Slot<ObjectEntry, UnparsedChunkItems>) -> &ObjectEntry {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected an object entry")
     }
 
     fn span_of(text: &str, pattern: &str) -> Span {
@@ -906,19 +956,19 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(errors, vec![]);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_pair(items[0].item.reference()).name.location,
+            as_argument(items[0].item.reference()).name.location,
             span_of(text, "id")
         );
         assert_eq!(
-            as_pair(items[0].item.reference()).name.item,
+            as_argument(items[0].item.reference()).name.item,
             ArgumentName("id".intern().to())
         );
         assert_eq!(
-            as_pair(items[0].item.reference()).value.location,
+            as_argument(items[0].item.reference()).value.location,
             span_of(text, "$petId")
         );
         assert_eq!(
-            as_pair(items[1].item.reference()).name.location,
+            as_argument(items[1].item.reference()).name.location,
             span_of(text, "shouted")
         );
     }
@@ -930,7 +980,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(errors, vec![]);
         let values: Vec<&NonConstantValue> = items
             .iter()
-            .map(|slot| as_pair(slot.item.reference()).value.item.reference())
+            .map(|slot| as_argument(slot.item.reference()).value.item.reference())
             .collect();
         assert!(matches!(values[0], NonConstantValue::Variable(_)));
         assert!(matches!(values[1], NonConstantValue::String(_)));
@@ -952,7 +1002,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         let text = "input: { id: 4, nested: { on: true } }";
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(errors, vec![]);
-        let value = as_pair(items[0].item.reference()).value.reference();
+        let value = as_argument(items[0].item.reference()).value.reference();
         assert_eq!(
             value.location,
             span_of(text, "{ id: 4, nested: { on: true } }")
@@ -963,7 +1013,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         };
         assert_eq!(object.0.len(), 2);
         assert_eq!(
-            as_pair(object.0[1].item.reference()).name.location,
+            as_entry(object.0[1].item.reference()).name.location,
             span_of(text, "nested")
         );
     }
@@ -983,7 +1033,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(items.len(), 1);
         assert_eq!(
-            as_pair(items[0].item.reference()).name.item,
+            as_argument(items[0].item.reference()).name.item,
             ArgumentName("id".intern().to())
         );
         assert_eq!(errors, vec![]);
@@ -994,7 +1044,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         let text = "a: 99999999999999999999, b: 1";
         let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
-        as_pair(items[1].item.reference());
+        as_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
             error.item == ParseError::IntegerDoesNotFitI64
                 && error.location == span_of(text, "99999999999999999999")
@@ -1007,7 +1057,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         let (items, errors, _) = parsed_pairs(text);
         assert!(items[0].item.item.is_none());
         assert_eq!(
-            as_pair(items[1].item.reference()).name.location,
+            as_argument(items[1].item.reference()).name.location,
             span_of(text, "b")
         );
         assert!(errors.iter().any(|error| {
@@ -1055,7 +1105,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         let (items, errors, _) = parsed_pairs(text);
         assert_eq!(items.len(), 1);
         assert_eq!(
-            as_pair(items[0].item.reference()).name.location,
+            as_argument(items[0].item.reference()).name.location,
             span_of(text, "id")
         );
         assert!(items[0].item.extra_tokens.is_some());
@@ -1080,11 +1130,11 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(comma_errors.len(), 1);
         assert_eq!(items.len(), 2);
         assert_eq!(
-            as_pair(items[0].item.reference()).name.location,
+            as_argument(items[0].item.reference()).name.location,
             span_of(text, "a")
         );
         assert_eq!(
-            as_pair(items[1].item.reference()).name.location,
+            as_argument(items[1].item.reference()).name.location,
             span_of(text, "b")
         );
         assert_eq!(errors, vec![]);
@@ -1099,7 +1149,7 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
         assert_eq!(list.location, span_of(text, "(id: $petId)"));
         assert_eq!(list.item.0.len(), 1);
         assert_eq!(
-            as_pair(list.item.0[0].item.reference()).name.item,
+            as_argument(list.item.0[0].item.reference()).name.item,
             ArgumentName("id".intern().to())
         );
         assert_eq!(
@@ -1145,5 +1195,5 @@ An entrypoint leftover token still answers `NonBracketToken`. `leftover_after_an
 
 1. `Separator(BracketKind)`, `closing`, `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`. Existing `Separator` call sites take a `BracketKind`. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Struct-field `#[from_container_parent]`, the macro test. `cargo test -p resolve_position_macros` passes.
-3. The `KeyValuePair` pin, `UnparsedChunkItemsParent`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+3. The `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 4. Move this doc to refactors/past.

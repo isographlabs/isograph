@@ -30,6 +30,17 @@ This pass is `IsoLiteralParse`. Resolve walks that tree only. Artifact generatio
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TokenText<'a> {
+    pub location: Span,
+    text: &'a str,
+}
+
+impl<'a> TokenText<'a> {
+    pub(crate) fn token_text(self) -> &'a str;
+    pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T>;
+}
+
 pub(crate) struct ItemCursor<'a> { /* ... */ }
 
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
@@ -52,7 +63,7 @@ impl<'a> ItemCursor<'a> {
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
-    ) -> Option<Span>;
+    ) -> Option<TokenText<'a>>;
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
@@ -63,7 +74,7 @@ impl<'a> ItemCursor<'a> {
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
-    ) -> Result<Span, ()>;
+    ) -> Result<TokenText<'a>, ()>;
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
@@ -73,7 +84,6 @@ impl<'a> ItemCursor<'a> {
     pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>);
     pub(crate) fn stream_chunk<'c>(&'c mut self, chunk: &'c Chunk) -> ChunkStream<'c>;
     pub(crate) fn text(&self) -> &'a str;
-    pub(crate) fn token_text(&self, span: Span) -> &'a str;
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
@@ -90,12 +100,12 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
 
 ### Span sources
 
-- Leaf: the `Span` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
+- Leaf: the `location` of the `TokenText` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
 - Parsed list item: the `WithSpan` `spanning` returned, stored on `Slot.item` when the form parsed.
 - Slot: form `Ok` and end is the item span. Form `Ok` and leftover is the join of the item span and the leftover items' span. Form `Err` is `contents_span`.
 - Value made of several items: one `spanning` call. The closure's first advance is a `consume_*` or `require_*`. Remaining items of that value are read inside the same `spanning`.
 
-`token_text` is `&self.text[span.as_usize_range()]`. A name in the tree is an interned string key (`token_text(span).intern().to::<EntityName>()`). The converted scalar is the `i64`. The wrapper span is location only.
+`token_text` is the source slice on that `TokenText`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -116,7 +126,8 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
     on_unmatched_span = from_path,
     self_type_generics = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<KeyValuePair, UnparsedChunkItems>, KeyValuePairParent<'a>),
+        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {
@@ -154,7 +165,7 @@ pub struct ExtraChunks(
 );
 ```
 
-Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `KeyValuePairSlot`). `#[from_container_parent]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
+Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`). `#[from_container_parent]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
 
 Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
@@ -165,7 +176,8 @@ Each list that stores a `Slot` appends a pin, a `ResolvedNode` variant whose pay
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    KeyValuePairSlot(KeyValuePairSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
 }
 
 pub type UnparsedChunkItemsPath<'a> =
@@ -177,14 +189,20 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<KeyValuePairSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: KeyValuePairSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::KeyValuePairSlot(path)
+impl<'a> From<NamedArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::NamedArgumentSlot(path)
+    }
+}
+
+impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ObjectEntrySlot(path)
     }
 }
 ```
 
-`IsoLiteralItem`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `KeyValuePair`'s `parent_type` is `KeyValuePairSlotPath<'a>`.
+`IsoLiteralItem`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `NamedArgument`'s `parent_type` is `NamedArgumentSlotPath<'a>`. `ObjectEntry`'s `parent_type` is `ObjectEntrySlotPath<'a>`.
 
 `Singleton` at the root stays pinned (`self_type_generics` as above). parse-variables.md adds a generic `Singleton` impl when `[...]` stores one.
 
@@ -288,23 +306,23 @@ pub(crate) fn parse_value(
                 .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                VariableName(cursor.token_text(name).intern().to()).with_span(name),
+                name.interned().map(VariableName),
             ))
             .wrap_ok();
         }
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(StringValue(cursor.token_text(span).intern().to()))
+            return NonConstantValue::String(StringValue(span.token_text().intern().to()))
                 .wrap_ok();
         }
         if let Some(span) = cursor
             .consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         {
-            let value = match cursor.token_text(span).parse() {
+            let value = match span.token_text().parse() {
                 Ok(value) => value,
                 Err(_) => {
-                    return ParseError::IntegerDoesNotFitI64.with_span(span).wrap_err();
+                    return ParseError::IntegerDoesNotFitI64.with_span(span.location).wrap_err();
                 }
             };
             return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
@@ -313,7 +331,7 @@ pub(crate) fn parse_value(
             NonBracketTokenKind::Identifier,
             SemanticToken::BooleanOrNull,
         ) {
-            return match cursor.token_text(span) {
+            return match span.token_text() {
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
@@ -321,7 +339,7 @@ pub(crate) fn parse_value(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
-                .with_span(span)
+                .with_span(span.location)
                 .wrap_err(),
             };
         }
@@ -339,7 +357,7 @@ pub(crate) fn parse_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers construct `VariableName(cursor.token_text(span).intern().to())` and do not add a second `From`.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers that do not add a second `From` construct `name.interned().map(VariableName)`.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
@@ -365,7 +383,7 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
 
 ## Narrower types for narrower grammars
 
-Variable defaults are constant values. The constant-value ladder is the value ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. The integer arm is the same `token_text(span).parse()` match; that `span` is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
+Variable defaults are constant values. The constant-value ladder is the value ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. The integer arm is the same `token.token_text().parse()` match; that token is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
 
 ## Errors
 
@@ -492,9 +510,9 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Optional group: `ItemCursor::consume_group_if`
 - Wrong or missing item: `ItemCursor::expected`
 - Multi-form position: `consume_*` ladder, last arm `expected`
-- Keyword / boolean / null text: `token_text` after an identifier
-- Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
-- Interned name: `token_text(span).intern().to::<EntityName>()`
+- Keyword / boolean / null text: `token.token_text()` after an identifier
+- Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
+- Interned name: `token.interned()` when the wrapper implements `From<StringKey>`; `token.interned().map(ArgumentName)` when it does not
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_each_chunk` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`
@@ -516,11 +534,12 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 Each grammar feature lands on this surface.
 
 - generic-slot.md: one `ResolvePosition` impl per `Slot<T, E>` pin, `on_unmatched_span = from_path`, one `ResolvedNode` variant per pin
-- parse-arguments.md: `Separator(BracketKind)`, the second `Slot` pin, `UnparsedChunkItemsParent`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- parse-arguments.md: `Separator(BracketKind)`, the `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
+- token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_one_chunk`, `parse_each_chunk`, and `parse_singleton`. This doc stays in `refactors/pending`.
