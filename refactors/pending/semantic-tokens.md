@@ -96,7 +96,7 @@ impl<'source> PeekableLexer<'source> {
         let parsed_token = std::mem::replace(&mut self.current, kind.with_span(span))
             .to_with_embedded_location(self.text_source);
         self.semantic_tokens
-            .push(isograph_semantic_token.with_span(parsed_token.location));
+            .push(isograph_semantic_token.with_location(parsed_token.location));
         parsed_token
     }
 
@@ -136,7 +136,7 @@ Delta from that extract:
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.
-- Recording uses `with_span`.
+- Recording uses `with_span`. `with_location` stays on `WithLocationPostfix`; the parser has only `Span`s, so every call site is `with_span`.
 
 ## 1. Construct with a noop or a non-noop
 
