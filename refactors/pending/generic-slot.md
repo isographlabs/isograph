@@ -1,6 +1,6 @@
 # generic-slot: one concrete `ResolvePosition` impl per `Slot<T, E>` pin
 
-Lands after resolve-position-on-unmatched-span.md (refactors/past). GAT predicates on `type Parent` / `type ResolvedNode` are in the derive.
+Lands after resolve-position-on-unmatched-span.md (refactors/past). GAT predicates on `type Parent` / `type ResolvedNode` are in the derive. `PathParent` (refactors/past/path-parent.md) was for `T::Parent::Parent` on a generic Slot impl. This doc does not use that. Change 1 deletes it.
 
 A generic `impl<T, E> ResolvePosition for Slot<T, E>` does not compile (E0276 on extra GAT bounds; `for<'a> T: ResolvePosition<Parent<'a> = Path<&'a Slot<T, E>, …>>` overflows or implies `'static`). `Slot<IsoLiteralItem, UnparsedChunkItems>` and `Slot<Selection, UnparsedChunkItems>` are different types. Each gets its own concrete impl. `self_type_generics` becomes a list of pins. Each pin is type arguments plus that impl’s `parent_type`. The derive emits one `impl ResolvePosition for Slot<…>` per pin.
 
@@ -101,7 +101,40 @@ pub type SlotPath<'a> =
 
 Unmatched is `struct_name`. There is no `From` impl.
 
-## Change 1: `self_type_generics` is one pin or a list of pins
+## Change 1: delete `PathParent`
+
+Origin: `crates/resolve_position/src/lib.rs` after path-parent.md. Delta: the trait, the impl, the test, and the test-module import. No caller remains.
+
+```rust
+// from crates/resolve_position/src/lib.rs
+pub trait PathParent {
+    type Parent;
+}
+
+impl<Inner, Parent> PathParent for PositionResolutionPath<Inner, Parent> {
+    type Parent = Parent;
+}
+```
+
+```rust
+// from crates/resolve_position/src/lib.rs
+    use crate::{PathParent, PositionResolutionPath, ResolvePosition};
+```
+
+```rust
+// from crates/resolve_position/src/lib.rs
+    #[test]
+    fn position_resolution_path_projects_its_parent_type_argument() {
+        fn assert_parent<T: PathParent<Parent = U>, U>() {}
+        assert_parent::<PositionResolutionPath<&u8, ()>, ()>();
+    }
+```
+
+After: those three gone. The test-module import is `use crate::{PositionResolutionPath, ResolvePosition};`.
+
+`cargo test -p resolve_position` passes.
+
+## Change 2: `self_type_generics` is one pin or a list of pins
 
 Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` parses as either one `<A, B>` (live; uses the container `parent_type`) or `[ (<A, B>, ParentTy), ... ]`. `handle_data_struct` emits one impl per pin. `parent_type` is optional when every pin carries its parent type.
 
@@ -217,9 +250,9 @@ fn parse_self_type_generics(
 
 `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass. Singleton still uses `One`. Slot is not converted yet.
 
-## Change 2: root pin list, `from_path`, `IsoLiteralSlot`
+## Change 3: root pin list, `from_path`, `IsoLiteralSlot`
 
-Origin: `Slot` in `chunk.rs` after change 1. Delta: list form with the root pin, `on_unmatched_span = from_path`, `SlotPath` → `IsoLiteralSlotPath`, `Slot` → `IsoLiteralSlot`, the `From` impl.
+Origin: `Slot` in `chunk.rs` after change 2. Delta: list form with the root pin, `on_unmatched_span = from_path`, `SlotPath` → `IsoLiteralSlotPath`, `Slot` → `IsoLiteralSlot`, the `From` impl.
 
 The After listings. Generated root impl (predicates already emitted by the derive):
 
@@ -435,6 +468,7 @@ Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_th
 
 ## Landing checklist
 
-1. Change 1: list form of `self_type_generics`, one impl per pin, `One` still uses container `parent_type`. Singleton unchanged. Two-pin macro test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-2. Change 2: root pin list on `Slot`, `from_path`, `From<IsoLiteralSlotPath>`, `IsoLiteralSlot`, `SlotPath` renamed, gap test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-3. Move this doc to refactors/past.
+1. Change 1: delete `PathParent`, the impl, the test. `cargo test -p resolve_position` passes.
+2. Change 2: list form of `self_type_generics`, one impl per pin, `One` still uses container `parent_type`. Singleton unchanged. Two-pin macro test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+3. Change 3: root pin list on `Slot`, `from_path`, `From<IsoLiteralSlotPath>`, `IsoLiteralSlot`, `SlotPath` renamed, gap test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+4. Move this doc to refactors/past.
