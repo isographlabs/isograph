@@ -1,13 +1,20 @@
 # parse-arguments: argument lists and values
 
-Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_chunk_item_list` and `Separator(BracketKind)`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
+Values: variables, strings, integers, booleans, null, objects. An object is a `name: value` chunk list. GraphQL and isograph wrap that list in `()` as a field argument list and in `{}` as an object value. Same interior; the delimiter is `BracketKind`. Lands `parse_chunk_item_list` and `Separator(BracketKind)`. Lands after generic-slot.md. parse-selection-sets.md attaches the paren list to selections. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
 
-Each contentful chunk of an argument list is one argument:
+Each contentful chunk is one named entry:
 
 ```
 <Identifier> : <value>
+```
+
+The list is wrapped as:
+
+```
+( <entries> )           argument list (field arguments)
+{ <entries> }           object literal (a value)
 ```
 
 A value is one of:
@@ -18,10 +25,10 @@ $ <Identifier>          a variable
 42, -7                  an integer literal, converted to i64
 true, false             a boolean
 null                    null
-{ <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
+{ <entries> }           an object literal
 ```
 
-Tests feed a list's interior to `parse_chunk_item_list`. The wrapping paren group lands with the host that consumes it.
+Tests feed a list's interior to `parse_chunk_item_list`. The wrapping group is `BracketKind::Parenthesis` for arguments and `BracketKind::Brace` for an object value. The host consumes that group.
 
 ## Change 1: `parse_chunk_item_list`
 
@@ -317,7 +324,7 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
 
 A gap in an argument slot answers `IsographResolutionNode::ArgumentSlot`. The root leaf is `IsoLiteralSlot(IsoLiteralSlotPath)`.
 
-`parse_value` is the listing in parsing-standards.md.
+`parse_value` is the listing in parsing-standards.md. `consume_argument_list` is the paren wrap. The object arm of `parse_value` is the brace wrap. Both call `parse_chunk_item_list` on the group's children. `parse_argument` and `parse_object_entry` are the same `name : value` form; they differ in `Expectation` (`Argument` vs `ObjectEntry`) and the name newtype (`ArgumentName` vs `ObjectEntryName`).
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs

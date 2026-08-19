@@ -345,6 +345,8 @@ A group plus its interior is `consume_group_if` or `require_group`, then `parse_
 
 When the next item may start several forms, the parse function is a `consume_*` ladder. The last arm is `expected`. If those arms are one value, the ladder is inside `spanning`. An arm that has taken its first item continues with `require_*` / `consume_*`.
 
+`parse_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
+
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 pub(crate) fn parse_value<F>(
