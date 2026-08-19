@@ -110,14 +110,17 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
-    resolved_node = IsographResolutionNode<'a>
+    resolved_node = IsographResolutionNode<'a>,
+    fallback = from_path
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-    for<'a> IsographResolutionNode<'a>: From<<T as ResolvePosition>::Parent<'a>>,
+    for<'a> IsographResolutionNode<'a>: From<
+        PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
+    >,
 {
     #[resolve_field]
     #[parent_from]
@@ -153,11 +156,11 @@ pub struct ExtraChunks(
 );
 ```
 
-`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. If every marked field is `parent_from`, the struct is not a leaf: the no-hit arm is `parent.to()`. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers the container (`Singleton`, `SelectionSet`, ...). `{ item: None, extra_tokens: None }` is the same fallback.
+`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. Fallback is not suppressed. `fallback = from_path` makes the no-hit arm `self.path(parent).to()`. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same fallback.
 
-Leftover span is tight to the leftover tokens. The gap after the item is a third region: the container.
+Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
-`Slot` is not a `ResolvedNode` variant. `SlotPath` is deleted. Each list that stores a `Slot` adds `From<that list's path> for IsographResolutionNode`.
+Each list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that monomorph's path, and a `From` into `IsographResolutionNode`. `SlotPath` stays the root alias.
 
 `UnparsedChunkItems`'s parent is an enum. Each list that stores a `Slot` adds a variant and a `From`:
 
@@ -587,7 +590,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 Each grammar feature lands on this surface.
 
-- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `Slot` is not a path segment, gap answers the container
+- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `fallback = from_path`, one `ResolvedNode` variant per slot monomorph
 - parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`

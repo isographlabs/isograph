@@ -168,15 +168,23 @@ impl<'a> From<SelectionSetPath<'a>> for UnparsedChunkItemsParent<'a> {
 `From<ArgumentListPath>` and `From<ObjectLiteralPath>` stay. `Selection: ResolvePosition<Parent = SelectionSetPath>`, so `Slot<Selection, UnparsedChunkItems>::Parent` is `SelectionSetPath`. `From<SelectionSetPath> for SelectionSetPath` is identity (the `item` field). `From<SelectionSetPath> for UnparsedChunkItemsParent` is the `SelectionSet` variant (the `extra_tokens` field).
 
 ```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-impl<'a> From<SelectionSetPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: SelectionSetPath<'a>) -> Self {
-        IsographResolutionNode::SelectionSet(path)
+// from crates/isograph_parser/src/selections.rs
+pub type SelectionSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>;
+
+impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: SelectionSlotPath<'a>) -> Self {
+        IsographResolutionNode::SelectionSlot(path)
     }
 }
 ```
 
-A gap in a selection slot answers `SelectionSet`.
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    SelectionSlot(SelectionSlotPath<'a>),
+```
+
+A gap in a selection slot answers `IsographResolutionNode::SelectionSlot`.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs

@@ -198,15 +198,35 @@ pub enum UnparsedChunkItemsParent<'a> {
 `From` impls for the two new variants.
 
 ```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-impl<'a> From<VariableDeclarationListPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: VariableDeclarationListPath<'a>) -> Self {
-        IsographResolutionNode::VariableDeclarationList(path)
+// from crates/isograph_parser/src/variables.rs
+pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<DeclaredVariable, UnparsedChunkItems>,
+    VariableDeclarationListPath<'a>,
+>;
+
+pub type TypeAnnotationSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>;
+
+impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
+        IsographResolutionNode::VariableDeclarationSlot(path)
+    }
+}
+
+impl<'a> From<TypeAnnotationSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: TypeAnnotationSlotPath<'a>) -> Self {
+        IsographResolutionNode::TypeAnnotationSlot(path)
     }
 }
 ```
 
-A gap in a variable-declaration slot answers `VariableDeclarationList`. A `[...]` slot's parent is `TypeAnnotationParent`; this doc writes `From<TypeAnnotationParent> for IsographResolutionNode` so a gap there answers the type-annotation node. The constant-object list adds `From<that list path> for IsographResolutionNode` when that type is named.
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
+    TypeAnnotationSlot(TypeAnnotationSlotPath<'a>),
+```
+
+The constant-object list adds its own path alias, `From`, and `ResolvedNode` variant when that type is named.
 
 `ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
 
