@@ -12,7 +12,7 @@ pub fn parse_iso_literal(
 ) -> Option<WithSpan<IsoLiteralParse>>
 ```
 
-`text` is the literal itself. The stage reads it to recognize keyword identifiers (`entrypoint`, `field`, `pointer`, `to`, `true`, `false`, `null`), to intern names (`token_text(span).intern().to::<EntityName>()`), and to convert integer literals to `i64`. The wrapper span is location only.
+`text` is the literal itself. The stage reads it to recognize keyword identifiers (`entrypoint`, `field`, `pointer`, `to`, `true`, `false`, `null`), to intern names (`name.token_text().intern().to::<EntityName>()`), and to convert integer literals to `i64`. The wrapper span is location only.
 
 The stage parses the same language as upstream isograph's `parse_iso_literal`, with the deliberate changes listed below. Where upstream and this stage disagree on an input's validity, the difference must appear in that list; anything else is a bug.
 
@@ -172,11 +172,12 @@ impl BracketKind {
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `parse-arguments.md`. `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. The second `Slot` pin and `UnparsedChunkItemsParent`. Tests feed a list interior to `parse_each_chunk`.
-2. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
-3. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
-4. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
-5. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
-6. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+1. `token-text.md`. `consume_token_if` / `require_token` return `TokenText`. The source slice is `token_text` on that value.
+2. `parse-arguments.md`. `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. The second `Slot` pin and `UnparsedChunkItemsParent`. Tests feed a list interior to `parse_each_chunk`.
+3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
+4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
+5. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
+6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
+7. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 
 Later: `parse-arrays.md`. `[ ... ]` list values. `parse-variables.md` uses them for defaults. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.

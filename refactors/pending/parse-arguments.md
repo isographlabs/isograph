@@ -579,7 +579,7 @@ pub type ArgumentNamePath<'a> = PositionResolutionPath<&'a ArgumentName, KeyValu
 pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
 ```
 
-`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `ArgumentName(cursor.token_text(span).intern().to())`.
+`string_key_newtype!` already implements `From<StringKey>` for `FieldArgumentName`, `VariableName`, and `StringLiteralValue`. The parser wrappers do not add a second `From`. Construction is `ArgumentName(name.token_text().intern().to())`.
 
 `NonConstantValueParent::KeyValue` is boxed to break `KeyValuePairPath -> NonConstantValue -> ObjectLiteral -> KeyValuePair`. A position on `$` answers `VariableUse`.
 
@@ -710,7 +710,7 @@ fn parse_key_value_pair(
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
     let value = parse_value(cursor)?;
     KeyValuePair {
-        name: ArgumentName(cursor.token_text(name).intern().to()).with_span(name),
+        name: ArgumentName(name.token_text().intern().to()).with_span(name.location),
         value,
     }
     .wrap_ok()
@@ -757,23 +757,23 @@ pub(crate) fn parse_value(
                 .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
             return NonConstantValue::Variable(VariableUse(
-                VariableName(cursor.token_text(name).intern().to()).with_span(name),
+                VariableName(name.token_text().intern().to()).with_span(name.location),
             ))
             .wrap_ok();
         }
         if let Some(span) =
             cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         {
-            return NonConstantValue::String(StringValue(cursor.token_text(span).intern().to()))
+            return NonConstantValue::String(StringValue(span.token_text().intern().to()))
                 .wrap_ok();
         }
         if let Some(span) = cursor
             .consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         {
-            let value = match cursor.token_text(span).parse() {
+            let value = match span.token_text().parse() {
                 Ok(value) => value,
                 Err(_) => {
-                    return ParseError::IntegerDoesNotFitI64.with_span(span).wrap_err();
+                    return ParseError::IntegerDoesNotFitI64.with_span(span.location).wrap_err();
                 }
             };
             return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
@@ -782,7 +782,7 @@ pub(crate) fn parse_value(
             NonBracketTokenKind::Identifier,
             SemanticToken::BooleanOrNull,
         ) {
-            return match cursor.token_text(span) {
+            return match span.token_text() {
                 "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
                 "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
                 "null" => NonConstantValue::Null(NullValue).wrap_ok(),
@@ -790,7 +790,7 @@ pub(crate) fn parse_value(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
-                .with_span(span)
+                .with_span(span.location)
                 .wrap_err(),
             };
         }
