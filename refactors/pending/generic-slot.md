@@ -165,7 +165,7 @@ On `type Parent<'a>`:
 - `Self: 'a`
 - If `#parent_type` is `<X as Trait>::Assoc`, then `X: Trait`. For `Slot` that is `<T as ResolvePosition>::Parent<'a>: PathParent`. Live `parent_type = IsoLiteralParsePath<'a>` has no `as`, so no bound.
 
-On `type ResolvedNode<'a>`:
+On `type ResolvedNode<'a>`: one `ResolvedNode` equality per `#[resolve_field]`, plus a `Parent` equality if that field is `ContainerPath` (`self.path(parent)`), plus a `From` if unmatched is `from_path`. `struct_name` unmatched does not add a `From`.
 
 - `Self: 'a`
 - Each non-transparent resolve field `F`: `F: ResolvePosition<ResolvedNode<'a> = #resolved_node>`
@@ -325,12 +325,14 @@ fn field_resolved_node_predicates(
         let Some(inner_type) = resolve_field_inner_type(info.field_type.reference()) else {
             continue;
         };
+        // `return field.resolve(...)` must be `#resolved_node`.
         predicates.push(quote! {
             #inner_type: ::resolve_position::ResolvePosition<
                 ResolvedNode<'a> = #resolved_node
             >
         });
         if matches!(info.parent_construction, ParentConstruction::ContainerPath) {
+            // Bare `#[resolve_field]` passes `self.path(parent)`.
             predicates.push(quote! {
                 #inner_type: ::resolve_position::ResolvePosition<
                     Parent<'a> = ::resolve_position::PositionResolutionPath<
@@ -344,6 +346,7 @@ fn field_resolved_node_predicates(
     predicates
 }
 
+// `on_unmatched_span = from_path`: `self.path(parent).to()`.
 fn from_path_predicate(
     resolved_node: &syn::Type,
     struct_name: &syn::Ident,
@@ -371,6 +374,7 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
         = IsographResolutionNode<'a>
     where
         Self: 'a,
+        // `item`: `ResolvedNode` equality, then `ContainerPath` parent equality
         IsoLiteralItem: ::resolve_position::ResolvePosition<
             ResolvedNode<'a> = IsographResolutionNode<'a>
         >,
@@ -380,6 +384,7 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
                 IsoLiteralParsePath<'a>
             >
         >,
+        // `extra_tokens`: same pair
         UnparsedChunkItems: ::resolve_position::ResolvePosition<
             ResolvedNode<'a> = IsographResolutionNode<'a>
         >,
@@ -389,6 +394,7 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
                 IsoLiteralParsePath<'a>
             >
         >;
+        // unmatched is `struct_name`: no `From` bound
 ```
 
 Those `Parent` equalities are live `SlotPath`. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
