@@ -1,3 +1,4 @@
+use intern::string_key::Intern;
 use nonempty::NonEmpty;
 use prelude::Postfix;
 use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
@@ -23,6 +24,26 @@ pub(crate) struct CursorPeek<'c, 'a> {
     peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
     previous_end: &'c mut u32,
     tokens: &'c mut Vec<WithSpan<SemanticToken>>,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub(crate) struct TokenText<'a> {
+    pub location: Span,
+    // Whole literal. A Span plus `cursor.text()` at the call site copies 16 fewer bytes per consume.
+    text: &'a str,
+}
+
+impl<'a> TokenText<'a> {
+    pub(crate) fn token_text(self) -> &'a str {
+        &self.text[self.location.as_usize_range()]
+    }
+
+    pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
+        self.token_text()
+            .intern()
+            .to::<T>()
+            .with_span(self.location)
+    }
 }
 
 /// Sequential reader of one chunk, plus `require_end`.
@@ -82,13 +103,18 @@ impl<'a> ItemCursor<'a> {
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
-    ) -> Option<Span> {
+    ) -> Option<TokenText<'a>> {
         let peek = self.peek()?;
         match peek.view().item.reference() {
             ChunkContentItem::NonBracket(found) if found.0 == kind => {}
             _ => return None,
         }
-        peek.commit(token).location.wrap_some()
+        let location = peek.commit(token).location;
+        TokenText {
+            location,
+            text: self.text,
+        }
+        .wrap_some()
     }
 
     #[cfg_attr(not(test), expect(dead_code))]
@@ -141,7 +167,7 @@ impl<'a> ItemCursor<'a> {
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
-    ) -> Result<Span, ()> {
+    ) -> Result<TokenText<'a>, ()> {
         self.consume_token_if(kind, token).ok_or(())
     }
 
@@ -157,10 +183,6 @@ impl<'a> ItemCursor<'a> {
     #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn text(&self) -> &'a str {
         self.text
-    }
-
-    pub(crate) fn token_text(&self, span: Span) -> &'a str {
-        &self.text[span.as_usize_range()]
     }
 
     pub(crate) fn spanning<T>(
@@ -208,7 +230,7 @@ mod tests {
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
-    use super::ChunkStream;
+    use super::{ChunkStream, TokenText};
     use crate::{
         BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind, ParseError,
         SemanticToken, chunk, match_brackets, tokenize,
@@ -238,6 +260,13 @@ mod tests {
         Span::from_usize(offset, offset + pattern.len())
     }
 
+    fn token_text<'a>(text: &'a str, pattern: &str) -> TokenText<'a> {
+        TokenText {
+            location: span_of(text, pattern),
+            text,
+        }
+    }
+
     fn expected(expectation: Expectation, found: Found) -> ParseError {
         ParseError::expected(expectation, found)
     }
@@ -265,7 +294,7 @@ mod tests {
         let cursor = stream.cursor();
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-            span_of(text, "foo").wrap_some(),
+            token_text(text, "foo").wrap_some(),
         );
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Period, SemanticToken::Period),
@@ -273,7 +302,7 @@ mod tests {
         );
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-            span_of(text, "bar").wrap_some(),
+            token_text(text, "bar").wrap_some(),
         );
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
@@ -295,7 +324,7 @@ mod tests {
         );
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-            span_of(text, "foo").wrap_some(),
+            token_text(text, "foo").wrap_some(),
         );
         assert_eq!(
             cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis),
@@ -334,7 +363,7 @@ mod tests {
         );
         assert_eq!(
             cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-            span_of(text, "foo").wrap_ok(),
+            token_text(text, "foo").wrap_ok(),
         );
         assert_eq!(
             cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
@@ -521,7 +550,7 @@ mod tests {
             stream
                 .cursor()
                 .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-            span_of(text, "foo").wrap_some(),
+            token_text(text, "foo").wrap_some(),
         );
     }
 
@@ -536,7 +565,8 @@ mod tests {
         let foo = cursor
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
-        assert_eq!(cursor.token_text(foo), "foo");
+        assert_eq!(foo.token_text(), "foo");
+        assert_eq!(foo.location, span_of(text, "foo"));
         assert_eq!(cursor.text(), text);
     }
 
@@ -574,7 +604,7 @@ mod tests {
                     stream
                         .cursor()
                         .require_token(NonBracketTokenKind::Identifier, token),
-                    span_of(text, text).wrap_ok(),
+                    token_text(text, text).wrap_ok(),
                     "for literal {text:?}",
                 );
             }
@@ -629,15 +659,15 @@ mod tests {
             let cursor = stream.cursor();
             assert_eq!(
                 cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-                span_of(text, "alias").wrap_some(),
+                token_text(text, "alias").wrap_some(),
             );
             assert_eq!(
                 cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon),
-                span_of(text, ":").wrap_some(),
+                token_text(text, ":").wrap_some(),
             );
             assert_eq!(
                 cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-                span_of(text, "name").wrap_some(),
+                token_text(text, "name").wrap_some(),
             );
         }
         assert_eq!(
@@ -704,7 +734,7 @@ mod tests {
                 stream
                     .cursor()
                     .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
-                span_of(text, "foo").wrap_some(),
+                token_text(text, "foo").wrap_some(),
             );
         }
         assert_eq!(

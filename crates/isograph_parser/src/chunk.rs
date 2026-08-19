@@ -1210,6 +1210,7 @@ mod tests {
         cursor
             .require_token(Identifier, SemanticToken::FieldName)
             .map_err(|()| cursor.expected(Expectation::Token(Identifier)))
+            .map(|token| token.location)
     }
 
     type ParsedEach = (

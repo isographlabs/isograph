@@ -1,4 +1,3 @@
-use intern::string_key::Intern;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -102,16 +101,16 @@ fn parse_iso_literal_item(
     let keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
-    match cursor.token_text(keyword) {
+    match keyword.token_text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" | "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword)
+            .with_span(keyword.location)
             .wrap_err(),
         _ => ParseError::expected(
             Expectation::DeclarationKeyword,
             Found::Token(NonBracketTokenKind::Identifier),
         )
-        .with_span(keyword)
+        .with_span(keyword.location)
         .wrap_err(),
     }
 }
@@ -129,16 +128,8 @@ fn parse_entrypoint(
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
-        parent_type: cursor
-            .token_text(parent_type)
-            .intern()
-            .to::<EntityName>()
-            .with_span(parent_type),
-        client_field_name: cursor
-            .token_text(client_field_name)
-            .intern()
-            .to::<ClientFieldName>()
-            .with_span(client_field_name),
+        parent_type: parent_type.interned(),
+        client_field_name: client_field_name.interned(),
     }
     .wrap_ok()
 }
