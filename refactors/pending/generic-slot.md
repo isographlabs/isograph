@@ -1,5 +1,7 @@
 # generic-slot: one impl for every `Slot<T, E>`
 
+Lands after resolve-position-fallback-from.md.
+
 `Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
 `IsographResolutionNode` has one variant per monomorph. The root is `Slot(SlotPath<'a>)` with today's alias. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`, not a variant of `SlotPath`. `SlotPath` stays `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`.
