@@ -19,6 +19,7 @@ prelude = { path = "../prelude" }
 tracing = "0.1.41"
 
 [lints.clippy]
+allow_attributes = "deny"
 print_stderr = "deny"
 print_stdout = "deny"
 explicit_deref_methods = "deny"
