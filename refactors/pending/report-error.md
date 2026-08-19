@@ -2,7 +2,7 @@
 
 `push_error: impl FnMut(WithSpan<ParseError>)` is a parameter of `parse_iso_literal`, `parse_one_chunk`, `parse_singleton`, and (in the feature docs) every grammar function that parses a nested list. Grammar functions do not report; they return `Result`. The helpers report. The callback is threaded so a nested `parse_each_chunk` / `parse_singleton` can report.
 
-This doc puts the sink on the cursor. Grammar functions take `&mut ItemCursor`. Nested lists reborrow the cursor's env. Reporting is `report_error`.
+This doc puts the sink on the cursor. Grammar functions already take `&mut ItemCursor`; that does not change. Nested lists reborrow the cursor's env. Reporting is `report_error`. `report_error` and `env_mut` are `&mut self`. That is expected: they write the error vec (and `env_mut` reborrows the token vec). `text` and `token_text` stay `&self`.
 
 Inner `parse_*` stays `Result`. The first `Err` of a form is returned. `parse_one_chunk` reports it. Grammar functions never call `report_error`.
 
@@ -373,6 +373,8 @@ That function is not landed by this doc. The listing is the shape parse-argument
 ```
 
 A nested `parse_singleton` (`[...]` in parse-variables.md) is `parse_singleton(level, &mut cursor.env_mut(), ...)`. Same reborrow: the `ParseEnv` value is a local, passed as `&mut`.
+
+The nest site today is `cursor.text()` (`&self`) plus a separate `push_error`. After this it is `cursor.env_mut()` (`&mut self`). The grammar function already holds `&mut ItemCursor`; the nested list now uses that mutable borrow instead of a shared one. `ChunkedLevel::parse_each_chunk` stays `&self` on the level. The level is not the sink.
 
 ## Change 3: `parse_iso_literal` takes the error vec
 
