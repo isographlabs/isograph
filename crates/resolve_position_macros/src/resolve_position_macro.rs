@@ -47,6 +47,7 @@ fn handle_data_struct(
         parent_type,
         resolved_node,
         self_type_generics,
+        on_unmatched_span,
     } = resolve_position_args;
 
     let generics_map =
@@ -88,14 +89,27 @@ fn handle_data_struct(
         .collect::<Vec<_>>();
 
     // A transparent field always answers; the container is not a path segment.
-    let fallback = if field_infos
+    let unmatched = if field_infos
         .iter()
         .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
     {
         quote!()
     } else {
-        quote! {
-            return Self::ResolvedNode::#struct_name(self.path(parent).into());
+        match on_unmatched_span.reference() {
+            Some(ident) if ident == "from_path" => quote! {
+                return self.path(parent).to();
+            },
+            None => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) if ident == "struct_name" => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) => Error::new_spanned(
+                ident,
+                "expected `on_unmatched_span = from_path` or `struct_name`",
+            )
+            .to_compile_error(),
         }
     };
 
@@ -123,7 +137,7 @@ fn handle_data_struct(
             ) -> Self::ResolvedNode<'a> {
                 #(#attributes_to_resolve)*
 
-                #fallback
+                #unmatched
             }
         }
     };
@@ -141,7 +155,17 @@ fn handle_data_enum(
         parent_type,
         resolved_node,
         self_type_generics,
+        on_unmatched_span,
     } = resolve_position_args;
+
+    if let Some(ident) = on_unmatched_span {
+        return Error::new_spanned(
+            ident,
+            "`on_unmatched_span` is a struct attribute; enums have no unmatched-span arm",
+        )
+        .to_compile_error()
+        .to();
+    }
 
     let _generics_map =
         match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
@@ -280,6 +304,7 @@ struct ResolvePositionArgs {
     parent_type: syn::Type,
     resolved_node: syn::Type,
     self_type_generics: Option<syn::AngleBracketedGenericArguments>,
+    on_unmatched_span: Option<syn::Ident>,
 }
 
 enum ResolveFieldInfoType {
