@@ -1,6 +1,6 @@
 # Semantic tokens
 
-The grammar stage records a semantic token as it consumes each token or bracket. Recording is a side effect of `consume_token_if` / `require_token` / `consume_group_if` / `require_group`. Each of those methods takes the `SemanticToken` the call site is consuming. The tree does not mention tokens; they are a sibling of the tree, not a field on it.
+The grammar stage records a semantic token as it commits each token or bracket. `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` the call site is consuming and records it. `consume_token_if` / `require_token` / `consume_group_if` / `require_group` take that token and pass it to `commit`. The tree does not mention tokens; they are a sibling of the tree, not a field on it.
 
 Two shippable changes. The first always constructs tokens into a `Vec`. The second makes the collector a type parameter so the parse can be constructed with a noop or a non-noop.
 
@@ -130,7 +130,7 @@ let dot = tokens
 
 Delta, common to the recording changes below:
 
-- `require_token` / `consume_token_if` take the kind and the `SemanticToken`. `require_group` / `consume_group_if` take the `BracketKind` and the `SemanticToken`.
+- `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` and records. `require_token` / `consume_token_if` take the kind and the token and pass the token to `commit`. `require_group` / `consume_group_if` take the `BracketKind` and the token the same way.
 - Open and close share one token. Upstream splits `ST_OPEN_PAREN` / `ST_CLOSE_PAREN` (and the brace pair) for formatter metadata.
 - One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` is `Type`; `ST_TYPE_ANNOTATION` and `!` are `GraphQLTypeName`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` are `FieldName`; `ST_OBJECT_LITERAL_KEY` is `ObjectKey`; `ST_STRING_LITERAL` covers string and block string.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
@@ -141,7 +141,7 @@ Delta, common to the recording changes below:
 
 No trait. No type parameter. The cursor holds `&mut Vec<WithSpan<SemanticToken>>`. Every parse constructs tokens.
 
-Grammar functions stay `fn parse_entrypoint(cursor: &mut ItemCursor<'_>)`. They do not mention the vec. They pass a `SemanticToken` into each consume.
+Grammar functions stay `fn parse_entrypoint(cursor: &mut ItemCursor<'_>)`. They do not mention the vec. They pass a `SemanticToken` into each consume, which passes it to `commit`.
 
 ### The cursor
 
@@ -218,20 +218,33 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
+pub(crate) struct CursorPeek<'c, 'a> {
+    peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
+    previous_end: &'c mut u32,
+    tokens: &'c mut Vec<WithSpan<SemanticToken>>,
+}
+
+impl<'a> ItemCursor<'a> {
+    pub(crate) fn peek(&mut self) -> Option<CursorPeek<'_, 'a>> {
+        CursorPeek {
+            peek: self.items.peek()?,
+            previous_end: &mut self.previous_end,
+            tokens: self.tokens,
+        }
+        .wrap_some()
+    }
+
     pub(crate) fn consume_token_if(
         &mut self,
         kind: NonBracketTokenKind,
         token: SemanticToken,
     ) -> Option<Span> {
-        let peek = self.items.peek()?;
+        let peek = self.peek()?;
         match peek.view().item.reference() {
             ChunkContentItem::NonBracket(found) if found.0 == kind => {}
             _ => return None,
         }
-        let item = peek.commit();
-        self.previous_end = item.location.end;
-        self.record(token, item.location);
-        item.location.wrap_some()
+        peek.commit(token).location.wrap_some()
     }
 
     pub(crate) fn consume_group_if(
@@ -239,13 +252,11 @@ After:
         kind: BracketKind,
         token: SemanticToken,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
-        let peek = self.items.peek()?;
+        let peek = self.peek()?;
         let item = *peek.view();
         match item.item.reference() {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                self.record(token, group.opening.location);
+                peek.commit(token);
                 group.with_span(item.location).wrap_some()
             }
             _ => None,
@@ -259,9 +270,29 @@ After:
     fn record(&mut self, token: SemanticToken, span: Span) {
         self.tokens.push(token.with_span(span));
     }
+}
+
+impl<'c, 'a> CursorPeek<'c, 'a> {
+    pub(crate) fn view(&self) -> &'a WithSpan<ChunkContentItem> {
+        *self.peek.view()
+    }
+
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+        let item = self.peek.commit();
+        *self.previous_end = item.location.end;
+        let span = match item.item.reference() {
+            ChunkContentItem::NonBracket(_) => item.location,
+            ChunkContentItem::Group(group) => group.opening.location,
+        };
+        self.tokens.push(token.with_span(span));
+        item
+    }
+}
 ```
 
-`require_token` / `require_group` stay `consume_*` or `Err(())`. They take the same `token` and inherit the side effect. `expected` only peeks and records nothing.
+`peek` does not take a `SemanticToken`. Dropping the guard leaves the item unconsumed and records nothing. `commit` takes the token, advances, and records: a non-bracket at `item.location`, a group at `group.opening.location`. `record_group_close` records the same token at the close.
+
+`consume_*` peek, match, and `commit(token)`. A match failure drops the guard and records nothing. `require_token` / `require_group` stay `consume_*` or `Err(())`. `expected` peeks and does not commit. `remaining_contents` uses `next`, not `commit`, so leftover items are not recorded.
 
 A consume that does not match records nothing.
 
@@ -807,7 +838,8 @@ No snapshots. Facts:
 - `parse_iso_literal` on `entrypoint Query.foo` fills the four tokens above and the same tree as today.
 - A failed first chunk that consumed a prefix (`entrypoint Foo.$`) still has the prefix tokens (`Keyword`, `Type`, `Period`).
 - `fieldd Query.foo` records `Keyword` at `fieldd`.
-- `expected` does not record.
+- `expected` peeks and does not commit, so it records nothing.
+- `peek()` without `commit` records nothing.
 
 `stream_of` in `chunk_stream.rs` tests takes the vec:
 
@@ -826,7 +858,7 @@ Existing consume tests pass `&mut Vec::new()` and a `SemanticToken` on every `co
 
 ### Docs this change amends
 
-- parsing-standards.md: `ItemCursor` gains `tokens: &'a mut Vec<WithSpan<SemanticToken>>`. `consume_token_if` / `require_token` take `(NonBracketTokenKind, SemanticToken)`. `consume_group_if` / `require_group` take `(BracketKind, SemanticToken)`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take the vec. Catalog adds `record`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. The group-plus-interior listing becomes the helper. The value ladder, `$name`, alias, and `to` listings pass the tokens in Pending grammar call sites.
+- parsing-standards.md: `ItemCursor` gains `tokens: &'a mut Vec<WithSpan<SemanticToken>>`. Catalog adds `peek`, `CursorPeek::view`, `CursorPeek::commit(token)`, `record`, `record_group_close`, `parse_group_items` / `parse_group_singleton`. `consume_token_if` / `require_token` take `(NonBracketTokenKind, SemanticToken)` and pass the token to `commit`. `consume_group_if` / `require_group` take `(BracketKind, SemanticToken)` the same way. `peek` does not take a `SemanticToken`. `Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_items` take the vec. The group-plus-interior listing becomes the helper. The value ladder, `$name`, alias, and `to` listings pass the tokens in Pending grammar call sites.
 - parse-entrypoint.md: `parse_iso_literal` takes `tokens: &mut Vec<WithSpan<SemanticToken>>`. The keyword / type / period / field-name consumes pass the tokens above.
 - parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each consume listed above.
 - parsing-plan.md: tokens are recorded during parse into a vec. `require_token` takes the role.
@@ -872,7 +904,7 @@ impl SemanticTokens for NoSemanticTokens {
 
 ### Cursor and helpers
 
-`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 1 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`. Consume signatures stay `(kind, token)`.
+`ItemCursor` / `ChunkStream` gain `TTokens`. The bound lives on the `impl`, not the struct. Every `&mut Vec<WithSpan<SemanticToken>>` from change 1 becomes `&mut TTokens`. Grammar functions become generic; their bodies do not mention `TTokens`. Consume signatures stay `(kind, token)`. `peek` still takes no `SemanticToken`. `CursorPeek::commit` still takes the token and records through `TTokens::record`.
 
 Before:
 
@@ -908,9 +940,28 @@ pub(crate) struct ItemCursor<'a, TTokens> {
 
 pub(crate) struct ChunkStream<'a, TTokens>(ItemCursor<'a, TTokens>);
 
+pub(crate) struct CursorPeek<'c, 'a, TTokens> {
+    peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
+    previous_end: &'c mut u32,
+    tokens: &'c mut TTokens,
+}
+
 impl<'a, TTokens: SemanticTokens> ItemCursor<'a, TTokens> {
     fn record(&mut self, token: SemanticToken, span: Span) {
         self.tokens.record(token, span);
+    }
+}
+
+impl<'c, 'a, TTokens: SemanticTokens> CursorPeek<'c, 'a, TTokens> {
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+        let item = self.peek.commit();
+        *self.previous_end = item.location.end;
+        let span = match item.item.reference() {
+            ChunkContentItem::NonBracket(_) => item.location,
+            ChunkContentItem::Group(group) => group.opening.location,
+        };
+        self.tokens.record(token, span);
+        item
     }
 }
 ```
