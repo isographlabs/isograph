@@ -8,6 +8,7 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>>
 ```
 
