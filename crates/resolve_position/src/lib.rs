@@ -73,6 +73,14 @@ pub struct PositionResolutionPath<Inner, Parent> {
     pub parent: Parent,
 }
 
+pub trait PathParent {
+    type Parent;
+}
+
+impl<Inner, Parent> PathParent for PositionResolutionPath<Inner, Parent> {
+    type Parent = Parent;
+}
+
 pub trait ResolvePosition: Sized {
     type Parent<'a>
     where
@@ -123,7 +131,7 @@ mod test {
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
-    use crate::{PositionResolutionPath, ResolvePosition};
+    use crate::{PathParent, PositionResolutionPath, ResolvePosition};
 
     #[derive(Debug)]
     enum TestResolvedNode<'a> {
@@ -197,6 +205,12 @@ mod test {
 
             Self::ResolvedNode::Child(self.path(parent))
         }
+    }
+
+    #[test]
+    fn position_resolution_path_projects_its_parent_type_argument() {
+        fn assert_parent<T: PathParent<Parent = U>, U>() {}
+        assert_parent::<PositionResolutionPath<&u8, ()>, ()>();
     }
 
     #[test]
