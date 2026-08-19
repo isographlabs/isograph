@@ -26,32 +26,17 @@ Tests feed a list interior to `parse_each_chunk`.
 
 ## Change 1: `parse_each_chunk`
 
+Already on `ChunkedLevel`. Nested lists pass the parent cursor. Tests that feed a list interior construct a parent stream to hold `text` / `tokens` / `errors`.
+
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    pub(crate) fn parse_each_chunk<'a, P, F>(
+    pub(crate) fn parse_each_chunk<'a, P>(
         &'a self,
-        text: &'a str,
+        parent: &mut ItemCursor<'_>,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
-        push_error: &mut F,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>>
-    where
-        F: FnMut(WithSpan<ParseError>),
-    {
-        self.0
-            .iter()
-            .map(|chunk| {
-                parse_one_chunk(
-                    chunk,
-                    text,
-                    leftover,
-                    &parse_item,
-                    push_error,
-                )
-            })
-            .collect()
-    }
 }
 ```
 
@@ -152,10 +137,10 @@ pub enum NonConstantValue {
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableUse {
+pub struct VariableUse(
     #[resolve_field]
-    pub name: WithSpan<VariableName>,
-}
+    pub WithSpan<VariableName>,
+);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -301,20 +286,16 @@ impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-fn parse_key_value_pair<F>(
+fn parse_key_value_pair(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<KeyValuePair, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<KeyValuePair, WithSpan<ParseError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
         .require_token(NonBracketTokenKind::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let value = parse_value(cursor, push_error)?;
+    let value = parse_value(cursor)?;
     KeyValuePair {
         name: cursor
             .token_text(name)
@@ -326,19 +307,14 @@ where
     .wrap_ok()
 }
 
-pub(crate) fn consume_argument_list<F>(
+pub(crate) fn consume_argument_list(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Option<WithSpan<ArgumentList>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Option<WithSpan<ArgumentList>> {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
     ArgumentList(group.item.children.item.parse_each_chunk(
-        cursor.text(),
+        cursor,
         Expectation::Separator(BracketKind::Parenthesis),
         parse_key_value_pair,
-        push_error,
     ))
     .with_span(group.location)
     .wrap_some()
@@ -347,20 +323,16 @@ where
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_value<F>(
+pub(crate) fn parse_value(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
         if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar) {
             let name = cursor
                 .require_token(NonBracketTokenKind::Identifier)
                 .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-            return NonConstantValue::Variable(VariableUse {
-                name: cursor
+            return NonConstantValue::Variable(VariableUse(
+                cursor
                     .token_text(name)
                     .intern()
                     .to::<VariableName>()
@@ -406,10 +378,9 @@ where
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
             return NonConstantValue::Object(ObjectLiteral(
                 group.item.children.item.parse_each_chunk(
-                    cursor.text(),
+                    cursor,
                     Expectation::Separator(BracketKind::Brace),
                     parse_key_value_pair,
-                    push_error,
                 ),
             ))
             .wrap_ok();
@@ -429,10 +400,7 @@ where
     fn parsed_items<P>(
         text: &str,
         leftover: Expectation,
-        parse_item: impl Fn(
-            &mut ItemCursor<'_>,
-            &mut Vec<WithSpan<ParseError>>,
-        ) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
     ) -> (
         Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
@@ -442,9 +410,15 @@ where
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         let (tree, comma_errors) = chunk(brackets.reference());
         let mut errors = Vec::new();
+        let mut tokens = Vec::new();
+        let dummy = {
+            let (brackets, _) = match_brackets(tokenize("x"), 1);
+            chunk(brackets.reference()).0
+        };
+        let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
         let items = tree
             .item
-            .parse_each_chunk(text, leftover, parse_item, &mut errors);
+            .parse_each_chunk(parent.cursor(), leftover, parse_item);
         (items, errors, comma_errors)
     }
 
