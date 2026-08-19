@@ -283,6 +283,26 @@ impl<'a> From<ObjectLiteralPath<'a>> for UnparsedChunkItemsParent<'a> {
 
 `From<IsoLiteralParsePath>` stays.
 
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub enum SlotPath<'a> {
+    Literal(
+        PositionResolutionPath<
+            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
+            IsoLiteralParsePath<'a>,
+        >,
+    ),
+    Argument(
+        PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>,
+    ),
+    ObjectEntry(
+        PositionResolutionPath<&'a Slot<NamedObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>,
+    ),
+}
+```
+
+`From` impls for the two new variants. A gap in an argument slot answers `IsographResolutionNode::Slot(SlotPath::Argument(_))`.
+
 `parse_value` is the listing in parsing-standards.md.
 
 ```rust

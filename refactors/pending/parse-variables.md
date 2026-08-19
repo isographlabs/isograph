@@ -197,6 +197,36 @@ pub enum UnparsedChunkItemsParent<'a> {
 
 `From` impls for the two new variants.
 
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+pub enum SlotPath<'a> {
+    Literal(
+        PositionResolutionPath<
+            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
+            IsoLiteralParsePath<'a>,
+        >,
+    ),
+    Argument(
+        PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>,
+    ),
+    ObjectEntry(
+        PositionResolutionPath<&'a Slot<NamedObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>,
+    ),
+    Selection(PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>),
+    VariableDeclaration(
+        PositionResolutionPath<
+            &'a Slot<DeclaredVariable, UnparsedChunkItems>,
+            VariableDeclarationListPath<'a>,
+        >,
+    ),
+    TypeAnnotation(
+        PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>,
+    ),
+}
+```
+
+`From` impls for the two new variants. The constant-object list adds a `SlotPath` variant when that type is named.
+
 `ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
 
 ```rust

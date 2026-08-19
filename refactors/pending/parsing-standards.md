@@ -89,6 +89,9 @@ where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
+    for<'a> SlotPath<'a>: From<
+        PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
+    >,
 {
     #[resolve_field]
     #[parent_from]
@@ -124,9 +127,11 @@ pub struct ExtraChunks(
 );
 ```
 
-`Slot` is not a path segment. `#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent and suppresses the container fallback. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`, the only extra bound. A position in leftover walks `extra_tokens`. `IsographResolutionNode` has no `Slot` variant.
+`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. Fallback is not suppressed. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers `IsographResolutionNode::Slot`. `{ item: None, extra_tokens: None }` is the same fallback.
 
-Form `Ok` and leftover: `extra_tokens.location` starts at `item.location.end`, so the gap after the item is inside leftover, not a third region.
+Leftover span is tight to the leftover tokens. The gap after the item is a third region: `Slot`.
+
+`SlotPath` is an enum of monomorphs. Each list that stores a `Slot` adds a variant and a `From`.
 
 `UnparsedChunkItems`'s parent is an enum. Each list that stores a `Slot` adds a variant and a `From`:
 
@@ -556,7 +561,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 Each grammar feature lands on this surface.
 
-- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, leftover span
+- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `SlotPath` enum, gap answers `Slot`
 - parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
