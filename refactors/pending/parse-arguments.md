@@ -1,6 +1,6 @@
 # parse-arguments: argument lists and values
 
-`name : value` is `parse_key_value_pair`. A list of those is `parse_chunk_item_list`. `( ... )` is an argument list. `{ ... }` is an object value. Lands after generic-slot.md. parse-selection-sets.md attaches the paren list to selections. parse-variables.md reuses `parse_value`.
+`name : value` is `parse_key_value_pair`. A list of those is `parse_each_chunk`. `( ... )` is an argument list. `{ ... }` is an object value. Lands after generic-slot.md. parse-selection-sets.md attaches the paren list to selections. parse-variables.md reuses `parse_value`.
 
 ## Grammar
 
@@ -22,14 +22,14 @@ null
 { <pairs> }             object value
 ```
 
-Tests feed a list interior to `parse_chunk_item_list`.
+Tests feed a list interior to `parse_each_chunk`.
 
-## Change 1: `parse_chunk_item_list`
+## Change 1: `parse_each_chunk`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    pub(crate) fn parse_chunk_item_list<'a, P, F>(
+    pub(crate) fn parse_each_chunk<'a, P, F>(
         &'a self,
         text: &'a str,
         leftover: Expectation,
@@ -42,7 +42,7 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                parse_chunk_item(
+                parse_one_chunk(
                     chunk,
                     text,
                     leftover,
@@ -334,7 +334,7 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    ArgumentList(group.item.children.item.parse_chunk_item_list(
+    ArgumentList(group.item.children.item.parse_each_chunk(
         cursor.text(),
         Expectation::Separator(BracketKind::Parenthesis),
         parse_key_value_pair,
@@ -351,7 +351,7 @@ where
 // from crates/isograph_parser/src/arguments.rs
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
             return NonConstantValue::Object(ObjectLiteral(
-                group.item.children.item.parse_chunk_item_list(
+                group.item.children.item.parse_each_chunk(
                     cursor.text(),
                     Expectation::Separator(BracketKind::Brace),
                     parse_key_value_pair,
@@ -386,7 +386,7 @@ where
         let mut errors = Vec::new();
         let items = tree
             .item
-            .parse_chunk_item_list(text, leftover, parse_item, &mut errors);
+            .parse_each_chunk(text, leftover, parse_item, &mut errors);
         (items, errors, comma_errors)
     }
 
@@ -582,5 +582,5 @@ where
 
 ## Landing checklist
 
-1. `parse_chunk_item_list`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `parse_key_value_pair`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `parse_each_chunk`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `parse_key_value_pair`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
