@@ -1,3 +1,5 @@
+use std::fmt;
+
 use thiserror::Error;
 
 use crate::{BracketKind, ChunkContentItem, NonBracketTokenKind};
@@ -14,32 +16,37 @@ pub enum ParseError {
     UnsupportedDeclarationType,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-#[error("Expected {expected}, found {found}.")]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct ExpectedFound {
     pub expected: Expectation,
     pub found: Found,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+impl fmt::Display for ExpectedFound {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Expected {}, found {}.", self.expected, self.found)
+    }
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum Expectation {
-    #[error("{0}")]
+    #[strum(to_string = "{0}")]
     Token(NonBracketTokenKind),
-    #[error("one of `entrypoint`, `field`, or `pointer`")]
+    #[strum(to_string = "one of `entrypoint`, `field`, or `pointer`")]
     DeclarationKeyword,
-    #[error("the end of the declaration")]
+    #[strum(to_string = "the end of the declaration")]
     EndOfDeclaration,
-    #[error("a comma or line break")]
+    #[strum(to_string = "a comma or line break")]
     Separator,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum Found {
-    #[error("{0}")]
+    #[strum(to_string = "{0}")]
     Token(NonBracketTokenKind),
-    #[error("a group opened by {0}")]
+    #[strum(to_string = "a group opened by {0}")]
     Group(BracketKind),
-    #[error("nothing more")]
+    #[strum(to_string = "nothing more")]
     EndOfChunk,
 }
 
@@ -55,5 +62,73 @@ impl From<&ChunkContentItem> for Found {
             ChunkContentItem::NonBracket(token) => Found::Token(token.0),
             ChunkContentItem::Group(group) => Found::Group(group.opening.item.0),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Expectation, ExpectedFound, Found, ParseError};
+    use crate::{BracketKind, NonBracketTokenKind};
+
+    #[test]
+    fn expectation_token_forwards_the_token_kind() {
+        assert_eq!(
+            Expectation::Token(NonBracketTokenKind::Identifier).to_string(),
+            "non-variable identifier (e.g. 'x' or 'Foo')",
+        );
+    }
+
+    #[test]
+    fn expectation_unit_variants_use_their_messages() {
+        assert_eq!(
+            Expectation::DeclarationKeyword.to_string(),
+            "one of `entrypoint`, `field`, or `pointer`",
+        );
+        assert_eq!(
+            Expectation::EndOfDeclaration.to_string(),
+            "the end of the declaration",
+        );
+        assert_eq!(Expectation::Separator.to_string(), "a comma or line break");
+    }
+
+    #[test]
+    fn found_token_forwards_the_token_kind() {
+        assert_eq!(
+            Found::Token(NonBracketTokenKind::Dollar).to_string(),
+            "dollar ('$')",
+        );
+    }
+
+    #[test]
+    fn found_group_includes_the_bracket() {
+        assert_eq!(
+            Found::Group(BracketKind::Brace).to_string(),
+            "a group opened by '{'",
+        );
+    }
+
+    #[test]
+    fn found_end_of_chunk() {
+        assert_eq!(Found::EndOfChunk.to_string(), "nothing more");
+    }
+
+    #[test]
+    fn expected_found_joins_both_sides() {
+        assert_eq!(
+            ExpectedFound {
+                expected: Expectation::EndOfDeclaration,
+                found: Found::EndOfChunk,
+            }
+            .to_string(),
+            "Expected the end of the declaration, found nothing more.",
+        );
+    }
+
+    #[test]
+    fn parse_error_expected_uses_expected_found() {
+        assert_eq!(
+            ParseError::expected(Expectation::Separator, Found::EndOfChunk).to_string(),
+            "Expected a comma or line break, found nothing more.",
+        );
     }
 }
