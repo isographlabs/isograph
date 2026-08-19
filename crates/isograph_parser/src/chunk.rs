@@ -8,7 +8,7 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::{
     BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem,
     IsoLiteralParsePath, IsographResolutionNode, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, OpenBracket, ParseError, SlotPath, UnparsedChunkItemsPath,
+    NonBracketTokenKind, OpenBracket, ParseError, SemanticToken, SlotPath, UnparsedChunkItemsPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -120,8 +120,12 @@ pub type CloseBracketPath<'a> = PositionResolutionPath<&'a CloseBracket, Chunked
 type LevelItems<'a> = SafePeekable<std::slice::Iter<'a, WithSpan<BracketItem>>>;
 
 impl Chunk {
-    pub(crate) fn stream<'a>(&'a self, text: &'a str) -> ChunkStream<'a> {
-        ChunkStream::new(self.contents.reference(), text)
+    pub(crate) fn stream<'a>(
+        &'a self,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    ) -> ChunkStream<'a> {
+        ChunkStream::new(self.contents.reference(), text, tokens)
     }
 
     /// First content item through last content item. `WithSpan<Chunk>` also covers
@@ -204,9 +208,10 @@ pub struct Singleton<T, E> {
 fn parse_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
     parse_item: impl FnOnce(&mut ItemCursor<'a>) -> Result<P, WithSpan<ParseError>>,
 ) -> (ChunkStream<'a>, Result<WithSpan<P>, WithSpan<ParseError>>) {
-    let mut stream = chunk.item.stream(text);
+    let mut stream = chunk.item.stream(text, tokens);
     let result = stream.cursor().spanning(parse_item);
     (stream, result)
 }
@@ -214,6 +219,7 @@ fn parse_chunk<'a, P>(
 fn parse_one_item<'a, P, F>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
     leftover: Expectation,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<P, WithSpan<ParseError>>,
     push_error: &mut F,
@@ -221,7 +227,7 @@ fn parse_one_item<'a, P, F>(
 where
     F: FnMut(WithSpan<ParseError>),
 {
-    let (mut stream, result) = parse_chunk(chunk, text, |cursor| parse(cursor, push_error));
+    let (mut stream, result) = parse_chunk(chunk, text, tokens, |cursor| parse(cursor, push_error));
     match result {
         Ok(item) => match stream.remaining_contents() {
             None => {
@@ -266,6 +272,7 @@ where
 pub(crate) fn parse_singleton<'a, T, F>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
     end: Expectation,
     extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
     parse: impl FnOnce(&mut ItemCursor<'a>, &mut F) -> Result<T, WithSpan<ParseError>>,
@@ -274,7 +281,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
 where
     F: FnMut(WithSpan<ParseError>),
 {
-    let item = parse_one_item(&level.item.0[0], text, end, parse, push_error);
+    let item = parse_one_item(&level.item.0[0], text, tokens, end, parse, push_error);
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         push_error(
             ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),

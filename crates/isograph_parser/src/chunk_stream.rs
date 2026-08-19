@@ -1,11 +1,11 @@
 use nonempty::NonEmpty;
 use prelude::Postfix;
-use safe_peekable::{IntoSafePeekable, SafePeekable};
+use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
-    ParseError,
+    ParseError, SemanticToken,
 };
 
 /// Sequential reader of one chunk. Parameter of a parse function.
@@ -15,17 +15,29 @@ pub(crate) struct ItemCursor<'a> {
     /// any). An `Expected(_, EndOfChunk)` error uses this offset.
     previous_end: u32,
     text: &'a str,
+    tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+}
+
+pub(crate) struct CursorPeek<'c, 'a> {
+    peek: Peek<'c, &'a WithSpan<ChunkContentItem>>,
+    previous_end: &'c mut u32,
+    tokens: &'c mut Vec<WithSpan<SemanticToken>>,
 }
 
 /// Sequential reader of one chunk, plus `require_end`.
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
-    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self {
+    pub(crate) fn new(
+        contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    ) -> Self {
         ChunkStream(ItemCursor {
             previous_end: contents.first().location.start,
             items: contents.iter().safe_peekable(),
             text,
+            tokens,
         })
     }
 
@@ -54,32 +66,53 @@ impl<'a> ChunkStream<'a> {
 }
 
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span> {
-        let peek = self.items.peek()?;
+    pub(crate) fn peek(&mut self) -> Option<CursorPeek<'_, 'a>> {
+        CursorPeek {
+            peek: self.items.peek()?,
+            previous_end: &mut self.previous_end,
+            tokens: self.tokens,
+        }
+        .wrap_some()
+    }
+
+    pub(crate) fn consume_token_if(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Option<Span> {
+        let peek = self.peek()?;
         match peek.view().item.reference() {
-            ChunkContentItem::NonBracket(token) if token.0 == kind => {}
+            ChunkContentItem::NonBracket(found) if found.0 == kind => {}
             _ => return None,
         }
-        let item = peek.commit();
-        self.previous_end = item.location.end;
-        item.location.wrap_some()
+        peek.commit(token).location.wrap_some()
     }
 
     #[allow(dead_code)]
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
+        token: SemanticToken,
     ) -> Option<WithSpan<&'a ChunkedGroup>> {
-        let peek = self.items.peek()?;
-        let item = *peek.view();
+        let peek = self.peek()?;
+        let item = peek.view();
         match item.item.reference() {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
-                peek.commit();
-                self.previous_end = item.location.end;
-                group.with_span(item.location).wrap_some()
+                let location = item.location;
+                peek.commit(token);
+                group.with_span(location).wrap_some()
             }
             _ => None,
         }
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken) {
+        self.record(token, group.closing.location);
+    }
+
+    fn record(&mut self, token: SemanticToken, span: Span) {
+        self.tokens.push(token.with_span(span));
     }
 
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
@@ -93,16 +126,21 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()> {
-        self.consume_token_if(kind).ok_or(())
+    pub(crate) fn require_token(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Result<Span, ()> {
+        self.consume_token_if(kind, token).ok_or(())
     }
 
     #[allow(dead_code)]
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
+        token: SemanticToken,
     ) -> Result<WithSpan<&'a ChunkedGroup>, ()> {
-        self.consume_group_if(kind).ok_or(())
+        self.consume_group_if(kind, token).ok_or(())
     }
 
     #[allow(dead_code)]
@@ -137,6 +175,23 @@ impl<'a> ItemCursor<'a> {
     }
 }
 
+impl<'c, 'a> CursorPeek<'c, 'a> {
+    pub(crate) fn view(&self) -> &'a WithSpan<ChunkContentItem> {
+        self.peek.view().dereference()
+    }
+
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+        let item = self.peek.commit();
+        *self.previous_end = item.location.end;
+        let span = match item.item.reference() {
+            ChunkContentItem::NonBracket(_) => item.location,
+            ChunkContentItem::Group(group) => group.opening.location,
+        };
+        self.tokens.push(token.with_span(span));
+        item
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use prelude::Postfix;
@@ -145,7 +200,7 @@ mod tests {
     use super::ChunkStream;
     use crate::{
         BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind, ParseError,
-        chunk, match_brackets, tokenize,
+        SemanticToken, chunk, match_brackets, tokenize,
     };
 
     fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
@@ -180,27 +235,35 @@ mod tests {
         Expectation::Token(kind)
     }
 
-    fn stream_of<'a>(tree: &'a WithSpan<ChunkedLevel>, text: &'a str) -> ChunkStream<'a> {
-        first_chunk(tree).stream(text)
+    fn stream_of<'a>(
+        tree: &'a WithSpan<ChunkedLevel>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    ) -> ChunkStream<'a> {
+        first_chunk(tree).stream(text, tokens)
     }
 
     #[test]
     fn consume_token_if_matches_the_next_identifier_and_skips_the_wrong_kind() {
         let text = "foo bar";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier),
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             span_of(text, "foo").wrap_some(),
         );
-        assert_eq!(cursor.consume_token_if(NonBracketTokenKind::Period), None);
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier),
+            cursor.consume_token_if(NonBracketTokenKind::Period, SemanticToken::Period),
+            None
+        );
+        assert_eq!(
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             span_of(text, "bar").wrap_some(),
         );
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier),
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             None
         );
     }
@@ -209,43 +272,57 @@ mod tests {
     fn consume_group_if_matches_a_brace_group_and_skips_a_token_or_the_wrong_bracket() {
         let text = "foo { bar }";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
-        assert_eq!(cursor.consume_group_if(BracketKind::Brace), None);
         assert_eq!(
-            cursor.consume_token_if(NonBracketTokenKind::Identifier),
+            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace),
+            None
+        );
+        assert_eq!(
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             span_of(text, "foo").wrap_some(),
         );
-        assert_eq!(cursor.consume_group_if(BracketKind::Parenthesis), None);
+        assert_eq!(
+            cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis),
+            None
+        );
         let group = cursor
-            .consume_group_if(BracketKind::Brace)
+            .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
             .expect("the next item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
         assert_eq!(group.item.opening.item.0, BracketKind::Brace);
-        assert_eq!(cursor.consume_group_if(BracketKind::Brace), None);
+        assert_eq!(
+            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace),
+            None
+        );
     }
 
     #[test]
     fn require_token_and_require_group_are_consume_or_err() {
         let text = "{ bar } foo";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier),
+            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             ().wrap_err(),
         );
         let group = cursor
-            .require_group(BracketKind::Brace)
+            .require_group(BracketKind::Brace, SemanticToken::Brace)
             .expect("the first item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
-        assert_eq!(cursor.require_group(BracketKind::Brace), ().wrap_err(),);
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier),
+            cursor.require_group(BracketKind::Brace, SemanticToken::Brace),
+            ().wrap_err(),
+        );
+        assert_eq!(
+            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             span_of(text, "foo").wrap_ok(),
         );
         assert_eq!(
-            cursor.require_token(NonBracketTokenKind::Identifier),
+            cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             ().wrap_err(),
         );
     }
@@ -254,7 +331,8 @@ mod tests {
     fn expected_names_the_next_item_or_end_of_chunk() {
         let text = "foo { bar }";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Period)),
@@ -265,7 +343,7 @@ mod tests {
             .with_span(span_of(text, "foo")),
         );
         cursor
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Identifier)),
@@ -276,7 +354,7 @@ mod tests {
             .with_span(span_of(text, "{ bar }")),
         );
         cursor
-            .consume_group_if(BracketKind::Brace)
+            .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
             .expect("the group is present");
         let group_end = span_of(text, "{ bar }").end;
         assert_eq!(
@@ -290,10 +368,11 @@ mod tests {
     fn expected_at_the_start_of_an_unconsumed_chunk_uses_the_first_item_start() {
         let text = "foo";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
         cursor
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         assert_eq!(
             cursor.expected(Expectation::Separator),
@@ -308,16 +387,17 @@ mod tests {
     fn require_end_is_ok_only_on_an_empty_remainder() {
         let text = "foo bar";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("bar is present");
         assert_eq!(stream.require_end(), ().wrap_ok());
     }
@@ -326,15 +406,17 @@ mod tests {
     fn remaining_contents_is_none_at_end_and_clones_the_unread_items() {
         let text = "foo bar baz";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         assert_eq!(
             stream.remaining_contents().map(|items| items.len()),
             3.wrap_some()
         );
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         match stream.remaining_contents() {
             Some(remaining) => {
@@ -351,15 +433,16 @@ mod tests {
     fn spanning_covers_what_the_closure_advanced_past() {
         let text = "foo bar";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let spanned = stream
             .cursor()
             .spanning(|cursor| {
                 cursor
-                    .require_token(NonBracketTokenKind::Identifier)
+                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Identifier)))?;
                 cursor
-                    .require_token(NonBracketTokenKind::Identifier)
+                    .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Identifier)))?;
                 ().wrap_ok()
             })
@@ -374,10 +457,11 @@ mod tests {
     fn spanning_on_an_empty_cursor_is_zero_width_at_previous_end() {
         let text = "foo";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         stream
             .cursor()
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         let spanned = stream
             .cursor()
@@ -391,12 +475,13 @@ mod tests {
     fn spanning_does_not_advance_when_the_closure_errors_without_consuming() {
         let text = "foo";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let error = stream
             .cursor()
             .spanning::<()>(|cursor| {
                 cursor
-                    .require_token(NonBracketTokenKind::Period)
+                    .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
                     .map_err(|()| cursor.expected(token(NonBracketTokenKind::Period)))?;
                 ().wrap_ok()
             })
@@ -412,7 +497,7 @@ mod tests {
         assert_eq!(
             stream
                 .cursor()
-                .consume_token_if(NonBracketTokenKind::Identifier),
+                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
             span_of(text, "foo").wrap_some(),
         );
     }
@@ -421,10 +506,11 @@ mod tests {
     fn token_text_is_the_source_slice() {
         let text = "foo bar";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         let cursor = stream.cursor();
         let foo = cursor
-            .consume_token_if(NonBracketTokenKind::Identifier)
+            .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
             .expect("foo is present");
         assert_eq!(cursor.token_text(foo), "foo");
         assert_eq!(cursor.text(), text);
@@ -434,13 +520,166 @@ mod tests {
     fn a_lone_group_is_the_whole_chunk() {
         let text = "{ bar }";
         let tree = chunked(text);
-        let mut stream = stream_of(tree.reference(), text);
+        let mut tokens = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens);
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .require_group(BracketKind::Brace)
+            .require_group(BracketKind::Brace, SemanticToken::Brace)
             .expect("the chunk is a brace group");
         assert_eq!(stream.require_end(), ().wrap_ok());
         assert_eq!(stream.remaining_contents(), None);
+    }
+
+    #[test]
+    fn require_token_records_the_role_the_caller_passed() {
+        for (text, token) in [
+            ("entrypoint", SemanticToken::Keyword),
+            ("Query", SemanticToken::Type),
+            ("foo", SemanticToken::FieldName),
+            ("id", SemanticToken::ObjectKey),
+            ("Foo", SemanticToken::GraphQLTypeName),
+        ] {
+            let tree = chunked(text);
+            let mut tokens = Vec::new();
+            {
+                let mut stream = stream_of(tree.reference(), text, &mut tokens);
+                assert_eq!(
+                    stream
+                        .cursor()
+                        .require_token(NonBracketTokenKind::Identifier, token),
+                    span_of(text, text).wrap_ok(),
+                    "for literal {text:?}",
+                );
+            }
+            assert_eq!(tokens, token.with_span(span_of(text, text)).wrap_vec());
+        }
+    }
+
+    #[test]
+    fn require_token_records_nothing_when_the_kind_does_not_match() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            assert_eq!(
+                stream
+                    .cursor()
+                    .require_token(NonBracketTokenKind::Period, SemanticToken::Period),
+                ().wrap_err(),
+            );
+        }
+        assert_eq!(tokens, vec![]);
+    }
+
+    #[test]
+    fn consume_token_if_records_nothing_when_the_kind_does_not_match() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            assert_eq!(
+                stream
+                    .cursor()
+                    .consume_token_if(NonBracketTokenKind::Period, SemanticToken::Period),
+                None,
+            );
+        }
+        assert_eq!(tokens, vec![]);
+    }
+
+    #[test]
+    fn alias_colon_name_records_field_name_colon_field_name() {
+        let text = "alias: name";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let cursor = stream.cursor();
+            assert_eq!(
+                cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                span_of(text, "alias").wrap_some(),
+            );
+            assert_eq!(
+                cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon),
+                span_of(text, ":").wrap_some(),
+            );
+            assert_eq!(
+                cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                span_of(text, "name").wrap_some(),
+            );
+        }
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::FieldName.with_span(span_of(text, "alias")),
+                SemanticToken::Colon.with_span(span_of(text, ":")),
+                SemanticToken::FieldName.with_span(span_of(text, "name")),
+            ],
+        );
+    }
+
+    #[test]
+    fn consume_group_if_records_the_open_and_record_group_close_records_the_close() {
+        let text = "{ bar }";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let cursor = stream.cursor();
+            let group = cursor
+                .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
+                .expect("the chunk is a brace group");
+            cursor.record_group_close(group.item, SemanticToken::Brace);
+        }
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Brace.with_span(span_of(text, "{")),
+                SemanticToken::Brace.with_span(span_of(text, "}")),
+            ],
+        );
+    }
+
+    #[test]
+    fn expected_does_not_record() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            stream.cursor().expected(token(NonBracketTokenKind::Period));
+        }
+        assert_eq!(tokens, vec![]);
+    }
+
+    #[test]
+    fn peek_without_commit_records_nothing() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let peek = stream.cursor().peek().expect("foo is present");
+            assert_eq!(peek.view().location, span_of(text, "foo"));
+        }
+        assert_eq!(tokens, vec![]);
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            assert_eq!(
+                stream
+                    .cursor()
+                    .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
+                span_of(text, "foo").wrap_some(),
+            );
+        }
+        assert_eq!(
+            tokens,
+            SemanticToken::FieldName
+                .with_span(span_of(text, "foo"))
+                .wrap_vec(),
+        );
     }
 }

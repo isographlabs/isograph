@@ -1,0 +1,22 @@
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Hash)]
+pub enum SemanticToken {
+    Keyword,
+    Type,
+    FieldName,
+    ObjectKey,
+    GraphQLTypeName,
+    DirectiveName,
+    Variable,
+    Argument,
+    Integer,
+    String,
+    BooleanOrNull,
+    Period,
+    Colon,
+    Equals,
+    Parenthesis,
+    Brace,
+    Content,
+    Bracket,
+    Error,
+}

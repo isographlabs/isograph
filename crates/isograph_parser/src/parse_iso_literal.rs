@@ -7,7 +7,7 @@ use span::{WithSpan, WithSpanPostfix};
 use crate::chunk_stream::ItemCursor;
 use crate::{
     ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NonBracketTokenKind,
-    ParseError, Singleton, Slot, UnparsedChunkItems, parse_singleton,
+    ParseError, SemanticToken, Singleton, Slot, UnparsedChunkItems, parse_singleton,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -70,6 +70,7 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     mut push_error: impl FnMut(WithSpan<ParseError>),
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
@@ -79,6 +80,7 @@ pub fn parse_iso_literal(
     let singleton = parse_singleton(
         root.reference(),
         text,
+        tokens,
         Expectation::EndOfDeclaration,
         |extra| ParseError::MultipleDeclarations.with_span(extra.location),
         |cursor, _| parse_iso_literal_item(cursor),
@@ -91,7 +93,7 @@ fn parse_iso_literal_item(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<IsoLiteralItem, WithSpan<ParseError>> {
     let keyword = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
     match cursor.token_text(keyword) {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
@@ -111,13 +113,13 @@ fn parse_entrypoint(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
     let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
-        .require_token(NonBracketTokenKind::Period)
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
     let client_field_name = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
         parent_type: cursor
@@ -158,6 +160,14 @@ mod tests {
         Vec<CommaWithoutItem>,
     );
 
+    type ParsedWithTokens = (
+        Option<WithSpan<IsoLiteralParse>>,
+        Vec<WithSpan<ParseError>>,
+        Vec<BracketError>,
+        Vec<CommaWithoutItem>,
+        Vec<WithSpan<SemanticToken>>,
+    );
+
     fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -166,11 +176,17 @@ mod tests {
     }
 
     fn parsed_with_errors(text: &str) -> ParsedWithErrors {
+        let (parse, errors, bracket_errors, comma_errors, _) = parsed_with_tokens(text);
+        (parse, errors, bracket_errors, comma_errors)
+    }
+
+    fn parsed_with_tokens(text: &str) -> ParsedWithTokens {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         let (tree, comma_errors) = chunk(brackets.reference());
         let mut errors = Vec::new();
-        let parse = parse_iso_literal(text, tree, |error| errors.push(error));
-        (parse, errors, bracket_errors, comma_errors)
+        let mut tokens = Vec::new();
+        let parse = parse_iso_literal(text, tree, |error| errors.push(error), &mut tokens);
+        (parse, errors, bracket_errors, comma_errors, tokens)
     }
 
     fn expected(expectation: Expectation, found: Found) -> ParseError {
@@ -603,5 +619,80 @@ mod tests {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the token leaf, got {node:?}"),
         }
+    }
+
+    #[test]
+    fn an_entrypoint_records_keyword_type_period_field_name() {
+        let text = "entrypoint Query.foo";
+        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        as_entrypoint(parse.reference());
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
+                SemanticToken::Type.with_span(span_of(text, "Query")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+                SemanticToken::FieldName.with_span(span_of(text, "foo")),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_failed_prefix_keeps_the_tokens_it_committed() {
+        let text = "entrypoint Foo.$ asdf";
+        let (_, _, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
+                SemanticToken::Type.with_span(span_of(text, "Foo")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+            ],
+        );
+    }
+
+    #[test]
+    fn an_unknown_keyword_records_keyword_at_that_identifier() {
+        let text = "fieldd Query.foo { bar }";
+        let (_, _, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(
+            tokens,
+            SemanticToken::Keyword
+                .with_span(span_of(text, "fieldd"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn leftover_after_an_entrypoint_is_not_recorded() {
+        let text = "entrypoint Query.foo bar";
+        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        as_entrypoint(parse.reference());
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "bar"))
+                .wrap_vec(),
+        );
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "entrypoint")),
+                SemanticToken::Type.with_span(span_of(text, "Query")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+                SemanticToken::FieldName.with_span(span_of(text, "foo")),
+            ],
+        );
     }
 }
