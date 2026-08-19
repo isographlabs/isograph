@@ -116,7 +116,7 @@ impl<T: ResolvePosition, TLocation> ResolvePosition for WithGenericLocation<T, T
 
 #[cfg(test)]
 mod test {
-    #![allow(unused)]
+    #![expect(unused)]
 
     use std::ops::ControlFlow;
 

@@ -138,7 +138,7 @@ impl Chunk {
         )
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn first_item(&self) -> &WithSpan<ChunkContentItem> {
         self.contents.first()
     }
@@ -159,7 +159,7 @@ impl ChunkedLevel {
         self.0.len()
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn parse_each_chunk<P>(
         &self,
         parent: &mut ItemCursor<'_>,

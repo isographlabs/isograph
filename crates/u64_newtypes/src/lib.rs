@@ -73,7 +73,7 @@ macro_rules! u64_conversion {
 }
 
 #[cfg(test)]
-#[allow(dead_code)] // macro expands methods (e.g. as_usize) this Display test does not call
+#[expect(dead_code)] // macro expands methods (e.g. as_usize) this Display test does not call
 mod test {
     crate::u64_newtype!(ExampleId);
 

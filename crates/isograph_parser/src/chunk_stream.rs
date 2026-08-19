@@ -48,7 +48,7 @@ impl<'a> ChunkStream<'a> {
         &mut self.0
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_end(&mut self) -> Result<(), ()> {
         self.0.items.peek().map_or(().wrap_ok(), |_| ().wrap_err())
     }
@@ -91,7 +91,7 @@ impl<'a> ItemCursor<'a> {
         peek.commit(token).location.wrap_some()
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn consume_group_if(
         &mut self,
         kind: BracketKind,
@@ -109,7 +109,7 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken) {
         self.record(token, group.closing.location);
     }
@@ -145,7 +145,7 @@ impl<'a> ItemCursor<'a> {
         self.consume_token_if(kind, token).ok_or(())
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_group(
         &mut self,
         kind: BracketKind,
@@ -154,7 +154,7 @@ impl<'a> ItemCursor<'a> {
         self.consume_group_if(kind, token).ok_or(())
     }
 
-    #[allow(dead_code)]
+    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn text(&self) -> &'a str {
         self.text
     }

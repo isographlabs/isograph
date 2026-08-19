@@ -317,7 +317,7 @@ enum ResolveFieldInfoType {
 enum ResolveFieldInfoTypeWrapper {
     None(Box<ResolveFieldInfoType>),
     IteratorWrapper(Box<ResolveFieldInfoTypeWrapper>),
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     Transparent(Box<syn::Type>),
 }
 
