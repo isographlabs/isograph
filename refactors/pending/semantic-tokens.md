@@ -292,9 +292,9 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
 
 `peek` does not take a `SemanticToken`. Dropping the guard leaves the item unconsumed and records nothing. `commit` takes the token, advances, and records: a non-bracket at `item.location`, a group at `group.opening.location`. `record_group_close` records the same token at the close.
 
-`consume_*` peek, match, and `commit(token)`. A match failure drops the guard and records nothing. `require_token` / `require_group` stay `consume_*` or `Err(())`. `expected` peeks and does not commit. `remaining_contents` uses `next`, not `commit`, so leftover items are not recorded.
+The only advance that records is `commit(token)`. `consume_*` peek, match, and `commit(token)`. A match failure drops the guard and records nothing. `require_token` / `require_group` stay `consume_*` or `Err(())`. `expected`, `spanning`'s start offset, and `require_end` peek and do not commit.
 
-A consume that does not match records nothing.
+`remaining_contents` advances with `Iterator::next`, not `commit`. Leftover items and failed-chunk items therefore have no recorded token. Leftover fill-in later walks those spans and emits `leftover_token`. A grammar item the caller never committed cannot have a role: there was no `SemanticToken` to pass.
 
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
@@ -810,7 +810,7 @@ records, in source order:
 
 `entrypoint Foo.$ asdf` records `Keyword` at `entrypoint`, `Type` at `Foo`, `Period` at `.`, then fails at `$`. Those three tokens stay. There is no pop.
 
-Leftover items (`asdf`) and separator commas are not consumed, so they are not recorded. Positions in leftover still resolve through `UnparsedChunkItems`. Highlighting them is the leftover fill-in change.
+Leftover items (`asdf`) and separator commas are not committed, so they are not recorded. `parse_one_item` takes them via `remaining_contents` (`next`, not `commit`). Positions in leftover still resolve through `UnparsedChunkItems`. Highlighting them is the leftover fill-in change, which classifies those uncommitted spans with `leftover_token`.
 
 ### Layering
 
@@ -840,6 +840,7 @@ No snapshots. Facts:
 - `fieldd Query.foo` records `Keyword` at `fieldd`.
 - `expected` peeks and does not commit, so it records nothing.
 - `peek()` without `commit` records nothing.
+- After `parse_iso_literal` on `entrypoint Query.foo bar`, the vec has the four committed tokens and not `bar`. `remaining_contents` advanced past `bar` with `next`. Fill-in later emits `Content` at `bar`.
 
 `stream_of` in `chunk_stream.rs` tests takes the vec:
 
@@ -1075,7 +1076,7 @@ When type annotations leave the language, `GraphQLTypeName` leaves this enum. Th
 
 ### Leftover fill-in
 
-A walk over `tokenize(text)` that emits `leftover_token` for every token whose span is not already in the collected vec, in source order. This covers `Slot.extra_tokens`, `Singleton.extra_chunks`, separator commas, the matcher's cut, and `Error` tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
+A walk over `tokenize(text)` that emits `leftover_token` for every token whose span is not already in the collected vec, in source order. Those spans were never passed to `commit`: `Slot.extra_tokens` (from `remaining_contents`), `Singleton.extra_chunks`, separator commas, the matcher's cut, and `Error` tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
 
 `leftover_token` is a free function only leftover fill-in calls. It picks one of four format buckets, or `Error`.
 
