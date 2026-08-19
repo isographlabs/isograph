@@ -180,4 +180,4 @@ parsing-standards.md governs how every implementation below is written. Each doc
 6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 7. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 
-Later: `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
+Later: `parse-arrays.md`. `[ ... ]` list values. `parse-variables.md` uses them for defaults. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
