@@ -158,6 +158,26 @@ impl ChunkedLevel {
     pub(crate) fn len(&self) -> usize {
         self.0.len()
     }
+
+    #[allow(dead_code)]
+    pub(crate) fn parse_each_chunk<P>(
+        &self,
+        parent: &mut ItemCursor<'_>,
+        leftover: Expectation,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+    ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
+        self.0
+            .iter()
+            .map(|chunk| {
+                parse_one_chunk(
+                    chunk,
+                    parent.stream_chunk(&chunk.item),
+                    leftover,
+                    &parse_item,
+                )
+            })
+            .collect()
+    }
 }
 
 /// Unread or failed items from the chunk under parse.
@@ -453,8 +473,13 @@ mod tests {
     use resolve_position::ResolvePosition;
 
     use super::*;
-    use crate::{BracketError, BracketKind, NonBracketTokenKind, match_brackets, tokenize};
+    use crate::{
+        BracketError, BracketKind, Expectation, Found, NonBracketTokenKind, ParseError,
+        SemanticToken, chunk_stream::ItemCursor, match_brackets, tokenize,
+    };
     use BracketKind::Brace;
+    use Expectation::Separator;
+    use NonBracketTokenKind::{Identifier, Period};
 
     fn tree(literal: &str) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {
         match_brackets(tokenize(literal), literal.len() as u32)
@@ -1163,5 +1188,166 @@ mod tests {
             }
             node => panic!("expected the interior level, got {node:?}"),
         }
+    }
+
+    fn parse_identifier(cursor: &mut ItemCursor<'_>) -> Result<Span, WithSpan<ParseError>> {
+        cursor
+            .require_token(Identifier, SemanticToken::FieldName)
+            .map_err(|()| cursor.expected(Expectation::Token(Identifier)))
+    }
+
+    type ParsedEach = (
+        Vec<WithSpan<Slot<Span, UnparsedChunkItems>>>,
+        Vec<WithSpan<ParseError>>,
+        Vec<CommaWithoutItem>,
+        Vec<WithSpan<SemanticToken>>,
+    );
+
+    fn parsed_each(text: &str) -> ParsedEach {
+        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
+        assert!(bracket_errors.is_empty(), "for literal {text:?}");
+        let (tree, comma_errors) = chunk(brackets.reference());
+        let mut errors = Vec::new();
+        let mut tokens = Vec::new();
+        let dummy = chunked("x");
+        let mut parent = dummy.item.0[0].item.stream(text, &mut tokens, &mut errors);
+        let items = tree
+            .item
+            .parse_each_chunk(parent.cursor(), Separator, parse_identifier);
+        (items, errors, comma_errors, tokens)
+    }
+
+    fn expected(expectation: Expectation, found: Found) -> ParseError {
+        ParseError::expected(expectation, found)
+    }
+
+    #[test]
+    fn parse_each_chunk_on_an_empty_level_is_no_slots_and_no_errors() {
+        for text in ["", "   ", "\n\n"] {
+            let (items, errors, comma_errors, tokens) = parsed_each(text);
+            assert_eq!(items, vec![], "for literal {text:?}");
+            assert_eq!(errors, vec![], "for literal {text:?}");
+            assert_eq!(comma_errors, vec![], "for literal {text:?}");
+            assert_eq!(tokens, vec![], "for literal {text:?}");
+        }
+    }
+
+    #[test]
+    fn parse_each_chunk_parses_one_identifier_per_chunk() {
+        let text = "foo, bar";
+        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            items[0].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
+        assert_eq!(
+            items[1].item.item.as_ref().map(|item| item.item),
+            span_of(text, "bar").wrap_some(),
+        );
+        assert!(items[0].item.extra_tokens.is_none());
+        assert!(items[1].item.extra_tokens.is_none());
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::FieldName.with_span(span_of(text, "foo")),
+                SemanticToken::FieldName.with_span(span_of(text, "bar")),
+            ],
+        );
+    }
+
+    #[test]
+    fn a_list_trailing_comma_is_not_a_parse_each_chunk_diagnostic() {
+        let text = "foo,";
+        let (items, errors, comma_errors, _) = parsed_each(text);
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
+        assert!(items[0].item.extra_tokens.is_none());
+    }
+
+    #[test]
+    fn leftover_after_a_list_item_keeps_the_item() {
+        let text = "foo bar";
+        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
+        assert!(items[0].item.extra_tokens.as_ref().is_some());
+        assert_eq!(
+            errors,
+            expected(Separator, Found::Token(Identifier))
+                .with_span(span_of(text, "bar"))
+                .wrap_vec(),
+        );
+        assert_eq!(
+            tokens,
+            SemanticToken::FieldName
+                .with_span(span_of(text, "foo"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_failed_list_chunk_is_none_and_the_next_chunk_still_parses() {
+        let text = ".\nfoo";
+        let (items, errors, comma_errors, tokens) = parsed_each(text);
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(items.len(), 2);
+        assert!(items[0].item.item.is_none());
+        assert!(items[0].item.extra_tokens.as_ref().is_some());
+        assert_eq!(
+            items[1].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
+        assert!(errors.iter().any(|error| {
+            error.item == expected(Expectation::Token(Identifier), Found::Token(Period))
+                && error.location == span_of(text, ".")
+        }));
+        assert_eq!(
+            tokens,
+            SemanticToken::FieldName
+                .with_span(span_of(text, "foo"))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn a_line_break_is_a_list_separator() {
+        let text = "foo\nbar";
+        let (items, errors, comma_errors, _) = parsed_each(text);
+        assert_eq!(comma_errors, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 2);
+        assert_eq!(
+            items[0].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
+        assert_eq!(
+            items[1].item.item.as_ref().map(|item| item.item),
+            span_of(text, "bar").wrap_some(),
+        );
+    }
+
+    #[test]
+    fn a_comma_without_item_is_chunkings_error_and_the_item_parses() {
+        let text = ",foo";
+        let (items, errors, comma_errors, _) = parsed_each(text);
+        assert_eq!(comma_errors.len(), 1);
+        assert_eq!(errors, vec![]);
+        assert_eq!(items.len(), 1);
+        assert_eq!(
+            items[0].item.item.as_ref().map(|item| item.item),
+            span_of(text, "foo").wrap_some(),
+        );
     }
 }

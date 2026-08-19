@@ -118,7 +118,6 @@ impl<'a> ItemCursor<'a> {
         self.errors.push(error);
     }
 
-    #[allow(dead_code)]
     pub(crate) fn stream_chunk<'c>(&'c mut self, chunk: &'c Chunk) -> ChunkStream<'c> {
         chunk.stream(self.text, self.tokens, self.errors)
     }
