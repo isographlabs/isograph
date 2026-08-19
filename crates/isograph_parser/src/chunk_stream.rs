@@ -4,7 +4,7 @@ use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketKind, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
+    BracketKind, Chunk, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
     ParseError, SemanticToken,
 };
 
@@ -16,6 +16,7 @@ pub(crate) struct ItemCursor<'a> {
     previous_end: u32,
     text: &'a str,
     tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    errors: &'a mut Vec<WithSpan<ParseError>>,
 }
 
 pub(crate) struct CursorPeek<'c, 'a> {
@@ -32,12 +33,14 @@ impl<'a> ChunkStream<'a> {
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        errors: &'a mut Vec<WithSpan<ParseError>>,
     ) -> Self {
         ChunkStream(ItemCursor {
             previous_end: contents.first().location.start,
             items: contents.iter().safe_peekable(),
             text,
             tokens,
+            errors,
         })
     }
 
@@ -109,6 +112,15 @@ impl<'a> ItemCursor<'a> {
     #[allow(dead_code)]
     pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken) {
         self.record(token, group.closing.location);
+    }
+
+    pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
+        self.errors.push(error);
+    }
+
+    #[allow(dead_code)]
+    pub(crate) fn stream_chunk<'c>(&'c mut self, chunk: &'c Chunk) -> ChunkStream<'c> {
+        chunk.stream(self.text, self.tokens, self.errors)
     }
 
     fn record(&mut self, token: SemanticToken, span: Span) {
@@ -239,8 +251,9 @@ mod tests {
         tree: &'a WithSpan<ChunkedLevel>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        errors: &'a mut Vec<WithSpan<ParseError>>,
     ) -> ChunkStream<'a> {
-        first_chunk(tree).stream(text, tokens)
+        first_chunk(tree).stream(text, tokens, errors)
     }
 
     #[test]
@@ -248,7 +261,8 @@ mod tests {
         let text = "foo bar";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
             cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
@@ -273,7 +287,8 @@ mod tests {
         let text = "foo { bar }";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
             cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace),
@@ -303,7 +318,8 @@ mod tests {
         let text = "{ bar } foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
             cursor.require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
@@ -332,7 +348,8 @@ mod tests {
         let text = "foo { bar }";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
             cursor.expected(token(NonBracketTokenKind::Period)),
@@ -369,7 +386,8 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         cursor
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
@@ -388,7 +406,8 @@ mod tests {
         let text = "foo bar";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
@@ -407,13 +426,15 @@ mod tests {
         let text = "foo bar baz";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         assert_eq!(
             stream.remaining_contents().map(|items| items.len()),
             3.wrap_some()
         );
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         stream
             .cursor()
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
@@ -434,7 +455,8 @@ mod tests {
         let text = "foo bar";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let spanned = stream
             .cursor()
             .spanning(|cursor| {
@@ -458,7 +480,8 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         stream
             .cursor()
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
@@ -476,7 +499,8 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let error = stream
             .cursor()
             .spanning::<()>(|cursor| {
@@ -507,7 +531,8 @@ mod tests {
         let text = "foo bar";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         let foo = cursor
             .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
@@ -521,7 +546,8 @@ mod tests {
         let text = "{ bar }";
         let tree = chunked(text);
         let mut tokens = Vec::new();
-        let mut stream = stream_of(tree.reference(), text, &mut tokens);
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
@@ -542,8 +568,9 @@ mod tests {
         ] {
             let tree = chunked(text);
             let mut tokens = Vec::new();
+            let mut errors = Vec::new();
             {
-                let mut stream = stream_of(tree.reference(), text, &mut tokens);
+                let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
                 assert_eq!(
                     stream
                         .cursor()
@@ -561,8 +588,9 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(
                 stream
                     .cursor()
@@ -578,8 +606,9 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(
                 stream
                     .cursor()
@@ -595,8 +624,9 @@ mod tests {
         let text = "alias: name";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             let cursor = stream.cursor();
             assert_eq!(
                 cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName),
@@ -626,8 +656,9 @@ mod tests {
         let text = "{ bar }";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             let cursor = stream.cursor();
             let group = cursor
                 .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
@@ -648,8 +679,9 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             stream.cursor().expected(token(NonBracketTokenKind::Period));
         }
         assert_eq!(tokens, vec![]);
@@ -660,14 +692,15 @@ mod tests {
         let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
+        let mut errors = Vec::new();
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             let peek = stream.cursor().peek().expect("foo is present");
             assert_eq!(peek.view().location, span_of(text, "foo"));
         }
         assert_eq!(tokens, vec![]);
         {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens);
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             assert_eq!(
                 stream
                     .cursor()
@@ -681,5 +714,18 @@ mod tests {
                 .with_span(span_of(text, "foo"))
                 .wrap_vec(),
         );
+    }
+
+    #[test]
+    fn report_error_appends_to_the_vec() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let error = ParseError::EmptyLiteral.with_span(span_of(text, "foo"));
+        stream.cursor().report_error(error);
+        assert_eq!(errors, error.wrap_vec());
+        assert_eq!(tokens, vec![]);
     }
 }

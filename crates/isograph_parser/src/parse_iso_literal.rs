@@ -69,22 +69,22 @@ pub type ClientFieldNamePath<'a> =
 pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
-    mut push_error: impl FnMut(WithSpan<ParseError>),
+    errors: &mut Vec<WithSpan<ParseError>>,
     tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
-        push_error(ParseError::EmptyLiteral.with_span(location));
+        errors.push(ParseError::EmptyLiteral.with_span(location));
         return None;
     }
     let singleton = parse_singleton(
         root.reference(),
         text,
         tokens,
+        errors,
         Expectation::EndOfDeclaration,
         |extra| ParseError::MultipleDeclarations.with_span(extra.location),
-        |cursor, _| parse_iso_literal_item(cursor),
-        &mut push_error,
+        parse_iso_literal_item,
     );
     singleton.with_span(location).wrap_some()
 }
@@ -185,7 +185,7 @@ mod tests {
         let (tree, comma_errors) = chunk(brackets.reference());
         let mut errors = Vec::new();
         let mut tokens = Vec::new();
-        let parse = parse_iso_literal(text, tree, |error| errors.push(error), &mut tokens);
+        let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
         (parse, errors, bracket_errors, comma_errors, tokens)
     }
 
