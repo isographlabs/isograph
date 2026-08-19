@@ -6,7 +6,11 @@ A generic `impl<T, E> ResolvePosition for Slot<T, E>` does not compile (E0276 on
 
 This doc’s list has the root pin. A later list appends `(<Selection, UnparsedChunkItems>, SelectionSetPath<'a>)`. `resolved_node` and `on_unmatched_span` stay on the container (every pin uses `IsographResolutionNode` and `from_path`).
 
-Both fields stay bare `#[resolve_field]`. The `Slot` is in the path for `item`, leftover, and the gap. That is live today.
+`UnparsedChunkItems` is `E` on every pin. One pin: its `parent_type` is `IsoLiteralSlotPath` (live `SlotPath`). Another pin: that parent is an enum of the slot paths (`IsoLiteralSlot(IsoLiteralSlotPath)`, `SelectionSlot(SelectionSlotPath)`, an argument slot, …). `T` is not shared; `IsoLiteralItem`’s parent stays `IsoLiteralSlotPath`, `Selection`’s stays `SelectionSlotPath`.
+
+`item` stays bare `#[resolve_field]`. `extra_tokens` stays bare while leftover’s parent is the one slot path. Once leftover’s parent is the enum, `extra_tokens` cannot stay bare (`Parent` is no longer equal to the slot path) and cannot use `#[parent_variant]` (one field, a different variant per pin). It uses `#[from_container_parent]`: `self.path(parent).to()`, with `From<IsoLiteralSlotPath>` / `From<SelectionSlotPath>` into the leftover parent enum. Live `from_container_parent` is enum-payload only; the struct-field form lands with that second pin.
+
+The `Slot` is in the path for `item`, leftover, and the gap. That is live today.
 
 Live `SlotPath` is renamed `IsoLiteralSlotPath`. `IsographResolutionNode::Slot` is renamed `IsoLiteralSlot`.
 
@@ -66,7 +70,7 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
 ```
 
-`IsoLiteralItem`, `EntrypointDeclaration`, and `UnparsedChunkItems` keep `parent_type = IsoLiteralSlotPath<'a>` (today `SlotPath`).
+`IsoLiteralItem`, `EntrypointDeclaration`, and `UnparsedChunkItems` have `parent_type = IsoLiteralSlotPath<'a>` (today `SlotPath`). Leftover’s parent is that path because this list has one pin.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
