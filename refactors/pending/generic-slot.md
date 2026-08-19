@@ -280,9 +280,9 @@ fn qself_trait_bound(parent_type: &syn::Type) -> Option<proc_macro2::TokenStream
         return None;
     };
     let qself = type_path.qself.as_ref()?;
-    let Some(_) = qself.as_token else {
+    if qself.as_token.is_none() {
         return None;
-    };
+    }
     let mut trait_path = type_path.path.clone();
     trait_path.segments = type_path
         .path
