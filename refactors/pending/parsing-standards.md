@@ -534,6 +534,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 Each grammar feature lands on this surface.
 
 - generic-slot.md: one `ResolvePosition` impl per `Slot<T, E>` pin, `on_unmatched_span = from_path`, one `ResolvedNode` variant per pin
+- from-container-parent-field.md: `#[from_container_parent]` on a struct field
 - parse-arguments.md: `Separator(BracketKind)`, the `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`

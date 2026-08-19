@@ -173,11 +173,12 @@ impl BracketKind {
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
 1. `token-text.md`. `consume_token_if` / `require_token` return `TokenText`. The source slice is `token_text` on that value. An interned name is `interned`.
-2. `parse-arguments.md`. `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`. Tests feed a list interior to `parse_each_chunk`.
-3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
-4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
-5. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
-6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
-7. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+2. `from-container-parent-field.md`. `#[from_container_parent]` on a struct field. `Slot.extra_tokens` stays bare until parse-arguments.md.
+3. `parse-arguments.md`. `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`. Tests feed a list interior to `parse_each_chunk`.
+4. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
+5. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
+6. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
+7. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
+8. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 
 Later: `parse-arrays.md`. `[ ... ]` list values. `parse-variables.md` uses them for defaults. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
