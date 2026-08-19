@@ -337,7 +337,7 @@ pub(crate) fn parse_value(
                     .intern()
                     .to::<VariableName>()
                     .with_span(name),
-            })
+             )
             .wrap_ok();
         }
         if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::StringLiteral) {
