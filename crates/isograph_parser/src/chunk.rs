@@ -216,7 +216,7 @@ fn parse_chunk<'a, P>(
     (stream, result)
 }
 
-fn parse_chunk_item<'a, P, F>(
+fn parse_one_chunk<'a, P, F>(
     chunk: &'a WithSpan<Chunk>,
     text: &'a str,
     tokens: &'a mut Vec<WithSpan<SemanticToken>>,
@@ -281,7 +281,7 @@ pub(crate) fn parse_singleton<'a, T, F>(
 where
     F: FnMut(WithSpan<ParseError>),
 {
-    let item = parse_chunk_item(&level.item.0[0], text, tokens, end, parse, push_error);
+    let item = parse_one_chunk(&level.item.0[0], text, tokens, end, parse, push_error);
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         push_error(
             ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
