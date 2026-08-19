@@ -253,26 +253,24 @@ return self.path(parent).to();
 
 `for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the impl is `E: 'static` on rustc 1.97. The predicates go on `type ResolvedNode<'a>` for that `'a`. `fn resolve` returns `Self::ResolvedNode<'a>`, so projecting that GAT brings them into scope for the body. `handle_data_enum` is unchanged.
 
-The derive does not name `T` and `E`. It walks the same fields that emit the body. Every derived struct gets the predicates its fields and unmatched arm imply.
+The derive does not name `T` and `E`. `F` is the inner type of a resolve field, the same type `generate_resolve_code` already passes to `new_parent_expr`. `#resolved_node` and `#parent_type` are the attribute values. `#struct_name #ty_generics` is `Self` on the impl. A later `Singleton<T, E>` with resolve fields and `from_path` gets 1, 2, and 4 from its own fields. Different parameter names do not change the derive.
 
-- Each non-transparent resolve field `F` contributes 1 / 2: `F: ResolvePosition<ResolvedNode<'a> = #resolved_node>`.
-- The `from_path` unmatched arm contributes 4: `#resolved_node: From<PositionResolutionPath<&'a #struct_name #ty_generics, #parent_type>>`. `#parent_type` is `Self::Parent`, which for `Slot` is `T::Parent`.
+The walk changes when the generated body gains a new kind of expression that needs a proof. Change 3 is that: `From::from(parent)` adds bound 3. A new unmatched arm would add another predicate. A struct that only uses `#[resolve_field]` and `struct_name` does not need a derive edit.
 
-`EntrypointDeclaration` gets an `F` equality per resolve field. Rustc already knew those from the concrete types. Live pinned `Slot` is the same: `self_type_generics` replaces `T` / `E` with `IsoLiteralItem` / `UnparsedChunkItems`, unmatched is still `struct_name`, so this change adds 1 and 2 as concrete equalities and does not add 4.
+Origin: `handle_data_struct` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: `split_for_impl` moves above the unmatched arm so `ty_generics` is in scope for bound 4. `type ResolvedNode<'a>` uses `field_resolved_node_predicates`. The `from_path` arm also pushes `from_path_predicate`. Omitted and `struct_name` come first in the match; live has `from_path`, then `None`, then `struct_name`.
 
-Origin: `handle_data_struct` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: `has_transparent` is named once. `split_for_impl` moves above the unmatched arm so `ty_generics` is in scope. `type ResolvedNode<'a>` uses `field_resolved_node_predicates`. The `from_path` unmatched arm also pushes `from_path_predicate`.
-
-Before:
+Before, the GAT and the live match:
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-    // A transparent field always answers; the container is not a path segment.
-    let unmatched = if field_infos
-        .iter()
-        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
-    {
-        quote!()
-    } else {
+            type ResolvedNode<'a>
+                = #resolved_node
+            where
+                Self: 'a;
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
         match on_unmatched_span.reference() {
             Some(ident) if ident == "from_path" => quote! {
                 return self.path(parent).to();
@@ -289,40 +287,12 @@ Before:
             )
             .to_compile_error(),
         }
-    };
-
-    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
-        Some(explicit) => (quote!(), quote!(#explicit), None),
-        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
-    };
-
-    let output = quote! {
-        impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
-            type Parent<'a>
-                = #parent_type
-            where
-                Self: 'a;
-            type ResolvedNode<'a>
-                = #resolved_node
-            where
-                Self: 'a;
 ```
 
-After:
+After. `split_for_impl` is unchanged and sits above this. `has_transparent` is the live `any` named once.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-    let has_transparent = field_infos
-        .iter()
-        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)));
-
-    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
-        Some(explicit) => (quote!(), quote!(#explicit), None),
-        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
-    };
-
     let mut resolved_node_predicates =
         field_resolved_node_predicates(field_infos.reference(), resolved_node.reference());
 
@@ -330,6 +300,12 @@ After:
         quote!()
     } else {
         match on_unmatched_span.reference() {
+            None => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) if ident == "struct_name" => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
             Some(ident) if ident == "from_path" => {
                 resolved_node_predicates.push(from_path_predicate(
                     resolved_node.reference(),
@@ -341,12 +317,6 @@ After:
                     return self.path(parent).to();
                 }
             }
-            None => quote! {
-                return Self::ResolvedNode::#struct_name(self.path(parent).to());
-            },
-            Some(ident) if ident == "struct_name" => quote! {
-                return Self::ResolvedNode::#struct_name(self.path(parent).to());
-            },
             Some(ident) => Error::new_spanned(
                 ident,
                 "expected `on_unmatched_span = from_path` or `struct_name`",
@@ -354,13 +324,10 @@ After:
             .to_compile_error(),
         }
     };
+```
 
-    let output = quote! {
-        impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
-            type Parent<'a>
-                = #parent_type
-            where
-                Self: 'a;
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
             type ResolvedNode<'a>
                 = #resolved_node
             where
