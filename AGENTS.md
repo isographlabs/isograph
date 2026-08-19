@@ -137,6 +137,7 @@ When told to audit, the deliverable is the whole class fixed everywhere, not the
 - Whether a type is span-carrying is decided once, at the type: every use of an enum is `WithSpan`-wrapped or none is, and within one enum, every variant's payload carries its span or none does. Do not mix wrapped and bare at either level. A value's span lives on its nearest wrapper, exactly once: the field wrapper when the value is a struct field, the item wrapper when the value rides in an enum whose items are wrapped — never both.
 - A struct with exactly one field is a newtype (`struct Foo(pub Bar)`), not a struct with one named field — especially when no second field is possible. The exceptions are shapes an external derive dictates: serde types where the field name is the wire key, clap types where the field name is the flag.
 - The map `entry` API is encouraged. Prefer `map.entry(k).or_insert(...)`, `or_default`, `and_modify`, or a match on `Entry` over a separate `contains_key` / `get` / `get_mut` plus `insert` when both reading and writing a slot.
+- Never `#[allow(lint)]`. Use `#[expect(lint)]`, so the attribute fails when the lint stops firing. An item whose only callers are tests is `#[cfg_attr(not(test), expect(dead_code))]`.
 
 ## Invariants - do not work around these
 
