@@ -160,7 +160,7 @@ pub struct ExtraChunks(
 
 Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
-Each list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that `Slot<T, E>`'s path, and a `From` into `IsographResolutionNode`. `SlotPath` stays the root alias.
+Each list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that `Slot<T, E>`'s path, and a `From` into `IsographResolutionNode`. The root is `IsoLiteralSlot(IsoLiteralSlotPath)`. Live `SlotPath` is that alias renamed.
 
 `UnparsedChunkItems`'s parent is an enum. Each list that stores a `Slot` adds a variant and a `From`:
 

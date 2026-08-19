@@ -4,7 +4,7 @@ Lands after resolve-position-on-unmatched-span.md (refactors/past).
 
 `Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
-`IsographResolutionNode` has one variant per `Slot<T, E>`. The root is `Slot(SlotPath<'a>)` with today's alias. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`, not a variant of `SlotPath`. `SlotPath` stays `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`.
+`IsographResolutionNode` has one variant per `Slot<T, E>`. The root is `IsoLiteralSlot(IsoLiteralSlotPath<'a>)`. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`. `IsoLiteralSlotPath` is `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`. Live `SlotPath` is this alias renamed. There is no `IsographResolutionNode::Slot`.
 
 Leftover span stays tight to the leftover tokens. The space after `foo` in `entrypoint Query.foo bar` is that gap.
 
@@ -55,19 +55,24 @@ The last bound is the unmatched-span arm. `self.path(parent)` is `PositionResolu
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub type SlotPath<'a> = PositionResolutionPath<
+pub type IsoLiteralSlotPath<'a> = PositionResolutionPath<
     &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
     IsoLiteralParsePath<'a>,
 >;
 
-impl<'a> From<SlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: SlotPath<'a>) -> Self {
-        IsographResolutionNode::Slot(path)
+impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+        IsographResolutionNode::IsoLiteralSlot(path)
     }
 }
 ```
 
-A list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that `Slot<T, E>`'s path, a `From` into `IsographResolutionNode`, an `UnparsedChunkItemsParent` variant, and a `From` into that. `SlotPath` is never an enum of other lists' slots.
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+```
+
+A list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that `Slot<T, E>`'s path, a `From` into `IsographResolutionNode`, an `UnparsedChunkItemsParent` variant, and a `From` into that. `IsoLiteralSlotPath` is never an enum of other lists' slots.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -107,7 +112,7 @@ pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
 ```
 
-`UnparsedChunkItemsPath` moves from `parse_iso_literal.rs` to `chunk.rs`. `IsoLiteralItem` and `EntrypointDeclaration` no longer use `SlotPath` as `parent_type`. `SlotPath` stays the root alias. Hover that matches `Slot` reads `path.inner.item`; `None` is a noop.
+`UnparsedChunkItemsPath` moves from `parse_iso_literal.rs` to `chunk.rs`. `IsoLiteralItem` and `EntrypointDeclaration` no longer use `SlotPath` as `parent_type`. Hover that matches `IsoLiteralSlot` reads `path.inner.item`; `None` is a noop.
 
 ## Before
 
@@ -154,6 +159,11 @@ pub type SlotPath<'a> =
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, SlotPath<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    Slot(SlotPath<'a>),
 ```
 
 ## Macro: `parent_from` on a struct field
@@ -285,7 +295,7 @@ Take `entrypoint Query.foo bar`:
 - leftover span is tight to `bar`
 - the space after `foo` is in the slot span and in neither field
 
-That space answers `IsographResolutionNode::Slot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `Slot`.
+That space answers `IsographResolutionNode::IsoLiteralSlot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `IsoLiteralSlot`.
 
 ## Tests
 
@@ -474,11 +484,11 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
         let (parse, _) = parsed(text);
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
         match parse.resolve((), gap) {
-            IsographResolutionNode::Slot(path) => {
+            IsographResolutionNode::IsoLiteralSlot(path) => {
                 assert!(path.inner.item.is_some());
                 assert!(path.inner.extra_tokens.is_some());
             }
-            node => panic!("expected the slot, got {node:?}"),
+            node => panic!("expected IsoLiteralSlot, got {node:?}"),
         }
     }
 
@@ -502,5 +512,5 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 ## Landing checklist
 
-1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, generic `Slot`, `From<SlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `IsoLiteralSlot` replaces `Slot`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 2. Move this doc to refactors/past.

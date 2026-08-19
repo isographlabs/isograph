@@ -172,7 +172,7 @@ pub enum BracketKind {
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that `Slot<T, E>`'s `ResolvedNode` variant (`Slot` at the root). Leftover span stays tight.
+1. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that `Slot<T, E>`'s `ResolvedNode` variant (`IsoLiteralSlot` at the root). Leftover span stays tight.
 2. `parse-arguments.md`. `parse_items`, `ClosingDelimiter`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_items`.
 3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_items`.
 4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
