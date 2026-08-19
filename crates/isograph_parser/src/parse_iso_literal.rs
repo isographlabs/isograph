@@ -14,17 +14,23 @@ pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, E
 
 pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, ()>;
 
-pub type SlotPath<'a> =
+pub type IsoLiteralSlotPath<'a> =
     PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
 
+impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+        IsographResolutionNode::IsoLiteralSlot(path)
+    }
+}
+
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub enum IsoLiteralItem {
     Entrypoint(EntrypointDeclaration),
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
     pub parent_type: WithSpan<EntityName>,
@@ -55,11 +61,12 @@ impl From<intern::string_key::StringKey> for ClientFieldName {
 }
 
 pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, SlotPath<'a>>;
+    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
 
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
@@ -564,6 +571,20 @@ mod tests {
         match parse.resolve((), span_of(text, "bar")) {
             IsographResolutionNode::NonBracketToken(_) => {}
             node => panic!("expected the leftover token, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_gap_after_the_item_resolves_to_the_slot() {
+        let text = "entrypoint Query.foo bar";
+        let (parse, _) = parsed(text);
+        let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
+        match parse.resolve((), gap) {
+            IsographResolutionNode::IsoLiteralSlot(path) => {
+                assert!(path.inner.item.is_some());
+                assert!(path.inner.extra_tokens.is_some());
+            }
+            node => panic!("expected IsoLiteralSlot, got {node:?}"),
         }
     }
 

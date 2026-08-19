@@ -7,8 +7,9 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
     BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem,
-    IsoLiteralParsePath, IsographResolutionNode, MatchedBrackets, NonBracketToken,
-    NonBracketTokenKind, OpenBracket, ParseError, SemanticToken, SlotPath, UnparsedChunkItemsPath,
+    IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode, MatchedBrackets,
+    NonBracketToken, NonBracketTokenKind, OpenBracket, ParseError, SemanticToken,
+    UnparsedChunkItemsPath,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -182,7 +183,7 @@ impl ChunkedLevel {
 
 /// Unread or failed items from the chunk under parse.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
     #[resolve_field]
     #[parent_variant(Unparsed)]
@@ -198,17 +199,30 @@ pub struct ExtraChunks(
     pub NonEmpty<WithSpan<Chunk>>,
 );
 
-/// One chunk's parse result.
+/// One parse attempt: an item plus leftover tokens in the same chunk.
+///
+/// `resolve` receives the list parent (`IsoLiteralParsePath` at the root, later
+/// `SelectionSetPath` from a second pin).
+/// Walk, given that parent:
+/// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
+///   to this `Slot`. `T::Parent` is that path. `Slot` is a path segment.
+/// - Position in `extra_tokens`: the same `self.path(parent)`.
+/// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
+///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
+///   `ResolvedNode` variant (`IsoLiteralSlot`, later `SelectionSlot`).
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
+    on_unmatched_span = from_path,
     self_type_generics = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
     ]
 )]
 pub struct Slot<T, E> {
+    /// `Some` when the form parsed.
     #[resolve_field]
     pub item: Option<WithSpan<T>>,
+    /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
     pub extra_tokens: Option<WithSpan<E>>,
 }
