@@ -3,7 +3,12 @@ use std::collections::HashMap;
 use prelude::Postfix;
 use proc_macro::TokenStream;
 use quote::quote;
-use syn::{Error, parse_macro_input, spanned::Spanned};
+use syn::{
+    Error,
+    parse::{Parse, ParseStream},
+    parse_macro_input,
+    spanned::Spanned,
+};
 
 use crate::map_generics::{replace_generics_in_type, validate_and_map_generics};
 
@@ -39,38 +44,114 @@ pub(crate) fn resolve_position_macro(item: TokenStream) -> TokenStream {
 
 fn handle_data_struct(
     struct_name: syn::Ident,
-    resolve_position_args: ResolvePositionArgs,
+    args: ResolvePositionArgs,
     data_struct: syn::DataStruct,
     input_generics: syn::Generics,
 ) -> TokenStream {
-    let ResolvePositionArgs {
-        parent_type,
-        resolved_node,
-        self_type_generics,
-        on_unmatched_span,
-    } = resolve_position_args;
-
-    let generics_map =
-        match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
-            Ok(map) => map,
-            Err(e) => {
+    match args.self_type_generics.reference() {
+        None => {
+            let parent_type = match require_parent_type(&args) {
+                Ok(parent_type) => parent_type,
+                Err(e) => return e.to(),
+            };
+            let field_infos = match collect_field_infos(&data_struct, &HashMap::new()) {
+                Ok(field_infos) => field_infos,
+                Err(e) => return e.to(),
+            };
+            let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+            emit_one_impl(EmitImpl {
+                struct_name: struct_name.reference(),
+                resolved_node: args.resolved_node.reference(),
+                parent_type: parent_type.reference(),
+                on_unmatched_span: args.on_unmatched_span.as_ref(),
+                impl_generics: quote!(#impl_generics),
+                ty_generics: quote!(#ty_generics),
+                where_clause: quote!(#where_clause),
+                field_infos: field_infos.reference(),
+            })
+            .to()
+        }
+        Some(pins) => {
+            if let Some(parent_type) = args.parent_type.as_ref() {
+                return Error::new_spanned(
+                    parent_type,
+                    "`parent_type` is on each pin when `self_type_generics` is present",
+                )
+                .to_compile_error()
+                .to();
+            }
+            if let Err(e) =
+                require_from_path_with_pins(pins.0.len(), args.on_unmatched_span.as_ref())
+            {
                 return e.to();
             }
-        };
+            let mut impls = Vec::new();
+            for pin in pins.0.iter() {
+                let generics_map = match validate_and_map_generics(
+                    input_generics.clone(),
+                    pin.args.clone().wrap_some(),
+                ) {
+                    Ok(generics_map) => generics_map,
+                    Err(e) => return e.to(),
+                };
+                let field_infos = match collect_field_infos(&data_struct, generics_map.reference())
+                {
+                    Ok(field_infos) => field_infos,
+                    Err(e) => return e.to(),
+                };
+                let pin_args = pin.args.reference();
+                impls.push(emit_one_impl(EmitImpl {
+                    struct_name: struct_name.reference(),
+                    resolved_node: args.resolved_node.reference(),
+                    parent_type: pin.parent_type.reference(),
+                    on_unmatched_span: args.on_unmatched_span.as_ref(),
+                    impl_generics: quote!(),
+                    ty_generics: quote!(#pin_args),
+                    where_clause: quote!(),
+                    field_infos: field_infos.reference(),
+                }));
+            }
+            quote!(#(#impls)*).to()
+        }
+    }
+}
 
-    let field_infos = match data_struct
+fn collect_field_infos(
+    data_struct: &syn::DataStruct,
+    generics_map: &HashMap<syn::Ident, syn::GenericArgument>,
+) -> Result<Vec<ResolveFieldInfo>, proc_macro2::TokenStream> {
+    data_struct
         .fields
         .iter()
         .enumerate()
-        .map(|(index, field)| get_resolve_field_info(field, index, generics_map.reference()))
+        .map(|(index, field)| get_resolve_field_info(field, index, generics_map))
         .collect::<Result<Vec<_>, _>>()
-    {
-        Ok(field_infos) => field_infos.into_iter().flatten().collect::<Vec<_>>(),
-        Err(e) => {
-            return e.to();
-        }
-    };
+        .map(|field_infos| field_infos.into_iter().flatten().collect())
+}
 
+struct EmitImpl<'a> {
+    struct_name: &'a syn::Ident,
+    resolved_node: &'a syn::Type,
+    parent_type: &'a syn::Type,
+    on_unmatched_span: Option<&'a syn::Ident>,
+    impl_generics: proc_macro2::TokenStream,
+    ty_generics: proc_macro2::TokenStream,
+    where_clause: proc_macro2::TokenStream,
+    field_infos: &'a [ResolveFieldInfo],
+}
+
+fn emit_one_impl(
+    EmitImpl {
+        struct_name,
+        resolved_node,
+        parent_type,
+        on_unmatched_span,
+        impl_generics,
+        ty_generics,
+        where_clause,
+        field_infos,
+    }: EmitImpl<'_>,
+) -> proc_macro2::TokenStream {
     let attributes_to_resolve = field_infos
         .iter()
         .map(
@@ -92,22 +173,16 @@ fn handle_data_struct(
         .iter()
         .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)));
 
-    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
-        Some(explicit) => (quote!(), quote!(#explicit), None),
-        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
-    };
-
     let mut parent_predicates = quote!(Self: 'a).wrap_vec();
-    if let Some(bound) = qself_trait_bound(parent_type.reference()) {
+    if let Some(bound) = qself_trait_bound(parent_type) {
         parent_predicates.push(bound);
     }
 
     let mut resolved_node_predicates = field_resolved_node_predicates(
-        field_infos.reference(),
-        resolved_node.reference(),
-        parent_type.reference(),
-        struct_name.reference(),
+        field_infos,
+        resolved_node,
+        parent_type,
+        struct_name,
         ty_generics.reference(),
     );
 
@@ -115,7 +190,7 @@ fn handle_data_struct(
     let unmatched = if has_transparent {
         quote!()
     } else {
-        match on_unmatched_span.reference() {
+        match on_unmatched_span {
             None => quote! {
                 return Self::ResolvedNode::#struct_name(self.path(parent).to());
             },
@@ -124,10 +199,10 @@ fn handle_data_struct(
             },
             Some(ident) if ident == "from_path" => {
                 resolved_node_predicates.push(from_path_predicate(
-                    resolved_node.reference(),
-                    struct_name.reference(),
+                    resolved_node,
+                    struct_name,
                     ty_generics.reference(),
-                    parent_type.reference(),
+                    parent_type,
                 ));
                 quote! {
                     return self.path(parent).to();
@@ -141,7 +216,7 @@ fn handle_data_struct(
         }
     };
 
-    let output = quote! {
+    quote! {
         impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
             type Parent<'a>
                 = #parent_type
@@ -162,9 +237,41 @@ fn handle_data_struct(
                 #unmatched
             }
         }
-    };
+    }
+}
 
-    output.to()
+fn require_parent_type(args: &ResolvePositionArgs) -> Result<syn::Type, proc_macro2::TokenStream> {
+    args.parent_type.clone().ok_or_else(|| {
+        Error::new_spanned(
+            args.resolved_node.reference(),
+            "`parent_type` is required when `self_type_generics` is omitted",
+        )
+        .to_compile_error()
+    })
+}
+
+fn require_from_path_with_pins(
+    pin_count: usize,
+    on_unmatched_span: Option<&syn::Ident>,
+) -> Result<(), proc_macro2::TokenStream> {
+    if pin_count < 2 {
+        return ().wrap_ok();
+    }
+    match on_unmatched_span {
+        Some(ident) if ident == "from_path" => ().wrap_ok(),
+        Some(ident) => Error::new_spanned(
+            ident,
+            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
+        )
+        .to_compile_error()
+        .wrap_err(),
+        None => Error::new(
+            proc_macro2::Span::call_site(),
+            "`on_unmatched_span = from_path` is required when `self_type_generics` has more than one pin",
+        )
+        .to_compile_error()
+        .wrap_err(),
+    }
 }
 
 fn qself_trait_bound(parent_type: &syn::Type) -> Option<proc_macro2::TokenStream> {
@@ -247,18 +354,11 @@ fn from_path_predicate(
 
 fn handle_data_enum(
     enum_name: syn::Ident,
-    resolve_position_args: ResolvePositionArgs,
+    args: ResolvePositionArgs,
     data_enum: syn::DataEnum,
     input_generics: syn::Generics,
 ) -> TokenStream {
-    let ResolvePositionArgs {
-        parent_type,
-        resolved_node,
-        self_type_generics,
-        on_unmatched_span,
-    } = resolve_position_args;
-
-    if let Some(ident) = on_unmatched_span {
+    if let Some(ident) = args.on_unmatched_span.as_ref() {
         return Error::new_spanned(
             ident,
             "`on_unmatched_span` is a struct attribute; enums have no unmatched-span arm",
@@ -267,36 +367,87 @@ fn handle_data_enum(
         .to();
     }
 
-    let _generics_map =
-        match validate_and_map_generics(input_generics.clone(), self_type_generics.clone()) {
-            Ok(map) => map,
-            Err(e) => return e.to(),
-        };
+    let match_arms = data_enum
+        .variants
+        .iter()
+        .map(|variant| {
+            let variant_name = variant.ident.reference();
 
-    let match_arms = data_enum.variants.iter().map(|variant| {
-        let variant_name = variant.ident.reference();
-
-        match variant.fields.reference() {
-            syn::Fields::Unnamed(fields) => {
-                let mut payloads = fields.unnamed.iter();
-                match (payloads.next(), payloads.next()) {
-                    (Some(payload), None) => {
-                        generate_enum_arm(enum_name.reference(), variant_name, payload)
+            match variant.fields.reference() {
+                syn::Fields::Unnamed(fields) => {
+                    let mut payloads = fields.unnamed.iter();
+                    match (payloads.next(), payloads.next()) {
+                        (Some(payload), None) => {
+                            generate_enum_arm(enum_name.reference(), variant_name, payload)
+                        }
+                        _ => single_payload_error(variant),
                     }
-                    _ => single_payload_error(variant),
                 }
+                _ => single_payload_error(variant),
             }
-            _ => single_payload_error(variant),
+        })
+        .collect::<Vec<_>>();
+
+    match args.self_type_generics.reference() {
+        None => {
+            let parent_type = match require_parent_type(&args) {
+                Ok(parent_type) => parent_type,
+                Err(e) => return e.to(),
+            };
+            let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+            emit_one_enum_impl(
+                enum_name.reference(),
+                parent_type.reference(),
+                args.resolved_node.reference(),
+                quote!(#impl_generics),
+                quote!(#ty_generics),
+                quote!(#where_clause),
+                match_arms.reference(),
+            )
+            .to()
         }
-    });
+        Some(pins) => {
+            if let Some(parent_type) = args.parent_type.as_ref() {
+                return Error::new_spanned(
+                    parent_type,
+                    "`parent_type` is on each pin when `self_type_generics` is present",
+                )
+                .to_compile_error()
+                .to();
+            }
+            let mut impls = Vec::new();
+            for pin in pins.0.iter() {
+                if let Err(e) =
+                    validate_and_map_generics(input_generics.clone(), pin.args.clone().wrap_some())
+                {
+                    return e.to();
+                }
+                let pin_args = pin.args.reference();
+                impls.push(emit_one_enum_impl(
+                    enum_name.reference(),
+                    pin.parent_type.reference(),
+                    args.resolved_node.reference(),
+                    quote!(),
+                    quote!(#pin_args),
+                    quote!(),
+                    match_arms.reference(),
+                ));
+            }
+            quote!(#(#impls)*).to()
+        }
+    }
+}
 
-    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let ty_generics = match self_type_generics.reference() {
-        Some(explicit) => quote!(#explicit),
-        None => quote!(#ty_generics),
-    };
-
-    let output = quote! {
+fn emit_one_enum_impl(
+    enum_name: &syn::Ident,
+    parent_type: &syn::Type,
+    resolved_node: &syn::Type,
+    impl_generics: proc_macro2::TokenStream,
+    ty_generics: proc_macro2::TokenStream,
+    where_clause: proc_macro2::TokenStream,
+    match_arms: &[proc_macro2::TokenStream],
+) -> proc_macro2::TokenStream {
+    quote! {
         impl #impl_generics ::resolve_position::ResolvePosition for #enum_name #ty_generics #where_clause {
             type Parent<'a>
                 = #parent_type
@@ -317,9 +468,7 @@ fn handle_data_enum(
                 }
             }
         }
-    };
-
-    output.to()
+    }
 }
 
 fn generate_enum_arm(
@@ -401,10 +550,52 @@ fn single_payload_error(variant: &syn::Variant) -> proc_macro2::TokenStream {
 #[derive(deluxe::ExtractAttributes)]
 #[deluxe(attributes(resolve_position))]
 struct ResolvePositionArgs {
-    parent_type: syn::Type,
+    parent_type: Option<syn::Type>,
     resolved_node: syn::Type,
-    self_type_generics: Option<syn::AngleBracketedGenericArguments>,
+    self_type_generics: Option<SelfTypeGenerics>,
     on_unmatched_span: Option<syn::Ident>,
+}
+
+struct SelfTypeGenerics(Vec<SelfTypePin>);
+
+struct SelfTypePin {
+    /// One argument per generic parameter of the struct, in declaration order.
+    /// `validate_and_map_generics` errors if the counts differ.
+    args: syn::AngleBracketedGenericArguments,
+    parent_type: syn::Type,
+}
+
+impl Parse for SelfTypeGenerics {
+    fn parse(input: ParseStream) -> syn::Result<Self> {
+        let content;
+        syn::bracketed!(content in input);
+        let mut pins = Vec::new();
+        while !content.is_empty() {
+            let inner;
+            syn::parenthesized!(inner in content);
+            let args = inner.parse::<syn::AngleBracketedGenericArguments>()?;
+            inner.parse::<syn::Token![,]>()?;
+            let parent_type = inner.parse::<syn::Type>()?;
+            pins.push(SelfTypePin { args, parent_type });
+            if content.peek(syn::Token![,]) {
+                content.parse::<syn::Token![,]>()?;
+            }
+        }
+        if pins.is_empty() {
+            return Error::new(
+                input.span(),
+                "`self_type_generics` must contain at least one pin",
+            )
+            .wrap_err();
+        }
+        SelfTypeGenerics(pins).wrap_ok()
+    }
+}
+
+impl deluxe::ParseMetaItem for SelfTypeGenerics {
+    fn parse_meta_item(input: ParseStream, _mode: deluxe::ParseMode) -> deluxe::Result<Self> {
+        input.parse()
+    }
 }
 
 enum ResolveFieldInfoType {

@@ -201,9 +201,10 @@ pub struct ExtraChunks(
 /// One chunk's parse result.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
     resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+    ]
 )]
 pub struct Slot<T, E> {
     #[resolve_field]
@@ -215,9 +216,10 @@ pub struct Slot<T, E> {
 /// One-item level.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = (),
     resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>
+    self_type_generics = [
+        (<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>, ()),
+    ]
 )]
 pub struct Singleton<T, E> {
     #[resolve_field]
