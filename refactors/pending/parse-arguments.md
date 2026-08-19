@@ -345,10 +345,64 @@ where
 }
 ```
 
-`parse_value` is the listing in parsing-standards.md. Its object arm is the brace caller:
-
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+pub(crate) fn parse_value<F>(
+    cursor: &mut ItemCursor<'_>,
+    push_error: &mut F,
+) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>>
+where
+    F: FnMut(WithSpan<ParseError>),
+{
+    cursor.spanning(|cursor| {
+        if let Some(dollar) = cursor.consume_token_if(NonBracketTokenKind::Dollar) {
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier)
+                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+            return NonConstantValue::Variable(VariableUse {
+                name: cursor
+                    .token_text(name)
+                    .intern()
+                    .to::<VariableName>()
+                    .with_span(name),
+            })
+            .wrap_ok();
+        }
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::StringLiteral) {
+            // Quotes included. Unquoting is later.
+            return NonConstantValue::String(
+                cursor
+                    .token_text(span)
+                    .intern()
+                    .to::<StringValue>(),
+            )
+            .wrap_ok();
+        }
+        // BlockStringLiteral is not consumed.
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral) {
+            let value = match cursor.token_text(span).parse() {
+                Ok(value) => value,
+                Err(_) => {
+                    return ParseError::IntegerDoesNotFitI64.with_span(span).wrap_err();
+                }
+            };
+            return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
+        }
+        // No FloatLiteral token. `1.5` does not parse as a value.
+        if let Some(span) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
+            return match cursor.token_text(span) {
+                "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
+                "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
+                "null" => NonConstantValue::Null(NullValue).wrap_ok(),
+                // Enum values (bare identifiers) are not parsed.
+                _ => ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
+                .with_span(span)
+                .wrap_err(),
+            };
+        }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
             return NonConstantValue::Object(ObjectLiteral(
                 group.item.children.item.parse_each_chunk(
@@ -360,6 +414,10 @@ where
             ))
             .wrap_ok();
         }
+        // `[ ... ]` is parse-arrays.md.
+        cursor.expected(Expectation::Value).wrap_err()
+    })
+}
 ```
 
 `lib.rs` adds `mod arguments;` and `pub use arguments::*;`.
