@@ -334,6 +334,17 @@ fn field_resolved_node_predicates(
                 >
             });
         }
+        if matches!(info.parent_construction, ParentConstruction::FromContainer) {
+            predicates.push(quote! {
+                <#inner_type as ::resolve_position::ResolvePosition>::Parent<'a>:
+                    ::std::convert::From<
+                        ::resolve_position::PositionResolutionPath<
+                            &'a #struct_name #ty_generics,
+                            #parent_type
+                        >
+                    >
+            });
+        }
     }
     predicates
 }
@@ -620,6 +631,9 @@ enum ParentConstruction {
     /// `#[parent_variant(V)]`: the child's `Parent` type is an
     /// enum, and the parent value is wrapped in its variant `V`.
     EnumVariant(syn::Ident),
+    /// `#[from_container_parent]`: the child's `Parent` is
+    /// `From::from(self.path(parent))`.
+    FromContainer,
     /// `#[resolve_field(transparent)]`: a bare `ResolvePosition` field, no
     /// path segment, no span check.
     Transparent,
@@ -887,16 +901,12 @@ fn get_resolve_field_info(
             }
             if let Some(attr) = from_container_parent {
                 parse_from_container_parent(attr)?;
-                return Error::new_spanned(
-                    attr,
-                    "`#[from_container_parent]` is an enum-payload attribute",
-                )
-                .to_compile_error()
-                .wrap_err();
-            }
-            match parent_variant {
-                Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
-                None => ParentConstruction::ContainerPath,
+                ParentConstruction::FromContainer
+            } else {
+                match parent_variant {
+                    Some(attr) => ParentConstruction::EnumVariant(parse_parent_variant(attr)?),
+                    None => ParentConstruction::ContainerPath,
+                }
             }
         }
     };
@@ -959,7 +969,8 @@ fn generate_resolve_code(
 }
 
 /// The expression passed as the child's parent. `self.path(parent)` is the
-/// container's own path in both arms; the variant wrapping is the only difference.
+/// container's own path. `EnumVariant` wraps it. `FromContainer` converts it
+/// with `From`.
 fn new_parent_expr(
     parent_construction: &ParentConstruction,
     inner_type: &syn::Type,
@@ -969,6 +980,9 @@ fn new_parent_expr(
         ParentConstruction::EnumVariant(variant) => quote!(
             <#inner_type as ::resolve_position::ResolvePosition>::Parent::#variant(self.path(parent).into())
         ),
+        ParentConstruction::FromContainer => {
+            quote!(::std::convert::From::from(self.path(parent)))
+        }
         ParentConstruction::Transparent => {
             Error::new_spanned(inner_type, "`transparent` does not build a field parent")
                 .to_compile_error()
