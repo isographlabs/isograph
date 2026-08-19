@@ -163,7 +163,7 @@ return self.path(parent).to();
 On `type Parent<'a>`:
 
 - `Self: 'a`
-- If `#parent_type` is `<X as PathParent>::Parent`, then `X: PathParent`. For `Slot`, `X` is `<T as ResolvePosition>::Parent<'a>`.
+- If `#parent_type` is `<X as Trait>::Assoc`, then `X: Trait`. For `Slot` that is `<T as ResolvePosition>::Parent<'a>: PathParent`. Live `parent_type = IsoLiteralParsePath<'a>` has no `as`, so no bound.
 
 On `type ResolvedNode<'a>`:
 
@@ -217,7 +217,7 @@ After. `split_for_impl` is unchanged and sits above this. `has_transparent` is t
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
     let mut parent_predicates = quote!(Self: 'a).wrap_vec();
-    if let Some(bound) = path_parent_bound(parent_type.reference()) {
+    if let Some(bound) = qself_trait_bound(parent_type.reference()) {
         parent_predicates.push(bound);
     }
 
@@ -271,26 +271,28 @@ After. `split_for_impl` is unchanged and sits above this. `has_transparent` is t
                 #(#resolved_node_predicates),*;
 ```
 
-`<X as PathParent>::Parent` is a syn `Type::Path` with `QSelf`. `qself.ty` is `X`. The path is `PathParent::Parent`.
+`<X as Trait>::Assoc` is a syn `Type::Path` with `QSelf`. `qself.ty` is `X`. `qself.position` is the index of `Assoc` in the path. The segments before that are `Trait`.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
-fn path_parent_bound(parent_type: &syn::Type) -> Option<proc_macro2::TokenStream> {
+fn qself_trait_bound(parent_type: &syn::Type) -> Option<proc_macro2::TokenStream> {
     let syn::Type::Path(type_path) = parent_type else {
         return None;
     };
     let qself = type_path.qself.as_ref()?;
-    let mut segments = type_path.path.segments.iter();
-    let trait_seg = segments.next()?;
-    let assoc = segments.next()?;
-    if segments.next().is_some() {
+    let Some(_) = qself.as_token else {
         return None;
-    }
-    if trait_seg.ident != "PathParent" || assoc.ident != "Parent" {
-        return None;
-    }
+    };
+    let mut trait_path = type_path.path.clone();
+    trait_path.segments = type_path
+        .path
+        .segments
+        .iter()
+        .take(qself.position)
+        .cloned()
+        .collect();
     let inner = qself.ty.reference();
-    quote!(#inner: ::resolve_position::PathParent).wrap_some()
+    quote!(#inner: #trait_path).wrap_some()
 }
 ```
 
@@ -646,6 +648,6 @@ Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_th
 
 ## Landing checklist
 
-1. Change 1: extra predicates on `type Parent<'a>` and `type ResolvedNode<'a>`, `path_parent_bound`, `ContainerPath` parent equality, unmatched match order. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+1. Change 1: extra predicates on `type Parent<'a>` and `type ResolvedNode<'a>`, `qself_trait_bound`, `ContainerPath` parent equality, unmatched match order. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 2. Change 2: generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode`, `IsoLiteralSlot` replaces `Slot`, `SlotPath` renamed, `path_parent_slot.rs`, the parser tests above. Leftover span is unchanged. Item and leftover parents stay the slot path. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 3. Move this doc to refactors/past.
