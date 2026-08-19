@@ -1,7 +1,23 @@
 {
   // This file is not used in compilation. It is here just for a nice editor experience.
-  "extends": "@docusaurus/tsconfig",
+  // @docusaurus/tsconfig sets baseUrl, which tsgolint rejects.
   "compilerOptions": {
+    "allowJs": true,
+    "esModuleInterop": true,
+    "jsx": "preserve",
+    "lib": ["DOM"],
+    "moduleResolution": "bundler",
+    "module": "esnext",
+    "noEmit": true,
+    "types": [
+      "node",
+      "@docusaurus/module-type-aliases",
+      "@docusaurus/theme-classic"
+    ],
+    "paths": {
+      "@site/*": ["./*"]
+    },
+    "skipLibCheck": true,
     "strict": true
   }
 }
