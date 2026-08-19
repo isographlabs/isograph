@@ -341,18 +341,19 @@ pub(crate) fn parse_value(
 
 `VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers construct `VariableName(cursor.token_text(span).intern().to())` and do not add a second `From`.
 
-Keyword text after `require_token(Identifier)` or `consume_token_if(Identifier)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
+Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar)` then `require_token(Identifier)`. After `require_token` on an identifier, `consume_token_if(Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar, SemanticToken::Variable)` then `require_token(Identifier, SemanticToken::Variable)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(expectation))?;
-    let (alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon) {
+    let (alias, name) = match cursor.consume_token_if(NonBracketTokenKind::Colon, SemanticToken::Colon)
+    {
         Some(_) => {
             let name = cursor
-                .require_token(NonBracketTokenKind::Identifier)
+                .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
                 .map_err(|()| {
                     cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
                 })?;

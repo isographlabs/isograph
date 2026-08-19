@@ -32,7 +32,9 @@ Origin: `crates/isograph_parser/src/parse_error.rs` and `crates/isograph_parser/
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+use thiserror::Error;
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error("{0}")]
     Expected(ExpectedFound),
@@ -46,7 +48,7 @@ pub enum ParseError {
     IntegerDoesNotFitI64,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
 pub enum Expectation {
     #[error("{0}")]
     Token(NonBracketTokenKind),
@@ -583,6 +585,17 @@ pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, Variabl
 
 `Slot<KeyValuePair, UnparsedChunkItems>::Parent` is `KeyValuePairParent`. `ArgumentList` and `ObjectLiteral` wrap their path in that enum, so the vec fields take `#[parent_variant]`. `KeyValuePair`'s parent is the slot path, the same way `IsoLiteralItem`'s parent is `IsoLiteralSlotPath`.
 
+`Slot`'s unmatched arm is `on_unmatched_span = from_path`: `self.path(parent).to()`. Each pin has a `From` into `IsographResolutionNode`. The root pin is live. This pin adds the second `From`.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+        IsographResolutionNode::IsoLiteralSlot(path)
+    }
+}
+```
+
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
@@ -592,8 +605,81 @@ impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
 }
 ```
 
+Every other new node uses the derive's `struct_name` unmatched arm, `IsographResolutionNode::#name(self.path(parent).to())`. Those variants are listed below. They do not take a `From`.
+
+Before:
+
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
+use crate::{
+    ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
+    CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
+    IsoLiteralParsePath, IsoLiteralSlotPath, NonBracketTokenPath, OpenBracketPath,
+    UnparsedChunkItemsPath,
+};
+
+/// What a position resolves to: the leaves of the newest tree. Each parsing stage
+/// modifies these variants in place; today they are the grammar tree's, with the chunk
+/// tree's still surfacing inside unparsed regions.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum IsographResolutionNode<'a> {
+    Singleton(IsoLiteralParsePath<'a>),
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    EntityName(EntityNamePath<'a>),
+    ClientFieldName(ClientFieldNamePath<'a>),
+    UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
+    ExtraChunks(ExtraChunksPath<'a>),
+    ChunkedLevel(ChunkedLevelPath<'a>),
+    /// This will be resolved for spans that contain one of the opening/closing brackets
+    /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
+    /// will never resolve to this.
+    ChunkedGroup(ChunkedGroupPath<'a>),
+    Chunk(ChunkPath<'a>),
+    ChunkSeparator(ChunkSeparatorPath<'a>),
+    NonBracketToken(NonBracketTokenPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
+}
+```
+
+After. Origin: that file. Delta: the use list and the argument/value variants.
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+use crate::{
+    ArgumentListPath, ArgumentNamePath, BooleanValuePath, ChunkPath, ChunkSeparatorPath,
+    ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath, CloseBracketPath, EntityNamePath,
+    EntrypointDeclarationPath, ExtraChunksPath, IntegerValuePath, IsoLiteralParsePath,
+    IsoLiteralSlotPath, KeyValuePairPath, KeyValuePairSlotPath, NonBracketTokenPath,
+    NullValuePath, ObjectLiteralPath, OpenBracketPath, StringValuePath, UnparsedChunkItemsPath,
+    VariableNamePath, VariableUsePath,
+};
+
+/// What a position resolves to: the leaves of the newest tree. Each parsing stage
+/// modifies these variants in place; today they are the grammar tree's, with the chunk
+/// tree's still surfacing inside unparsed regions.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum IsographResolutionNode<'a> {
+    Singleton(IsoLiteralParsePath<'a>),
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    EntrypointDeclaration(EntrypointDeclarationPath<'a>),
+    EntityName(EntityNamePath<'a>),
+    ClientFieldName(ClientFieldNamePath<'a>),
+    UnparsedChunkItems(UnparsedChunkItemsPath<'a>),
+    ExtraChunks(ExtraChunksPath<'a>),
+    ChunkedLevel(ChunkedLevelPath<'a>),
+    /// This will be resolved for spans that contain one of the opening/closing brackets
+    /// and part of the inside, e.g. "{ ba" in "foo { bar }". Single-character spans
+    /// will never resolve to this.
+    ChunkedGroup(ChunkedGroupPath<'a>),
+    Chunk(ChunkPath<'a>),
+    ChunkSeparator(ChunkSeparatorPath<'a>),
+    NonBracketToken(NonBracketTokenPath<'a>),
+    OpenBracket(OpenBracketPath<'a>),
+    CloseBracket(CloseBracketPath<'a>),
     KeyValuePairSlot(KeyValuePairSlotPath<'a>),
     ArgumentList(ArgumentListPath<'a>),
     ObjectLiteral(ObjectLiteralPath<'a>),
@@ -605,6 +691,7 @@ impl<'a> From<KeyValuePairSlotPath<'a>> for IsographResolutionNode<'a> {
     IntegerValue(IntegerValuePath<'a>),
     BooleanValue(BooleanValuePath<'a>),
     NullValue(NullValuePath<'a>),
+}
 ```
 
 ```rust
