@@ -88,23 +88,51 @@ fn handle_data_struct(
         )
         .collect::<Vec<_>>();
 
-    // A transparent field always answers; the container is not a path segment.
-    let unmatched = if field_infos
+    let has_transparent = field_infos
         .iter()
-        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
-    {
+        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)));
+
+    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
+        Some(explicit) => (quote!(), quote!(#explicit), None),
+        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
+    };
+
+    let mut parent_predicates = quote!(Self: 'a).wrap_vec();
+    if let Some(bound) = qself_trait_bound(parent_type.reference()) {
+        parent_predicates.push(bound);
+    }
+
+    let mut resolved_node_predicates = field_resolved_node_predicates(
+        field_infos.reference(),
+        resolved_node.reference(),
+        parent_type.reference(),
+        struct_name.reference(),
+        ty_generics.reference(),
+    );
+
+    // A transparent field always answers; the container is not a path segment.
+    let unmatched = if has_transparent {
         quote!()
     } else {
         match on_unmatched_span.reference() {
-            Some(ident) if ident == "from_path" => quote! {
-                return self.path(parent).to();
-            },
             None => quote! {
                 return Self::ResolvedNode::#struct_name(self.path(parent).to());
             },
             Some(ident) if ident == "struct_name" => quote! {
                 return Self::ResolvedNode::#struct_name(self.path(parent).to());
             },
+            Some(ident) if ident == "from_path" => {
+                resolved_node_predicates.push(from_path_predicate(
+                    resolved_node.reference(),
+                    struct_name.reference(),
+                    ty_generics.reference(),
+                    parent_type.reference(),
+                ));
+                quote! {
+                    return self.path(parent).to();
+                }
+            }
             Some(ident) => Error::new_spanned(
                 ident,
                 "expected `on_unmatched_span = from_path` or `struct_name`",
@@ -113,22 +141,16 @@ fn handle_data_struct(
         }
     };
 
-    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
-    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
-        Some(explicit) => (quote!(), quote!(#explicit), None),
-        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
-    };
-
     let output = quote! {
         impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
             type Parent<'a>
                 = #parent_type
             where
-                Self: 'a;
+                #(#parent_predicates),*;
             type ResolvedNode<'a>
                 = #resolved_node
             where
-                Self: 'a;
+                #(#resolved_node_predicates),*;
 
             fn resolve<'a>(
                 &'a self,
@@ -143,6 +165,84 @@ fn handle_data_struct(
     };
 
     output.to()
+}
+
+fn qself_trait_bound(parent_type: &syn::Type) -> Option<proc_macro2::TokenStream> {
+    let syn::Type::Path(type_path) = parent_type else {
+        return None;
+    };
+    let qself = type_path.qself.as_ref()?;
+    qself.as_token.as_ref()?;
+    let mut trait_path = type_path.path.clone();
+    trait_path.segments = type_path
+        .path
+        .segments
+        .iter()
+        .take(qself.position)
+        .cloned()
+        .collect();
+    let inner = qself.ty.reference();
+    quote!(#inner: #trait_path).wrap_some()
+}
+
+fn resolve_field_inner_type(wrapper: &ResolveFieldInfoTypeWrapper) -> Option<&syn::Type> {
+    match wrapper {
+        ResolveFieldInfoTypeWrapper::None(inner) => match (**inner).reference() {
+            ResolveFieldInfoType::WithSpan(inner_type)
+            | ResolveFieldInfoType::WithLocation(inner_type)
+            | ResolveFieldInfoType::WithEmbeddedLocation(inner_type)
+            | ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => inner_type.wrap_some(),
+        },
+        ResolveFieldInfoTypeWrapper::IteratorWrapper(inner) => resolve_field_inner_type(inner),
+        ResolveFieldInfoTypeWrapper::Transparent(_) => None,
+    }
+}
+
+fn field_resolved_node_predicates(
+    field_infos: &[ResolveFieldInfo],
+    resolved_node: &syn::Type,
+    parent_type: &syn::Type,
+    struct_name: &syn::Ident,
+    ty_generics: &proc_macro2::TokenStream,
+) -> Vec<proc_macro2::TokenStream> {
+    let mut predicates = quote!(Self: 'a).wrap_vec();
+    for info in field_infos {
+        let Some(inner_type) = resolve_field_inner_type(info.field_type.reference()) else {
+            continue;
+        };
+        // `return field.resolve(...)` must be `#resolved_node`.
+        predicates.push(quote! {
+            #inner_type: ::resolve_position::ResolvePosition<
+                ResolvedNode<'a> = #resolved_node
+            >
+        });
+        if matches!(info.parent_construction, ParentConstruction::ContainerPath) {
+            // Bare `#[resolve_field]` passes `self.path(parent)`.
+            predicates.push(quote! {
+                #inner_type: ::resolve_position::ResolvePosition<
+                    Parent<'a> = ::resolve_position::PositionResolutionPath<
+                        &'a #struct_name #ty_generics,
+                        #parent_type
+                    >
+                >
+            });
+        }
+    }
+    predicates
+}
+
+// `on_unmatched_span = from_path`: `self.path(parent).to()`.
+fn from_path_predicate(
+    resolved_node: &syn::Type,
+    struct_name: &syn::Ident,
+    ty_generics: &proc_macro2::TokenStream,
+    parent_type: &syn::Type,
+) -> proc_macro2::TokenStream {
+    quote! {
+        #resolved_node: ::std::convert::From<
+            ::resolve_position::PositionResolutionPath<&'a #struct_name #ty_generics, #parent_type>
+        >
+    }
 }
 
 fn handle_data_enum(
