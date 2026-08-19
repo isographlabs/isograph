@@ -12,6 +12,23 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
+/// One parse attempt: an item plus leftover tokens in the same chunk.
+///
+/// `resolve` receives the list parent (`IsoLiteralParsePath` at the root, later
+/// `SelectionSetPath`, and so on). That parent is `T::Parent`, so `parent_type`
+/// is `T::Parent` and the owned tree does not carry a lifetime.
+///
+/// Walk, given that parent:
+/// - Position in `item`: `parent_from` passes `From::from(parent)` as `T::Parent`
+///   (identity). `Slot` is not a path segment.
+/// - Position in `extra_tokens`: `parent_from` passes `From::from(parent)` as
+///   `E::Parent` (wrap, `UnparsedChunkItemsParent::Literal` at the root).
+/// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
+///   returns `self.path(parent).to()`. Each `Slot<T, E>` supplies a `From` that
+///   builds its `ResolvedNode` variant (`IsoLiteralSlot`, later `SelectionSlot`).
+///
+/// `for<'a>` is every borrow length `resolve` might use. `Slot` has no lifetime
+/// parameter of its own.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
@@ -20,16 +37,21 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
+    // `item.resolve` / leftover `.resolve` return this enum.
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
+    // Leftover parent wrap. Item is `From<P> for P` on `T::Parent`; no bound.
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
+    // Gap arm: `self.path(parent).to()`. The path's parent is `T::Parent`.
     for<'a> IsographResolutionNode<'a>: From<
         PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
     >,
 {
+    /// `Some` when the form parsed.
     #[resolve_field]
     #[parent_from]
     pub item: Option<WithSpan<T>>,
+    /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
     #[parent_from]
     pub extra_tokens: Option<WithSpan<E>>,
