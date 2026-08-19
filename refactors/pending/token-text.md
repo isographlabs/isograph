@@ -14,16 +14,16 @@ pub(crate) struct TokenText<'a> {
 
 impl<'a> TokenText<'a> {
     pub(crate) fn token_text(self) -> &'a str {
-        self.text
+        &self.text[self.location.as_usize_range()]
     }
 
     pub(crate) fn interned<T: From<intern::string_key::StringKey>>(self) -> WithSpan<T> {
-        self.text.intern().to::<T>().with_span(self.location)
+        self.token_text().intern().to::<T>().with_span(self.location)
     }
 }
 ```
 
-`text` is the slice of `ItemCursor`'s source at `location`. `'a` is that source, not the cursor borrow. `interned` needs `use intern::string_key::Intern` in `chunk_stream.rs`. A parser wrapper that implements `From<StringKey>` is `token.interned()`. A parser wrapper that does not is `token.interned().map(ArgumentName)`, and `interned` infers the inner lang type.
+`text` is `ItemCursor`'s source, the whole literal. `'a` is that source, not the cursor borrow. `token_text` and `interned` index it. `interned` needs `use intern::string_key::Intern` in `chunk_stream.rs`. A parser wrapper that implements `From<StringKey>` is `token.interned()`. A parser wrapper that does not is `token.interned().map(ArgumentName)`, and `interned` infers the inner lang type.
 
 Before:
 
@@ -72,7 +72,7 @@ After:
         let location = peek.commit(token).location;
         TokenText {
             location,
-            text: &self.text[location.as_usize_range()],
+            text: self.text,
         }
         .wrap_some()
     }
@@ -283,7 +283,7 @@ impl<'a> ItemCursor<'a> {
 ```
 
 - Leaf: the `location` of the `TokenText` from `require_token` or `consume_token_if`, or the `WithSpan` from `require_group` or `consume_group_if`.
-- `token_text` is the source slice on that `TokenText`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
+- `TokenText.text` is the whole literal. `token_text` indexes it at `location`. A name in the tree is `token.interned()`. The converted scalar is the `i64`. The wrapper span is location only.
 - Keyword / boolean / null text: `token.token_text()` after an identifier
 - Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
 - Interned name: `token.interned()` when the wrapper implements `From<StringKey>`; `token.interned().map(ArgumentName)` when it does not
@@ -344,10 +344,9 @@ Parser wrappers that do not implement `From<StringKey>` construct `name.interned
 ```rust
 // from crates/isograph_parser/src/chunk_stream.rs
     fn token_text<'a>(text: &'a str, pattern: &str) -> TokenText<'a> {
-        let location = span_of(text, pattern);
         TokenText {
-            location,
-            text: &text[location.as_usize_range()],
+            location: span_of(text, pattern),
+            text,
         }
     }
 ```
