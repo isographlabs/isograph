@@ -12,7 +12,7 @@ Each contentful chunk of a selection set is one selection:
 
 The leading identifier is the alias when a colon follows, the name otherwise. A paren group is `consume_argument_list`. A brace group is an object selection whose interior recurses; without one it is a scalar selection.
 
-Tests feed a list's interior to `parse_list`. The wrapping brace group lands with the host that requires it.
+Tests feed a list's interior to `parse_chunk_item_list`. The wrapping brace group lands with the host that requires it.
 
 ## Change 1: `Expectation`
 
@@ -198,7 +198,7 @@ where
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
-    SelectionSet(group.item.children.item.parse_list(
+    SelectionSet(group.item.children.item.parse_chunk_item_list(
         cursor.text(),
         Expectation::Separator(BracketKind::Brace),
         parse_selection,
@@ -216,7 +216,7 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    SelectionSet(group.item.children.item.parse_list(
+    SelectionSet(group.item.children.item.parse_chunk_item_list(
         cursor.text(),
         Expectation::Separator(BracketKind::Brace),
         parse_selection,
@@ -326,7 +326,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         let mut errors = Vec::new();
         let items = tree
             .item
-            .parse_list(text, leftover, parse_item, &mut errors);
+            .parse_chunk_item_list(text, leftover, parse_item, &mut errors);
         (items, errors, comma_errors)
     }
 

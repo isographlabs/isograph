@@ -1,6 +1,6 @@
 # parse-arguments: argument lists and values
 
-Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_list` and `Separator(BracketKind)`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
+Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_chunk_item_list` and `Separator(BracketKind)`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
 
@@ -21,14 +21,14 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-Tests feed a list's interior to `parse_list`. The wrapping paren group lands with the host that consumes it.
+Tests feed a list's interior to `parse_chunk_item_list`. The wrapping paren group lands with the host that consumes it.
 
-## Change 1: `parse_list`
+## Change 1: `parse_chunk_item_list`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    pub(crate) fn parse_list<'a, P, F>(
+    pub(crate) fn parse_chunk_item_list<'a, P, F>(
         &'a self,
         text: &'a str,
         leftover: Expectation,
@@ -41,7 +41,7 @@ impl ChunkedLevel {
         self.0
             .iter()
             .map(|chunk| {
-                parse_one_item(
+                parse_chunk_item(
                     chunk,
                     text,
                     leftover,
@@ -329,7 +329,7 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    ArgumentList(group.item.children.item.parse_list(
+    ArgumentList(group.item.children.item.parse_chunk_item_list(
         cursor.text(),
         Expectation::Separator(BracketKind::Parenthesis),
         parse_argument,
@@ -436,7 +436,7 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
         let mut errors = Vec::new();
         let items = tree
             .item
-            .parse_list(text, leftover, parse_item, &mut errors);
+            .parse_chunk_item_list(text, leftover, parse_item, &mut errors);
         (items, errors, comma_errors)
     }
 
@@ -659,5 +659,5 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
 
 ## Landing checklist
 
-1. `parse_list`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `parse_chunk_item_list`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

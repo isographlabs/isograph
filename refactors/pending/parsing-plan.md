@@ -18,7 +18,7 @@ The stage parses the same language as upstream isograph's `parse_iso_literal`, w
 
 ## The golden rule: one chunk, one item
 
-A chunk parses to exactly one grammar item, in its entirety and always independently. `parse_one_item` returns `Slot<P, UnparsedChunkItems>`: `item: Some` when the form parsed, `extra_tokens: Some` when unread or failed items remain. An item never continues past a separator into the next chunk:
+A chunk parses to exactly one grammar item, in its entirety and always independently. `parse_chunk_item` returns `Slot<P, UnparsedChunkItems>`: `item: Some` when the form parsed, `extra_tokens: Some` when unread or failed items remain. An item never continues past a separator into the next chunk:
 
 - the declaration is one root-level chunk;
 - a selection is one chunk of its brace group's interior level;
@@ -173,8 +173,8 @@ impl BracketKind {
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
 1. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that `Slot<T, E>`'s `ResolvedNode` variant (`IsoLiteralSlot` at the root). Leftover span stays tight.
-2. `parse-arguments.md`. `parse_list`, `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_list`.
-3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_list`.
+2. `parse-arguments.md`. `parse_chunk_item_list`, `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_chunk_item_list`.
+3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_chunk_item_list`.
 4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
 5. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
 6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.

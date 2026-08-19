@@ -250,7 +250,7 @@ fn parse_entrypoint<TTokens: SemanticTokens>(
 
 `parse_iso_literal_item`, `parse_selection`, `parse_value`, and the rest of the grammar functions are the same substitution.
 
-`Chunk::stream`, `parse_chunk`, `parse_one_item`, `parse_singleton`, `parse_list`, and `parse_group_*` are generic over `TTokens: SemanticTokens` and take `&mut TTokens`. Closures receive `&mut ItemCursor<'_, TTokens>`.
+`Chunk::stream`, `parse_chunk`, `parse_chunk_item`, `parse_singleton`, `parse_chunk_item_list`, and `parse_group_*` are generic over `TTokens: SemanticTokens` and take `&mut TTokens`. Closures receive `&mut ItemCursor<'_, TTokens>`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs

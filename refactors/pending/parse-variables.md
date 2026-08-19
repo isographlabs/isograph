@@ -251,7 +251,7 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    VariableDeclarationList(group.item.children.item.parse_list(
+    VariableDeclarationList(group.item.children.item.parse_chunk_item_list(
         cursor.text(),
         Expectation::Separator(BracketKind::Parenthesis),
         parse_variable_declaration,
@@ -366,7 +366,7 @@ where
 }
 ```
 
-`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_one_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt.
+`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_chunk_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt.
 
 `[Pet,]` is one chunk plus a boundary comma: `inner.item: Some(Pet)` plus `push_error(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
 
