@@ -9,6 +9,7 @@
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TokenText<'a> {
     pub location: Span,
+    // Whole literal. A Span plus `cursor.text()` at the call site copies 16 fewer bytes per consume.
     text: &'a str,
 }
 
@@ -240,6 +241,7 @@ After:
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub(crate) struct TokenText<'a> {
     pub location: Span,
+    // Whole literal. A Span plus `cursor.text()` at the call site copies 16 fewer bytes per consume.
     text: &'a str,
 }
 
