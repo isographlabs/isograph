@@ -30,12 +30,6 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 /// `Parent` and `ResolvedNode` are GATs (`type Parent<'a> where Self: 'a`). A
 /// path holds `&'a` the node; that `'a` is the resolve borrow of the tree, not
 /// a lifetime stored in `Slot`.
-///
-/// Leftover equality: `extra.resolve` returns `E::ResolvedNode<'a>`. `Slot::resolve`
-/// returns `T::ResolvedNode<'a>`. Those must be the same type for this `'a`.
-/// `for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the
-/// impl or the type is what rustc 1.97 reads as `E: 'static`. That bound is not
-/// written here. It lives on `type ResolvedNode<'a>` for that `'a` only.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
@@ -67,9 +61,7 @@ return extra.item.resolve(new_parent, position);
 
 The item arm is the same `From::from(parent)`, but the target is `IsoLiteralItem::Parent`, which is `IsoLiteralParsePath`. That is `From<P> for P`. No impl to write.
 
-The generic leftover bound is that fact for any `T` / `E`: `E::Parent: From<T::Parent>`.
-
-The last bound is the unmatched-span arm. `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `.to()` requires `T::ResolvedNode: From<that path>`.
+The leftover `From` bound is that fact for any `T` / `E`: `E::Parent: From<T::Parent>`. Leftover `resolve` returns `E::ResolvedNode<'a>`; `Slot::resolve` returns `T::ResolvedNode<'a>`. Those are the same type for this `'a`. The unmatched-span arm: `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `.to()` requires `T::ResolvedNode: From<that path>`. Change 2 and change 3 put those predicates on `type ResolvedNode<'a>`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -184,13 +176,236 @@ pub type EntrypointDeclarationPath<'a> =
     Slot(SlotPath<'a>),
 ```
 
-## Macro: `from_container_parent` on a struct field
+## Change 1: rename `parent_from` to `from_container_parent`
 
-`#[resolve_field]` + `#[from_container_parent]` on a struct field is accepted. Emission is `From::from(parent)`. The unmatched-span arm is unchanged.
+Every `parent_from` ident and string in `crates/resolve_position_macros/src/lib.rs`, `crates/resolve_position_macros/src/resolve_position_macro.rs`, and `crates/resolve_position_macros/tests/generic_slot.rs` becomes `from_container_parent`. `parse_parent_from` becomes `parse_from_container_parent`. Behavior is unchanged: enum payloads still emit `From::from(parent)`; a struct field with the attribute still errors, now as "`#[from_container_parent]` is an enum-payload attribute".
+
+Origin: those three files as they stand. Delta: the rename.
+
+```rust
+// from crates/resolve_position_macros/src/lib.rs
+        from_container_parent,
+        parent_variant,
+        resolve_field,
+        resolve_position,
+        self_type_generics
+```
+
+```rust
+// from crates/resolve_position_macros/tests/generic_slot.rs
+    Unparsed(#[from_container_parent] Unparsed),
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn parse_from_container_parent(attr: &syn::Attribute) -> Result<(), proc_macro2::TokenStream> {
+    match attr.meta.reference() {
+        syn::Meta::Path(_) => ().wrap_ok(),
+        _ => Error::new_spanned(attr, "expected `#[from_container_parent]`")
+            .to_compile_error()
+            .wrap_err(),
+    }
+}
+```
+
+`cargo test -p resolve_position_macros` passes.
+
+## Change 2: extra predicates on `type ResolvedNode<'a>`
+
+Live `handle_data_struct` emits only `where Self: 'a` on both associated types. A generic struct whose field `resolve` returns a different `ResolvedNode` than the container, or whose unmatched arm is `self.path(parent).to()`, does not type-check without more predicates. `for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the impl is `E: 'static` on rustc 1.97. The predicates go on `type ResolvedNode<'a>` for that `'a`. `handle_data_enum` is unchanged.
+
+The derive synthesizes those predicates from the same field walk that emits the body. Every derived struct gets the predicates its fields and unmatched arm imply. There are no `T` / `E` names in the derive; Slot's expansion is this rule with those parameters.
+
+Origin: `handle_data_struct` in `crates/resolve_position_macros/src/resolve_position_macro.rs`. Delta: `has_transparent` is named once. `split_for_impl` moves above the unmatched arm so `ty_generics` is in scope. `type ResolvedNode<'a>` uses `field_resolved_node_predicates`. The `from_path` unmatched arm also pushes `from_path_predicate`.
+
+Before:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    // A transparent field always answers; the container is not a path segment.
+    let unmatched = if field_infos
+        .iter()
+        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
+    {
+        quote!()
+    } else {
+        match on_unmatched_span.reference() {
+            Some(ident) if ident == "from_path" => quote! {
+                return self.path(parent).to();
+            },
+            None => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) if ident == "struct_name" => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) => Error::new_spanned(
+                ident,
+                "expected `on_unmatched_span = from_path` or `struct_name`",
+            )
+            .to_compile_error(),
+        }
+    };
+
+    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
+        Some(explicit) => (quote!(), quote!(#explicit), None),
+        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
+    };
+
+    let output = quote! {
+        impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
+            type Parent<'a>
+                = #parent_type
+            where
+                Self: 'a;
+            type ResolvedNode<'a>
+                = #resolved_node
+            where
+                Self: 'a;
+```
+
+After:
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let has_transparent = field_infos
+        .iter()
+        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)));
+
+    let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+    let (impl_generics, ty_generics, where_clause) = match self_type_generics.reference() {
+        Some(explicit) => (quote!(), quote!(#explicit), None),
+        None => (quote!(#impl_generics), quote!(#ty_generics), where_clause),
+    };
+
+    let mut resolved_node_predicates =
+        field_resolved_node_predicates(field_infos.reference(), resolved_node.reference());
+
+    let unmatched = if has_transparent {
+        quote!()
+    } else {
+        match on_unmatched_span.reference() {
+            Some(ident) if ident == "from_path" => {
+                resolved_node_predicates.push(from_path_predicate(
+                    resolved_node.reference(),
+                    struct_name.reference(),
+                    ty_generics.reference(),
+                    parent_type.reference(),
+                ));
+                quote! {
+                    return self.path(parent).to();
+                }
+            }
+            None => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) if ident == "struct_name" => quote! {
+                return Self::ResolvedNode::#struct_name(self.path(parent).to());
+            },
+            Some(ident) => Error::new_spanned(
+                ident,
+                "expected `on_unmatched_span = from_path` or `struct_name`",
+            )
+            .to_compile_error(),
+        }
+    };
+
+    let output = quote! {
+        impl #impl_generics ::resolve_position::ResolvePosition for #struct_name #ty_generics #where_clause {
+            type Parent<'a>
+                = #parent_type
+            where
+                Self: 'a;
+            type ResolvedNode<'a>
+                = #resolved_node
+            where
+                #(#resolved_node_predicates),*;
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn resolve_field_inner_type(wrapper: &ResolveFieldInfoTypeWrapper) -> Option<&syn::Type> {
+    match wrapper {
+        ResolveFieldInfoTypeWrapper::None(inner) => match (**inner).reference() {
+            ResolveFieldInfoType::WithSpan(inner_type)
+            | ResolveFieldInfoType::WithLocation(inner_type)
+            | ResolveFieldInfoType::WithEmbeddedLocation(inner_type)
+            | ResolveFieldInfoType::GraphQLTypeAnnotation(inner_type) => inner_type.wrap_some(),
+        },
+        ResolveFieldInfoTypeWrapper::IteratorWrapper(inner) => resolve_field_inner_type(inner),
+        ResolveFieldInfoTypeWrapper::Transparent(_) => None,
+    }
+}
+
+fn field_resolved_node_predicates(
+    field_infos: &[ResolveFieldInfo],
+    resolved_node: &syn::Type,
+) -> Vec<proc_macro2::TokenStream> {
+    let mut predicates = quote!(Self: 'a).wrap_vec();
+    for info in field_infos {
+        let Some(inner_type) = resolve_field_inner_type(info.field_type.reference()) else {
+            continue;
+        };
+        predicates.push(quote! {
+            #inner_type: ::resolve_position::ResolvePosition<
+                ResolvedNode<'a> = #resolved_node
+            >
+        });
+    }
+    predicates
+}
+
+fn from_path_predicate(
+    resolved_node: &syn::Type,
+    struct_name: &syn::Ident,
+    ty_generics: &proc_macro2::TokenStream,
+    parent_type: &syn::Type,
+) -> proc_macro2::TokenStream {
+    quote! {
+        #resolved_node: ::std::convert::From<
+            ::resolve_position::PositionResolutionPath<&'a #struct_name #ty_generics, #parent_type>
+        >
+    }
+}
+```
+
+`Option` / `Vec` / `NonEmpty` unwrap to the inner `WithSpan` type, same as the resolve walk. `transparent` fields are skipped. Tautological equalities stay.
+
+Live pinned `Slot` after this change, `self_type_generics` still in place, unmatched still `struct_name`:
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkItems> {
+    type Parent<'a>
+        = IsoLiteralParsePath<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+        = IsographResolutionNode<'a>
+    where
+        Self: 'a,
+        IsoLiteralItem: ::resolve_position::ResolvePosition<
+            ResolvedNode<'a> = IsographResolutionNode<'a>
+        >,
+        UnparsedChunkItems: ::resolve_position::ResolvePosition<
+            ResolvedNode<'a> = IsographResolutionNode<'a>
+        >;
+```
+
+`on_unmatched_span.rs` `Slot` is concrete, `from_path`. Its `type ResolvedNode<'a>` gains `Child: ResolvePosition<ResolvedNode<'a> = TestResolvedNode<'a>>` and `TestResolvedNode<'a>: From<PositionResolutionPath<&'a Slot, ParentPath<'a>>>`. The `From` impl in that file satisfies the second.
+
+`cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+
+## Change 3: `from_container_parent` on a struct field
+
+`#[resolve_field]` + `#[from_container_parent]` on a struct field is accepted. Emission is `From::from(parent)`. `ParentConstruction` gains `FromContainerParent`. `field_resolved_node_predicates` gains the leftover `Parent: From` predicate for those fields.
 
 `on_unmatched_span = from_path` is shipped (refactors/past/resolve-position-on-unmatched-span.md). This doc uses it.
 
-Today `ParentConstruction` has no `FromContainerParent`: enum payloads emit `From::from` directly, and a struct field with `#[from_container_parent]` is an error. This doc puts `FromContainerParent` back for struct fields.
+Today `ParentConstruction` has no `FromContainerParent`: enum payloads emit `From::from` directly, and a struct field with `#[from_container_parent]` is an error. This change puts `FromContainerParent` on struct fields.
+
+Origin: `ParentConstruction`, `get_resolve_field_info`, `new_parent_expr`, and `field_resolved_node_predicates` after change 2. Delta: the variant, the struct-field accept path, the `new_parent_expr` arm, and the `From` predicate.
 
 Before:
 
@@ -259,62 +474,42 @@ After:
         }
 ```
 
-## Generated `Slot`
+Origin: `field_resolved_node_predicates` after change 2. Delta: `parent_type` parameter; `FromContainerParent` pushes a `Parent: From` predicate.
 
 ```rust
-// generated by resolve_position_macros/src/resolve_position_macro.rs
-impl<T: ResolvePosition, E: ResolvePosition> ::resolve_position::ResolvePosition for Slot<T, E> {
-    type Parent<'a>
-        = <T as ::resolve_position::ResolvePosition>::Parent<'a>
-    where
-        Self: 'a;
-    type ResolvedNode<'a>
-        = <T as ::resolve_position::ResolvePosition>::ResolvedNode<'a>
-    where
-        Self: 'a,
-        E: ResolvePosition<ResolvedNode<'a> = <T as ResolvePosition>::ResolvedNode<'a>>,
-        <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-        <T as ResolvePosition>::ResolvedNode<'a>: From<
-            PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
-        >;
-
-    fn resolve<'a>(
-        &'a self,
-        parent: Self::Parent<'a>,
-        position: ::span::Span,
-    ) -> Self::ResolvedNode<'a> {
-        for item in self.item.iter() {
-            if item.location.contains(position) {
-                let new_parent = ::std::convert::From::from(parent);
-                return item.item.resolve(new_parent, position);
-            }
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn field_resolved_node_predicates(
+    field_infos: &[ResolveFieldInfo],
+    resolved_node: &syn::Type,
+    parent_type: &syn::Type,
+) -> Vec<proc_macro2::TokenStream> {
+    let mut predicates = quote!(Self: 'a).wrap_vec();
+    for info in field_infos {
+        let Some(inner_type) = resolve_field_inner_type(info.field_type.reference()) else {
+            continue;
+        };
+        predicates.push(quote! {
+            #inner_type: ::resolve_position::ResolvePosition<
+                ResolvedNode<'a> = #resolved_node
+            >
+        });
+        if matches!(
+            info.parent_construction,
+            ParentConstruction::FromContainerParent
+        ) {
+            predicates.push(quote! {
+                <#inner_type as ::resolve_position::ResolvePosition>::Parent<'a>:
+                    ::std::convert::From<#parent_type>
+            });
         }
-        for item in self.extra_tokens.iter() {
-            if item.location.contains(position) {
-                let new_parent = ::std::convert::From::from(parent);
-                return item.item.resolve(new_parent, position);
-            }
-        }
-        return self.path(parent).to();
     }
+    predicates
 }
 ```
 
-The derive does not write `'static` and does not copy leftover-equality as `for<'a>` onto the impl. `for<'a> E: ResolvePosition<ResolvedNode<'a> = T::ResolvedNode<'a>>` on the impl is `E: 'static` (rustc 1.97). Those predicates go on `type ResolvedNode<'a>` for that `'a`: leftover equality, leftover `Parent: From<T::Parent>`, and `from_path` `From`. `where Self: 'a` stays. `split_for_impl` still keeps `T: ResolvePosition, E: ResolvePosition`.
+The change 2 call becomes `field_resolved_node_predicates(field_infos.reference(), resolved_node.reference(), parent_type.reference())`.
 
-`where Self: 'a` on the associated types makes `parent_type = <T as ResolvePosition>::Parent<'a>` legal.
-
-Take `entrypoint Query.foo bar`:
-
-- `item` span is `entrypoint Query.foo`
-- leftover span is tight to `bar`
-- the space after `foo` is in the slot span and in neither field
-
-That space answers `IsographResolutionNode::IsoLiteralSlot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `IsoLiteralSlot`.
-
-## Tests
-
-### Macro
+### Test
 
 ```rust
 // from crates/resolve_position_macros/tests/from_container_parent_struct.rs
@@ -480,7 +675,73 @@ fn a_position_outside_the_slot_resolves_to_the_list() {
 }
 ```
 
-### Parser
+The test `Slot` has no `where` clause. Change 2's predicates on `type ResolvedNode<'a>` are what make it compile. `cargo test -p resolve_position_macros` passes.
+
+## Change 4: generic `Slot`
+
+The After listings. Generated expansion, field order `item` then `extra_tokens`, then the `from_path` predicate:
+
+```rust
+// generated by resolve_position_macros/src/resolve_position_macro.rs
+impl<T: ResolvePosition, E: ResolvePosition> ::resolve_position::ResolvePosition for Slot<T, E> {
+    type Parent<'a>
+        = <T as ::resolve_position::ResolvePosition>::Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+        = <T as ::resolve_position::ResolvePosition>::ResolvedNode<'a>
+    where
+        Self: 'a,
+        T: ::resolve_position::ResolvePosition<
+            ResolvedNode<'a> = <T as ::resolve_position::ResolvePosition>::ResolvedNode<'a>
+        >,
+        <T as ::resolve_position::ResolvePosition>::Parent<'a>:
+            ::std::convert::From<<T as ::resolve_position::ResolvePosition>::Parent<'a>>,
+        E: ::resolve_position::ResolvePosition<
+            ResolvedNode<'a> = <T as ::resolve_position::ResolvePosition>::ResolvedNode<'a>
+        >,
+        <E as ::resolve_position::ResolvePosition>::Parent<'a>:
+            ::std::convert::From<<T as ::resolve_position::ResolvePosition>::Parent<'a>>,
+        <T as ::resolve_position::ResolvePosition>::ResolvedNode<'a>: ::std::convert::From<
+            ::resolve_position::PositionResolutionPath<
+                &'a Slot<T, E>,
+                <T as ::resolve_position::ResolvePosition>::Parent<'a>,
+            >,
+        >;
+
+    fn resolve<'a>(
+        &'a self,
+        parent: Self::Parent<'a>,
+        position: ::span::Span,
+    ) -> Self::ResolvedNode<'a> {
+        for item in self.item.iter() {
+            if item.location.contains(position) {
+                let new_parent = ::std::convert::From::from(parent);
+                return item.item.resolve(new_parent, position);
+            }
+        }
+        for item in self.extra_tokens.iter() {
+            if item.location.contains(position) {
+                let new_parent = ::std::convert::From::from(parent);
+                return item.item.resolve(new_parent, position);
+            }
+        }
+        return self.path(parent).to();
+    }
+}
+```
+
+`split_for_impl` still keeps `T: ResolvePosition, E: ResolvePosition`. `where Self: 'a` on the associated types makes `parent_type = <T as ResolvePosition>::Parent<'a>` legal.
+
+Take `entrypoint Query.foo bar`:
+
+- `item` span is `entrypoint Query.foo`
+- leftover span is tight to `bar`
+- the space after `foo` is in the slot span and in neither field
+
+That space answers `IsographResolutionNode::IsoLiteralSlot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `IsoLiteralSlot`.
+
+### Parser tests
 
 Entrypoint tests keep passing. A leftover token still resolves to `NonBracketToken`. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still resolves `Query` / `foo` / `entrypoint` / `.` the same way: those positions are in `item`, so the path does not go through `Slot`. `token.parent` inside leftover is `ChunkContentItemParent::Unparsed`; that path's parent is `UnparsedChunkItemsParent::Literal`.
 
@@ -518,7 +779,12 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 `leftover_after_an_entrypoint_resolves_to_the_leftover_token` stays.
 
+`cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+
 ## Landing checklist
 
-1. Macro: `from_container_parent` on struct fields, `FromContainerParent` on `ParentConstruction`, generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode` via `on_unmatched_span = from_path`, `IsoLiteralSlot` replaces `Slot`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-2. Move this doc to refactors/past.
+1. Change 1: rename `parent_from` to `from_container_parent`. Struct field still errors. `cargo test -p resolve_position_macros` passes.
+2. Change 2: extra predicates on `type ResolvedNode<'a>`. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+3. Change 3: `from_container_parent` on struct fields, `FromContainerParent`, the `From` predicate, `from_container_parent_struct.rs`. `cargo test -p resolve_position_macros` passes.
+4. Change 4: generic `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode`, `IsoLiteralSlot` replaces `Slot`, `UnparsedChunkItemsParent`, entrypoint parent paths, the parser tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+5. Move this doc to refactors/past.
