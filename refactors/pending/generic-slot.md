@@ -1,12 +1,14 @@
-# generic-slot: pin the root `Slot`, gap via `from_path`
+# generic-slot: one concrete `ResolvePosition` impl per `Slot<T, E>` pin
 
 Lands after resolve-position-on-unmatched-span.md (refactors/past). GAT predicates on `type Parent` / `type ResolvedNode` are in the derive.
 
-A generic `impl<T, E> ResolvePosition for Slot<T, E>` does not compile. Extra `where` clauses on the GATs are E0276 (stricter than the trait, which only has `Self: 'a`). The same bounds as `for<'a> T: ResolvePosition<Parent<'a> = PositionResolutionPath<&'a Slot<T, E>, …>>` overflow or imply `T: 'static`. `Slot<IsoLiteralItem, UnparsedChunkItems>` and `Slot<Selection, UnparsedChunkItems>` are different types; each can have its own concrete impl. The derive emits one impl per struct, via `self_type_generics`. This doc is that impl for the root, `on_unmatched_span = from_path`, and the variant rename. A later list’s `Slot<Selection, UnparsedChunkItems>` is a later concrete impl.
+A generic `impl<T, E> ResolvePosition for Slot<T, E>` does not compile (E0276 on extra GAT bounds; `for<'a> T: ResolvePosition<Parent<'a> = Path<&'a Slot<T, E>, …>>` overflows or implies `'static`). `Slot<IsoLiteralItem, UnparsedChunkItems>` and `Slot<Selection, UnparsedChunkItems>` are different types. Each gets its own concrete impl. `self_type_generics` becomes a list of pins. Each pin is type arguments plus that impl’s `parent_type`. The derive emits one `impl ResolvePosition for Slot<…>` per pin.
 
-Both fields stay bare `#[resolve_field]`. The `Slot` is in the path for `item`, leftover, and the gap, the same way a level is in the path for `{ foo bar }`. That is live today.
+This doc’s list has the root pin. A later list appends `(<Selection, UnparsedChunkItems>, SelectionSetPath<'a>)`. `resolved_node` and `on_unmatched_span` stay on the container (every pin uses `IsographResolutionNode` and `from_path`).
 
-`IsographResolutionNode` has one variant per concrete `Slot<T, E>` impl. The root is `IsoLiteralSlot(IsoLiteralSlotPath<'a>)`. Live `SlotPath` is this alias renamed. There is no `IsographResolutionNode::Slot`.
+Both fields stay bare `#[resolve_field]`. The `Slot` is in the path for `item`, leftover, and the gap. That is live today.
+
+Live `SlotPath` is renamed `IsoLiteralSlotPath`. `IsographResolutionNode::Slot` is renamed `IsoLiteralSlot`.
 
 Leftover span stays tight to the leftover tokens. The space after `foo` in `entrypoint Query.foo bar` is that gap.
 
@@ -16,20 +18,22 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 // from crates/isograph_parser/src/chunk.rs
 /// One parse attempt: an item plus leftover tokens in the same chunk.
 ///
-/// `resolve` receives the list parent (`IsoLiteralParsePath` at the root).
+/// `resolve` receives the list parent (`IsoLiteralParsePath` at the root, later
+/// `SelectionSetPath` from a second pin).
 /// Walk, given that parent:
 /// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
-///   to this `Slot`. `IsoLiteralItem::Parent` is that path. `Slot` is a path segment.
-/// - Position in `extra_tokens`: the same `self.path(parent)`. `UnparsedChunkItems::Parent`
-///   is that path.
+///   to this `Slot`. `T::Parent` is that path. `Slot` is a path segment.
+/// - Position in `extra_tokens`: the same `self.path(parent)`.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
-///   returns `self.path(parent).to()`, which is `IsographResolutionNode::IsoLiteralSlot`.
+///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
+///   `ResolvedNode` variant (`IsoLiteralSlot`, later `SelectionSlot`).
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
     resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>,
-    on_unmatched_span = from_path
+    on_unmatched_span = from_path,
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+    ]
 )]
 pub struct Slot<T, E> {
     /// `Some` when the form parsed.
@@ -62,23 +66,162 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
 ```
 
-`IsoLiteralItem`, `EntrypointDeclaration`, and `UnparsedChunkItems` keep `parent_type = IsoLiteralSlotPath<'a>` (today `SlotPath`). `UnparsedChunkItemsPath` stays `PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>`.
+`IsoLiteralItem`, `EntrypointDeclaration`, and `UnparsedChunkItems` keep `parent_type = IsoLiteralSlotPath<'a>` (today `SlotPath`).
+
+`Singleton` keeps the old one-list form: `parent_type = ()` and `self_type_generics = <Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>`.
+
+## Before
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(
+    parent_type = IsoLiteralParsePath<'a>,
+    resolved_node = IsographResolutionNode<'a>,
+    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+)]
+pub struct Slot<T, E> {
+    #[resolve_field]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field]
+    pub extra_tokens: Option<WithSpan<E>>,
+}
+```
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum IsoLiteralItem {
-    Entrypoint(EntrypointDeclaration),
-}
-
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntrypointDeclaration { /* fields unchanged */ }
-
-pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
+pub type SlotPath<'a> =
+    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
 ```
 
-The generated root impl (change 1 predicates plus `from_path`):
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    Slot(SlotPath<'a>),
+```
+
+Unmatched is `struct_name`. There is no `From` impl.
+
+## Change 1: `self_type_generics` is one pin or a list of pins
+
+Origin: `ResolvePositionArgs` and `validate_and_map_generics` in `crates/resolve_position_macros/src/resolve_position_macro.rs` and `map_generics.rs`. Delta: `self_type_generics` parses as either one `<A, B>` (live; uses the container `parent_type`) or `[ (<A, B>, ParentTy), ... ]`. `handle_data_struct` emits one impl per pin. `parent_type` is optional when every pin carries its parent type.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+struct ResolvePositionArgs {
+    parent_type: Option<syn::Type>,
+    resolved_node: syn::Type,
+    self_type_generics: Option<SelfTypeGenerics>,
+    on_unmatched_span: Option<syn::Ident>,
+}
+
+enum SelfTypeGenerics {
+    One(syn::AngleBracketedGenericArguments),
+    Pins(Vec<SelfTypePin>),
+}
+
+struct SelfTypePin {
+    args: syn::AngleBracketedGenericArguments,
+    parent_type: syn::Type,
+}
+```
+
+`One` is live `self_type_generics = <IsoLiteralItem, UnparsedChunkItems>` with container `parent_type`. `Pins` is the list form. An omitted `self_type_generics` is still a generic impl over the struct’s own params (no pin).
+
+If `self_type_generics` is `Pins`, container `parent_type` is absent. If it is `One` or omitted, container `parent_type` is required.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn pins_to_emit(
+    args: &ResolvePositionArgs,
+) -> Result<Vec<(syn::AngleBracketedGenericArguments, syn::Type)>, proc_macro2::TokenStream> {
+    match args.self_type_generics.reference() {
+        None => {
+            let parent_type = require_parent_type(args)?;
+            (syn::parse_quote!(<>), parent_type).wrap_vec().wrap_ok()
+        }
+        Some(SelfTypeGenerics::One(one)) => {
+            let parent_type = require_parent_type(args)?;
+            (one.clone(), parent_type).wrap_vec().wrap_ok()
+        }
+        Some(SelfTypeGenerics::Pins(pins)) => {
+            if args.parent_type.is_some() {
+                return Error::new_spanned(
+                    /* parent_type attr */,
+                    "`parent_type` is on each pin when `self_type_generics` is a list",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            pins.iter()
+                .map(|pin| (pin.args.clone(), pin.parent_type.clone()))
+                .collect::<Vec<_>>()
+                .wrap_ok()
+        }
+    }
+}
+```
+
+The `None` branch’s `<>` is wrong for a generic struct (live uses `split_for_impl` and empty map). Keep the live no-pin path as it is: one impl, `parent_type` required, `ty_generics` from `split_for_impl`. Only `One` and `Pins` go through the pin loop.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let output = match pins {
+        None => emit_one_impl(
+            /* live path: impl_generics, ty_generics from split_for_impl, parent_type required */
+        ),
+        Some(pins) => {
+            let mut impls = Vec::new();
+            for (args, parent_type) in pins {
+                let generics_map =
+                    validate_and_map_generics(input_generics.clone(), args.clone().wrap_some())?;
+                let field_infos = /* same field walk, generics_map */;
+                impls.push(emit_one_impl(
+                    /* impl_generics empty, ty_generics = args, parent_type from the pin */
+                ));
+            }
+            quote!(#(#impls)*)
+        }
+    };
+```
+
+`emit_one_impl` is the current `handle_data_struct` body after `field_infos` is known: predicates, unmatched, the `impl` quote.
+
+Parsing the list: a `syn::Expr::Array` whose elements are tuples `(args, parent_type)`. `args` is `Expr::Path` or a type wrapped as `<A, B>` parsed as `syn::Type::Path` with angle-bracketed args on a dummy, or parse each tuple’s first element as `syn::AngleBracketedGenericArguments` via `syn::parse2`.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn parse_self_type_generics(
+    attr: &syn::ParseBuffer,
+) -> Result<SelfTypeGenerics, syn::Error> {
+    if attr.peek(syn::token::Lt) {
+        let one = attr.parse::<syn::AngleBracketedGenericArguments>()?;
+        return SelfTypeGenerics::One(one).wrap_ok();
+    }
+    let content;
+    syn::bracketed!(content in attr);
+    let mut pins = Vec::new();
+    while !content.is_empty() {
+        let inner;
+        syn::parenthesized!(inner in content);
+        let args = inner.parse::<syn::AngleBracketedGenericArguments>()?;
+        inner.parse::<syn::Token![,]>()?;
+        let parent_type = inner.parse::<syn::Type>()?;
+        pins.push(SelfTypePin { args, parent_type });
+        if content.peek(syn::Token![,]) {
+            content.parse::<syn::Token![,]>()?;
+        }
+    }
+    SelfTypeGenerics::Pins(pins).wrap_ok()
+}
+```
+
+`cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass. Singleton still uses `One`. Slot is not converted yet.
+
+## Change 2: root pin list, `from_path`, `IsoLiteralSlot`
+
+Origin: `Slot` in `chunk.rs` after change 1. Delta: list form with the root pin, `on_unmatched_span = from_path`, `SlotPath` → `IsoLiteralSlotPath`, `Slot` → `IsoLiteralSlot`, the `From` impl.
+
+The After listings. Generated root impl (predicates already emitted by the derive):
 
 ```rust
 // generated by resolve_position_macros/src/resolve_position_macro.rs
@@ -91,7 +234,6 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
         = IsographResolutionNode<'a>
     where
         Self: 'a,
-        // `item`: `ResolvedNode` equality, then `ContainerPath` parent equality
         IsoLiteralItem: ::resolve_position::ResolvePosition<
             ResolvedNode<'a> = IsographResolutionNode<'a>
         >,
@@ -101,7 +243,6 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
                 IsoLiteralParsePath<'a>
             >
         >,
-        // `extra_tokens`: same pair
         UnparsedChunkItems: ::resolve_position::ResolvePosition<
             ResolvedNode<'a> = IsographResolutionNode<'a>
         >,
@@ -111,7 +252,6 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
                 IsoLiteralParsePath<'a>
             >
         >,
-        // `on_unmatched_span = from_path`
         IsographResolutionNode<'a>: ::std::convert::From<
             ::resolve_position::PositionResolutionPath<
                 &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
@@ -141,99 +281,136 @@ impl ::resolve_position::ResolvePosition for Slot<IsoLiteralItem, UnparsedChunkI
 }
 ```
 
-The `From` bound is the `impl From<IsoLiteralSlotPath> for IsographResolutionNode` above.
+### Macro test: two pins on one `Slot`
 
-## Before
+Parser pins share `IsographResolutionNode`. The test does the same.
 
 ```rust
-// from crates/isograph_parser/src/chunk.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+// from crates/resolve_position_macros/tests/self_type_generics_pins.rs
+use prelude::Postfix;
+use resolve_position::{PositionResolutionPath, ResolvePosition};
+use resolve_position_macros::ResolvePosition;
+use span::{Span, WithSpan, WithSpanPostfix};
+
+#[derive(Debug)]
+enum TestResolvedNode<'a> {
+    ListA(PathA<'a>),
+    ListB(PathB<'a>),
+    SlotA(SlotAPath<'a>),
+    SlotB(SlotBPath<'a>),
+    ChildA(PositionResolutionPath<&'a ChildA, SlotAPath<'a>>),
+    ExtraA(PositionResolutionPath<&'a ExtraA, SlotAPath<'a>>),
+    ChildB(PositionResolutionPath<&'a ChildB, SlotBPath<'a>>),
+    ExtraB(PositionResolutionPath<&'a ExtraB, SlotBPath<'a>>),
+}
+
+impl<'a> From<SlotAPath<'a>> for TestResolvedNode<'a> {
+    fn from(path: SlotAPath<'a>) -> Self {
+        TestResolvedNode::SlotA(path)
+    }
+}
+
+impl<'a> From<SlotBPath<'a>> for TestResolvedNode<'a> {
+    fn from(path: SlotBPath<'a>) -> Self {
+        TestResolvedNode::SlotB(path)
+    }
+}
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = TestResolvedNode<'a>)]
+struct ListA(#[resolve_field] Vec<WithSpan<Slot<ChildA, ExtraA>>>);
+
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = (), resolved_node = TestResolvedNode<'a>)]
+struct ListB(#[resolve_field] Vec<WithSpan<Slot<ChildB, ExtraB>>>);
+
+type PathA<'a> = PositionResolutionPath<&'a ListA, ()>;
+type PathB<'a> = PositionResolutionPath<&'a ListB, ()>;
+type SlotAPath<'a> = PositionResolutionPath<&'a Slot<ChildA, ExtraA>, PathA<'a>>;
+type SlotBPath<'a> = PositionResolutionPath<&'a Slot<ChildB, ExtraB>, PathB<'a>>;
+
+#[derive(Debug, ResolvePosition)]
 #[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>
+    resolved_node = TestResolvedNode<'a>,
+    on_unmatched_span = from_path,
+    self_type_generics = [
+        (<ChildA, ExtraA>, PathA<'a>),
+        (<ChildB, ExtraB>, PathB<'a>),
+    ]
 )]
-pub struct Slot<T, E> {
+struct Slot<T, E> {
     #[resolve_field]
-    pub item: Option<WithSpan<T>>,
+    item: Option<WithSpan<T>>,
     #[resolve_field]
-    pub extra_tokens: Option<WithSpan<E>>,
-}
-```
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub type SlotPath<'a> =
-    PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>;
-
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum IsoLiteralItem {
-    Entrypoint(EntrypointDeclaration),
+    extra_tokens: Option<WithSpan<E>>,
 }
 
-#[resolve_position(parent_type = SlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntrypointDeclaration { /* ... */ }
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotAPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ChildA;
 
-pub type UnparsedChunkItemsPath<'a> = PositionResolutionPath<&'a UnparsedChunkItems, SlotPath<'a>>;
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotAPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ExtraA;
 
-pub type EntrypointDeclarationPath<'a> =
-    PositionResolutionPath<&'a EntrypointDeclaration, SlotPath<'a>>;
-```
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotBPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ChildB;
 
-```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-    Slot(SlotPath<'a>),
-```
+#[derive(Debug, ResolvePosition)]
+#[resolve_position(parent_type = SlotBPath<'a>, resolved_node = TestResolvedNode<'a>)]
+struct ExtraB;
 
-Unmatched is `struct_name`: `IsographResolutionNode::Slot(self.path(parent).to())`. There is no `From` impl.
-
-## Change 1: `from_path` on the pinned `Slot`
-
-Origin: `crates/isograph_parser/src/chunk.rs` `Slot` as it stands. Delta: `on_unmatched_span = from_path`. The derive already emits the `From` bound on `type ResolvedNode` when unmatched is `from_path`.
-
-```rust
-// from crates/isograph_parser/src/chunk.rs
-#[resolve_position(
-    parent_type = IsoLiteralParsePath<'a>,
-    resolved_node = IsographResolutionNode<'a>,
-    self_type_generics = <IsoLiteralItem, UnparsedChunkItems>,
-    on_unmatched_span = from_path
-)]
-pub struct Slot<T, E> {
-    #[resolve_field]
-    pub item: Option<WithSpan<T>>,
-    #[resolve_field]
-    pub extra_tokens: Option<WithSpan<E>>,
+#[test]
+fn pin_a_item_and_gap() {
+    let list = ListA(
+        Slot {
+            item: ChildA.with_span(Span::new(0, 4)).wrap_some(),
+            extra_tokens: ExtraA.with_span(Span::new(6, 8)).wrap_some(),
+        }
+        .with_span(Span::new(0, 8))
+        .wrap_vec(),
+    );
+    match list.resolve((), Span::new(1, 2)) {
+        TestResolvedNode::ChildA(path) => {
+            assert!(std::ptr::eq(path.parent.inner, list.0[0].item.reference()));
+        }
+        node => panic!("expected ChildA, got {node:?}"),
+    }
+    match list.resolve((), Span::new(4, 5)) {
+        TestResolvedNode::SlotA(_) => {}
+        node => panic!("expected SlotA, got {node:?}"),
+    }
 }
-```
 
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub type IsoLiteralSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-    IsoLiteralParsePath<'a>,
->;
-
-impl<'a> From<IsoLiteralSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
-        IsographResolutionNode::IsoLiteralSlot(path)
+#[test]
+fn pin_b_item_and_gap() {
+    let list = ListB(
+        Slot {
+            item: ChildB.with_span(Span::new(0, 4)).wrap_some(),
+            extra_tokens: ExtraB.with_span(Span::new(6, 8)).wrap_some(),
+        }
+        .with_span(Span::new(0, 8))
+        .wrap_vec(),
+    );
+    match list.resolve((), Span::new(1, 2)) {
+        TestResolvedNode::ChildB(path) => {
+            assert!(std::ptr::eq(path.parent.inner, list.0[0].item.reference()));
+        }
+        node => panic!("expected ChildB, got {node:?}"),
+    }
+    match list.resolve((), Span::new(4, 5)) {
+        TestResolvedNode::SlotB(_) => {}
+        node => panic!("expected SlotB, got {node:?}"),
     }
 }
 ```
 
-Every `SlotPath` ident becomes `IsoLiteralSlotPath`. `IsographResolutionNode::Slot` becomes `IsoLiteralSlot`.
-
-Take `entrypoint Query.foo bar`:
-
-- `item` span is `entrypoint Query.foo`
-- leftover span is tight to `bar`
-- the space after `foo` is in the slot span and in neither field
-
-`Query` answers through `EntrypointDeclaration` with parent `IsoLiteralSlotPath`. `bar` answers the leftover token; `UnparsedChunkItems`'s parent is `IsoLiteralSlotPath`. The space answers `IsographResolutionNode::IsoLiteralSlot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. `{ item: None, extra_tokens: None }` has no field hits, so the same unmatched-span arm answers `IsoLiteralSlot`.
+`cargo test -p resolve_position_macros` passes.
 
 ### Parser tests
 
-Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still resolves `Query` / `foo` / `entrypoint` / `.` through `item`; those paths still go through `IsoLiteralSlotPath`. A leftover token still resolves to `NonBracketToken`.
+Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_the_declaration` still goes through `IsoLiteralSlotPath`. Leftover `bar` is still `NonBracketToken`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -258,5 +435,6 @@ Entrypoint tests keep passing. `names_resolve_to_their_leaves_and_the_rest_to_th
 
 ## Landing checklist
 
-1. `on_unmatched_span = from_path` on `Slot`, `From<IsoLiteralSlotPath> for IsographResolutionNode`, `IsoLiteralSlot` replaces `Slot`, `SlotPath` renamed, the gap test. Leftover span is unchanged. Item and leftover parents stay the slot path. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-2. Move this doc to refactors/past.
+1. Change 1: list form of `self_type_generics`, one impl per pin, `One` still uses container `parent_type`. Singleton unchanged. Two-pin macro test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+2. Change 2: root pin list on `Slot`, `from_path`, `From<IsoLiteralSlotPath>`, `IsoLiteralSlot`, `SlotPath` renamed, gap test. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+3. Move this doc to refactors/past.
