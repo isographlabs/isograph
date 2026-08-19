@@ -2,9 +2,9 @@
 
 Lands after resolve-position-on-unmatched-span.md.
 
-`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
+`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
 
-`IsographResolutionNode` has one variant per monomorph. The root is `Slot(SlotPath<'a>)` with today's alias. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`, not a variant of `SlotPath`. `SlotPath` stays `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`.
+`IsographResolutionNode` has one variant per `Slot<T, E>`. The root is `Slot(SlotPath<'a>)` with today's alias. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`, not a variant of `SlotPath`. `SlotPath` stays `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`.
 
 Leftover span stays tight to the leftover tokens. The space after `foo` in `entrypoint Query.foo bar` is that gap.
 
@@ -36,7 +36,7 @@ where
 }
 ```
 
-`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. `on_unmatched_span = from_path` means the no-hit arm is `return self.path(parent).to()`, not `ResolvedNode::Slot(...)`. Each monomorph writes a `From` into `IsographResolutionNode` that builds its own variant.
+`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. `on_unmatched_span = from_path` means the no-hit arm is `return self.path(parent).to()`, not `ResolvedNode::Slot(...)`. Each `Slot<T, E>` writes a `From` into `IsographResolutionNode` that builds its own variant.
 
 At the root, `T` is `IsoLiteralItem` and `E` is `UnparsedChunkItems`. After this doc, `IsoLiteralItem::Parent` is `IsoLiteralParsePath`. The generated leftover arm is:
 
@@ -67,7 +67,7 @@ impl<'a> From<SlotPath<'a>> for IsographResolutionNode<'a> {
 }
 ```
 
-A list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that monomorph's path, a `From` into `IsographResolutionNode`, an `UnparsedChunkItemsParent` variant, and a `From` into that. `SlotPath` is never an enum of other lists' slots.
+A list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that `Slot<T, E>`'s path, a `From` into `IsographResolutionNode`, an `UnparsedChunkItemsParent` variant, and a `From` into that. `SlotPath` is never an enum of other lists' slots.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
