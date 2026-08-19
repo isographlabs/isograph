@@ -83,7 +83,7 @@ pub fn match_brackets(
     // while a brace is on the stack, so the `}` closes the group.
     let mut enclosing_stack = Stack::new();
     let mut errors = Vec::new();
-    let mut items = parse_items(&mut tokens, &mut enclosing_stack, &mut errors);
+    let mut items = parse_bracket_items(&mut tokens, &mut enclosing_stack, &mut errors);
     strip_captured_line_breaks(&mut items);
     errors.sort_by_key(|error| match error {
         BracketError::UnmatchedOpen(open) => open.location.start,
@@ -110,7 +110,7 @@ enum Emission {
     Cut,
 }
 
-fn parse_items(
+fn parse_bracket_items(
     tokens: &mut TokenStream,
     enclosing_stack: &mut Stack<BracketKind>,
     errors: &mut Vec<BracketError>,
@@ -168,7 +168,7 @@ fn parse_bracketed(
     opening: WithSpan<OpenBracket>,
 ) -> ParsedGroup {
     let mut children = enclosing_stack.with_pushed(opening.item.0, |enclosing_stack| {
-        parse_items(tokens, enclosing_stack, errors)
+        parse_bracket_items(tokens, enclosing_stack, errors)
     });
     match tokens.peek() {
         Some(peek)
