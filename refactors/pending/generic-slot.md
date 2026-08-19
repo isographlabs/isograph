@@ -27,8 +27,12 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 ///   returns `self.path(parent).to()`. Each `Slot<T, E>` supplies a `From` that
 ///   builds its `ResolvedNode` variant (`IsoLiteralSlot`, later `SelectionSlot`).
 ///
-/// `for<'a>` is every borrow length `resolve` might use. `Slot` has no lifetime
-/// parameter of its own.
+/// `Parent` and `ResolvedNode` are GATs (`type Parent<'a> where Self: 'a`). A
+/// path holds `&'a` the node; that `'a` is the resolve borrow of the tree, not
+/// a lifetime stored in `Slot`. A bound that names `ResolvedNode<'a>` or
+/// `Parent<'a>` therefore needs a lifetime. `Slot` is not `Slot<'a>`, so the
+/// where-clause uses `for<'a>`: the bound holds for every borrow length
+/// `resolve` might use.
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
