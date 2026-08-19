@@ -1,6 +1,6 @@
 # parse-arguments: argument lists and values
 
-Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_items` and `ClosingDelimiter`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
+Values: variables, strings, integers, booleans, null, object literals. Argument lists are `name: value` chunks. Lands `parse_list` and `Separator(BracketKind)`. Lands after generic-slot.md. parse-selection-sets.md attaches the list to selections. parse-variables.md reuses the value grammar for defaults.
 
 ## The grammar this doc accepts
 
@@ -21,14 +21,14 @@ null                    null
 { <entries> }           an object literal, each contentful chunk one `<Identifier> : <value>` entry
 ```
 
-Tests feed a list's interior to `parse_items`. The wrapping paren group lands with the host that consumes it.
+Tests feed a list's interior to `parse_list`. The wrapping paren group lands with the host that consumes it.
 
-## Change 1: `parse_items`
+## Change 1: `parse_list`
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 impl ChunkedLevel {
-    pub(crate) fn parse_items<'a, P, F>(
+    pub(crate) fn parse_list<'a, P, F>(
         &'a self,
         text: &'a str,
         leftover: Expectation,
@@ -68,8 +68,8 @@ pub enum Expectation {
     DeclarationKeyword,
     #[error("the end of the declaration")]
     EndOfDeclaration,
-    #[error("a comma, a line break, or {0}")]
-    Separator(ClosingDelimiter),
+    #[error("a comma, a line break, or {}", .0.closing())]
+    Separator(BracketKind),
     #[error("an argument, like 'id: $id'")]
     Argument,
     #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
@@ -77,19 +77,24 @@ pub enum Expectation {
     #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
 }
+```
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ClosingDelimiter {
-    #[error("'}}'")]
-    Brace,
-    #[error("')'")]
-    Parenthesis,
-    #[error("']'")]
-    Bracket,
+Before, `Separator` is a unit variant (`"a comma or line break"`). This doc gives it the group's `BracketKind`. `BracketKind`'s `Display` is the opener (`Found::Group`). Leftover names the closer:
+
+```rust
+// from crates/isograph_parser/src/non_bracket_token.rs
+impl BracketKind {
+    pub fn closing(self) -> &'static str {
+        match self {
+            BracketKind::Parenthesis => "')'",
+            BracketKind::Brace => "'}'",
+            BracketKind::Bracket => "']'",
+        }
+    }
 }
 ```
 
-Before, `Separator` is a unit variant (`"a comma or line break"`). This doc gives it the closer. Argument leftover is `Expectation::Separator(ClosingDelimiter::Parenthesis)`. Object-literal leftover is `Expectation::Separator(ClosingDelimiter::Brace)`.
+Argument leftover is `Expectation::Separator(BracketKind::Parenthesis)`. Object-literal leftover is `Expectation::Separator(BracketKind::Brace)`.
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -324,9 +329,9 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    ArgumentList(group.item.children.item.parse_items(
+    ArgumentList(group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Parenthesis),
+        Expectation::Separator(BracketKind::Parenthesis),
         parse_argument,
         push_error,
     ))
@@ -431,7 +436,7 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
         let mut errors = Vec::new();
         let items = tree
             .item
-            .parse_items(text, leftover, parse_item, &mut errors);
+            .parse_list(text, leftover, parse_item, &mut errors);
         (items, errors, comma_errors)
     }
 
@@ -443,7 +448,7 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
     ) {
         let (items, errors, comma_errors) = parsed_items(
             text,
-            Expectation::Separator(ClosingDelimiter::Parenthesis),
+            Expectation::Separator(BracketKind::Parenthesis),
             parse_argument,
         );
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
@@ -629,7 +634,7 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(
-                    Expectation::Separator(ClosingDelimiter::Parenthesis),
+                    Expectation::Separator(BracketKind::Parenthesis),
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
                 && error.location == span_of(text, "junk")
@@ -641,7 +646,7 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
         let text = "a: 1,, b: 2";
         let (items, errors, comma_errors) = parsed_items(
             text,
-            Expectation::Separator(ClosingDelimiter::Parenthesis),
+            Expectation::Separator(BracketKind::Parenthesis),
             parse_argument,
         );
         assert_eq!(comma_errors.len(), 1);
@@ -654,5 +659,5 @@ Resolve-from-a-host tests wait for parse-selection-sets.md. This doc asserts par
 
 ## Landing checklist
 
-1. `parse_items`, `ClosingDelimiter`, `IntegerDoesNotFitI64`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `parse_list`, `Separator(BracketKind)`, `IntegerDoesNotFitI64`, `arguments.rs`, the resolution-node variants, the tests. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

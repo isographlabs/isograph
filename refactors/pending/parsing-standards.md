@@ -18,13 +18,13 @@ pub fn parse_iso_literal(
 
 `parse_iso_literal` takes `text: &str`, the chunked literal, `push_error`, and `tokens`. Each chunk is passed to `Chunk::stream(text, tokens)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`.
 
-A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
+A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_list` or `parse_singleton` on `group.children`.
 
 Each token and group has a span. A parse function assigns a span to a value made of more than one item by calling `spanning`. `expected` on an exhausted cursor is `Expected(_, EndOfChunk)` at `end_span`.
 
 ## `ItemCursor` and `ChunkStream`
 
-`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.remaining_contents` and builds a `Slot<P, UnparsedChunkItems>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra chunks sit on `Singleton.extra_chunks`. `Slot.item` is `Some` when the form parsed. `Slot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_items`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
+`parse_chunk` calls `Chunk::stream`, then passes `stream.cursor()` (`&mut ItemCursor`) into the parse function. `parse_one_item` then calls `stream.remaining_contents` and builds a `Slot<P, UnparsedChunkItems>`. Diagnostics are not leftover items. Leftover items sit on `Slot.extra_tokens`. Extra chunks sit on `Singleton.extra_chunks`. `Slot.item` is `Some` when the form parsed. `Slot.extra_tokens` is `Some` when extra items are present. Diagnostics go through `push_error: impl FnMut(WithSpan<ParseError>)` on `parse_one_item`, `parse_list`, `parse_singleton`, and `parse_iso_literal`. Inner `parse_*` stays `Result`. Artifact generation requires that no one called `push_error` and that the earlier-stage lists are empty. `require_end` is a method on `ChunkStream`.
 
 This pass is `IsoLiteralParse`. Resolve walks that tree only. Artifact generation does not resolve.
 
@@ -189,7 +189,7 @@ impl<'a> From<IsoLiteralParsePath<'a>> for UnparsedChunkItemsParent<'a> {
 
 ## Lists and one-item levels
 
-`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_items` maps each chunk through `parse_one_item`. `parse_singleton` is a one-item level with at least one chunk: chunk 0 through `parse_one_item`, then extra chunks and a boundary comma. Empty is the caller's.
+`ChunkedLevel`'s vec is private to the `chunk` module. `len` is the chunk count. `parse_list` maps each chunk through `parse_one_item`. `parse_singleton` is a one-item level with at least one chunk: chunk 0 through `parse_one_item`, then extra chunks and a boundary comma. Empty is the caller's.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -246,7 +246,7 @@ where
 }
 
 impl ChunkedLevel {
-    pub(crate) fn parse_items<'a, P, F>(
+    pub(crate) fn parse_list<'a, P, F>(
         &'a self,
         text: &'a str,
         leftover: Expectation,
@@ -301,7 +301,7 @@ where
 }
 ```
 
-`parse_items` leftover is `Expectation::Separator(ClosingDelimiter::...)` at a selection set (`}`), an argument list (`)`), an object literal (`}`), and a variable-declaration list (`)`). A list trailing comma is legal and is not a diagnostic.
+`parse_list` leftover is `Expectation::Separator(BracketKind::...)` at a selection set (`}`), an argument list (`)`), an object literal (`}`), and a variable-declaration list (`)`). A list trailing comma is legal and is not a diagnostic.
 
 `parse_singleton` leftover and boundary comma use `end` (`EndOfDeclaration` at the root, `EndOfType` inside `[...]`). A boundary comma is a tokenless diagnostic via `push_error`. Extra chunks clone. Empty is the caller (`parse_iso_literal` pushes `EmptyLiteral` and returns `None`; a `[...]` with zero chunks is `Expected(TypeAnnotation, EndOfChunk)`).
 
@@ -314,16 +314,16 @@ A type that contains a group stores `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`.
 - `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
 - `require_*`: `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
-- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_items`, `parse_singleton`, or `spanning`. A nested list also takes `push_error`.
-- Diagnostic: `push_error` on `parse_one_item`, `parse_items`, `parse_singleton`, `parse_iso_literal`. Not stored on the tree.
+- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_list`, `parse_singleton`, or `spanning`. A nested list also takes `push_error`.
+- Diagnostic: `push_error` on `parse_one_item`, `parse_list`, `parse_singleton`, `parse_iso_literal`. Not stored on the tree.
 
-A group plus its interior is `consume_group_if` or `require_group`, then `parse_items` or `parse_singleton` on `group.children`:
+A group plus its interior is `consume_group_if` or `require_group`, then `parse_list` or `parse_singleton` on `group.children`:
 
 ```rust
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    group.item.children.item.parse_items(
+    group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Brace),
+        Expectation::Separator(BracketKind::Brace),
         parse_item,
         push_error,
     )
@@ -333,9 +333,9 @@ A group plus its interior is `consume_group_if` or `require_group`, then `parse_
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(expectation))?;
-    group.item.children.item.parse_items(
+    group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Brace),
+        Expectation::Separator(BracketKind::Brace),
         parse_item,
         push_error,
     )
@@ -402,9 +402,9 @@ where
         }
         if let Some(group) = cursor.consume_group_if(BracketKind::Brace) {
             return NonConstantValue::Object(ObjectLiteral(
-                group.item.children.item.parse_items(
+                group.item.children.item.parse_list(
                     cursor.text(),
-                    Expectation::Separator(ClosingDelimiter::Brace),
+                    Expectation::Separator(BracketKind::Brace),
                     parse_object_entry,
                     push_error,
                 ),
@@ -482,8 +482,8 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
-    #[error("a comma, a line break, or {0}")]
-    Separator(ClosingDelimiter),
+    #[error("a comma, a line break, or {}", .0.closing())]
+    Separator(BracketKind),
     #[error("an argument, like 'id: $id'")]
     Argument,
     #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
@@ -500,16 +500,6 @@ pub enum Expectation {
     EndOfType,
     #[error("the keyword `to`")]
     ToKeyword,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-pub enum ClosingDelimiter {
-    #[error("'}}'")]
-    Brace,
-    #[error("')'")]
-    Parenthesis,
-    #[error("']'")]
-    Bracket,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
@@ -532,9 +522,19 @@ pub enum BracketKind {
     #[strum(to_string = "'['")]
     Bracket,
 }
+
+impl BracketKind {
+    pub fn closing(self) -> &'static str {
+        match self {
+            BracketKind::Parenthesis => "')'",
+            BracketKind::Brace => "'}'",
+            BracketKind::Bracket => "']'",
+        }
+    }
+}
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(ClosingDelimiter)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
@@ -572,7 +572,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Integer conversion: `token_text(span).parse()` on an `IntegerLiteral` span
 - Interned name: `token_text(span).intern().to::<EntityName>()`
 - Composite span: `ItemCursor::spanning`
-- List of items: `ChunkedLevel::parse_items` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
+- List of items: `ChunkedLevel::parse_list` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`
 - Recovered item: `Slot.item` → `Option<WithSpan<T>>`
 - Extra items: `Slot.extra_tokens` → `Option<WithSpan<UnparsedChunkItems>>`
@@ -582,8 +582,8 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Leftover after a list item: `item: Some` plus extra tokens and `push_error(Expected(Separator, ...))`
 - Leftover after a singleton first chunk: `item: Some` plus extra tokens and `push_error(Expected(end, ...))`
 - Extra root chunks: `ExtraChunks` plus `push_error(MultipleDeclarations)`
-- Diagnostic: `push_error` on `parse_one_item` / `parse_items` / `parse_singleton` / `parse_iso_literal`
-- Group interior: `require_group` / `consume_group_if`, then `parse_items` or `parse_singleton` on `group.children`
+- Diagnostic: `push_error` on `parse_one_item` / `parse_list` / `parse_singleton` / `parse_iso_literal`
+- Group interior: `require_group` / `consume_group_if`, then `parse_list` or `parse_singleton` on `group.children`
 - Constant-only value: `parse_constant_value` → `ConstantValue`
 
 ## Shipping and amending
@@ -591,11 +591,11 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 Each grammar feature lands on this surface.
 
 - generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`, one `ResolvedNode` variant per `Slot<T, E>`
-- parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- parse-arguments.md: `parse_list`, `Separator(BracketKind)`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
 
-A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_chunk`, `parse_items`, and `parse_singleton`. This doc stays in `refactors/pending`.
+A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_chunk`, `parse_list`, and `parse_singleton`. This doc stays in `refactors/pending`.

@@ -100,8 +100,8 @@ pub enum Expectation {
     SelectionSet,
     #[error("a field selection")]
     Selection,
-    #[error("a comma, a line break, or {0}")]
-    Separator(ClosingDelimiter),
+    #[error("a comma, a line break, or {}", .0.closing())]
+    Separator(BracketKind),
     #[error("an argument, like 'id: $id'")]
     Argument,
     #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
@@ -118,16 +118,6 @@ pub enum Expectation {
     EndOfType,
     #[error("the keyword `to`")]
     ToKeyword,
-}
-
-#[derive(Copy, Clone, Debug, PartialEq, Eq, thiserror::Error)]
-pub enum ClosingDelimiter {
-    #[error("'}}'")]
-    Brace,
-    #[error("')'")]
-    Parenthesis,
-    #[error("']'")]
-    Bracket,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
@@ -149,6 +139,16 @@ pub enum BracketKind {
     Brace,
     #[strum(to_string = "'['")]
     Bracket,
+}
+
+impl BracketKind {
+    pub fn closing(self) -> &'static str {
+        match self {
+            BracketKind::Parenthesis => "')'",
+            BracketKind::Brace => "'}'",
+            BracketKind::Bracket => "']'",
+        }
+    }
 }
 ```
 
@@ -173,8 +173,8 @@ pub enum BracketKind {
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
 1. `generic-slot.md`. Generic `Slot` impl, `UnparsedChunkItemsParent`, `on_unmatched_span = from_path`. A gap answers that `Slot<T, E>`'s `ResolvedNode` variant (`IsoLiteralSlot` at the root). Leftover span stays tight.
-2. `parse-arguments.md`. `parse_items`, `ClosingDelimiter`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_items`.
-3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_items`.
+2. `parse-arguments.md`. `parse_list`, `Separator(BracketKind)`. Argument lists and values: variable, string, integer (`i64` / `IntegerDoesNotFitI64`), `BooleanValue(Boolean::{True, False})`, null, and object literals. Tests feed a list interior to `parse_list`.
+3. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_list`.
 4. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
 5. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
 6. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.

@@ -12,7 +12,7 @@ Each contentful chunk of a selection set is one selection:
 
 The leading identifier is the alias when a colon follows, the name otherwise. A paren group is `consume_argument_list`. A brace group is an object selection whose interior recurses; without one it is a scalar selection.
 
-Tests feed a list's interior to `parse_items`. The wrapping brace group lands with the host that requires it.
+Tests feed a list's interior to `parse_list`. The wrapping brace group lands with the host that requires it.
 
 ## Change 1: `Expectation`
 
@@ -24,7 +24,7 @@ Tests feed a list's interior to `parse_items`. The wrapping brace group lands wi
     Selection,
 ```
 
-Selection leftover is `Expectation::Separator(ClosingDelimiter::Brace)`.
+Selection leftover is `Expectation::Separator(BracketKind::Brace)`.
 
 ## Change 2: `selections.rs`
 
@@ -38,7 +38,7 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, BracketKind, ClosingDelimiter, Expectation, IsographResolutionNode,
+    ArgumentList, BracketKind, Expectation, IsographResolutionNode,
     NonBracketTokenKind, ParseError, Slot, UnparsedChunkItems, consume_argument_list,
 };
 
@@ -198,9 +198,9 @@ where
     let group = cursor
         .require_group(BracketKind::Brace)
         .map_err(|()| cursor.expected(Expectation::SelectionSet))?;
-    SelectionSet(group.item.children.item.parse_items(
+    SelectionSet(group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Brace),
+        Expectation::Separator(BracketKind::Brace),
         parse_selection,
         push_error,
     ))
@@ -216,9 +216,9 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Brace)?;
-    SelectionSet(group.item.children.item.parse_items(
+    SelectionSet(group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Brace),
+        Expectation::Separator(BracketKind::Brace),
         parse_selection,
         push_error,
     ))
@@ -326,7 +326,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         let mut errors = Vec::new();
         let items = tree
             .item
-            .parse_items(text, leftover, parse_item, &mut errors);
+            .parse_list(text, leftover, parse_item, &mut errors);
         (items, errors, comma_errors)
     }
 
@@ -338,7 +338,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
     ) {
         let (items, errors, comma_errors) = parsed_items(
             text,
-            Expectation::Separator(ClosingDelimiter::Brace),
+            Expectation::Separator(BracketKind::Brace),
             parse_selection,
         );
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
@@ -406,7 +406,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         let text = ", bar";
         let (items, errors, comma_errors) = parsed_items(
             text,
-            Expectation::Separator(ClosingDelimiter::Brace),
+            Expectation::Separator(BracketKind::Brace),
             parse_selection,
         );
         assert_eq!(comma_errors.len(), 1);
@@ -417,7 +417,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         let lone = ",";
         let (items, errors, comma_errors) = parsed_items(
             lone,
-            Expectation::Separator(ClosingDelimiter::Brace),
+            Expectation::Separator(BracketKind::Brace),
             parse_selection,
         );
         assert_eq!(comma_errors.len(), 1);
@@ -498,7 +498,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         let text = "a,, b";
         let (items, errors, comma_errors) = parsed_items(
             text,
-            Expectation::Separator(ClosingDelimiter::Brace),
+            Expectation::Separator(BracketKind::Brace),
             parse_selection,
         );
         assert_eq!(comma_errors.len(), 1);
@@ -518,7 +518,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         assert!(errors.iter().any(|error| {
             error.item
                 == ParseError::expected(
-                    Expectation::Separator(ClosingDelimiter::Brace),
+                    Expectation::Separator(BracketKind::Brace),
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
                 && error.location == span_of(text, "baz")
@@ -534,7 +534,7 @@ Resolve-from-a-declaration tests wait for parse-fields.md. This doc asserts pars
         assert_eq!(
             errors,
             ParseError::expected(
-                Expectation::Separator(ClosingDelimiter::Brace),
+                Expectation::Separator(BracketKind::Brace),
                 Found::Token(NonBracketTokenKind::At),
             )
             .with_span(span_of(text, "@"))

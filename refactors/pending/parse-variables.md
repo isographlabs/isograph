@@ -251,9 +251,9 @@ where
     F: FnMut(WithSpan<ParseError>),
 {
     let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    VariableDeclarationList(group.item.children.item.parse_items(
+    VariableDeclarationList(group.item.children.item.parse_list(
         cursor.text(),
-        Expectation::Separator(ClosingDelimiter::Parenthesis),
+        Expectation::Separator(BracketKind::Parenthesis),
         parse_variable_declaration,
         push_error,
     ))
