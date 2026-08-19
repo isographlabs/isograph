@@ -197,7 +197,7 @@ jobs:
           target: wasm32-wasip1
           toolchain: stable
           components: rustfmt
-          rustflags: "-D warnings -C link-arg=--allow-undefined"
+          rustflags: '-D warnings -C link-arg=--allow-undefined'
       - uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: musl-tools # provides musl-gcc
@@ -352,7 +352,7 @@ jobs:
           target: wasm32-wasip1
           toolchain: stable
           components: rustfmt
-          rustflags: "-D warnings -C link-arg=--allow-undefined"
+          rustflags: '-D warnings -C link-arg=--allow-undefined'
       - uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: musl-tools # provides musl-gcc
@@ -434,7 +434,7 @@ jobs:
           target: wasm32-wasip1
           toolchain: stable
           components: rustfmt
-          rustflags: "-D warnings -C link-arg=--allow-undefined"
+          rustflags: '-D warnings -C link-arg=--allow-undefined'
       - uses: awalsh128/cache-apt-pkgs-action@v1
         with:
           packages: musl-tools # provides musl-gcc
