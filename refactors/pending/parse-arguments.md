@@ -284,24 +284,33 @@ impl<'a> From<ObjectLiteralPath<'a>> for UnparsedChunkItemsParent<'a> {
 `From<IsoLiteralParsePath>` stays.
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum SlotPath<'a> {
-    Literal(
-        PositionResolutionPath<
-            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-            IsoLiteralParsePath<'a>,
-        >,
-    ),
-    Argument(
-        PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>,
-    ),
-    ObjectEntry(
-        PositionResolutionPath<&'a Slot<NamedObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>,
-    ),
+// from crates/isograph_parser/src/arguments.rs
+pub type ArgumentSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>;
+
+pub type ObjectEntrySlotPath<'a> =
+    PositionResolutionPath<&'a Slot<NamedObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>;
+
+impl<'a> From<ArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ArgumentSlotPath<'a>) -> Self {
+        IsographResolutionNode::ArgumentSlot(path)
+    }
+}
+
+impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
+        IsographResolutionNode::ObjectEntrySlot(path)
+    }
 }
 ```
 
-`From` impls for the two new variants. A gap in an argument slot answers `IsographResolutionNode::Slot(SlotPath::Argument(_))`.
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    ArgumentSlot(ArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+```
+
+A gap in an argument slot answers `IsographResolutionNode::ArgumentSlot`. `SlotPath` stays the root alias.
 
 `parse_value` is the listing in parsing-standards.md.
 

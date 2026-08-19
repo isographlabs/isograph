@@ -1,6 +1,8 @@
 # generic-slot: one impl for every `Slot<T, E>`
 
-`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers `IsographResolutionNode::Slot`, including `{ item: None, extra_tokens: None }`.
+`Slot` is used at the root and in every list. One pinned impl cannot cover `Slot<P, UnparsedChunkItems>` for a later list item `P`. Drop `self_type_generics`. Both fields use `parent_from`. A position in a field skips `Slot` in the path. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant, including `{ item: None, extra_tokens: None }`.
+
+`IsographResolutionNode` has one variant per monomorph. The root is `Slot(SlotPath<'a>)` with today's alias. A later list adds `SelectionSlot(SelectionSlotPath<'a>)`, not a variant of `SlotPath`. `SlotPath` stays `PositionResolutionPath<&'a Slot<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>>`.
 
 Leftover span stays tight to the leftover tokens. The space after `foo` in `entrypoint Query.foo bar` is that gap.
 
@@ -11,14 +13,15 @@ Leftover span stays tight to the leftover tokens. The space after `foo` in `entr
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
-    resolved_node = IsographResolutionNode<'a>
+    resolved_node = IsographResolutionNode<'a>,
+    fallback = from_path
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-    for<'a> SlotPath<'a>: From<
+    for<'a> IsographResolutionNode<'a>: From<
         PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
     >,
 {
@@ -31,7 +34,7 @@ where
 }
 ```
 
-`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. The container fallback stays: `IsographResolutionNode::Slot(self.path(parent).to())`.
+`Slot::Parent` is `T::Parent`. Both fields emit `From::from(parent)`. `fallback = from_path` means the no-hit arm is `return self.path(parent).to()`, not `ResolvedNode::Slot(...)`. Each monomorph writes a `From` into `IsographResolutionNode` that builds its own variant.
 
 At the root, `T` is `IsoLiteralItem` and `E` is `UnparsedChunkItems`. After this doc, `IsoLiteralItem::Parent` is `IsoLiteralParsePath`. The generated leftover arm is:
 
@@ -46,39 +49,23 @@ The item arm is the same `From::from(parent)`, but the target is `IsoLiteralItem
 
 The generic leftover bound is that fact for any `T` / `E`: `E::Parent: From<T::Parent>`.
 
-The `SlotPath` bound is the fallback: `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `IsographResolutionNode::Slot` holds `SlotPath`. `.to()` requires `SlotPath: From<that path>`. One `From` per monomorph.
+The last bound is the fallback. `self.path(parent)` is `PositionResolutionPath<&Slot<T, E>, T::Parent>`. `.to()` requires `IsographResolutionNode: From<that path>`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum SlotPath<'a> {
-    Literal(
-        PositionResolutionPath<
-            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-            IsoLiteralParsePath<'a>,
-        >,
-    ),
-}
+pub type SlotPath<'a> = PositionResolutionPath<
+    &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
+    IsoLiteralParsePath<'a>,
+>;
 
-impl<'a>
-    From<
-        PositionResolutionPath<
-            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-            IsoLiteralParsePath<'a>,
-        >,
-    > for SlotPath<'a>
-{
-    fn from(
-        path: PositionResolutionPath<
-            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-            IsoLiteralParsePath<'a>,
-        >,
-    ) -> Self {
-        SlotPath::Literal(path)
+impl<'a> From<SlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: SlotPath<'a>) -> Self {
+        IsographResolutionNode::Slot(path)
     }
 }
 ```
 
-A list that stores a `Slot` adds a `SlotPath` variant, a `From` into it, an `UnparsedChunkItemsParent` variant, and a `From` into that.
+A list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that monomorph's path, a `From` into `IsographResolutionNode`, an `UnparsedChunkItemsParent` variant, and a `From` into that. `SlotPath` is never an enum of other lists' slots.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -118,7 +105,7 @@ pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralParsePath<'a>>;
 ```
 
-`UnparsedChunkItemsPath` moves from `parse_iso_literal.rs` to `chunk.rs`. `IsoLiteralItem` and `EntrypointDeclaration` no longer use `SlotPath` as `parent_type`. `IsographResolutionNode::Slot` stays. Hover that matches `Slot` reads `path.inner.item`; `None` is a noop.
+`UnparsedChunkItemsPath` moves from `parse_iso_literal.rs` to `chunk.rs`. `IsoLiteralItem` and `EntrypointDeclaration` no longer use `SlotPath` as `parent_type`. `SlotPath` stays the root alias. Hover that matches `Slot` reads `path.inner.item`; `None` is a noop.
 
 ## Before
 
@@ -169,7 +156,19 @@ pub type EntrypointDeclarationPath<'a> =
 
 ## Macro: `parent_from` on a struct field
 
-`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. Fallback is not suppressed. A gap still returns `Self::ResolvedNode::#struct_name(self.path(parent).to())`.
+`#[resolve_field]` + `#[parent_from]` on a struct field is accepted. Emission is `From::from(parent)`. Fallback is not suppressed.
+
+`ResolvePositionArgs` gains `fallback: Option<syn::Ident>`. `fallback = from_path` emits `return self.path(parent).to()`. Absent, the emit stays `Self::ResolvedNode::#struct_name(self.path(parent).to())`. `from_path` is the only accepted ident. `transparent` still suppresses fallback entirely.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+struct ResolvePositionArgs {
+    parent_type: syn::Type,
+    resolved_node: syn::Type,
+    self_type_generics: Option<syn::AngleBracketedGenericArguments>,
+    fallback: Option<syn::Ident>,
+}
+```
 
 Today `ParentConstruction` has no `FromParent`: enum payloads emit `From::from` directly, and a struct field with `#[parent_from]` is an error. This doc puts `FromParent` back for struct fields.
 
@@ -240,7 +239,35 @@ After:
         }
 ```
 
-Fallback stays the struct-name variant. `transparent` still suppresses it. `parent_from` does not.
+Default fallback stays the struct-name variant. `fallback = from_path` uses `self.path(parent).to()`. `transparent` still suppresses fallback. `parent_from` does not. An unknown `fallback` ident is a compile error. `handle_data_enum` binds `fallback` and errors if it is `Some`: enums have no container fallback.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let ResolvePositionArgs {
+        parent_type,
+        resolved_node,
+        self_type_generics,
+        fallback,
+    } = resolve_position_args;
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let fallback = if field_infos
+        .iter()
+        .any(|info| matches!(info.field_type, ResolveFieldInfoTypeWrapper::Transparent(_)))
+    {
+        quote!()
+    } else if fallback.as_ref().is_some_and(|ident| ident == "from_path") {
+        quote! {
+            return self.path(parent).to();
+        }
+    } else {
+        quote! {
+            return Self::ResolvedNode::#struct_name(self.path(parent).to());
+        }
+    };
+```
 
 ## Generated `Slot`
 
@@ -251,7 +278,7 @@ where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-    for<'a> SlotPath<'a>: From<
+    for<'a> IsographResolutionNode<'a>: From<
         PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
     >,
 {
@@ -281,7 +308,7 @@ where
                 return item.item.resolve(new_parent, position);
             }
         }
-        return Self::ResolvedNode::Slot(self.path(parent).to());
+        return self.path(parent).to();
     }
 }
 ```
@@ -296,7 +323,7 @@ Take `entrypoint Query.foo bar`:
 - leftover span is tight to `bar`
 - the space after `foo` is in the slot span and in neither field
 
-That space answers `IsographResolutionNode::Slot(SlotPath::Literal(_))`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same fallback answers `Slot`.
+That space answers `IsographResolutionNode::Slot(path)` with `path.inner: &Slot<IsoLiteralItem, UnparsedChunkItems>`. A position on `bar` answers the token. `{ item: None, extra_tokens: None }` has no field hits, so the same fallback answers `Slot`.
 
 ## Tests
 
@@ -312,19 +339,14 @@ use span::{Span, WithSpan, WithSpanPostfix};
 #[derive(Debug)]
 enum TestResolvedNode<'a> {
     List(ParentPath<'a>),
-    Slot(SlotPath<'a>),
+    Slot(PositionResolutionPath<&'a Slot<Child, Extra>, ParentPath<'a>>),
     Child(ChildPath<'a>),
     Extra(ExtraPath<'a>),
 }
 
-#[derive(Debug)]
-enum SlotPath<'a> {
-    List(PositionResolutionPath<&'a Slot<Child, Extra>, ParentPath<'a>>),
-}
-
-impl<'a> From<PositionResolutionPath<&'a Slot<Child, Extra>, ParentPath<'a>>> for SlotPath<'a> {
+impl<'a> From<PositionResolutionPath<&'a Slot<Child, Extra>, ParentPath<'a>>> for TestResolvedNode<'a> {
     fn from(path: PositionResolutionPath<&'a Slot<Child, Extra>, ParentPath<'a>>) -> Self {
-        SlotPath::List(path)
+        TestResolvedNode::Slot(path)
     }
 }
 
@@ -337,14 +359,15 @@ type ParentPath<'a> = PositionResolutionPath<&'a List, ()>;
 #[derive(Debug, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
-    resolved_node = TestResolvedNode<'a>
+    resolved_node = TestResolvedNode<'a>,
+    fallback = from_path
 )]
 struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = TestResolvedNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = TestResolvedNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-    for<'a> SlotPath<'a>:
+    for<'a> TestResolvedNode<'a>:
         From<PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>>,
 {
     #[resolve_field]
@@ -431,7 +454,7 @@ fn a_gap_after_the_item_resolves_to_the_slot() {
     );
 
     match list.resolve((), Span::new(4, 5)) {
-        TestResolvedNode::Slot(SlotPath::List(path)) => {
+        TestResolvedNode::Slot(path) => {
             assert!(path.inner.item.is_some());
             assert!(path.inner.extra_tokens.is_some());
         }
@@ -450,7 +473,7 @@ fn an_empty_slot_resolves_to_the_slot() {
     );
 
     match list.resolve((), Span::new(1, 2)) {
-        TestResolvedNode::Slot(SlotPath::List(path)) => {
+        TestResolvedNode::Slot(path) => {
             assert!(path.inner.item.is_none());
             assert!(path.inner.extra_tokens.is_none());
         }
@@ -489,7 +512,7 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
         let (parse, _) = parsed(text);
         let gap = Span::new(span_of(text, "foo").end, span_of(text, "bar").start);
         match parse.resolve((), gap) {
-            IsographResolutionNode::Slot(SlotPath::Literal(path)) => {
+            IsographResolutionNode::Slot(path) => {
                 assert!(path.inner.item.is_some());
                 assert!(path.inner.extra_tokens.is_some());
             }
@@ -517,5 +540,5 @@ Entrypoint tests keep passing. A leftover token still resolves to `NonBracketTok
 
 ## Landing checklist
 
-1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, generic `Slot`, `SlotPath` enum, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+1. Macro: `parent_from` on struct fields, `FromParent` on `ParentConstruction`, `fallback = from_path`, generic `Slot`, `From<SlotPath> for IsographResolutionNode`, `UnparsedChunkItemsParent`, entrypoint parent paths, the tests above. Leftover span is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 2. Move this doc to refactors/past.

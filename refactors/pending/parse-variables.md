@@ -198,34 +198,35 @@ pub enum UnparsedChunkItemsParent<'a> {
 `From` impls for the two new variants.
 
 ```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub enum SlotPath<'a> {
-    Literal(
-        PositionResolutionPath<
-            &'a Slot<IsoLiteralItem, UnparsedChunkItems>,
-            IsoLiteralParsePath<'a>,
-        >,
-    ),
-    Argument(
-        PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>,
-    ),
-    ObjectEntry(
-        PositionResolutionPath<&'a Slot<NamedObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>,
-    ),
-    Selection(PositionResolutionPath<&'a Slot<Selection, UnparsedChunkItems>, SelectionSetPath<'a>>),
-    VariableDeclaration(
-        PositionResolutionPath<
-            &'a Slot<DeclaredVariable, UnparsedChunkItems>,
-            VariableDeclarationListPath<'a>,
-        >,
-    ),
-    TypeAnnotation(
-        PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>,
-    ),
+// from crates/isograph_parser/src/variables.rs
+pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<DeclaredVariable, UnparsedChunkItems>,
+    VariableDeclarationListPath<'a>,
+>;
+
+pub type TypeAnnotationSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>;
+
+impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
+        IsographResolutionNode::VariableDeclarationSlot(path)
+    }
+}
+
+impl<'a> From<TypeAnnotationSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: TypeAnnotationSlotPath<'a>) -> Self {
+        IsographResolutionNode::TypeAnnotationSlot(path)
+    }
 }
 ```
 
-`From` impls for the two new variants. The constant-object list adds a `SlotPath` variant when that type is named.
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
+    TypeAnnotationSlot(TypeAnnotationSlotPath<'a>),
+```
+
+The constant-object list adds its own path alias, `From`, and `ResolvedNode` variant when that type is named.
 
 `ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
 

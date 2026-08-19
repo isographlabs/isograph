@@ -12,10 +12,11 @@ pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
     push_error: impl FnMut(WithSpan<ParseError>),
+    tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>>
 ```
 
-`parse_iso_literal` takes `text: &str`, the chunked literal, and `push_error`. Each chunk is passed to `Chunk::stream(text)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`.
+`parse_iso_literal` takes `text: &str`, the chunked literal, `push_error`, and `tokens`. Each chunk is passed to `Chunk::stream(text, tokens)`, which returns one `ChunkStream`. A group's interior is the `ChunkedLevel` in `group.children`.
 
 A group is one item. `require_group` and `consume_group_if` return it in one call. The interior is parsed by calling `parse_items` or `parse_singleton` on `group.children`.
 
@@ -34,24 +35,51 @@ pub(crate) struct ItemCursor<'a> { /* ... */ }
 pub(crate) struct ChunkStream<'a>(ItemCursor<'a>);
 
 impl<'a> ChunkStream<'a> {
-    pub(crate) fn new(contents: &'a NonEmpty<WithSpan<ChunkContentItem>>, text: &'a str) -> Self;
+    pub(crate) fn new(
+        contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+    ) -> Self;
     pub(crate) fn cursor(&mut self) -> &mut ItemCursor<'a>;
     pub(crate) fn require_end(&mut self) -> Result<(), ()>;
     pub(crate) fn remaining_contents(&mut self) -> Option<NonEmpty<WithSpan<ChunkContentItem>>>;
 }
 
 impl<'a> ItemCursor<'a> {
-    pub(crate) fn consume_token_if(&mut self, kind: NonBracketTokenKind) -> Option<Span>;
-    pub(crate) fn consume_group_if(&mut self, kind: BracketKind) -> Option<WithSpan<&'a ChunkedGroup>>;
+    pub(crate) fn peek(&mut self) -> Option<CursorPeek<'_, 'a>>;
+    pub(crate) fn consume_token_if(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Option<Span>;
+    pub(crate) fn consume_group_if(
+        &mut self,
+        kind: BracketKind,
+        token: SemanticToken,
+    ) -> Option<WithSpan<&'a ChunkedGroup>>;
     pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError>;
-    pub(crate) fn require_token(&mut self, kind: NonBracketTokenKind) -> Result<Span, ()>;
-    pub(crate) fn require_group(&mut self, kind: BracketKind) -> Result<WithSpan<&'a ChunkedGroup>, ()>;
+    pub(crate) fn require_token(
+        &mut self,
+        kind: NonBracketTokenKind,
+        token: SemanticToken,
+    ) -> Result<Span, ()>;
+    pub(crate) fn require_group(
+        &mut self,
+        kind: BracketKind,
+        token: SemanticToken,
+    ) -> Result<WithSpan<&'a ChunkedGroup>, ()>;
+    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken);
     pub(crate) fn text(&self) -> &'a str;
     pub(crate) fn token_text(&self, span: Span) -> &'a str;
     pub(crate) fn spanning<T>(
         &mut self,
         parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
     ) -> Result<WithSpan<T>, WithSpan<ParseError>>;
+}
+
+impl<'c, 'a> CursorPeek<'c, 'a> {
+    pub(crate) fn view(&self) -> &'a WithSpan<ChunkContentItem>;
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem>;
 }
 ```
 
@@ -82,14 +110,15 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     parent_type = <T as ResolvePosition>::Parent<'a>,
-    resolved_node = IsographResolutionNode<'a>
+    resolved_node = IsographResolutionNode<'a>,
+    fallback = from_path
 )]
 pub struct Slot<T: ResolvePosition, E: ResolvePosition>
 where
     for<'a> T: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> E: ResolvePosition<ResolvedNode<'a> = IsographResolutionNode<'a>>,
     for<'a> <E as ResolvePosition>::Parent<'a>: From<<T as ResolvePosition>::Parent<'a>>,
-    for<'a> SlotPath<'a>: From<
+    for<'a> IsographResolutionNode<'a>: From<
         PositionResolutionPath<&'a Slot<T, E>, <T as ResolvePosition>::Parent<'a>>,
     >,
 {
@@ -127,11 +156,11 @@ pub struct ExtraChunks(
 );
 ```
 
-`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. Fallback is not suppressed. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers `IsographResolutionNode::Slot`. `{ item: None, extra_tokens: None }` is the same fallback.
+`#[resolve_field]` + `#[parent_from]` on a struct field passes `From::from(parent)` as the child's parent. Fallback is not suppressed. `fallback = from_path` makes the no-hit arm `self.path(parent).to()`. `T::Parent` equals `Slot<T, E>::Parent`. The item conversion is the blanket `From<P> for P`. Leftover is `From<T::Parent> for E::Parent`. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that monomorph's `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same fallback.
 
-Leftover span is tight to the leftover tokens. The gap after the item is a third region: `Slot`.
+Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
-`SlotPath` is an enum of monomorphs. Each list that stores a `Slot` adds a variant and a `From`.
+Each list that stores a `Slot` adds a `ResolvedNode` variant whose payload is that monomorph's path, and a `From` into `IsographResolutionNode`. `SlotPath` stays the root alias.
 
 `UnparsedChunkItems`'s parent is an enum. Each list that stores a `Slot` adds a variant and a `From`:
 
@@ -561,7 +590,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 Each grammar feature lands on this surface.
 
-- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `SlotPath` enum, gap answers `Slot`
+- generic-slot.md: generic `Slot` impl, `UnparsedChunkItemsParent`, `fallback = from_path`, one `ResolvedNode` variant per slot monomorph
 - parse-arguments.md: `parse_items`, `ClosingDelimiter`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
