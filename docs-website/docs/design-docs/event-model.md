@@ -22,7 +22,7 @@ Figaro has one process on the machine (`Instance::global`). Isograph has one pro
 
 The process is found by `--config`, or by the nearest `isograph.config.json`, `isograph.config.js`, or `isograph.config.ts` at or above the current directory. At one directory, that order: json, then js, then ts. Two paths to one file are one process.
 
-A `.json` config is data. A `.js` or `.ts` config is a module that exports the config object (`export default` or `module.exports`). Loading it runs the file with the first of `node` and `bun` that is on `PATH`, and reads JSON from stdout.
+A `.json` config is data. A `.js` or `.ts` config is a module that exports the config object (`export default` or `module.exports`). Loading it runs the file with an executor and reads JSON from stdout. The executor is the first that works, same shape as barnum: `bun`, then `deno`, then `node` plus `tsx/cli` from `node_modules` walking up from the config, then `pnpm exec tsx`, `npx tsx`, `yarn exec tsx`, then `node`.
 
 Watch mode and the LSP are that process. They share the pico database.
 

@@ -190,7 +190,17 @@ Binary tests, same private-`HOME` harness as isograph-cli.md:
 
 ## Change 2: JS and TS configs become JSON
 
-A `.json` file is already JSON: read it. A `.js` or `.ts` file is a module. Run it with the first of `node` and `bun` on `PATH`, take the export (`export default` or `module.exports`), `JSON.stringify` that value, and that string is the JSON.
+A `.json` file is already JSON: read it. A `.js` or `.ts` file is a module. Run it with an executor, take the export (`export default` or `module.exports`), `JSON.stringify` that value, and that string is the JSON.
+
+The executor is one command, the same shape as barnum (`"bun"` or `"node <tsx/cli>"`). First that is present wins:
+
+1. `bun`
+2. `deno`
+3. `node` plus `tsx/cli` (`node_modules/tsx/dist/cli.mjs`) walking up from the config file, which is barnum's `require.resolve("tsx/cli")`
+4. `pnpm exec tsx`
+5. `npx tsx`
+6. `yarn exec tsx`
+7. `node`
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
@@ -202,17 +212,23 @@ enum ConfigSyntax {
     TypeScript,
 }
 
-enum JsRuntime {
-    Node,
-    Bun,
+enum EvalKind {
+    DashE,
+    DenoEval,
 }
 
-impl JsRuntime {
-    fn program(self) -> &'static str {
-        match self {
-            Self::Node => "node",
-            Self::Bun => "bun",
-        }
+struct Executor {
+    program: String,
+    prefix: Vec<String>,
+    eval: EvalKind,
+}
+
+impl Executor {
+    fn display(&self) -> String {
+        std::iter::once(self.program.as_str())
+            .chain(self.prefix.iter().map(String::as_str))
+            .collect::<Vec<_>>()
+            .join(" ")
     }
 }
 
@@ -242,7 +258,7 @@ pub enum LoadError {
     Unreadable(ConfigNotReadable),
     #[error("{} is not .json, .js, or .ts", .0.path.display())]
     UnknownSyntax(UnknownSyntax),
-    #[error("no node or bun on PATH; needed to load {}", .0.path.display())]
+    #[error("no bun, deno, tsx, npx, pnpm, yarn, or node; needed to load {}", .0.path.display())]
     NoJsRuntime(NoJsRuntime),
     #[error("{} failed on {}: {}", .0.program, .0.path.display(), .0.stderr)]
     JsFailed(JsFailed),
@@ -259,15 +275,77 @@ fn syntax(path: &Path) -> Option<ConfigSyntax> {
     }
 }
 
-fn first_js_runtime() -> Option<JsRuntime> {
-    [JsRuntime::Node, JsRuntime::Bun]
-        .into_iter()
-        .find(|runtime| {
-            Command::new(runtime.program())
-                .arg("--version")
-                .output()
-                .is_ok()
-        })
+fn on_path(program: &str) -> bool {
+    Command::new(program).arg("--version").output().is_ok()
+}
+
+fn tsx_cli(start: &Path) -> Option<PathBuf> {
+    start.ancestors().find_map(|dir| {
+        let mjs = dir.join("node_modules/tsx/dist/cli.mjs");
+        mjs.is_file().then_some(mjs)
+    })
+}
+
+fn first_executor(config: &Path) -> Option<Executor> {
+    if on_path("bun") {
+        return Executor {
+            program: "bun".to_owned(),
+            prefix: Vec::new(),
+            eval: EvalKind::DashE,
+        }
+        .wrap_some();
+    }
+    if on_path("deno") {
+        return Executor {
+            program: "deno".to_owned(),
+            prefix: Vec::new(),
+            eval: EvalKind::DenoEval,
+        }
+        .wrap_some();
+    }
+    if on_path("node") {
+        if let Some(tsx) = tsx_cli(config) {
+            return Executor {
+                program: "node".to_owned(),
+                prefix: tsx.display().to_string().wrap_vec(),
+                eval: EvalKind::DashE,
+            }
+            .wrap_some();
+        }
+    }
+    if on_path("pnpm") {
+        return Executor {
+            program: "pnpm".to_owned(),
+            prefix: vec!["exec".to_owned(), "tsx".to_owned()],
+            eval: EvalKind::DashE,
+        }
+        .wrap_some();
+    }
+    if on_path("npx") {
+        return Executor {
+            program: "npx".to_owned(),
+            prefix: "tsx".to_owned().wrap_vec(),
+            eval: EvalKind::DashE,
+        }
+        .wrap_some();
+    }
+    if on_path("yarn") {
+        return Executor {
+            program: "yarn".to_owned(),
+            prefix: vec!["exec".to_owned(), "tsx".to_owned()],
+            eval: EvalKind::DashE,
+        }
+        .wrap_some();
+    }
+    if on_path("node") {
+        return Executor {
+            program: "node".to_owned(),
+            prefix: Vec::new(),
+            eval: EvalKind::DashE,
+        }
+        .wrap_some();
+    }
+    None
 }
 
 const EXPORT_TO_JSON: &str = r"
@@ -279,6 +357,14 @@ import('node:url').then(({ pathToFileURL }) => import(pathToFileURL(path).href))
   console.error(err);
   process.exit(1);
 });
+";
+
+const DENO_EXPORT_TO_JSON: &str = r"
+const path = Deno.args[0];
+const href = new URL(path, 'file:///').href;
+const m = await import(href);
+const config = m.default ?? m;
+Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(config)));
 ";
 
 /// The config file as JSON text.
@@ -293,8 +379,8 @@ pub fn config_json(path: &Path) -> Result<String, LoadError> {
             })
         }
         Some(ConfigSyntax::JavaScript | ConfigSyntax::TypeScript) => {
-            let runtime = match first_js_runtime() {
-                Some(runtime) => runtime,
+            let executor = match first_executor(path) {
+                Some(executor) => executor,
                 None => {
                     return LoadError::NoJsRuntime(NoJsRuntime {
                         path: path.to_owned(),
@@ -302,7 +388,7 @@ pub fn config_json(path: &Path) -> Result<String, LoadError> {
                     .wrap_err();
                 }
             };
-            run_js(runtime, path)
+            run_js(executor.reference(), path)
         }
         None => LoadError::UnknownSyntax(UnknownSyntax {
             path: path.to_owned(),
@@ -311,25 +397,37 @@ pub fn config_json(path: &Path) -> Result<String, LoadError> {
     }
 }
 
-fn run_js(runtime: JsRuntime, path: &Path) -> Result<String, LoadError> {
-    let program = runtime.program();
-    let output = Command::new(program)
-        .arg("-e")
-        .arg(EXPORT_TO_JSON)
-        .arg("--")
-        .arg(path)
-        .output()
-        .map_err(|source| {
-            LoadError::JsIo(JsIo {
-                path: path.to_owned(),
-                program: program.to_owned(),
-                source,
-            })
-        })?;
+fn run_js(executor: &Executor, path: &Path) -> Result<String, LoadError> {
+    let mut command = Command::new(executor.program.reference());
+    command.args(executor.prefix.reference());
+    match executor.eval {
+        EvalKind::DashE => {
+            command
+                .arg("-e")
+                .arg(EXPORT_TO_JSON)
+                .arg("--")
+                .arg(path);
+        }
+        EvalKind::DenoEval => {
+            command
+                .arg("eval")
+                .arg("--allow-read")
+                .arg(DENO_EXPORT_TO_JSON)
+                .arg("--")
+                .arg(path);
+        }
+    }
+    let output = command.output().map_err(|source| {
+        LoadError::JsIo(JsIo {
+            path: path.to_owned(),
+            program: executor.display(),
+            source,
+        })
+    })?;
     if !output.status.success() {
         return LoadError::JsFailed(JsFailed {
             path: path.to_owned(),
-            program: program.to_owned(),
+            program: executor.display(),
             stderr: String::from_utf8_lossy(output.stderr.reference()).into_owned(),
         })
         .wrap_err();
@@ -340,17 +438,18 @@ fn run_js(runtime: JsRuntime, path: &Path) -> Result<String, LoadError> {
 }
 ```
 
-Inner structs derive `Debug`.
+`on_path` is a PATH probe. Inner structs derive `Debug`.
 
 This change does not parse the JSON and does not call `config_json` from `instance` / `run_daemon`.
 
 ### Tests
 
 - A `.json` file whose contents are `{}\n` comes back as that text.
-- A `.js` file `export default {};` comes back as `{}` (skipped if no `node` or `bun`).
-- A `.ts` file `export default {};` comes back as `{}` (skipped if no runtime that will execute it).
+- A `.js` file `export default {};` comes back as `{}` (skipped if no executor).
+- A `.ts` file `export default {};` comes back as `{}` (skipped if no executor that will execute TypeScript).
 - A `.js` file that throws fails with `JsFailed`.
 - A `.txt` path fails with `UnknownSyntax`.
+- `tsx_cli` finds `node_modules/tsx/dist/cli.mjs` from a subdirectory of a project that has it.
 
 ## Change 3: deserialize the JSON
 
@@ -376,7 +475,7 @@ pub enum LoadError {
     Unreadable(ConfigNotReadable),
     #[error("{} is not .json, .js, or .ts", .0.path.display())]
     UnknownSyntax(UnknownSyntax),
-    #[error("no node or bun on PATH; needed to load {}", .0.path.display())]
+    #[error("no bun, deno, tsx, npx, pnpm, yarn, or node; needed to load {}", .0.path.display())]
     NoJsRuntime(NoJsRuntime),
     #[error("{} failed on {}: {}", .0.program, .0.path.display(), .0.stderr)]
     JsFailed(JsFailed),
