@@ -5,10 +5,10 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkedLevel, EntityNameWrapper, Expectation, Found, IsographResolutionNode,
-    NonBracketTokenKind, NonConstantValue, ParseError, SelectableDeclarationPath, SemanticToken,
-    Slot, UnparsedChunkItems, VariableDeclarationOrUsage, parse_name_colon,
-    parse_non_constant_value, parse_variable_name,
+    BracketKind, ChunkContentItem, ChunkedLevel, EntityNameWrapper, Expectation, Found,
+    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, NonConstantValue, ParseError,
+    SelectableDeclarationPath, SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationOrUsage,
+    parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -141,21 +141,19 @@ pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     let core = parse_named_or_list(cursor)?;
-    match cursor.consume_token_if(
-        NonBracketTokenKind::Exclamation,
-        SemanticToken::GraphQLTypeName,
-    ) {
-        Some(bang) => core
-            .item
-            .with_span(Span::new(core.location.start, bang.location.end))
-            .wrap_ok(),
-        None => {
-            let location = core.location;
-            TypeAnnotation::Null(NullTypeAnnotation(core).boxed())
-                .with_span(location)
-                .wrap_ok()
-        }
+    if let Some(peek) = cursor.peek()
+        && matches!(
+            peek.view().item.reference(),
+            ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Exclamation))
+        )
+    {
+        peek.advance();
+        return core.wrap_ok();
     }
+    let location = core.location;
+    TypeAnnotation::Null(NullTypeAnnotation(core).boxed())
+        .with_span(location)
+        .wrap_ok()
 }
 
 fn parse_named_or_list(
@@ -214,10 +212,10 @@ fn parse_bracket_interior_type(
             )
             .with_span(extra.location)
         },
-        |cursor| parse_type_annotation(cursor).map(|wrapped| wrapped.item),
+        parse_type_annotation,
     );
     BracketInteriorType {
-        item: singleton.item.item.item,
+        item: singleton.item.item.item.map(|wrapped| wrapped.item),
         extra: singleton.item.item.extra,
     }
     .wrap_ok()

@@ -94,6 +94,7 @@ impl<'a> ItemCursor<'a> {
 
 impl<'c, 'a> CursorPeek<'c, 'a> {
     pub(crate) fn view(&self) -> &'a WithSpan<ChunkContentItem>;
+    pub(crate) fn advance(self) -> &'a WithSpan<ChunkContentItem>;
     pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem>;
 }
 ```
@@ -333,7 +334,7 @@ When the next item may start several forms, peek without `commit`. Copy what the
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"`; `"true"` / `"false"` / `"null"`). Optional `to` copies the identifier span from `peek().and_then`, then compares `cursor.text()` at that span to `"to"`, then `require_token(Identifier, Keyword)` and parse the type. A non-`to` identifier is not consumed.
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. That consume is the use of `!` (semantic token plus span on the annotation). `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is peek; if `Exclamation`, `CursorPeek::advance` (no semantic token, annotation span stays the core). The next item may be the caller's `=`. `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
@@ -474,6 +475,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 
 - Required token: `ItemCursor::require_token`
 - Optional token: `ItemCursor::consume_token_if`
+- Optional token with no semantic token: `CursorPeek::advance`
 - Required group: `ItemCursor::require_group`
 - Optional group: `ItemCursor::consume_group_if`
 - Wrong or missing item: `ItemCursor::expected`

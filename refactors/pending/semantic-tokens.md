@@ -44,7 +44,7 @@ Call sites, by variant:
 - `Type`: `Query` / `User` in `Type.fieldName`.
 - `FieldName`: `foo` in `Query.foo`, a selection name, and a selection alias. The first identifier of `alias: name` is consumed before the colon is visible; `SafePeekable` has one item of lookahead, so that identifier is `FieldName` on both arms.
 - `ObjectKey`: an object-literal key.
-- `GraphQLTypeName`: a type annotation's name, `!`, and a type-list `[]` the grammar consumes (`Foo`, `Foo!`, `[Foo]`). This variant goes away when type annotations leave the language.
+- `GraphQLTypeName`: a type annotation's name and a type-list `[]` the grammar consumes (`Foo`, `[Foo]`). `!` is consumed without a semantic token. This variant goes away when type annotations leave the language.
 - `DirectiveName`: `@` and the directive identifier the grammar consumes.
 - `Variable`: `$` and the variable identifier the grammar consumes.
 - `Argument`: an argument name.
@@ -130,9 +130,9 @@ let dot = tokens
 
 Delta from that extract:
 
-- `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` and records. `require_token` / `consume_token_if` take the kind and the token and pass the token to `commit`. `require_group` / `consume_group_if` take the `BracketKind`, the token, and `parse_inside`.
+- `ItemCursor::peek` does not take a `SemanticToken`. `CursorPeek::commit` takes the `SemanticToken` and records. `CursorPeek::advance` commits the item without recording. `require_token` / `consume_token_if` take the kind and the token and pass the token to `commit`. `require_group` / `consume_group_if` take the `BracketKind`, the token, and `parse_inside`.
 - Open and close share one token. Upstream splits `ST_OPEN_PAREN` / `ST_CLOSE_PAREN` (and the brace pair) for formatter metadata.
-- One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` is `Type`; `ST_TYPE_ANNOTATION` and `!` are `GraphQLTypeName`; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` are `FieldName`; `ST_OBJECT_LITERAL_KEY` is `ObjectKey`; `ST_STRING_LITERAL` covers string and block string.
+- One variant per role. Upstream's `ST_DIRECTIVE_AT` / `ST_DIRECTIVE` are both `DirectiveName`; `ST_VARIABLE_DOLLAR_DECLARATION` / `ST_VARIABLE_DOLLAR_USAGE` / `ST_VARIABLE` are `Variable`; `ST_KEYWORD_USE` / `ST_KEYWORD_DECLARATION` / `ST_TO` are `Keyword`; `ST_SERVER_OBJECT_TYPE` is `Type`; `ST_TYPE_ANNOTATION` is `GraphQLTypeName`; `!` is not a semantic token; `ST_CLIENT_SELECTABLE_NAME` / `ST_SELECTION_NAME_OR_ALIAS` / `ST_SELECTION_NAME_OR_ALIAS_POST_COLON` are `FieldName`; `ST_OBJECT_LITERAL_KEY` is `ObjectKey`; `ST_STRING_LITERAL` covers string and block string.
 - The constructor does not push a dummy token and pop it. Upstream `PeekableLexer::new` does `parse_token(ST_COMMENT)` then `semantic_tokens.pop()`.
 - A failed `require_token` records nothing. A successful consume that a later `?` discards stays recorded. There is no corrective pop.
 - The declaration types do not grow a `semantic_tokens` field.

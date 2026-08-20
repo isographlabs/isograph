@@ -251,14 +251,28 @@ impl<'c, 'a> CursorPeek<'c, 'a> {
         self.peek.view().dereference()
     }
 
-    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+    fn take_item(
+        self,
+    ) -> (
+        &'c mut Vec<WithSpan<SemanticToken>>,
+        &'a WithSpan<ChunkContentItem>,
+    ) {
         let item = self.peek.commit();
         *self.previous_end = item.location.end;
+        (self.tokens, item)
+    }
+
+    pub(crate) fn advance(self) -> &'a WithSpan<ChunkContentItem> {
+        self.take_item().1
+    }
+
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem> {
+        let (tokens, item) = self.take_item();
         let span = match item.item.reference() {
             ChunkContentItem::NonBracket(_) => item.location,
             ChunkContentItem::Group(group) => group.opening.location,
         };
-        self.tokens.push(token.with_span(span));
+        tokens.push(token.with_span(span));
         item
     }
 }
@@ -776,6 +790,20 @@ mod tests {
         {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
             stream.cursor().expected(token(NonBracketTokenKind::Period));
+        }
+        assert_eq!(tokens, vec![]);
+    }
+
+    #[test]
+    fn advance_records_nothing() {
+        let text = "foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        {
+            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+            let peek = stream.cursor().peek().expect("foo is present");
+            assert_eq!(peek.advance().location, span_of(text, "foo"));
         }
         assert_eq!(tokens, vec![]);
     }

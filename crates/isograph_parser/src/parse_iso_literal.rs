@@ -1280,7 +1280,7 @@ mod tests {
                 .as_ref()
                 .expect("the fixture writes to Person!")
                 .location,
-            span_of(text, "Person!")
+            span_of(text, "Person")
         );
         assert!(declaration.description.is_some());
     }
@@ -1289,9 +1289,9 @@ mod tests {
     fn a_to_target_accepts_every_type_annotation_form() {
         for (text, target) in [
             ("field Query.Foo to Pet { id }", "Pet"),
-            ("field Query.Foo to Pet! { id }", "Pet!"),
+            ("field Query.Foo to Pet! { id }", "Pet"),
             ("field Query.Foo to [Pet] { id }", "[Pet]"),
-            ("field Query.Foo to [Pet!]! { id }", "[Pet!]!"),
+            ("field Query.Foo to [Pet!]! { id }", "[Pet!]"),
             ("field Query.Foo to [[Pet]] { id }", "[[Pet]]"),
         ] {
             let (parse, errors) = parsed(text);
@@ -1317,7 +1317,7 @@ mod tests {
             .target_type
             .as_ref()
             .expect("the fixture writes a list target");
-        assert_eq!(target.location, span_of(text, "[Pet!]!"));
+        assert_eq!(target.location, span_of(text, "[Pet!]"));
         match target.item.reference() {
             TypeAnnotation::List(list) => {
                 let inner = list.inner.as_ref().expect("the list holds a type");
@@ -1365,7 +1365,7 @@ mod tests {
             .target_type
             .as_ref()
             .expect("the fixture writes to Pet!");
-        assert_eq!(target.location, span_of(text, "Pet!"));
+        assert_eq!(target.location, span_of(text, "Pet"));
         match target.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "Pet"));
@@ -1413,7 +1413,7 @@ mod tests {
             TypeAnnotation::List(list) => {
                 let inner = list.inner.as_ref().expect("the list holds a type");
                 assert!(matches!(inner.item, TypeAnnotation::Named(_)));
-                assert_eq!(inner.location, span_of(text, "Pet!"));
+                assert_eq!(inner.location, span_of(text, "Pet"));
             }
             annotation => panic!("expected List, got {annotation:?}"),
         }
@@ -2025,7 +2025,7 @@ mod tests {
         match declared.type_.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "ID"));
-                assert_eq!(declared.type_.location, span_of(text, "ID !"));
+                assert_eq!(declared.type_.location, span_of(text, "ID"));
             }
             annotation => panic!("expected a named type, got {annotation:?}"),
         }
@@ -2037,7 +2037,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
-        assert_eq!(declared.type_.location, span_of(text, "[Pet!]!"));
+        assert_eq!(declared.type_.location, span_of(text, "[Pet!]"));
         let list = match declared.type_.item.reference() {
             TypeAnnotation::List(list) => list.as_ref(),
             annotation => panic!("expected a list type, got {annotation:?}"),
@@ -2046,7 +2046,7 @@ mod tests {
         match inner.item.reference() {
             TypeAnnotation::Named(named) => {
                 assert_eq!(named.name.location, span_of(text, "Pet"));
-                assert_eq!(inner.location, span_of(text, "Pet!"));
+                assert_eq!(inner.location, span_of(text, "Pet"));
             }
             annotation => panic!("expected the named element type, got {annotation:?}"),
         }
@@ -2288,14 +2288,14 @@ mod tests {
     }
 
     #[test]
-    fn a_bang_resolves_to_the_annotation() {
+    fn a_bang_resolves_to_the_variable_declaration() {
         let text = "field Query.Foo($id: ID!) { bar }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "!")) {
-            IsographResolutionNode::NamedTypeAnnotation(annotation) => {
-                assert_eq!(annotation.inner.name.location, span_of(text, "ID"));
+            IsographResolutionNode::VariableDeclaration(declaration) => {
+                assert_eq!(declaration.inner.name.location, span_of(text, "$id"));
             }
-            node => panic!("expected the named type, got {node:?}"),
+            node => panic!("expected the variable declaration, got {node:?}"),
         }
     }
 
@@ -2667,7 +2667,7 @@ mod tests {
 
     #[test]
     fn a_field_records_keyword_type_to_and_selections() {
-        let text = "field Query.Foo to Pet { id }";
+        let text = "field Query.Foo to Pet! { id }";
         let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
         assert!(bracket_errors.is_empty());
         assert_eq!(comma_errors, vec![]);
