@@ -66,8 +66,8 @@ pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
+    ScalarSelection(ScalarSelectionPath<'a>),
+    ObjectSelection(ObjectSelectionPath<'a>),
 }
 
 pub type IsographFieldDirectiveListPath<'a> = PositionResolutionPath<
@@ -89,8 +89,8 @@ The list is not a chunk list and does not use `Slot`. Directives are sequential 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
 pub enum ArgumentListParent<'a> {
-    Scalar(ScalarSelectionPath<'a>),
-    Object(ObjectSelectionPath<'a>),
+    ScalarSelection(ScalarSelectionPath<'a>),
+    ObjectSelection(ObjectSelectionPath<'a>),
     IsographFieldDirective(IsographFieldDirectivePath<'a>),
 }
 ```
@@ -446,7 +446,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         match parse.resolve((), span_of(text, "loadable")) {
             IsographResolutionNode::IsographDirectiveNameWrapper(name) => {
                 match name.parent.parent.parent {
-                    IsographFieldDirectiveListParent::Scalar(_) => {}
+                    IsographFieldDirectiveListParent::ScalarSelection(_) => {}
                     parent => panic!("expected a scalar directive list, got {parent:?}"),
                 }
             }
