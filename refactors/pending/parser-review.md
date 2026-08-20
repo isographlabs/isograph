@@ -30,100 +30,9 @@ The float regex is live. `1.5`, `12.34`, `0.0`, `-1.5`, `1e2`, and `1.5e2` are `
 
 Moved to type-annotation-null.md.
 
-### `parse_iso_literal` has no single entry point and three error channels (specified)
+### `parse_iso_literal` has no single entry point and three error channels (moved)
 
-The crate entry is one function over `&str`. It runs tokenize, match brackets, chunk, grammar. The three error lists live on the return value, so a caller cannot drop a channel without ignoring a named field. Grammar-stage tests call this function. Stage unit tests (tokenize, brackets, chunk, subparsers) keep `pub(crate)` internals.
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct ParsedIsoLiteral {
-    pub item: Option<WithSpan<IsoLiteralParse>>,
-    pub errors: Vec<WithSpan<ParseError>>,
-    pub bracket_errors: Vec<BracketError>,
-    pub comma_errors: Vec<CommaWithoutItem>,
-    pub tokens: Vec<WithSpan<SemanticToken>>,
-}
-
-pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
-    let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-    let (tree, comma_errors) = chunk(brackets.reference());
-    let mut errors = Vec::new();
-    let mut tokens = Vec::new();
-    let item = parse_chunked_iso_literal(text, tree, &mut errors, &mut tokens);
-    ParsedIsoLiteral {
-        item,
-        errors,
-        bracket_errors,
-        comma_errors,
-        tokens,
-    }
-}
-
-pub(crate) fn parse_chunked_iso_literal(
-    text: &str,
-    root: WithSpan<ChunkedLevel>,
-    errors: &mut Vec<WithSpan<ParseError>>,
-    tokens: &mut Vec<WithSpan<SemanticToken>>,
-) -> Option<WithSpan<IsoLiteralParse>>
-```
-
-Before: `pub fn parse_iso_literal(text, root, errors, tokens) -> Option<WithSpan<IsoLiteralParse>>`. After: that body is `parse_chunked_iso_literal`. `item: None` is still only the empty-literal case.
-
-`BracketError` and `CommaWithoutItem` gain `Display` and `std::error::Error`, same impls as lsp-parse-diagnostics.md Change 1 (`Unclosed '{'` / `Unexpected '('` / `A comma with no item before it.`). Tests of those Displays live in the modules that own the types.
-
-```rust
-// from crates/isograph_parser/src/lib.rs
-mod arguments;
-mod chunk;
-mod chunk_stream;
-mod directives;
-mod isograph_resolution_node;
-mod matched_brackets;
-mod non_bracket_token;
-mod parse_error;
-mod parse_iso_literal;
-mod selections;
-mod semantic_token;
-mod token_kind;
-mod tokenize;
-mod variables;
-
-pub use arguments::{
-    Argument, ArgumentList, ArgumentListParent, ArgumentNameWrapper, Boolean, BooleanValue,
-    IntegerValue, ListLiteral, ListLiteralValue, NonConstantValue, NullValue, ObjectEntry,
-    ObjectLiteral, StringLiteralValueWrapper, VariableDeclarationOrUsage, VariableUse,
-    ValueKeyNameWrapper,
-};
-pub use chunk::{
-    Chunk, ChunkContentItem, ChunkSeparator, ChunkedGroup, ChunkedLevel, CommaWithoutItem,
-    ExtraChunks, Singleton, Slot, UnparsedChunkItems,
-};
-pub use directives::{
-    IsographDirectiveNameWrapper, IsographFieldDirective, IsographFieldDirectiveList,
-};
-pub use isograph_resolution_node::IsographResolutionNode;
-pub use matched_brackets::{BracketError, CloseBracket, OpenBracket};
-pub use non_bracket_token::{BracketKind, NonBracketToken, NonBracketTokenKind};
-pub use parse_error::{Expectation, Found, ParseError};
-pub use parse_iso_literal::{
-    Description, EntityNameWrapper, EntrypointDeclaration, IsoLiteralItem, IsoLiteralParse,
-    ParsedIsoLiteral, SelectableDeclaration, SelectableNameWrapper, parse_iso_literal,
-};
-pub use selections::{Selection, SelectionNameWrapper, SelectionSet};
-pub use semantic_token::SemanticToken;
-pub use variables::{
-    ListTypeAnnotation, NamedTypeAnnotation, TypeAnnotation, VariableDeclaration,
-    VariableDeclarationList,
-};
-```
-
-Path aliases and `*Parent` enums that `IsographResolutionNode` names stay `pub` via the modules that define them: add those `pub use` lines for every path type the resolve node lists. Do not `pub use` `tokenize`, `match_brackets`, `chunk`, `ItemCursor`, `ChunkStream`, `IsographLangTokenKind`, `TokenKindExtras`, `parse_type_annotation`, `consume_description`, or other parse helpers. `mod tokenize` and friends stay private; `tokenize` / `match_brackets` / `chunk` become `pub(crate)`.
-
-Grammar tests: `parsed` / `parsed_with_errors` / `parsed_with_tokens` call `parse_iso_literal(text)` and read the struct fields. They do not call `tokenize` / `match_brackets` / `chunk`. `parsed` still asserts `bracket_errors` empty and `comma_errors` empty. `chunked` / `stream_of` used by `consume_description` unit tests stay on `pub(crate)` internals.
-
-`arguments.rs` and `selections.rs` subparser tests stay on internals; they are not whole-literal parses.
-
-Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md `file_literals` call `parse_iso_literal(text)`.
+Moved to parse-iso-literal-entry.md.
 
 ### Test suite is red on purpose in one case (fixed)
 
@@ -325,9 +234,9 @@ A successful `entrypoint Query.foo,` reports the comma as a `ParseError` and the
 
 `span_of`, `parsed_items`, and the dummy parent-cursor setup are duplicated in `arguments.rs` and `selections.rs` tests. `crates/tests` is an empty crate.
 
-### `lib.rs` glob-exports every module (specified)
+### `lib.rs` glob-exports every module (moved)
 
-Covered by the combined `parse_iso_literal` entry above. Explicit `pub use` of the AST, errors, tokens, and that function. Pipeline stages are `pub(crate)`.
+Moved to parse-iso-literal-entry.md Change 3.
 
 ### `impl std::error::Error for Expectation`
 
@@ -354,4 +263,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-The next work is the combined `parse_iso_literal(text)` entry and making `VariableDeclarationOrUsage` the shared `$name` node whose parent is `Declaration | Usage`. Nullability is type-annotation-null.md. `Slot` and `parse_singleton` wait in parser-minor-improvements.md.
+The next work is making `VariableDeclarationOrUsage` the shared `$name` node whose parent is `Declaration | Usage`. Combined parse is parse-iso-literal-entry.md. Nullability is type-annotation-null.md. `Slot` and `parse_singleton` wait in parser-minor-improvements.md.

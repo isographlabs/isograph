@@ -12,6 +12,8 @@ Open a file containing `iso(\`entrypoint\`)`. The `Type.name` is missing. A red 
 
 ## Change 1: `Display` on `BracketError` and `CommaWithoutItem`
 
+Owned by parse-iso-literal-entry.md Change 1. Same impls. Implement once.
+
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
 use std::fmt;

@@ -1,6 +1,6 @@
 # Parser minor improvements
 
-Not in the grammar-stage order. Do not mix these into type-annotation-null.md or a combined-parse change.
+Not in the grammar-stage order. Do not mix these into type-annotation-null.md or parse-iso-literal-entry.md.
 
 ## `Slot<T, E>` is two independent `Option`s
 
