@@ -63,7 +63,7 @@ pub struct IsographDirectiveNameWrapper(common_lang_types::IsographDirectiveName
 #[derive(Debug)]
 pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
-    FieldDeclaration(FieldDeclarationPath<'a>),
+    SelectableDeclaration(SelectableDeclarationPath<'a>),
     Selection(SelectionPath<'a>),
 }
 
@@ -211,16 +211,16 @@ Field. Origin field name: `directive_set`.
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub target_type: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub selection_set: Option<WithSpan<SelectionSet>>,
 ```
 
@@ -308,7 +308,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let text = "field Query.Foo($id: ID) @component \"the route\" { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let field = as_field(parse.reference());
+        let field = as_selectable(parse.reference());
         assert!(field.variable_definitions.is_some());
         assert_eq!(
             field
@@ -326,7 +326,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let field = as_field(parse.reference());
+        let field = as_selectable(parse.reference());
         assert!(field.target_type.is_some());
         assert_eq!(
             field
@@ -344,7 +344,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let text = "field Query.Foo { bar @loadable(lazyLoadArtifact: true) }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let selection = as_selection(selections(as_field(parse.reference()).selection_set.reference())[0].item.reference());
+        let selection = as_selection(selections(as_selectable(parse.reference()).selection_set.reference())[0].item.reference());
         let directives = selection
             .directive_set
             .as_ref()
@@ -367,7 +367,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let directives = as_selection(
-            selections(as_field(parse.reference()).selection_set.reference())[0]
+            selections(as_selectable(parse.reference()).selection_set.reference())[0]
                 .item
                 .reference(),
         )
@@ -382,7 +382,7 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
     fn a_directive_on_the_next_line_is_its_own_failed_selection() {
         let text = "field Query.Foo { bar\n@loadable }";
         let (parse, errors) = parsed(text);
-        let items = selections(as_field(parse.reference()).selection_set.reference());
+        let items = selections(as_selectable(parse.reference()).selection_set.reference());
         assert_eq!(items.len(), 2);
         as_selection(items[0].item.reference());
         assert!(items[1].item.item.is_none());

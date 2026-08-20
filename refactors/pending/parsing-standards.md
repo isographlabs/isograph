@@ -514,6 +514,7 @@ Each grammar feature lands on this surface.
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-type-dot-name.md: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
 - selectable-name-wrapper.md: `SelectableNameWrapper` for entrypoint and field names; `FieldDeclaration`; `name` not `client_field_name`; `SelectionNameWrapper` stays
+- selectable-declaration.md: `SelectableDeclaration`; `IsoLiteralItem::Selectable`; `parse_selectable_declaration`; keyword `field` stays
 - selection-name.md: `SelectionNameWrapper` wraps `SelectionName`
 - expectation-one-of.md: `Expectation::OneOf`, `Keyword`; `DECLARATION_KEYWORD`
 - parse-descriptions.md: description via two `consume_token_if`

@@ -1,19 +1,19 @@
 # optional-field-selection-set: `field Type.name` with no `{ }`
 
-A field declaration's selection set is optional. `field Foo.Bar` is a complete declaration. `selection_set` is `Option<WithSpan<SelectionSet>>`. `parse_field` uses `consume_selection_set`. `require_selection_set` is deleted.
+A field declaration's selection set is optional. `field Foo.Bar` is a complete declaration. `selection_set` is `Option<WithSpan<SelectionSet>>`. `parse_selectable_declaration` uses `consume_selection_set`. `require_selection_set` is deleted.
 
-Lands after optional-to.md, before parse-directives.md. The selection set is still required in optional-to.md.
+Lands after selectable-declaration.md, before parse-directives.md. The selection set is still required.
 
-Origin: optional-to.md after. Delta: `selection_set` is `Option`; `consume_selection_set` at the field. `require_selection_set` is deleted.
+Origin: selectable-declaration.md after. Delta: `selection_set` is `Option`; `consume_selection_set` at the field. `require_selection_set` is deleted.
 
-## Changes to FieldDeclaration
+## Changes to SelectableDeclaration
 
 Before:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 ```
 
@@ -22,11 +22,11 @@ After:
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     #[resolve_field]
-    #[parent_variant(FieldDeclaration)]
+    #[parent_variant(SelectableDeclaration)]
     pub selection_set: Option<WithSpan<SelectionSet>>,
 ```
 
-## Changes to parse_field
+## Changes to parse_selectable_declaration
 
 Before:
 
@@ -36,7 +36,7 @@ Before:
     let description = consume_description(cursor);
     let selection_set =
         require_selection_set(cursor, TO_OR_DESCRIPTION_OR_SELECTION_SET)?;
-    FieldDeclaration {
+    SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
         variable_definitions,
@@ -53,7 +53,7 @@ After:
     let target_type = consume_to_target(cursor)?;
     let description = consume_description(cursor);
     let selection_set = consume_selection_set(cursor);
-    FieldDeclaration {
+    SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
         variable_definitions,
@@ -63,7 +63,7 @@ After:
     }
 ```
 
-`consume_selection_set` is `pub(crate)`. `require_selection_set` is deleted. `parse_field` stays `Result` through `consume_to_target`.
+`consume_selection_set` is `pub(crate)`. `require_selection_set` is deleted. `parse_selectable_declaration` stays `Result` through `consume_to_target`.
 
 After `Type.name`, variables, and optional `to`, description and `{` are both optional. Junk in the same chunk is leftover: `Expected(EndOfDeclaration, ...)`. `field Query.Foo Owner { id }` parses `Foo` and reports `EndOfDeclaration` at `Owner`. `TO_OR_DESCRIPTION_OR_SELECTION_SET` is unused and deleted.
 
@@ -76,7 +76,7 @@ After `Type.name`, variables, and optional `to`, description and `{` are both op
         let text = "field Query.Foo";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        assert_eq!(as_field(parse.reference()).selection_set, None);
+        assert_eq!(as_selectable(parse.reference()).selection_set, None);
     }
 
     #[test]
@@ -84,7 +84,7 @@ After `Type.name`, variables, and optional `to`, description and `{` are both op
         let text = "field Query.Foo \"the home route\"";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
-        let declaration = as_field(parse.reference());
+        let declaration = as_selectable(parse.reference());
         assert!(declaration.description.is_some());
         assert_eq!(declaration.selection_set, None);
     }
@@ -99,7 +99,7 @@ After `Type.name`, variables, and optional `to`, description and `{` are both op
     fn a_selection_set_on_its_own_line_is_a_second_declaration() {
         let text = "field Query.Foo\n{ bar }";
         let (parse, errors) = parsed(text);
-        assert_eq!(as_field(parse.reference()).selection_set, None);
+        assert_eq!(as_selectable(parse.reference()).selection_set, None);
         assert_eq!(
             errors,
             ParseError::MultipleDeclarations
@@ -114,5 +114,5 @@ Tests that read `declaration.selection_set.location` or `selections(declaration.
 
 ## Landing checklist
 
-1. `FieldDeclaration.selection_set`, `parse_field`, delete `require_selection_set`, the test replacements. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. `SelectableDeclaration.selection_set`, `parse_selectable_declaration`, delete `require_selection_set`, the test replacements. `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

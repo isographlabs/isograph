@@ -8,7 +8,7 @@ Lands before optional-field-selection-set.md. No grammar change. selection-name.
 
 Slots that skip optionals and then `require` the last item report only that last item. Landed:
 
-- `parse_field`: `consume_to_target`, `consume_description`, then `require_selection_set` with `ToOrDescriptionOrSelectionSet`. That unit variant is this doc's `OneOf`. optional-field-selection-set.md later makes the selection set optional.
+- `parse_selectable_declaration`: `consume_to_target`, `consume_description`, then `require_selection_set` with `ToOrDescriptionOrSelectionSet`. That unit variant is this doc's `OneOf`. optional-field-selection-set.md later makes the selection set optional.
 - Variable defaults: `consume_token_if(Equals)`, then `parse_non_constant_value`. Junk that is not `=` is leftover in the variable chunk. No `require` of a union.
 - `!` after a type: `consume_token_if(Exclamation)`. Junk after the type is leftover.
 - Selection arguments and nested sets: both `consume_*`. Leftover is `Separator`.

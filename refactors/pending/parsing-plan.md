@@ -164,9 +164,9 @@ Justified differences:
 - `Selection` is one struct with optional `selection_set` (not `SelectionType<ScalarSelection, ObjectSelection>`).
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
-- `FieldDeclaration` (isograph `ClientFieldDeclaration`).
+- `SelectableDeclaration` (isograph `ClientFieldDeclaration`).
 - `SelectableNameWrapper` for entrypoint and field names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` wraps `SelectionName` (isograph uses `SelectableName` as the interned key of a selection name).
-- `FieldDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
+- `SelectableDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
 - `name` on entrypoint and field declarations (isograph `client_field_name`).
 - Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
 - `Description` stores quotes included (upstream unquotes and dedents).
@@ -196,8 +196,9 @@ parsing-standards.md governs how every implementation below is written. Each doc
 3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint and field names. `FieldDeclaration`. `name` not `client_field_name`. `SelectionNameWrapper` stays.
 4. `selection-name.md`. `SelectionNameWrapper` wraps `SelectionName`.
 5. `expectation-one-of.md`. `Expectation::OneOf` and `Keyword`. `DeclarationKeyword` and `ToOrDescriptionOrSelectionSet` become `OneOf`.
-6. `optional-field-selection-set.md`. `field Type.name` with no `{ }`. `selection_set` is `Option`.
-7. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+6. `selectable-declaration.md`. `FieldDeclaration` is `SelectableDeclaration`. The keyword `field` stays.
+7. `optional-field-selection-set.md`. `field Type.name` with no `{ }`. `selection_set` is `Option`.
+8. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.
 
