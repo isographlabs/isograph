@@ -682,7 +682,7 @@ const config = m.default ?? m;
 Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(config)));
 ```
 
-`include_str!` so the shipped binary does not look for those files on disk. `on_path` is a PATH probe. Inner structs derive `Debug`.
+The scripts are `include_str!`. `on_path` is a PATH probe. Inner structs derive `Debug`.
 
 This change does not parse the JSON and does not call `config_json` from `instance` / `run_daemon`.
 
