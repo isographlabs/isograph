@@ -12,7 +12,7 @@ Open a file containing `iso(\`entrypoint\`)`. The `Type.name` is missing. A red 
 
 ## Change 1: `thiserror` on `BracketError` and `CommaWithoutItem`
 
-Owned by parse-iso-literal-entry.md Change 1. `BracketError` and `CommaWithoutItem` derive `thiserror::Error`. `IsoLiteralError` wraps them with `#[error("{0}")]`. Implement once.
+Owned by parse-iso-literal-entry.md Change 2. `BracketError` and `CommaWithoutItem` derive `thiserror::Error`. `ParseError` wraps them with `#[error("{0}")]`. Implement once.
 
 ## Change 2: file diagnostics
 
@@ -342,6 +342,6 @@ fn run(connection: Connection) {
 
 ## Order
 
-1. Change 1; parse-iso-literal-entry.md thiserror on `BracketError` / `CommaWithoutItem` and `IsoLiteralError`.
+1. Change 1; parse-iso-literal-entry.md thiserror on `BracketError` / `CommaWithoutItem` and pipeline `ParseError`.
 2. Change 2; `diagnostics_for_file`, `char_index_to_position`, unit tests.
 3. Change 3; publish on open/change, clear on close, `LspState` sender, handler tests with `Connection::memory()`.
