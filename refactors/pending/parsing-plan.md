@@ -162,7 +162,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectableNameWrapper` covers an entrypoint name, a field name, a selection name, and a `reader_alias`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `SelectableNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`). `SelectionNameWrapper` is a selection name and a `reader_alias`. `SelectableNameWrapper` is an entrypoint name and a field name. The left-hand side of `Type.name` is `EntityNameWrapper`.
 
 Justified differences:
 
@@ -177,7 +177,7 @@ Justified differences:
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
 - `FieldDeclaration` (isograph `ClientFieldDeclaration`).
-- `SelectableNameWrapper` for entrypoint names, field names, selection names, and `reader_alias` (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName` / `SelectionNameWrapper`).
+- `SelectableNameWrapper` for entrypoint and field names (isograph `ClientScalarSelectableNameWrapper` / `ClientObjectSelectableName`). `SelectionNameWrapper` stays for selection names and `reader_alias`.
 - `FieldDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
 - `name` on entrypoint and field declarations (isograph `client_field_name`).
 - Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
@@ -204,7 +204,7 @@ parsing-standards.md governs how every implementation below is written. Each doc
 
 1. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 2. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
-3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint, field, and selection names. `FieldDeclaration`. `name` not `client_field_name`.
+3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint and field names. `FieldDeclaration`. `name` not `client_field_name`. `SelectionNameWrapper` stays.
 4. `optional-to.md`. Optional `to Type` on `FieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
 5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 

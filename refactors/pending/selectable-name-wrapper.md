@@ -1,10 +1,10 @@
-# selectable-name-wrapper: one `SelectableNameWrapper`
+# selectable-name-wrapper: `SelectableNameWrapper` and `FieldDeclaration`
 
-`ClientScalarSelectableNameWrapper` and `SelectionNameWrapper` are one type, `SelectableNameWrapper`. `ClientFieldDeclaration` is `FieldDeclaration`. `client_field_name` is `name`. There is no scalar/object split and no client/server split in these names.
+`ClientScalarSelectableNameWrapper` is `SelectableNameWrapper`. `ClientFieldDeclaration` is `FieldDeclaration`. `client_field_name` is `name`. `SelectionNameWrapper` stays: a selection's `name` and `reader_alias` are that wrapper. The left-hand side of `Type.name` on an entrypoint or field stays `EntityNameWrapper`.
 
 Lands after parse-type-dot-name.md, before optional-to.md. No grammar change.
 
-Origin: `ClientScalarSelectableNameWrapper` in `crates/isograph_parser/src/parse_iso_literal.rs` and `SelectionNameWrapper` in `crates/isograph_parser/src/selections.rs`. Delta: one wrapper over `SelectableName`; parent enum `EntrypointDeclaration | FieldDeclaration | Selection`. Origin for the declaration: `ClientFieldDeclaration` in the same file. Delta: `FieldDeclaration`, field `name`.
+Origin: `ClientScalarSelectableNameWrapper` in `crates/isograph_parser/src/parse_iso_literal.rs`. Delta: rename to `SelectableNameWrapper`. Origin for the declaration: `ClientFieldDeclaration` in the same file. Delta: `FieldDeclaration`, field `name`.
 
 ## Changes to the wrapper
 
@@ -29,15 +29,6 @@ pub type ClientScalarSelectableNameWrapperPath<'a> = PositionResolutionPath<
 >;
 ```
 
-```rust
-// from crates/isograph_parser/src/selections.rs
-#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
-
-pub type SelectionNameWrapperPath<'a> =
-    PositionResolutionPath<&'a SelectionNameWrapper, SelectionPath<'a>>;
-```
-
 After:
 
 ```rust
@@ -52,16 +43,19 @@ pub struct SelectableNameWrapper(common_lang_types::SelectableName);
 pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     FieldDeclaration(FieldDeclarationPath<'a>),
-    Selection(SelectionPath<'a>),
 }
 
 pub type SelectableNameWrapperPath<'a> =
     PositionResolutionPath<&'a SelectableNameWrapper, SelectableNameWrapperParent<'a>>;
 ```
 
-`SelectableNameWrapper` stays in parse_iso_literal.rs. `Selection.name` and `reader_alias` use `crate::SelectableNameWrapper`. `parse_iso_literal.rs` gains `SelectionPath` in its `use crate` list.
+`SelectionNameWrapper` is unchanged: parent `SelectionPath`, used for `Selection.name` and `Selection.reader_alias`.
 
-`SelectionNameWrapper` is deleted.
+```rust
+// from crates/isograph_parser/src/selections.rs
+#[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
+```
 
 ## Changes to FieldDeclaration
 
@@ -175,26 +169,14 @@ pub enum IsoLiteralItem {
 pub struct Description(common_lang_types::DescriptionValue);
 ```
 
-`IsoLiteralItem::Field` stays the variant name.
+`IsoLiteralItem::Field` stays the variant name. `parent_type` stays `EntityNameWrapper`.
 
-## Changes to Selection
+## Changes to SelectionSetParent
 
 Before:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-pub struct Selection {
-    #[resolve_field]
-    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
-    #[resolve_field]
-    pub name: WithSpan<SelectionNameWrapper>,
-    #[resolve_field]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-    #[resolve_field]
-    #[parent_variant(Selection)]
-    pub selection_set: Option<WithSpan<SelectionSet>>,
-}
-
 pub enum SelectionSetParent<'a> {
     ClientFieldDeclaration(crate::ClientFieldDeclarationPath<'a>),
     Selection(Box<SelectionPath<'a>>),
@@ -205,34 +187,13 @@ After:
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
-pub struct Selection {
-    #[resolve_field]
-    #[parent_variant(Selection)]
-    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
-    #[resolve_field]
-    #[parent_variant(Selection)]
-    pub name: WithSpan<SelectableNameWrapper>,
-    #[resolve_field]
-    pub arguments: Option<WithSpan<ArgumentList>>,
-    #[resolve_field]
-    #[parent_variant(Selection)]
-    pub selection_set: Option<WithSpan<SelectionSet>>,
-}
-
 pub enum SelectionSetParent<'a> {
     FieldDeclaration(crate::FieldDeclarationPath<'a>),
     Selection(Box<SelectionPath<'a>>),
 }
 ```
 
-`reader_alias` and `name` gain `#[parent_variant(Selection)]` because the wrapper's parent is now an enum.
-
-```rust
-// from crates/isograph_parser/src/selections.rs
-                    first.interned().map(SelectableNameWrapper).wrap_some(),
-                    name.interned().map(SelectableNameWrapper),
-            None => (None, first.interned().map(SelectableNameWrapper)),
-```
+`Selection.name` and `reader_alias` stay `SelectionNameWrapper`. Construction stays `first.interned().map(SelectionNameWrapper)`.
 
 ## Changes to parse_entrypoint and parse_field
 
@@ -305,13 +266,13 @@ pub type VariableDeclarationOrUsageListPath<'a> =
     SelectableNameWrapper(SelectableNameWrapperPath<'a>),
 ```
 
-`ClientFieldDeclaration` and `ClientScalarSelectableNameWrapper` and `SelectionNameWrapper` variants are deleted.
+`ClientFieldDeclaration` and `ClientScalarSelectableNameWrapper` variants are deleted. `SelectionNameWrapper` stays.
 
-A position on an entrypoint name, a field name, a selection name, or a `reader_alias` answers `SelectableNameWrapper`. The parent variant is `EntrypointDeclaration`, `FieldDeclaration`, or `Selection`.
+A position on an entrypoint name or a field name answers `SelectableNameWrapper`. A position on a selection name or `reader_alias` answers `SelectionNameWrapper`. A position on `Query` in `entrypoint Query.foo` answers `EntityNameWrapper`.
 
 ## Tests
 
-Every `ClientScalarSelectableNameWrapper`, `SelectionNameWrapper`, `ClientFieldDeclaration`, `client_field_name`, and `ClientFieldDeclarationPath` identifier in `crates/isograph_parser` becomes the new name. Resolution matches:
+Every `ClientScalarSelectableNameWrapper`, `ClientFieldDeclaration`, `client_field_name`, and `ClientFieldDeclarationPath` identifier in `crates/isograph_parser` becomes the new name. `SelectionNameWrapper` identifiers stay.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -323,11 +284,8 @@ Every `ClientScalarSelectableNameWrapper`, `SelectionNameWrapper`, `ClientFieldD
 
 ```rust
         match parse.resolve((), span_of(text, "bar")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
-                SelectableNameWrapperParent::Selection(_) => {}
-                parent => panic!("expected a selection parent, got {parent:?}"),
-            },
-            node => panic!("expected the selectable name leaf, got {node:?}"),
+            IsographResolutionNode::SelectionNameWrapper(_) => {}
+            node => panic!("expected the selection name leaf, got {node:?}"),
         }
 ```
 
@@ -345,10 +303,10 @@ a_field_declaration_parses_with_scalar_selections → a_field_declaration_parses
 ## AGENTS.md on landing
 
 ```
-Parser interned-key wrappers are named `$RoleWrapper` and wrap the `common_lang_types` interned type for that role (`FieldArgumentNameWrapper(FieldArgumentName)`, `SelectableNameWrapper(SelectableName)`). They do not implement `From<StringKey>`: `string_key_newtype!` already does that on the inner type. Construction is `token.interned().map(SelectableNameWrapper)`. A selection name, a `reader_alias`, an entrypoint name, and a field name are the same wrapper.
+Parser interned-key wrappers are named `$RoleWrapper` and wrap the `common_lang_types` interned type for that role (`FieldArgumentNameWrapper(FieldArgumentName)`, `SelectionNameWrapper(SelectableName)`, `SelectableNameWrapper(SelectableName)`). They do not implement `From<StringKey>`: `string_key_newtype!` already does that on the inner type. Construction is `token.interned().map(SelectionNameWrapper)`. A selection name and a `reader_alias` are `SelectionNameWrapper`. An entrypoint name and a field name are `SelectableNameWrapper`. The left-hand side of `Type.name` is `EntityNameWrapper`.
 ```
 
-The Selection vs Selectable paragraph stays: a selection node is not named `Selectable*`. The interned name wrapper is `SelectableNameWrapper`.
+The Selection vs Selectable paragraph stays: a selection node is not named `Selectable*`. A selection's interned name is still `SelectableName`.
 
 ## Landing checklist
 

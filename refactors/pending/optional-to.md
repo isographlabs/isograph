@@ -113,17 +113,15 @@ pub enum IsoLiteralItem {
 }
 ```
 
-A field with `to` and a field without `to` are the same `FieldDeclaration`. Variables, description, and `selection_set` are the same fields. Nested selections are the same `Selection` (`selection_set: Option`). `SelectableNameWrapper` is the declaration name on entrypoints and on fields, with or without `to`.
+A field with `to` and a field without `to` are the same `FieldDeclaration`. Variables, description, and `selection_set` are the same fields. Nested selections are the same `Selection` (`selection_set: Option`). The field name is `SelectableNameWrapper`. A selection's `name` and `reader_alias` stay `SelectionNameWrapper`.
 
 ```rust
 // from crates/isograph_parser/src/selections.rs
 pub struct Selection {
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
     pub arguments: Option<WithSpan<ArgumentList>>,
     #[resolve_field]
@@ -147,7 +145,6 @@ pub enum EntityNameWrapperParent<'a> {
 pub enum SelectableNameWrapperParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     FieldDeclaration(FieldDeclarationPath<'a>),
-    Selection(SelectionPath<'a>),
 }
 ```
 
@@ -591,15 +588,12 @@ No new `IsographResolutionNode` variants. A position on `to` answers `FieldDecla
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "id")) {
-            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
-                SelectableNameWrapperParent::Selection(selection) => {
-                    match selection.parent.parent.parent {
-                        SelectionSetParent::FieldDeclaration(_) => {}
-                        parent => panic!("expected the field at the top, got {parent:?}"),
-                    }
+            IsographResolutionNode::SelectionNameWrapper(name) => {
+                match name.parent.parent.parent.parent {
+                    SelectionSetParent::FieldDeclaration(_) => {}
+                    parent => panic!("expected the field at the top, got {parent:?}"),
                 }
-                parent => panic!("expected a selection parent, got {parent:?}"),
-            },
+            }
             node => panic!("expected the selection name leaf, got {node:?}"),
         }
     }

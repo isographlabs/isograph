@@ -342,7 +342,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name, a `reader_alias`, an entrypoint name, and a field name are `SelectableNameWrapper` over `SelectableName`. The integer arm is `span.text().parse()` on the token `require_token(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. An entrypoint name and a field name are `SelectableNameWrapper` over `SelectableName`. The left-hand side of `Type.name` is `EntityNameWrapper`. The integer arm is `span.text().parse()` on the token `require_token(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"`; `"true"` / `"false"` / `"null"`). Optional `to` is peek-then-parse: peek Identifier, `drop` the peek, compare `cursor.text()` at that span to `"to"`, then `require_token(Identifier, Keyword)` and parse the type. A non-`to` identifier is not consumed.
 
@@ -361,11 +361,11 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
                     cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
                 })?;
             (
-                first.interned().map(SelectableNameWrapper).wrap_some(),
-                name.interned().map(SelectableNameWrapper),
+                first.interned().map(SelectionNameWrapper).wrap_some(),
+                name.interned().map(SelectionNameWrapper),
             )
         }
-        None => (None, first.interned().map(SelectableNameWrapper)),
+        None => (None, first.interned().map(SelectionNameWrapper)),
     };
 ```
 
@@ -492,7 +492,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Multi-form position: `consume_*` ladder, last arm `expected`
 - Keyword / boolean / null text: `token.text()` after an identifier
 - Integer conversion: `token.text().parse()` on an `IntegerLiteral` token
-- Interned name: `token.interned().map(SelectableNameWrapper)` (the inner lang type implements `From<StringKey>`; the wrapper does not)
+- Interned name: `token.interned().map(SelectionNameWrapper)` or `.map(SelectableNameWrapper)` (the inner lang type implements `From<StringKey>`; the wrapper does not)
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_each_chunk` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`
@@ -525,7 +525,7 @@ Each grammar feature lands on this surface.
 - token-kind-zst.md: `NonBracketTokenKind` ZST payloads as peek-match proof; consume/require use associated constants
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-type-dot-name.md: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
-- selectable-name-wrapper.md: `SelectableNameWrapper`; `FieldDeclaration`; `name` not `client_field_name`
+- selectable-name-wrapper.md: `SelectableNameWrapper` for entrypoint and field names; `FieldDeclaration`; `name` not `client_field_name`; `SelectionNameWrapper` stays
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
 - optional-to.md: optional `to Type` on `FieldDeclaration`; peek Identifier, `drop`, compare `cursor.text()` to `"to"`, then `require_token`; `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>)`

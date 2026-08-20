@@ -235,11 +235,9 @@ Selections. Upstream deserializes immediately into typed directive sets. This st
 // from crates/isograph_parser/src/selections.rs
 pub struct Selection {
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub reader_alias: Option<WithSpan<SelectableNameWrapper>>,
+    pub reader_alias: Option<WithSpan<SelectionNameWrapper>>,
     #[resolve_field]
-    #[parent_variant(Selection)]
-    pub name: WithSpan<SelectableNameWrapper>,
+    pub name: WithSpan<SelectionNameWrapper>,
     #[resolve_field]
     #[parent_variant(Selection)]
     pub arguments: Option<WithSpan<ArgumentList>>,
