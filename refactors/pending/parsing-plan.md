@@ -63,7 +63,7 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 6. Variable defaults accept `$`. One value type (`NonConstantValue`). Upstream parses a `ConstantValue` and rejects `$` at the `$`.
 
-7. There is no `pointer` keyword. `field Type.name to Type { ... }` is a field with `target_type: Some`. Upstream's `pointer Type.name to Type { ... }` is `DeclarationKeyword` at `pointer`.
+7. There is no `pointer` keyword. `field Type.name to Type { ... }` is a field with `target_type: Some`. Upstream's `pointer Type.name to Type { ... }` is `DECLARATION_KEYWORD` at `pointer`.
 
 ## The error model
 
@@ -92,34 +92,22 @@ pub struct ExpectedFound {
     pub found: Found,
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Expectation {
-    #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("one of `entrypoint` or `field`")]
-    DeclarationKeyword,
-    #[error("the end of the declaration")]
+    Keyword(&'static str),
+    Description,
+    OneOf(&'static [Expectation]),
     EndOfDeclaration,
-    #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
-    #[error("a field selection")]
     Selection,
-    #[error("a comma, a line break, or {}", .0.closing())]
     Separator(BracketKind),
-    #[error("an argument, like 'id: $id'")]
     Argument,
-    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
     Value,
-    #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
-    #[error("a variable declaration, like '$id: ID!'")]
     VariableDeclarationOrUsage,
-    #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[error("the end of the type")]
     EndOfType,
-    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
-    ToOrDescriptionOrSelectionSet,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
@@ -207,8 +195,9 @@ parsing-standards.md governs how every implementation below is written. Each doc
 2. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
 3. `selectable-name-wrapper.md`. `SelectableNameWrapper` for entrypoint and field names. `FieldDeclaration`. `name` not `client_field_name`. `SelectionNameWrapper` stays.
 4. `selection-name.md`. `SelectionNameWrapper` wraps `SelectionName`.
-5. `optional-to.md`. Optional `to Type` on `FieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
-6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+5. `expectation-one-of.md`. `Expectation::OneOf` and `Keyword`. `DeclarationKeyword` and `ToOrDescriptionOrSelectionSet` become `OneOf`.
+6. `optional-field-selection-set.md`. `field Type.name` with no `{ }`. `selection_set` is `Option`.
+7. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.
 

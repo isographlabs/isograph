@@ -1,6 +1,6 @@
 # parse-directives: `@name` and `@name(args)`
 
-Lands after optional-to.md. Every host that isograph attaches directives to already exists: entrypoints, fields (with or without `to`), and selections. isograph's pointer site is the field site after `to`.
+Lands after optional-field-selection-set.md. Every host that isograph attaches directives to already exists: entrypoints, fields (with or without `to`), and selections. isograph's pointer site is the field site after `to`. The field selection set is already optional.
 
 The grammar stage stores the raw `@name` form. Typed sets (`EntrypointDirectiveSet`, …) are a later stage. Unknown names parse.
 
@@ -219,6 +219,9 @@ Field. Origin field name: `directive_set`.
     #[resolve_field]
     #[parent_variant(FieldDeclaration)]
     pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
+    #[parent_variant(FieldDeclaration)]
+    pub selection_set: Option<WithSpan<SelectionSet>>,
 ```
 
 ```rust
@@ -226,8 +229,7 @@ Field. Origin field name: `directive_set`.
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
-    let selection_set =
-        require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
+    let selection_set = consume_selection_set(cursor);
 ```
 
 Selections. Upstream deserializes immediately into typed directive sets. This stage stores the raw list on `Selection`.

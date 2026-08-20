@@ -292,59 +292,46 @@ A group plus its interior is `consume_group_if` or `require_group` with a functi
 
 ## Dispatch
 
-When the next item may start several forms, peek without `commit`, `drop` the peek, then call a parse function that requires its first token. The last arm is `expected`. If those arms are one value, the match is inside `spanning`.
+When the next item may start several forms, peek without `commit`. Copy what the match needs from the peek (`view()`, a span). The peek ends when that expression ends. Then call a parse function that requires its first token. Do not write `drop(peek)`: Clippy does not check it. The last arm is `expected`. If those arms are one value, the match is inside `spanning`. Landed `parse_non_constant_value` uses `cursor.peek().map(|peek| peek.view().item.reference())` so the peek is gone before `parse_*`.
 
 `parse_non_constant_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_non_constant_value(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
-    cursor.spanning(|cursor| {
-        if let Some(peek) = cursor.peek() {
-            match peek.view().item.reference() {
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
-                    drop(peek);
-                    return NonConstantValue::Variable(VariableUse(parse_variable_name(
-                        cursor,
-                        Expectation::Token(NonBracketTokenKind::Dollar),
-                    )?))
-                    .wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::StringLiteral,
-                )) => {
-                    drop(peek);
-                    return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(
-                    NonBracketTokenKind::IntegerLiteral,
-                )) => {
-                    drop(peek);
-                    return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
-                }
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
-                    drop(peek);
-                    return parse_boolean_or_null(cursor);
-                }
-                ChunkContentItem::Group(group)
-                    if group.opening.item.0 == BracketKind::Brace =>
-                {
-                    drop(peek);
-                    return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
-                }
-                _ => {}
+        match cursor.peek().map(|peek| peek.view().item.reference()) {
+            Some(ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar))) => {
+                return NonConstantValue::Variable(VariableUse(parse_variable_name(
+                    cursor,
+                    Expectation::Token(NonBracketTokenKind::Dollar),
+                )?))
+                .wrap_ok();
             }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::StringLiteral,
+            ))) => {
+                return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::IntegerLiteral,
+            ))) => {
+                return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::Identifier,
+            ))) => {
+                return parse_boolean_or_null(cursor);
+            }
+            Some(ChunkContentItem::Group(group)) if group.opening.item.0 == BracketKind::Brace => {
+                return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
+            }
+            _ => {}
         }
         cursor.expected(Expectation::Value).wrap_err()
-    })
-}
 ```
 
 `VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectionName` (an AST item). An entrypoint name and a field name are `SelectableNameWrapper` over `SelectableName` (a definition). The left-hand side of `Type.name` is `EntityNameWrapper`. Checking that a selection refers to a selectable that exists is a later pass. The integer arm is `span.text().parse()` on the token `require_token(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
-Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"`; `"true"` / `"false"` / `"null"`). Optional `to` is peek-then-parse: peek Identifier, `drop` the peek, compare `cursor.text()` at that span to `"to"`, then `require_token(Identifier, Keyword)` and parse the type. A non-`to` identifier is not consumed.
+Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"`; `"true"` / `"false"` / `"null"`). Optional `to` copies the identifier span from `peek().and_then`, then compares `cursor.text()` at that span to `"to"`, then `require_token(Identifier, Keyword)` and parse the type. A non-`to` identifier is not consumed.
 
 One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is `parse_variable_name(cursor, missing_dollar)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
@@ -420,8 +407,9 @@ pub enum Expectation {
     TypeAnnotation,
     #[error("the end of the type")]
     EndOfType,
-    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
-    ToOrDescriptionOrSelectionSet,
+    Keyword(&'static str),
+    Description,
+    OneOf(&'static [Expectation]),
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
@@ -456,7 +444,7 @@ impl BracketKind {
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, and `EndOfType`. optional-to.md adds `ToOrDescriptionOrSelectionSet` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, and `EndOfType`. expectation-one-of.md replaces `DeclarationKeyword` and `ToOrDescriptionOrSelectionSet` with `OneOf` and `Keyword`. optional-field-selection-set.md makes the field selection set optional.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
@@ -521,14 +509,15 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- peek-then-parse.md: peek without `commit`, `drop` the peek, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
+- peek-then-parse.md: peek without `commit`, copy what the match needs, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
 - token-kind-zst.md: `NonBracketTokenKind` ZST payloads as peek-match proof; consume/require use associated constants
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-type-dot-name.md: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
 - selectable-name-wrapper.md: `SelectableNameWrapper` for entrypoint and field names; `FieldDeclaration`; `name` not `client_field_name`; `SelectionNameWrapper` stays
 - selection-name.md: `SelectionNameWrapper` wraps `SelectionName`
+- expectation-one-of.md: `Expectation::OneOf`, `Keyword`; `DECLARATION_KEYWORD`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
-- optional-to.md: optional `to Type` on `FieldDeclaration`; peek Identifier, `drop`, compare `cursor.text()` to `"to"`, then `require_token`; `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>)`
+- optional-field-selection-set.md: `selection_set: Option`; `consume_selection_set`; `require_selection_set` deleted
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_one_chunk`, `parse_each_chunk`, and `parse_singleton`. This doc stays in `refactors/pending`.

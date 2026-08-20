@@ -7,7 +7,7 @@
 A field declaration (with or without `to`) may carry a description immediately before its selection set:
 
 ```
-field <Identifier> . <Identifier> [<paren group>] [to <type>] [<description>] <brace group>
+field <Identifier> . <Identifier> [<paren group>] [to <type>] [<description>] [<brace group>]
 ```
 
 `<type>` is a type annotation: `Pet`, `Pet!`, `[Pet]`, `[Pet!]!`, `[[Pet]]`.
