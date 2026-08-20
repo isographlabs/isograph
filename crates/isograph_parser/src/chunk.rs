@@ -308,6 +308,42 @@ pub struct Singleton<T, E> {
     pub extra_chunks: Option<WithSpan<E>>,
 }
 
+fn separator_as_content(token: WithSpan<SeparatorToken>) -> WithSpan<ChunkContentItem> {
+    let kind = match token.item {
+        SeparatorToken::Comma => NonBracketTokenKind::Comma,
+        SeparatorToken::LineBreak => NonBracketTokenKind::LineBreak,
+    };
+    ChunkContentItem::NonBracket(NonBracketToken(kind)).with_span(token.location)
+}
+
+fn extra_plus_trailing_separator(
+    extra: Option<WithSpan<UnparsedChunkItems>>,
+    trailing_separator: Option<&WithSpan<ChunkSeparator>>,
+) -> Option<WithSpan<UnparsedChunkItems>> {
+    let Some(separator) = trailing_separator else {
+        return extra;
+    };
+    let added = separator.item.0.iter().copied().map(separator_as_content);
+    match extra {
+        Some(extra) => {
+            let mut items = extra.item.0;
+            items.extend(added);
+            let location = Span::join(extra.location, separator.location);
+            UnparsedChunkItems(items).with_span(location).wrap_some()
+        }
+        None => {
+            let NonEmpty { head, tail } = separator.item.0.clone();
+            let items = NonEmpty {
+                head: separator_as_content(head),
+                tail: tail.into_iter().map(separator_as_content).collect(),
+            };
+            UnparsedChunkItems(items)
+                .with_span(separator.location)
+                .wrap_some()
+        }
+    }
+}
+
 fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     mut stream: ChunkStream<'a>,
@@ -316,40 +352,48 @@ fn parse_one_chunk<'a, P>(
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
     let result = stream.cursor().spanning(parse);
     match result {
-        Ok(item) => match stream.remaining_contents() {
-            None => {
-                let location = item.location;
-                Slot {
-                    item: item.wrap_some(),
-                    extra: None,
-                }
-                .with_span(location)
-            }
-            Some(remaining) => {
-                stream.cursor().report_error(
-                    AstError::expected(leftover, Found::from(remaining.first().item.reference()))
+        Ok(item) => {
+            let extra = match stream.remaining_contents() {
+                None => None,
+                Some(remaining) => {
+                    stream.cursor().report_error(
+                        AstError::expected(
+                            leftover,
+                            Found::from(remaining.first().item.reference()),
+                        )
                         .with_span(remaining.first().location),
-                );
-                let leftover_span =
-                    Span::join(remaining.first().location, remaining.last().location);
-                let location = Span::join(item.location, leftover_span);
-                Slot {
-                    item: item.wrap_some(),
-                    extra: UnparsedChunkItems(remaining)
+                    );
+                    let leftover_span =
+                        Span::join(remaining.first().location, remaining.last().location);
+                    UnparsedChunkItems(remaining)
                         .with_span(leftover_span)
-                        .wrap_some(),
+                        .wrap_some()
                 }
-                .with_span(location)
+            };
+            let extra = match leftover {
+                Expectation::Separator(_) => extra,
+                _ => extra_plus_trailing_separator(extra, chunk.item.trailing_separator.as_ref()),
+            };
+            let location = match extra.as_ref() {
+                None => item.location,
+                Some(extra) => Span::join(item.location, extra.location),
+            };
+            Slot {
+                item: item.wrap_some(),
+                extra,
             }
-        },
+            .with_span(location)
+        }
         Err(reason) => {
             stream.cursor().report_error(reason);
-            let location = chunk.item.contents_span();
+            let extra = match stream.remaining_contents() {
+                Some(remaining) => remaining,
+                None => chunk.item.contents.clone(),
+            };
+            let location = Span::join(extra.first().location, extra.last().location);
             Slot {
                 item: None,
-                extra: UnparsedChunkItems(chunk.item.contents.clone())
-                    .with_span(location)
-                    .wrap_some(),
+                extra: UnparsedChunkItems(extra).with_span(location).wrap_some(),
             }
             .with_span(location)
         }

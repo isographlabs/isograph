@@ -843,7 +843,97 @@ mod tests {
     }
 
     #[test]
-    fn a_failed_form_keeps_the_whole_chunk_as_remaining() {
+    fn a_trailing_comma_after_an_entrypoint_is_extra() {
+        let text = "entrypoint Query.foo,";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
+        as_entrypoint(parse.reference());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("the comma is extra");
+        assert_eq!(extra.location, span_of(text, ","));
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn leftover_dollars_after_entrypoint_are_extra() {
+        let text = "entrypoint $ $";
+        let (parse, errors) = parsed(text, &[(SemanticToken::Keyword, "entrypoint")]);
+        assert!(parsed_item(parse.reference()).is_none());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("$ $ is extra");
+        assert_eq!(extra.location, span_of(text, "$ $"));
+        assert!(
+            errors
+                .iter()
+                .any(|error| { error.item == expected(token(Identifier), Found::Token(Dollar)) })
+        );
+    }
+
+    #[test]
+    fn leftover_then_a_trailing_comma_are_both_extra() {
+        let text = "entrypoint Query.foo bar,";
+        let (parse, errors) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
+        as_entrypoint(parse.reference());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("bar and the comma are extra");
+        assert_eq!(extra.location, span_of(text, "bar,"));
+        assert!(errors.iter().any(|error| {
+            error.item == expected(EndOfDeclaration, Found::Token(Identifier))
+                && error.location == span_of(text, "bar")
+        }));
+        assert!(errors.iter().any(|error| {
+            error.item == expected(EndOfDeclaration, Found::Token(Comma))
+                && error.location == span_of(text, ",")
+        }));
+    }
+
+    #[test]
+    fn a_failed_form_that_consumed_every_item_still_has_extra() {
+        let text = "entrypoint Query.";
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+            ],
+        );
+        assert!(parsed_item(parse.reference()).is_none());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("the whole contents are extra");
+        assert_eq!(extra.location, span_of(text, "entrypoint Query."));
+    }
+
+    #[test]
+    fn a_failed_form_puts_unread_remainder_in_extra() {
         let text = "entrypoint Foo.$ asdf";
         let (parse, errors) = parsed(
             text,
@@ -854,21 +944,33 @@ mod tests {
             ],
         );
         assert!(parsed_item(parse.reference()).is_none());
-        match first_slot(parse.reference())
+        let extra = first_slot(parse.reference())
             .extra
             .as_ref()
-            .map(|wrapped| wrapped.item.reference())
-        {
-            Some(items) => {
-                assert_eq!(items.0.first().location, span_of(text, "entrypoint"));
-                assert_eq!(items.0.last().location, span_of(text, "asdf"));
-            }
-            None => panic!("expected remaining items covering the whole chunk"),
-        }
+            .expect("$ asdf is extra");
+        assert_eq!(extra.location, span_of(text, "$ asdf"));
         assert!(errors.iter().any(|error| {
             error.item == expected(token(Identifier), Found::Token(Dollar))
                 && error.location == span_of(text, "$")
         }));
+    }
+
+    #[test]
+    fn a_trailing_comma_after_an_entrypoint_resolves_to_the_comma() {
+        let text = "entrypoint Query.foo,";
+        let (parse, _) = parsed(
+            text,
+            &[
+                (SemanticToken::Keyword, "entrypoint"),
+                (SemanticToken::Type, "Query"),
+                (SemanticToken::Period, "."),
+                (SemanticToken::FieldName, "foo"),
+            ],
+        );
+        match parse.resolve((), span_of(text, ",")) {
+            IsographResolutionNode::NonBracketToken(_) => {}
+            node => panic!("expected the leftover comma, got {node:?}"),
+        }
     }
 
     #[test]
@@ -1297,8 +1399,8 @@ mod tests {
         let text = "fieldd Query.foo { bar }";
         let (parse, _) = parsed(text, &[(SemanticToken::Keyword, "fieldd")]);
         match parse.resolve((), span_of(text, "fieldd")) {
-            IsographResolutionNode::NonBracketToken(_) => {}
-            node => panic!("expected the token leaf, got {node:?}"),
+            IsographResolutionNode::Singleton(_) => {}
+            node => panic!("expected the singleton, got {node:?}"),
         }
     }
 
