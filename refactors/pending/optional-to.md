@@ -2,7 +2,7 @@
 
 `field Type.name [vars] [to type] [description] { set }`. Fields and pointers are one struct. `to` is optional syntax. The target is parse-variables.md's type annotation (`Pet`, `Pet!`, `[Pet]`, `[Pet!]!`, `[[Pet]]`). The keyword is `field`. There is no `pointer` keyword and no `ClientPointerDeclaration`. Removes `UnsupportedDeclarationType`.
 
-Lands after selectable-name-wrapper.md. Type annotations are parse-variables.md's. Directives land in parse-directives.md.
+Lands after selection-name.md. Type annotations are parse-variables.md's. Directives land in parse-directives.md.
 
 Origin: `ClientPointerDeclaration` in `crates/isograph_lang_types/src/declarations/client_selectable_declaration.rs` and `parse_iso_client_pointer_declaration` in `crates/isograph_lang_parser/src/parse_iso_literal.rs`. Delta: the target sits on `FieldDeclaration` as `target_type: Option<WithSpan<TypeAnnotation>>`; the name is `SelectableNameWrapper`; no `const_export_name`, `definition_path`, `directives`, or `semantic_tokens`.
 
