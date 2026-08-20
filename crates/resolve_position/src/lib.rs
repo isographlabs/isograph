@@ -114,6 +114,21 @@ impl<T: ResolvePosition, TLocation> ResolvePosition for WithGenericLocation<T, T
     }
 }
 
+impl<T: ResolvePosition> ResolvePosition for Box<T> {
+    type Parent<'a>
+        = T::Parent<'a>
+    where
+        Self: 'a;
+    type ResolvedNode<'a>
+        = T::ResolvedNode<'a>
+    where
+        Self: 'a;
+
+    fn resolve<'a>(&'a self, parent: Self::Parent<'a>, position: Span) -> Self::ResolvedNode<'a> {
+        (**self).resolve(parent, position)
+    }
+}
+
 #[cfg(test)]
 mod test {
     #![expect(unused)]
