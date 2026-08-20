@@ -1,11 +1,19 @@
 //! Drive the built `isograph` binary. Every daemon's lock and log live under a private HOME.
 
+use std::path::PathBuf;
 use std::process::{Command, Output};
 use std::time::{Duration, Instant};
 
 use prelude::Postfix;
 
 const DEADLINE: Duration = Duration::from_secs(10);
+
+fn isograph_bin() -> PathBuf {
+    match std::env::var_os("ISOGRAPH_BIN") {
+        Some(path) => PathBuf::from(path),
+        None => PathBuf::from(env!("CARGO_BIN_EXE_isograph")),
+    }
+}
 
 struct Daemon {
     dir: tempfile::TempDir,
@@ -27,7 +35,7 @@ impl Daemon {
     fn isograph(&self, args: &[&str]) -> Output {
         let home = self.dir.path().join("home");
         std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
-        Command::new(env!("CARGO_BIN_EXE_isograph"))
+        Command::new(isograph_bin())
             .args(args)
             .current_dir(self.dir.path())
             .env("HOME", home.reference())
