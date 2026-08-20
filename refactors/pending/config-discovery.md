@@ -36,6 +36,7 @@ New module `crates/isograph_cli/src/discover.rs`. `App::Id` becomes the config f
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
+use std::hash::{DefaultHasher, Hash, Hasher};
 use std::path::{Path, PathBuf};
 
 use freddie_cli::Instance;
@@ -110,22 +111,15 @@ pub fn config_and_instance(flag: Option<&Path>) -> Result<(PathBuf, Instance), D
     (config, instance).wrap_ok()
 }
 
-/// A filename derived from the canonical path, stable across invocations.
+/// A filename: `Instance::named` puts this in a path, so it cannot contain `/`.
 fn slug(config: &Path) -> String {
-    format!("isograph-{:016x}", fnv1a(config.as_os_str().as_encoded_bytes()))
-}
-
-fn fnv1a(bytes: &[u8]) -> u64 {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
-    for byte in bytes {
-        hash ^= u64::from(*byte);
-        hash = hash.wrapping_mul(0x0000_0100_0000_01b3);
-    }
-    hash
+    let mut hasher = DefaultHasher::new();
+    config.hash(&mut hasher);
+    format!("isograph-{:016x}", hasher.finish())
 }
 ```
 
-`fnv1a` is written out because `std`'s hasher is not stable across releases and the slug is a filename the next invocation has to find. `thiserror` on `DiscoverError` for the `Display` / `Error` impls. `NoUserDir` converts with `From`.
+`thiserror` on `DiscoverError` for the `Display` / `Error` impls. `NoUserDir` converts with `From`.
 
 `config_and_instance` computes the pair together so no caller can key an instance to the wrong config.
 
