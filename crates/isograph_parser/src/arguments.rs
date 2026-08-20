@@ -186,14 +186,17 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 
 #[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<ArgumentList>> {
-    let group = cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis)?;
-    let list = ArgumentList(group.item.children.item.parse_each_chunk(
-        cursor,
-        Expectation::Separator(BracketKind::Parenthesis),
-        parse_argument,
-    ));
-    cursor.record_group_close(group.item, SemanticToken::Parenthesis);
-    list.with_span(group.location).wrap_some()
+    cursor.consume_group_if(
+        BracketKind::Parenthesis,
+        SemanticToken::Parenthesis,
+        |cursor, children| {
+            ArgumentList(children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Parenthesis),
+                parse_argument,
+            ))
+        },
+    )
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
@@ -250,14 +253,18 @@ pub(crate) fn parse_value(
                 .wrap_err(),
             };
         }
-        if let Some(group) = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace) {
-            let object = ObjectLiteral(group.item.children.item.parse_each_chunk(
-                cursor,
-                Expectation::Separator(BracketKind::Brace),
-                parse_object_entry,
-            ));
-            cursor.record_group_close(group.item, SemanticToken::Brace);
-            return NonConstantValue::Object(object).wrap_ok();
+        if let Some(object) = cursor.consume_group_if(
+            BracketKind::Brace,
+            SemanticToken::Brace,
+            |cursor, children| {
+                ObjectLiteral(children.item.parse_each_chunk(
+                    cursor,
+                    Expectation::Separator(BracketKind::Brace),
+                    parse_object_entry,
+                ))
+            },
+        ) {
+            return NonConstantValue::Object(object.item).wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })

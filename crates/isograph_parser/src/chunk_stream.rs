@@ -5,7 +5,7 @@ use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketKind, Chunk, ChunkContentItem, ChunkedGroup, Expectation, Found, NonBracketTokenKind,
+    BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, Found, NonBracketTokenKind,
     ParseError, SemanticToken,
 };
 
@@ -43,6 +43,26 @@ impl<'a> TokenText<'a> {
             .intern()
             .to::<T>()
             .with_span(self.location)
+    }
+}
+
+/// Records `token` at `closing` when dropped, however the parse function exits, a panic included.
+#[cfg_attr(not(test), expect(dead_code))]
+struct RecordGroupClose<'c, 'a> {
+    cursor: &'c mut ItemCursor<'a>,
+    closing: Span,
+    token: SemanticToken,
+}
+
+impl<'c, 'a> RecordGroupClose<'c, 'a> {
+    fn cursor(&mut self) -> &mut ItemCursor<'a> {
+        self.cursor
+    }
+}
+
+impl Drop for RecordGroupClose<'_, '_> {
+    fn drop(&mut self) {
+        self.cursor.record(self.token, self.closing);
     }
 }
 
@@ -118,26 +138,31 @@ impl<'a> ItemCursor<'a> {
     }
 
     #[cfg_attr(not(test), expect(dead_code))]
-    pub(crate) fn consume_group_if(
+    pub(crate) fn consume_group_if<R>(
         &mut self,
         kind: BracketKind,
         token: SemanticToken,
-    ) -> Option<WithSpan<&'a ChunkedGroup>> {
+        parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
+    ) -> Option<WithSpan<R>> {
         let peek = self.peek()?;
         let item = peek.view();
         match item.item.reference() {
             ChunkContentItem::Group(group) if group.opening.item.0 == kind => {
                 let location = item.location;
+                let closing = group.closing.location;
+                let children = group.children.reference();
                 peek.commit(token);
-                group.with_span(location).wrap_some()
+                let mut close = RecordGroupClose {
+                    cursor: self,
+                    closing,
+                    token,
+                };
+                parse_inside(close.cursor(), children)
+                    .with_span(location)
+                    .wrap_some()
             }
             _ => None,
         }
-    }
-
-    #[cfg_attr(not(test), expect(dead_code))]
-    pub(crate) fn record_group_close(&mut self, group: &ChunkedGroup, token: SemanticToken) {
-        self.record(token, group.closing.location);
     }
 
     pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
@@ -148,6 +173,7 @@ impl<'a> ItemCursor<'a> {
         chunk.stream(self.text, self.tokens, self.errors)
     }
 
+    #[cfg_attr(not(test), expect(dead_code))]
     fn record(&mut self, token: SemanticToken, span: Span) {
         self.tokens.push(token.with_span(span));
     }
@@ -172,12 +198,13 @@ impl<'a> ItemCursor<'a> {
     }
 
     #[cfg_attr(not(test), expect(dead_code))]
-    pub(crate) fn require_group(
+    pub(crate) fn require_group<R>(
         &mut self,
         kind: BracketKind,
         token: SemanticToken,
-    ) -> Result<WithSpan<&'a ChunkedGroup>, ()> {
-        self.consume_group_if(kind, token).ok_or(())
+        parse_inside: impl FnOnce(&mut Self, &'a WithSpan<ChunkedLevel>) -> R,
+    ) -> Result<WithSpan<R>, ()> {
+        self.consume_group_if(kind, token, parse_inside).ok_or(())
     }
 
     #[cfg_attr(not(test), expect(dead_code))]
@@ -319,7 +346,7 @@ mod tests {
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
         let cursor = stream.cursor();
         assert_eq!(
-            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace),
+            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
             None
         );
         assert_eq!(
@@ -327,16 +354,19 @@ mod tests {
             token_text(text, "foo").wrap_some(),
         );
         assert_eq!(
-            cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis),
+            cursor.consume_group_if(
+                BracketKind::Parenthesis,
+                SemanticToken::Parenthesis,
+                |_, _| ()
+            ),
             None
         );
         let group = cursor
-            .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
+            .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
             .expect("the next item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
-        assert_eq!(group.item.opening.item.0, BracketKind::Brace);
         assert_eq!(
-            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace),
+            cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
             None
         );
     }
@@ -354,11 +384,11 @@ mod tests {
             ().wrap_err(),
         );
         let group = cursor
-            .require_group(BracketKind::Brace, SemanticToken::Brace)
+            .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
             .expect("the first item is a brace group");
         assert_eq!(group.location, span_of(text, "{ bar }"));
         assert_eq!(
-            cursor.require_group(BracketKind::Brace, SemanticToken::Brace),
+            cursor.require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
             ().wrap_err(),
         );
         assert_eq!(
@@ -399,7 +429,7 @@ mod tests {
             .with_span(span_of(text, "{ bar }")),
         );
         cursor
-            .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
+            .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
             .expect("the group is present");
         let group_end = span_of(text, "{ bar }").end;
         assert_eq!(
@@ -584,7 +614,7 @@ mod tests {
         assert_eq!(stream.require_end(), ().wrap_err());
         stream
             .cursor()
-            .require_group(BracketKind::Brace, SemanticToken::Brace)
+            .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
             .expect("the chunk is a brace group");
         assert_eq!(stream.require_end(), ().wrap_ok());
         assert_eq!(stream.remaining_contents(), None);
@@ -685,26 +715,45 @@ mod tests {
     }
 
     #[test]
-    fn consume_group_if_records_the_open_and_record_group_close_records_the_close() {
-        let text = "{ bar }";
+    fn consume_group_if_records_the_open_and_the_close() {
+        for text in ["{ bar }", "{}"] {
+            let tree = chunked(text);
+            let mut tokens = Vec::new();
+            let mut errors = Vec::new();
+            {
+                let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+                stream
+                    .cursor()
+                    .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+                    .expect("the chunk is a brace group");
+            }
+            assert_eq!(
+                tokens,
+                vec![
+                    SemanticToken::Brace.with_span(span_of(text, "{")),
+                    SemanticToken::Brace.with_span(span_of(text, "}")),
+                ],
+                "for literal {text:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn require_group_err_records_nothing() {
+        let text = "foo";
         let tree = chunked(text);
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
         {
             let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
-            let cursor = stream.cursor();
-            let group = cursor
-                .consume_group_if(BracketKind::Brace, SemanticToken::Brace)
-                .expect("the chunk is a brace group");
-            cursor.record_group_close(group.item, SemanticToken::Brace);
+            assert_eq!(
+                stream
+                    .cursor()
+                    .require_group(BracketKind::Brace, SemanticToken::Brace, |_, _| ()),
+                ().wrap_err(),
+            );
         }
-        assert_eq!(
-            tokens,
-            vec![
-                SemanticToken::Brace.with_span(span_of(text, "{")),
-                SemanticToken::Brace.with_span(span_of(text, "}")),
-            ],
-        );
+        assert_eq!(tokens, vec![]);
     }
 
     #[test]
