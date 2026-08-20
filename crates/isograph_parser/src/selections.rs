@@ -53,10 +53,11 @@ pub struct ObjectSelection {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionNameWrapper(common_lang_types::SelectableName);
+pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {
+    ClientFieldDeclaration(crate::ClientFieldDeclarationPath<'a>),
     ObjectSelection(Box<ObjectSelectionPath<'a>>),
 }
 
@@ -86,7 +87,6 @@ impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
     }
 }
 
-#[expect(dead_code)]
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {

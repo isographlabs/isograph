@@ -155,7 +155,6 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
     }
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_name_colon_value<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
@@ -171,7 +170,6 @@ fn parse_name_colon_value<N: From<intern::string_key::StringKey>>(
     (name.interned(), value).wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_argument(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<SelectionFieldArgument, WithSpan<ParseError>> {
@@ -184,7 +182,6 @@ fn parse_argument(
     .wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
     let (name, value) =
         parse_name_colon_value(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)?;
@@ -195,7 +192,6 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
     .wrap_ok()
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<ArgumentList>> {
     cursor.consume_group_if(
         BracketKind::Parenthesis,
@@ -210,7 +206,6 @@ pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithS
     )
 }
 
-#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {

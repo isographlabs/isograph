@@ -161,7 +161,6 @@ impl ChunkedLevel {
         self.0.len()
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn parse_each_chunk<P>(
         &self,
         parent: &mut ItemCursor<'_>,

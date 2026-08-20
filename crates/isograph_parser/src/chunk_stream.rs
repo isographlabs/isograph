@@ -47,7 +47,6 @@ impl<'a> TokenText<'a> {
 }
 
 /// Records `token` at `closing` when dropped, however the parse function exits, a panic included.
-#[cfg_attr(not(test), expect(dead_code))]
 struct RecordGroupClose<'c, 'a> {
     cursor: &'c mut ItemCursor<'a>,
     closing: Span,
@@ -137,7 +136,6 @@ impl<'a> ItemCursor<'a> {
         .wrap_some()
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn consume_group_if<R>(
         &mut self,
         kind: BracketKind,
@@ -173,7 +171,6 @@ impl<'a> ItemCursor<'a> {
         chunk.stream(self.text, self.tokens, self.errors)
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     fn record(&mut self, token: SemanticToken, span: Span) {
         self.tokens.push(token.with_span(span));
     }
@@ -197,7 +194,6 @@ impl<'a> ItemCursor<'a> {
         self.consume_token_if(kind, token).ok_or(())
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn require_group<R>(
         &mut self,
         kind: BracketKind,
