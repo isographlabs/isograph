@@ -4,7 +4,7 @@ The schema is a graph. An entity is a node. A selectable is a named pointer from
 
 There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities.
 
-Some entities and selectables come from upstream, for example a GraphQL schema. Others are defined in the project. A `SelectableDeclaration` (iso keyword `field`) defines a selectable in the project. An `EntityDeclaration` (iso keyword `type`, future) defines a named entity in the project.
+Isograph takes upstream entities and selectables, for example from a GraphQL schema, and adds ones defined in the project. A `SelectableDeclaration` (iso keyword `field`) adds a selectable. An `EntityDeclaration` (iso keyword `type`, future) adds a named entity.
 
 The building blocks are `Wrapper`, `Entity`, `EntityDeclaration`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
@@ -62,7 +62,7 @@ struct AnonymousEntity {
 }
 ```
 
-A named entity has a name such as `User`, `Query`, or `String`. It may come from upstream or from an entity declaration.
+A named entity has a name such as `User`, `Query`, or `String`. Upstream supplies some. The project adds others.
 
 An anonymous entity is created by a selectable declaration with no `to` clause, for example `field Foo.Bar`. It has exactly one incoming selectable: the selectable that declaration defines. It has no name, so no other selectable can point at it.
 
@@ -72,7 +72,7 @@ A selectable declaration's parent is a named entity. That entity may be upstream
 
 ## EntityDeclaration
 
-Future. An `EntityDeclaration` defines a named entity in the project. The iso keyword is `type`. Upstream named entities are not entity declarations. GraphQL `type User` and `scalar ID` are upstream; they are not this form.
+Future. An `EntityDeclaration` adds a named entity. The iso keyword is `type`. Upstream named entities are not entity declarations. GraphQL `type User` and `scalar ID` are upstream; they are not this form.
 
 ```rust
 struct EntityDeclaration {
@@ -88,7 +88,7 @@ This defines the named entity `Friend`. A selectable declaration can point at it
 
 ## Selectable
 
-A selectable is a named pointer from an entity to a wrapper of an entity. It may come from upstream or from a selectable declaration.
+A selectable is a named pointer from an entity to a wrapper of an entity. Upstream supplies some. The project adds others.
 
 ```rust
 struct Selectable {
@@ -105,7 +105,7 @@ Nested selections under a selection of this selectable are selections on the inn
 
 ## SelectableDeclaration
 
-A `SelectableDeclaration` defines a selectable in the project. The iso keyword is `field`. Upstream selectables are not selectable declarations. GraphQL fields are upstream; they are not this form.
+A `SelectableDeclaration` adds a selectable. The iso keyword is `field`. Upstream selectables are not selectable declarations. GraphQL fields are upstream; they are not this form.
 
 Every selectable declaration produces exactly one selectable. Not every selectable comes from a declaration.
 
