@@ -1,10 +1,14 @@
 # Event model
 
-An isograph process is a pure function of state and event. Sources send events. Dispatch mutates the state and returns inert effects. An effect loop performs them. Dispatch does no IO. Sources do not touch the state.
+Two layers.
 
-The process does not read the filesystem. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect. A production watcher is a source that observes the OS and emits those events. It is not dispatch. A process started without that source (`Filesystem::Injected`) only accepts events from outside.
+Inner: `handle(state, event) -> Vec<IsographEffect>`. No filesystem, no LSP, no socket. This is what CI tests: feed events, assert effects.
 
-This is figaro's shape. Figaro's events are keys and OS reports. Isograph's events are file changes and completed work.
+Outer: adapters that turn the world into events and effects into the world. A watcher observes the OS. An LSP adapter turns LSP requests into events and effects into LSP responses. The CLI can submit any ingested event. The effect loop performs writes, diagnostics, LSP replies.
+
+The process does not read the filesystem. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect.
+
+This is figaro's shape. Figaro's events are keys and OS reports. Isograph's events are file changes, editor buffers, and completed work.
 
 The building blocks are `Config`, `Event`, `Effect`, `DiskFile`, and `OpenFile`. The state is a pico database.
 
@@ -35,7 +39,24 @@ enum Filesystem {
 }
 ```
 
-`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not. Both accept `IncomingEvent`s from outside.
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not. The CLI, the LSP adapter, and the socket all submit ingested events into the same `handle`.
+
+## Inner
+
+```rust
+fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
+```
+
+CI calls this. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects.
+
+## Outer
+
+Each adapter is outside `handle`.
+
+- Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not.
+- LSP adapter: an LSP request (`textDocument/didOpen`, `didChange`, `didClose`, hover, completions, …) becomes one or more ingested events, usually `EditorChanged`. Effects come back as LSP responses and notifications (`publishDiagnostics`, `semanticTokens/full`, …). The adapter is request/response. `handle` is not.
+- CLI: every ingested event can be submitted as a frame, including `DiskChanged` and `EditorChanged`. Same events the watcher and the LSP adapter would have produced.
+- Effect loop: performs `WriteArtifacts`, `ReportDiagnostics`, LSP replies, `Kill`.
 
 ## Event
 
@@ -78,11 +99,13 @@ struct AsyncWorkFinished;
 struct Quit;
 ```
 
-`DiskChanged` is a filesystem fact. `Present` carries the contents. Dispatch does not open the path. Boot scan is a burst of `DiskChanged` from a source that read the tree; Injected mode has no such burst.
+Ingested events come from outside `handle`: `DiskChanged`, `EditorChanged`. The CLI can submit any of them. The watcher submits `DiskChanged`. The LSP adapter submits `EditorChanged` (and any later LSP-originated events).
 
-`EditorChanged` is the LSP: the buffer for an open file, or that the file is no longer open.
+`DiskChanged` is a filesystem fact. `Present` carries the contents. `handle` does not open the path. Boot scan is a burst of `DiskChanged` from the watcher; Injected mode has no such burst.
 
-`AsyncWorkFinished` is the answer to work dispatch asked the effect loop to do off-thread: a compilation, a schema fetch.
+`EditorChanged` is an editor-buffer fact. The LSP adapter produces it from `didOpen` / `didChange` / `didClose`. The CLI can produce the same event without an editor.
+
+`AsyncWorkFinished` is the answer to work `handle` asked the effect loop to do off-thread: a compilation, a schema fetch. Tests may inject it.
 
 `Quit` is `isograph stop` and SIGTERM.
 
@@ -124,10 +147,6 @@ Artifact generation and watch mode read `DiskFile`. They do not read `OpenFile`.
 The LSP reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The LSP does not generate artifacts. Whether it should is open.
 
 ## Dispatch
-
-```rust
-fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
-```
 
 `DiskChanged` with `Present` sets `DiskFile` from the payload. `DiskChanged` with `Absent` removes it. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
 
