@@ -2,18 +2,24 @@
 
 The derive walks children and, when the walk stops, produces a `ResolvedNode`. Configuring a site is answering two questions: how to build the child's `Parent` when descending, and how to build this type's `ResolvedNode` when no child contains the position.
 
-This doc is the surface. Change 1 and Change 2 rename the two attributes whose names do not match that split.
+This doc is the surface. Change 1 stores container `parent_type` and the pin list as one enum. Change 2 and Change 3 rename the two attributes whose names do not match that split.
 
 ## Container: `#[resolve_position(...)]`
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
 struct ResolvePositionArgs {
-    parent_type: Option<syn::Type>,
+    parent_type: ParentType,
     resolved_node: syn::Type,
-    self_type_generics: Option<SelfTypeGenerics>,
     on_unmatched_span: Option<syn::Ident>,
 }
+
+enum ParentType {
+    Container(syn::Type),
+    Pins(SelfTypeGenerics),
+}
+
+struct SelfTypeGenerics(Vec<SelfTypePin>);
 
 struct SelfTypePin {
     args: syn::AngleBracketedGenericArguments,
@@ -23,9 +29,11 @@ struct SelfTypePin {
 
 `resolved_node` is this type's `ResolvePosition::ResolvedNode`. Required.
 
-`parent_type` is this type's `ResolvePosition::Parent`. Required when `self_type_generics` is omitted. Forbidden when `self_type_generics` is present: each pin carries its own.
+`parent_type` is this type's `ResolvePosition::Parent`.
 
-`self_type_generics` is a list of pins `[ (<A, B>, ParentTy), ... ]`. Omitted: one impl over the type's own generics (`split_for_impl`). Present: one impl per pin, `ty_generics = pin.args`, `parent_type = pin.parent_type`, no impl generics. One pin may use `on_unmatched_span = struct_name` (the default). Two or more pins require `on_unmatched_span = from_path`. An empty list is a compile error. Container `parent_type` next to a list is a compile error.
+`ParentType::Container`: the attribute `parent_type = Ty`. One impl over the type's own generics (`split_for_impl`).
+
+`ParentType::Pins`: the attribute `self_type_generics = [ (<A, B>, ParentTy), ... ]`. One impl per pin, `ty_generics = pin.args`, `parent_type = pin.parent_type`, no impl generics. One pin may use `on_unmatched_span = struct_name` (the default). Two or more pins require `on_unmatched_span = from_path`. An empty list is a compile error.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -188,13 +196,205 @@ Proposed surface:
 
 `on_unmatched_span = struct_name` stays. It names the `ResolvedNode` variant after the struct. That is what the emission does.
 
-## Change 1: `self_type_generics` is `pins`
+## Change 1: `parent_type` is `ParentType`
 
-Origin: `ResolvePositionArgs`, `SelfTypeGenerics` parse, error strings, the derive `attributes(...)` list does not name this (it is an argument of `resolve_position`). Delta: the argument is `pins`. `<A, B>` without the pin tuple stays a parse error.
+Origin: `ResolvePositionArgs`, `require_parent_type`, the `self_type_generics` match in `handle_data_struct` and `handle_data_enum`. Delta: deluxe extracts `ResolvePositionAttr`. `ResolvePositionArgs::from_attr` builds `ParentType`. `handle_data_struct` and `handle_data_enum` match `ParentType`. `require_parent_type` is deleted. Attribute syntax is unchanged. Error strings are unchanged.
 
 ```rust
 // from crates/resolve_position_macros/src/resolve_position_macro.rs
 struct ResolvePositionArgs {
+    parent_type: ParentType,
+    resolved_node: syn::Type,
+    on_unmatched_span: Option<syn::Ident>,
+}
+
+enum ParentType {
+    Container(syn::Type),
+    Pins(SelfTypeGenerics),
+}
+
+#[derive(deluxe::ExtractAttributes)]
+#[deluxe(attributes(resolve_position))]
+struct ResolvePositionAttr {
+    parent_type: Option<syn::Type>,
+    resolved_node: syn::Type,
+    self_type_generics: Option<SelfTypeGenerics>,
+    on_unmatched_span: Option<syn::Ident>,
+}
+```
+
+Before: `ResolvePositionArgs` is the deluxe extract, with `parent_type: Option<syn::Type>` and `self_type_generics: Option<SelfTypeGenerics>`.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+impl ResolvePositionArgs {
+    fn from_attr(attr: ResolvePositionAttr) -> Result<Self, proc_macro2::TokenStream> {
+        let parent_type = match (attr.parent_type, attr.self_type_generics) {
+            (Some(parent_type), None) => ParentType::Container(parent_type),
+            (None, Some(pins)) => ParentType::Pins(pins),
+            (Some(parent_type), Some(_)) => {
+                return Error::new_spanned(
+                    parent_type,
+                    "`parent_type` is on each pin when `self_type_generics` is present",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+            (None, None) => {
+                return Error::new_spanned(
+                    attr.resolved_node.reference(),
+                    "`parent_type` is required when `self_type_generics` is omitted",
+                )
+                .to_compile_error()
+                .wrap_err();
+            }
+        };
+        ResolvePositionArgs {
+            parent_type,
+            resolved_node: attr.resolved_node,
+            on_unmatched_span: attr.on_unmatched_span,
+        }
+        .wrap_ok()
+    }
+}
+```
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    let resolve_position_attr = match deluxe::extract_attributes(&mut input) {
+        Ok(resolve_position_attr) => resolve_position_attr,
+        Err(e) => return e.into_compile_error().to(),
+    };
+    let resolve_position_args = match ResolvePositionArgs::from_attr(resolve_position_attr) {
+        Ok(resolve_position_args) => resolve_position_args,
+        Err(e) => return e.to(),
+    };
+```
+
+Before: one `deluxe::extract_attributes` into `ResolvePositionArgs`.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+fn handle_data_struct(
+    struct_name: syn::Ident,
+    args: ResolvePositionArgs,
+    data_struct: syn::DataStruct,
+    input_generics: syn::Generics,
+) -> TokenStream {
+    match args.parent_type.reference() {
+        ParentType::Container(parent_type) => {
+            let field_infos = match collect_field_infos(&data_struct, &HashMap::new()) {
+                Ok(field_infos) => field_infos,
+                Err(e) => return e.to(),
+            };
+            let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+            emit_one_impl(EmitImpl {
+                struct_name: struct_name.reference(),
+                resolved_node: args.resolved_node.reference(),
+                parent_type,
+                on_unmatched_span: args.on_unmatched_span.as_ref(),
+                impl_generics: quote!(#impl_generics),
+                ty_generics: quote!(#ty_generics),
+                where_clause: quote!(#where_clause),
+                field_infos: field_infos.reference(),
+            })
+            .to()
+        }
+        ParentType::Pins(pins) => {
+            if let Err(e) =
+                require_from_path_with_pins(pins.0.len(), args.on_unmatched_span.as_ref())
+            {
+                return e.to();
+            }
+            let mut impls = Vec::new();
+            for pin in pins.0.iter() {
+                let generics_map = match validate_and_map_generics(
+                    input_generics.clone(),
+                    pin.args.clone().wrap_some(),
+                ) {
+                    Ok(generics_map) => generics_map,
+                    Err(e) => return e.to(),
+                };
+                let field_infos = match collect_field_infos(&data_struct, generics_map.reference())
+                {
+                    Ok(field_infos) => field_infos,
+                    Err(e) => return e.to(),
+                };
+                let pin_args = pin.args.reference();
+                impls.push(emit_one_impl(EmitImpl {
+                    struct_name: struct_name.reference(),
+                    resolved_node: args.resolved_node.reference(),
+                    parent_type: pin.parent_type.reference(),
+                    on_unmatched_span: args.on_unmatched_span.as_ref(),
+                    impl_generics: quote!(),
+                    ty_generics: quote!(#pin_args),
+                    where_clause: quote!(),
+                    field_infos: field_infos.reference(),
+                }));
+            }
+            quote!(#(#impls)*).to()
+        }
+    }
+}
+```
+
+Before: `match args.self_type_generics.reference()`. `None` calls `require_parent_type`. `Some` errors if `args.parent_type` is `Some`.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+    match args.parent_type.reference() {
+        ParentType::Container(parent_type) => {
+            let (impl_generics, ty_generics, where_clause) = input_generics.split_for_impl();
+            emit_one_enum_impl(
+                enum_name.reference(),
+                parent_type,
+                args.resolved_node.reference(),
+                quote!(#impl_generics),
+                quote!(#ty_generics),
+                quote!(#where_clause),
+                match_arms.reference(),
+            )
+            .to()
+        }
+        ParentType::Pins(pins) => {
+            let mut impls = Vec::new();
+            for pin in pins.0.iter() {
+                if let Err(e) =
+                    validate_and_map_generics(input_generics.clone(), pin.args.clone().wrap_some())
+                {
+                    return e.to();
+                }
+                let pin_args = pin.args.reference();
+                impls.push(emit_one_enum_impl(
+                    enum_name.reference(),
+                    pin.parent_type.reference(),
+                    args.resolved_node.reference(),
+                    quote!(),
+                    quote!(#pin_args),
+                    quote!(),
+                    match_arms.reference(),
+                ));
+            }
+            quote!(#(#impls)*).to()
+        }
+    }
+```
+
+Before: the same `self_type_generics` match, `require_parent_type`, and container-`parent_type` error as the struct handler.
+
+`require_parent_type` is deleted. `require_from_path_with_pins` stays.
+
+Attribute syntax is unchanged. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+
+## Change 2: `self_type_generics` is `pins`
+
+Origin: `ResolvePositionAttr`, `SelfTypeGenerics` parse, `ResolvePositionArgs::from_attr` error strings, `require_from_path_with_pins` error strings. The derive `attributes(...)` list does not name this (it is an argument of `resolve_position`). Delta: the argument is `pins`. `<A, B>` without the pin tuple stays a parse error.
+
+```rust
+// from crates/resolve_position_macros/src/resolve_position_macro.rs
+#[derive(deluxe::ExtractAttributes)]
+#[deluxe(attributes(resolve_position))]
+struct ResolvePositionAttr {
     parent_type: Option<syn::Type>,
     resolved_node: syn::Type,
     pins: Option<SelfTypeGenerics>,
@@ -202,9 +402,11 @@ struct ResolvePositionArgs {
 }
 ```
 
-Error strings that say `self_type_generics` say `pins`. Empty list: `` `pins` must contain at least one pin ``. Container `parent_type` with a list: `` `parent_type` is on each pin when `pins` is present ``. Two or more pins still require `on_unmatched_span = from_path`.
+Before: `self_type_generics: Option<SelfTypeGenerics>`.
 
-Live sites: `Slot` and `Singleton` in `crates/isograph_parser/src/chunk.rs`. Tests: `crates/resolve_position_macros/tests/self_type_generics_pins.rs`, `from_container_parent_field.rs`. Pending docs that write the list: parse-arguments.md, parsing-standards.md.
+`from_attr` matches `attr.pins`. Error strings that say `self_type_generics` say `pins`. Empty list: `` `pins` must contain at least one pin ``. Container `parent_type` with a list: `` `parent_type` is on each pin when `pins` is present ``. Omitted list: `` `parent_type` is required when `pins` is omitted ``. Two or more pins still require `on_unmatched_span = from_path`.
+
+Live sites: `Slot` and `Singleton` in `crates/isograph_parser/src/chunk.rs`. Tests: `crates/resolve_position_macros/tests/self_type_generics_pins.rs`, `from_container_parent_field.rs`. Pending docs that write the list: parse-arguments.md, parsing-standards.md, parse-selection-sets.md.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -217,7 +419,7 @@ Before: `self_type_generics = [ ... ]`.
 
 `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
 
-## Change 2: `from_container_parent` is `parent_from`
+## Change 3: `from_container_parent` is `parent_from`
 
 Origin: the derive `attributes(...)` list, `collect_field_attributes`, `parse_from_container_parent`, error strings, enum-payload emission, struct-field `FromContainer`. Delta: the attribute is `parent_from`. Error strings that name `from_container_parent` name `parent_from`. Combining with `parent_variant` still errors.
 
@@ -250,6 +452,7 @@ Parser `Slot.extra_tokens` is still bare. parse-arguments.md writes `#[parent_fr
 
 ## Landing checklist
 
-1. Change 1: `pins`. Live sites, tests, pending docs that copy the list. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-2. Change 2: `parent_from`. Derive attributes, tests, pending docs that copy the attribute. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
-3. Move this doc to refactors/past.
+1. Change 1: `ParentType`. Macro only. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+2. Change 2: `pins`. Live sites, tests, pending docs that copy the list. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+3. Change 3: `parent_from`. Derive attributes, tests, pending docs that copy the attribute. `cargo test -p resolve_position_macros` and `cargo test -p isograph_parser` pass.
+4. Move this doc to refactors/past.
