@@ -2,7 +2,7 @@
 
 Requires lsp-semantic-tokens.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
-The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral` holds `errors`, `bracket_errors`, and `comma_errors` with literal-relative spans, and `host_errors` with file-absolute spans from `Slot.extra`. This doc turns those into `lsp_types::Diagnostic`. Literal-relative spans are rebased with `with_offset(extraction.location.start)`. Host-error spans are used as-is.
+The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral.errors` is `Vec<WithSpan<IsoLiteralError<THostLanguage>>>` from `Slot.extra`, already file-absolute. This doc turns those into `lsp_types::Diagnostic`.
 
 Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types.
 
@@ -96,7 +96,6 @@ Tests in those modules:
 
 ```rust
 // from crates/isograph_lsp/src/diagnostics.rs
-use isograph_parser::{BracketError, CommaWithoutItem, ParseError};
 use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use prelude::Postfix;
 use span::Span;
@@ -117,41 +116,11 @@ fn diagnostics_for_literal<THostLanguage: HostLanguage>(
     source: &str,
     literal: &FileLiteral<'_, THostLanguage>,
 ) -> Vec<Diagnostic> {
-    let offset = literal.extraction.location.start;
-    let mut out = Vec::new();
-    for error in &literal.errors {
-        out.push(diagnostic(
-            source,
-            error.location.with_offset(offset),
-            error.item.to_string(),
-        ));
-    }
-    for error in &literal.bracket_errors {
-        let span = match error {
-            BracketError::UnmatchedOpen(open) => open.location,
-            BracketError::UnmatchedClose(close) => close.location,
-        };
-        out.push(diagnostic(
-            source,
-            span.with_offset(offset),
-            error.to_string(),
-        ));
-    }
-    for error in &literal.comma_errors {
-        out.push(diagnostic(
-            source,
-            error.0.with_offset(offset),
-            error.to_string(),
-        ));
-    }
-    for error in &literal.host_errors {
-        out.push(diagnostic(
-            source,
-            error.location,
-            error.item.to_string(),
-        ));
-    }
-    out
+    literal
+        .errors
+        .iter()
+        .map(|error| diagnostic(source, error.location, error.item.to_string()))
+        .collect()
 }
 
 fn diagnostic(source: &str, span: Span, message: String) -> Diagnostic {
@@ -185,7 +154,7 @@ pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 ```
 
-Origin of `char_index_to_position`: isograph `crates/isograph_lsp/src/format.rs`, verbatim. Origin of the publish shape: isograph `diagnostic_notification.rs` (`range`, `message`; we also set `severity` and `source`). Delta: no code-action `data`, no `isograph_location_to_lsp_location`, no pico, rebase via `span.with_offset(extraction.location.start)` on the file text.
+Origin of `char_index_to_position`: isograph `crates/isograph_lsp/src/format.rs`, verbatim. Origin of the publish shape: isograph `diagnostic_notification.rs` (`range`, `message`; we also set `severity` and `source`). Delta: no code-action `data`, no `isograph_location_to_lsp_location`, no pico. Spans on `IsoLiteralError` are already file-absolute.
 
 `lib.rs` gains `mod diagnostics;`.
 
