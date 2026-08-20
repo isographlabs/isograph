@@ -199,8 +199,8 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `one-kind-of-selection.md`. One `Selection` struct with optional `selection_set`. Deletes `ScalarSelection` / `ObjectSelection`.
-2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+1. `parse-name-colon.md`. `parse_colon_rhs` and `parse_name_colon`. Argument and object-entry call sites pass `parse_non_constant_value`.
+2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), `require_variable_name` / `parse_variable_name`, and the `Box` delegation impl.
 3. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.

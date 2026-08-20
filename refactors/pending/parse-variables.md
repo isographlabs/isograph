@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `require_variable_name` then parse-name-colon.md's `parse_colon_rhs`. Lands after parse-name-colon.md.
 
 ## The grammar this doc accepts
 
@@ -99,7 +99,8 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
     Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError,
-    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_non_constant_value,
+    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_colon_rhs,
+    parse_non_constant_value, require_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -275,6 +276,62 @@ impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
 ```
 
+`$name` after a `$` that the caller already took:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub(crate) fn parse_variable_name(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    name.interned().map(VariableNameWrapper).wrap_ok()
+}
+
+pub(crate) fn require_variable_name(
+    cursor: &mut ItemCursor<'_>,
+    missing_dollar: Expectation,
+) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
+    cursor
+        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(missing_dollar))?;
+    parse_variable_name(cursor)
+}
+```
+
+`parse_non_constant_value`'s `$` arm. Before:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if cursor
+            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .is_some()
+        {
+            let name = cursor
+                .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+                .map_err(|()| {
+                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+                })?;
+            return NonConstantValue::Variable(VariableUse(
+                name.interned().map(VariableNameWrapper),
+            ))
+            .wrap_ok();
+        }
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+        if cursor
+            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .is_some()
+        {
+            return NonConstantValue::Variable(VariableUse(parse_variable_name(cursor)?)).wrap_ok();
+        }
+```
+
 ```rust
 // from crates/isograph_parser/src/variables.rs
 pub(crate) fn consume_variable_declaration_list(
@@ -296,23 +353,15 @@ pub(crate) fn consume_variable_declaration_list(
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
-    cursor
-        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(Expectation::VariableDeclarationOrUsage))?;
-    let name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    cursor
-        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let type_ = parse_type_annotation(cursor)?;
+    let name = require_variable_name(cursor, Expectation::VariableDeclarationOrUsage)?;
+    let type_ = parse_colon_rhs(cursor, parse_type_annotation)?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
     {
         Some(_) => parse_non_constant_value(cursor)?.wrap_some(),
         None => None,
     };
     VariableDeclarationOrUsage {
-        name: name.interned().map(VariableNameWrapper),
+        name,
         type_,
         default_value,
     }
@@ -717,5 +766,5 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
 ## Landing checklist
 
 1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-2. `parse_nested_singleton`, variables.rs, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. `parse_nested_singleton`, variables.rs, `parse_variable_name` / `require_variable_name`, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.
