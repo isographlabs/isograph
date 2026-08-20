@@ -202,7 +202,8 @@ parsing-standards.md governs how every implementation below is written. Each doc
 1. `peek-then-parse.md`. `parse_non_constant_value` peeks without `commit`, `drop`s the peek, then a parse function requires the first token. `parse_variable_name` requires `$` then the identifier. `CursorPeek` is unchanged.
 2. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
 3. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
-4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `text() == "to"`. Removes `UnsupportedDeclarationType`.
-5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+4. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
+5. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `text() == "to"`. Removes `UnsupportedDeclarationType`.
+6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.

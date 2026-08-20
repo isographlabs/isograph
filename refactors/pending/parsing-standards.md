@@ -511,6 +511,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
 - `$ ident`: `parse_variable_name(cursor, missing_dollar)`
+- `Type.name`: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
 
 ## Shipping and amending
 
@@ -525,6 +526,7 @@ Each grammar feature lands on this surface.
 - peek-then-parse.md: peek without `commit`, `drop` the peek, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
 - token-kind-zst.md: `NonBracketTokenKind` ZST payloads as peek-match proof; consume/require use associated constants
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
+- parse-type-dot-name.md: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `text()`

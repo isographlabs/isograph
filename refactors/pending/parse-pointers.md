@@ -105,15 +105,7 @@ There is no `PointerKeyword` and no `ToKeyword` node. A position on `pointer` or
 fn parse_pointer(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientPointerDeclaration, WithSpan<ParseError>> {
-    let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    cursor
-        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
-    let client_pointer_name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let (parent_type, client_pointer_name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let to_keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
@@ -130,10 +122,8 @@ fn parse_pointer(
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientPointerDeclaration {
-        parent_type: parent_type.interned().map(EntityNameWrapper),
-        client_pointer_name: client_pointer_name
-            .interned()
-            .map(ClientObjectSelectableNameWrapper),
+        parent_type,
+        client_pointer_name: client_pointer_name.map(ClientObjectSelectableNameWrapper),
         variable_definitions,
         target_type,
         description,
