@@ -10,14 +10,13 @@ Most important first. Parser crate: the trait. TypeScript crate: the implementor
 
 ```rust
 // from crates/isograph_parser/src/host_language.rs
-use std::fmt;
-
 use span::WithSpan;
+use thiserror::Error;
 
 use crate::{BracketError, CommaWithoutItem, ParseError, Slot};
 
 pub trait HostLanguage: Sized {
-    type Error: fmt::Display + std::error::Error;
+    type Error: std::fmt::Display + std::error::Error;
     type LiteralContext;
 
     fn extract_iso_literals<'a>(
@@ -31,29 +30,20 @@ pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
     pub context: THostLanguage::LiteralContext,
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum IsoLiteralError<THostLanguage: HostLanguage> {
+    #[error("{0}")]
     Host(THostLanguage::Error),
+    #[error("{0}")]
     Parse(ParseError),
+    #[error("{0}")]
     Bracket(BracketError),
+    #[error("{0}")]
     Comma(CommaWithoutItem),
 }
-
-impl<THostLanguage: HostLanguage> fmt::Display for IsoLiteralError<THostLanguage> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            IsoLiteralError::Host(error) => write!(f, "{error}"),
-            IsoLiteralError::Parse(error) => write!(f, "{error}"),
-            IsoLiteralError::Bracket(error) => write!(f, "{error}"),
-            IsoLiteralError::Comma(error) => write!(f, "{error}"),
-        }
-    }
-}
-
-impl<THostLanguage: HostLanguage> std::error::Error for IsoLiteralError<THostLanguage> {}
 ```
 
-`IsoLiteralError` derives `Debug, PartialEq, Eq` (`Clone` when `THostLanguage::Error` is `Clone`). Spans on those errors are the inner `WithSpan` in `Slot.extra`'s `Vec<WithSpan<IsoLiteralError<Self>>>`. The outer `WithSpan` on `extra` is the extraction span.
+`IsoLiteralError` derives `Error`. Spans on those errors are the inner `WithSpan` in `Slot.extra`'s `Vec<WithSpan<IsoLiteralError<Self>>>`. The outer `WithSpan` on `extra` is the extraction span.
 
 ```rust
 // from crates/isograph_extract_typescript/src/lib.rs
@@ -61,8 +51,8 @@ use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_parser::{
     BracketError, CommaWithoutItem, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralItem, IsoLiteralParse, ParseError, SelectableNameWrapper, Slot, chunk,
-    match_brackets, parse_iso_literal, tokenize,
+    IsoLiteralItem, IsoLiteralParse, ParseError, ParsedIsoLiteral, SelectableNameWrapper, Slot,
+    parse_iso_literal,
 };
 use prelude::Postfix;
 use regex::Regex;
@@ -318,18 +308,8 @@ impl HostLanguage for TypeScriptHostLanguage {
     }
 }
 
-fn parse_tree(text: &str) -> (
-    Option<WithSpan<IsoLiteralParse>>,
-    Vec<WithSpan<ParseError>>,
-    Vec<BracketError>,
-    Vec<CommaWithoutItem>,
-) {
-    let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
-    let (tree, comma_errors) = chunk(brackets.reference());
-    let mut errors = Vec::new();
-    let mut tokens = Vec::new();
-    let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
-    (parse, errors, bracket_errors, comma_errors)
+fn parse_tree(text: &str) -> ParsedIsoLiteral {
+    parse_iso_literal(text)
 }
 
 fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
