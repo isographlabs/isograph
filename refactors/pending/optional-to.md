@@ -163,6 +163,60 @@ After:
 
 The test `field_and_pointer_declarations_do_not_parse_yet` is deleted.
 
+## Changes to parse_type_dot_name
+
+Origin: parse-type-dot-name.md after. Delta: `N` is `SelectableName`. Both callers still `.map(ClientScalarSelectableNameWrapper)`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<N>), WithSpan<ParseError>> {
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    (
+        parent_type.interned().map(EntityNameWrapper),
+        name.interned(),
+    )
+    .wrap_ok()
+}
+```
+
+`parse_iso_literal.rs` adds `use common_lang_types::SelectableName`.
+
+After:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+fn parse_type_dot_name(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<ParseError>> {
+    let parent_type = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    cursor
+        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    (
+        parent_type.interned().map(EntityNameWrapper),
+        name.interned(),
+    )
+    .wrap_ok()
+}
+```
+
 ## Changes to parse_field
 
 Origin: parse-type-dot-name.md after. Delta: `consume_to_target` between the variable list and the description.
@@ -494,5 +548,5 @@ No new `IsographResolutionNode` variants. A position on `to` answers `ClientFiel
 
 ## Landing checklist
 
-1. The parse_iso_literal.rs, parse_error.rs, variables.rs, and chunk_stream.rs changes, the test deletion, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. The parse_iso_literal.rs, parse_error.rs, variables.rs, and chunk_stream.rs changes, `parse_type_dot_name` returning `SelectableName`, the test deletion, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.

@@ -509,7 +509,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
 - `$ ident`: `parse_variable_name(cursor, missing_dollar)`
-- `Type.name`: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
+- `Type.name`: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>)`
 
 ## Shipping and amending
 
@@ -527,6 +527,6 @@ Each grammar feature lands on this surface.
 - parse-type-dot-name.md: `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<N>)`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
-- optional-to.md: optional `to Type` on `ClientFieldDeclaration`; peek Identifier, `drop`, compare `cursor.text()` to `"to"`, then `require_token`
+- optional-to.md: optional `to Type` on `ClientFieldDeclaration`; peek Identifier, `drop`, compare `cursor.text()` to `"to"`, then `require_token`; `parse_type_dot_name` → `(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>)`
 
 A feature is reviewed against this doc when it lands. Amendment sites: the `ItemCursor` and `ChunkStream` impls, `parse_one_chunk`, `parse_each_chunk`, and `parse_singleton`. This doc stays in `refactors/pending`.

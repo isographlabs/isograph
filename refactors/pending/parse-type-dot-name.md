@@ -2,7 +2,7 @@
 
 Entrypoint and field declarations both parse `Identifier . Identifier`. optional-to.md keeps that header and adds optional `to Type` after it. This doc extracts the shared form. No AST type, path alias, or `IsographResolutionNode` variant changes.
 
-The parent type is `EntityNameWrapper`. The name is generic `N: From<StringKey>`; callers `.map` the wrapper (`ClientScalarSelectableNameWrapper`).
+The parent type is `EntityNameWrapper`. The name is generic `N: From<StringKey>`; callers `.map` the wrapper (`ClientScalarSelectableNameWrapper`). optional-to.md replaces `N` with `SelectableName`.
 
 Lands after parse-variables.md, before optional-to.md.
 
