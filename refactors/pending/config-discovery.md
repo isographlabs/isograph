@@ -1,6 +1,6 @@
 # Config discovery
 
-Requires isograph-cli.md and cli-ci-build.md. The daemon is keyed to one config: `--config` when given, otherwise the nearest `isograph.config.json`, `isograph.config.js`, or `isograph.config.ts` at or above the current directory. At one directory, that order: json, then js, then ts. Two paths to one file are one daemon. The daemon still parks. It logs the config it is.
+Requires isograph-cli.md and cli-ci-build.md. The daemon is keyed to one config: `--config` when given, otherwise the nearest `isograph.config.json`, `isograph.config.js`, or `isograph.config.ts` at or above the current directory. At one directory, that order: json, then js, then ts. Two paths to one file are one daemon. The lock and the log file are `{slug}` and `{slug}.log`. The daemon still parks. It logs the config it is.
 
 Walk-up is the babel plugin's walk, with two extra names. The babel plugin still only opens `isograph.config.json`.
 
@@ -11,9 +11,12 @@ $ cd app/src/components && isograph
 $ isograph status
 /Users/x/app/isograph.config.json is running (pid 12345)
 $ isograph logs
+{"timestamp":"...","level":"INFO","fields":{"message":"logging","path":"/Users/x/Library/Logs/isograph/isograph-0123456789abcdef.log"}}
 {"timestamp":"...","level":"INFO","fields":{"message":"isograph daemon up","config":"/Users/x/app/isograph.config.json"}}
 $ isograph stop
 ```
+
+`isograph logs` follows that daemon's file. Two configs are two files in the same directory (`~/Library/Logs/isograph/` on macOS, `$XDG_STATE_HOME/isograph/` on Linux, `%LOCALAPPDATA%/isograph/logs/` on Windows).
 
 Every verb resolves the config the same way, so `isograph stop` in a subdirectory stops the daemon that `isograph` in that subdirectory started.
 
@@ -114,7 +117,7 @@ pub fn config_and_instance(flag: Option<&Path>) -> Result<(PathBuf, Instance), D
     (config, instance).wrap_ok()
 }
 
-/// A filename: `Instance::named` puts this in a path, so it cannot contain `/`.
+/// A filename: `Instance::named` keys the lock to this and the log to `{slug}.log`.
 fn slug(config: &Path) -> String {
     let mut hasher = DefaultHasher::new();
     config.hash(&mut hasher);
@@ -124,7 +127,7 @@ fn slug(config: &Path) -> String {
 
 `thiserror` on `DiscoverError` for the `Display` / `Error` impls. `NoUserDir` converts with `From`.
 
-`config_and_instance` computes the pair together so no caller can key an instance to the wrong config.
+`config_and_instance` computes the pair together so no caller can key an instance to the wrong config. `Instance::named` puts the log at `{log_dir}/{slug}.log`, not `isograph.log`.
 
 ```rust
 // from crates/isograph_cli/src/main.rs
@@ -341,8 +344,12 @@ mod tests {
     #[test]
     fn slug_is_a_filename() {
         let slug = slug(Path::new("/a/b/isograph.config.json"));
-        assert!(slug.starts_with("isograph-"));
         assert!(!slug.contains('/'));
+        let hex = slug
+            .strip_prefix("isograph-")
+            .expect("the slug is isograph-<hash>");
+        assert_eq!(hex.len(), 16);
+        assert!(hex.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')));
     }
 
     #[test]
@@ -467,9 +474,9 @@ impl World {
         }
     }
 
-    fn log_text(&self) -> String {
+    fn log_paths(&self) -> Vec<PathBuf> {
         let home = self.dir.path().join("home");
-        let mut out = String::new();
+        let mut paths = Vec::new();
         let mut stack = home.wrap_vec();
         while let Some(dir) = stack.pop() {
             let Ok(entries) = std::fs::read_dir(dir.reference()) else {
@@ -480,13 +487,11 @@ impl World {
                 if path.is_dir() {
                     stack.push(path);
                 } else if path.extension().is_some_and(|e| e == "log") {
-                    if let Ok(text) = std::fs::read_to_string(path.reference()) {
-                        out.push_str(text.reference());
-                    }
+                    paths.push(path);
                 }
             }
         }
-        out
+        paths
     }
 }
 
@@ -521,6 +526,22 @@ fn stderr(output: &Output) -> String {
 
 fn canonical(path: &Path) -> PathBuf {
     path.canonicalize().expect("the fixture exists")
+}
+
+fn hashed_log_name(path: &Path) {
+    let name = path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .expect("log file names are utf-8");
+    let hex = name
+        .strip_prefix("isograph-")
+        .and_then(|s| s.strip_suffix(".log"))
+        .expect("the log file is isograph-<hash>.log");
+    assert_eq!(hex.len(), 16, "{name}");
+    assert!(
+        hex.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')),
+        "{name}"
+    );
 }
 
 fn pid_from(output: &Output) -> u32 {
@@ -640,6 +661,30 @@ fn two_projects_are_two_daemons() {
         stdout(status_b.reference())
             .contains(&canonical(b_config.reference()).display().to_string())
     );
+    let a_path = canonical(a_config.reference()).display().to_string();
+    let b_path = canonical(b_config.reference()).display().to_string();
+    let logs = poll(|| {
+        let paths = world.log_paths();
+        (paths.len() == 2).then_some(paths)
+    });
+    for path in logs.iter() {
+        hashed_log_name(path.reference());
+    }
+    let texts: Vec<String> = logs
+        .iter()
+        .map(|path| std::fs::read_to_string(path).expect("the log is readable"))
+        .collect();
+    assert_eq!(
+        texts.iter().filter(|text| text.contains(a_path.reference())).count(),
+        1
+    );
+    assert_eq!(
+        texts.iter().filter(|text| text.contains(b_path.reference())).count(),
+        1
+    );
+    assert!(!texts
+        .iter()
+        .any(|text| text.contains(a_path.reference()) && text.contains(b_path.reference())));
 }
 
 #[test]
@@ -656,15 +701,24 @@ fn stop_in_one_project_leaves_the_other_running() {
 }
 
 #[test]
-fn the_log_contains_the_canonical_config_path() {
+fn the_log_is_named_for_the_config_hash_and_contains_the_canonical_path() {
     let world = World::new();
     let (project, config) = world.project_with_json("app");
     let _running = world.start(project.reference(), None);
     let path = canonical(config.reference()).display().to_string();
-    poll(|| {
-        let log = world.log_text();
-        (log.contains("isograph daemon up") && log.contains(path.reference())).then_some(())
+    let logs = poll(|| {
+        let paths = world.log_paths();
+        let has = paths.iter().any(|log| {
+            std::fs::read_to_string(log)
+                .ok()
+                .is_some_and(|text| {
+                    text.contains("isograph daemon up") && text.contains(path.reference())
+                })
+        });
+        has.then_some(paths)
     });
+    assert_eq!(logs.len(), 1);
+    hashed_log_name(logs[0].reference());
 }
 
 #[test]
