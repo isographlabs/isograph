@@ -74,27 +74,21 @@ Every interned-key wrapper field is `pub`, including `Description`. Resolve retu
 
 Moved to string-literal-value.md. The interned payload is the GraphQL string value. The token span still includes the quotes.
 
------
-
 ## Structure
 
-### Four trees, then the first chunk tree is thrown away and cloned back
+### Four trees, then the first chunk tree is thrown away and cloned back (moved)
 
-`MatchedBrackets` and `ChunkedLevel` are the same nesting with different item types (`Bracketed` vs `ChunkedGroup`). `chunk` walks the first to build the second, copying every opening and closing. `parse_iso_literal` then drops the root `ChunkedLevel` except extra chunks. Failed or leftover regions clone `ChunkContentItem` trees into `UnparsedChunkItems` so resolve-position still has somewhere to walk.
+Moved to four-trees.md. Chunking introduces `Chunk` / trailing separators; it is not a typed map of the bracket tree. Leftover contents are leftover-in-extra.md.
 
-That is wasted allocation and a split source of truth. Either keep the chunk tree and have `Slot` point into it, or parse into the grammar tree during chunking and stop cloning.
+### Trailing separators of a parsed chunk leave the tree (moved)
 
-### Trailing separators of a parsed chunk leave the tree
+Moved to leftover-in-extra.md. The comma in `entrypoint Query.foo,` goes in `Slot.extra`.
 
-A successful `entrypoint Query.foo,` reports the comma as a `ParseError` and then the comma is not a node. Resolve on it hits the singleton / slot unmatched span. Cut unmatched brackets are also gone: `entrypoint Query.foo)` parses, and the `)` is only in `BracketError`, not in the tree. Hover and highlighting cannot see those characters as tokens.
+### Semantic tokens stop at the first failure in a chunk (moved)
 
-### Semantic tokens stop at the first failure in a chunk
+Moved to leftover-in-extra.md. `entrypoint $ $` extra is `$ $`, both `Content`. `entrypoint\nasdf` records `asdf` as `Content` from `extra_chunks`.
 
-`an_unknown_keyword_records_keyword_at_that_identifier` records `fieldd` as `Keyword` and nothing after it. Leftover after a successful item is also unrecorded (`leftover_after_an_entrypoint_is_not_recorded`). `SemanticToken::Error` / `Content` look like they were meant to cover that and are unused.
-
-`@` is recorded as `DirectiveName`, and the name is too. `!` is recorded as `GraphQLTypeName`. Roles are caller-supplied strings, not a function of the token, which is correct, but several of those roles are lies.
-
-----
+-----
 
 ### Keyword-as-identifier is copy-pasted
 
@@ -135,4 +129,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, and string-literal-value.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
+Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, string-literal-value.md, leftover-in-extra.md, and four-trees.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
