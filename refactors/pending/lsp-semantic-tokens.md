@@ -27,13 +27,12 @@ Most important first.
 ```rust
 // from crates/isograph_lsp/src/file_literals.rs
 use isograph_parser::{
-    HostLanguage, IsoLiteralError, IsoLiteralExtraction, IsoLiteralParse, SemanticToken,
-    parse_iso_literal,
+    HostLanguage, IsoLiteralError, IsoLiteralParse, SemanticToken, parse_iso_literal,
 };
 use span::WithSpan;
 
 pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
-    pub extraction: WithSpan<IsoLiteralExtraction<'a, THostLanguage>>,
+    pub extraction: WithSpan<(&'a str, THostLanguage::LiteralContext)>,
     pub parse: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<IsoLiteralError<THostLanguage>>>,
     pub tokens: Vec<WithSpan<SemanticToken>>,
@@ -47,7 +46,7 @@ pub fn file_literals<THostLanguage: HostLanguage>(
         .into_iter()
         .map(|extracted| {
             let extraction = extracted.item;
-            let text = extraction.item.iso_literal_text;
+            let text = extraction.item.0;
             let parsed = parse_iso_literal(text);
             FileLiteral {
                 extraction,
@@ -167,7 +166,7 @@ mod tests {
         let literals = file_literals(&TypeScriptHostLanguage, source);
         assert_eq!(literals.len(), 1);
         assert_eq!(
-            literals[0].extraction.item.context.const_export_name,
+            literals[0].extraction.item.1.const_export_name,
             "fullName".intern().to::<common_lang_types::ConstExportName>().wrap_some()
         );
         assert!(matches!(
@@ -189,7 +188,7 @@ mod tests {
             literals[0]
                 .tokens
                 .contains(&SemanticToken::Keyword.with_span(span_of(
-                    literals[0].extraction.item.iso_literal_text,
+                    literals[0].extraction.item.0,
                     "field"
                 )))
         );

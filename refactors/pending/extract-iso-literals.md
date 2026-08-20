@@ -1,8 +1,8 @@
 # Extract iso literals
 
-Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `Vec<WithErrors<WithSpan<IsoLiteralExtraction<Self>>, Vec<WithSpan<IsoLiteralError<Self>>>>>`. `item` is the isograph string and host context. `errors` is empty when there were none. `IsoLiteralError` is `Host`, `Parse`, `Bracket`, `Comma`. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
+Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `Vec<WithErrors<WithSpan<(&'a str, Self::LiteralContext)>, Vec<WithSpan<IsoLiteralError<Self>>>>>`. `item` is the isograph string and host context. `errors` is empty when there were none. `IsoLiteralError` is `Host`, `Parse`, `Bracket`, `Comma`. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
 
-The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and puts the interior of the backticks in `item`.
+The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and puts the interior of the backticks as `item.item.0`.
 
 ## Types
 
@@ -24,7 +24,7 @@ pub trait HostLanguage: Sized {
         source: &'a str,
     ) -> Vec<
         WithErrors<
-            WithSpan<IsoLiteralExtraction<'a, Self>>,
+            WithSpan<(&'a str, Self::LiteralContext)>,
             Vec<WithSpan<IsoLiteralError<Self>>>,
         >,
     >;
@@ -34,11 +34,6 @@ pub trait HostLanguage: Sized {
 pub struct WithErrors<T, E> {
     pub item: T,
     pub errors: E,
-}
-
-pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
-    pub iso_literal_text: &'a str,
-    pub context: THostLanguage::LiteralContext,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
@@ -61,8 +56,8 @@ pub enum IsoLiteralError<THostLanguage: HostLanguage> {
 use common_lang_types::ConstExportName;
 use intern::string_key::Intern;
 use isograph_parser::{
-    BracketError, CommaWithoutItem, HostLanguage, IsoLiteralError, IsoLiteralExtraction,
-    IsoLiteralItem, IsoLiteralParse, ParseError, SelectableNameWrapper, WithErrors,
+    BracketError, CommaWithoutItem, HostLanguage, IsoLiteralError, IsoLiteralItem,
+    IsoLiteralParse, ParseError, SelectableNameWrapper, WithErrors,
     parse_iso_literal,
 };
 use prelude::Postfix;
@@ -104,13 +99,13 @@ pub enum TypeScriptHostError {
 }
 ```
 
-Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `WithErrors` is `Clone, Debug, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`. `isograph_parser` does not depend on `regex` or on the TypeScript crate.
+Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `WithErrors` is `Clone, Debug, PartialEq, Eq`. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`. `isograph_parser` does not depend on `regex` or on the TypeScript crate.
 
-The string's location in the file is `WithErrors.item`'s `WithSpan`, not a field on `IsoLiteralExtraction`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.iso_literal_text`. Host errors share that span.
+The string's location in the file is `WithErrors.item`'s `WithSpan`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.0`. Host errors share that span.
 
 `IsoCall::FunctionCall` is `iso(\`...\`)`. `IsoCall::TaggedTemplate` is `iso\`...\``. `AssociatedJsFunction::Present` is the `(` the regex reads after the iso call, the start of the resolver argument.
 
-Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`. Delta: host facts move to `TypeScriptLiteralContext`; location is `WithErrors.item.location`; return is `WithErrors` (`item` / `errors`); `IsoLiteralError` is `Host` / `Parse` / `Bracket` / `Comma`.
+Origin of the item: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs` `IsoLiteralExtraction`. Delta: unnamed tuple `(&'a str, THostLanguage::LiteralContext)`; host facts on `TypeScriptLiteralContext`; location is `WithErrors.item.location`; return is `WithErrors` (`item` / `errors`); `IsoLiteralError` is `Host` / `Parse` / `Bracket` / `Comma`.
 
 ```rust
 // from crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs (upstream)
@@ -125,10 +120,7 @@ pub struct IsoLiteralExtraction {
 
 ```rust
 // from crates/isograph_parser/src/host_language.rs
-pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
-    pub iso_literal_text: &'a str,
-    pub context: THostLanguage::LiteralContext,
-}
+WithSpan<(&'a str, Self::LiteralContext)>
 ```
 
 ## Change 1: `HostLanguage` in the parser
@@ -142,7 +134,7 @@ mod host_language;
 pub use host_language::*;
 ```
 
-`HostLanguage`, `WithErrors`, `IsoLiteralExtraction`, and `IsoLiteralError` as in Types. No TypeScript types, no regex.
+`HostLanguage`, `WithErrors`, and `IsoLiteralError` as in Types. No TypeScript types, no regex.
 
 `BracketError` and `CommaWithoutItem` derive `thiserror::Error` here (messages as in lsp-parse-diagnostics.md Change 1), so `IsoLiteralError` can wrap them. `SelectableNameWrapper` gains `Display` here so `TypeScriptHostError::MissingExport` can format the name.
 
@@ -221,7 +213,7 @@ impl HostLanguage for TypeScriptHostLanguage {
         source: &'a str,
     ) -> Vec<
         WithErrors<
-            WithSpan<IsoLiteralExtraction<'a, Self>>,
+            WithSpan<(&'a str, Self::LiteralContext)>,
             Vec<WithSpan<IsoLiteralError<Self>>>,
         >,
     > {
@@ -233,33 +225,31 @@ impl HostLanguage for TypeScriptHostLanguage {
                 }
                 let literal = captures.name("literal")?;
                 let span = Span::from_usize(literal.start(), literal.end());
-                let extraction = IsoLiteralExtraction {
-                    iso_literal_text: literal.as_str(),
-                    context: TypeScriptLiteralContext {
-                        const_export_name: captures
-                            .name("export_name")
-                            .map(|m| m.as_str().intern().to()),
-                        call: match captures.name("open_paren") {
-                            Some(_) => IsoCall::FunctionCall,
-                            None => IsoCall::TaggedTemplate,
-                        },
-                        associated_js_function: match captures.name("associated") {
-                            Some(_) => AssociatedJsFunction::Present,
-                            None => AssociatedJsFunction::Absent,
-                        },
+                let iso_literal_text = literal.as_str();
+                let context = TypeScriptLiteralContext {
+                    const_export_name: captures
+                        .name("export_name")
+                        .map(|m| m.as_str().intern().to()),
+                    call: match captures.name("open_paren") {
+                        Some(_) => IsoCall::FunctionCall,
+                        None => IsoCall::TaggedTemplate,
+                    },
+                    associated_js_function: match captures.name("associated") {
+                        Some(_) => AssociatedJsFunction::Present,
+                        None => AssociatedJsFunction::Absent,
                     },
                 };
-                let parsed = parse_iso_literal(extraction.iso_literal_text);
+                let parsed = parse_iso_literal(iso_literal_text);
                 let parsed_item = parsed.item.as_ref().and_then(item_of);
                 let mut errors = Vec::new();
-                if let IsoCall::TaggedTemplate = extraction.context.call {
+                if let IsoCall::TaggedTemplate = context.call {
                     errors.push(
                         IsoLiteralError::Host(TypeScriptHostError::MissingParentheses)
                             .with_span(span),
                     );
                 }
                 if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
-                    if extraction.context.const_export_name.is_none() {
+                    if context.const_export_name.is_none() {
                         errors.push(
                             IsoLiteralError::Host(TypeScriptHostError::MissingExport {
                                 suggested_name: selectable.name.item,
@@ -267,8 +257,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                             .with_span(span),
                         );
                     }
-                    if let AssociatedJsFunction::Absent =
-                        extraction.context.associated_js_function
+                    if let AssociatedJsFunction::Absent = context.associated_js_function
                     {
                         errors.push(
                             IsoLiteralError::Host(
@@ -301,7 +290,7 @@ impl HostLanguage for TypeScriptHostLanguage {
                     );
                 }
                 WithErrors {
-                    item: extraction.with_span(span),
+                    item: (iso_literal_text, context).with_span(span),
                     errors,
                 }
                 .wrap_some()
@@ -327,7 +316,7 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 
 `TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
-Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; host facts on `context`; return is `WithErrors` (`item` / `errors`).
+Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; host facts on the tuple's second element; return is `WithErrors` (`item` / `errors`).
 
 ### Tests
 
@@ -338,7 +327,7 @@ In `crates/isograph_extract_typescript/src/lib.rs` under `#[cfg(test)]`. Helper 
 #[cfg(test)]
 mod tests {
     use intern::string_key::Intern;
-    use isograph_parser::{HostLanguage, IsoLiteralError, IsoLiteralExtraction, WithErrors};
+    use isograph_parser::{HostLanguage, IsoLiteralError, WithErrors};
     use prelude::Postfix;
     use span::{Span, WithSpan, WithSpanPostfix};
 
@@ -349,7 +338,7 @@ mod tests {
 
     fn extract(
         source: &str,
-    ) -> Vec<WithSpan<IsoLiteralExtraction<'_, TypeScriptHostLanguage>>> {
+    ) -> Vec<WithSpan<(&str, TypeScriptLiteralContext)>> {
         TypeScriptHostLanguage
             .extract_iso_literals(source)
             .into_iter()
@@ -361,7 +350,7 @@ mod tests {
         source: &str,
     ) -> Vec<
         WithErrors<
-            WithSpan<IsoLiteralExtraction<'_, TypeScriptHostLanguage>>,
+            WithSpan<(&str, TypeScriptLiteralContext)>,
             Vec<WithSpan<IsoLiteralError<TypeScriptHostLanguage>>>,
         >,
     > {
@@ -393,14 +382,14 @@ mod tests {
         assert_eq!(extracted.len(), 1);
         assert_eq!(
             extracted[0],
-            IsoLiteralExtraction {
-                iso_literal_text: text,
-                context: TypeScriptLiteralContext {
+            (
+                text,
+                TypeScriptLiteralContext {
                     const_export_name: interned_export("fullName").wrap_some(),
                     call: IsoCall::FunctionCall,
                     associated_js_function: AssociatedJsFunction::Present,
                 },
-            }
+            )
             .with_span(Span::from_usize(start, start + text.len()))
         );
         assert_eq!(&source[extracted[0].location.as_usize_range()], text);
@@ -411,16 +400,16 @@ mod tests {
         let source = "iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.const_export_name, None);
-        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.1.const_export_name, None);
+        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].item.context.associated_js_function,
+            extracted[0].item.1.associated_js_function,
             AssociatedJsFunction::Absent
         );
         assert_eq!(
             &source[extracted[0].location.as_usize_range()],
-            extracted[0].item.iso_literal_text
+            extracted[0].item.0
         );
     }
 
@@ -429,12 +418,12 @@ mod tests {
         let source = "iso`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.call, IsoCall::TaggedTemplate);
+        assert_eq!(extracted[0].item.1.call, IsoCall::TaggedTemplate);
         assert_eq!(
-            extracted[0].item.context.associated_js_function,
+            extracted[0].item.1.associated_js_function,
             AssociatedJsFunction::Absent
         );
-        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -451,10 +440,10 @@ export const Bar = iso(`field Pet.bar { id }`)(";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(
-            extracted[0].item.context.const_export_name,
+            extracted[0].item.1.const_export_name,
             interned_export("Bar").wrap_some()
         );
-        assert_eq!(extracted[0].item.iso_literal_text, "field Pet.bar { id }");
+        assert_eq!(extracted[0].item.0, "field Pet.bar { id }");
     }
 
     #[test]
@@ -465,11 +454,11 @@ iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].item.context.const_export_name,
+            extracted[0].item.1.const_export_name,
             interned_export("fullName").wrap_some()
         );
-        assert_eq!(extracted[1].item.context.const_export_name, None);
-        assert_eq!(extracted[1].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[1].item.1.const_export_name, None);
+        assert_eq!(extracted[1].item.0, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -487,20 +476,20 @@ export const HomeRoute = iso(`
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].item.context.const_export_name,
+            extracted[0].item.1.const_export_name,
             interned_export("HomeRoute").wrap_some()
         );
         assert_eq!(
-            extracted[0].item.context.associated_js_function,
+            extracted[0].item.1.associated_js_function,
             AssociatedJsFunction::Present
         );
-        assert_eq!(extracted[1].item.context.const_export_name, None);
+        assert_eq!(extracted[1].item.1.const_export_name, None);
         assert_eq!(
-            extracted[1].item.iso_literal_text,
+            extracted[1].item.0,
             "entrypoint Query.PetFavoritePhrase"
         );
         assert_eq!(
-            extracted[1].item.context.associated_js_function,
+            extracted[1].item.1.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -515,7 +504,7 @@ export const HomeRoute = iso(`
         let source = "const Foo = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.const_export_name, None);
+        assert_eq!(extracted[0].item.1.const_export_name, None);
     }
 
     #[test]
@@ -523,7 +512,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo  = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.const_export_name, None);
+        assert_eq!(extracted[0].item.1.const_export_name, None);
     }
 
     #[test]
@@ -531,7 +520,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo =iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.const_export_name, None);
+        assert_eq!(extracted[0].item.1.const_export_name, None);
     }
 
     #[test]
@@ -539,8 +528,8 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`,)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
     }
 
     #[test]
@@ -548,9 +537,9 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.1.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].item.context.associated_js_function,
+            extracted[0].item.1.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -560,7 +549,7 @@ export const HomeRoute = iso(`
         let source = "iso( `entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -569,12 +558,12 @@ export const HomeRoute = iso(`
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(
-            extracted[0].item.iso_literal_text,
+            extracted[0].item.0,
             "\nentrypoint Query.HomeRoute\n"
         );
         assert_eq!(
             &source[extracted[0].location.as_usize_range()],
-            extracted[0].item.iso_literal_text
+            extracted[0].item.0
         );
     }
 
@@ -588,7 +577,7 @@ export const HomeRoute = iso(`
         let source = "//iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.0, "entrypoint Query.HomeRoute");
     }
 }
 ```
@@ -730,6 +719,6 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 
 ## Order
 
-1. Change 1; `HostLanguage`, `WithErrors`, `IsoLiteralExtraction`, `IsoLiteralError` in `isograph_parser`. `thiserror` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
+1. Change 1; `HostLanguage`, `WithErrors`, `IsoLiteralError` in `isograph_parser`. `thiserror` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
 2. Change 2; `crates/isograph_extract_typescript`, `typescript` feature on callers, regex, extract tests.
 3. Change 3; host-error tests.
