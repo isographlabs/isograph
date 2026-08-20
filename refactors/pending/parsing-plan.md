@@ -200,11 +200,9 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `peek-then-parse.md`. `parse_non_constant_value` peeks without `commit`, `drop`s the peek, then a parse function requires the first token. `parse_variable_name` requires `$` then the identifier. `CursorPeek` is unchanged.
-2. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
-3. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
-4. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
-5. `optional-to.md`. Optional `to Type` on `ClientFieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
-6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+1. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+2. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
+3. `optional-to.md`. Optional `to Type` on `ClientFieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
+4. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
-Later: `parse-arrays.md`. `[ ... ]` list values.
+Later: `parse-arrays.md`. `[ ... ]` list values. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.

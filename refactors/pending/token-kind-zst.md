@@ -1,6 +1,6 @@
 # token-kind-zst: proof tokens in `NonBracketTokenKind`
 
-Lands after peek-then-parse.md. Each `NonBracketTokenKind` variant carries a ZST. Matching `Dollar(dollar)` yields a `Dollar` you can only get from a token. `parse_variable_name` and the other value parse functions take that proof.
+Each `NonBracketTokenKind` variant carries a ZST. Matching `Dollar(dollar)` yields a `Dollar` you can only get from a token. `parse_variable_name` and the other value parse functions take that proof.
 
 The ZST field is private. Construction is only in this module, via `From<IsographLangTokenKind>` and the associated constants that `consume_token_if` / `require_token` pass. Outside this module, a `Dollar` comes from a match.
 
@@ -307,7 +307,7 @@ fn parse_boolean_or_null(
                 }
 ```
 
-A declaration has no peek. parse-variables.md's `parse_name_colon` lhs peeks; `Dollar(dollar)` drops and calls `parse_variable_name(cursor, dollar)`; anything else is `Expectation::VariableDeclarationOrUsage`.
+parse-variables.md's `parse_name_colon` lhs is `parse_variable_name(cursor, Expectation::VariableDeclarationOrUsage)`. This doc peeks there to bind `Dollar(dollar)` and pass it; anything else is `Expectation::VariableDeclarationOrUsage`.
 
 ```rust
 // from crates/isograph_parser/src/variables.rs

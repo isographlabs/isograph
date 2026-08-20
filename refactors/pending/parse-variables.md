@@ -1,11 +1,11 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; optional-to.md reuses them for optional `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with a lhs that peeks a `Dollar` proof and calls `parse_variable_name`. Lands after token-kind-zst.md.
+Field declarations gain variable-declaration lists. Type annotations land here; optional-to.md reuses them for optional `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `parse_variable_name` and `parse_type_annotation`. The value arm of `parse_variable_name` passes `Expectation::Token(Dollar)`; the declaration lhs passes `Expectation::VariableDeclarationOrUsage`.
 
 ## The grammar this doc accepts
 
 ```
-field <Identifier> . <Identifier> [<paren group>] <brace group>
+field <Identifier> . <Identifier> [<paren group>] [<description>] <brace group>
 ```
 
 Each contentful chunk of the paren group's interior is one variable declaration:
@@ -97,10 +97,10 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkContentItem, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
-    Expectation, Found, IsographResolutionNode, NonBracketToken, NonBracketTokenKind,
-    NonConstantValue, ParseError, SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper,
-    parse_name_colon, parse_non_constant_value, parse_variable_name,
+    BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper, Expectation, Found,
+    IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError, SemanticToken, Slot,
+    UnparsedChunkItems, VariableNameWrapper, parse_name_colon, parse_non_constant_value,
+    parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -299,22 +299,7 @@ fn parse_variable_declaration(
 ) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
     let (name, type_) = parse_name_colon(
         cursor,
-        |cursor| match cursor.peek() {
-            Some(peek) => match peek.view().item.reference() {
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar(
-                    dollar,
-                ))) => {
-                    drop(peek);
-                    parse_variable_name(cursor, dollar)
-                }
-                _ => cursor
-                    .expected(Expectation::VariableDeclarationOrUsage)
-                    .wrap_err(),
-            },
-            None => cursor
-                .expected(Expectation::VariableDeclarationOrUsage)
-                .wrap_err(),
-        },
+        |cursor| parse_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
         parse_type_annotation,
     )?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
@@ -427,6 +412,8 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
+    pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
@@ -446,6 +433,8 @@ pub struct ClientFieldDeclaration {
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
+    pub description: Option<WithSpan<Description>>,
+    #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
 }
@@ -454,7 +443,17 @@ pub struct ClientFieldDeclaration {
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     let variable_definitions = consume_variable_declaration_list(cursor);
+    let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
+    ClientFieldDeclaration {
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name
+            .interned()
+            .map(ClientScalarSelectableNameWrapper),
+        variable_definitions,
+        description,
+        selection_set,
+    }
 ```
 
 `lib.rs` adds `mod variables;` and `pub use variables::*;`.
