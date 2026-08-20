@@ -196,12 +196,10 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `align-parser-names.md`. Rename landed wrappers and pairs to the isograph names. Split object-entry keys onto `ValueKeyNameWrapper`.
-2. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
-3. `parse-fields.md`. `field Type.name { ... }` via `require_token` + `require_selection_set`. Resolve-from-the-declaration tests.
-4. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
-5. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
-6. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
-7. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+1. `parse-fields.md`. `field Type.name { ... }` via `require_token` + `require_selection_set`. Resolve-from-the-declaration tests.
+2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+3. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
+4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
