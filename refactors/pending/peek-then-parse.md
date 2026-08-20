@@ -213,6 +213,8 @@ The peek is not committed. Each arm `drop`s it, then `parse_*` requires its firs
 
 Existing value tests. Behavior is unchanged.
 
+Follow-up: `token-kind-zst.md`. Each `NonBracketTokenKind` variant carries a ZST passed into `parse_*` as proof of the peek match.
+
 ## Landing checklist
 
 1. `parse_variable_name`, the other value parse functions, the new `parse_non_constant_value` body. `cargo test -p isograph_parser` passes.

@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with `parse_variable_name` and `parse_type_annotation`. Lands after peek-then-parse.md.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with a lhs that peeks a `Dollar` proof and calls `parse_variable_name`. Lands after token-kind-zst.md.
 
 ## The grammar this doc accepts
 
@@ -97,10 +97,10 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
-    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError,
-    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_name_colon,
-    parse_non_constant_value, parse_variable_name,
+    BracketKind, ChunkContentItem, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
+    Expectation, Found, IsographResolutionNode, NonBracketToken, NonBracketTokenKind,
+    NonConstantValue, ParseError, SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper,
+    parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -299,7 +299,22 @@ fn parse_variable_declaration(
 ) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
     let (name, type_) = parse_name_colon(
         cursor,
-        |cursor| parse_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
+        |cursor| match cursor.peek() {
+            Some(peek) => match peek.view().item.reference() {
+                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar(
+                    dollar,
+                ))) => {
+                    drop(peek);
+                    parse_variable_name(cursor, dollar)
+                }
+                _ => cursor
+                    .expected(Expectation::VariableDeclarationOrUsage)
+                    .wrap_err(),
+            },
+            None => cursor
+                .expected(Expectation::VariableDeclarationOrUsage)
+                .wrap_err(),
+        },
         parse_type_annotation,
     )?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)

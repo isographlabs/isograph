@@ -523,6 +523,7 @@ Each grammar feature lands on this surface.
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
 - peek-then-parse.md: peek without `commit`, `drop` the peek, parse function requires the first token; `parse_variable_name` requires `$` then the identifier
+- token-kind-zst.md: `NonBracketTokenKind` ZST payloads as peek-match proof; consume/require use associated constants
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value
