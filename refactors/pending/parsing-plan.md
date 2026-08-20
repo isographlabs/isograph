@@ -203,6 +203,6 @@ parsing-standards.md governs how every implementation below is written. Each doc
 
 Later: `parse-arrays.md`. `[ ... ]` list values.
 
-Later: `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text. `IsoLiteralExtraction` holds the exported name and the other host-language facts; `IsoLiteralParse` stays the parse of the backtick contents.
+Later: `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text into `IsoLiteralExtraction`.
 
 Deferred: `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
