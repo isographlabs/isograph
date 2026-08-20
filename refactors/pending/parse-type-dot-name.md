@@ -1,10 +1,10 @@
 # parse-type-dot-name: `Type.name`
 
-Entrypoint and field declarations both parse `Identifier . Identifier`. parse-pointers.md needs the same header. This doc extracts that form. No AST type, path alias, or `IsographResolutionNode` variant changes.
+Entrypoint and field declarations both parse `Identifier . Identifier`. optional-to.md keeps that header and adds optional `to Type` after it. This doc extracts the shared form. No AST type, path alias, or `IsographResolutionNode` variant changes.
 
-The parent type is `EntityNameWrapper`. The name is generic `N: From<StringKey>`; callers `.map` the wrapper (`ClientScalarSelectableNameWrapper`, `ClientObjectSelectableNameWrapper`).
+The parent type is `EntityNameWrapper`. The name is generic `N: From<StringKey>`; callers `.map` the wrapper (`ClientScalarSelectableNameWrapper`).
 
-Lands after parse-variables.md, before parse-pointers.md.
+Lands after parse-variables.md, before optional-to.md.
 
 ## Before
 
@@ -109,7 +109,7 @@ fn parse_field(
 }
 ```
 
-`parse_type_dot_name` is `pub(crate)` so parse-pointers.md can call it. `N` is the inner lang type; callers `.map` the wrapper. `variable_definitions` is parse-variables.md's, between the name and the description.
+`parse_type_dot_name` is `pub(crate)` so `parse_entrypoint` and `parse_field` share it. `N` is the inner lang type; callers `.map` the wrapper. `variable_definitions` is parse-variables.md's, between the name and the description.
 
 ## Tests
 

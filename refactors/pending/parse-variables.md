@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with a lhs that peeks a `Dollar` proof and calls `parse_variable_name`. Lands after token-kind-zst.md.
+Field declarations gain variable-declaration lists. Type annotations land here; optional-to.md reuses them for optional `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `parse_name_colon` with a lhs that peeks a `Dollar` proof and calls `parse_variable_name`. Lands after token-kind-zst.md.
 
 ## The grammar this doc accepts
 

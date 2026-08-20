@@ -12,7 +12,7 @@ pub fn parse_iso_literal(
 ) -> Option<WithSpan<IsoLiteralParse>>
 ```
 
-`text` is the literal itself. The stage reads it to recognize keyword identifiers (`entrypoint`, `field`, `pointer`, `to`, `true`, `false`, `null`), to intern names (`token.interned()`), and to convert integer literals to `i64`. The wrapper span is location only.
+`text` is the literal itself. The stage reads it to recognize keyword identifiers (`entrypoint`, `field`, `to`, `true`, `false`, `null`), to intern names (`token.interned()`), and to convert integer literals to `i64`. The wrapper span is location only.
 
 The stage parses the same language as upstream isograph's `parse_iso_literal`, with the deliberate changes listed below. Where upstream and this stage disagree on an input's validity, the difference must appear in that list; anything else is a bug.
 
@@ -63,6 +63,8 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 6. Variable defaults accept `$`. One value type (`NonConstantValue`). Upstream parses a `ConstantValue` and rejects `$` at the `$`.
 
+7. There is no `pointer` keyword. `field Type.name to Type { ... }` is a field with `target_type: Some`. Upstream's `pointer Type.name to Type { ... }` is `DeclarationKeyword` at `pointer`.
+
 ## The error model
 
 `parse_iso_literal` returns `None` on an empty chunked literal and a tree otherwise. Diagnostics go through `report_error` on a cursor, or `errors.push` at the root where there is no cursor. They are not stored on the tree. A failed chunk is `Slot { item: None, extra_tokens: Some(the chunk's items) }`. Leftover after a successful item is `item: Some` plus leftover items. Extra root chunks sit on `IsoLiteralParse.extra_chunks`.
@@ -79,8 +81,6 @@ pub enum ParseError {
     EmptyLiteral,
     #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
     MultipleDeclarations,
-    #[error("This declaration type is not supported yet.")]
-    UnsupportedDeclarationType,
     #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
 }
@@ -96,7 +96,7 @@ pub struct ExpectedFound {
 pub enum Expectation {
     #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("one of `entrypoint`, `field`, or `pointer`")]
+    #[error("one of `entrypoint` or `field`")]
     DeclarationKeyword,
     #[error("the end of the declaration")]
     EndOfDeclaration,
@@ -162,7 +162,7 @@ impl BracketKind {
 
 ## Names relative to isograph
 
-Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`, `ClientObjectSelectableNameWrapper`). `SelectionNameWrapper` covers both a selection name and a `reader_alias`.
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectionNameWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`). `SelectionNameWrapper` covers both a selection name and a `reader_alias`.
 
 Justified differences:
 
@@ -176,7 +176,8 @@ Justified differences:
 - `Selection` is one struct with optional `selection_set` (not `SelectionType<ScalarSelection, ObjectSelection>`).
 - Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
 - `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
-- `directive_set` on pointer declarations (upstream field name is `directives`).
+- `ClientFieldDeclaration.target_type: Option<WithSpan<TypeAnnotation>>` (isograph has a separate `ClientPointerDeclaration` and a `pointer` keyword).
+- Field names stay `ClientScalarSelectableNameWrapper` with or without `to` (isograph uses `ClientObjectSelectableName` on pointers).
 - Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
 - `Description` stores quotes included (upstream unquotes and dedents).
 - Empty optional lists are `None` (upstream empty `Vec` with a generated span).
@@ -203,7 +204,7 @@ parsing-standards.md governs how every implementation below is written. Each doc
 2. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
 3. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 4. `parse-type-dot-name.md`. Extract `Type.name` from entrypoint and field. No AST change.
-5. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `text() == "to"`. Removes `UnsupportedDeclarationType`.
-6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
+5. `optional-to.md`. Optional `to Type` on `ClientFieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
+6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.

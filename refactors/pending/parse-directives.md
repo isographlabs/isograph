@@ -1,6 +1,6 @@
 # parse-directives: `@name` and `@name(args)`
 
-Lands after parse-pointers.md. Every host that isograph attaches directives to already exists: entrypoints, fields, pointers, scalar selections, object selections.
+Lands after optional-to.md. Every host that isograph attaches directives to already exists: entrypoints, fields (with or without `to`), and selections. isograph's pointer site is the field site after `to`.
 
 The grammar stage stores the raw `@name` form. Typed sets (`EntrypointDirectiveSet`, `ScalarSelectionDirectiveSet`, `ClientScalarSelectableDirectiveSet`, …) are a later stage. Unknown names parse.
 
@@ -17,8 +17,7 @@ The paren group is `consume_argument_list`.
 Sites, matching `crates/isograph_lang_parser/src/parse_iso_literal.rs`:
 
 - entrypoint: after `Type.name`, last item of the chunk
-- field: after variable definitions, before the description
-- pointer: after the target type, before the description
+- field: after variable definitions and optional `to` type, before the description
 - selection: after arguments, before the nested selection set
 
 A line break before `@` ends the host chunk. `bar @loadable` is one selection. `bar\n@loadable` is a scalar `bar` plus a failed selection at `@`. That is language change 1 in parsing-plan.md.
@@ -65,7 +64,6 @@ pub struct IsographDirectiveNameWrapper(common_lang_types::IsographDirectiveName
 pub enum IsographFieldDirectiveListParent<'a> {
     EntrypointDeclaration(EntrypointDeclarationPath<'a>),
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
-    ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
     Selection(SelectionPath<'a>),
 }
 
@@ -213,6 +211,9 @@ Field. Origin field name: `directive_set`.
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
+    pub target_type: Option<WithSpan<TypeAnnotation>>,
+    #[resolve_field]
+    #[parent_variant(ClientFieldDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
@@ -221,29 +222,10 @@ Field. Origin field name: `directive_set`.
 
 ```rust
     let variable_definitions = consume_variable_declaration_list(cursor);
+    let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
-```
-
-Pointer. Upstream field name is `directives`. The field here is `directive_set`: same name as the other two declaration kinds.
-
-```rust
-    #[resolve_field]
-    #[parent_variant(PointerTarget)]
-    pub target_type: WithSpan<TypeAnnotation>,
-    #[resolve_field]
-    #[parent_variant(ClientPointerDeclaration)]
-    pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
-    #[resolve_field]
-    #[parent_variant(ClientPointerDeclaration)]
-    pub description: Option<WithSpan<Description>>,
-```
-
-```rust
-    let target_type = parse_type_annotation(cursor)?;
-    let directive_set = consume_directives(cursor)?;
-    let description = consume_description(cursor);
 ```
 
 Selections. Upstream deserializes immediately into typed scalar/object directive sets. This stage stores the raw list on `Selection`.
@@ -336,18 +318,21 @@ A position on `@` answers `IsographFieldDirective` (the `@` span is part of the 
     }
 
     #[test]
-    fn a_pointer_directive_sits_between_the_target_and_the_description() {
-        let text = "pointer Pet.BestFriend to Pet @updatable \"x\" { id }";
+    fn a_field_directive_sits_between_the_target_and_the_description() {
+        let text = "field Pet.BestFriend to Owner @updatable \"x\" { id }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
+        let field = as_field(parse.reference());
+        assert!(field.target_type.is_some());
         assert_eq!(
-            as_pointer(parse.reference())
+            field
                 .directive_set
                 .as_ref()
                 .expect("the fixture carries a directive")
                 .location,
             span_of(text, "@updatable")
         );
+        assert!(field.description.is_some());
     }
 
     #[test]

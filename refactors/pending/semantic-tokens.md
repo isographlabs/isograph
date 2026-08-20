@@ -40,7 +40,7 @@ Grammar consume names the role. Unparsed extra tokens, extra chunks, and the mat
 
 Call sites, by variant:
 
-- `Keyword`: `entrypoint`, `field`, `pointer`, `to`.
+- `Keyword`: `entrypoint`, `field`, `to`.
 - `Type`: `Query` / `User` in `Type.fieldName`.
 - `FieldName`: `foo` in `Query.foo`, a selection name, and a selection alias. The first identifier of `alias: name` is consumed before the colon is visible; `SafePeekable` has one item of lookahead, so that identifier is `FieldName` on both arms.
 - `ObjectKey`: an object-literal key.
@@ -337,7 +337,7 @@ The existing recording facts still hold against `CollectedSemanticTokens`. Added
 
 - parsing-standards.md: `ItemCursor` / `ChunkStream` gain `TTokens`. List helpers are generic over `TTokens: SemanticTokens`. Grammar functions take `ItemCursor<'_, TTokens>`. Catalog replaces the vec with `SemanticTokens`, `CollectedSemanticTokens::new`, `NoSemanticTokens::new`.
 - parse-entrypoint.md: `parse_iso_literal` is generic over `TTokens`.
-- parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, parse-pointers.md: each `parse_*` gains `TTokens: SemanticTokens`.
+- parse-arguments.md, parse-selection-sets.md, parse-fields.md, parse-variables.md, parse-descriptions.md, optional-to.md: each `parse_*` gains `TTokens: SemanticTokens`.
 - spanless-parsing.md: the cheap pass is `NoSemanticTokens::new()` plus `NoSpan`.
 
 ## Later changes
