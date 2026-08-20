@@ -4,6 +4,7 @@ use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
+use thiserror::Error;
 
 use crate::{
     Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, Bracketed, CloseBracket,
@@ -85,7 +86,8 @@ pub enum SeparatorToken {
 
 /// A chunking error: a comma no item precedes, at the comma's span. The comma and its
 /// boundary have no chunk; positions on them answer their level.
-#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[error("A comma with no item before it.")]
 pub struct CommaWithoutItem(pub Span);
 
 #[derive(Debug)]
@@ -630,6 +632,14 @@ mod tests {
 
     fn separator_kinds(separator: &ChunkSeparator) -> Vec<SeparatorToken> {
         separator.0.iter().map(|s| s.item).collect()
+    }
+
+    #[test]
+    fn comma_without_item_displays() {
+        assert_eq!(
+            CommaWithoutItem(Span::new(0, 1)).to_string(),
+            "A comma with no item before it.",
+        );
     }
 
     #[test]

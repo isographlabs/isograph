@@ -3,6 +3,7 @@ use resolve_position_macros::ResolvePosition;
 use safe_peekable::{IntoSafePeekable, SafePeekable};
 use scoped_stack::Stack;
 use span::{Span, WithSpan, WithSpanPostfix};
+use thiserror::Error;
 
 use crate::{
     BracketKind, BracketToken, ChunkContentItemParent, ChunkedGroupPath, IsographLangTokenKind,
@@ -43,11 +44,13 @@ pub struct CloseBracket(pub BracketKind);
 
 /// The matcher's errors, returned beside the tree, in source order. The tree cannot
 /// represent them: each cut its level at its position.
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Error)]
 pub enum BracketError {
     /// An open bracket whose close never came.
+    #[error("Unclosed {}", .0.item.0)]
     UnmatchedOpen(WithSpan<OpenBracket>),
     /// A close bracket no enclosing group owns.
+    #[error("Unexpected {}", .0.item.0)]
     UnmatchedClose(WithSpan<CloseBracket>),
 }
 
@@ -238,6 +241,21 @@ mod tests {
             BracketItem::Bracketed(group) => group,
             item => panic!("expected a group at {index}, got {item:?}"),
         }
+    }
+
+    #[test]
+    fn unmatched_open_displays_the_kind() {
+        let err =
+            BracketError::UnmatchedOpen(OpenBracket(BracketKind::Brace).with_span(Span::new(0, 1)));
+        assert_eq!(err.to_string(), "Unclosed '{'");
+    }
+
+    #[test]
+    fn unmatched_close_displays_the_kind() {
+        let err = BracketError::UnmatchedClose(
+            CloseBracket(BracketKind::Parenthesis).with_span(Span::new(0, 1)),
+        );
+        assert_eq!(err.to_string(), "Unexpected '('");
     }
 
     #[test]
