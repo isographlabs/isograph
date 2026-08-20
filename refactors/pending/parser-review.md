@@ -56,8 +56,6 @@ Moved to variable-declaration-or-usage.md.
 
 `ResolvePosition` on enums requires exactly one unnamed payload per variant. `enum BooleanValue { True, False }` cannot derive it. `BooleanValue(Boolean)` is the resolve node; `Boolean` is True/False without being leaves. `NullValue` is a unit struct because it has no payload.
 
------
-
 ### Dead token kinds sit on every match
 
 Three different holes.
@@ -68,15 +66,15 @@ Three different holes.
 
 `Expectation::Description` and `Expectation::SelectionSet` are never passed to `cursor.expected`. Descriptions and selection sets are optional in the language, so those variants will not become real diagnostics without a language change. Display tests can use `Keyword` and `Selection` (`Selection` is used). Delete the two variants. Also small. parser-minor-improvements.md.
 
+### Wrapper interned keys have inconsistent visibility (fixed)
+
+Every interned-key wrapper field is `pub`, including `Description`. Resolve returns the wrapper; callers read `.0`.
+
+### String / description values are lexemes, not values (moved)
+
+Moved to string-literal-value.md. The interned payload is the GraphQL string value. The token span still includes the quotes.
+
 -----
-
-### Wrapper interned keys have inconsistent visibility
-
-`EntityNameWrapper(pub ...)`, `SelectionNameWrapper(pub ...)`, `VariableNameWrapper(pub ...)` vs private `SelectableNameWrapper`, `ArgumentNameWrapper`, `StringLiteralValueWrapper`. No rule distinguishes them.
-
-### String / description values are lexemes, not values
-
-`Description` is documented as the source slice including quotes. `parse_string_literal` uses the same `interned()` path, so a value `"hi"` is interned as `"\"hi\""`, and `"\\n"` is not a newline. The lexer accepted escape sequences and then the parser discarded that work. `StringLiteralValue` is the wrong representation if later passes compare to GraphQL string values.
 
 ## Structure
 
@@ -95,6 +93,8 @@ A successful `entrypoint Query.foo,` reports the comma as a `ParseError` and the
 `an_unknown_keyword_records_keyword_at_that_identifier` records `fieldd` as `Keyword` and nothing after it. Leftover after a successful item is also unrecorded (`leftover_after_an_entrypoint_is_not_recorded`). `SemanticToken::Error` / `Content` look like they were meant to cover that and are unused.
 
 `@` is recorded as `DirectiveName`, and the name is too. `!` is recorded as `GraphQLTypeName`. Roles are caller-supplied strings, not a function of the token, which is correct, but several of those roles are lies.
+
+----
 
 ### Keyword-as-identifier is copy-pasted
 
@@ -135,4 +135,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, and variable-declaration-or-usage.md. `Slot` and `parse_singleton` wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
+Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, and string-literal-value.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
