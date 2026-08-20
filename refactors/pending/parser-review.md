@@ -322,7 +322,8 @@ mod variables;
 pub use arguments::{
     Argument, ArgumentList, ArgumentListParent, ArgumentNameWrapper, Boolean, BooleanValue,
     IntegerValue, ListLiteral, ListLiteralValue, NonConstantValue, NullValue, ObjectEntry,
-    ObjectLiteral, StringLiteralValueWrapper, ValueKeyNameWrapper, VariableUse,
+    ObjectLiteral, StringLiteralValueWrapper, VariableDeclarationOrUsage, VariableUse,
+    ValueKeyNameWrapper,
 };
 pub use chunk::{
     Chunk, ChunkContentItem, ChunkSeparator, ChunkedGroup, ChunkedLevel, CommaWithoutItem,
