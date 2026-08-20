@@ -29,7 +29,7 @@ pub struct Selection {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectionPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct SelectionNameWrapper(pub common_lang_types::SelectableName);
+pub struct SelectionNameWrapper(pub common_lang_types::SelectionName);
 
 #[derive(Debug)]
 pub enum SelectionSetParent<'a> {

@@ -68,6 +68,8 @@ string_key_newtype!(FieldArgumentName);
 string_key_equality!(FieldArgumentName, VariableName);
 string_key_equality!(SelectableName, VariableName);
 
+string_key_newtype!(SelectionName);
+
 string_key_newtype!(ArtifactFilePrefix);
 string_key_newtype!(ArtifactFileName);
 
