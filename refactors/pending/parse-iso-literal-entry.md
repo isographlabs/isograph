@@ -1,8 +1,8 @@
 # Combined `parse_iso_literal` entry
 
-The crate entry is one function over `&str`. It runs tokenize, match brackets, chunk, grammar. Matcher, chunker, and grammar errors are one `Vec<WithSpan<ParsedIsoLiteralError>>`. Grammar-stage tests call this function. Stage unit tests (tokenize, brackets, chunk, subparsers) keep `pub(crate)` internals.
+The crate entry is one function over `&str`. It runs tokenize, match brackets, chunk, grammar. Matcher, chunker, and grammar errors are one `Vec<WithSpan<IsoLiteralError>>`. Grammar-stage tests call this function. Stage unit tests (tokenize, brackets, chunk, subparsers) keep `pub(crate)` internals.
 
-Does not depend on type-annotation-null.md. Grammar `ParseError` keeps its name. `ParsedIsoLiteralError` wraps it.
+Does not depend on type-annotation-null.md. Grammar `ParseError` keeps its name. `IsoLiteralError` wraps it. extract-iso-literals.md's `IsoLiteralError<H>` is `Host` plus these three variants.
 
 ## Types
 
@@ -13,42 +13,42 @@ Most important first.
 use thiserror::Error;
 
 #[derive(Debug, PartialEq, Eq, Error)]
-pub enum ParsedIsoLiteralError {
+pub enum IsoLiteralError {
     #[error("{0}")]
-    Parse(ParseError),
+    Parse(#[from] ParseError),
     #[error("{0}")]
-    Bracket(BracketError),
+    Bracket(#[from] BracketError),
     #[error("{0}")]
-    Comma(CommaWithoutItem),
+    Comma(#[from] CommaWithoutItem),
 }
 
 pub struct ParsedIsoLiteral {
     pub item: Option<WithSpan<IsoLiteralParse>>,
-    pub errors: Vec<WithSpan<ParsedIsoLiteralError>>,
+    pub errors: Vec<WithSpan<IsoLiteralError>>,
     pub tokens: Vec<WithSpan<SemanticToken>>,
 }
 
 pub fn parse_iso_literal(text: &str) -> ParsedIsoLiteral {
     let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
     let (tree, comma_errors) = chunk(brackets.reference());
-    let mut errors: Vec<WithSpan<ParsedIsoLiteralError>> = bracket_errors
+    let mut errors: Vec<WithSpan<IsoLiteralError>> = bracket_errors
         .into_iter()
         .map(|error| {
             let location = match error.reference() {
                 BracketError::UnmatchedOpen(open) => open.location,
                 BracketError::UnmatchedClose(close) => close.location,
             };
-            ParsedIsoLiteralError::Bracket(error).with_span(location)
+            error.to::<IsoLiteralError>().with_span(location)
         })
         .collect();
     errors.extend(comma_errors.into_iter().map(|error| {
-        ParsedIsoLiteralError::Comma(error).with_span(error.0)
+        error.to::<IsoLiteralError>().with_span(error.0)
     }));
     let mut grammar_errors = Vec::new();
     let mut tokens = Vec::new();
     let item = parse_chunked_iso_literal(text, tree, &mut grammar_errors, &mut tokens);
     errors.extend(grammar_errors.into_iter().map(|error| {
-        ParsedIsoLiteralError::Parse(error.item).with_span(error.location)
+        error.item.to::<IsoLiteralError>().with_span(error.location)
     }));
     ParsedIsoLiteral {
         item,
@@ -79,17 +79,17 @@ pub fn parse_iso_literal(
 
 That body is `parse_chunked_iso_literal`. `item: None` is still only the empty-literal case.
 
-`errors` is matcher, then chunker, then grammar, in that order. `parse_chunked_iso_literal` still takes `Vec<WithSpan<ParseError>>`. Mapping to `ParsedIsoLiteralError::Parse` is at the combined entry.
+`errors` is matcher, then chunker, then grammar, in that order. `parse_chunked_iso_literal` still takes `Vec<WithSpan<ParseError>>`. Mapping to `IsoLiteralError::Parse` is at the combined entry.
 
 `match_brackets` still returns `Vec<BracketError>`. `chunk` still returns `Vec<CommaWithoutItem>`.
 
 `ParsedIsoLiteral` derives `Debug`. No `PartialEq`: the tree is compared field-wise in tests.
 
-`ParsedIsoLiteralError` is the combined error. Grammar `ParseError` is the payload of `Parse`. Do not flatten `Expected` / `EmptyLiteral` / `UnmatchedOpen` onto one enum.
+`IsoLiteralError` is the combined error. Grammar `ParseError` is the payload of `Parse`. Do not flatten `Expected` / `EmptyLiteral` / `UnmatchedOpen` onto one enum. `#[from]` is thiserror's `From` impl for each payload (`ParseError`, `BracketError`, `CommaWithoutItem`). Strum has no wrapping `From`.
 
 ## Change 1: `thiserror` on `BracketError` and `CommaWithoutItem`
 
-`ParsedIsoLiteralError` wraps with `#[error("{0}")]`, so the inner types need `Display`. They are errors. Derive `Error`; do not write a manual `Display` or `std::error::Error` impl.
+`IsoLiteralError` wraps with `#[error("{0}")]`, so the inner types need `Display`. They are errors. Derive `Error`; do not write a manual `Display` or `std::error::Error` impl.
 
 ```rust
 // from crates/isograph_parser/src/matched_brackets.rs
@@ -151,7 +151,7 @@ lsp-parse-diagnostics.md Change 1 is this work. Implement once, here.
 
 ## Change 2: combined entry and grammar tests
 
-`parse_iso_literal` / `parse_chunked_iso_literal` / `ParsedIsoLiteral` / `ParsedIsoLiteralError` as in Types.
+`parse_iso_literal` / `parse_chunked_iso_literal` / `ParsedIsoLiteral` / `IsoLiteralError` as in Types.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -161,8 +161,8 @@ lsp-parse-diagnostics.md Change 1 is this work. Implement once, here.
             .errors
             .into_iter()
             .map(|error| match error.item {
-                ParsedIsoLiteralError::Parse(parse) => parse.with_span(error.location),
-                ParsedIsoLiteralError::Bracket(_) | ParsedIsoLiteralError::Comma(_) => {
+                IsoLiteralError::Parse(parse) => parse.with_span(error.location),
+                IsoLiteralError::Bracket(_) | IsoLiteralError::Comma(_) => {
                     panic!("for literal {text:?}")
                 }
             })
@@ -209,7 +209,7 @@ Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple be
         let parsed = parse_iso_literal("");
         assert!(parsed.item.is_none());
         assert!(parsed.errors.iter().any(|error| {
-            error.item == ParsedIsoLiteralError::Parse(ParseError::EmptyLiteral)
+            error.item == IsoLiteralError::Parse(ParseError::EmptyLiteral)
         }));
     }
 
@@ -221,7 +221,7 @@ Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple be
         assert!(parsed.errors.iter().any(|error| {
             matches!(
                 error.item.reference(),
-                ParsedIsoLiteralError::Bracket(BracketError::UnmatchedClose(close))
+                IsoLiteralError::Bracket(BracketError::UnmatchedClose(close))
                     if close.item.0 == BracketKind::Parenthesis
                         && close.location == span_of(text, ")")
             ) && error.location == span_of(text, ")")
@@ -231,7 +231,7 @@ Call sites of `parsed_with_errors` / `parsed_with_tokens` that bind the tuple be
 
 `the_cut_removes_an_unmatched_bracket_and_the_declaration_parses` already covers the cut. This test asserts the combined entry kept the unmatched close instead of dropping it.
 
-Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md `file_literals` call `parse_iso_literal(text)`. Those docs already use that call. `parsed.errors` is the one vec. extract-iso-literals.md `IsoLiteralError` maps `ParsedIsoLiteralError::Parse` / `Bracket` / `Comma` onto its `Parse` / `Bracket` / `Comma` (Host stays).
+Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md `file_literals` call `parse_iso_literal(text)`. Those docs already use that call. `parsed.errors` is the one vec. extract-iso-literals.md `IsoLiteralError<H>` adds `Host`; its `Parse` / `Bracket` / `Comma` are these variants.
 
 ## Change 3: public surface
 
@@ -283,7 +283,7 @@ pub use parse_iso_literal::{
     Description, DescriptionPath, EntityNameWrapper, EntityNameWrapperParent,
     EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, ExtraChunksPath,
     IsoLiteralItem, IsoLiteralParse, IsoLiteralParsePath, IsoLiteralSlotPath, ParsedIsoLiteral,
-    ParsedIsoLiteralError, SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
+    IsoLiteralError, SelectableDeclaration, SelectableDeclarationPath, SelectableNameWrapper,
     SelectableNameWrapperParent, SelectableNameWrapperPath, parse_iso_literal,
 };
 pub use selections::{
