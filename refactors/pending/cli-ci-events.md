@@ -2,9 +2,9 @@
 
 Requires the event model. The parked daemon in `isograph-cli.md` is not enough: CI needs a process that accepts filesystem facts as events.
 
-CI tests inner `handle`: feed events, assert effects. No daemon required for that.
+CI tests the same `handle` the binary runs. Feed events, assert effects. No daemon required for that.
 
-Driving the binary is the outer path: `Filesystem::Injected`, submit the same ingested events (`DiskChanged`, `EditorChanged`, …) the watcher or LSP adapter would have produced.
+Driving the binary is the outer path: the real process listens to the filesystem (or, with `Filesystem::Injected`, only to submitted events). Those events are the same types `handle` already takes.
 
 Whether we also want tests that write real files and watch them is open. This doc is the injected path.
 
