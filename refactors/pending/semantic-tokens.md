@@ -36,7 +36,7 @@ pub enum SemanticToken {
 }
 ```
 
-Grammar consume names the role. Unparsed extra tokens, extra chunks, and the matcher's cut are classified later by `leftover_token`, a free function only that fill-in calls.
+Grammar consume names the role. Unparsed extra, extra chunks, and the matcher's cut are classified later by `leftover_token`, a free function only leftover fill-in calls. extra and extra_chunks are leftover-semantic-tokens.md. The matcher's cut stays this doc's leftover fill-in.
 
 Call sites, by variant:
 
@@ -350,14 +350,14 @@ When type annotations leave the language, `GraphQLTypeName` leaves this enum. Th
 
 ### Leftover fill-in
 
-A walk over `tokenize(text)` that emits `leftover_token` for every token whose span is not already in the collected vec, in source order. Those spans were never passed to `commit`: `Slot.extra_tokens` (from `remaining_contents`), `Singleton.extra_chunks`, separator commas, the matcher's cut, and `Error` tokens. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
+A walk over `tokenize(text)` that emits `leftover_token` for every token whose span is not already in the collected vec, in source order. Those spans were never passed to `commit`: the matcher's cut. `Slot.extra`, `Singleton.extra_chunks`, and separator commas are leftover-semantic-tokens.md. The collected vec stays sorted by span. This is the LSP layer, not the parser's consume path. It runs against `CollectedSemanticTokens`.
 
-`leftover_token` is a free function only leftover fill-in calls. It picks one of four format buckets, or `Error`.
+`leftover_token` is a free function leftover fill-in calls. leftover-semantic-tokens.md's extra walk calls it too. It picks one of four format buckets, or `Error`.
 
 ```rust
 // from crates/isograph_parser/src/semantic_token.rs
-// Only leftover fill-in: extra_tokens, extra_chunks, the matcher's cut.
-fn leftover_token(kind: SplitToken) -> Option<SemanticToken> {
+// Only leftover fill-in: extra, extra_chunks, the matcher's cut.
+pub(crate) fn leftover_token(kind: SplitToken) -> Option<SemanticToken> {
     match kind {
         SplitToken::NonBracket(NonBracketTokenKind::IntegerLiteral) => {
             SemanticToken::Integer.wrap_some()
@@ -383,8 +383,7 @@ Facts:
 - `leftover_token` on `IntegerLiteral` is `Integer`. On `StringLiteral` and `BlockStringLiteral` is `String`. On `Error` is `Error`.
 - `leftover_token` on each `BracketToken` is `Bracket`.
 - `leftover_token` on `LineBreak` and `EndOfFile` is `None`.
-- After fill-in, `entrypoint Query.foo bar` has the four consumed tokens plus `Content` at `bar`.
-- After fill-in, `entrypoint Query.foo @lazy` has `Content` at `@` and `Content` at `lazy`.
+- extra / extra_chunks after-fill-in facts are leftover-semantic-tokens.md.
 
 ### Formatter metadata
 

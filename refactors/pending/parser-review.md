@@ -62,7 +62,7 @@ Three different holes.
 
 `EndOfFile` is actually dead. `tokenize` stops at the last real token. End of input is `Found::EndOfChunk`. Every `From` / `Display` / `SplitToken` match still has an `EndOfFile` arm. Delete the variant from `IsographLangTokenKind` and `NonBracketTokenKind`. Small. parser-minor-improvements.md.
 
-`SemanticToken::Content` is leftover fill-in in semantic-tokens.md (`leftover_token` maps unparsed identifiers, `@`, `!`, `$`, and so on). Do not delete it here.
+`SemanticToken::Content` is leftover fill-in in leftover-semantic-tokens.md (`leftover_token` maps unparsed identifiers, `@`, `!`, `$`, and so on). Do not delete it here.
 
 `Expectation::Description` and `Expectation::SelectionSet` are never passed to `cursor.expected`. Descriptions and selection sets are optional in the language, so those variants will not become real diagnostics without a language change. Display tests can use `Keyword` and `Selection` (`Selection` is used). Delete the two variants. Also small. parser-minor-improvements.md.
 
@@ -78,7 +78,7 @@ Moved to string-literal-value.md. The interned payload is the GraphQL string val
 
 ### Four trees, then the first chunk tree is thrown away and cloned back (moved)
 
-Moved to four-trees.md. Chunking introduces `Chunk` / trailing separators; it is not a typed map of the bracket tree. Leftover contents are leftover-in-extra.md.
+Moved to four-trees.md. Chunking introduces `Chunk` / trailing separators; it is not a typed map of the bracket tree. Leftover contents are leftover-in-extra.md. Highlighting is leftover-semantic-tokens.md.
 
 ### Trailing separators of a parsed chunk leave the tree (moved)
 
@@ -86,7 +86,7 @@ Moved to leftover-in-extra.md. The comma in `entrypoint Query.foo,` goes in `Slo
 
 ### Semantic tokens stop at the first failure in a chunk (moved)
 
-Moved to leftover-in-extra.md. `entrypoint $ $` extra is `$ $`, both `Content`. `entrypoint\nasdf` records `asdf` as `Content` from `extra_chunks`.
+Moved to leftover-semantic-tokens.md. `entrypoint $ $` extra is `$ $`, both `Content`. `entrypoint\nasdf` records `asdf` as `Content` from `extra_chunks`.
 
 -----
 
@@ -129,4 +129,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, string-literal-value.md, leftover-in-extra.md, and four-trees.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.
+Specified work is in type-annotation-null.md, parse-iso-literal-entry.md, variable-declaration-or-usage.md, string-literal-value.md, leftover-in-extra.md, leftover-semantic-tokens.md, and four-trees.md. `Slot`, `parse_singleton`, `EndOfFile`, and unused `Expectation` variants wait in parser-minor-improvements.md. Items below the `-----` have not been processed.

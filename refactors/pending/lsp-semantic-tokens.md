@@ -62,7 +62,7 @@ pub fn file_literals<THostLanguage: HostLanguage>(
 }
 ```
 
-`parse` is `None` when `ParsedIsoLiteral.item` is `None` (empty literal). `tokens` are literal-relative, consume order, whatever the grammar recorded (leftover is not filled in). `errors` is `Slot.extra`'s inner vec: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
+`parse` is `None` when `ParsedIsoLiteral.item` is `None` (empty literal). `tokens` are literal-relative, consume order, whatever the grammar recorded. extra and extra_chunks leftover is leftover-semantic-tokens.md. The matcher's cut is not filled in. `errors` is `Slot.extra`'s inner vec: `IsoLiteralError` (`Host`, `Parse`, `Bracket`, `Comma`), already file-absolute.
 
 ```rust
 // from crates/isograph_lsp/src/lsp_state.rs
