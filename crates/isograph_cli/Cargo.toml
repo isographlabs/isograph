@@ -18,6 +18,10 @@ freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "04d3be57eef
 prelude = { path = "../prelude" }
 tracing = "0.1.41"
 
+[dev-dependencies]
+prelude = { path = "../prelude" }
+tempfile = "3"
+
 [lints.clippy]
 allow_attributes = "deny"
 print_stderr = "deny"
