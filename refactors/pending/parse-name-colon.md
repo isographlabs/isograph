@@ -1,6 +1,6 @@
-# parse-name-colon: `name : rhs`
+# parse-name-colon: lhs, colon, rhs
 
-`parse_name_colon_value` hardcodes the rhs as `parse_non_constant_value`. This doc splits out `:` + rhs and makes the name form take the rhs parser. parse-variables.md's `$name: Type` is `$` + identifier, then this `:` + rhs.
+`parse_name_colon_value` inlines an identifier lhs, a colon, and `parse_non_constant_value`. This doc replaces it with one function that takes the lhs parser and the rhs parser. The colon stays in the middle.
 
 No AST type, path alias, or `IsographResolutionNode` variant changes. A selection alias is `consume_token_if(Colon)`, not this form.
 
@@ -50,30 +50,28 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_colon_rhs<V>(
+pub(crate) fn parse_name_colon<L, R>(
     cursor: &mut ItemCursor<'_>,
-    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<WithSpan<V>, WithSpan<ParseError>>,
-) -> Result<WithSpan<V>, WithSpan<ParseError>> {
+    parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<ParseError>>,
+    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<R, WithSpan<ParseError>>,
+) -> Result<(L, R), WithSpan<ParseError>> {
+    let lhs = parse_lhs(cursor)?;
     cursor
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    parse_rhs(cursor)
+    let rhs = parse_rhs(cursor)?;
+    (lhs, rhs).wrap_ok()
 }
 
-fn parse_name_colon<N, V>(
+fn require_interned_identifier<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
     missing_name: Expectation,
-    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<WithSpan<V>, WithSpan<ParseError>>,
-) -> Result<(WithSpan<N>, WithSpan<V>), WithSpan<ParseError>>
-where
-    N: From<intern::string_key::StringKey>,
-{
+) -> Result<WithSpan<N>, WithSpan<ParseError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, name_token)
         .map_err(|()| cursor.expected(missing_name))?;
-    let rhs = parse_colon_rhs(cursor, parse_rhs)?;
-    (name.interned(), rhs).wrap_ok()
+    name.interned().wrap_ok()
 }
 
 fn parse_argument(
@@ -81,8 +79,7 @@ fn parse_argument(
 ) -> Result<SelectionFieldArgument, WithSpan<ParseError>> {
     let (name, value) = parse_name_colon(
         cursor,
-        SemanticToken::Argument,
-        Expectation::Argument,
+        |cursor| require_interned_identifier(cursor, SemanticToken::Argument, Expectation::Argument),
         parse_non_constant_value,
     )?;
     SelectionFieldArgument {
@@ -95,8 +92,9 @@ fn parse_argument(
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
     let (name, value) = parse_name_colon(
         cursor,
-        SemanticToken::ObjectKey,
-        Expectation::ObjectEntry,
+        |cursor| {
+            require_interned_identifier(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)
+        },
         parse_non_constant_value,
     )?;
     ObjectEntry {
@@ -107,7 +105,18 @@ fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSp
 }
 ```
 
-`parse_colon_rhs` is `pub(crate)` for parse-variables.md. `parse_name_colon` stays in this module. `N` is the inner lang type; callers `.map` the wrapper.
+`parse_name_colon` is `pub(crate)` for parse-variables.md. `require_interned_identifier` stays in this module. `N` is the inner lang type; callers `.map` the wrapper.
+
+parse-variables.md's `$name: Type`:
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+    let (name, type_) = parse_name_colon(
+        cursor,
+        |cursor| require_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
+        parse_type_annotation,
+    )?;
+```
 
 ## Tests
 
@@ -115,5 +124,5 @@ Existing argument and object-entry tests. Behavior is unchanged.
 
 ## Landing checklist
 
-1. `parse_colon_rhs`, `parse_name_colon`, the two call sites. `cargo test -p isograph_parser` passes.
+1. `parse_name_colon`, `require_interned_identifier`, the two call sites. `cargo test -p isograph_parser` passes.
 2. Move this doc to refactors/past.

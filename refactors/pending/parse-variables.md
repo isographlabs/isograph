@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is `require_variable_name` then parse-name-colon.md's `parse_colon_rhs`. Lands after parse-name-colon.md.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`. `$name: Type` is parse-name-colon.md's `parse_name_colon` with `require_variable_name` and `parse_type_annotation`. Lands after parse-name-colon.md.
 
 ## The grammar this doc accepts
 
@@ -99,7 +99,7 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
     Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError,
-    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_colon_rhs,
+    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_name_colon,
     parse_non_constant_value, require_variable_name,
 };
 
@@ -353,8 +353,11 @@ pub(crate) fn consume_variable_declaration_list(
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
-    let name = require_variable_name(cursor, Expectation::VariableDeclarationOrUsage)?;
-    let type_ = parse_colon_rhs(cursor, parse_type_annotation)?;
+    let (name, type_) = parse_name_colon(
+        cursor,
+        |cursor| require_variable_name(cursor, Expectation::VariableDeclarationOrUsage),
+        parse_type_annotation,
+    )?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
     {
         Some(_) => parse_non_constant_value(cursor)?.wrap_some(),
