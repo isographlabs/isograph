@@ -61,6 +61,8 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 5. A selection that starts with `.` is `Expected(Selection, Token(Period))`. Upstream emits a fragment-spread diagnostic for `...`.
 
+6. Variable defaults accept `$`. One value type (`NonConstantValue`). Upstream parses a `ConstantValue` and rejects `$` at the `$`.
+
 ## The error model
 
 `parse_iso_literal` returns `None` on an empty chunked literal and a tree otherwise. Diagnostics go through `report_error` on a cursor, or `errors.push` at the root where there is no cursor. They are not stored on the tree. A failed chunk is `Slot { item: None, extra_tokens: Some(the chunk's items) }`. Leftover after a successful item is `item: Some` plus leftover items. Extra root chunks sit on `IsoLiteralParse.extra_chunks`.
@@ -114,8 +116,6 @@ pub enum Expectation {
     VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[error("a constant value; variables are not allowed here")]
-    ConstantValue,
     #[error("the end of the type")]
     EndOfType,
     #[error("the keyword `to`")]
@@ -181,6 +181,7 @@ Justified differences:
 - `Description` stores quotes included (upstream unquotes and dedents).
 - Empty optional lists are `None` (upstream empty `Vec` with a generated span).
 - `parse_nested_singleton` (isograph has no chunk singleton).
+- Defaults are `NonConstantValue` (isograph `ConstantValue`). `$` in a default is a variable use.
 
 ## What later stages own
 
@@ -192,15 +193,16 @@ Justified differences:
 - Synthetic closing of unclosed groups: unclosed-group-recovery.md.
 - Span-slot genericity: spanless-parsing.md.
 - Storing leftover as a range into the original chunk instead of a clone.
+- Reachable variables as `HashSet<VariableName>` from a walk of `NonConstantValue`. A later pass panics if a context that forbids variables contains any.
 
 ## The docs, in order
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
 1. `one-kind-of-selection.md`. One `Selection` struct with optional `selection_set`. Deletes `ScalarSelection` / `ObjectSelection`.
-2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+2. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 3. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
 4. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
 5. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
-Later: `parse-arrays.md`. `[ ... ]` list values. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
+Later: `parse-arrays.md`. `[ ... ]` list values.

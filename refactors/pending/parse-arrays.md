@@ -1,6 +1,6 @@
 # parse-arrays: `[ ... ]` list values
 
-Lands after parse-directives.md. Each contentful chunk is a value. Leftover is `Expectation::Separator(BracketKind::Bracket)`. parse-variables.md's `ConstantValue` defaults do not accept lists until this doc and a matching constant-list pin land; until then `[` is `Expected(Value, Group(Bracket))` or `Expected(ConstantValue, Group(Bracket))`.
+Lands after parse-directives.md. Each contentful chunk is a value. Leftover is `Expectation::Separator(BracketKind::Bracket)`. Until this doc, `[` as a value is `Expected(Value, Group(Bracket))`, including after `=` on a variable default.
 
 Upstream `parse_non_constant_value` does not parse lists. The `NonConstantValue::List` variant exists on the isograph type and is unused by that parser. This doc adds the form.
 
@@ -14,7 +14,7 @@ A value is whatever `parse_non_constant_value` already accepts, including nested
 
 ## Types
 
-`NonConstantValue` is a field of `SelectionFieldArgument` and of `ObjectEntry`. A vanilla `Slot<T, E>` pin's `T::Parent` is the slot path, so `NonConstantValue` cannot be that `T`. The slot item is a wrapper whose only job is to own the list-element parent, the same split as `SelectionFieldArgument` / `ObjectEntry`.
+`NonConstantValue` is a field of `SelectionFieldArgument`, `ObjectEntry`, and `VariableDeclarationOrUsage`. A vanilla `Slot<T, E>` pin's `T::Parent` is the slot path, so `NonConstantValue` cannot be that `T`. The slot item is a wrapper whose only job is to own the list-element parent, the same split as `SelectionFieldArgument` / `ObjectEntry`.
 
 Origin: `NonConstantValueInner::List` in `crates/isograph_lang_types/src/declarations/selection_argument.rs`. Delta: the wrapper and the `Slot`.
 
@@ -44,9 +44,27 @@ pub enum NonConstantValue {
     List(ListLiteral),
 }
 
+```
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
 pub enum NonConstantValueParent<'a> {
     SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
+    VariableDefault(VariableDeclarationOrUsagePath<'a>),
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub enum NonConstantValueParent<'a> {
+    SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
+    ObjectEntry(Box<ObjectEntryPath<'a>>),
+    VariableDefault(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListLiteralValuePath<'a>>),
 }
 
@@ -113,9 +131,7 @@ fn parse_list_literal_value(
 }
 ```
 
-`parse_non_constant_value` stays the spanning ladder. `parse_list_literal_value` calls it; leftover is the slot's, not the value's.
-
-A matching `ConstantListLiteral` / `ConstantListLiteralValue` pin lands in the same change if defaults should accept lists. Otherwise `[` after `=` remains `Expected(ConstantValue, Group(Bracket))` until constant-value.md.
+`parse_non_constant_value` stays the spanning ladder. `parse_list_literal_value` calls it; leftover is the slot's, not the value's. Defaults share this function, so list defaults land with list argument values.
 
 ## Tests
 
@@ -128,6 +144,7 @@ Feed list interiors with leftover `Separator(BracketKind::Bracket)` and `parse_l
 - leftover after a value keeps the item
 - a doubled comma is chunking's error
 - `id: [1, 2]` as an argument value
+- `$ids: [ID!] = [1, $x]` as a default
 
 ## Landing checklist
 

@@ -365,7 +365,7 @@ pub(crate) fn parse_non_constant_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name and `reader_alias` are `SelectionNameWrapper` over `SelectableName`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`. The integer arm is `token.token_text().parse()` on the token `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow. Variable defaults call this same function.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
@@ -391,10 +391,6 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
         None => (None, first.interned().map(SelectionNameWrapper)),
     };
 ```
-
-## Narrower types for narrower grammars
-
-Variable defaults are constant values. The constant-value ladder is the value ladder without the `$` arm. `$` falls through to `expected(Expectation::ConstantValue)`. The integer arm is the same `token.token_text().parse()` match; that token is the one `consume_token_if(IntegerLiteral)` just returned. `parse::<i64>()` on an `IntegerLiteral` token (`-?(0|[1-9][0-9]*)`) fails only as overflow or underflow.
 
 ## Errors
 
@@ -447,8 +443,6 @@ pub enum Expectation {
     VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[error("a constant value; variables are not allowed here")]
-    ConstantValue,
     #[error("the end of the type")]
     EndOfType,
     #[error("the keyword `to`")]
@@ -487,7 +481,7 @@ impl BracketKind {
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 
@@ -538,7 +532,6 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` / `parse_iso_literal`
 - Nested list stream: `ItemCursor::stream_chunk`
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
-- Constant-only value: `parse_constant_value` → `ConstantValue`
 
 ## Shipping and amending
 
@@ -549,7 +542,7 @@ Each grammar feature lands on this surface.
 - parse-arguments.md: `Separator(BracketKind)`, the `SelectionFieldArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `parse_non_constant_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
-- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
+- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`

@@ -1,6 +1,6 @@
 # parse-variables: variable declarations and type annotations
 
-Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults reuse parse-arguments.md's value grammar with variables rejected.
+Field declarations gain variable-declaration lists. Type annotations land here; parse-pointers.md reuses them for `to` targets. Defaults call parse-arguments.md's `parse_non_constant_value`.
 
 ## The grammar this doc accepts
 
@@ -20,7 +20,7 @@ A type is a name with an optional `!`, or a bracket group holding exactly one ty
 Pet    Pet!    [Pet]    [Pet!]!    [[Pet]]
 ```
 
-A default value is a `ConstantValue`: the same scalar and object forms as a value, with `$` rejected at the `$`.
+A default value is a `NonConstantValue`. `$` is a variable use, including nested in an object.
 
 ## Change 1: `Box` delegation in resolve_position
 
@@ -50,8 +50,6 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
     VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[error("a constant value; variables are not allowed here")]
-    ConstantValue,
     #[error("the end of the type")]
     EndOfType,
 ```
@@ -87,7 +85,7 @@ impl<'a> ItemCursor<'a> {
 
 ## New module: variables.rs
 
-Origin for the declaration: `crates/isograph_lang_types/src/declarations/variable_declaration.rs` (`VariableDeclaration`, field `type_`, `default_value`). Origin for the annotation shape written here: GraphQL named / list / `!`, not isograph's post-conversion `TypeAnnotationDeclaration` (`Scalar` / `Union` / `Plural`). Delta: i2 names the type `VariableDeclarationOrUsage`; each declaration sits in a `Slot`; `VariableDeclarationOrUsageList` wraps the vec (isograph stores `Vec<VariableDeclaration>` on the field); `!` is not a `NonNull` variant; leftover inside `[...]` is stored on `ListTypeAnnotation` (see below).
+Origin for the declaration: `crates/isograph_lang_types/src/declarations/variable_declaration.rs` (`VariableDeclaration`, field `type_`, `default_value`). Origin for the annotation shape written here: GraphQL named / list / `!`, not isograph's post-conversion `TypeAnnotationDeclaration` (`Scalar` / `Union` / `Plural`). Delta: i2 names the type `VariableDeclarationOrUsage`; each declaration sits in a `Slot`; `VariableDeclarationOrUsageList` wraps the vec (isograph stores `Vec<VariableDeclaration>` on the field); `default_value` is `NonConstantValue` (isograph `ConstantValue`); `!` is not a `NonNull` variant; leftover inside `[...]` is stored on `ListTypeAnnotation` (see below).
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
@@ -99,9 +97,9 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkedLevel, ClientFieldDeclarationPath, ConstantValue, EntityNameWrapper,
-    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError, SemanticToken,
-    Slot, UnparsedChunkItems, VariableNameWrapper, parse_constant_value,
+    BracketKind, ChunkedLevel, ClientFieldDeclarationPath, EntityNameWrapper,
+    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, NonConstantValue, ParseError,
+    SemanticToken, Slot, UnparsedChunkItems, VariableNameWrapper, parse_non_constant_value,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -121,7 +119,7 @@ pub struct VariableDeclarationOrUsage {
     pub type_: WithSpan<TypeAnnotation>,
     #[resolve_field]
     #[parent_variant(VariableDefault)]
-    pub default_value: Option<WithSpan<ConstantValue>>,
+    pub default_value: Option<WithSpan<NonConstantValue>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -215,6 +213,29 @@ pub type VariableNameWrapperPath<'a> =
 
 `VariableUse`'s `name` field respells to `#[resolve_field]` + `#[parent_variant(Use)]`.
 
+`NonConstantValue` gains a default parent. Before:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub enum NonConstantValueParent<'a> {
+    SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
+    ObjectEntry(Box<ObjectEntryPath<'a>>),
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub enum NonConstantValueParent<'a> {
+    SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
+    ObjectEntry(Box<ObjectEntryPath<'a>>),
+    VariableDefault(VariableDeclarationOrUsagePath<'a>),
+}
+```
+
+`VariableDefault` is unboxed: `VariableDeclarationOrUsagePath` does not contain `NonConstantValueParent`.
+
 ```rust
 // from crates/isograph_parser/src/chunk.rs
     pins = [
@@ -254,77 +275,6 @@ impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
 ```
 
-`ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub enum ConstantValue {
-    String(StringLiteralValueWrapper),
-    Integer(IntegerValue),
-    Boolean(BooleanValue),
-    Null(NullValue),
-    Object(ConstantObjectLiteral),
-}
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ConstantObjectLiteral(
-    #[resolve_field] pub Vec<WithSpan<Slot<ConstantObjectEntry, UnparsedChunkItems>>>,
-);
-
-#[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ConstantObjectEntrySlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ConstantObjectEntry {
-    #[resolve_field]
-    pub name: WithSpan<ValueKeyNameWrapper>,
-    #[resolve_field]
-    #[parent_variant(ConstantObjectEntry)]
-    pub value: WithSpan<ConstantValue>,
-}
-
-#[derive(Debug)]
-pub enum ConstantValueParent<'a> {
-    VariableDefault(VariableDeclarationOrUsagePath<'a>),
-    ConstantObjectEntry(Box<ConstantObjectEntryPath<'a>>),
-}
-```
-
-`ValueKeyNameWrapper` gains a second parent:
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-#[derive(Debug)]
-pub enum ValueKeyNameWrapperParent<'a> {
-    ObjectEntry(ObjectEntryPath<'a>),
-    ConstantObjectEntry(ConstantObjectEntryPath<'a>),
-}
-```
-
-`ObjectEntry.name` respells to `#[parent_variant(ObjectEntry)]`. The constant-object pin:
-
-```
-(<ConstantObjectEntry, UnparsedChunkItems>, ConstantObjectLiteralPath<'a>)
-```
-
-`UnparsedChunkItemsParent::ConstantObjectEntrySlot`. `From` into `IsographResolutionNode::ConstantObjectEntrySlot`. `IntegerValue` / `BooleanValue` / `NullValue` / `StringLiteralValueWrapper` gain `ConstantValueParent` as a second parent via a shared enum, or they stay on `NonConstantValueParent` and `ConstantValue` uses the same payload types with a new parent enum that includes both trees.
-
-Payload types used by both `NonConstantValue` and `ConstantValue` need a parent enum that names both:
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-#[derive(Debug)]
-pub enum IntegerValueParent<'a> {
-    NonConstant(NonConstantValueParent<'a>),
-    Constant(ConstantValueParent<'a>),
-}
-```
-
-The same for `BooleanValue`, `NullValue`, `StringLiteralValueWrapper`. Each payload's `parent_type` becomes that enum. `NonConstantValue::Integer` and `ConstantValue::Integer` mark `#[parent_variant(NonConstant)]` / `#[parent_variant(Constant)]`.
-
-constant-value.md deletes this second tree.
-
 ```rust
 // from crates/isograph_parser/src/variables.rs
 pub(crate) fn consume_variable_declaration_list(
@@ -358,7 +308,7 @@ fn parse_variable_declaration(
     let type_ = parse_type_annotation(cursor)?;
     let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
     {
-        Some(_) => parse_constant_value(cursor)?.wrap_some(),
+        Some(_) => parse_non_constant_value(cursor)?.wrap_some(),
         None => None,
     };
     VariableDeclarationOrUsage {
@@ -532,6 +482,13 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
             .expect("expected a declared variable")
     }
 
+    fn as_entry(slot: &Slot<ObjectEntry, UnparsedChunkItems>) -> &ObjectEntry {
+        slot.item
+            .as_ref()
+            .map(|wrapped| wrapped.item.reference())
+            .expect("expected an object entry")
+    }
+
     #[test]
     fn a_multi_line_variable_list_parses_in_the_demo_style() {
         let text = "field Query.PetCheckinListRoute(\n  $id: ID !\n) {\n  pets\n}";
@@ -576,7 +533,7 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
     }
 
     #[test]
-    fn defaults_parse_and_reject_variables_at_any_depth() {
+    fn defaults_parse_including_variables() {
         let text = "field Query.Foo($limit: Int = 10) { bar }";
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
@@ -587,29 +544,77 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
             .expect("the fixture declares a default");
         assert!(matches!(
             default.item,
-            ConstantValue::Integer(IntegerValue(10))
+            NonConstantValue::Integer(IntegerValue(10))
         ));
 
         let shallow = "field Query.Foo($limit: Int = $other) { bar }";
         let (parse, errors) = parsed(shallow);
-        assert!(
-            variables_of(parse.reference()).item.0[0]
-                .item
-                .item
-                .is_none()
-        );
-        assert!(errors.iter().any(|error| {
-            error.item
-                == expected(
-                    Expectation::ConstantValue,
-                    Found::Token(NonBracketTokenKind::Dollar),
-                )
-                && error.location == span_of(shallow, "$")
-        }));
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        assert!(matches!(default.item, NonConstantValue::Variable(_)));
 
         let deep = "field Query.Foo($input: Input = { pet: $pet }) { bar }";
         let (parse, errors) = parsed(deep);
-        assert!(errors.iter().any(|error| error.location == span_of(deep, "$")));
+        assert_eq!(errors, vec![]);
+        let declared = as_declared(variables_of(parse.reference()).item.0[0].item.reference());
+        let default = declared
+            .default_value
+            .as_ref()
+            .expect("the fixture declares a default");
+        match default.item.reference() {
+            NonConstantValue::Object(object) => {
+                let entry = as_entry(object.0[0].item.reference());
+                assert!(matches!(entry.value.item, NonConstantValue::Variable(_)));
+            }
+            value => panic!("expected an object default, got {value:?}"),
+        }
+
+        let cross = "field Query.Foo($foo: String = \"foo\", $bar: Input = { foo: $foo }) { baz }";
+        let (parse, errors) = parsed(cross);
+        assert_eq!(errors, vec![]);
+        let variables = variables_of(parse.reference());
+        assert_eq!(variables.item.0.len(), 2);
+        let bar = as_declared(variables.item.0[1].item.reference());
+        match bar
+            .default_value
+            .as_ref()
+            .expect("bar has a default")
+            .item
+            .reference()
+        {
+            NonConstantValue::Object(object) => {
+                let entry = as_entry(object.0[0].item.reference());
+                assert!(matches!(entry.value.item, NonConstantValue::Variable(_)));
+            }
+            value => panic!("expected an object default, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn a_default_variable_resolves_through_variable_default() {
+        let text = "field Query.Foo($limit: Int = $other) { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        match parse.resolve((), span_of(text, "other")) {
+            IsographResolutionNode::VariableNameWrapper(name) => match name.parent {
+                VariableNameWrapperParent::Use(variable_use) => match variable_use.parent {
+                    NonConstantValueParent::VariableDefault(declaration) => {
+                        assert_eq!(declaration.inner.name.location, span_of(text, "limit"));
+                    }
+                    parent => panic!("expected VariableDefault, got {parent:?}"),
+                },
+                parent => panic!("expected Use, got {parent:?}"),
+            },
+            node => panic!("expected the variable name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "$")) {
+            IsographResolutionNode::VariableUse(_) => {}
+            node => panic!("expected the variable use, got {node:?}"),
+        }
     }
 
     #[test]
@@ -712,5 +717,5 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsage
 ## Landing checklist
 
 1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-2. `parse_nested_singleton`, variables.rs, `ConstantValue`, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. `parse_nested_singleton`, variables.rs, the `NonConstantValueParent::VariableDefault` variant, the `ClientFieldDeclaration` slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.
