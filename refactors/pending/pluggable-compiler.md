@@ -29,7 +29,7 @@ Each seam is a trait, which is the case AGENTS.md reserves traits for: a boundar
 
 ### Extraction
 
-The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract` finds iso literals in a file; `validate` checks the host embedding. `IsoLiteralExtraction` carries the common contents and span plus `THostLanguage::LiteralContext`. The first implementor is `Javascript`. File extensions for the watcher stay a later field on that trait (cli-daemon.md's `TRACKED_EXTENSIONS` is the placeholder).
+The extraction seam is `HostLanguage` in extract-iso-literals.md. `extract` finds iso literals in a file; `validate` checks the host embedding. `IsoLiteralExtraction` carries the common contents and span plus `THostLanguage::LiteralContext`. The first implementor is `TypeScriptHostLanguage`. File extensions for the watcher stay a later field on that trait (cli-daemon.md's `TRACKED_EXTENSIONS` is the placeholder).
 
 ### NetworkProtocol
 

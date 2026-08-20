@@ -154,7 +154,7 @@ pub fn start() -> std::process::ExitCode;
 // from crates/isograph_lsp/src/file_literals.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{IsoLiteralItem, Javascript, SemanticToken};
+    use isograph_parser::{IsoLiteralItem, TypeScriptHostLanguage, SemanticToken};
     use intern::string_key::Intern;
     use prelude::Postfix;
     use span::{Span, WithSpanPostfix};
@@ -176,7 +176,7 @@ mod tests {
     #[test]
     fn exported_field_is_one_file_literal() {
         let source = "export const fullName = iso(`field Pet.fullName { id }`)(";
-        let literals = file_literals(&Javascript, source);
+        let literals = file_literals(&TypeScriptHostLanguage, source);
         assert_eq!(literals.len(), 1);
         assert_eq!(
             literals[0].extraction.context.const_export_name,
@@ -212,7 +212,7 @@ mod tests {
         let source = "\
 export const fullName = iso(`field Pet.fullName { id }`)(
 iso(`entrypoint Query.HomeRoute`)";
-        let literals = file_literals(&Javascript, source);
+        let literals = file_literals(&TypeScriptHostLanguage, source);
         assert_eq!(literals.len(), 2);
         assert!(matches!(
             literals[1]
@@ -328,12 +328,12 @@ Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
-use isograph_parser::{HostLanguage, Javascript};
+use isograph_parser::{HostLanguage, TypeScriptHostLanguage};
 
 use crate::file_literals::{FileLiteral, file_literals};
 
 pub fn lsp_tokens_for_file(source: &str) -> Vec<LspSemanticToken> {
-    let literals = file_literals(&Javascript, source);
+    let literals = file_literals(&TypeScriptHostLanguage, source);
     let absolute = concatenate_and_absolutize(literals.iter(), source);
     convert_absolute_token_to_lsp_token(absolute, source).collect()
 }
@@ -417,7 +417,7 @@ Tests:
 // from crates/isograph_lsp/src/semantic_tokens.rs
 #[cfg(test)]
 mod tests {
-    use isograph_parser::{Javascript, SemanticToken};
+    use isograph_parser::{TypeScriptHostLanguage, SemanticToken};
     use prelude::Postfix;
 
     use super::{
@@ -427,7 +427,7 @@ mod tests {
     use crate::file_literals::file_literals;
 
     fn absolute_for(source: &str) -> Vec<AbsoluteToken> {
-        let literals = file_literals(&Javascript, source);
+        let literals = file_literals(&TypeScriptHostLanguage, source);
         concatenate_and_absolutize(literals.iter(), source).collect()
     }
 

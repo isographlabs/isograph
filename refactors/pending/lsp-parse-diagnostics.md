@@ -101,12 +101,12 @@ use lsp_types::{Diagnostic, DiagnosticSeverity, Position, Range};
 use prelude::Postfix;
 use span::Span;
 
-use isograph_parser::{HostLanguage, Javascript};
+use isograph_parser::{HostLanguage, TypeScriptHostLanguage};
 
 use crate::file_literals::{FileLiteral, file_literals};
 
 pub fn diagnostics_for_file(source: &str) -> Vec<Diagnostic> {
-    file_literals(&Javascript, source)
+    file_literals(&TypeScriptHostLanguage, source)
         .iter()
         .flat_map(|literal| diagnostics_for_literal(source, literal))
         .collect()
