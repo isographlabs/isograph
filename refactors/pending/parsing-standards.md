@@ -137,7 +137,7 @@ pub struct Slot<T, E> {
     pub item: Option<WithSpan<T>>,
     #[resolve_field]
     #[parent_from]
-    pub extra_tokens: Option<WithSpan<E>>,
+    pub extra: Option<WithSpan<E>>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]

@@ -2,7 +2,7 @@
 
 Requires lsp-semantic-tokens.md. After a `didOpen` or `didChange`, the language server publishes parse errors for the iso literals in that file as `textDocument/publishDiagnostics`. Closing the file publishes an empty list for that URI, which clears the squiggles.
 
-The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral` holds `errors`, `bracket_errors`, and `comma_errors` with literal-relative spans, and `host_errors` with file-absolute spans from `HostLanguage::validate`. This doc turns those into `lsp_types::Diagnostic`. Literal-relative spans are rebased with `with_offset(extraction.span.start)`. Host-error spans are used as-is.
+The pipeline is `file_literals` from lsp-semantic-tokens.md. Each `FileLiteral` holds `errors`, `bracket_errors`, and `comma_errors` with literal-relative spans, and `host_errors` with file-absolute spans from `Slot.extra`. This doc turns those into `lsp_types::Diagnostic`. Literal-relative spans are rebased with `with_offset(extraction.location.start)`. Host-error spans are used as-is.
 
 Origin: isograph `crates/isograph_lsp/src/diagnostic_notification.rs` and the debounce-then-`validate_entire_schema` publish in `server.rs`. Delta: parse errors and host-language errors of the open file only, published on `didOpen` / `didChange` (no debounce, no schema, no file watcher). `didClose` clears. Messages are `Display` of the error types.
 
@@ -116,7 +116,7 @@ fn diagnostics_for_literal<THostLanguage: HostLanguage>(
     source: &str,
     literal: &FileLiteral<'_, THostLanguage>,
 ) -> Vec<Diagnostic> {
-    let offset = literal.extraction.span.start;
+    let offset = literal.extraction.location.start;
     let mut out = Vec::new();
     for error in &literal.errors {
         out.push(diagnostic(
@@ -184,7 +184,7 @@ pub fn char_index_to_position(content: &str, char_index: usize) -> Position {
 }
 ```
 
-Origin of `char_index_to_position`: isograph `crates/isograph_lsp/src/format.rs`, verbatim. Origin of the publish shape: isograph `diagnostic_notification.rs` (`range`, `message`; we also set `severity` and `source`). Delta: no code-action `data`, no `isograph_location_to_lsp_location`, no pico, rebase via `span.with_offset(extraction.span.start)` on the file text.
+Origin of `char_index_to_position`: isograph `crates/isograph_lsp/src/format.rs`, verbatim. Origin of the publish shape: isograph `diagnostic_notification.rs` (`range`, `message`; we also set `severity` and `source`). Delta: no code-action `data`, no `isograph_location_to_lsp_location`, no pico, rebase via `span.with_offset(extraction.location.start)` on the file text.
 
 `lib.rs` gains `mod diagnostics;`.
 

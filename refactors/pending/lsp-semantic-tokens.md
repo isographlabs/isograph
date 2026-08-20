@@ -34,7 +34,7 @@ use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
 
 pub struct FileLiteral<'a, THostLanguage: HostLanguage> {
-    pub extraction: IsoLiteralExtraction<'a, THostLanguage>,
+    pub extraction: WithSpan<IsoLiteralExtraction<'a, THostLanguage>>,
     pub parse: Option<WithSpan<IsoLiteralParse>>,
     pub errors: Vec<WithSpan<ParseError>>,
     pub bracket_errors: Vec<BracketError>,
@@ -49,22 +49,32 @@ pub fn file_literals<THostLanguage: HostLanguage>(
 ) -> Vec<FileLiteral<'_, THostLanguage>> {
     host.extract_iso_literals(source)
         .into_iter()
-        .filter_map(|extracted| {
-            let extraction = extracted.result?;
-            let text = extraction.iso_literal_text;
+        .filter_map(|slot| {
+            let extraction = slot.item?;
+            let text = extraction.item.iso_literal_text;
             let (brackets, bracket_errors) =
                 match_brackets(tokenize(text), text.len() as u32);
             let (tree, comma_errors) = chunk(brackets.reference());
             let mut errors = Vec::new();
             let mut tokens = Vec::new();
             let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
+            let host_errors = slot
+                .extra
+                .map(|errors| {
+                    errors
+                        .item
+                        .into_iter()
+                        .map(|error| error.with_span(errors.location))
+                        .collect()
+                })
+                .unwrap_or_default();
             FileLiteral {
                 extraction,
                 parse,
                 errors,
                 bracket_errors,
                 comma_errors,
-                host_errors: extracted.errors.unwrap_or_default(),
+                host_errors,
                 tokens,
             }
             .wrap_some()
@@ -171,7 +181,7 @@ mod tests {
         let literals = file_literals(&TypeScriptHostLanguage, source);
         assert_eq!(literals.len(), 1);
         assert_eq!(
-            literals[0].extraction.context.const_export_name,
+            literals[0].extraction.item.context.const_export_name,
             "fullName".intern().to::<common_lang_types::ConstExportName>().wrap_some()
         );
         assert!(matches!(
@@ -193,7 +203,7 @@ mod tests {
             literals[0]
                 .tokens
                 .contains(&SemanticToken::Keyword.with_span(span_of(
-                    literals[0].extraction.iso_literal_text,
+                    literals[0].extraction.item.iso_literal_text,
                     "field"
                 )))
         );
@@ -316,7 +326,7 @@ pub fn lsp_type_index(token: SemanticToken) -> u32 {
 
 Delta from isograph's per-constant `lsp_semantic_token`: i2 has one `SemanticToken` enum. `FieldName` is PROPERTY (isograph uses METHOD for `Type.name` and PROPERTY for selections). `Error` is COMMENT. `Content` is OPERATOR.
 
-Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source.span` is `extraction.span`; `IsographSemanticToken` is `SemanticToken`; no pico; no `uri_is_project_file`; `page_content` is the open file text.
+Absolutize and encode, origin isograph `semantic_tokens.rs`. Delta: `text_source.span` is `extraction.location`; `IsographSemanticToken` is `SemanticToken`; no pico; no `uri_is_project_file`; `page_content` is the open file text.
 
 ```rust
 // from crates/isograph_lsp/src/semantic_tokens.rs
@@ -335,7 +345,7 @@ fn concatenate_and_absolutize<'a, THostLanguage: HostLanguage>(
     page_content: &'a str,
 ) -> impl Iterator<Item = AbsoluteToken> + 'a {
     literals.flat_map(move |literal| {
-        let iso_literal_extraction_span = literal.extraction.span;
+        let iso_literal_extraction_span = literal.extraction.location;
         literal.tokens.iter().flat_map(move |relative_token| {
             absolutize_relative_token(page_content, iso_literal_extraction_span, relative_token)
         })

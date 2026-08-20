@@ -1,8 +1,8 @@
 # Extract iso literals
 
-Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `ExtractedIsoLiteral`: `result: Option` when the host produced the string, `errors: Option` when the host reported problems. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
+Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. `extract_iso_literals` returns `Vec<Slot<IsoLiteralExtraction<Self>, Vec<Self::Error>>>`. `Slot.item` is `Some` when the host produced the string. `Slot.extra` is `Some` when the host reported problems, never `Some` of an empty vec. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
 
-The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and sets `iso_literal_text` / `span` to the interior of the backticks.
+The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and puts the interior of the backticks in `item`.
 
 ## Types
 
@@ -19,7 +19,7 @@ use std::fmt;
 use std::sync::LazyLock;
 
 use crate::{
-    IsoLiteralItem, IsoLiteralParse, SelectableNameWrapper, chunk, match_brackets,
+    IsoLiteralItem, IsoLiteralParse, SelectableNameWrapper, Slot, chunk, match_brackets,
     parse_iso_literal, tokenize,
 };
 
@@ -30,20 +30,11 @@ pub trait HostLanguage: Sized {
     fn extract_iso_literals<'a>(
         &self,
         source: &'a str,
-    ) -> Vec<ExtractedIsoLiteral<'a, Self>>;
-}
-
-/// Same shape as `Slot`: `result` is `Some` when the host produced an isograph
-/// string; `errors` is `Some` when the host reported problems. `errors` is never
-/// `Some` of an empty vec.
-pub struct ExtractedIsoLiteral<'a, THostLanguage: HostLanguage> {
-    pub result: Option<IsoLiteralExtraction<'a, THostLanguage>>,
-    pub errors: Option<Vec<WithSpan<THostLanguage::Error>>>,
+    ) -> Vec<Slot<IsoLiteralExtraction<'a, Self>, Vec<Self::Error>>>;
 }
 
 pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
     pub iso_literal_text: &'a str,
-    pub span: Span,
     pub context: THostLanguage::LiteralContext,
 }
 
@@ -72,9 +63,9 @@ pub enum TypeScriptHostError {
 }
 ```
 
-Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `ExtractedIsoLiteral` and `IsoLiteralExtraction` are `Debug, PartialEq, Eq` (`IsoLiteralExtraction` is also `Copy, Clone` when `LiteralContext` is). `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`.
+Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`.
 
-`iso_literal_text` is the isograph source. `span` is where that string sits in the file. For `TypeScriptHostLanguage`, both are the interior of the backticks, and `&source[extraction.span.as_usize_range()] == extraction.iso_literal_text`.
+The string's location in the file is `Slot.item`'s `WithSpan`, not a field on `IsoLiteralExtraction`. For `TypeScriptHostLanguage`, that span is the interior of the backticks, and `&source[item.location.as_usize_range()] == item.item.iso_literal_text`. Host errors share that span: `extra` is `WithSpan<Vec<Error>>` at the same location.
 
 `IsoCall::FunctionCall` is `iso(\`...\`)`. `IsoCall::TaggedTemplate` is `iso\`...\``. `AssociatedJsFunction::Present` is the `(` the regex reads after the iso call, the start of the resolver argument.
 
@@ -82,13 +73,32 @@ Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated
 
 ```
 struct IsoLiteralExtraction { const_export_name, iso_literal_text, iso_literal_start_index, has_associated_js_function, iso_function_called_with_paren }
--> IsoLiteralExtraction<THostLanguage> { iso_literal_text: &'a str, span: Span, context: THostLanguage::LiteralContext }
+-> IsoLiteralExtraction<THostLanguage> { iso_literal_text: &'a str, context: THostLanguage::LiteralContext }
+location is Slot.item.location
+return is Slot<IsoLiteralExtraction, Vec<Error>> (item / extra), not a second struct
 TypeScriptLiteralContext holds const_export_name, call, associated_js_function
 has_associated_js_function: bool -> AssociatedJsFunction
 iso_function_called_with_paren: bool -> IsoCall
 ```
 
-## Change 1: `HostLanguage::extract` and `TypeScriptHostLanguage`
+## Change 1: `Slot.extra_tokens` is `extra`
+
+`extra_tokens` names leftover parse tokens. `Slot` is also the return of `extract_iso_literals`, where the second Option is host errors. The field is `extra`, matching `Singleton.extra_chunks`.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub struct Slot<T, E> {
+    #[resolve_field]
+    pub item: Option<WithSpan<T>>,
+    #[resolve_field]
+    #[parent_from]
+    pub extra: Option<WithSpan<E>>,
+}
+```
+
+Before: `extra_tokens`. Every `extra_tokens` in `crates/isograph_parser` (struct field, constructions, tests, `#[parent_from]` on that field) becomes `extra`. `UnparsedChunkItemsParent` and resolve pins stay. `parsing-standards.md` Slot listings become `extra`.
+
+## Change 2: `HostLanguage::extract_iso_literals` and `TypeScriptHostLanguage`
 
 `crates/isograph_parser/Cargo.toml` gains `regex`:
 
@@ -178,7 +188,7 @@ impl HostLanguage for TypeScriptHostLanguage {
     fn extract_iso_literals<'a>(
         &self,
         source: &'a str,
-    ) -> Vec<ExtractedIsoLiteral<'a, Self>> {
+    ) -> Vec<Slot<IsoLiteralExtraction<'a, Self>, Vec<Self::Error>>> {
         EXTRACT_ISO_LITERAL
             .captures_iter(source)
             .filter_map(|captures| {
@@ -186,9 +196,9 @@ impl HostLanguage for TypeScriptHostLanguage {
                     return None;
                 }
                 let literal = captures.name("literal")?;
+                let span = Span::from_usize(literal.start(), literal.end());
                 let extraction = IsoLiteralExtraction {
                     iso_literal_text: literal.as_str(),
-                    span: Span::from_usize(literal.start(), literal.end()),
                     context: TypeScriptLiteralContext {
                         const_export_name: captures
                             .name("export_name")
@@ -204,37 +214,29 @@ impl HostLanguage for TypeScriptHostLanguage {
                     },
                 };
                 let parse = parse_tree(extraction.iso_literal_text);
-                let item = parse.as_ref().and_then(item_of);
+                let parsed_item = parse.as_ref().and_then(item_of);
                 let mut errors = Vec::new();
                 if let IsoCall::TaggedTemplate = extraction.context.call {
-                    errors.push(
-                        TypeScriptHostError::MissingParentheses.with_span(extraction.span),
-                    );
+                    errors.push(TypeScriptHostError::MissingParentheses);
                 }
-                if let Some(IsoLiteralItem::Selectable(selectable)) = item {
+                if let Some(IsoLiteralItem::Selectable(selectable)) = parsed_item {
                     if extraction.context.const_export_name.is_none() {
-                        errors.push(
-                            TypeScriptHostError::MissingExport {
-                                suggested_name: selectable.name.item,
-                            }
-                            .with_span(extraction.span),
-                        );
+                        errors.push(TypeScriptHostError::MissingExport {
+                            suggested_name: selectable.name.item,
+                        });
                     }
                     if let AssociatedJsFunction::Absent =
                         extraction.context.associated_js_function
                     {
-                        errors.push(
-                            TypeScriptHostError::MissingAssociatedFunction
-                                .with_span(extraction.span),
-                        );
+                        errors.push(TypeScriptHostError::MissingAssociatedFunction);
                     }
                 }
-                ExtractedIsoLiteral {
-                    result: extraction.wrap_some(),
-                    errors: if errors.is_empty() {
+                Slot {
+                    item: extraction.with_span(span).wrap_some(),
+                    extra: if errors.is_empty() {
                         None
                     } else {
-                        errors.wrap_some()
+                        errors.with_span(span).wrap_some()
                     },
                 }
                 .wrap_some()
@@ -262,17 +264,17 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 }
 ```
 
-`parse_tree` / `item_of` are private helpers in `extract.rs` for `TypeScriptHostLanguage`: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not the `result`. `result` is the isograph string and host context. Grammar errors stay on `parse_iso_literal`'s error vec when a later caller parses.
+`parse_tree` / `item_of` are private helpers in `extract.rs` for `TypeScriptHostLanguage`: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors stay on `parse_iso_literal`'s error vec when a later caller parses.
 
-`Display` for `TypeScriptHostError` lands with Change 1. Change 2 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
+`Display` for `TypeScriptHostError` lands with Change 2. Change 3 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
 
 `TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
-Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; `Span`; the two enums; host facts on `context`; return is `ExtractedIsoLiteral` (`result: Option`, `errors: Option`), the same two-Option shape as `Slot`.
+Origin of `extract_iso_literals`: `extract_iso_literals_from_file_content` plus the host checks in `process_iso_literal_extraction` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; interned `ConstExportName`; host facts on `context`; return is `Slot` (`item` / `extra`).
 
 ### Tests
 
-In `extract.rs` under `#[cfg(test)]`. Helper `extract` takes `.result` of each `ExtractedIsoLiteral`. Host-error tests read `.errors`.
+In `extract.rs` under `#[cfg(test)]`. Helper `extract` takes `.item` of each `Slot`. Host-error tests read `.extra`.
 
 ```rust
 // from crates/isograph_parser/src/extract.rs
@@ -280,22 +282,27 @@ In `extract.rs` under `#[cfg(test)]`. Helper `extract` takes `.result` of each `
 mod tests {
     use intern::string_key::Intern;
     use prelude::Postfix;
-    use span::Span;
+    use span::{Span, WithSpan, WithSpanPostfix};
 
     use super::{
-        AssociatedJsFunction, ExtractedIsoLiteral, HostLanguage, IsoCall, IsoLiteralExtraction,
-        TypeScriptHostLanguage, TypeScriptLiteralContext,
+        AssociatedJsFunction, HostLanguage, IsoCall, IsoLiteralExtraction, Slot,
+        TypeScriptHostError, TypeScriptHostLanguage, TypeScriptLiteralContext,
     };
 
-    fn extract(source: &str) -> Vec<IsoLiteralExtraction<'_, TypeScriptHostLanguage>> {
+    fn extract(
+        source: &str,
+    ) -> Vec<WithSpan<IsoLiteralExtraction<'_, TypeScriptHostLanguage>>> {
         TypeScriptHostLanguage
             .extract_iso_literals(source)
             .into_iter()
-            .filter_map(|extracted| extracted.result)
+            .filter_map(|slot| slot.item)
             .collect()
     }
 
-    fn extract_all(source: &str) -> Vec<ExtractedIsoLiteral<'_, TypeScriptHostLanguage>> {
+    fn extract_all(
+        source: &str,
+    ) -> Vec<Slot<IsoLiteralExtraction<'_, TypeScriptHostLanguage>, Vec<TypeScriptHostError>>>
+    {
         TypeScriptHostLanguage.extract_iso_literals(source)
     }
 
@@ -326,15 +333,15 @@ mod tests {
             extracted[0],
             IsoLiteralExtraction {
                 iso_literal_text: text,
-                span: Span::from_usize(start, start + text.len()),
                 context: TypeScriptLiteralContext {
                     const_export_name: interned_export("fullName").wrap_some(),
                     call: IsoCall::FunctionCall,
                     associated_js_function: AssociatedJsFunction::Present,
                 },
             }
+            .with_span(Span::from_usize(start, start + text.len()))
         );
-        assert_eq!(&source[extracted[0].span.as_usize_range()], text);
+        assert_eq!(&source[extracted[0].location.as_usize_range()], text);
     }
 
     #[test]
@@ -342,16 +349,16 @@ mod tests {
         let source = "iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.const_export_name, None);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.context.const_export_name, None);
+        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].context.associated_js_function,
+            extracted[0].item.context.associated_js_function,
             AssociatedJsFunction::Absent
         );
         assert_eq!(
-            &source[extracted[0].span.as_usize_range()],
-            extracted[0].iso_literal_text
+            &source[extracted[0].location.as_usize_range()],
+            extracted[0].item.iso_literal_text
         );
     }
 
@@ -360,12 +367,12 @@ mod tests {
         let source = "iso`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.call, IsoCall::TaggedTemplate);
+        assert_eq!(extracted[0].item.context.call, IsoCall::TaggedTemplate);
         assert_eq!(
-            extracted[0].context.associated_js_function,
+            extracted[0].item.context.associated_js_function,
             AssociatedJsFunction::Absent
         );
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -382,10 +389,10 @@ export const Bar = iso(`field Pet.bar { id }`)(";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(
-            extracted[0].context.const_export_name,
+            extracted[0].item.context.const_export_name,
             interned_export("Bar").wrap_some()
         );
-        assert_eq!(extracted[0].iso_literal_text, "field Pet.bar { id }");
+        assert_eq!(extracted[0].item.iso_literal_text, "field Pet.bar { id }");
     }
 
     #[test]
@@ -396,11 +403,11 @@ iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].context.const_export_name,
+            extracted[0].item.context.const_export_name,
             interned_export("fullName").wrap_some()
         );
-        assert_eq!(extracted[1].context.const_export_name, None);
-        assert_eq!(extracted[1].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[1].item.context.const_export_name, None);
+        assert_eq!(extracted[1].item.iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -418,20 +425,20 @@ export const HomeRoute = iso(`
         let extracted = extract(source);
         assert_eq!(extracted.len(), 2);
         assert_eq!(
-            extracted[0].context.const_export_name,
+            extracted[0].item.context.const_export_name,
             interned_export("HomeRoute").wrap_some()
         );
         assert_eq!(
-            extracted[0].context.associated_js_function,
+            extracted[0].item.context.associated_js_function,
             AssociatedJsFunction::Present
         );
-        assert_eq!(extracted[1].context.const_export_name, None);
+        assert_eq!(extracted[1].item.context.const_export_name, None);
         assert_eq!(
-            extracted[1].iso_literal_text,
+            extracted[1].item.iso_literal_text,
             "entrypoint Query.PetFavoritePhrase"
         );
         assert_eq!(
-            extracted[1].context.associated_js_function,
+            extracted[1].item.context.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -446,7 +453,7 @@ export const HomeRoute = iso(`
         let source = "const Foo = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.const_export_name, None);
+        assert_eq!(extracted[0].item.context.const_export_name, None);
     }
 
     #[test]
@@ -454,7 +461,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo  = iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.const_export_name, None);
+        assert_eq!(extracted[0].item.context.const_export_name, None);
     }
 
     #[test]
@@ -462,7 +469,7 @@ export const HomeRoute = iso(`
         let source = "export const Foo =iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.const_export_name, None);
+        assert_eq!(extracted[0].item.context.const_export_name, None);
     }
 
     #[test]
@@ -470,8 +477,8 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`,)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
-        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
     }
 
     #[test]
@@ -479,9 +486,9 @@ export const HomeRoute = iso(`
         let source = "iso(`entrypoint Query.HomeRoute`";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].context.call, IsoCall::FunctionCall);
+        assert_eq!(extracted[0].item.context.call, IsoCall::FunctionCall);
         assert_eq!(
-            extracted[0].context.associated_js_function,
+            extracted[0].item.context.associated_js_function,
             AssociatedJsFunction::Absent
         );
     }
@@ -491,7 +498,7 @@ export const HomeRoute = iso(`
         let source = "iso( `entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
     }
 
     #[test]
@@ -500,12 +507,12 @@ export const HomeRoute = iso(`
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
         assert_eq!(
-            extracted[0].iso_literal_text,
+            extracted[0].item.iso_literal_text,
             "\nentrypoint Query.HomeRoute\n"
         );
         assert_eq!(
-            &source[extracted[0].span.as_usize_range()],
-            extracted[0].iso_literal_text
+            &source[extracted[0].location.as_usize_range()],
+            extracted[0].item.iso_literal_text
         );
     }
 
@@ -519,7 +526,7 @@ export const HomeRoute = iso(`
         let source = "//iso(`entrypoint Query.HomeRoute`)";
         let extracted = extract(source);
         assert_eq!(extracted.len(), 1);
-        assert_eq!(extracted[0].iso_literal_text, "entrypoint Query.HomeRoute");
+        assert_eq!(extracted[0].item.iso_literal_text, "entrypoint Query.HomeRoute");
     }
 }
 ```
@@ -552,7 +559,7 @@ impl fmt::Display for TypeScriptHostError {
 impl std::error::Error for TypeScriptHostError {}
 ```
 
-Origin of the three messages: isograph `process_iso_literal_extraction` and `expected_literal_to_be_exported_diagnostic`. Delta: typed errors; span is `extraction.span` (the contents), not `Span::todo_generated`. Parentheses apply to every literal. Export and associated function apply only to `IsoLiteralItem::Selectable`. Entrypoints and a failed parse (`item: None`) get the parentheses check only.
+Origin of the three messages: isograph `process_iso_literal_extraction` and `expected_literal_to_be_exported_diagnostic`. Delta: typed errors; span is `Slot.item.location` (the contents), not `Span::todo_generated`. Parentheses apply to every literal. Export and associated function apply only to `IsoLiteralItem::Selectable`. Entrypoints and a failed parse (`item: None`) get the parentheses check only.
 
 `MissingExport` writes `SelectableNameWrapper`. That type gains `Display`:
 
@@ -567,23 +574,19 @@ impl fmt::Display for SelectableNameWrapper {
 
 Before: `SelectableNameWrapper` has no `Display`. `parse_iso_literal.rs` gains `use std::fmt;`.
 
-## Change 2: host-error tests
+## Change 3: host-error tests
 
-Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `host_errors` takes the one extracted literal's `errors`.
+Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `host_errors` takes the one extracted slot's `extra`.
 
 ```rust
-    use crate::TypeScriptHostError;
-
     fn host_errors(source: &str) -> Vec<TypeScriptHostError> {
         let extracted = extract_all(source);
         assert_eq!(extracted.len(), 1);
         extracted[0]
-            .errors
+            .extra
             .as_ref()
-            .into_iter()
-            .flatten()
-            .map(|error| error.item)
-            .collect()
+            .map(|errors| errors.item.clone())
+            .unwrap_or_default()
     }
 
     #[test]
@@ -641,23 +644,24 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
     fn host_error_span_is_the_extraction_span() {
         let source = "iso`entrypoint Query.HomeRoute`";
         let extracted = extract_all(source);
-        let result = extracted[0]
-            .result
+        let item = extracted[0]
+            .item
+            .as_ref()
             .expect("the fixture extracts a literal");
-        let errors = extracted[0]
-            .errors
+        let extra = extracted[0]
+            .extra
             .as_ref()
             .expect("the fixture has host errors");
-        assert_eq!(errors.len(), 1);
-        assert_eq!(errors[0].location, result.span);
+        assert_eq!(extra.item.len(), 1);
+        assert_eq!(extra.location, item.location);
     }
 
     #[test]
-    fn valid_extraction_has_result_and_no_errors() {
+    fn valid_extraction_has_item_and_no_extra() {
         let extracted = extract_all("iso(`entrypoint Query.HomeRoute`)");
         assert_eq!(extracted.len(), 1);
-        assert!(extracted[0].result.is_some());
-        assert!(extracted[0].errors.is_none());
+        assert!(extracted[0].item.is_some());
+        assert!(extracted[0].extra.is_none());
     }
 ```
 
@@ -677,5 +681,6 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 
 ## Order
 
-1. Change 1; crate module, trait, `extract_iso_literals` returning `ExtractedIsoLiteral`, TypeScript extract, `Display`, extract tests.
-2. Change 2; `Display` for `SelectableNameWrapper`, host-error tests.
+1. Change 1; `Slot.extra_tokens` is `extra`.
+2. Change 2; trait, `extract_iso_literals` returning `Slot`, TypeScript regex, `Display` for `TypeScriptHostError`, extract tests.
+3. Change 3; `Display` for `SelectableNameWrapper`, host-error tests.
