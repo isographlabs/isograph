@@ -2,6 +2,8 @@
 
 An isograph process is a pure function of state and event. Sources send events. Dispatch mutates the state and returns inert effects. An effect loop performs them. Dispatch does no IO. Sources do not touch the state.
 
+The process does not read the filesystem. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect. A production watcher is a source that observes the OS and emits those events. It is not dispatch. A process started without that source (`Filesystem::Injected`) only accepts events from outside.
+
 This is figaro's shape. Figaro's events are keys and OS reports. Isograph's events are file changes and completed work.
 
 The building blocks are `Config`, `Event`, `Effect`, `DiskFile`, and `OpenFile`. The state is a pico database.
@@ -26,6 +28,15 @@ A `.json` config is data. A `.js` or `.ts` config is a module that exports the c
 
 Watch mode and the LSP are that process. They share the pico database.
 
+```rust
+enum Filesystem {
+    Watch,
+    Injected,
+}
+```
+
+`Watch` starts a source that observes the OS and emits `DiskChanged`. `Injected` does not. Both accept `IncomingEvent`s from outside.
+
 ## Event
 
 An event is something that happened, already carrying what the source knows.
@@ -44,8 +55,12 @@ struct DiskChanged {
 }
 
 enum Presence {
-    Present,
+    Present(Present),
     Absent,
+}
+
+struct Present {
+    contents: String,
 }
 
 struct EditorChanged {
@@ -63,7 +78,7 @@ struct AsyncWorkFinished;
 struct Quit;
 ```
 
-`DiskChanged` is the file watcher: created, written, or removed. Boot scan is a burst of `DiskChanged` with `Present` for every project file.
+`DiskChanged` is a filesystem fact. `Present` carries the contents. Dispatch does not open the path. Boot scan is a burst of `DiskChanged` from a source that read the tree; Injected mode has no such burst.
 
 `EditorChanged` is the LSP: the buffer for an open file, or that the file is no longer open.
 
@@ -114,7 +129,7 @@ The LSP reads `OpenFile` when it exists for that path, otherwise `DiskFile`. The
 fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-`DiskChanged` with `Present` sets `DiskFile`. `DiskChanged` with `Absent` removes it. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
+`DiskChanged` with `Present` sets `DiskFile` from the payload. `DiskChanged` with `Absent` removes it. `EditorChanged` with `Open` sets `OpenFile`. `EditorChanged` with `Closed` removes it. `AsyncWorkFinished` records the result. `Quit` returns `Kill`.
 
 ## Watch and batch
 
