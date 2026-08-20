@@ -28,35 +28,83 @@ impl fmt::Display for ExpectedFound {
     }
 }
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum Expectation {
-    #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("one of `entrypoint` or `field`")]
-    DeclarationKeyword,
-    #[error("the end of the declaration")]
+    Keyword(&'static str),
+    Description,
+    OneOf(&'static [Expectation]),
     EndOfDeclaration,
-    #[error("a comma, a line break, or {}", .0.closing())]
-    Separator(BracketKind),
-    #[error("an argument, like 'id: $id'")]
-    Argument,
-    #[error("a value, like $foo, 42, \"bar\", true, false, null, or an object literal")]
-    Value,
-    #[error("an object entry, like 'id: 4'")]
-    ObjectEntry,
-    #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
-    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
-    ToOrDescriptionOrSelectionSet,
-    #[error("a field selection")]
     Selection,
-    #[error("a variable declaration, like '$id: ID!'")]
+    Separator(BracketKind),
+    Argument,
+    Value,
+    ObjectEntry,
     VariableDeclarationOrUsage,
-    #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
-    #[error("the end of the type")]
     EndOfType,
 }
+
+impl fmt::Display for Expectation {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match *self {
+            Expectation::Token(kind) => write!(f, "{kind}"),
+            Expectation::Keyword(word) => write!(f, "the keyword `{word}`"),
+            Expectation::Description => write!(f, "a description"),
+            Expectation::OneOf(items) => write_one_of(f, items),
+            Expectation::EndOfDeclaration => write!(f, "the end of the declaration"),
+            Expectation::SelectionSet => write!(f, "a selection set, like '{{ id, name }}'"),
+            Expectation::Selection => write!(f, "a field selection"),
+            Expectation::Separator(kind) => {
+                write!(f, "a comma, a line break, or {}", kind.closing())
+            }
+            Expectation::Argument => write!(f, "an argument, like 'id: $id'"),
+            Expectation::Value => write!(
+                f,
+                "a value, like $foo, 42, \"bar\", true, false, null, or an object literal"
+            ),
+            Expectation::ObjectEntry => write!(f, "an object entry, like 'id: 4'"),
+            Expectation::VariableDeclarationOrUsage => {
+                write!(f, "a variable declaration, like '$id: ID!'")
+            }
+            Expectation::TypeAnnotation => {
+                write!(f, "a type, like 'String', 'String!', or '[String]'")
+            }
+            Expectation::EndOfType => write!(f, "the end of the type"),
+        }
+    }
+}
+
+impl std::error::Error for Expectation {}
+
+fn write_one_of(f: &mut fmt::Formatter<'_>, items: &[Expectation]) -> fmt::Result {
+    match items {
+        [] => write!(f, "one of"),
+        [item] => write!(f, "{item}"),
+        [first, second] => write!(f, "{first} or {second}"),
+        [start @ .., last] => {
+            for (i, item) in start.iter().enumerate() {
+                if i > 0 {
+                    write!(f, ", ")?;
+                }
+                write!(f, "{item}")?;
+            }
+            write!(f, ", or {last}")
+        }
+    }
+}
+
+pub const DECLARATION_KEYWORD: Expectation = Expectation::OneOf(&[
+    Expectation::Keyword("entrypoint"),
+    Expectation::Keyword("field"),
+]);
+
+pub const TO_OR_DESCRIPTION_OR_SELECTION_SET: Expectation = Expectation::OneOf(&[
+    Expectation::Keyword("to"),
+    Expectation::Description,
+    Expectation::SelectionSet,
+]);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum Found {
@@ -85,7 +133,10 @@ impl From<&ChunkContentItem> for Found {
 
 #[cfg(test)]
 mod tests {
-    use super::{Expectation, ExpectedFound, Found, ParseError};
+    use super::{
+        DECLARATION_KEYWORD, Expectation, ExpectedFound, Found, ParseError,
+        TO_OR_DESCRIPTION_OR_SELECTION_SET,
+    };
     use crate::{BracketKind, NonBracketTokenKind};
 
     #[test]
@@ -99,11 +150,12 @@ mod tests {
     #[test]
     fn expectation_unit_variants_use_their_messages() {
         assert_eq!(
-            Expectation::DeclarationKeyword.to_string(),
-            "one of `entrypoint` or `field`",
+            DECLARATION_KEYWORD.to_string(),
+            "the keyword `entrypoint` or the keyword `field`",
         );
+        assert_eq!(Expectation::Keyword("to").to_string(), "the keyword `to`",);
         assert_eq!(
-            Expectation::ToOrDescriptionOrSelectionSet.to_string(),
+            TO_OR_DESCRIPTION_OR_SELECTION_SET.to_string(),
             "the keyword `to`, a description, or a selection set, like '{ id, name }'",
         );
         assert_eq!(

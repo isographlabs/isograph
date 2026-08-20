@@ -6,9 +6,10 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found, IsographFieldDirectiveList,
-    IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind,
-    ParseError, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems,
+    ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
+    IsographFieldDirectiveList, IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken,
+    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
+    TO_OR_DESCRIPTION_OR_SELECTION_SET, TypeAnnotation, UnparsedChunkItems,
     VariableDeclarationOrUsageList, consume_directives, consume_variable_declaration_list,
     parse_singleton, parse_type_annotation, require_selection_set,
 };
@@ -146,12 +147,12 @@ fn parse_iso_literal_item(
 ) -> Result<IsoLiteralItem, WithSpan<ParseError>> {
     let keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
-        .map_err(|()| cursor.expected(Expectation::DeclarationKeyword))?;
+        .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
     match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
         _ => ParseError::expected(
-            Expectation::DeclarationKeyword,
+            DECLARATION_KEYWORD,
             Found::Token(NonBracketTokenKind::Identifier),
         )
         .with_span(keyword.location)
@@ -197,7 +198,7 @@ fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
+    let selection_set = require_selection_set(cursor, TO_OR_DESCRIPTION_OR_SELECTION_SET)?;
     FieldDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -255,15 +256,16 @@ mod tests {
     use super::*;
     use crate::{
         ArgumentListParent, BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem,
-        Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
+        DECLARATION_KEYWORD, Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
         IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
         NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
-        SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
-        TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent,
-        VariableDeclarationOrUsage, VariableDeclarationOrUsageList, VariableNameWrapper,
-        VariableNameWrapperParent, chunk, match_brackets, tokenize,
+        SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot,
+        TO_OR_DESCRIPTION_OR_SELECTION_SET, TypeAnnotation, TypeAnnotationParent,
+        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
+        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
+        match_brackets, tokenize,
     };
-    use Expectation::{DeclarationKeyword, EndOfDeclaration};
+    use Expectation::EndOfDeclaration;
     use NonBracketTokenKind::{
         Comma, Dollar, ErrorNumberLiteralTrailingInvalid, Identifier, Period,
     };
@@ -606,7 +608,7 @@ mod tests {
         let text = "fieldd Query.foo { bar }";
         assert_no_declaration(
             text,
-            expected(DeclarationKeyword, Found::Token(Identifier)),
+            expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "fieldd"),
         );
     }
@@ -616,7 +618,7 @@ mod tests {
         let text = "{ bar }";
         assert_no_declaration(
             text,
-            expected(DeclarationKeyword, Found::Group(BracketKind::Brace)),
+            expected(DECLARATION_KEYWORD, Found::Group(BracketKind::Brace)),
             span_of(text, "{ bar }"),
         );
     }
@@ -626,7 +628,7 @@ mod tests {
         let text = "pointer Pet.BestFriend to Owner { id }";
         assert_no_declaration(
             text,
-            expected(DeclarationKeyword, Found::Token(Identifier)),
+            expected(DECLARATION_KEYWORD, Found::Token(Identifier)),
             span_of(text, "pointer"),
         );
     }
@@ -1100,10 +1102,7 @@ mod tests {
         let end = span_of(text, "Foo").end;
         assert_no_declaration(
             text,
-            expected(
-                Expectation::ToOrDescriptionOrSelectionSet,
-                Found::EndOfChunk,
-            ),
+            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
             Span::new(end, end),
         );
     }
@@ -1114,10 +1113,7 @@ mod tests {
         let end = span_of(text, "Foo").end;
         assert_no_declaration(
             text,
-            expected(
-                Expectation::ToOrDescriptionOrSelectionSet,
-                Found::EndOfChunk,
-            ),
+            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
             Span::new(end, end),
         );
     }
@@ -1229,10 +1225,7 @@ mod tests {
         let end = span_of(text, "\"the home route\"").end;
         assert_no_declaration(
             text,
-            expected(
-                Expectation::ToOrDescriptionOrSelectionSet,
-                Found::EndOfChunk,
-            ),
+            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
             Span::new(end, end),
         );
     }
@@ -1351,10 +1344,7 @@ mod tests {
         let text = "field Query.Foo Owner { id }";
         assert_no_declaration(
             text,
-            expected(
-                Expectation::ToOrDescriptionOrSelectionSet,
-                Found::Token(Identifier),
-            ),
+            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::Token(Identifier)),
             span_of(text, "Owner"),
         );
     }
@@ -1388,10 +1378,7 @@ mod tests {
         let text = "field Query.Foo \"x\" to Owner { id }";
         assert_no_declaration(
             text,
-            expected(
-                Expectation::ToOrDescriptionOrSelectionSet,
-                Found::Token(Identifier),
-            ),
+            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::Token(Identifier)),
             span_of(text, "to"),
         );
     }
