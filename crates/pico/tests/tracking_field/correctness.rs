@@ -73,7 +73,7 @@ struct Input {
 #[memo]
 fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
-    for (_, input_id) in db.get_map().tracked().0.iter() {
+    for input_id in db.get_map().tracked().0.values() {
         let input = db.get(*input_id);
         result.push(input.value.clone())
     }
@@ -83,7 +83,7 @@ fn get_values_tracked(db: &TestDatabase) -> Vec<String> {
 #[memo]
 fn get_values_untracked(db: &TestDatabase) -> Vec<String> {
     let mut result = vec![];
-    for (_, input_id) in db.get_map().untracked().0.iter() {
+    for input_id in db.get_map().untracked().0.values() {
         let input = db.get(*input_id);
         result.push(input.value.clone())
     }

@@ -22,11 +22,10 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-      # Stricter than ci.yml's clippy job: any warning blocks the commit. pico is kept
-      # from upstream unchanged, so its warnings are not ours to fix and it is excluded.
+      # Stricter than ci.yml's clippy job: any warning blocks the commit.
       - id: cargo-clippy
         name: cargo clippy
-        entry: cargo clippy --workspace --exclude pico --all-targets -- -D warnings
+        entry: cargo clippy --workspace --all-targets -- -D warnings
         language: system
         types: [rust]
         pass_filenames: false
