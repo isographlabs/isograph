@@ -5,7 +5,7 @@ use thiserror::Error;
 use crate::{BracketKind, ChunkContentItem, NonBracketTokenKind};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
-pub enum ParseError {
+pub enum AstError {
     #[error("{0}")]
     Expected(ExpectedFound),
     #[error("Expected a declaration. An isograph literal cannot be empty.")]
@@ -110,9 +110,9 @@ pub enum Found {
     EndOfChunk,
 }
 
-impl ParseError {
+impl AstError {
     pub fn expected(expected: Expectation, found: Found) -> Self {
-        ParseError::Expected(ExpectedFound { expected, found })
+        AstError::Expected(ExpectedFound { expected, found })
     }
 }
 
@@ -127,7 +127,7 @@ impl From<&ChunkContentItem> for Found {
 
 #[cfg(test)]
 mod tests {
-    use super::{DECLARATION_KEYWORD, Expectation, ExpectedFound, Found, ParseError};
+    use super::{AstError, DECLARATION_KEYWORD, Expectation, ExpectedFound, Found};
     use crate::{BracketKind, NonBracketTokenKind};
 
     #[test]
@@ -205,17 +205,17 @@ mod tests {
     }
 
     #[test]
-    fn parse_error_unit_variants_use_their_messages() {
+    fn ast_error_unit_variants_use_their_messages() {
         assert_eq!(
-            ParseError::EmptyLiteral.to_string(),
+            AstError::EmptyLiteral.to_string(),
             "Expected a declaration. An isograph literal cannot be empty.",
         );
         assert_eq!(
-            ParseError::MultipleDeclarations.to_string(),
+            AstError::MultipleDeclarations.to_string(),
             "Expected nothing after the declaration. Each literal holds exactly one declaration.",
         );
         assert_eq!(
-            ParseError::IntegerDoesNotFitI64.to_string(),
+            AstError::IntegerDoesNotFitI64.to_string(),
             "This integer does not fit in a 64-bit signed integer.",
         );
     }
@@ -254,9 +254,9 @@ mod tests {
     }
 
     #[test]
-    fn parse_error_expected_uses_expected_found() {
+    fn ast_error_expected_uses_expected_found() {
         assert_eq!(
-            ParseError::expected(
+            AstError::expected(
                 Expectation::Separator(BracketKind::Parenthesis),
                 Found::EndOfChunk,
             )

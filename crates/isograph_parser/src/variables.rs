@@ -5,8 +5,8 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkContentItem, ChunkedLevel, EntityNameWrapper, Expectation, Found,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, NonConstantValue, ParseError,
+    AstError, BracketKind, ChunkContentItem, ChunkedLevel, EntityNameWrapper, Expectation, Found,
+    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, NonConstantValue,
     SelectableDeclarationPath, SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationOrUsage,
     parse_name_colon, parse_non_constant_value, parse_variable_name,
 };
@@ -118,7 +118,7 @@ pub(crate) fn consume_variable_declaration_list(
 
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
-) -> Result<VariableDeclaration, WithSpan<ParseError>> {
+) -> Result<VariableDeclaration, WithSpan<AstError>> {
     let (name, type_) = parse_name_colon(
         cursor,
         |cursor| parse_variable_name(cursor, Expectation::VariableDeclaration),
@@ -139,7 +139,7 @@ fn parse_variable_declaration(
 
 pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
     let core = parse_named_or_list(cursor)?;
     if let Some(peek) = cursor.peek()
         && matches!(
@@ -158,7 +158,7 @@ pub(crate) fn parse_type_annotation(
 
 fn parse_named_or_list(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<AstError>> {
     cursor.spanning(|cursor| {
         if let Some(name) = cursor.consume_token_if(
             NonBracketTokenKind::Identifier,
@@ -196,9 +196,9 @@ struct BracketInteriorType {
 fn parse_bracket_interior_type(
     cursor: &mut ItemCursor<'_>,
     level: &WithSpan<ChunkedLevel>,
-) -> Result<BracketInteriorType, WithSpan<ParseError>> {
+) -> Result<BracketInteriorType, WithSpan<AstError>> {
     if level.item.len() == 0 {
-        return ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
+        return AstError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
             .with_span(Span::new(level.location.end, level.location.end))
             .wrap_err();
     }
@@ -206,7 +206,7 @@ fn parse_bracket_interior_type(
         level,
         Expectation::EndOfType,
         |extra| {
-            ParseError::expected(
+            AstError::expected(
                 Expectation::EndOfType,
                 Found::from(extra.item.first_item().item.reference()),
             )

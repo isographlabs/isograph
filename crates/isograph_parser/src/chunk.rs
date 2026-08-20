@@ -6,11 +6,11 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    Argument, ArgumentListPath, ArgumentSlotPath, BracketItem, Bracketed, CloseBracket,
+    Argument, ArgumentListPath, ArgumentSlotPath, AstError, BracketItem, Bracketed, CloseBracket,
     Expectation, ExtraChunksPath, Found, IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath,
     IsographResolutionNode, ListLiteralPath, ListLiteralValue, ListLiteralValueSlotPath,
     ListTypeAnnotationPath, MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry,
-    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, Selection, SelectionSetPath,
+    ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, Selection, SelectionSetPath,
     SelectionSlotPath, SemanticToken, VariableDeclaration, VariableDeclarationListPath,
     VariableDeclarationSlotPath,
     chunk_stream::{ChunkStream, ItemCursor},
@@ -128,7 +128,7 @@ impl Chunk {
         &'a self,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-        errors: &'a mut Vec<WithSpan<ParseError>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         ChunkStream::new(self.contents.reference(), text, tokens, errors)
     }
@@ -166,7 +166,7 @@ impl ChunkedLevel {
         &self,
         parent: &mut ItemCursor<'_>,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
     ) -> Vec<WithSpan<Slot<P, UnparsedChunkItems>>> {
         self.0
             .iter()
@@ -310,7 +310,7 @@ fn parse_one_chunk<'a, P>(
     chunk: &'a WithSpan<Chunk>,
     mut stream: ChunkStream<'a>,
     leftover: Expectation,
-    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
 ) -> WithSpan<Slot<P, UnparsedChunkItems>> {
     let result = stream.cursor().spanning(parse);
     match result {
@@ -325,7 +325,7 @@ fn parse_one_chunk<'a, P>(
             }
             Some(remaining) => {
                 stream.cursor().report_error(
-                    ParseError::expected(leftover, Found::from(remaining.first().item.reference()))
+                    AstError::expected(leftover, Found::from(remaining.first().item.reference()))
                         .with_span(remaining.first().location),
                 );
                 let leftover_span =
@@ -358,10 +358,10 @@ pub(crate) fn parse_singleton<'a, T>(
     level: &'a WithSpan<ChunkedLevel>,
     text: &'a str,
     tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    errors: &'a mut Vec<WithSpan<ParseError>>,
+    errors: &'a mut Vec<WithSpan<AstError>>,
     end: Expectation,
-    extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<ParseError>,
-    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
+    extra_chunks: impl FnOnce(&'a WithSpan<Chunk>) -> WithSpan<AstError>,
+    parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
 ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
     let item = parse_one_chunk(
         &level.item.0[0],
@@ -371,7 +371,7 @@ pub(crate) fn parse_singleton<'a, T>(
     );
     if let Some(comma) = level.item.0[0].item.boundary_comma() {
         errors.push(
-            ParseError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
+            AstError::expected(end, Found::Token(NonBracketTokenKind::Comma)).with_span(comma),
         );
     }
     let extra_chunks = (level.item.len() > 1).then(|| {
@@ -554,7 +554,7 @@ mod tests {
 
     use super::*;
     use crate::{
-        BracketError, BracketKind, Expectation, Found, NonBracketTokenKind, ParseError,
+        AstError, BracketError, BracketKind, Expectation, Found, NonBracketTokenKind,
         SemanticToken, chunk_stream::ItemCursor, match_brackets, tokenize,
     };
     use BracketKind::Brace;
@@ -1270,7 +1270,7 @@ mod tests {
         }
     }
 
-    fn parse_identifier(cursor: &mut ItemCursor<'_>) -> Result<Span, WithSpan<ParseError>> {
+    fn parse_identifier(cursor: &mut ItemCursor<'_>) -> Result<Span, WithSpan<AstError>> {
         cursor
             .require_token(Identifier, SemanticToken::FieldName)
             .map_err(|()| cursor.expected(Expectation::Token(Identifier)))
@@ -1279,7 +1279,7 @@ mod tests {
 
     type ParsedEach = (
         Vec<WithSpan<Slot<Span, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<CommaWithoutItem>,
         Vec<WithSpan<SemanticToken>>,
     );
@@ -1300,8 +1300,8 @@ mod tests {
         (items, errors, comma_errors, tokens)
     }
 
-    fn expected(expectation: Expectation, found: Found) -> ParseError {
-        ParseError::expected(expectation, found)
+    fn expected(expectation: Expectation, found: Found) -> AstError {
+        AstError::expected(expectation, found)
     }
 
     #[test]

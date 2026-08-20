@@ -5,9 +5,9 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, ChunkContentItem, EntrypointDeclarationPath, Expectation, IsographResolutionNode,
-    NonBracketToken, NonBracketTokenKind, ParseError, SelectableDeclarationPath, SelectionPath,
-    SemanticToken, consume_argument_list,
+    ArgumentList, AstError, ChunkContentItem, EntrypointDeclarationPath, Expectation,
+    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, SelectableDeclarationPath,
+    SelectionPath, SemanticToken, consume_argument_list,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -55,7 +55,7 @@ fn next_is_at(cursor: &mut ItemCursor<'_>) -> bool {
 
 pub(crate) fn consume_directives(
     cursor: &mut ItemCursor<'_>,
-) -> Result<Option<WithSpan<IsographFieldDirectiveList>>, WithSpan<ParseError>> {
+) -> Result<Option<WithSpan<IsographFieldDirectiveList>>, WithSpan<AstError>> {
     if !next_is_at(cursor) {
         return None.wrap_ok();
     }
@@ -75,7 +75,7 @@ pub(crate) fn consume_directives(
 fn parse_directive_after_at(
     cursor: &mut ItemCursor<'_>,
     at: Span,
-) -> Result<WithSpan<IsographFieldDirective>, WithSpan<ParseError>> {
+) -> Result<WithSpan<IsographFieldDirective>, WithSpan<AstError>> {
     let name = cursor
         .require_token(
             NonBracketTokenKind::Identifier,

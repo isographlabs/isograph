@@ -5,9 +5,8 @@ use safe_peekable::{IntoSafePeekable, Peek, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found,
-    NonBracketTokenKind, ParseError, SemanticToken, Singleton, Slot, UnparsedChunkItems,
-    parse_singleton,
+    AstError, BracketKind, Chunk, ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found,
+    NonBracketTokenKind, SemanticToken, Singleton, Slot, UnparsedChunkItems, parse_singleton,
 };
 
 /// Sequential reader of one chunk. Parameter of a parse function.
@@ -18,7 +17,7 @@ pub(crate) struct ItemCursor<'a> {
     previous_end: u32,
     text: &'a str,
     tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-    errors: &'a mut Vec<WithSpan<ParseError>>,
+    errors: &'a mut Vec<WithSpan<AstError>>,
 }
 
 pub(crate) struct CursorPeek<'c, 'a> {
@@ -71,7 +70,7 @@ impl<'a> ChunkStream<'a> {
         contents: &'a NonEmpty<WithSpan<ChunkContentItem>>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-        errors: &'a mut Vec<WithSpan<ParseError>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> Self {
         ChunkStream(ItemCursor {
             previous_end: contents.first().location.start,
@@ -161,7 +160,7 @@ impl<'a> ItemCursor<'a> {
         }
     }
 
-    pub(crate) fn report_error(&mut self, error: WithSpan<ParseError>) {
+    pub(crate) fn report_error(&mut self, error: WithSpan<AstError>) {
         self.errors.push(error);
     }
 
@@ -173,12 +172,12 @@ impl<'a> ItemCursor<'a> {
         self.tokens.push(token.with_span(span));
     }
 
-    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<ParseError> {
+    pub(crate) fn expected(&mut self, expected: Expectation) -> WithSpan<AstError> {
         match self.items.peek() {
-            None => ParseError::expected(expected, Found::EndOfChunk).with_span(self.end_span()),
+            None => AstError::expected(expected, Found::EndOfChunk).with_span(self.end_span()),
             Some(peek) => {
                 let item = peek.view();
-                ParseError::expected(expected, Found::from(item.item.reference()))
+                AstError::expected(expected, Found::from(item.item.reference()))
                     .with_span(item.location)
             }
         }
@@ -205,8 +204,8 @@ impl<'a> ItemCursor<'a> {
         &mut self,
         level: &WithSpan<ChunkedLevel>,
         end: Expectation,
-        extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<ParseError>,
-        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
+        extra_chunks: impl FnOnce(&WithSpan<Chunk>) -> WithSpan<AstError>,
+        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<AstError>>,
     ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
         parse_singleton(
             level,
@@ -225,8 +224,8 @@ impl<'a> ItemCursor<'a> {
 
     pub(crate) fn spanning<T>(
         &mut self,
-        parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<ParseError>>,
-    ) -> Result<WithSpan<T>, WithSpan<ParseError>> {
+        parse: impl FnOnce(&mut Self) -> Result<T, WithSpan<AstError>>,
+    ) -> Result<WithSpan<T>, WithSpan<AstError>> {
         let start = match self.items.peek() {
             Some(peek) => peek.view().location.start,
             None => self.previous_end,
@@ -284,7 +283,7 @@ mod tests {
 
     use super::{ChunkStream, TokenText};
     use crate::{
-        BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind, ParseError,
+        AstError, BracketKind, Chunk, ChunkedLevel, Expectation, Found, NonBracketTokenKind,
         SemanticToken, chunk, match_brackets, tokenize,
     };
 
@@ -319,8 +318,8 @@ mod tests {
         }
     }
 
-    fn expected(expectation: Expectation, found: Found) -> ParseError {
-        ParseError::expected(expectation, found)
+    fn expected(expectation: Expectation, found: Found) -> AstError {
+        AstError::expected(expectation, found)
     }
 
     fn token(kind: NonBracketTokenKind) -> Expectation {
@@ -331,7 +330,7 @@ mod tests {
         tree: &'a WithSpan<ChunkedLevel>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-        errors: &'a mut Vec<WithSpan<ParseError>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> ChunkStream<'a> {
         first_chunk(tree).stream(text, tokens, errors)
     }
@@ -844,7 +843,7 @@ mod tests {
         let mut tokens = Vec::new();
         let mut errors = Vec::new();
         let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
-        let error = ParseError::EmptyLiteral.with_span(span_of(text, "foo"));
+        let error = AstError::EmptyLiteral.with_span(span_of(text, "foo"));
         stream.cursor().report_error(error);
         assert_eq!(errors, error.wrap_vec());
         assert_eq!(tokens, vec![]);

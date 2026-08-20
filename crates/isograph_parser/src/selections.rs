@@ -5,8 +5,8 @@ use span::WithSpan;
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ArgumentList, BracketKind, Expectation, IsographFieldDirectiveList, IsographResolutionNode,
-    NonBracketTokenKind, ParseError, SemanticToken, Slot, UnparsedChunkItems,
+    ArgumentList, AstError, BracketKind, Expectation, IsographFieldDirectiveList,
+    IsographResolutionNode, NonBracketTokenKind, SemanticToken, Slot, UnparsedChunkItems,
     consume_argument_list, consume_directives,
 };
 
@@ -72,7 +72,7 @@ pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithS
     )
 }
 
-fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<ParseError>> {
+fn parse_selection(cursor: &mut ItemCursor<'_>) -> Result<Selection, WithSpan<AstError>> {
     let first = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Selection))?;
@@ -112,27 +112,27 @@ mod tests {
 
     use super::*;
     use crate::{
-        CommaWithoutItem, Found, NonBracketTokenKind, ParseError, SemanticToken, chunk,
+        AstError, CommaWithoutItem, Found, NonBracketTokenKind, SemanticToken, chunk,
         match_brackets, tokenize,
     };
 
     type ParsedItems<P> = (
         Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<CommaWithoutItem>,
         Vec<WithSpan<SemanticToken>>,
     );
 
     type ParsedSelections = (
         Vec<WithSpan<Slot<Selection, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<WithSpan<SemanticToken>>,
     );
 
     fn parsed_items<P>(
         text: &str,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
     ) -> ParsedItems<P> {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -346,7 +346,7 @@ mod tests {
         assert!(items[1].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(Expectation::Selection, Found::Group(BracketKind::Brace))
+                == AstError::expected(Expectation::Selection, Found::Group(BracketKind::Brace))
                 && error.location == span_of(text, "{ baz }")
         }));
     }
@@ -384,7 +384,7 @@ mod tests {
         assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Separator(BracketKind::Brace),
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
@@ -403,7 +403,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Selection,
                     Found::Token(NonBracketTokenKind::Period),
                 )

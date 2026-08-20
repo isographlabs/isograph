@@ -5,9 +5,9 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
-    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, ParseError, SelectionPath,
-    SemanticToken, Slot, UnparsedChunkItems, VariableDeclarationPath,
+    AstError, BracketKind, ChunkContentItem, Expectation, Found, IsographFieldDirectivePath,
+    IsographResolutionNode, NonBracketToken, NonBracketTokenKind, SelectionPath, SemanticToken,
+    Slot, UnparsedChunkItems, VariableDeclarationPath,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -201,9 +201,9 @@ impl<'a> From<ListLiteralValueSlotPath<'a>> for IsographResolutionNode<'a> {
 
 pub(crate) fn parse_name_colon<L, R>(
     cursor: &mut ItemCursor<'_>,
-    parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<ParseError>>,
-    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<R, WithSpan<ParseError>>,
-) -> Result<(L, R), WithSpan<ParseError>> {
+    parse_lhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<L, WithSpan<AstError>>,
+    parse_rhs: impl FnOnce(&mut ItemCursor<'_>) -> Result<R, WithSpan<AstError>>,
+) -> Result<(L, R), WithSpan<AstError>> {
     let lhs = parse_lhs(cursor)?;
     cursor
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
@@ -216,14 +216,14 @@ fn require_interned_identifier<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
     missing_name: Expectation,
-) -> Result<WithSpan<N>, WithSpan<ParseError>> {
+) -> Result<WithSpan<N>, WithSpan<AstError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, name_token)
         .map_err(|()| cursor.expected(missing_name))?;
     name.interned().wrap_ok()
 }
 
-fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<ParseError>> {
+fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<AstError>> {
     let (name, value) = parse_name_colon(
         cursor,
         |cursor| {
@@ -238,7 +238,7 @@ fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<Argument, WithSpan<Pars
     .wrap_ok()
 }
 
-fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
+fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<AstError>> {
     let (name, value) = parse_name_colon(
         cursor,
         |cursor| {
@@ -270,7 +270,7 @@ pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithS
 pub(crate) fn parse_variable_name(
     cursor: &mut ItemCursor<'_>,
     missing_dollar: Expectation,
-) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<ParseError>> {
+) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<AstError>> {
     cursor.spanning(|cursor| {
         cursor
             .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
@@ -284,7 +284,7 @@ pub(crate) fn parse_variable_name(
 
 fn parse_string_literal(
     cursor: &mut ItemCursor<'_>,
-) -> Result<StringLiteralValueWrapper, WithSpan<ParseError>> {
+) -> Result<StringLiteralValueWrapper, WithSpan<AstError>> {
     let span = cursor
         .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
         .or_else(|| {
@@ -300,13 +300,13 @@ fn parse_string_literal(
         .wrap_ok()
 }
 
-fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<ParseError>> {
+fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<AstError>> {
     let span = cursor
         .require_token(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::IntegerLiteral)))?;
     match span.text().parse() {
         Ok(value) => IntegerValue(value).wrap_ok(),
-        Err(_) => ParseError::IntegerDoesNotFitI64
+        Err(_) => AstError::IntegerDoesNotFitI64
             .with_span(span.location)
             .wrap_err(),
     }
@@ -314,7 +314,7 @@ fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, With
 
 fn parse_boolean_or_null(
     cursor: &mut ItemCursor<'_>,
-) -> Result<NonConstantValue, WithSpan<ParseError>> {
+) -> Result<NonConstantValue, WithSpan<AstError>> {
     let span = cursor
         .require_token(
             NonBracketTokenKind::Identifier,
@@ -325,7 +325,7 @@ fn parse_boolean_or_null(
         "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
         "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
         "null" => NonConstantValue::Null(NullValue).wrap_ok(),
-        _ => ParseError::expected(
+        _ => AstError::expected(
             Expectation::Value,
             Found::Token(NonBracketTokenKind::Identifier),
         )
@@ -336,14 +336,12 @@ fn parse_boolean_or_null(
 
 fn parse_list_literal_value(
     cursor: &mut ItemCursor<'_>,
-) -> Result<ListLiteralValue, WithSpan<ParseError>> {
+) -> Result<ListLiteralValue, WithSpan<AstError>> {
     let value = parse_non_constant_value(cursor)?;
     ListLiteralValue { value }.wrap_ok()
 }
 
-fn parse_object_literal(
-    cursor: &mut ItemCursor<'_>,
-) -> Result<ObjectLiteral, WithSpan<ParseError>> {
+fn parse_object_literal(cursor: &mut ItemCursor<'_>) -> Result<ObjectLiteral, WithSpan<AstError>> {
     let object = cursor
         .require_group(
             BracketKind::Brace,
@@ -362,7 +360,7 @@ fn parse_object_literal(
 
 pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
+) -> Result<WithSpan<NonConstantValue>, WithSpan<AstError>> {
     cursor.spanning(|cursor| {
         match cursor.peek().map(|peek| peek.view().item.reference()) {
             Some(ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar))) => {
@@ -417,33 +415,33 @@ mod tests {
 
     use super::*;
     use crate::{
-        CommaWithoutItem, Found, NonBracketTokenKind, ParseError, SemanticToken, chunk,
+        AstError, CommaWithoutItem, Found, NonBracketTokenKind, SemanticToken, chunk,
         match_brackets, tokenize,
     };
 
     type ParsedItems<P> = (
         Vec<WithSpan<Slot<P, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<CommaWithoutItem>,
         Vec<WithSpan<SemanticToken>>,
     );
 
     type ParsedPairs = (
         Vec<WithSpan<Slot<Argument, UnparsedChunkItems>>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<WithSpan<SemanticToken>>,
     );
 
     type ParsedArgumentList = (
         Option<WithSpan<ArgumentList>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<WithSpan<SemanticToken>>,
     );
 
     fn parsed_items<P>(
         text: &str,
         leftover: Expectation,
-        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<ParseError>>,
+        parse_item: impl Fn(&mut ItemCursor<'_>) -> Result<P, WithSpan<AstError>>,
     ) -> ParsedItems<P> {
         let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
@@ -619,7 +617,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         as_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
-            error.item == ParseError::IntegerDoesNotFitI64
+            error.item == AstError::IntegerDoesNotFitI64
                 && error.location == span_of(text, "99999999999999999999")
         }));
     }
@@ -635,7 +633,7 @@ mod tests {
         );
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Token(NonBracketTokenKind::Colon),
                     Found::Token(NonBracketTokenKind::IntegerLiteral),
                 )
@@ -649,7 +647,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
@@ -664,7 +662,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Argument,
                     Found::Token(NonBracketTokenKind::IntegerLiteral),
                 )
@@ -684,7 +682,7 @@ mod tests {
         assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Separator(BracketKind::Parenthesis),
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
@@ -870,7 +868,7 @@ mod tests {
         assert!(items[0].item.extra.is_some());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Separator(BracketKind::Bracket),
                     Found::Token(NonBracketTokenKind::Identifier),
                 )
@@ -915,7 +913,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         as_argument(items[1].item.reference());
         assert!(errors.iter().any(|error| {
-            error.item == ParseError::IntegerDoesNotFitI64
+            error.item == AstError::IntegerDoesNotFitI64
                 && error.location == span_of(text, "-99999999999999999999")
         }));
     }
@@ -949,7 +947,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::ErrorNumberLiteralLeadingZero),
                 )
@@ -964,7 +962,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Value,
                     Found::Token(NonBracketTokenKind::FloatLiteral),
                 )
@@ -1053,7 +1051,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         let colon_end = span_of(text, ":").end;
         assert!(errors.iter().any(|error| {
-            error.item == ParseError::expected(Expectation::Value, Found::EndOfChunk)
+            error.item == AstError::expected(Expectation::Value, Found::EndOfChunk)
                 && error.location == Span::new(colon_end, colon_end)
         }));
     }
@@ -1066,7 +1064,7 @@ mod tests {
         let dollar_end = span_of(text, "$").end;
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::Token(NonBracketTokenKind::Identifier),
                     Found::EndOfChunk,
                 )
@@ -1081,7 +1079,7 @@ mod tests {
         assert!(items[0].item.item.is_none());
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(Expectation::Value, Found::Group(BracketKind::Parenthesis))
+                == AstError::expected(Expectation::Value, Found::Group(BracketKind::Parenthesis))
                 && error.location == span_of(text, "(x)")
         }));
     }
@@ -1109,7 +1107,7 @@ mod tests {
             assert!(items[0].item.item.is_none(), "for literal {text:?}");
             assert!(
                 errors.iter().any(|error| {
-                    error.item == ParseError::expected(Expectation::Value, found)
+                    error.item == AstError::expected(Expectation::Value, found)
                         && error.location == span_of(text, pattern)
                 }),
                 "for literal {text:?}, errors were {errors:?}",
@@ -1134,7 +1132,7 @@ mod tests {
         }
         assert!(errors.iter().any(|error| {
             error.item
-                == ParseError::expected(
+                == AstError::expected(
                     Expectation::ObjectEntry,
                     Found::Token(NonBracketTokenKind::IntegerLiteral),
                 )

@@ -6,9 +6,9 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
+    AstError, ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
     IsographFieldDirectiveList, IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken,
-    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation,
+    NonBracketTokenKind, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation,
     UnparsedChunkItems, VariableDeclarationList, consume_directives, consume_selection_set,
     consume_variable_declaration_list, parse_singleton, parse_type_annotation,
 };
@@ -122,12 +122,12 @@ pub type SelectableNameWrapperPath<'a> =
 pub fn parse_iso_literal(
     text: &str,
     root: WithSpan<ChunkedLevel>,
-    errors: &mut Vec<WithSpan<ParseError>>,
+    errors: &mut Vec<WithSpan<AstError>>,
     tokens: &mut Vec<WithSpan<SemanticToken>>,
 ) -> Option<WithSpan<IsoLiteralParse>> {
     let location = root.location;
     if root.item.len() == 0 {
-        errors.push(ParseError::EmptyLiteral.with_span(location));
+        errors.push(AstError::EmptyLiteral.with_span(location));
         return None;
     }
     let singleton = parse_singleton(
@@ -136,7 +136,7 @@ pub fn parse_iso_literal(
         tokens,
         errors,
         Expectation::EndOfDeclaration,
-        |extra| ParseError::MultipleDeclarations.with_span(extra.location),
+        |extra| AstError::MultipleDeclarations.with_span(extra.location),
         parse_iso_literal_item,
     );
     singleton.with_span(location).wrap_some()
@@ -144,14 +144,14 @@ pub fn parse_iso_literal(
 
 fn parse_iso_literal_item(
     cursor: &mut ItemCursor<'_>,
-) -> Result<IsoLiteralItem, WithSpan<ParseError>> {
+) -> Result<IsoLiteralItem, WithSpan<AstError>> {
     let keyword = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
         .map_err(|()| cursor.expected(DECLARATION_KEYWORD))?;
     match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" => IsoLiteralItem::Selectable(parse_selectable_declaration(cursor)?).wrap_ok(),
-        _ => ParseError::expected(
+        _ => AstError::expected(
             DECLARATION_KEYWORD,
             Found::Token(NonBracketTokenKind::Identifier),
         )
@@ -162,7 +162,7 @@ fn parse_iso_literal_item(
 
 fn parse_type_dot_name(
     cursor: &mut ItemCursor<'_>,
-) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<ParseError>> {
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<AstError>> {
     let parent_type = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
@@ -181,7 +181,7 @@ fn parse_type_dot_name(
 
 fn parse_entrypoint(
     cursor: &mut ItemCursor<'_>,
-) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
+) -> Result<EntrypointDeclaration, WithSpan<AstError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let directive_set = consume_directives(cursor)?;
     EntrypointDeclaration {
@@ -194,7 +194,7 @@ fn parse_entrypoint(
 
 fn parse_selectable_declaration(
     cursor: &mut ItemCursor<'_>,
-) -> Result<SelectableDeclaration, WithSpan<ParseError>> {
+) -> Result<SelectableDeclaration, WithSpan<AstError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
@@ -215,7 +215,7 @@ fn parse_selectable_declaration(
 
 fn consume_to_target(
     cursor: &mut ItemCursor<'_>,
-) -> Result<Option<WithSpan<TypeAnnotation>>, WithSpan<ParseError>> {
+) -> Result<Option<WithSpan<TypeAnnotation>>, WithSpan<AstError>> {
     let peek = cursor.peek();
     let Some(peek) = peek else {
         return None.wrap_ok();
@@ -257,10 +257,10 @@ mod tests {
 
     use super::*;
     use crate::{
-        ArgumentListParent, BracketError, BracketKind, ChunkContentItemParent, CommaWithoutItem,
-        DECLARATION_KEYWORD, Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
-        IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
-        NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
+        ArgumentListParent, AstError, BracketError, BracketKind, ChunkContentItemParent,
+        CommaWithoutItem, DECLARATION_KEYWORD, Expectation, Found, IntegerValue,
+        IsographDirectiveNameWrapper, IsographFieldDirectiveListParent, IsographResolutionNode,
+        NonBracketTokenKind, NonConstantValue, NonConstantValueParent, ObjectEntry, Selection,
         SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
         TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclaration,
         VariableDeclarationList, VariableDeclarationOrUsageParent, VariableNameWrapper, chunk,
@@ -273,20 +273,20 @@ mod tests {
 
     type ParsedWithErrors = (
         Option<WithSpan<IsoLiteralParse>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<BracketError>,
         Vec<CommaWithoutItem>,
     );
 
     type ParsedWithTokens = (
         Option<WithSpan<IsoLiteralParse>>,
-        Vec<WithSpan<ParseError>>,
+        Vec<WithSpan<AstError>>,
         Vec<BracketError>,
         Vec<CommaWithoutItem>,
         Vec<WithSpan<SemanticToken>>,
     );
 
-    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<ParseError>>) {
+    fn parsed(text: &str) -> (WithSpan<IsoLiteralParse>, Vec<WithSpan<AstError>>) {
         let (parse, errors, bracket_errors, comma_errors) = parsed_with_errors(text);
         assert!(bracket_errors.is_empty(), "for literal {text:?}");
         assert_eq!(comma_errors, vec![], "for literal {text:?}");
@@ -307,8 +307,8 @@ mod tests {
         (parse, errors, bracket_errors, comma_errors, tokens)
     }
 
-    fn expected(expectation: Expectation, found: Found) -> ParseError {
-        ParseError::expected(expectation, found)
+    fn expected(expectation: Expectation, found: Found) -> AstError {
+        AstError::expected(expectation, found)
     }
 
     fn token(kind: NonBracketTokenKind) -> Expectation {
@@ -339,7 +339,7 @@ mod tests {
         tree: &'a WithSpan<ChunkedLevel>,
         text: &'a str,
         tokens: &'a mut Vec<WithSpan<SemanticToken>>,
-        errors: &'a mut Vec<WithSpan<ParseError>>,
+        errors: &'a mut Vec<WithSpan<AstError>>,
     ) -> crate::chunk_stream::ChunkStream<'a> {
         tree.item.0[0].item.stream(text, tokens, errors)
     }
@@ -411,7 +411,7 @@ mod tests {
             .expect("expected a selection")
     }
 
-    fn assert_no_declaration(text: &str, reason: ParseError, reason_span: Span) {
+    fn assert_no_declaration(text: &str, reason: AstError, reason_span: Span) {
         let (parse, errors) = parsed(text);
         assert!(
             parsed_item(parse.reference()).is_none(),
@@ -476,7 +476,7 @@ mod tests {
             assert!(parse.is_none(), "for literal {text:?}");
             assert_eq!(
                 errors,
-                ParseError::EmptyLiteral
+                AstError::EmptyLiteral
                     .with_span(Span::from_usize(0, text.len()))
                     .wrap_vec(),
                 "for literal {text:?}",
@@ -516,7 +516,7 @@ mod tests {
         assert!(parse.is_none());
         assert_eq!(
             errors,
-            ParseError::EmptyLiteral
+            AstError::EmptyLiteral
                 .with_span(Span::from_usize(0, text.len()))
                 .wrap_vec(),
         );
@@ -566,7 +566,7 @@ mod tests {
             errors,
             vec![
                 expected(EndOfDeclaration, Found::Token(Comma)).with_span(span_of(text, ",")),
-                ParseError::MultipleDeclarations.with_span(span_of(text, "field User.name")),
+                AstError::MultipleDeclarations.with_span(span_of(text, "field User.name")),
             ],
         );
         assert!(parse.item.extra_chunks.as_ref().is_some());
@@ -582,7 +582,7 @@ mod tests {
         );
         assert_eq!(
             errors,
-            ParseError::MultipleDeclarations
+            AstError::MultipleDeclarations
                 .with_span(span_of(text, "field User.name"))
                 .wrap_vec(),
         );
@@ -602,7 +602,7 @@ mod tests {
         assert!(
             errors
                 .iter()
-                .any(|error| error.item == ParseError::MultipleDeclarations)
+                .any(|error| error.item == AstError::MultipleDeclarations)
         );
         assert!(parse.item.extra_chunks.as_ref().is_some());
     }
@@ -1110,7 +1110,7 @@ mod tests {
         assert_eq!(as_selectable(parse.reference()).selection_set, None);
         assert_eq!(
             errors,
-            ParseError::MultipleDeclarations
+            AstError::MultipleDeclarations
                 .with_span(span_of(text, "{ bar }"))
                 .wrap_vec(),
         );
