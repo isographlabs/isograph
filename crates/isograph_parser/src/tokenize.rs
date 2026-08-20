@@ -178,4 +178,20 @@ mod tests {
             IsographLangTokenKind::LineBreak
         );
     }
+
+    #[test]
+    fn a_control_character_in_a_block_string_does_not_panic() {
+        let terminated = tokenize("\"\"\"\u{0000}\"\"\"");
+        assert_eq!(terminated.len(), 1);
+        assert_eq!(
+            terminated[0].item,
+            IsographLangTokenKind::BlockStringLiteral
+        );
+        let unterminated = tokenize("\"\"\"\u{0000}");
+        assert_eq!(unterminated.len(), 1);
+        assert_eq!(
+            unterminated[0].item,
+            IsographLangTokenKind::ErrorUnterminatedBlockString
+        );
+    }
 }

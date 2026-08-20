@@ -243,8 +243,9 @@ fn lex_block_string(lexer: &mut Lexer<'_, IsographLangTokenKind>) -> bool {
                 lexer.bump(string_lexer.span().end);
                 return true;
             }
-            BlockStringToken::EscapedTripleQuote | BlockStringToken::Other => {}
-            BlockStringToken::Error => unreachable!(),
+            BlockStringToken::EscapedTripleQuote
+            | BlockStringToken::Other
+            | BlockStringToken::Error => {}
         }
     }
     fail_with(
