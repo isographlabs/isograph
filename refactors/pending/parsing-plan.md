@@ -118,8 +118,8 @@ pub enum Expectation {
     TypeAnnotation,
     #[error("the end of the type")]
     EndOfType,
-    #[error("the keyword `to`")]
-    ToKeyword,
+    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
+    ToOrDescriptionOrSelectionSet,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]

@@ -420,8 +420,8 @@ pub enum Expectation {
     TypeAnnotation,
     #[error("the end of the type")]
     EndOfType,
-    #[error("the keyword `to`")]
-    ToKeyword,
+    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
+    ToOrDescriptionOrSelectionSet,
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Error)]
@@ -456,7 +456,7 @@ impl BracketKind {
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, and `EndOfType`. optional-to.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, and `EndOfType`. optional-to.md adds `ToOrDescriptionOrSelectionSet` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 

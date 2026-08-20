@@ -226,7 +226,8 @@ Field. Origin field name: `directive_set`.
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor)?;
+    let selection_set =
+        require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
 ```
 
 Selections. Upstream deserializes immediately into typed directive sets. This stage stores the raw list on `Selection`.

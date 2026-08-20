@@ -36,11 +36,13 @@ The `to` keyword is an identifier whose text is `to`. A position on `to` answers
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
-    #[error("the keyword `to`")]
-    ToKeyword,
+    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
+    ToOrDescriptionOrSelectionSet,
 ```
 
-`expectation_unit_variants_use_their_messages` asserts the new `DeclarationKeyword` string and `ToKeyword`:
+`to` is optional. After `Type.name` and the variable list, the next item is `to`, a description, or `{`. `ToOrDescriptionOrSelectionSet` is that slot. There is no `ToKeyword`.
+
+`expectation_unit_variants_use_their_messages` asserts the new `DeclarationKeyword` string and `ToOrDescriptionOrSelectionSet`:
 
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
@@ -49,8 +51,8 @@ The `to` keyword is an identifier whose text is `to`. A position on `to` answers
             "one of `entrypoint` or `field`",
         );
         assert_eq!(
-            Expectation::ToKeyword.to_string(),
-            "the keyword `to`",
+            Expectation::ToOrDescriptionOrSelectionSet.to_string(),
+            "the keyword `to`, a description, or a selection set, like '{ id, name }'",
         );
 ```
 
@@ -309,7 +311,8 @@ fn parse_field(
     let variable_definitions = consume_variable_declaration_list(cursor);
     let target_type = consume_to_target(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor)?;
+    let selection_set =
+        require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
     FieldDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -340,13 +343,64 @@ fn consume_to_target(
     }
     cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
-        .map_err(|()| cursor.expected(Expectation::ToKeyword))?;
+        .map_err(|()| {
+            cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
+        })?;
     let target_type = parse_type_annotation(cursor)?;
     target_type.wrap_some().wrap_ok()
 }
 ```
 
-A non-`to` identifier is not consumed. `field Query.Foo Owner { id }` fails at `Owner` as `Expected(SelectionSet, Token(Identifier))`, not as `ToKeyword`. Peeking `to` commits to a type: `field Query.Foo to { id }` is `Expected(TypeAnnotation, Group(Brace))`.
+A non-`to` identifier is not consumed. `field Query.Foo Owner { id }` fails at `Owner` as `Expected(ToOrDescriptionOrSelectionSet, Token(Identifier))`. Peeking `to` commits to a type: `field Query.Foo to { id }` is `Expected(TypeAnnotation, Group(Brace))`. The `require_token` after a `to` peek is the peek-then-parse assert; it reports `Token(Identifier)`.
+
+`require_selection_set` takes the missing expectation. Origin: landed `require_selection_set` in `crates/isograph_parser/src/selections.rs`. Delta: `missing: Expectation`.
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub(crate) fn require_selection_set(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
+    cursor
+        .require_group(
+            BracketKind::Brace,
+            SemanticToken::Brace,
+            |cursor, children| {
+                SelectionSet(children.item.parse_each_chunk(
+                    cursor,
+                    Expectation::Separator(BracketKind::Brace),
+                    parse_selection,
+                ))
+            },
+        )
+        .map_err(|()| cursor.expected(Expectation::SelectionSet))
+}
+```
+
+After:
+
+```rust
+// from crates/isograph_parser/src/selections.rs
+pub(crate) fn require_selection_set(
+    cursor: &mut ItemCursor<'_>,
+    missing: Expectation,
+) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
+    cursor
+        .require_group(
+            BracketKind::Brace,
+            SemanticToken::Brace,
+            |cursor, children| {
+                SelectionSet(children.item.parse_each_chunk(
+                    cursor,
+                    Expectation::Separator(BracketKind::Brace),
+                    parse_selection,
+                ))
+            },
+        )
+        .map_err(|()| cursor.expected(missing))
+}
+```
 
 `ItemCursor::text` loses `#[cfg_attr(not(test), expect(dead_code))]`. `consume_to_target` is the production caller.
 
@@ -364,6 +418,8 @@ A non-`to` identifier is not consumed. `field Query.Foo Owner { id }` fails at `
 No new `IsographResolutionNode` variants. A position on `to` answers `FieldDeclaration`. A target type name answers `EntityNameWrapper` with `EntityNameWrapperParent::NamedTypeAnnotation` whose `TypeAnnotationParent` is `FieldDeclaration`. A field without `to` has `target_type: None`.
 
 ## Tests
+
+Landed tests `a_field_declaration_without_a_selection_set_is_a_failed_item`, `a_selection_set_split_onto_its_own_line_is_a_failed_item`, and `a_description_without_a_selection_set_is_a_failed_item` use `ToOrDescriptionOrSelectionSet` instead of `SelectionSet`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -487,7 +543,10 @@ No new `IsographResolutionNode` variants. A position on `to` answers `FieldDecla
         let text = "field Query.Foo Owner { id }";
         assert_no_declaration(
             text,
-            expected(Expectation::SelectionSet, Found::Token(Identifier)),
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::Token(Identifier),
+            ),
             span_of(text, "Owner"),
         );
     }
@@ -521,7 +580,10 @@ No new `IsographResolutionNode` variants. A position on `to` answers `FieldDecla
         let text = "field Query.Foo \"x\" to Owner { id }";
         assert_no_declaration(
             text,
-            expected(Expectation::SelectionSet, Found::Token(Identifier)),
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::Token(Identifier),
+            ),
             span_of(text, "to"),
         );
     }
@@ -601,5 +663,5 @@ No new `IsographResolutionNode` variants. A position on `to` answers `FieldDecla
 
 ## Landing checklist
 
-1. The parse_iso_literal.rs, parse_error.rs, variables.rs, and chunk_stream.rs changes, `parse_type_dot_name` returning `SelectableName`, the test deletion, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. The parse_iso_literal.rs, parse_error.rs, variables.rs, selections.rs, and chunk_stream.rs changes, `parse_type_dot_name` returning `SelectableName`, the test deletion, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
