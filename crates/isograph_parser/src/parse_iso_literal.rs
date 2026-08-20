@@ -8,10 +8,9 @@ use crate::chunk_stream::ItemCursor;
 use crate::{
     ChunkContentItem, ChunkedLevel, DECLARATION_KEYWORD, Expectation, ExtraChunks, Found,
     IsographFieldDirectiveList, IsographResolutionNode, NamedTypeAnnotationPath, NonBracketToken,
-    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
-    TO_OR_DESCRIPTION_OR_SELECTION_SET, TypeAnnotation, UnparsedChunkItems,
-    VariableDeclarationOrUsageList, consume_directives, consume_variable_declaration_list,
-    parse_singleton, parse_type_annotation, require_selection_set,
+    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot, TypeAnnotation,
+    UnparsedChunkItems, VariableDeclarationOrUsageList, consume_directives, consume_selection_set,
+    consume_variable_declaration_list, parse_singleton, parse_type_annotation,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -69,7 +68,7 @@ pub struct SelectableDeclaration {
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
     #[parent_variant(SelectableDeclaration)]
-    pub selection_set: WithSpan<SelectionSet>,
+    pub selection_set: Option<WithSpan<SelectionSet>>,
 }
 
 /// The name of a schema type, `Query` in `entrypoint Query.foo`.
@@ -201,7 +200,7 @@ fn parse_selectable_declaration(
     let target_type = consume_to_target(cursor)?;
     let directive_set = consume_directives(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor, TO_OR_DESCRIPTION_OR_SELECTION_SET)?;
+    let selection_set = consume_selection_set(cursor);
     SelectableDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
@@ -262,11 +261,10 @@ mod tests {
         DECLARATION_KEYWORD, Expectation, Found, IntegerValue, IsographDirectiveNameWrapper,
         IsographFieldDirectiveListParent, IsographResolutionNode, NonBracketTokenKind,
         NonConstantValue, NonConstantValueParent, ObjectEntry, ParseError, Selection,
-        SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot,
-        TO_OR_DESCRIPTION_OR_SELECTION_SET, TypeAnnotation, TypeAnnotationParent,
-        UnparsedChunkItems, UnparsedChunkItemsParent, VariableDeclarationOrUsage,
-        VariableDeclarationOrUsageList, VariableNameWrapper, VariableNameWrapperParent, chunk,
-        match_brackets, tokenize,
+        SelectionNameWrapper, SelectionSet, SelectionSetParent, Slot, TypeAnnotation,
+        TypeAnnotationParent, UnparsedChunkItems, UnparsedChunkItemsParent,
+        VariableDeclarationOrUsage, VariableDeclarationOrUsageList, VariableNameWrapper,
+        VariableNameWrapperParent, chunk, match_brackets, tokenize,
     };
     use Expectation::EndOfDeclaration;
     use NonBracketTokenKind::{
@@ -401,6 +399,13 @@ mod tests {
         selection_set: &WithSpan<SelectionSet>,
     ) -> &[WithSpan<Slot<Selection, UnparsedChunkItems>>] {
         selection_set.item.0.reference()
+    }
+
+    fn selection_set_of(declaration: &SelectableDeclaration) -> &WithSpan<SelectionSet> {
+        declaration
+            .selection_set
+            .as_ref()
+            .expect("the fixture writes a selection set")
     }
 
     fn as_selection(slot: &Slot<Selection, UnparsedChunkItems>) -> &Selection {
@@ -787,7 +792,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let selection = as_selection(
-            selections(as_selectable(parse.reference()).selection_set.reference())[0]
+            selections(selection_set_of(as_selectable(parse.reference())))[0]
                 .item
                 .reference(),
         );
@@ -813,7 +818,7 @@ mod tests {
         let (parse, errors) = parsed(text);
         assert_eq!(errors, vec![]);
         let directives = as_selection(
-            selections(as_selectable(parse.reference()).selection_set.reference())[0]
+            selections(selection_set_of(as_selectable(parse.reference())))[0]
                 .item
                 .reference(),
         )
@@ -828,7 +833,7 @@ mod tests {
     fn a_directive_on_the_next_line_is_its_own_failed_selection() {
         let text = "field Query.Foo { bar\n@loadable }";
         let (parse, errors) = parsed(text);
-        let items = selections(as_selectable(parse.reference()).selection_set.reference());
+        let items = selections(selection_set_of(as_selectable(parse.reference())));
         assert_eq!(items.len(), 2);
         as_selection(items[0].item.reference());
         assert!(items[1].item.item.is_none());
@@ -1061,10 +1066,10 @@ mod tests {
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.name.location, span_of(text, "Foo"));
         assert_eq!(
-            declaration.selection_set.location,
+            selection_set_of(declaration).location,
             Span::new(span_of(text, "{").start, span_of(text, "}").end)
         );
-        let items = selections(declaration.selection_set.reference());
+        let items = selections(selection_set_of(declaration));
         assert_eq!(items.len(), 2);
         assert_eq!(
             as_selection(items[0].item.reference()).name.item,
@@ -1091,7 +1096,7 @@ mod tests {
         ] {
             let (parse, errors) = parsed(text);
             assert_eq!(
-                selections(as_selectable(parse.reference()).selection_set.reference()).len(),
+                selections(selection_set_of(as_selectable(parse.reference()))).len(),
                 0,
                 "for literal {text:?}"
             );
@@ -1100,25 +1105,25 @@ mod tests {
     }
 
     #[test]
-    fn a_selectable_declaration_without_a_selection_set_is_a_failed_item() {
+    fn a_field_declaration_without_a_selection_set_parses() {
         let text = "field Query.Foo";
-        let end = span_of(text, "Foo").end;
-        assert_no_declaration(
-            text,
-            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
-            Span::new(end, end),
-        );
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(as_selectable(parse.reference()).selection_set, None);
     }
 
     #[test]
-    fn a_selection_set_split_onto_its_own_line_is_a_failed_item() {
+    fn a_selection_set_on_its_own_line_is_a_second_declaration() {
         let text = "field Query.Foo\n{ bar }";
-        let end = span_of(text, "Foo").end;
-        assert_no_declaration(
-            text,
-            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
-            Span::new(end, end),
+        let (parse, errors) = parsed(text);
+        assert_eq!(as_selectable(parse.reference()).selection_set, None);
+        assert_eq!(
+            errors,
+            ParseError::MultipleDeclarations
+                .with_span(span_of(text, "{ bar }"))
+                .wrap_vec(),
         );
+        assert!(parse.item.extra_chunks.as_ref().is_some());
     }
 
     #[test]
@@ -1186,7 +1191,7 @@ mod tests {
             description.location,
             span_of(text, "\"\"\"\n  the home\n  route\n\"\"\"")
         );
-        assert_eq!(selections(declaration.selection_set.reference()).len(), 1);
+        assert_eq!(selections(selection_set_of(declaration)).len(), 1);
     }
 
     #[test]
@@ -1223,14 +1228,13 @@ mod tests {
     }
 
     #[test]
-    fn a_description_without_a_selection_set_is_a_failed_item() {
+    fn a_field_declaration_with_only_a_description_parses() {
         let text = "field Query.Foo \"the home route\"";
-        let end = span_of(text, "\"the home route\"").end;
-        assert_no_declaration(
-            text,
-            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::EndOfChunk),
-            Span::new(end, end),
-        );
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declaration = as_selectable(parse.reference());
+        assert!(declaration.description.is_some());
+        assert_eq!(declaration.selection_set, None);
     }
 
     #[test]
@@ -1263,7 +1267,7 @@ mod tests {
             }
             annotation => panic!("expected a named target, got {annotation:?}"),
         }
-        assert_eq!(selections(declaration.selection_set.reference()).len(), 1);
+        assert_eq!(selections(selection_set_of(declaration)).len(), 1);
     }
 
     #[test]
@@ -1345,10 +1349,14 @@ mod tests {
     #[test]
     fn a_non_to_identifier_is_not_consumed_as_to() {
         let text = "field Query.Foo Owner { id }";
-        assert_no_declaration(
-            text,
-            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::Token(Identifier)),
-            span_of(text, "Owner"),
+        let (parse, errors) = parsed(text);
+        as_selectable(parse.reference());
+        assert_eq!(as_selectable(parse.reference()).selection_set, None);
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "Owner"))
+                .wrap_vec(),
         );
     }
 
@@ -1379,10 +1387,15 @@ mod tests {
     #[test]
     fn a_to_after_the_description_is_not_a_target() {
         let text = "field Query.Foo \"x\" to Owner { id }";
-        assert_no_declaration(
-            text,
-            expected(TO_OR_DESCRIPTION_OR_SELECTION_SET, Found::Token(Identifier)),
-            span_of(text, "to"),
+        let (parse, errors) = parsed(text);
+        let declaration = as_selectable(parse.reference());
+        assert!(declaration.description.is_some());
+        assert_eq!(declaration.target_type, None);
+        assert_eq!(
+            errors,
+            expected(EndOfDeclaration, Found::Token(Identifier))
+                .with_span(span_of(text, "to"))
+                .wrap_vec(),
         );
     }
 

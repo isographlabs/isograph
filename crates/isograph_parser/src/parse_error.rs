@@ -100,12 +100,6 @@ pub const DECLARATION_KEYWORD: Expectation = Expectation::OneOf(&[
     Expectation::Keyword("field"),
 ]);
 
-pub const TO_OR_DESCRIPTION_OR_SELECTION_SET: Expectation = Expectation::OneOf(&[
-    Expectation::Keyword("to"),
-    Expectation::Description,
-    Expectation::SelectionSet,
-]);
-
 #[derive(Copy, Clone, Debug, PartialEq, Eq, strum::Display)]
 pub enum Found {
     #[strum(to_string = "{0}")]
@@ -133,10 +127,7 @@ impl From<&ChunkContentItem> for Found {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        DECLARATION_KEYWORD, Expectation, ExpectedFound, Found, ParseError,
-        TO_OR_DESCRIPTION_OR_SELECTION_SET,
-    };
+    use super::{DECLARATION_KEYWORD, Expectation, ExpectedFound, Found, ParseError};
     use crate::{BracketKind, NonBracketTokenKind};
 
     #[test]
@@ -154,10 +145,6 @@ mod tests {
             "the keyword `entrypoint` or the keyword `field`",
         );
         assert_eq!(Expectation::Keyword("to").to_string(), "the keyword `to`",);
-        assert_eq!(
-            TO_OR_DESCRIPTION_OR_SELECTION_SET.to_string(),
-            "the keyword `to`, a description, or a selection set, like '{ id, name }'",
-        );
         assert_eq!(
             Expectation::EndOfDeclaration.to_string(),
             "the end of the declaration",

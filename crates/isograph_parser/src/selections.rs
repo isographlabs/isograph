@@ -58,26 +58,7 @@ impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
     }
 }
 
-pub(crate) fn require_selection_set(
-    cursor: &mut ItemCursor<'_>,
-    missing: Expectation,
-) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
-    cursor
-        .require_group(
-            BracketKind::Brace,
-            SemanticToken::Brace,
-            |cursor, children| {
-                SelectionSet(children.item.parse_each_chunk(
-                    cursor,
-                    Expectation::Separator(BracketKind::Brace),
-                    parse_selection,
-                ))
-            },
-        )
-        .map_err(|()| cursor.expected(missing))
-}
-
-fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
+pub(crate) fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {
     cursor.consume_group_if(
         BracketKind::Brace,
         SemanticToken::Brace,
