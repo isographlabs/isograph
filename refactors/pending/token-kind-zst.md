@@ -1,5 +1,7 @@
 # token-kind-zst: proof tokens in `NonBracketTokenKind`
 
+Deferred. Not in the grammar-stage order.
+
 Each `NonBracketTokenKind` variant carries a ZST. Matching `Dollar(dollar)` yields a `Dollar` you can only get from a token. `parse_variable_name` and the other value parse functions take that proof.
 
 The ZST field is private. Construction is only in this module, via `From<IsographLangTokenKind>` and the associated constants that `consume_token_if` / `require_token` pass. Outside this module, a `Dollar` comes from a match.

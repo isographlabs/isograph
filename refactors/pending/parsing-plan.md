@@ -210,4 +210,6 @@ parsing-standards.md governs how every implementation below is written. Each doc
 5. `optional-to.md`. Optional `to Type` on `FieldDeclaration`. The keyword is `field`. Removes `UnsupportedDeclarationType`.
 6. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
-Later: `parse-arrays.md`. `[ ... ]` list values. `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
+Later: `parse-arrays.md`. `[ ... ]` list values.
+
+Deferred: `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
