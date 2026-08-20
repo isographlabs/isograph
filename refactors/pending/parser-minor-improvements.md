@@ -1,6 +1,6 @@
 # Parser minor improvements
 
-These are not in the grammar-stage order. Do not mix them into type-annotation-null.md or parse-iso-literal-entry.md. Each heading is independently shippable.
+These are not in the grammar-stage order. Do not mix them into type-annotation-null.md, parse-iso-literal-entry.md, or type-annotation-union.md. Each heading is independently shippable.
 
 ## `Slot<T, E>` is two independent `Option`s
 
@@ -187,3 +187,9 @@ leftover-semantic-tokens.md records `Keyword` at `fieldd`; `parse_iso_literal_it
 `consume_selection_set`, `consume_argument_list`, `consume_variable_declaration_list`, object interiors, and list interiors all go through `parse_each_chunk`. That is the right extraction.
 
 `span_of`, `parsed_items`, and the dummy parent-cursor setup (`match_brackets(tokenize("x"), 1)` then `chunk` then `stream`) are duplicated in `arguments.rs` and `selections.rs` tests. `crates/tests` is an empty crate. The shared harness lives with the tests.
+
+## `UnionVariant::Null` is a unit
+
+type-annotation-union.md uses `Null(NullTypeAnnotation)`, a ZST, so the all-delegate `ResolvePosition` derive compiles. The row's location is `None`; resolve is never called.
+
+`Null` is a unit variant. The derive then allows mixed enums: `Named` and `List` continue into the payload, `Null` is unmarked and answers `UnionTypeAnnotation`. Parked design: `refactors/past/resolve-option-like-enums.md`. Depends on type-annotation-union.md.
