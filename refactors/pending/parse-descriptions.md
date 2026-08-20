@@ -1,14 +1,8 @@
-# parse-descriptions: descriptions on declarations
+# parse-descriptions: consume_description
 
-A field declaration may carry a description between its variable definitions and its selection set. parse-pointers.md reuses the slot. Entrypoints carry none.
+A description is one `StringLiteral` token (`"..."`) or one `BlockStringLiteral` token (`"""..."""`). `consume_description` takes it when the next item is one of those.
 
-## The grammar this doc accepts
-
-```
-field <Identifier> . <Identifier> [<paren group>] [<description>] <brace group>
-```
-
-A description is one `StringLiteral` token (`"..."`) or one `BlockStringLiteral` token (`"""..."""`). A block string is a single token whatever it contains, line breaks included, so a multi-line description never splits the chunk. The tree stores the interned source slice, quotes included. Unquoting and block-string dedenting are derivations a consumer computes from that key.
+A block string is a single token whatever it contains, line breaks included, so a multi-line description never splits the chunk. The value is the interned source slice, quotes included. Unquoting and block-string dedenting are derivations a consumer computes from that key.
 
 Origin: `parse_optional_description` in `crates/isograph_lang_parser/src/description.rs` and `Description` in `crates/isograph_lang_types/src/string_key_wrappers.rs`. Delta: i2 does not unquote or dedent; isograph stores the cleaned inner text. i2 function name is `consume_description` (cursor `consume_*` convention).
 
@@ -16,60 +10,16 @@ Origin: `parse_optional_description` in `crates/isograph_lang_parser/src/descrip
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+/// The interned source slice of a description, quotes included.
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Description(common_lang_types::DescriptionValue);
-
-pub type DescriptionPath<'a> =
-    PositionResolutionPath<&'a Description, ClientFieldDeclarationPath<'a>>;
-```
-
-parse-pointers.md converts the parent to `DescriptionParent` when the second parent arrives.
-
-Before:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct ClientFieldDeclaration {
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub parent_type: WithSpan<EntityNameWrapper>,
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
-    #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub selection_set: WithSpan<SelectionSet>,
-}
-```
-
-After:
-
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-pub struct ClientFieldDeclaration {
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub parent_type: WithSpan<EntityNameWrapper>,
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
-    #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
-    #[resolve_field]
-    pub description: Option<WithSpan<Description>>,
-    #[resolve_field]
-    #[parent_variant(ClientFieldDeclaration)]
-    pub selection_set: WithSpan<SelectionSet>,
-}
 ```
 
 ## The parser
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+#[cfg_attr(not(test), expect(dead_code))]
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
     let span = cursor
         .consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
@@ -83,110 +33,207 @@ pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpa
 }
 ```
 
-```rust
-// from crates/isograph_parser/src/parse_iso_literal.rs
-    let variable_definitions = consume_variable_declaration_list(cursor);
-    let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor)?;
-```
-
-A malformed string token is not consumed here and surfaces as the found token of the selection-set expectation. A description in any other position is an ordinary unexpected token there.
-
-## The resolution surface
-
-```rust
-// from crates/isograph_parser/src/isograph_resolution_node.rs
-    Description(DescriptionPath<'a>),
-```
-
-The expansion follows `EntityNameWrapper`.
+A token that is not a string or block string is not consumed. An unterminated `"` lexes as `Error` plus whatever follows, so it is not consumed here.
 
 ## Tests
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+    fn chunked(text: &str) -> WithSpan<ChunkedLevel> {
+        let (brackets, bracket_errors) = match_brackets(tokenize(text), text.len() as u32);
+        assert!(bracket_errors.is_empty(), "for literal {text:?}");
+        let (tree, comma_errors) = chunk(brackets.reference());
+        assert_eq!(comma_errors, vec![], "for literal {text:?}");
+        tree
+    }
+
+    fn stream_of<'a>(
+        tree: &'a WithSpan<ChunkedLevel>,
+        text: &'a str,
+        tokens: &'a mut Vec<WithSpan<SemanticToken>>,
+        errors: &'a mut Vec<WithSpan<ParseError>>,
+    ) -> crate::chunk_stream::ChunkStream<'a> {
+        tree.item.0[0].item.stream(text, tokens, errors)
+    }
+
     #[test]
-    fn a_single_line_description_parses_with_its_quotes() {
-        let text = "field Query.Foo \"the home route\" { bar }";
-        let (parse, errors) = parsed(text);
-        assert_eq!(errors, vec![]);
-        let description = as_field(parse.reference())
-            .description
-            .as_ref()
-            .expect("the fixture carries a description");
+    fn a_single_line_description_is_the_source_slice_including_quotes() {
+        let text = "\"the home route\"";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let description = consume_description(stream.cursor())
+            .expect("the fixture is a string description");
         assert_eq!(description.location, span_of(text, "\"the home route\""));
         assert_eq!(
             description.item,
             Description("\"the home route\"".intern().to())
         );
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            SemanticToken::String
+                .with_span(span_of(text, "\"the home route\""))
+                .wrap_vec(),
+        );
     }
 
     #[test]
-    fn a_block_string_description_spans_lines_without_splitting_the_chunk() {
-        let text = "field Query.Foo($id: ID!) \"\"\"\n  the home\n  route\n\"\"\" { bar }";
-        let (parse, errors) = parsed(text);
-        assert_eq!(errors, vec![]);
-        let description = as_field(parse.reference())
-            .description
-            .as_ref()
-            .expect("the fixture carries a description");
+    fn an_empty_string_is_a_description() {
+        let text = "\"\"";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let description = consume_description(stream.cursor())
+            .expect("the fixture is a string description");
+        assert_eq!(description.location, span_of(text, "\"\""));
+        assert_eq!(description.item, Description("\"\"".intern().to()));
+    }
+
+    #[test]
+    fn a_block_string_description_is_one_token_including_line_breaks() {
+        let text = "\"\"\"\n  the home\n  route\n\"\"\"";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 1);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let description = consume_description(stream.cursor())
+            .expect("the fixture is a block-string description");
         assert_eq!(
             description.location,
             span_of(text, "\"\"\"\n  the home\n  route\n\"\"\"")
         );
-        assert!(as_field(parse.reference()).variable_definitions.is_some());
-    }
-
-    #[test]
-    fn a_description_after_the_selection_set_is_leftover() {
-        let text = "field Query.Foo { bar } \"too late\"";
-        let (parse, errors) = parsed(text);
-        as_field(parse.reference());
-        assert!(first_slot(parse.reference()).extra_tokens.is_some());
         assert_eq!(
-            errors,
-            expected(
-                Expectation::EndOfDeclaration,
-                Found::Token(NonBracketTokenKind::StringLiteral)
-            )
-            .with_span(span_of(text, "\"too late\""))
-            .wrap_vec(),
+            description.item,
+            Description("\"\"\"\n  the home\n  route\n\"\"\"".intern().to())
+        );
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            SemanticToken::String
+                .with_span(span_of(text, "\"\"\"\n  the home\n  route\n\"\"\""))
+                .wrap_vec(),
         );
     }
 
     #[test]
-    fn an_entrypoint_carries_no_description() {
-        let text = "entrypoint Query.foo \"nope\"";
-        let (parse, errors) = parsed(text);
-        as_entrypoint(parse.reference());
+    fn a_block_string_with_line_breaks_does_not_split_the_chunk() {
+        let text = "Foo \"\"\"\n  the home\n  route\n\"\"\" Bar";
+        let tree = chunked(text);
+        assert_eq!(tree.item.0.len(), 1);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let cursor = stream.cursor();
         assert_eq!(
-            errors,
-            expected(
-                Expectation::EndOfDeclaration,
-                Found::Token(NonBracketTokenKind::StringLiteral)
-            )
-            .with_span(span_of(text, "\"nope\""))
-            .wrap_vec(),
+            cursor
+                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .map(|token| token.location),
+            span_of(text, "Foo").wrap_some(),
+        );
+        let description = consume_description(cursor)
+            .expect("the fixture carries a block-string description");
+        assert_eq!(
+            description.location,
+            span_of(text, "\"\"\"\n  the home\n  route\n\"\"\"")
+        );
+        assert_eq!(
+            cursor
+                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .map(|token| token.location),
+            span_of(text, "Bar").wrap_some(),
         );
     }
 
     #[test]
-    fn a_description_resolves_to_its_leaf() {
-        let text = "field Query.Foo \"the home route\" { bar }";
-        let (parse, _) = parsed(text);
-        match parse.resolve((), span_of(text, "home")) {
-            IsographResolutionNode::Description(description) => {
-                assert_eq!(
-                    description.parent.inner.client_field_name.location,
-                    span_of(text, "Foo")
-                );
-            }
-            node => panic!("expected the description leaf, got {node:?}"),
-        }
+    fn a_description_does_not_consume_the_following_item() {
+        let text = "\"hi\" Foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let cursor = stream.cursor();
+        let description = consume_description(cursor).expect("the fixture starts with a description");
+        assert_eq!(description.location, span_of(text, "\"hi\""));
+        assert_eq!(
+            cursor
+                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .map(|token| token.location),
+            span_of(text, "Foo").wrap_some(),
+        );
+    }
+
+    #[test]
+    fn a_non_string_is_not_a_description() {
+        let text = "Foo";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let cursor = stream.cursor();
+        assert_eq!(consume_description(cursor), None);
+        assert_eq!(tokens, vec![]);
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            cursor
+                .consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
+                .map(|token| token.location),
+            span_of(text, "Foo").wrap_some(),
+        );
+    }
+
+    #[test]
+    fn a_brace_group_is_not_a_description() {
+        let text = "{ bar }";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let cursor = stream.cursor();
+        assert_eq!(consume_description(cursor), None);
+        assert_eq!(
+            cursor
+                .consume_group_if(BracketKind::Brace, SemanticToken::Brace, |_, _| ())
+                .map(|group| group.location),
+            span_of(text, "{ bar }").wrap_some(),
+        );
+    }
+
+    #[test]
+    fn an_unterminated_string_is_not_a_description() {
+        let text = "\"unterminated";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let cursor = stream.cursor();
+        assert_eq!(consume_description(cursor), None);
+        assert_eq!(
+            cursor
+                .consume_token_if(NonBracketTokenKind::Error, SemanticToken::Error)
+                .map(|token| token.location),
+            span_of(text, "\"").wrap_some(),
+        );
+    }
+
+    #[test]
+    fn an_empty_block_string_is_a_description() {
+        let text = "\"\"\"\"\"\"";
+        let tree = chunked(text);
+        let mut tokens = Vec::new();
+        let mut errors = Vec::new();
+        let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
+        let description = consume_description(stream.cursor())
+            .expect("the fixture is a block-string description");
+        assert_eq!(description.location, span_of(text, "\"\"\"\"\"\""));
+        assert_eq!(description.item, Description("\"\"\"\"\"\"".intern().to()));
     }
 ```
 
 ## Landing checklist
 
-1. The `Description` type, the `ClientFieldDeclaration` and `parse_field` changes, the resolution-node variant, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+1. The `Description` type, `consume_description`, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 2. Move this doc to refactors/past.
