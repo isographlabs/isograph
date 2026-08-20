@@ -6,10 +6,10 @@ use safe_peekable::{IntoSafePeekable, SafePeekable};
 use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::{
-    BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found, IsoLiteralItem,
-    IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode, MatchedBrackets,
-    NonBracketToken, NonBracketTokenKind, OpenBracket, ParseError, SemanticToken,
-    UnparsedChunkItemsPath,
+    ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
+    IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
+    MatchedBrackets, NamedArgument, NamedArgumentSlotPath, NonBracketToken, NonBracketTokenKind,
+    ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, SemanticToken,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -183,12 +183,40 @@ impl ChunkedLevel {
 
 /// Unread or failed items from the chunk under parse.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = UnparsedChunkItemsParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct UnparsedChunkItems(
     #[resolve_field]
     #[parent_variant(Unparsed)]
     pub NonEmpty<WithSpan<ChunkContentItem>>,
 );
+
+#[derive(Debug)]
+pub enum UnparsedChunkItemsParent<'a> {
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+}
+
+pub type UnparsedChunkItemsPath<'a> =
+    PositionResolutionPath<&'a UnparsedChunkItems, UnparsedChunkItemsParent<'a>>;
+
+impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: IsoLiteralSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::IsoLiteralSlot(path)
+    }
+}
+
+impl<'a> From<NamedArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::NamedArgumentSlot(path)
+    }
+}
+
+impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: ObjectEntrySlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::ObjectEntrySlot(path)
+    }
+}
 
 /// Extra root chunks after the first.
 #[derive(Clone, Debug, PartialEq, Eq, ResolvePosition)]
@@ -206,16 +234,19 @@ pub struct ExtraChunks(
 /// Walk, given that parent:
 /// - Position in `item`: bare `#[resolve_field]` passes `self.path(parent)`, a path
 ///   to this `Slot`. `T::Parent` is that path. `Slot` is a path segment.
-/// - Position in `extra_tokens`: the same `self.path(parent)`.
+/// - Position in `extra_tokens`: `#[from_container_parent]` converts the slot path
+///   into leftover's parent enum.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
-///   `ResolvedNode` variant (`IsoLiteralSlot`, later `SelectionSlot`).
+///   `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`).
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
     self_type_generics = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
     ]
 )]
 pub struct Slot<T, E> {
@@ -224,6 +255,7 @@ pub struct Slot<T, E> {
     pub item: Option<WithSpan<T>>,
     /// Unread or failed tokens after the item. Span is tight to those tokens.
     #[resolve_field]
+    #[from_container_parent]
     pub extra_tokens: Option<WithSpan<E>>,
 }
 

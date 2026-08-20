@@ -64,9 +64,6 @@ pub type EntrypointDeclarationPath<'a> =
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type UnparsedChunkItemsPath<'a> =
-    PositionResolutionPath<&'a UnparsedChunkItems, IsoLiteralSlotPath<'a>>;
-
 pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
 
 pub type ClientFieldNamePath<'a> =

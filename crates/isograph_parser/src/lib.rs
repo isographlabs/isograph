@@ -1,3 +1,4 @@
+mod arguments;
 mod chunk;
 mod chunk_stream;
 mod isograph_resolution_node;
@@ -9,6 +10,7 @@ mod semantic_token;
 mod token_kind;
 mod tokenize;
 
+pub use arguments::*;
 pub use chunk::*;
 pub use isograph_resolution_node::*;
 pub use matched_brackets::*;

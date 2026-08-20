@@ -1,8 +1,11 @@
 use crate::{
-    ChunkPath, ChunkSeparatorPath, ChunkedGroupPath, ChunkedLevelPath, ClientFieldNamePath,
-    CloseBracketPath, EntityNamePath, EntrypointDeclarationPath, ExtraChunksPath,
-    IsoLiteralParsePath, IsoLiteralSlotPath, NonBracketTokenPath, OpenBracketPath,
-    UnparsedChunkItemsPath,
+    ArgumentListPath, BooleanValuePath, ChunkPath, ChunkSeparatorPath, ChunkedGroupPath,
+    ChunkedLevelPath, ClientFieldNamePath, CloseBracketPath, EntityNamePath,
+    EntrypointDeclarationPath, ExtraChunksPath, FieldArgumentNameWrapperPath, IntegerValuePath,
+    IsoLiteralParsePath, IsoLiteralSlotPath, NamedArgumentPath, NamedArgumentSlotPath,
+    NonBracketTokenPath, NullValuePath, ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath,
+    OpenBracketPath, StringLiteralValueWrapperPath, UnparsedChunkItemsPath,
+    VariableNameWrapperPath, VariableUsePath,
 };
 
 /// What a position resolves to: the leaves of the newest tree. Each parsing stage
@@ -28,4 +31,17 @@ pub enum IsographResolutionNode<'a> {
     NonBracketToken(NonBracketTokenPath<'a>),
     OpenBracket(OpenBracketPath<'a>),
     CloseBracket(CloseBracketPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+    ArgumentList(ArgumentListPath<'a>),
+    ObjectLiteral(ObjectLiteralPath<'a>),
+    NamedArgument(NamedArgumentPath<'a>),
+    ObjectEntry(ObjectEntryPath<'a>),
+    FieldArgumentNameWrapper(FieldArgumentNameWrapperPath<'a>),
+    VariableUse(VariableUsePath<'a>),
+    VariableNameWrapper(VariableNameWrapperPath<'a>),
+    StringLiteralValueWrapper(StringLiteralValueWrapperPath<'a>),
+    IntegerValue(IntegerValuePath<'a>),
+    BooleanValue(BooleanValuePath<'a>),
+    NullValue(NullValuePath<'a>),
 }
