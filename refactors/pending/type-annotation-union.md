@@ -333,7 +333,79 @@ Before:
 
 ### Tests
 
-In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `UnionVariant`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
+In `parse_iso_literal.rs`. The test module's `use crate::{...}` list gains `NamedTypeAnnotation`, `UnionTypeAnnotation`, `UnionVariant`, and `WithOptionalSpan`. `use span::WithGenericLocation`. Span tests that do not mention `Null` stay (`a_to_target_accepts_every_type_annotation_form`, `a_full_field` `Person!`, `a_bracketed_target_is_a_list_annotation` `[Pet!]!` is `List` of `Named` with location `[Pet!]`, `list_types_nest_with_non_null_markers`, `a_multi_line_variable_list_parses_in_the_demo_style`, `a_bang_resolves_to_the_variable_declaration`).
+
+The type-annotation syntax always yields a union of length 2: the written type, then `Null`. Length 0, 1, and 3+ are constructed.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    fn named_union_member(name: &str, span: Span) -> WithOptionalSpan<UnionVariant> {
+        WithGenericLocation::new(
+            UnionVariant::Named(NamedTypeAnnotation {
+                name: EntityNameWrapper(name.intern().to()).with_span(span),
+            }),
+            span.wrap_some(),
+        )
+    }
+
+    #[test]
+    fn an_empty_union_has_no_members() {
+        let union = UnionTypeAnnotation(vec![]);
+        assert_eq!(union.0.len(), 0);
+    }
+
+    #[test]
+    fn a_one_member_union_is_a_named_type() {
+        let span = Span::new(0, 3);
+        let union = UnionTypeAnnotation(named_union_member("Foo", span).wrap_vec());
+        assert_eq!(union.0.len(), 1);
+        match union.0[0].item.reference() {
+            UnionVariant::Named(named) => {
+                assert_eq!(named.name.item, EntityNameWrapper("Foo".intern().to()));
+                assert_eq!(named.name.location, span);
+            }
+            variant => panic!("expected Named, got {variant:?}"),
+        }
+        assert_eq!(union.0[0].location, span.wrap_some());
+    }
+
+    #[test]
+    fn a_one_member_union_can_be_only_null() {
+        let union = UnionTypeAnnotation(
+            WithGenericLocation::new(UnionVariant::Null, None).wrap_vec(),
+        );
+        assert_eq!(union.0.len(), 1);
+        assert!(matches!(union.0[0].item, UnionVariant::Null));
+        assert_eq!(union.0[0].location, None);
+    }
+
+    #[test]
+    fn a_three_member_union_keeps_order() {
+        let foo = Span::new(0, 3);
+        let bar = Span::new(4, 7);
+        let union = UnionTypeAnnotation(vec![
+            named_union_member("Foo", foo),
+            named_union_member("Bar", bar),
+            WithGenericLocation::new(UnionVariant::Null, None),
+        ]);
+        assert_eq!(union.0.len(), 3);
+        match union.0[0].item.reference() {
+            UnionVariant::Named(named) => {
+                assert_eq!(named.name.item, EntityNameWrapper("Foo".intern().to()));
+            }
+            variant => panic!("expected Named Foo, got {variant:?}"),
+        }
+        match union.0[1].item.reference() {
+            UnionVariant::Named(named) => {
+                assert_eq!(named.name.item, EntityNameWrapper("Bar".intern().to()));
+            }
+            variant => panic!("expected Named Bar, got {variant:?}"),
+        }
+        assert!(matches!(union.0[2].item, UnionVariant::Null));
+        assert_eq!(union.0[2].location, None);
+    }
+```
+
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
