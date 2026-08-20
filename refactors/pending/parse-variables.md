@@ -56,6 +56,41 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
     EndOfType,
 ```
 
+## Change 3: `ItemCursor::buffers`
+
+`parse_singleton` at the root takes `text`, `tokens`, and `errors`. A nested `[...]` type has those on the parent cursor.
+
+```rust
+// from crates/isograph_parser/src/chunk_stream.rs
+impl<'a> ItemCursor<'a> {
+    pub(crate) fn buffers(
+        &mut self,
+    ) -> (
+        &'a str,
+        &mut Vec<WithSpan<SemanticToken>>,
+        &mut Vec<WithSpan<ParseError>>,
+    ) {
+        (self.text, self.tokens, self.errors)
+    }
+}
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+impl ItemCursor<'_> {
+    pub(crate) fn parse_singleton<'c, T>(
+        &'c mut self,
+        level: &'c WithSpan<ChunkedLevel>,
+        end: Expectation,
+        extra_chunks: impl FnOnce(&'c WithSpan<Chunk>) -> WithSpan<ParseError>,
+        parse: impl FnOnce(&mut ItemCursor<'_>) -> Result<T, WithSpan<ParseError>>,
+    ) -> Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks> {
+        let (text, tokens, errors) = self.buffers();
+        parse_singleton(level, text, tokens, errors, end, extra_chunks, parse)
+    }
+}
+```
+
 ## New module: variables.rs
 
 ```rust
@@ -68,9 +103,9 @@ use span::{Span, WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    parse_constant_value, parse_singleton, BracketKind, ChunkedLevel, ClientFieldDeclarationPath,
-    Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError, Slot,
-    UnparsedChunkItems, UnparsedChunkItemsParent, VariableName,
+    parse_constant_value, BracketKind, ChunkedLevel, ClientFieldDeclarationPath, Expectation,
+    Found, IsographResolutionNode, NonBracketTokenKind, ParseError, SemanticToken, Slot,
+    UnparsedChunkItems, VariableNameWrapper,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -80,11 +115,11 @@ pub struct VariableDeclarationList(
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableDeclarationListPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(parent_type = VariableDeclarationSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct DeclaredVariable {
     #[resolve_field]
     #[parent_variant(Declaration)]
-    pub name: WithSpan<VariableName>,
+    pub name: WithSpan<VariableNameWrapper>,
     #[resolve_field]
     #[parent_variant(Variable)]
     pub type_annotation: WithSpan<TypeAnnotation>,
@@ -104,7 +139,7 @@ pub enum TypeAnnotation {
 #[resolve_position(parent_type = TypeAnnotationParent<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct NamedTypeAnnotation {
     #[resolve_field]
-    pub name: WithSpan<TypeName>,
+    pub name: WithSpan<TypeNameWrapper>,
 }
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -117,13 +152,7 @@ pub struct ListTypeAnnotation {
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NamedTypeAnnotationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct TypeName(common_lang_types::EntityName);
-
-impl From<intern::string_key::StringKey> for TypeName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        TypeName(key.to())
-    }
-}
+pub struct TypeNameWrapper(common_lang_types::EntityName);
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
@@ -134,8 +163,13 @@ pub enum TypeAnnotationParent<'a> {
 pub type VariableDeclarationListPath<'a> =
     PositionResolutionPath<&'a VariableDeclarationList, ClientFieldDeclarationPath<'a>>;
 
+pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<DeclaredVariable, UnparsedChunkItems>,
+    VariableDeclarationListPath<'a>,
+>;
+
 pub type DeclaredVariablePath<'a> =
-    PositionResolutionPath<&'a DeclaredVariable, VariableDeclarationListPath<'a>>;
+    PositionResolutionPath<&'a DeclaredVariable, VariableDeclarationSlotPath<'a>>;
 
 pub type NamedTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NamedTypeAnnotation, TypeAnnotationParent<'a>>;
@@ -143,70 +177,124 @@ pub type NamedTypeAnnotationPath<'a> =
 pub type ListTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a ListTypeAnnotation, TypeAnnotationParent<'a>>;
 
-pub type TypeNamePath<'a> = PositionResolutionPath<&'a TypeName, NamedTypeAnnotationPath<'a>>;
+pub type TypeNameWrapperPath<'a> =
+    PositionResolutionPath<&'a TypeNameWrapper, NamedTypeAnnotationPath<'a>>;
+
+pub type TypeAnnotationSlotPath<'a> =
+    PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>;
 ```
 
 A position on `$` answers `DeclaredVariable`. `parse_type_annotation`'s `spanning` covers a trailing `!`. A position on `!` answers `NamedTypeAnnotation` or `ListTypeAnnotation` (the `Foo!` / `[Foo]!` node). Hover uses that node. There is no `Exclamation` field and no `NonNull` variant.
 
-`TypeAnnotation` is the slot item inside `[...]`. `Slot<TypeAnnotation, UnparsedChunkItems>::Parent` is `TypeAnnotation::Parent`, which is `TypeAnnotationParent`. `#[resolve_field]` + `#[parent_variant(List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover `parent_from` wraps that same parent:
+`TypeAnnotation` is the slot item inside `[...]`. The pin parent is `TypeAnnotationParent`. `#[resolve_field]` + `#[parent_variant(List)]` on `inner` wraps the `ListTypeAnnotation` path in `TypeAnnotationParent::List`. Leftover converts the slot path:
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
-impl<'a> From<TypeAnnotationParent<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(parent: TypeAnnotationParent<'a>) -> Self {
-        UnparsedChunkItemsParent::TypeAnnotation(parent)
+impl<'a> From<TypeAnnotationSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: TypeAnnotationSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::TypeAnnotationSlot(path)
     }
 }
 ```
 
 `TypeAnnotationParent::List` is boxed to break the cycle.
 
-`VariableName` gains a second parent. Before:
+`VariableNameWrapper` gains a second parent. Before:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableUsePath<'a>>;
+#[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableNameWrapper(common_lang_types::VariableName);
+
+pub type VariableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a VariableNameWrapper, VariableUsePath<'a>>;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub struct VariableUse(#[resolve_field] pub WithSpan<VariableNameWrapper>);
 ```
 
 After:
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+#[resolve_position(parent_type = VariableNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableNameWrapper(common_lang_types::VariableName);
+
 #[derive(Debug)]
-pub enum VariableNameParent<'a> {
+pub enum VariableNameWrapperParent<'a> {
     Use(VariableUsePath<'a>),
     Declaration(DeclaredVariablePath<'a>),
 }
 
-pub type VariableNamePath<'a> = PositionResolutionPath<&'a VariableName, VariableNameParent<'a>>;
+pub type VariableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a VariableNameWrapper, VariableNameWrapperParent<'a>>;
 ```
 
-`VariableUse`'s `name` field respells to `#[resolve_field]` + `#[parent_variant(Use)]`.
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub struct VariableUse(
+    #[resolve_field]
+    #[parent_variant(Use)]
+    pub WithSpan<VariableNameWrapper>,
+);
+```
+
+Before:
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
+        (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
+    ]
+```
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
 pub enum UnparsedChunkItemsParent<'a> {
-    Literal(IsoLiteralParsePath<'a>),
-    SelectionSet(SelectionSetPath<'a>),
-    ArgumentList(ArgumentListPath<'a>),
-    ObjectLiteral(ObjectLiteralPath<'a>),
-    VariableDeclarationList(VariableDeclarationListPath<'a>),
-    TypeAnnotation(TypeAnnotationParent<'a>),
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+    SelectionSlot(SelectionSlotPath<'a>),
 }
 ```
 
-`From` impls for the two new variants.
+After. Origin: those two listings. Delta: the `DeclaredVariable`, `TypeAnnotation`, and `NamedConstantObjectEntry` pins and leftover variants.
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+    self_type_generics = [
+        (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
+        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
+        (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
+        (<DeclaredVariable, UnparsedChunkItems>, VariableDeclarationListPath<'a>),
+        (<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>),
+        (<NamedConstantObjectEntry, UnparsedChunkItems>, ConstantObjectLiteralPath<'a>),
+    ]
+```
+
+```rust
+// from crates/isograph_parser/src/chunk.rs
+pub enum UnparsedChunkItemsParent<'a> {
+    IsoLiteralSlot(IsoLiteralSlotPath<'a>),
+    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    ObjectEntrySlot(ObjectEntrySlotPath<'a>),
+    SelectionSlot(SelectionSlotPath<'a>),
+    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
+    TypeAnnotationSlot(TypeAnnotationSlotPath<'a>),
+    NamedConstantObjectEntrySlot(NamedConstantObjectEntrySlotPath<'a>),
+}
+```
+
+`From` impls for the three new slot paths, matching the existing slot-path `From`s.
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<DeclaredVariable, UnparsedChunkItems>,
-    VariableDeclarationListPath<'a>,
->;
-
-pub type TypeAnnotationSlotPath<'a> =
-    PositionResolutionPath<&'a Slot<TypeAnnotation, UnparsedChunkItems>, TypeAnnotationParent<'a>>;
-
 impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
     fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
         IsographResolutionNode::VariableDeclarationSlot(path)
@@ -226,114 +314,329 @@ impl<'a> From<TypeAnnotationSlotPath<'a>> for IsographResolutionNode<'a> {
     TypeAnnotationSlot(TypeAnnotationSlotPath<'a>),
 ```
 
-The constant-object list adds its own path alias, `From`, and `ResolvedNode` variant when that type is named.
+## Change 4: `ConstantValue`
 
 `ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
 
+Integer, boolean, null, and string leaves appear under both value enums. Each leaf's parent becomes an enum of those two.
+
+Before:
+
 ```rust
 // from crates/isograph_parser/src/arguments.rs
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct StringLiteralValueWrapper(common_lang_types::StringLiteralValue);
+
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct IntegerValue(pub i64);
+
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct BooleanValue(pub Boolean);
+
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NullValue;
+```
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub enum FieldArgumentNameWrapperParent<'a> {
+    NamedArgument(NamedArgumentPath<'a>),
+    ObjectEntry(ObjectEntryPath<'a>),
+}
+
+pub enum NonConstantValue {
+    Variable(VariableUse),
+    String(StringLiteralValueWrapper),
+    Integer(IntegerValue),
+    Boolean(BooleanValue),
+    Null(NullValue),
+    Object(ObjectLiteral),
+}
+```
+
+After. Origin: those listings. Delta: leaf parents become two-variant enums; `NonConstantValue` variants take `#[parent_variant(NonConstant)]`; `FieldArgumentNameWrapperParent` gains `ConstantObjectEntry`.
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+#[resolve_position(parent_type = StringLiteralValueWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct StringLiteralValueWrapper(common_lang_types::StringLiteralValue);
+
+#[resolve_position(parent_type = IntegerValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct IntegerValue(pub i64);
+
+#[resolve_position(parent_type = BooleanValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct BooleanValue(pub Boolean);
+
+#[resolve_position(parent_type = NullValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NullValue;
+
+#[derive(Debug)]
+pub enum StringLiteralValueWrapperParent<'a> {
+    NonConstant(NonConstantValueParent<'a>),
+    Constant(ConstantValueParent<'a>),
+}
+
+#[derive(Debug)]
+pub enum IntegerValueParent<'a> {
+    NonConstant(NonConstantValueParent<'a>),
+    Constant(ConstantValueParent<'a>),
+}
+
+#[derive(Debug)]
+pub enum BooleanValueParent<'a> {
+    NonConstant(NonConstantValueParent<'a>),
+    Constant(ConstantValueParent<'a>),
+}
+
+#[derive(Debug)]
+pub enum NullValueParent<'a> {
+    NonConstant(NonConstantValueParent<'a>),
+    Constant(ConstantValueParent<'a>),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum NonConstantValue {
+    Variable(VariableUse),
+    #[parent_variant(NonConstant)]
+    String(StringLiteralValueWrapper),
+    #[parent_variant(NonConstant)]
+    Integer(IntegerValue),
+    #[parent_variant(NonConstant)]
+    Boolean(BooleanValue),
+    #[parent_variant(NonConstant)]
+    Null(NullValue),
+    Object(ObjectLiteral),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub enum ConstantValue {
+    #[parent_variant(Constant)]
+    String(StringLiteralValueWrapper),
+    #[parent_variant(Constant)]
+    Integer(IntegerValue),
+    #[parent_variant(Constant)]
+    Boolean(BooleanValue),
+    #[parent_variant(Constant)]
+    Null(NullValue),
+    Object(ConstantObjectLiteral),
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ConstantObjectLiteral(
+    #[resolve_field] pub Vec<WithSpan<Slot<NamedConstantObjectEntry, UnparsedChunkItems>>>,
+);
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = NamedConstantObjectEntrySlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct NamedConstantObjectEntry {
+    #[resolve_field]
+    #[parent_variant(ConstantObjectEntry)]
+    pub name: WithSpan<FieldArgumentNameWrapper>,
+    #[resolve_field]
+    #[parent_variant(ConstantObjectEntry)]
+    pub value: WithSpan<ConstantValue>,
+}
+
 #[derive(Debug)]
 pub enum ConstantValueParent<'a> {
     VariableDefault(DeclaredVariablePath<'a>),
     ConstantObjectEntry(Box<NamedConstantObjectEntryPath<'a>>),
 }
+
+#[derive(Debug)]
+pub enum FieldArgumentNameWrapperParent<'a> {
+    NamedArgument(NamedArgumentPath<'a>),
+    ObjectEntry(ObjectEntryPath<'a>),
+    ConstantObjectEntry(NamedConstantObjectEntryPath<'a>),
+}
+
+pub type ConstantObjectLiteralPath<'a> =
+    PositionResolutionPath<&'a ConstantObjectLiteral, ConstantValueParent<'a>>;
+
+pub type NamedConstantObjectEntrySlotPath<'a> = PositionResolutionPath<
+    &'a Slot<NamedConstantObjectEntry, UnparsedChunkItems>,
+    ConstantObjectLiteralPath<'a>,
+>;
+
+pub type NamedConstantObjectEntryPath<'a> = PositionResolutionPath<
+    &'a NamedConstantObjectEntry,
+    NamedConstantObjectEntrySlotPath<'a>,
+>;
 ```
 
-`ConstantValue` mirrors `NonConstantValue` without `Variable`. An object default uses `Slot<NamedConstantObjectEntry, UnparsedChunkItems>`.
+```rust
+// from crates/isograph_parser/src/arguments.rs
+impl<'a> From<NamedConstantObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: NamedConstantObjectEntrySlotPath<'a>) -> Self {
+        IsographResolutionNode::NamedConstantObjectEntrySlot(path)
+    }
+}
+```
+
+```rust
+// from crates/isograph_parser/src/isograph_resolution_node.rs
+    NamedConstantObjectEntrySlot(NamedConstantObjectEntrySlotPath<'a>),
+    ConstantObjectLiteral(ConstantObjectLiteralPath<'a>),
+    NamedConstantObjectEntry(NamedConstantObjectEntryPath<'a>),
+```
+
+Path aliases for the leaf-parent enums replace `NonConstantValueParent` on `StringLiteralValueWrapperPath`, `IntegerValuePath`, `BooleanValuePath`, and `NullValuePath`.
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub(crate) fn parse_constant_value(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<ConstantValue>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        if cursor
+            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .is_some()
+        {
+            return cursor.expected(Expectation::ConstantValue).wrap_err();
+        }
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        {
+            return ConstantValue::String(span.interned().map(StringLiteralValueWrapper).item)
+                .wrap_ok();
+        }
+        if let Some(span) =
+            cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
+        {
+            let value = match span.token_text().parse() {
+                Ok(value) => value,
+                Err(_) => {
+                    return ParseError::IntegerDoesNotFitI64
+                        .with_span(span.location)
+                        .wrap_err();
+                }
+            };
+            return ConstantValue::Integer(IntegerValue(value)).wrap_ok();
+        }
+        if let Some(span) = cursor.consume_token_if(
+            NonBracketTokenKind::Identifier,
+            SemanticToken::BooleanOrNull,
+        ) {
+            return match span.token_text() {
+                "true" => ConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
+                "false" => ConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
+                "null" => ConstantValue::Null(NullValue).wrap_ok(),
+                _ => ParseError::expected(
+                    Expectation::ConstantValue,
+                    Found::Token(NonBracketTokenKind::Identifier),
+                )
+                .with_span(span.location)
+                .wrap_err(),
+            };
+        }
+        if let Some(group) = cursor.consume_group_if(BracketKind::Brace, SemanticToken::Brace) {
+            let object = ConstantObjectLiteral(group.item.children.item.parse_each_chunk(
+                cursor,
+                Expectation::Separator(BracketKind::Brace),
+                parse_constant_object_entry,
+            ));
+            cursor.record_group_close(group.item, SemanticToken::Brace);
+            return ConstantValue::Object(object).wrap_ok();
+        }
+        cursor.expected(Expectation::ConstantValue).wrap_err()
+    })
+}
+
+fn parse_constant_object_entry(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<NamedConstantObjectEntry, WithSpan<ParseError>> {
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::ObjectKey)
+        .map_err(|()| cursor.expected(Expectation::ObjectEntry))?;
+    cursor
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
+    let value = parse_constant_value(cursor)?;
+    NamedConstantObjectEntry {
+        name: name.interned().map(FieldArgumentNameWrapper),
+        value,
+    }
+    .wrap_ok()
+}
+```
+
+The `$` arm consumes the dollar (so the span is the `$`) and then `expected(ConstantValue)`.
+
+## The parsers
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-pub(crate) fn consume_variable_declaration_list<F>(
+pub(crate) fn consume_variable_declaration_list(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Option<WithSpan<VariableDeclarationList>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
-    let group = cursor.consume_group_if(BracketKind::Parenthesis)?;
-    VariableDeclarationList(group.item.children.item.parse_chunk_item_list(
-        cursor.text(),
+) -> Option<WithSpan<VariableDeclarationList>> {
+    let group = cursor.consume_group_if(BracketKind::Parenthesis, SemanticToken::Parenthesis)?;
+    let list = VariableDeclarationList(group.item.children.item.parse_each_chunk(
+        cursor,
         Expectation::Separator(BracketKind::Parenthesis),
         parse_variable_declaration,
-        push_error,
-    ))
-    .with_span(group.location)
-    .wrap_some()
+    ));
+    cursor.record_group_close(group.item, SemanticToken::Parenthesis);
+    list.with_span(group.location).wrap_some()
 }
 
-fn parse_variable_declaration<F>(
+fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<DeclaredVariable, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<DeclaredVariable, WithSpan<ParseError>> {
     cursor
-        .require_token(NonBracketTokenKind::Dollar)
+        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
         .map_err(|()| cursor.expected(Expectation::VariableDeclaration))?;
     let name = cursor
-        .require_token(NonBracketTokenKind::Identifier)
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
-        .require_token(NonBracketTokenKind::Colon)
+        .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let type_annotation = parse_type_annotation(cursor, push_error)?;
-    let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals) {
-        Some(_) => parse_constant_value(cursor, push_error)?.wrap_some(),
+    let type_annotation = parse_type_annotation(cursor)?;
+    let default_value = match cursor.consume_token_if(NonBracketTokenKind::Equals, SemanticToken::Equals)
+    {
+        Some(_) => parse_constant_value(cursor)?.wrap_some(),
         None => None,
     };
     DeclaredVariable {
-        name: cursor
-            .token_text(name)
-            .intern()
-            .to::<VariableName>()
-            .with_span(name),
+        name: name.interned().map(VariableNameWrapper),
         type_annotation,
         default_value,
     }
     .wrap_ok()
 }
 
-pub(crate) fn parse_type_annotation<F>(
+pub(crate) fn parse_type_annotation(
     cursor: &mut ItemCursor<'_>,
-    push_error: &mut F,
-) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<WithSpan<TypeAnnotation>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
-        if let Some(name) = cursor.consume_token_if(NonBracketTokenKind::Identifier) {
-            cursor.consume_token_if(NonBracketTokenKind::Exclamation);
+        if let Some(name) =
+            cursor.consume_token_if(NonBracketTokenKind::Identifier, SemanticToken::GraphQLTypeName)
+        {
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::GraphQLTypeName);
             return TypeAnnotation::Named(NamedTypeAnnotation {
-                name: cursor
-                    .token_text(name)
-                    .intern()
-                    .to::<TypeName>()
-                    .with_span(name),
+                name: name.interned().map(TypeNameWrapper),
             })
             .wrap_ok();
         }
-        if let Some(group) = cursor.consume_group_if(BracketKind::Bracket) {
-            let inner = parse_bracket_interior_type(
-                cursor.text(),
-                group.item.children.reference(),
-                push_error,
-            )?;
-            cursor.consume_token_if(NonBracketTokenKind::Exclamation);
+        if let Some(group) =
+            cursor.consume_group_if(BracketKind::Bracket, SemanticToken::GraphQLTypeName)
+        {
+            let inner = parse_bracket_interior_type(cursor, group.item.children.reference())?;
+            cursor.record_group_close(group.item, SemanticToken::GraphQLTypeName);
+            cursor.consume_token_if(NonBracketTokenKind::Exclamation, SemanticToken::GraphQLTypeName);
             return TypeAnnotation::List(ListTypeAnnotation { inner }.boxed()).wrap_ok();
         }
         cursor.expected(Expectation::TypeAnnotation).wrap_err()
     })
 }
 
-fn parse_bracket_interior_type<F>(
-    text: &str,
+fn parse_bracket_interior_type(
+    cursor: &mut ItemCursor<'_>,
     level: &WithSpan<ChunkedLevel>,
-    push_error: &mut F,
-) -> Result<WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>, WithSpan<ParseError>>
-where
-    F: FnMut(WithSpan<ParseError>),
-{
+) -> Result<WithSpan<Slot<TypeAnnotation, UnparsedChunkItems>>, WithSpan<ParseError>> {
     if level.item.len() == 0 {
         return ParseError::expected(Expectation::TypeAnnotation, Found::EndOfChunk)
             .with_span(Span::new(level.location.end, level.location.end))
@@ -348,9 +651,8 @@ where
         .with_span(extra.location)
         .wrap_err();
     }
-    let singleton = parse_singleton(
+    let singleton = cursor.parse_singleton(
         level,
-        text,
         Expectation::EndOfType,
         |extra| {
             ParseError::expected(
@@ -359,16 +661,15 @@ where
             )
             .with_span(extra.location)
         },
-        |cursor, push_error| parse_type_annotation(cursor, push_error).map(|wrapped| wrapped.item),
-        push_error,
+        |cursor| parse_type_annotation(cursor).map(|wrapped| wrapped.item),
     );
     singleton.item.wrap_ok()
 }
 ```
 
-`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_chunk_item` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt.
+`parse_type_annotation` returns `WithSpan<TypeAnnotation>` via `spanning`. The singleton interior maps that to `TypeAnnotation`; `parse_one_chunk` spans the first-chunk attempt again. `ListTypeAnnotation.inner` is that attempt.
 
-`[Pet,]` is one chunk plus a boundary comma: `inner.item: Some(Pet)` plus `push_error(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
+`[Pet,]` is one chunk plus a boundary comma: `inner.item: Some(Pet)` plus `errors.push(Expected(EndOfType, Token(Comma)))` at the comma. The variable declaration parses.
 
 `[Pet\n!]` is two chunks. The type is `Err` at `!`. The enclosing variable declaration is `item: None`. The `!` does not attach to `Pet`.
 
@@ -383,14 +684,24 @@ Before:
 pub struct ClientFieldDeclaration {
     #[resolve_field]
     #[parent_variant(Field)]
-    pub parent_type: WithSpan<EntityName>,
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
     #[parent_variant(Field)]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    pub client_field_name: WithSpan<ClientFieldNameWrapper>,
     #[resolve_field]
     #[parent_variant(Field)]
     pub selection_set: WithSpan<SelectionSet>,
 }
+```
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    let selection_set = require_selection_set(cursor)?;
+    ClientFieldDeclaration {
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name.interned().map(ClientFieldNameWrapper),
+        selection_set,
+    }
 ```
 
 After:
@@ -400,10 +711,10 @@ After:
 pub struct ClientFieldDeclaration {
     #[resolve_field]
     #[parent_variant(Field)]
-    pub parent_type: WithSpan<EntityName>,
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
     #[parent_variant(Field)]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    pub client_field_name: WithSpan<ClientFieldNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
     #[resolve_field]
@@ -414,8 +725,14 @@ pub struct ClientFieldDeclaration {
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    let variable_definitions = consume_variable_declaration_list(cursor, push_error);
-    let selection_set = require_selection_set(cursor, push_error)?;
+    let variable_definitions = consume_variable_declaration_list(cursor);
+    let selection_set = require_selection_set(cursor)?;
+    ClientFieldDeclaration {
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name.interned().map(ClientFieldNameWrapper),
+        variable_definitions,
+        selection_set,
+    }
 ```
 
 `lib.rs` adds `mod variables;` and `pub use variables::*;`.
@@ -428,10 +745,10 @@ pub struct ClientFieldDeclaration {
     DeclaredVariable(DeclaredVariablePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
-    TypeName(TypeNamePath<'a>),
+    TypeNameWrapper(TypeNameWrapperPath<'a>),
 ```
 
-The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` expands like `SelectionSet`. `DeclaredVariable` like `NamedArgument`. `TypeAnnotation` like `NonConstantValue`. `TypeName` like `EntityName`.
+The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` expands like `SelectionSet`. `DeclaredVariable` like `NamedArgument`. `TypeAnnotation` like `NonConstantValue`. `TypeNameWrapper` like `EntityNameWrapper`.
 
 ## Tests
 
@@ -459,7 +776,10 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
         let variables = variables_of(parse.reference());
         assert_eq!(variables.item.0.len(), 1);
         let declared = as_declared(variables.item.0[0].item.reference());
-        assert_eq!(declared.name.item, "id".intern().to());
+        assert_eq!(
+            declared.name.item,
+            VariableNameWrapper("id".intern().to())
+        );
         assert_eq!(declared.name.location, span_of(text, "id"));
         match declared.type_annotation.item.reference() {
             TypeAnnotation::Named(named) => {
@@ -587,7 +907,7 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
         let text = "field Query.Foo($pets: [Pet]) { bar }";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Pet")) {
-            IsographResolutionNode::TypeName(name) => {
+            IsographResolutionNode::TypeNameWrapper(name) => {
                 let list = match name.parent.parent.reference() {
                     TypeAnnotationParent::List(list) => list.as_ref(),
                     parent => panic!("expected a list parent, got {parent:?}"),
@@ -602,8 +922,8 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
             node => panic!("expected the type name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "pets")) {
-            IsographResolutionNode::VariableName(name) => {
-                assert!(matches!(name.parent, VariableNameParent::Declaration(_)));
+            IsographResolutionNode::VariableNameWrapper(name) => {
+                assert!(matches!(name.parent, VariableNameWrapperParent::Declaration(_)));
             }
             node => panic!("expected the variable name leaf, got {node:?}"),
         }
@@ -620,10 +940,42 @@ The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` e
             node => panic!("expected the named type, got {node:?}"),
         }
     }
+
+    #[test]
+    fn a_variable_list_records_parens_dollar_name_colon_and_type() {
+        let text = "field Query.Foo($id: ID!) { bar }";
+        let (parse, errors, bracket_errors, comma_errors, tokens) = parsed_with_tokens(text);
+        assert!(bracket_errors.is_empty());
+        assert_eq!(comma_errors, vec![]);
+        let parse = parse.expect("the fixture is not an empty literal");
+        as_field(parse.reference());
+        assert_eq!(errors, vec![]);
+        assert_eq!(
+            tokens,
+            vec![
+                SemanticToken::Keyword.with_span(span_of(text, "field")),
+                SemanticToken::Type.with_span(span_of(text, "Query")),
+                SemanticToken::Period.with_span(span_of(text, ".")),
+                SemanticToken::FieldName.with_span(span_of(text, "Foo")),
+                SemanticToken::Parenthesis.with_span(span_of(text, "(")),
+                SemanticToken::Variable.with_span(span_of(text, "$")),
+                SemanticToken::Variable.with_span(span_of(text, "id")),
+                SemanticToken::Colon.with_span(span_of(text, ":")),
+                SemanticToken::GraphQLTypeName.with_span(span_of(text, "ID")),
+                SemanticToken::GraphQLTypeName.with_span(span_of(text, "!")),
+                SemanticToken::Parenthesis.with_span(span_of(text, ")")),
+                SemanticToken::Brace.with_span(span_of(text, "{")),
+                SemanticToken::FieldName.with_span(span_of(text, "bar")),
+                SemanticToken::Brace.with_span(span_of(text, "}")),
+            ],
+        );
+    }
 ```
+
+The resolve walk for `Pet` in `[Pet]`: `TypeNameWrapper` parent is `NamedTypeAnnotationPath`, whose parent is `TypeAnnotationParent::List`. `variable.inner` is `DeclaredVariable`; `DeclaredVariablePath` parent is the slot. `variable.inner.name` is still the name field.
 
 ## Landing checklist
 
 1. The `Box<T>` blanket; `cargo test -p resolve_position` passes.
-2. variables.rs, `ConstantValue`, the ClientFieldDeclaration slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
+2. `ItemCursor::buffers` / `parse_singleton`, variables.rs, `ConstantValue`, the ClientFieldDeclaration slot, the resolution-node variants, and the tests; `cargo test -p isograph_parser` and the clippy pre-commit hook pass.
 3. Move this doc to refactors/past.
