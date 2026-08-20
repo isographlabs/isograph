@@ -4,30 +4,9 @@ The parser is a four-stage pipeline (tokenize, match brackets, chunk, parse gram
 
 ## Bugs
 
-### Lexer: `1.5` is an integer, then rejected as overflow
+### Lexer: `1.5` is an integer, then rejected as overflow (fixed)
 
-`tokenize("1.5")` emits one `IntegerLiteral` spanning the whole `1.5`. Same for `12.34`, `0.0`, `-1.5`. `parse_integer_value` then does `span.text().parse::<i64>()`, which fails with invalid digit, and that failure is mapped to `IntegerDoesNotFitI64`.
-
-```rust
-// from crates/isograph_parser/src/arguments.rs
-fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<ParseError>> {
-    let span = cursor
-        .require_token(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::IntegerLiteral)))?;
-    match span.text().parse() {
-        Ok(value) => IntegerValue(value).wrap_ok(),
-        Err(_) => ParseError::IntegerDoesNotFitI64
-            .with_span(span.location)
-            .wrap_err(),
-    }
-}
-```
-
-`a: 1.5` therefore errors as "This integer does not fit in a 64-bit signed integer." `a_float_is_not_a_value` passes only because this path fails. The kind is wrong, the diagnostic is wrong, and `str::parse::<i64>` overflow and invalid-digit are collapsed into one error.
-
-`1e2` and `1.5e2` become a generic `Error` token. `1.` is `ErrorNumberLiteralTrailingInvalid`. `.5` is `ErrorFloatLiteralMissingZero`. Adjacent numeric regexes in `token_kind.rs` do not form a coherent DFA.
-
-The mental model has no float value, so rejecting floats is fine. Classifying them as integers and reporting overflow is not.
+The float regex is live. `1.5`, `12.34`, `0.0`, `-1.5`, `1e2`, and `1.5e2` are `FloatLiteral`. `parse_non_constant_value` does not match that kind, so `a: 1.5` is `Expected a value, found floating point value`. `IntegerDoesNotFitI64` is overflow of an integer token only. `1.` is still `ErrorNumberLiteralTrailingInvalid`. `.5` is still `ErrorFloatLiteralMissingZero`.
 
 ### Lexer: string failures do not produce the error kinds that exist, and they do not consume the body (fixed)
 
@@ -39,14 +18,9 @@ The mental model has no float value, so rejecting floats is fine. Classifying th
 
 `number_and_string_errors_are_their_kinds` passes. `an_unterminated_string_is_not_a_description` consumes the whole token.
 
-### Lexer: a control character inside a block string panics
+### Lexer: a control character inside a block string panics (fixed)
 
-```rust
-// from crates/isograph_parser/src/token_kind.rs
-            BlockStringToken::Error => unreachable!(),
-```
-
-`BlockStringToken::Other` is `[\u0009\u000A\u000D\u0020-\uFFFF]`. NUL and other C0 controls except tab/LF/CR hit `Error`. `tokenize` on a block string containing U+0000 panics. The crate rule is that the parser never panics on any input.
+`BlockStringToken::Error` is consumed like `Other`. A terminated block string containing U+0000 is `BlockStringLiteral`. An unterminated one is `ErrorUnterminatedBlockString`.
 
 ### Block strings are values in tests and in descriptions, not in `parse_non_constant_value` (fixed)
 
@@ -182,7 +156,7 @@ The public surface is the entire AST, chunker, tokenizer, `Slot`, `Singleton`, r
 
 ### Commented-out grammar in `token_kind.rs`
 
-Float, spread, comments, `Pipe`, `PeriodPeriod` sit as comments, plus `TODO don't skip comments and spaces`. The crate rule is that a comment must not describe what was not done. `observe_kinds` is the same residue in test form.
+Spread, comments, `Pipe`, `PeriodPeriod` sit as comments, plus `TODO don't skip comments and spaces`. The crate rule is that a comment must not describe what was not done. `observe_kinds` is the same residue in test form.
 
 ## Grammar sharp edges (tested, still wrong for a GraphQL-shaped language)
 
@@ -201,4 +175,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-The next work that actually changes outcomes is: make the lexer honest (block-string panic, numeric DFA), put `Null` on `TypeAnnotation`, and replace `Slot`'s two `Option`s with an enum.
+The next work that actually changes outcomes is: put `Null` on `TypeAnnotation`, and replace `Slot`'s two `Option`s with an enum.
