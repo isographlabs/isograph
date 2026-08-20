@@ -8,6 +8,7 @@ Walk-up is the babel plugin's walk, with two extra names. The babel plugin still
 
 ```
 $ cd app/src/components && isograph
+/Users/x/app/isograph.config.json started (pid 12345)
 $ isograph status
 /Users/x/app/isograph.config.json is running (pid 12345)
 $ isograph logs
@@ -173,6 +174,8 @@ impl App for Isograph {
 ```
 
 `IsographArgs` is deleted. The daemon still parks. `status` / `logs` / `stop` in a subdirectory find the right daemon because they go through `instance`.
+
+`start` prints `{config} started (pid …)` on stdout. Client tracing writes that same record to the log file. `run_daemon` writes `config` on `isograph daemon up` to the log file.
 
 The contents of the config file are not read.
 
@@ -413,6 +416,7 @@ struct Running<'a> {
     world: &'a World,
     cwd: PathBuf,
     config: Option<PathBuf>,
+    start_stdout: String,
 }
 
 impl World {
@@ -473,6 +477,7 @@ impl World {
             world: self,
             cwd: cwd.to_owned(),
             config: config.map(Path::to_owned),
+            start_stdout: stdout(output.reference()),
         }
     }
 
@@ -563,13 +568,23 @@ fn pid_from(output: &Output) -> u32 {
 fn start_then_status_reports_running_and_names_the_config() {
     let world = World::new();
     let (project, config) = world.project_with_json("app");
-    let _running = world.start(project.reference(), None);
+    let running = world.start(project.reference(), None);
+    let path = canonical(config.reference()).display().to_string();
+    assert!(
+        running.start_stdout.contains("started"),
+        "{}",
+        running.start_stdout
+    );
+    assert!(
+        running.start_stdout.contains(path.reference()),
+        "{}",
+        running.start_stdout
+    );
     let status = world.isograph(project.reference(), None, ["status"]);
     assert!(status.status.success());
     let text = stdout(status.reference());
-    let path = canonical(config.reference());
     assert!(text.contains("is running"), "{text}");
-    assert!(text.contains(&path.display().to_string()), "{text}");
+    assert!(text.contains(path.reference()), "{text}");
 }
 
 #[test]
