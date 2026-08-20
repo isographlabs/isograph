@@ -1,6 +1,6 @@
 # Parser review
 
-The parser is a four-stage pipeline (tokenize, match brackets, chunk, parse grammar) with real recovery and a large test suite. The grammar layer is in decent shape. The lexer and the type AST are not. `cargo test -p isograph_parser --lib` is red: 225 passed, 3 failed.
+The parser is a four-stage pipeline (tokenize, match brackets, chunk, parse grammar) with real recovery and a large test suite. The grammar layer is in decent shape. The lexer and the type AST are not. `cargo test -p isograph_parser --lib` is green.
 
 ## Bugs
 
@@ -29,36 +29,15 @@ fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, With
 
 The mental model has no float value, so rejecting floats is fine. Classifying them as integers and reporting overflow is not.
 
-### Lexer: string failures do not produce the error kinds that exist, and they do not consume the body
+### Lexer: string failures do not produce the error kinds that exist, and they do not consume the body (fixed)
 
-`ErrorUnterminatedString`, `ErrorUnsupportedStringCharacter`, and `ErrorUnterminatedBlockString` are variants with Display text. `lex_string` / `lex_block_string` never emit them. On failure they return `false`, so logos emits `Error` covering only the opener. The old `lexer.extras.error_token = ...` assignments are commented out.
+`lex_string` / `lex_block_string` bump through the body and set `lexer.extras.error_token`. `tokenize` takes that extras onto the `Error` logos emits.
 
-```rust
-// from crates/isograph_parser/src/token_kind.rs
-fn lex_string(lexer: &mut Lexer<'_, IsographLangTokenKind>) -> bool {
-    // ...
-            StringToken::LineTerminator => {
-                lexer.bump(string_lexer.span().start);
-                // lexer.extras.error_token = Some(IsographLangTokenKind::ErrorUnterminatedString);
-                return false;
-            }
-            // ...
-            StringToken::Error => {
-                // lexer.extras.error_token = Some(TokenKind::ErrorUnsupportedStringCharacter);
-                return false;
-            }
-    // ...
-    false
-}
-```
+- `"unterminated"` → one `ErrorUnterminatedString`
+- `"\"\\x\""` → one `ErrorUnsupportedStringCharacter`
+- unterminated `"""` → one `ErrorUnterminatedBlockString`
 
-Verified:
-
-- `"unterminated"` → `Error "\""` then `Identifier "unterminated"`
-- `"\"\\x\""` → `Error "\""` then `Error "\\"` then `Identifier "x"` then `Error "\""`
-- unterminated `"""` → `Error "\"\"\""` then the rest re-lexed as ordinary tokens
-
-`number_and_string_errors_are_their_kinds` expects `ErrorUnterminatedString` and fails. `an_unterminated_string_is_not_a_description` documents the actual (bad) recovery: only the opening quote is the error token.
+`number_and_string_errors_are_their_kinds` passes. `an_unterminated_string_is_not_a_description` consumes the whole token.
 
 ### Lexer: a control character inside a block string panics
 
@@ -69,9 +48,9 @@ Verified:
 
 `BlockStringToken::Other` is `[\u0009\u000A\u000D\u0020-\uFFFF]`. NUL and other C0 controls except tab/LF/CR hit `Error`. `tokenize` on a block string containing U+0000 panics. The crate rule is that the parser never panics on any input.
 
-### Block strings are values in tests and in descriptions, not in `parse_non_constant_value`
+### Block strings are values in tests and in descriptions, not in `parse_non_constant_value` (fixed)
 
-`consume_description` accepts `StringLiteral` or `BlockStringLiteral`. `parse_non_constant_value` only matches `StringLiteral`. `a: """hi"""` errors `Expected a value, found block string`. `a_block_string_is_a_value` fails. That is a split grammar, not a missing feature: the same token is a description and is not a value.
+`parse_non_constant_value` matches `StringLiteral` or `BlockStringLiteral`. `a: """hi"""` is a string value. `a_block_string_is_a_value` passes.
 
 ### `!` is consumed and dropped. Nullability is not in the tree
 
@@ -113,7 +92,7 @@ Callers must `tokenize` → `match_brackets` → `chunk` → `parse_iso_literal`
 
 ### Test suite is red on purpose in one case
 
-`tokenize::tests::observe_kinds` always `panic!`s with a dump. That is leftover instrumentation, not a test.
+`tokenize::tests::observe_kinds` is not in the tree.
 
 ## Invariants not encoded in types
 
@@ -155,7 +134,7 @@ Mental model is `BooleanValue { True, False }`. The parser has `enum Boolean { T
 
 ### Dead token kinds sit on every match
 
-`EndOfFile` is never emitted (`tokenize` stops at the last real token). `ErrorUnterminatedString`, `ErrorUnsupportedStringCharacter`, `ErrorUnterminatedBlockString` are never emitted. `NonBracketTokenKind` still carries all of them, so every `From` / `Display` / `SplitToken` match pretends they exist. `SemanticToken::Content` is never recorded. `Expectation::Description` and `Expectation::SelectionSet` exist only for Display tests.
+`EndOfFile` is never emitted (`tokenize` stops at the last real token). `NonBracketTokenKind` still carries it, so every `From` / `Display` / `SplitToken` match pretends it exists. `SemanticToken::Content` is never recorded. `Expectation::Description` and `Expectation::SelectionSet` exist only for Display tests.
 
 ### Wrapper interned keys have inconsistent visibility
 
@@ -222,4 +201,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-The next work that actually changes outcomes is: make the lexer honest (string errors, block-string panic, numeric DFA), put `Null` on `TypeAnnotation`, and replace `Slot`'s two `Option`s with an enum. The red tests are already pointing at the first of those.
+The next work that actually changes outcomes is: make the lexer honest (block-string panic, numeric DFA), put `Null` on `TypeAnnotation`, and replace `Slot`'s two `Option`s with an enum.
