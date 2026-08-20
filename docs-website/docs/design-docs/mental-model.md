@@ -2,7 +2,9 @@
 
 The schema is a graph. An entity is a node. A selectable is a named pointer from an entity to a wrapper of an entity.
 
-There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities. A GraphQL field and an iso `field` declaration are both selectable declarations. Each produces a selectable. A GraphQL `type` or `scalar` is an entity declaration. Iso `type` is future.
+There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities.
+
+Some entities and selectables come from upstream, for example a GraphQL schema. Others are defined in the project. A `SelectableDeclaration` (iso keyword `field`) defines a selectable in the project. An `EntityDeclaration` (iso keyword `type`, future) defines a named entity in the project.
 
 The building blocks are `Wrapper`, `Entity`, `EntityDeclaration`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
@@ -60,17 +62,17 @@ struct AnonymousEntity {
 }
 ```
 
-A named entity has a name such as `User`, `Query`, or `String`.
+A named entity has a name such as `User`, `Query`, or `String`. It may come from upstream or from an entity declaration.
 
-An anonymous entity is created by a selectable declaration with no `to` clause, for example `field Foo.Bar`. It has exactly one incoming selectable: the selectable that declaration declares. It has no name, so no other selectable declaration can point at it.
+An anonymous entity is created by a selectable declaration with no `to` clause, for example `field Foo.Bar`. It has exactly one incoming selectable: the selectable that declaration defines. It has no name, so no other selectable can point at it.
 
 `defined_by` is that unique incoming selectable. The selectable itself lives on the parent entity.
 
-A selectable declaration's parent is a named entity (`field User.Avatar`, `type User { name: String }`).
+A selectable declaration's parent is a named entity. That entity may be upstream (`field User.Avatar` where `User` comes from GraphQL) or from an entity declaration.
 
 ## EntityDeclaration
 
-Future. An `EntityDeclaration` produces a named `Entity`. Every named entity comes from exactly one entity declaration. Anonymous entities are not produced by an entity declaration; they are produced by a selectable declaration with no `to`. The iso keyword is `type`.
+Future. An `EntityDeclaration` defines a named entity in the project. The iso keyword is `type`. Upstream named entities are not entity declarations. GraphQL `type User` and `scalar ID` are upstream; they are not this form.
 
 ```rust
 struct EntityDeclaration {
@@ -82,23 +84,11 @@ struct EntityDeclaration {
 type Friend
 ```
 
-This declares the named entity `Friend`. A selectable declaration can point at it with `to Friend`.
-
-A GraphQL entity declaration:
-
-```graphql
-type User {
-  name: String!
-}
-
-scalar ID
-```
-
-`type User` declares `User`. `scalar ID` declares `ID`. The nested GraphQL fields are selectable declarations, not part of the entity declaration.
+This defines the named entity `Friend`. A selectable declaration can point at it with `to Friend`. Anonymous entities are not produced by an entity declaration; they are produced by a selectable declaration with no `to`.
 
 ## Selectable
 
-A selectable is a named pointer from an entity to a wrapper of an entity.
+A selectable is a named pointer from an entity to a wrapper of an entity. It may come from upstream or from a selectable declaration.
 
 ```rust
 struct Selectable {
@@ -115,7 +105,9 @@ Nested selections under a selection of this selectable are selections on the inn
 
 ## SelectableDeclaration
 
-A `SelectableDeclaration` produces a `Selectable`. Every selectable comes from exactly one declaration. Every declaration produces exactly one selectable. The iso keyword is `field`.
+A `SelectableDeclaration` defines a selectable in the project. The iso keyword is `field`. Upstream selectables are not selectable declarations. GraphQL fields are upstream; they are not this form.
+
+Every selectable declaration produces exactly one selectable. Not every selectable comes from a declaration.
 
 ```rust
 struct SelectableDeclaration {
@@ -130,17 +122,6 @@ struct SelectableDeclaration {
 If `to` is `None`, the declaration creates an anonymous entity and a selectable whose `target` is that entity (identity wrapper). If `to` is `Some(w)`, the declaration creates a selectable whose `target` is `w`. No new entity.
 
 The selection set, when present, selects selectables of `parent`. It is what the declaration reads. It does not declare selectables of the target.
-
-A GraphQL selectable declaration:
-
-```graphql
-type User {
-  name: String!
-  friends: [User!]!
-}
-```
-
-`User.name` has `to: String`. `User.friends` has `to: [User]`. There is no selection set on these declarations.
 
 An iso selectable declaration with no `to`:
 
@@ -207,7 +188,7 @@ struct Directive {
 }
 ```
 
-An argument definition is a name, a type, and an optional default. GraphQL writes it as `name: Type` on the field: `user(id: ID!)` defines `id` of type `ID`. Iso writes it as `$name: Type` on the selectable declaration: `field Query.HomePage($id: ID!)` defines `id` of type `ID`. The `$` is syntax. `$id: ID! = "x"` has a default.
+An argument definition is a name, a type, and an optional default. An upstream GraphQL field writes it as `name: Type`: `user(id: ID!)` defines `id` of type `ID`. A selectable declaration writes it as `$name: Type`: `field Query.HomePage($id: ID!)` defines `id` of type `ID`. The `$` is syntax. `$id: ID! = "x"` has a default.
 
 An argument is a `name: value` pair. The names are argument definitions of the selectable or directive being applied. A value is a variable or a literal. A variable names an argument of the enclosing selectable declaration.
 
@@ -261,9 +242,11 @@ entrypoint User.Avatar
 
 The entity does not have to be `Query`. `Query` is an ordinary named entity. Any entity that has the selectable can host an entrypoint.
 
-An entrypoint does not create a selectable. It marks one that a selectable declaration already declared.
+An entrypoint does not create a selectable. It marks one that already exists.
 
 ## Example
+
+Upstream GraphQL schema:
 
 ```graphql
 type Query {
@@ -279,6 +262,8 @@ type User {
 scalar ID
 scalar String
 ```
+
+In-project iso:
 
 ```text
 field User.Avatar {
@@ -297,22 +282,27 @@ field Query.HomePage($id: ID!) {
 entrypoint Query.HomePage
 ```
 
-Named entities: `Query`, `User`, `ID`, `String`.
+Named entities from upstream: `Query`, `User`, `ID`, `String`.
 
-Anonymous entities: the result of `User.Avatar`, the result of `Query.HomePage`. Each has one incoming selectable.
+Anonymous entities from in-project selectable declarations: the result of `User.Avatar`, the result of `Query.HomePage`. Each has one incoming selectable.
 
-Selectables:
+Selectables from upstream:
 
 ```text
 Query.user       ->  User | null
 User.id          ->  ID
 User.name        ->  String
 User.friends     ->  [User]
+```
+
+Selectables from in-project declarations:
+
+```text
 User.Avatar      ->  Avatar anonymous entity
 Query.HomePage   ->  HomePage anonymous entity
 ```
 
-Selectable declarations: the four GraphQL fields, plus the two iso fields. `Query.user` has argument definition `id: ID`. `Query.HomePage` has argument definition `$id: ID!`.
+`Query.user` has argument definition `id: ID`. `Query.HomePage` has argument definition `$id: ID!`.
 
 Selections inside `User.Avatar`: `name`.
 
