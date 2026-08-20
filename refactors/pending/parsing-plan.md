@@ -205,4 +205,6 @@ Later: `parse-arrays.md`. `[ ... ]` list values.
 
 Later: `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text into `IsoLiteralExtraction`.
 
+Later: `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
+
 Deferred: `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
