@@ -1,0 +1,18 @@
+[package]
+name = "isograph_extract_typescript"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+common_lang_types = { path = "../common_lang_types" }
+intern = { path = "../../relay-crates/intern" }
+isograph_compiler = { path = "../isograph_compiler" }
+isograph_parser = { path = "../isograph_parser" }
+prelude = { path = "../prelude" }
+regex = { workspace = true }
+span = { path = "../span" }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true
