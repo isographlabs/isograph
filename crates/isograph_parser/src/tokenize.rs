@@ -55,4 +55,93 @@ mod tests {
         assert_eq!(tokens[0].location, Span::new(2, 3));
         assert_eq!(tokens[1].location, Span::new(3, 5));
     }
+
+    #[test]
+    fn punctuation_and_sigils_are_their_kinds() {
+        let tokens = tokenize("$@:=!,");
+        let kinds: Vec<_> = tokens.iter().map(|token| token.item).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                IsographLangTokenKind::Dollar,
+                IsographLangTokenKind::At,
+                IsographLangTokenKind::Colon,
+                IsographLangTokenKind::Equals,
+                IsographLangTokenKind::Exclamation,
+                IsographLangTokenKind::Comma,
+            ]
+        );
+    }
+
+    #[test]
+    fn a_string_and_a_block_string_are_their_kinds() {
+        assert_eq!(
+            tokenize("\"hi\"")[0].item,
+            IsographLangTokenKind::StringLiteral
+        );
+        assert_eq!(
+            tokenize("\"\"")[0].item,
+            IsographLangTokenKind::StringLiteral
+        );
+        assert_eq!(
+            tokenize("\"\"\"hi\"\"\"")[0].item,
+            IsographLangTokenKind::BlockStringLiteral
+        );
+    }
+
+    #[test]
+    fn integers_are_their_kind() {
+        for text in ["0", "-0", "42", "-7", "9223372036854775807"] {
+            assert_eq!(
+                tokenize(text)[0].item,
+                IsographLangTokenKind::IntegerLiteral,
+                "for literal {text:?}"
+            );
+        }
+        assert_eq!(
+            tokenize("1.5")[0].item,
+            IsographLangTokenKind::IntegerLiteral
+        );
+    }
+
+    #[test]
+    fn brackets_are_their_kinds() {
+        let kinds: Vec<_> = tokenize("(){}[]").iter().map(|token| token.item).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                IsographLangTokenKind::OpenParenthesis,
+                IsographLangTokenKind::CloseParenthesis,
+                IsographLangTokenKind::OpenBrace,
+                IsographLangTokenKind::CloseBrace,
+                IsographLangTokenKind::OpenBracket,
+                IsographLangTokenKind::CloseBracket,
+            ]
+        );
+    }
+
+    #[test]
+    fn number_and_string_errors_are_their_kinds() {
+        assert_eq!(
+            tokenize("01")[0].item,
+            IsographLangTokenKind::ErrorNumberLiteralLeadingZero
+        );
+        assert_eq!(
+            tokenize(".5")[0].item,
+            IsographLangTokenKind::ErrorFloatLiteralMissingZero
+        );
+        assert_eq!(
+            tokenize("1.")[0].item,
+            IsographLangTokenKind::ErrorNumberLiteralTrailingInvalid
+        );
+        assert_eq!(tokenize("1e2")[0].item, IsographLangTokenKind::Error);
+        assert_eq!(tokenize("-")[0].item, IsographLangTokenKind::Error);
+        let unterminated = tokenize("\"unterminated");
+        assert_eq!(unterminated[0].item, IsographLangTokenKind::Error);
+        assert_eq!(unterminated[0].location, Span::new(0, 1));
+        assert_eq!(unterminated[1].item, IsographLangTokenKind::Identifier);
+        let block = tokenize("\"\"\"unterminated");
+        assert_eq!(block[0].item, IsographLangTokenKind::Error);
+        assert_eq!(block[1].item, IsographLangTokenKind::Identifier);
+    }
 }

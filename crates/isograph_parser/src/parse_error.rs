@@ -153,6 +153,71 @@ mod tests {
             Expectation::Separator(BracketKind::Parenthesis).to_string(),
             "a comma, a line break, or ')'",
         );
+        assert_eq!(
+            Expectation::OneOf(&[
+                Expectation::Keyword("to"),
+                Expectation::Description,
+                Expectation::SelectionSet,
+            ])
+            .to_string(),
+            "the keyword `to`, a description, or a selection set, like '{ id, name }'",
+        );
+        assert_eq!(Expectation::OneOf(&[]).to_string(), "one of");
+        assert_eq!(
+            Expectation::OneOf(&[Expectation::Description]).to_string(),
+            "a description",
+        );
+        assert_eq!(Expectation::Description.to_string(), "a description");
+        assert_eq!(
+            Expectation::SelectionSet.to_string(),
+            "a selection set, like '{ id, name }'",
+        );
+        assert_eq!(Expectation::Selection.to_string(), "a selection");
+        assert_eq!(
+            Expectation::Argument.to_string(),
+            "an argument, like 'id: $id'",
+        );
+        assert_eq!(
+            Expectation::Value.to_string(),
+            "a value, like $foo, 42, \"bar\", true, false, null, or an object literal",
+        );
+        assert_eq!(
+            Expectation::ObjectEntry.to_string(),
+            "an object entry, like 'id: 4'",
+        );
+        assert_eq!(
+            Expectation::VariableDeclarationOrUsage.to_string(),
+            "a variable declaration, like '$id: ID!'",
+        );
+        assert_eq!(
+            Expectation::TypeAnnotation.to_string(),
+            "a type, like 'String', 'String!', or '[String]'",
+        );
+        assert_eq!(Expectation::EndOfType.to_string(), "the end of the type");
+        assert_eq!(
+            Expectation::Separator(BracketKind::Brace).to_string(),
+            "a comma, a line break, or '}'",
+        );
+        assert_eq!(
+            Expectation::Separator(BracketKind::Bracket).to_string(),
+            "a comma, a line break, or ']'",
+        );
+    }
+
+    #[test]
+    fn parse_error_unit_variants_use_their_messages() {
+        assert_eq!(
+            ParseError::EmptyLiteral.to_string(),
+            "Expected a declaration. An isograph literal cannot be empty.",
+        );
+        assert_eq!(
+            ParseError::MultipleDeclarations.to_string(),
+            "Expected nothing after the declaration. Each literal holds exactly one declaration.",
+        );
+        assert_eq!(
+            ParseError::IntegerDoesNotFitI64.to_string(),
+            "This integer does not fit in a 64-bit signed integer.",
+        );
     }
 
     #[test]

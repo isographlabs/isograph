@@ -892,4 +892,218 @@ mod tests {
             value => panic!("expected a list argument, got {value:?}"),
         }
     }
+
+    #[test]
+    fn integer_underflow_is_a_typed_error_on_that_pair() {
+        let text = "a: -99999999999999999999, b: 1";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        as_argument(items[1].item.reference());
+        assert!(errors.iter().any(|error| {
+            error.item == ParseError::IntegerDoesNotFitI64
+                && error.location == span_of(text, "-99999999999999999999")
+        }));
+    }
+
+    #[test]
+    fn zero_parses_as_an_integer() {
+        let text = "a: 0";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(0))
+        ));
+    }
+
+    #[test]
+    fn i64_min_parses() {
+        let text = "a: -9223372036854775808";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(i64::MIN))
+        ));
+    }
+
+    #[test]
+    fn a_leading_zero_integer_is_not_a_value() {
+        let text = "a: 01";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::ErrorNumberLiteralLeadingZero),
+                )
+                && error.location == span_of(text, "01")
+        }));
+    }
+
+    #[test]
+    fn a_float_does_not_fit_i64() {
+        let text = "a: 1.5";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item == ParseError::IntegerDoesNotFitI64 && error.location == span_of(text, "1.5")
+        }));
+    }
+
+    #[test]
+    fn an_empty_object_is_a_value() {
+        let text = "input: {}";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::Object(object) => assert_eq!(object.0.len(), 0),
+            value => panic!("expected an object, got {value:?}"),
+        }
+    }
+
+    #[test]
+    fn a_block_string_is_not_a_value() {
+        let text = "a: \"\"\"hi\"\"\"";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Value,
+                    Found::Token(NonBracketTokenKind::BlockStringLiteral),
+                )
+                && error.location == span_of(text, "\"\"\"hi\"\"\"")
+        }));
+    }
+
+    #[test]
+    fn i64_max_parses() {
+        let text = "a: 9223372036854775807";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(i64::MAX))
+        ));
+    }
+
+    #[test]
+    fn negative_zero_parses_as_zero() {
+        let text = "a: -0";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::Integer(IntegerValue(0))
+        ));
+    }
+
+    #[test]
+    fn an_empty_string_is_a_value() {
+        let text = "a: \"\"";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors, vec![]);
+        assert!(matches!(
+            as_argument(items[0].item.reference()).value.item,
+            NonConstantValue::String(_)
+        ));
+    }
+
+    #[test]
+    fn a_colon_without_a_value_fails_that_pair() {
+        let text = "a:";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        let colon_end = span_of(text, ":").end;
+        assert!(errors.iter().any(|error| {
+            error.item == ParseError::expected(Expectation::Value, Found::EndOfChunk)
+                && error.location == Span::new(colon_end, colon_end)
+        }));
+    }
+
+    #[test]
+    fn a_dollar_without_a_name_is_not_a_value() {
+        let text = "a: $";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        let dollar_end = span_of(text, "$").end;
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::Token(NonBracketTokenKind::Identifier),
+                    Found::EndOfChunk,
+                )
+                && error.location == Span::new(dollar_end, dollar_end)
+        }));
+    }
+
+    #[test]
+    fn a_paren_group_is_not_a_value() {
+        let text = "a: (x)";
+        let (items, errors, _) = parsed_pairs(text);
+        assert!(items[0].item.item.is_none());
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(Expectation::Value, Found::Group(BracketKind::Parenthesis))
+                && error.location == span_of(text, "(x)")
+        }));
+    }
+
+    #[test]
+    fn a_non_integer_number_is_not_a_value() {
+        for (text, found, pattern) in [
+            (
+                "a: .5",
+                Found::Token(NonBracketTokenKind::ErrorFloatLiteralMissingZero),
+                ".5",
+            ),
+            (
+                "a: 1.",
+                Found::Token(NonBracketTokenKind::ErrorNumberLiteralTrailingInvalid),
+                "1.",
+            ),
+            ("a: 1e2", Found::Token(NonBracketTokenKind::Error), "1e2"),
+        ] {
+            let (items, errors, _) = parsed_pairs(text);
+            assert!(items[0].item.item.is_none(), "for literal {text:?}");
+            assert!(
+                errors.iter().any(|error| {
+                    error.item == ParseError::expected(Expectation::Value, found)
+                        && error.location == span_of(text, pattern)
+                }),
+                "for literal {text:?}, errors were {errors:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn an_object_entry_that_does_not_start_with_a_name_fails_that_entry() {
+        let text = "input: { 1: 2 }";
+        let (items, errors, _) = parsed_pairs(text);
+        assert_eq!(errors.len(), 1);
+        match as_argument(items[0].item.reference())
+            .value
+            .item
+            .reference()
+        {
+            NonConstantValue::Object(object) => {
+                assert!(object.0[0].item.item.is_none());
+            }
+            value => panic!("expected an object, got {value:?}"),
+        }
+        assert!(errors.iter().any(|error| {
+            error.item
+                == ParseError::expected(
+                    Expectation::ObjectEntry,
+                    Found::Token(NonBracketTokenKind::IntegerLiteral),
+                )
+                && error.location == span_of(text, "1")
+        }));
+    }
 }
