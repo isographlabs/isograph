@@ -1,12 +1,34 @@
 # Leftover semantic tokens
 
-`Slot.extra` and `Singleton.extra_chunks` get `leftover_token`. Grammar consume still names the role. Cut unmatched brackets stay `BracketError` until semantic-tokens.md leftover fill-in walks `tokenize`.
+Leftover that the grammar did not consume is highlighted by walking the tree fields that hold it. `Slot.extra` holds unread remainder of a chunk and, after leftover-in-extra.md, a singleton's trailing separator. `Singleton.extra_chunks` holds whole extra chunks after the first. After the grammar parse of a chunk returns, this change records a semantic token for each leftover token in those fields.
 
-Depends on leftover-in-extra.md and parse-iso-literal-entry.md. leftover-in-extra puts trailing separators and unread remainder in extra. `extra_chunks` is already in `parse_singleton`. Combined `parse_iso_literal` is the test entry. Does not depend on four-trees.md or type-annotation-null.md.
+When the grammar consumes a token, it records the role the call site names (`Keyword`, `Type`, `FieldName`, and the rest). Leftover uses `leftover_token`, which maps a token kind to `Content`, `Integer`, `String`, `Error`, or `Bracket`.
 
-Extracted from semantic-tokens.md leftover fill-in (`leftover_token` and the Content / Integer / String / Error / Bracket facts). Delta: leftover fill-in for extra and extra_chunks walks `Slot.extra` and `Singleton.extra_chunks`, not `tokenize`. `leftover_token` is `pub(crate)` so `chunk.rs` can call it. semantic-tokens.md leftover fill-in remains a walk of `tokenize` for the matcher's cut.
+Unmatched brackets that the matcher cut never enter a chunk. They remain `BracketError` on the pipeline error list. They get a semantic token when semantic-tokens.md leftover fill-in walks `tokenize`.
 
-`$` is `Content`. `asdf` is `Content`. A leftover `{ bar }` records `Bracket` on `{` and `}`, `Content` on `bar`. Record only spans not already in `tokens` (a failed chunk may clone contents that the prefix already committed as `Keyword`).
+## What the user sees
+
+`entrypoint Query.foo bar` highlights `entrypoint` as Keyword, `Query` as Type, `.` as Period, `foo` as FieldName, and `bar` as Content.
+
+`entrypoint $ $` highlights `entrypoint` as Keyword and each `$` as Content.
+
+`entrypoint Query.foo,` highlights the comma as Content.
+
+`entrypoint\nasdf` highlights `asdf` as Content.
+
+`fieldd Query.foo { bar }` highlights `fieldd` as Keyword, `Query` / `.` / `foo` / `bar` as Content, and `{` `}` as Bracket.
+
+`$` is Content. `asdf` is Content. A leftover `{ bar }` records Bracket on `{` and `}`, Content on `bar`. Leftover never records `Type`.
+
+## Dependencies
+
+This change depends on leftover-in-extra.md, which puts trailing separators and unread remainder in `Slot.extra`. Tests call `parse_iso_literal` (parse-iso-literal-entry.md). `parse_singleton` already builds `extra_chunks`. This change does not depend on four-trees.md or type-annotation-null.md.
+
+## Extraction
+
+Extracted from semantic-tokens.md leftover fill-in: `leftover_token` and the facts that leftover identifiers and punctuation are `Content`, leftover integers are `Integer`, leftover strings are `String`, leftover error tokens are `Error`, leftover brackets are `Bracket`, and line breaks and EOF record nothing.
+
+The delta from that extraction is that leftover fill-in for extra and extra_chunks walks `Slot.extra` and `Singleton.extra_chunks`, not `tokenize`. `leftover_token` is `pub(crate)` so `chunk.rs` can call it. The leftover fill-in that remains in semantic-tokens.md is still a walk of `tokenize`, covering the matcher's cut.
 
 ## `leftover_token`
 
@@ -31,7 +53,12 @@ pub(crate) fn leftover_token(kind: SplitToken) -> Option<SemanticToken> {
 }
 ```
 
-Not on the crate surface.
+The function is `pub(crate)`.
+
+```rust
+// from crates/isograph_parser/src/lib.rs
+pub(crate) use semantic_token::leftover_token;
+```
 
 Facts:
 
@@ -41,6 +68,8 @@ Facts:
 - `leftover_token` on `LineBreak` and `EndOfFile` is `None`.
 
 ## Record leftover
+
+The walkers push a leftover role for each span that is not already in `tokens`. A failed chunk may clone contents that the prefix already committed. `entrypoint Query.` consumes every content item, then fails; leftover-in-extra.md puts the whole contents in extra, including `entrypoint` / `Query` / `.` which the grammar already recorded as `Keyword` / `Type` / `Period`. `record_leftover_span` skips a span that is already in `tokens`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -104,13 +133,13 @@ fn record_leftover_span(
 }
 ```
 
-`record_leftover_chunk` walks `contents`. leftover-in-extra.md folds a singleton trailing separator into extra as `NonBracket` items, so walking extra covers that comma. extra_chunks keep their trailing separator on the chunk; leftover fill-in does not walk it (`LineBreak` is `None` anyway).
+`record_leftover_chunk` walks `chunk.contents`. leftover-in-extra.md folds a singleton trailing separator into extra as `ChunkContentItem::NonBracket` items, so walking extra records that comma. Extra chunks keep their trailing separator on the chunk; `record_leftover_chunk` walks those chunks' `contents`. A trailing line break maps to `None` from `leftover_token`.
 
-`chunk.rs` imports `leftover_token`, `SplitToken`, and `BracketToken`.
+`chunk.rs` adds `leftover_token`, `SplitToken`, and `BracketToken` to its `use crate::{...}` list. `SplitToken` and `BracketToken` are already `pub(crate)` from `lib.rs`.
 
 ## `parse_one_chunk` records extra
 
-After leftover-in-extra.md's `parse_one_chunk` (extra is unread remainder, and on a leftover that is not `Separator(_)` the trailing separator tokens):
+leftover-in-extra.md's `parse_one_chunk` returns a `Slot`. `extra` is unread remainder, and, when leftover is not `Expectation::Separator(_)`, the trailing separator tokens. That function returns the `Slot` from its `match result`. This change binds the match to `slot`, records leftover on `extra`, and returns `slot`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
@@ -128,6 +157,8 @@ After leftover-in-extra.md's `parse_one_chunk` (extra is unread remainder, and o
 `parse_each_chunk` goes through `parse_one_chunk`. Leftover in a list item (`foo bar`, a failed `.` chunk) is extra and is recorded here.
 
 ## `parse_singleton` records extra_chunks
+
+`parse_singleton` already builds `extra_chunks` from chunks after the first. After that value is built, this change walks each extra chunk and records leftover on its contents.
 
 Before:
 
@@ -169,6 +200,8 @@ After:
 `entrypoint\nasdf`: chunk 0 is `entrypoint` (fails), chunk 1 is `asdf` in `extra_chunks`, `asdf` is `Content`.
 
 ## Tests
+
+This change renames `leftover_after_an_entrypoint_is_not_recorded` to `leftover_after_an_entrypoint_is_content`. The committed prefix stays `Keyword` / `Type` / `Period` / `FieldName`. `bar` is `Content`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -247,9 +280,7 @@ After:
     }
 ```
 
-`leftover_after_an_entrypoint_is_not_recorded` becomes `leftover_after_an_entrypoint_is_content`.
-
-Exact token vecs that currently stop at the committed prefix gain leftover roles:
+The token vecs on `a_failed_prefix_keeps_the_tokens_it_committed` and the unknown-keyword test gain leftover roles. `entrypoint Foo.$ asdf` keeps `Keyword` / `Type` / `Period` on the consumed prefix and records `Content` on `$` and `asdf`. `fieldd Query.foo { bar }` still records `Keyword` at `fieldd`. The rest of that chunk is leftover: `Query`, `.`, `foo`, and `bar` are `Content`; `{` and `}` are `Bracket`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -295,7 +326,7 @@ Exact token vecs that currently stop at the committed prefix gain leftover roles
     }
 ```
 
-`Type` is not used on leftover. `an_unknown_keyword_records_keyword_at_that_identifier` still records `Keyword` at `fieldd`.
+List leftover is extra on the slot `parse_one_chunk` already built. `foo bar` keeps `FieldName` on `foo` and records `Content` on `bar`. `.\nfoo` records `Content` on the failed `.` and `FieldName` on `foo`.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
