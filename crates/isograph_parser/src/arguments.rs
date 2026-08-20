@@ -5,8 +5,8 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    BracketKind, Expectation, Found, IsographResolutionNode, NonBracketTokenKind, ParseError,
-    SelectionPath, SemanticToken, Slot, UnparsedChunkItems,
+    BracketKind, ChunkContentItem, Expectation, Found, IsographResolutionNode, NonBracketToken,
+    NonBracketTokenKind, ParseError, SelectionPath, SemanticToken, Slot, UnparsedChunkItems,
 };
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -219,60 +219,70 @@ pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithS
     )
 }
 
-pub(crate) fn parse_non_constant_value(
+pub(crate) fn parse_variable_name(
     cursor: &mut ItemCursor<'_>,
-) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
-    cursor.spanning(|cursor| {
-        if cursor
-            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-            .is_some()
-        {
-            let name = cursor
-                .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
-                .map_err(|()| {
-                    cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
-                })?;
-            return NonConstantValue::Variable(VariableUse(
-                name.interned().map(VariableNameWrapper),
-            ))
-            .wrap_ok();
-        }
-        if let Some(span) =
-            cursor.consume_token_if(NonBracketTokenKind::StringLiteral, SemanticToken::String)
-        {
-            return NonConstantValue::String(span.interned().map(StringLiteralValueWrapper).item)
-                .wrap_ok();
-        }
-        if let Some(span) =
-            cursor.consume_token_if(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
-        {
-            let value = match span.text().parse() {
-                Ok(value) => value,
-                Err(_) => {
-                    return ParseError::IntegerDoesNotFitI64
-                        .with_span(span.location)
-                        .wrap_err();
-                }
-            };
-            return NonConstantValue::Integer(IntegerValue(value)).wrap_ok();
-        }
-        if let Some(span) = cursor.consume_token_if(
+    missing_dollar: Expectation,
+) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
+    cursor
+        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(missing_dollar))?;
+    let name = cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    name.interned().map(VariableNameWrapper).wrap_ok()
+}
+
+fn parse_string_literal(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<StringLiteralValueWrapper, WithSpan<ParseError>> {
+    let span = cursor
+        .require_token(NonBracketTokenKind::StringLiteral, SemanticToken::String)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::StringLiteral)))?;
+    span.interned()
+        .map(StringLiteralValueWrapper)
+        .item
+        .wrap_ok()
+}
+
+fn parse_integer_value(cursor: &mut ItemCursor<'_>) -> Result<IntegerValue, WithSpan<ParseError>> {
+    let span = cursor
+        .require_token(NonBracketTokenKind::IntegerLiteral, SemanticToken::Integer)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::IntegerLiteral)))?;
+    match span.text().parse() {
+        Ok(value) => IntegerValue(value).wrap_ok(),
+        Err(_) => ParseError::IntegerDoesNotFitI64
+            .with_span(span.location)
+            .wrap_err(),
+    }
+}
+
+fn parse_boolean_or_null(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<NonConstantValue, WithSpan<ParseError>> {
+    let span = cursor
+        .require_token(
             NonBracketTokenKind::Identifier,
             SemanticToken::BooleanOrNull,
-        ) {
-            return match span.text() {
-                "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
-                "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
-                "null" => NonConstantValue::Null(NullValue).wrap_ok(),
-                _ => ParseError::expected(
-                    Expectation::Value,
-                    Found::Token(NonBracketTokenKind::Identifier),
-                )
-                .with_span(span.location)
-                .wrap_err(),
-            };
-        }
-        if let Some(object) = cursor.consume_group_if(
+        )
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    match span.text() {
+        "true" => NonConstantValue::Boolean(BooleanValue(Boolean::True)).wrap_ok(),
+        "false" => NonConstantValue::Boolean(BooleanValue(Boolean::False)).wrap_ok(),
+        "null" => NonConstantValue::Null(NullValue).wrap_ok(),
+        _ => ParseError::expected(
+            Expectation::Value,
+            Found::Token(NonBracketTokenKind::Identifier),
+        )
+        .with_span(span.location)
+        .wrap_err(),
+    }
+}
+
+fn parse_object_literal(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<ObjectLiteral, WithSpan<ParseError>> {
+    let object = cursor
+        .require_group(
             BracketKind::Brace,
             SemanticToken::Brace,
             |cursor, children| {
@@ -282,8 +292,42 @@ pub(crate) fn parse_non_constant_value(
                     parse_object_entry,
                 ))
             },
-        ) {
-            return NonConstantValue::Object(object.item).wrap_ok();
+        )
+        .map_err(|()| cursor.expected(Expectation::Value))?;
+    object.item.wrap_ok()
+}
+
+pub(crate) fn parse_non_constant_value(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        match cursor.peek().map(|peek| peek.view().item.reference()) {
+            Some(ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar))) => {
+                return NonConstantValue::Variable(VariableUse(parse_variable_name(
+                    cursor,
+                    Expectation::Token(NonBracketTokenKind::Dollar),
+                )?))
+                .wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::StringLiteral,
+            ))) => {
+                return NonConstantValue::String(parse_string_literal(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::IntegerLiteral,
+            ))) => {
+                return NonConstantValue::Integer(parse_integer_value(cursor)?).wrap_ok();
+            }
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::Identifier,
+            ))) => {
+                return parse_boolean_or_null(cursor);
+            }
+            Some(ChunkContentItem::Group(group)) if group.opening.item.0 == BracketKind::Brace => {
+                return NonConstantValue::Object(parse_object_literal(cursor)?).wrap_ok();
+            }
+            _ => {}
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
