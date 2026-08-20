@@ -128,7 +128,7 @@ pub type IsoLiteralParsePath<'a> = PositionResolutionPath<&'a IsoLiteralParse, (
     on_unmatched_span = from_path,
     pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
     ]
 )]
@@ -167,7 +167,7 @@ pub struct ExtraChunks(
 );
 ```
 
-Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`). `#[parent_from]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
+Bare `#[resolve_field]` on `item` passes `self.path(parent)`, a path to this `Slot`. `T::Parent` is that path. `on_unmatched_span = from_path` makes the unmatched-span arm `self.path(parent).to()`. Each pin's `From` builds that pin's `ResolvedNode` variant (`IsoLiteralSlot`, `SelectionFieldArgumentSlot`, `ObjectEntrySlot`). `#[parent_from]` on `extra_tokens` passes `From::from(self.path(parent))`. Leftover's parent is an enum of those slot paths. A position in leftover walks `extra_tokens`. A position in the slot span but in neither field answers that `Slot<T, E>`'s `ResolvedNode` variant. `{ item: None, extra_tokens: None }` is the same arm.
 
 Leftover span is tight to the leftover tokens. The gap after the item is a third region: the slot leaf.
 
@@ -178,7 +178,7 @@ Each list that stores a `Slot` appends a pin, a `ResolvedNode` variant whose pay
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
 }
 
@@ -191,9 +191,9 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<NamedArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::NamedArgumentSlot(path)
+impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::SelectionFieldArgumentSlot(path)
     }
 }
 
@@ -204,9 +204,9 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for UnparsedChunkItemsParent<'a> {
 }
 ```
 
-`IsoLiteralItem`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `NamedArgument`'s `parent_type` is `NamedArgumentSlotPath<'a>`. `ObjectEntry`'s `parent_type` is `ObjectEntrySlotPath<'a>`.
+`IsoLiteralItem`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `EntrypointDeclaration`'s `parent_type` is `IsoLiteralSlotPath<'a>`. `SelectionFieldArgument`'s `parent_type` is `SelectionFieldArgumentSlotPath<'a>`. `ObjectEntry`'s `parent_type` is `ObjectEntrySlotPath<'a>`.
 
-`Singleton` at the root stays pinned (`pins` as above). parse-variables.md adds a generic `Singleton` impl when `[...]` stores one.
+`Singleton` at the root stays pinned (`pins` as above). parse-variables.md calls `parse_nested_singleton` for `[...]` and stores the item and leftover on `ListTypeAnnotation`; it does not pin `Singleton` a second time.
 
 `item: None` and `extra_tokens: None` together is representable and never constructed.
 
@@ -294,11 +294,11 @@ A group plus its interior is `consume_group_if` or `require_group` with a functi
 
 When the next item may start several forms, the parse function is a `consume_*` ladder. The last arm is `expected`. If those arms are one value, the ladder is inside `spanning`. An arm that has taken its first item continues with `require_*` / `consume_*`.
 
-`parse_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
+`parse_non_constant_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
-pub(crate) fn parse_value(
+pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
@@ -545,8 +545,8 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 Each grammar feature lands on this surface.
 
 - generic-slot.md: one `ResolvePosition` impl per `Slot<T, E>` pin, `on_unmatched_span = from_path`, one `ResolvedNode` variant per pin
-- from-container-parent-field.md: `#[from_container_parent]` on a struct field
-- parse-arguments.md: `Separator(BracketKind)`, the `NamedArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `parse_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
+- from-container-parent-field.md: `#[parent_from]` on a struct field
+- parse-arguments.md: `Separator(BracketKind)`, the `SelectionFieldArgument` and `ObjectEntry` pins, `UnparsedChunkItemsParent`, `parse_non_constant_value`, `IntegerDoesNotFitI64`, `BooleanValue(Boolean::{True, False})`
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `ConstantValue`, `parse_constant_value`, `Box<T>` delegation in `resolve_position`
