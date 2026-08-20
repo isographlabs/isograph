@@ -115,6 +115,19 @@ The vec row is `WithGenericLocation::new(UnionVariant::Null(NullTypeAnnotation),
 The derive emits `From<UnionTypeAnnotationPath<'a>> for IsographResolutionNode<'a>`. Do not write that `From`.
 
 ```rust
+// from crates/isograph_parser/src/lib.rs
+pub use variables::{
+    ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,
+    NullTypeAnnotation, NullTypeAnnotationPath, TypeAnnotation, TypeAnnotationParent,
+    UnionTypeAnnotation, UnionTypeAnnotationPath, UnionVariant, VariableDeclaration,
+    VariableDeclarationList, VariableDeclarationListPath, VariableDeclarationPath,
+    VariableDeclarationSlotPath,
+};
+```
+
+Before: no `UnionTypeAnnotation`, `UnionTypeAnnotationPath`, or `UnionVariant`. `NullTypeAnnotation` and `NullTypeAnnotationPath` stay; the ZST still has a path for `from_path`.
+
+```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
     ListTypeAnnotationPath, NamedTypeAnnotationPath, NonBracketTokenPath, NullValuePath,
     ObjectEntryPath, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracketPath,
@@ -263,6 +276,26 @@ enum Wrapper {
 `List` is `[W]`. `Union([W, Null])` is `W | null`. Schema types are not located.
 
 ```text
+Foo
+Union([Foo, Null])
+[Foo]
+[Union([Foo, Null])]
+Union([[Foo], Null])
+```
+
+Before:
+
+```text
+Foo
+Foo | null
+[Foo]
+[Foo | null]
+[Foo] | null
+```
+
+A GraphQL type annotation is a wrapper:
+
+```text
 Foo!      ->  Entity(Foo)
 Foo       ->  Union([Entity(Foo), Null])
 [Foo!]!   ->  List(Entity(Foo))
@@ -279,8 +312,6 @@ Foo       ->  Foo | null
 [Foo!]!   ->  [Foo]
 [Foo]     ->  [Foo | null] | null
 ```
-
-and `Null` is `W | null`.
 
 Selectable example `to User`:
 
@@ -483,51 +514,157 @@ Before, `a_list_target_maps_graphql_nullability`:
             annotation => panic!("expected Null list, got {annotation:?}"),
 ```
 
-`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`: `$x: ID` is `Union([Named(ID), Null])` with `Null` at `None`.
+`a_variable_type_without_bang_is_null_wrapped` becomes `a_variable_type_without_bang_is_a_union_with_null`.
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        match declared.type_.item.reference() {
+            TypeAnnotation::Union(union) => {
+                assert_eq!(union.0.len(), 2);
+                assert!(matches!(union.0[0].item, UnionVariant::Named(_)));
+                assert!(matches!(union.0[1].item, UnionVariant::Null(NullTypeAnnotation)));
+                assert_eq!(union.0[1].location, None);
+            }
+            annotation => panic!("expected Union, got {annotation:?}"),
+        }
+```
+
+Before: `TypeAnnotation::Null` wrapping `Named`.
 
 `a_nested_list_target_wraps_null_at_every_layer` becomes `a_nested_list_target_is_a_union_at_every_layer`. `[[Pet]]` is `Union([List(Union([List(Union([Named(Pet), Null])), Null])), Null])`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
         match target.item.reference() {
-            TypeAnnotation::Union(outer) => match outer.0[0].item.reference() {
-                UnionVariant::List(list) => {
-                    let inner = list.inner.as_ref().expect("the list holds a type");
-                    assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+            TypeAnnotation::Union(outer) => {
+                assert_eq!(outer.0.len(), 2);
+                match outer.0[0].item.reference() {
+                    UnionVariant::List(outer_list) => {
+                        let mid = outer_list
+                            .inner
+                            .as_ref()
+                            .expect("the outer list holds a type");
+                        match mid.item.reference() {
+                            TypeAnnotation::Union(mid_union) => {
+                                assert_eq!(mid_union.0.len(), 2);
+                                match mid_union.0[0].item.reference() {
+                                    UnionVariant::List(inner_list) => {
+                                        let elem = inner_list
+                                            .inner
+                                            .as_ref()
+                                            .expect("the inner list holds a type");
+                                        match elem.item.reference() {
+                                            TypeAnnotation::Union(elem_union) => {
+                                                assert_eq!(elem_union.0.len(), 2);
+                                                assert!(matches!(
+                                                    elem_union.0[0].item,
+                                                    UnionVariant::Named(_)
+                                                ));
+                                                assert!(matches!(
+                                                    elem_union.0[1].item,
+                                                    UnionVariant::Null(NullTypeAnnotation)
+                                                ));
+                                                assert_eq!(elem_union.0[1].location, None);
+                                            }
+                                            annotation => {
+                                                panic!("expected Union named, got {annotation:?}")
+                                            }
+                                        }
+                                    }
+                                    variant => panic!("expected inner List, got {variant:?}"),
+                                }
+                                assert!(matches!(
+                                    mid_union.0[1].item,
+                                    UnionVariant::Null(NullTypeAnnotation)
+                                ));
+                                assert_eq!(mid_union.0[1].location, None);
+                            }
+                            annotation => {
+                                panic!("expected Union around inner List, got {annotation:?}")
+                            }
+                        }
+                    }
+                    variant => panic!("expected outer List, got {variant:?}"),
                 }
-                variant => panic!("expected List, got {variant:?}"),
-            },
+                assert!(matches!(
+                    outer.0[1].item,
+                    UnionVariant::Null(NullTypeAnnotation)
+                ));
+                assert_eq!(outer.0[1].location, None);
+            }
+            annotation => panic!("expected Union around outer List, got {annotation:?}"),
+        }
+```
+
+Before: `Null(List(Null(List(Null(Named)))))`.
+
+`a_nullable_list_of_non_null_named` (`[Pet!]`):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        match target.item.reference() {
+            TypeAnnotation::Union(outer) => {
+                assert_eq!(outer.0.len(), 2);
+                match outer.0[0].item.reference() {
+                    UnionVariant::List(list) => {
+                        let inner = list.inner.as_ref().expect("the list holds a type");
+                        assert!(matches!(inner.item, TypeAnnotation::Named(_)));
+                    }
+                    variant => panic!("expected List, got {variant:?}"),
+                }
+                assert!(matches!(
+                    outer.0[1].item,
+                    UnionVariant::Null(NullTypeAnnotation)
+                ));
+                assert_eq!(outer.0[1].location, None);
+            }
             annotation => panic!("expected Union list, got {annotation:?}"),
         }
 ```
 
-Before, `a_nullable_list_of_non_null_named` (`[Pet!]`): `Null(List(Named))`.
+Before: `Null(List(Named))`.
+
+`a_non_null_list_of_nullable_named` (`[Pet]!`):
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
+        match target.item.reference() {
             TypeAnnotation::List(list) => {
                 let inner = list.inner.as_ref().expect("the list holds a type");
                 match inner.item.reference() {
                     TypeAnnotation::Union(elem) => {
+                        assert_eq!(elem.0.len(), 2);
                         assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
-                        assert!(matches!(elem.0[1].item, UnionVariant::Null(NullTypeAnnotation)));
+                        assert!(matches!(
+                            elem.0[1].item,
+                            UnionVariant::Null(NullTypeAnnotation)
+                        ));
                         assert_eq!(elem.0[1].location, None);
                     }
                     annotation => panic!("expected Union element, got {annotation:?}"),
                 }
             }
             annotation => panic!("expected List, got {annotation:?}"),
+        }
 ```
 
-Before, `a_non_null_list_of_nullable_named` (`[Pet]!`): `List(Null(Named))`.
+Before: `List(Null(Named))`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
                 EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
-                    TypeAnnotationParent::Union(union) => match union.as_ref().parent.reference() {
-                        TypeAnnotationParent::SelectableDeclaration(_) => {}
-                        parent => panic!("expected the field as type parent, got {parent:?}"),
-                    },
+                    TypeAnnotationParent::Union(union) => {
+                        let union = union.as_ref();
+                        assert!(matches!(
+                            union.inner.0[1].item,
+                            UnionVariant::Null(NullTypeAnnotation)
+                        ));
+                        assert_eq!(union.inner.0[1].location, None);
+                        match union.parent.reference() {
+                            TypeAnnotationParent::SelectableDeclaration(_) => {}
+                            parent => panic!("expected the field as type parent, got {parent:?}"),
+                        }
+                    }
                     parent => panic!("expected Union, got {parent:?}"),
                 },
 ```
@@ -566,6 +703,70 @@ Before, `to_and_the_target_resolve_with_their_ancestry` on `Owner`: `TypeAnnotat
 
 Before, `type_names_resolve_through_their_annotation_ancestry`: Named → Null → List → Null → Variable.
 
-`to_as_a_target_type_name_parses` (`to to`): `Union([Named(to), Null])` instead of `Null(Named(to))`.
+`to_as_a_target_type_name_parses` (`to to`):
 
-`a_line_break_inside_a_list_type_does_not_attach_bang`: chunk 0 is `Union([Named(Pet), Null])` instead of `Null(Named(Pet))`.
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        match as_selectable(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes a target")
+            .item
+            .reference()
+        {
+            TypeAnnotation::Union(union) => {
+                assert_eq!(union.0.len(), 2);
+                match union.0[0].item.reference() {
+                    UnionVariant::Named(named) => {
+                        assert_eq!(named.name.item, EntityNameWrapper("to".intern().to()));
+                    }
+                    variant => panic!("expected Named, got {variant:?}"),
+                }
+                assert!(matches!(
+                    union.0[1].item,
+                    UnionVariant::Null(NullTypeAnnotation)
+                ));
+                assert_eq!(union.0[1].location, None);
+            }
+            annotation => panic!("expected Union, got {annotation:?}"),
+        }
+```
+
+Before: `Null(Named(to))`.
+
+`a_line_break_inside_a_list_type_does_not_attach_bang` (`[Pet\n!]`):
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+        match declared.type_.item.reference() {
+            TypeAnnotation::Union(outer) => {
+                assert_eq!(outer.0.len(), 2);
+                match outer.0[0].item.reference() {
+                    UnionVariant::List(list) => {
+                        let inner = list.inner.as_ref().expect("chunk 0 parsed Pet");
+                        match inner.item.reference() {
+                            TypeAnnotation::Union(elem) => {
+                                assert!(matches!(elem.0[0].item, UnionVariant::Named(_)));
+                                assert_eq!(elem.0[0].location, span_of(text, "Pet").wrap_some());
+                                assert!(matches!(
+                                    elem.0[1].item,
+                                    UnionVariant::Null(NullTypeAnnotation)
+                                ));
+                                assert_eq!(elem.0[1].location, None);
+                            }
+                            annotation => panic!("expected Union element, got {annotation:?}"),
+                        }
+                    }
+                    variant => panic!("expected List, got {variant:?}"),
+                }
+                assert!(matches!(
+                    outer.0[1].item,
+                    UnionVariant::Null(NullTypeAnnotation)
+                ));
+                assert_eq!(outer.0[1].location, None);
+            }
+            annotation => panic!("expected Union list, got {annotation:?}"),
+        }
+```
+
+Before: `Null(List(Null(Named)))` with the named span `Pet`. The `EndOfType` error on `!` stays.
