@@ -18,7 +18,7 @@ Unmatched brackets that the matcher cut never enter a chunk. They remain `Bracke
 
 `fieldd Query.foo { bar }` highlights `fieldd` as Keyword, `Query` / `.` / `foo` / `bar` as Content, and `{` `}` as Bracket.
 
-`$` is Content. `asdf` is Content. A leftover `{ bar }` records Bracket on `{` and `}`, Content on `bar`. Leftover never records `Type`.
+A leftover `{ bar }` records Bracket on `{` and `}`, Content on `bar`. Leftover never records `Type`. `$` and `asdf` are Content.
 
 ## Dependencies
 
@@ -139,7 +139,7 @@ fn record_leftover_span(
 
 ## `parse_one_chunk` records extra
 
-leftover-in-extra.md's `parse_one_chunk` returns a `Slot`. `extra` is unread remainder, and, when leftover is not `Expectation::Separator(_)`, the trailing separator tokens. That function returns the `Slot` from its `match result`. This change binds the match to `slot`, records leftover on `extra`, and returns `slot`.
+leftover-in-extra.md's `parse_one_chunk` returns a `Slot`. `extra` is unread remainder, and, when leftover is not `Expectation::Separator(_)`, leftover-in-extra.md's `extra_plus_trailing_separator` appends the trailing separator tokens. That function returns the `Slot` from its `match result`. This change binds the match to `slot`, records leftover on `extra`, and returns `slot`. The Ok and Err arms are leftover-in-extra.md's after.
 
 ```rust
 // from crates/isograph_parser/src/chunk.rs
