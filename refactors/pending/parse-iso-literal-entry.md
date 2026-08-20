@@ -283,8 +283,8 @@ pub use arguments::{
     NonConstantValueParent, NullValue, NullValuePath, ObjectEntry, ObjectEntryPath,
     ObjectEntrySlotPath, ObjectLiteral, ObjectLiteralPath, StringLiteralValueWrapper,
     StringLiteralValueWrapperPath, ValueKeyNameWrapper, ValueKeyNameWrapperPath,
-    VariableNameWrapper, VariableNameWrapperParent, VariableNameWrapperPath, VariableUse,
-    VariableUsePath,
+    VariableDeclarationOrUsage, VariableDeclarationOrUsageParent, VariableDeclarationOrUsagePath,
+    VariableNameWrapper, VariableNameWrapperPath, VariableUse, VariableUsePath,
 };
 pub use chunk::{
     Chunk, ChunkContentItem, ChunkContentItemParent, ChunkParent, ChunkPath, ChunkSeparator,
@@ -301,7 +301,7 @@ pub use directives::{
 pub use isograph_resolution_node::IsographResolutionNode;
 pub use matched_brackets::{BracketError, CloseBracket, NonBracketToken, OpenBracket};
 pub use non_bracket_token::{BracketKind, NonBracketTokenKind};
-pub use parse_error::{AstError, Expectation, Found, ParseError};
+pub use parse_error::{AstError, Expectation, ExpectedFound, Found, ParseError};
 pub use parse_iso_literal::{
     Description, DescriptionPath, EntityNameWrapper, EntityNameWrapperParent,
     EntityNameWrapperPath, EntrypointDeclaration, EntrypointDeclarationPath, ExtraChunksPath,
@@ -316,9 +316,23 @@ pub use selections::{
 pub use semantic_token::SemanticToken;
 pub use variables::{
     ListTypeAnnotation, ListTypeAnnotationPath, NamedTypeAnnotation, NamedTypeAnnotationPath,
-    TypeAnnotation, TypeAnnotationParent, VariableDeclaration, VariableDeclarationList,
-    VariableDeclarationListPath, VariableDeclarationPath, VariableDeclarationSlotPath,
+    NullTypeAnnotation, NullTypeAnnotationPath, TypeAnnotation, TypeAnnotationParent,
+    VariableDeclaration, VariableDeclarationList, VariableDeclarationListPath,
+    VariableDeclarationPath, VariableDeclarationSlotPath,
 };
+
+pub(crate) use arguments::{
+    consume_argument_list, parse_name_colon, parse_non_constant_value, parse_variable_name,
+};
+pub(crate) use chunk::{chunk, parse_singleton};
+pub(crate) use directives::consume_directives;
+pub(crate) use matched_brackets::{BracketItem, Bracketed, MatchedBrackets, match_brackets};
+pub(crate) use non_bracket_token::{BracketToken, SplitToken};
+pub(crate) use parse_error::DECLARATION_KEYWORD;
+pub(crate) use selections::consume_selection_set;
+pub(crate) use token_kind::IsographLangTokenKind;
+pub(crate) use tokenize::tokenize;
+pub(crate) use variables::{consume_variable_declaration_list, parse_type_annotation};
 ```
 
 Before:
@@ -340,4 +354,4 @@ pub use tokenize::*;
 pub use variables::*;
 ```
 
-Do not `pub use` `tokenize`, `match_brackets`, `chunk`, `ItemCursor`, `ChunkStream`, `IsographLangTokenKind`, `TokenKindExtras`, `MatchedBrackets`, `BracketItem`, `Bracketed`, `SplitToken`, `BracketToken`, `SeparatorToken`, `parse_type_annotation`, `consume_description`, or other parse helpers. `mod tokenize` and friends stay private. `tokenize` / `match_brackets` / `chunk` become `pub(crate)`.
+Do not `pub use` `tokenize`, `match_brackets`, `chunk`, `ItemCursor`, `ChunkStream`, `IsographLangTokenKind`, `TokenKindExtras`, `MatchedBrackets`, `BracketItem`, `Bracketed`, `SplitToken`, `BracketToken`, `parse_type_annotation`, `consume_description`, or other parse helpers. `mod tokenize` and friends stay private. `tokenize` / `match_brackets` / `chunk` become `pub(crate)`. Crate-internal callers keep `use crate::tokenize` via the `pub(crate) use` block.

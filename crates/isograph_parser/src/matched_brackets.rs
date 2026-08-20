@@ -75,7 +75,7 @@ fn strip_captured_line_breaks(items: &mut Vec<WithSpan<BracketItem>>) {
 
 /// The root's span is the whole literal, leading and trailing whitespace included, which
 /// the tokens alone do not record; hence the length parameter.
-pub fn match_brackets(
+pub(crate) fn match_brackets(
     tokens: Vec<WithSpan<IsographLangTokenKind>>,
     literal_length: u32,
 ) -> (WithSpan<MatchedBrackets>, Vec<BracketError>) {

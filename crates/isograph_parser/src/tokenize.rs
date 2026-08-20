@@ -8,7 +8,7 @@ use prelude::Postfix;
 /// rather than with an `EndOfFile` token. The tokenizer skips spaces (line breaks are
 /// tokens; the bracket matcher captures the ones at the literal's start and at a closed
 /// group's interior's start), so consecutive tokens' spans need not touch.
-pub fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
+pub(crate) fn tokenize(literal: &str) -> Vec<WithSpan<IsographLangTokenKind>> {
     let mut lexer = IsographLangTokenKind::lexer(literal);
     let mut tokens = Vec::new();
     while let Some(kind) = lexer.next() {

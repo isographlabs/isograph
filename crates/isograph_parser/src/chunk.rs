@@ -391,7 +391,9 @@ pub(crate) fn parse_singleton<'a, T>(
 /// Chunk a matched-brackets tree. Every non-separator token lands in a chunk; a comma
 /// no item precedes is the pass's one error, returned beside the tree; no grammar is
 /// checked.
-pub fn chunk(tree: &WithSpan<MatchedBrackets>) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
+pub(crate) fn chunk(
+    tree: &WithSpan<MatchedBrackets>,
+) -> (WithSpan<ChunkedLevel>, Vec<CommaWithoutItem>) {
     let mut errors = Vec::new();
     let level = chunk_level(tree.item.reference(), &mut errors);
     (level.with_span(tree.location), errors)
