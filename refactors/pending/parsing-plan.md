@@ -199,7 +199,7 @@ Justified differences:
 parsing-standards.md governs how every implementation below is written.
 
 1. `parser-test-gaps.md`. Missing grammar-stage tests.
-2. `extract-iso-literals.md`. `THostLanguage: HostLanguage` extracts iso literals from a file and validates the host embedding. `TypeScriptHostLanguage` is the first implementor.
+2. `extract-iso-literals.md`. `THostLanguage: HostLanguage` has `extract_iso_literals`, returning `ExtractedIsoLiteral` (`result: Option`, `errors: Option`). `TypeScriptHostLanguage` is the first implementor.
 3. `lsp-semantic-tokens.md`. `isograph lsp` answers `textDocument/semanticTokens/full` so iso literals are colored when a JS/TS file is opened.
 4. `lsp-parse-diagnostics.md`. Parse errors of those literals are `publishDiagnostics`.
 

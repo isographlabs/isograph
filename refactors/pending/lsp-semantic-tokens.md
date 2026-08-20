@@ -27,9 +27,8 @@ Most important first.
 ```rust
 // from crates/isograph_lsp/src/file_literals.rs
 use isograph_parser::{
-    BracketError, CommaWithoutItem, HostLanguage, IsoLiteralExtraction, IsoLiteralItem,
-    IsoLiteralParse, ParseError, SemanticToken, chunk, match_brackets, parse_iso_literal,
-    tokenize,
+    BracketError, CommaWithoutItem, HostLanguage, IsoLiteralExtraction, IsoLiteralParse,
+    ParseError, SemanticToken, chunk, match_brackets, parse_iso_literal, tokenize,
 };
 use prelude::Postfix;
 use span::{WithSpan, WithSpanPostfix};
@@ -48,9 +47,10 @@ pub fn file_literals<THostLanguage: HostLanguage>(
     host: &THostLanguage,
     source: &str,
 ) -> Vec<FileLiteral<'_, THostLanguage>> {
-    host.extract(source)
+    host.extract_iso_literals(source)
         .into_iter()
-        .map(|extraction| {
+        .filter_map(|extracted| {
+            let extraction = extracted.result?;
             let text = extraction.iso_literal_text;
             let (brackets, bracket_errors) =
                 match_brackets(tokenize(text), text.len() as u32);
@@ -58,24 +58,16 @@ pub fn file_literals<THostLanguage: HostLanguage>(
             let mut errors = Vec::new();
             let mut tokens = Vec::new();
             let parse = parse_iso_literal(text, tree, &mut errors, &mut tokens);
-            let item = parse.as_ref().and_then(|tree| {
-                tree.item
-                    .item
-                    .item
-                    .item
-                    .as_ref()
-                    .map(|item| item.item.reference())
-            });
-            let host_errors = host.validate(&extraction, item);
             FileLiteral {
                 extraction,
                 parse,
                 errors,
                 bracket_errors,
                 comma_errors,
-                host_errors,
+                host_errors: extracted.errors.unwrap_or_default(),
                 tokens,
             }
+            .wrap_some()
         })
         .collect()
 }
