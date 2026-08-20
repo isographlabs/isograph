@@ -80,7 +80,7 @@ pub struct VariableUse(
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct StringLiteralValueWrapper(common_lang_types::StringLiteralValue);
+pub struct StringLiteralValueWrapper(pub common_lang_types::StringLiteralValue);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -105,11 +105,11 @@ pub struct NullValue;
     parent_type = ArgumentPath<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct ArgumentNameWrapper(common_lang_types::ArgumentName);
+pub struct ArgumentNameWrapper(pub common_lang_types::ArgumentName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ValueKeyNameWrapper(common_lang_types::ValueKeyName);
+pub struct ValueKeyNameWrapper(pub common_lang_types::ValueKeyName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]

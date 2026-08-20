@@ -82,12 +82,12 @@ pub struct EntityNameWrapper(pub common_lang_types::EntityName);
     parent_type = SelectableNameWrapperParent<'a>,
     resolved_node = IsographResolutionNode<'a>
 )]
-pub struct SelectableNameWrapper(common_lang_types::SelectableName);
+pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
 
 /// The interned source slice of a description, quotes included.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct Description(common_lang_types::DescriptionValue);
+pub struct Description(pub common_lang_types::DescriptionValue);
 
 #[derive(Debug)]
 pub enum EntityNameWrapperParent<'a> {
