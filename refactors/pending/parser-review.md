@@ -46,15 +46,17 @@ Moved to parse-iso-literal-entry.md.
 
 Moved to variable-declaration-or-usage.md.
 
+### `TypeAnnotation::List(Box<ListTypeAnnotation>)` vs named-struct enums (not needed)
+
+`List(Box<ListTypeAnnotation>)` is a single named payload. `Box` is recursion so `TypeAnnotation` is sized. Not `{ inner: ... }` and not `List(A, B)`.
+
+`Expectation::Keyword(&'static str)` and `Found::Token(NonBracketTokenKind)` are also one payload. `OneOf(&[])` displaying as `"one of"` is a Display bug, not an enum-shape bug.
+
+### `BooleanValue(Boolean)` is two layers (not needed)
+
+`ResolvePosition` on enums requires exactly one unnamed payload per variant. `enum BooleanValue { True, False }` cannot derive it. `BooleanValue(Boolean)` is the resolve node; `Boolean` is True/False without being leaves. `NullValue` is a unit struct because it has no payload.
+
 -----
-
-### `TypeAnnotation::List(Box<ListTypeAnnotation>)` vs named-struct enums
-
-The crate standard is `enum Foo { NamedStruct(Struct) }` or unit variants, not mixed payload shapes. `Expectation::Keyword(&'static str)`, `Expectation::OneOf(&'static [Expectation])`, `Found::Token(NonBracketTokenKind)`, `Found::Group(BracketKind)` are tuple variants. `OneOf(&[])` displays as `"one of"`.
-
-### `BooleanValue(Boolean)` is two layers
-
-Mental model is `BooleanValue { True, False }`. The parser has `enum Boolean { True, False }` plus `struct BooleanValue(pub Boolean)` so resolve-position has a node. `NullValue` is a unit struct. `BooleanValue` can be the enum.
 
 ### Dead token kinds sit on every match
 
