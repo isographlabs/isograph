@@ -61,7 +61,7 @@ pub struct NullTypeAnnotation(
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
-    Variable(VariableDeclarationOrUsagePath<'a>),
+    Variable(VariableDeclarationPath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
     SelectableDeclaration(SelectableDeclarationPath<'a>),
     Null(Box<NullTypeAnnotationPath<'a>>),
@@ -365,26 +365,145 @@ Who else calls the pipeline: extract-iso-literals.md and lsp-semantic-tokens.md 
 
 ### `VariableDeclarationOrUsage` is only a declaration
 
-Rename. A use is `VariableUse`. This type is always a declaration (mental-model `ArgumentDefinition`).
+The `$name` node is the same whether it is a declaration or a use. Distinction is the resolve parent, not the payload.
 
+Before: `VariableDeclarationOrUsage` is the declaration (`name`, `type_`, `default_value`). A use is `VariableUse(VariableNameWrapper)`. `VariableNameWrapperParent` is already `Use | Declaration`, but the `$name` tree is two different shapes, and `$` on a declaration is not a `VariableDeclarationOrUsage`.
+
+After, most important first:
+
+```rust
+// from crates/isograph_parser/src/arguments.rs
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = VariableDeclarationOrUsageParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclarationOrUsage(
+    #[resolve_field]
+    pub WithSpan<VariableNameWrapper>,
+);
+
+#[derive(Debug)]
+pub enum VariableDeclarationOrUsageParent<'a> {
+    Declaration(VariableDeclarationPath<'a>),
+    Usage(VariableUsePath<'a>),
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = VariableDeclarationOrUsagePath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableNameWrapper(pub common_lang_types::VariableName);
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = NonConstantValueParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableUse(
+    #[resolve_field]
+    #[parent_variant(Usage)]
+    pub WithSpan<VariableDeclarationOrUsage>,
+);
+
+pub type VariableDeclarationOrUsagePath<'a> = PositionResolutionPath<
+    &'a VariableDeclarationOrUsage,
+    VariableDeclarationOrUsageParent<'a>,
+>;
+
+pub type VariableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a VariableNameWrapper, VariableDeclarationOrUsagePath<'a>>;
 ```
-VariableDeclarationOrUsage -> VariableDeclaration
-VariableDeclarationOrUsageList -> VariableDeclarationList
-VariableDeclarationOrUsagePath -> VariableDeclarationPath
-VariableDeclarationOrUsageListPath -> VariableDeclarationListPath
-VariableDeclarationOrUsageSlotPath -> VariableDeclarationSlotPath
-IsographResolutionNode::VariableDeclarationOrUsage* -> VariableDeclaration*
-Expectation::VariableDeclarationOrUsage -> VariableDeclaration
-TypeAnnotationParent::Variable(VariableDeclarationOrUsagePath) -> VariableDeclarationPath
-VariableNameWrapperParent::Declaration(VariableDeclarationOrUsagePath) -> VariableDeclarationPath
-parse_variable_declaration returns VariableDeclaration
-consume_variable_declaration_list returns Option<WithSpan<VariableDeclarationList>>
-SelectableDeclaration.variable_definitions: Option<WithSpan<VariableDeclarationList>>
+
+```rust
+// from crates/isograph_parser/src/variables.rs
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = VariableDeclarationSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclaration {
+    #[resolve_field]
+    #[parent_variant(Declaration)]
+    pub name: WithSpan<VariableDeclarationOrUsage>,
+    #[resolve_field]
+    #[parent_variant(Variable)]
+    pub type_: WithSpan<TypeAnnotation>,
+    #[resolve_field]
+    #[parent_variant(VariableDefault)]
+    pub default_value: Option<WithSpan<NonConstantValue>>,
+}
+
+#[derive(Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = SelectableDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclarationList(
+    #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclaration, UnparsedChunkItems>>>,
+);
 ```
 
-Display of `Expectation::VariableDeclaration` stays `a variable declaration, like '$id: ID!'`. Fields, `parent_variant(Declaration)`, and `VariableUse` do not change. Every identifier in `crates/isograph_parser` that contains `VariableDeclarationOrUsage` is the rename. Tests that name the type follow.
+`VariableUse` stays a newtype so `#[parent_variant(Usage)]` has a pin. It does not add fields. `VariableNameWrapperParent` is deleted. `NonConstantValue::Variable(VariableUse)` is unchanged at the enum. `NonConstantValueParent::VariableDefault` and `TypeAnnotationParent::Variable` take `VariableDeclarationPath`.
 
----------
+```rust
+// from crates/isograph_parser/src/arguments.rs
+pub(crate) fn parse_variable_name(
+    cursor: &mut ItemCursor<'_>,
+    missing_dollar: Expectation,
+) -> Result<WithSpan<VariableDeclarationOrUsage>, WithSpan<ParseError>> {
+    cursor.spanning(|cursor| {
+        cursor
+            .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+            .map_err(|()| cursor.expected(missing_dollar))?;
+        let name = cursor
+            .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
+            .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+        VariableDeclarationOrUsage(name.interned().map(VariableNameWrapper)).wrap_ok()
+    })
+}
+```
+
+Before: returns `WithSpan<VariableNameWrapper>` whose span is the identifier only; `$` is consumed and not on that node. After: span is `$` plus the identifier. Call sites still wrap a use in `VariableUse(...)` and still pass the result to `parse_name_colon` as the declaration lhs.
+
+`Expectation::VariableDeclarationOrUsage` becomes `Expectation::VariableDeclaration`. Display stays `a variable declaration, like '$id: ID!'`.
+
+`IsographResolutionNode`: keep `VariableDeclarationOrUsage`. Add `VariableDeclaration`, `VariableDeclarationList`, `VariableDeclarationSlot`. Drop `VariableNameWrapper` parent enum variants. `UnparsedChunkItemsParent` leftover pin is `VariableDeclarationSlot`.
+
+Who calls: `parse_variable_declaration`, `parse_non_constant_value`'s `$` arm, `parse_variable_name` callers. `chunk.rs` pin list.
+
+Tests:
+
+```rust
+// from crates/isograph_parser/src/parse_iso_literal.rs
+    #[test]
+    fn a_dollar_in_a_use_resolves_to_declaration_or_usage_with_usage_parent() {
+        let text = "field Query.Foo { bar(id: $x) }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "$")) {
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Usage(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "x")) {
+            IsographResolutionNode::VariableNameWrapper(name) => {
+                assert_eq!(name.inner.0, "x".intern().to());
+            }
+            node => panic!("expected the name leaf, got {node:?}"),
+        }
+    }
+
+    #[test]
+    fn a_dollar_in_a_declaration_resolves_to_declaration_or_usage_with_declaration_parent() {
+        let text = "field Query.Foo($id: ID) { bar }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "$")) {
+            IsographResolutionNode::VariableDeclarationOrUsage(node) => {
+                assert!(matches!(
+                    node.parent,
+                    VariableDeclarationOrUsageParent::Declaration(_)
+                ));
+            }
+            node => panic!("expected VariableDeclarationOrUsage, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "id")) {
+            IsographResolutionNode::VariableNameWrapper(_) => {}
+            node => panic!("expected the name leaf, got {node:?}"),
+        }
+    }
+```
+
+`argument_names_resolve_through_the_selection` and `a_default_variable_resolves_through_variable_default` currently expect `VariableUse` on `$`. They expect `VariableDeclarationOrUsage` with `Usage` parent. `type_names_resolve_through_their_annotation_ancestry` currently matches `VariableNameWrapperParent::Declaration`; the name's parent is `VariableDeclarationOrUsagePath`, whose parent is `Declaration`.
 
 ### `TypeAnnotation::List(Box<ListTypeAnnotation>)` vs named-struct enums
 
@@ -463,4 +582,4 @@ Spaces do not split. Newlines do. Anyone who formats a selection set or a `to` c
 
 Bracket matching with cut-and-diagnose is consistent and well tested. Crossing `foo { (} )` and unclosed interiors behave as documented. Chunking's `CommaWithoutItem` vs trailing comma is the right split. Per-chunk recovery (`each_malformed_variable_declaration_degrades_alone`, leftover keeps the item) is the right parser architecture. `SafePeekable` / `ItemCursor` make "peek without consume" a lifetime, not a boolean. `parse_name_colon` is the right helper for `name: value`. Resolve-position coverage on the grammar tree is thorough.
 
-The next work is `Null` on `TypeAnnotation` (with the tests above), the combined `parse_iso_literal(text)` entry, and renaming `VariableDeclarationOrUsage` to `VariableDeclaration`. `Slot` and `parse_singleton` wait in parser-minor-improvements.md.
+The next work is `Null` on `TypeAnnotation` (with the tests above), the combined `parse_iso_literal(text)` entry, and making `VariableDeclarationOrUsage` the shared `$name` node whose parent is `Declaration | Usage`. `Slot` and `parse_singleton` wait in parser-minor-improvements.md.
