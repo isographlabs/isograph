@@ -13,63 +13,63 @@ on:
       artifact-name:
         required: true
         type: string
+      artifact-file:
+        required: true
+        type: string
       longpaths:
-        required: false
-        type: boolean
-      cross:
-        required: false
-        type: boolean
-      musl:
         required: false
         type: boolean
 
 jobs:
-  build-cli:
-    name: Build compiler
+  build:
+    name: Build ${{ inputs.artifact-name }}
     timeout-minutes: 15
     runs-on: ${{ inputs.os }}
     steps:
       - uses: actions/checkout@v2
-      - name: Cache turbo
-        uses: actions/cache@v4
-        with:
-          path: .turbo
-          key: ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-turbo-${{ inputs.artifact-name }}-
-      - uses: pnpm/action-setup@v2
-      - name: Use Node.js 22
-        uses: actions/setup-node@v3
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile --ignore-scripts
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: stable
           override: true
           target: ${{ inputs.target }}
-      # more info here:- https://github.com/rust-lang/cargo/issues/13020
       - name: Enable longer pathnames for git
         if: inputs.longpaths
         run: git config --system core.longpaths true
-      - name: Install cross
-        if: inputs.cross
-        uses: actions-rs/cargo@v1
-        with:
-          command: install
-          args: cross
-      - uses: awalsh128/cache-apt-pkgs-action@v1
-        if: inputs.musl
-        with:
-          packages: musl-tools # provides musl-gcc
-          version: 1.0
-      - name: 'Build isograph_cli with cargo (${{inputs.target}})'
-        run: pnpm exec turbo ${{ inputs.cross && 'cross' || 'build-compiler' }} -- --target ${{ inputs.target }} --release
+      - name: 'Build isograph (${{inputs.target}})'
+        run: cargo build --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --release --target ${{ inputs.target }}
+      - name: Name the artifact isograph_cli
+        shell: bash
+        run: |
+          src="target/${{ inputs.target }}/release/${{ inputs.build-name }}"
+          mkdir -p artifact
+          cp "$src" "artifact/${{ inputs.artifact-file }}"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.artifact-name }}
-          path: target/${{ inputs.target }}/release/${{ inputs.build-name }}
+          path: artifact/${{ inputs.artifact-file }}
           if-no-files-found: error
+
+  test:
+    name: Test ${{ inputs.artifact-name }}
+    needs: build
+    timeout-minutes: 15
+    runs-on: ${{ inputs.os }}
+    steps:
+      - uses: actions/checkout@v2
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - uses: actions/download-artifact@v4
+        with:
+          name: ${{ inputs.artifact-name }}
+          path: artifact
+      - name: Make the artifact executable
+        if: runner.os != 'Windows'
+        run: chmod +x "artifact/${{ inputs.artifact-file }}"
+      - name: 'Test isograph (${{inputs.target}})'
+        env:
+          ISOGRAPH_BIN: ${{ github.workspace }}/artifact/${{ inputs.artifact-file }}
+        run: cargo test --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml --tests

@@ -2,7 +2,7 @@
 
 Requires isograph-cli.md and ts-graphql-react-isograph-cli.md.
 
-`crates/isograph_cli` and `crates/ts_graphql_react_isograph_cli` are excluded from the root workspace, so `cargo test`, `cargo clippy`, and `pnpm build-compiler` never compile them. CI must build the mini-workspace on its own lockfile (`crates/ts_graphql_react_isograph_cli`). Release still drops the binary into `libs/isograph-compiler/artifacts/{platform}/isograph_cli`, and `cli.js` / `index.js` still pick that file.
+`crates/isograph_cli` and `crates/ts_graphql_react_isograph_cli` are root workspace members. `cargo test`, `cargo clippy`, and `pnpm build-compiler` compile them with the rest of the workspace. Release still drops the binary into `libs/isograph-compiler/artifacts/{platform}/isograph_cli`, and `cli.js` / `index.js` still pick that file.
 
 Supported platforms, same as `index.js`:
 
@@ -20,7 +20,7 @@ Each platform is two jobs: build and upload the release binary, then download th
 
 `.github/workflows/ci.yml` gains `cargo-clippy-cli`. `all-checks-passed` waits on it and on the five platform jobs from Change 3.
 
-`cargo-fmt` already runs `cargo fmt --manifest-path crates/ts_graphql_react_isograph_cli/Cargo.toml`. Leave it.
+`cargo-fmt` already runs `cargo fmt`. Leave it.
 
 ```yaml
 # from .github/workflows/ci.yml
@@ -75,7 +75,7 @@ impl Daemon {
 
 ## Change 3: five-platform build and upload, then download and test
 
-`.github/workflows/build-cli.yml` builds the mini-workspace, not the root workspace. `pnpm build-compiler` is `cargo build` at the root and cannot see `ts_graphql_react_isograph_cli`. Two jobs per platform: `build` compiles `--release --target` and uploads; `test` downloads that file and runs `cargo test` with `ISOGRAPH_BIN` pointing at it. Every e2e test runs on every platform.
+`.github/workflows/build-cli.yml` builds the `isograph` binary with `--release --target`. Two jobs per platform: `build` compiles and uploads; `test` downloads that file and runs `cargo test` with `ISOGRAPH_BIN` pointing at it. Every e2e test runs on every platform. One workspace, so the binary is `target/${{ inputs.target }}/release/${{ inputs.build-name }}`.
 
 Native runners, so the tests can execute the download:
 
@@ -147,7 +147,7 @@ jobs:
       - name: Name the artifact isograph_cli
         shell: bash
         run: |
-          src="crates/ts_graphql_react_isograph_cli/target/${{ inputs.target }}/release/${{ inputs.build-name }}"
+          src="target/${{ inputs.target }}/release/${{ inputs.build-name }}"
           mkdir -p artifact
           cp "$src" "artifact/${{ inputs.artifact-file }}"
       - uses: actions/upload-artifact@v4

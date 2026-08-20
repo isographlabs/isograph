@@ -226,6 +226,52 @@ jobs:
       - name: Build swc
         run: pnpm build-swc
 
+  build-cli-linux-x64:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: x86_64-unknown-linux-gnu
+      os: ubuntu-latest
+      build-name: isograph
+      artifact-name: isograph_cli-linux-x64
+      artifact-file: isograph_cli
+
+  build-cli-linux-arm64:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: aarch64-unknown-linux-gnu
+      os: ubuntu-24.04-arm
+      build-name: isograph
+      artifact-name: isograph_cli-bin-linux-arm64
+      artifact-file: isograph_cli
+
+  build-cli-macos-x64:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: x86_64-apple-darwin
+      os: macos-15-intel
+      build-name: isograph
+      artifact-name: isograph_cli-macos-x64
+      artifact-file: isograph_cli
+
+  build-cli-macos-arm64:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: aarch64-apple-darwin
+      os: macos-latest
+      build-name: isograph
+      artifact-name: isograph_cli-macos-arm64
+      artifact-file: isograph_cli
+
+  build-cli-win-x64:
+    uses: ./.github/workflows/build-cli.yml
+    with:
+      target: x86_64-pc-windows-msvc
+      os: windows-latest
+      build-name: isograph.exe
+      artifact-name: isograph_cli-bin-win-x64
+      artifact-file: isograph_cli.exe
+      longpaths: true
+
   all-checks-passed:
     name: All checks passed
     runs-on: ubuntu-latest
@@ -242,6 +288,11 @@ jobs:
         typecheck-demos,
         build-swc,
         lint,
+        build-cli-linux-x64,
+        build-cli-linux-arm64,
+        build-cli-macos-x64,
+        build-cli-macos-arm64,
+        build-cli-win-x64,
       ]
     steps:
       - name: Do nothing
