@@ -1,10 +1,10 @@
 # Event model
 
-Two layers.
+Two layers, one `handle`.
 
-Inner: `handle(state, event) -> Vec<IsographEffect>`. No filesystem, no LSP, no socket. This is what CI tests: feed events, assert effects.
+Inner: `handle(state, event) -> Vec<IsographEffect>`. No filesystem, no LSP, no socket. The test harness calls this function. The running binary calls this same function. There is not a second copy for tests.
 
-Outer: adapters that turn the world into events and effects into the world. A watcher observes the OS. An LSP adapter turns LSP requests into events and effects into LSP responses. The CLI can submit any ingested event. The effect loop performs writes, diagnostics, LSP replies.
+Outer: the real process. It listens to the filesystem, speaks LSP, accepts CLI frames, and performs effects. Every path into the process becomes an event, then `handle`, then effects.
 
 The process does not read the filesystem. Facts about files arrive as events: a path is present with these contents, or a path is absent. Writing files is an effect.
 
@@ -47,11 +47,11 @@ enum Filesystem {
 fn handle(state: &mut Database, event: IsographEvent) -> Vec<IsographEffect>
 ```
 
-CI calls this. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects.
+The test harness calls this. It does not start a daemon, open a socket, or write a file. A test constructs a `DiskChanged` or `EditorChanged`, runs `handle`, and asserts the effects. The binary's event loop calls the same `handle` with the same types.
 
 ## Outer
 
-Each adapter is outside `handle`.
+The binary is the outer. Each adapter is outside `handle` and feeds it.
 
 - Watcher: OS notifications become `DiskChanged` (path plus contents or absent). It may read the disk to fill `Present.contents`. `handle` does not.
 - LSP adapter: an LSP request (`textDocument/didOpen`, `didChange`, `didClose`, hover, completions, …) becomes one or more ingested events, usually `EditorChanged`. Effects come back as LSP responses and notifications (`publishDiagnostics`, `semanticTokens/full`, …). The adapter is request/response. `handle` is not.
