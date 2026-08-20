@@ -1,8 +1,5 @@
 [workspace]
 members = ["./crates/*"]
-# isograph_cli resolves its own lockfile: freddie_cli requires serde >= 1.0.229, and
-# swc_common 2.0.1 does not compile against serde >= 1.0.229.
-exclude = ["crates/isograph_cli"]
 resolver = "2"
 
 [workspace.package]

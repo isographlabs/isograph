@@ -50,9 +50,10 @@ impl Daemon {
                 if path.is_dir() {
                     stack.push(path);
                 } else if path.extension().is_some_and(|e| e == "log") {
-                    if let Ok(text) = std::fs::read_to_string(path.reference()) {
-                        out.push_str(text.reference());
-                    }
+                    let Ok(text) = std::fs::read_to_string(path.reference()) else {
+                        continue;
+                    };
+                    out.push_str(text.reference());
                 }
             }
         }
