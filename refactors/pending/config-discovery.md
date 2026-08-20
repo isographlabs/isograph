@@ -19,7 +19,7 @@ Every verb resolves the config the same way, so `isograph stop` in a subdirector
 
 ```
 $ cd /tmp && isograph status
-error: no isograph.config.json, isograph.config.js, or isograph.config.ts at or above /tmp; create one, or pass the --config flag
+error: no isograph.config.json, isograph.config.js, or isograph.config.ts at or above /tmp; create one, or pass one using the --config flag
 ```
 
 ```
@@ -65,7 +65,7 @@ pub struct NoCurrentDir {
 pub enum DiscoverError {
     #[error("could not resolve the config at {}: {}", .0.path.display(), .0.source)]
     ConfigNotReadable(ConfigNotReadable),
-    #[error("no isograph.config.json, isograph.config.js, or isograph.config.ts at or above {}; create one, or pass the --config flag", .0.start.display())]
+    #[error("no isograph.config.json, isograph.config.js, or isograph.config.ts at or above {}; create one, or pass one using the --config flag", .0.start.display())]
     NotFound(ConfigNotFound),
     #[error("could not read the current directory: {}", .0.source)]
     NoCurrentDir(NoCurrentDir),
