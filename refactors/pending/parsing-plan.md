@@ -180,7 +180,7 @@ Justified differences:
 - Typed directive sets (`from_isograph_field_directives`, `EntrypointDirectiveSet`, …).
 - Description unquote and block-string dedent.
 - Semantic tokens: semantic-tokens.md.
-- Extraction context (`const_export_name`, definition path, export check).
+- Extraction: extract-iso-literals.md. Definition path, and the export / associated-function / parentheses checks, stay later.
 - Diagnostics rendering.
 - Synthetic closing of unclosed groups: unclosed-group-recovery.md.
 - Span-slot genericity: spanless-parsing.md.
@@ -202,5 +202,7 @@ parsing-standards.md governs how every implementation below is written. Each doc
 8. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
 Later: `parse-arrays.md`. `[ ... ]` list values.
+
+Later: `extract-iso-literals.md`. Regex extraction of `iso(\`...\`)` from file text. `IsoLiteralExtraction` holds the exported name and the other host-language facts; `IsoLiteralParse` stays the parse of the backtick contents.
 
 Deferred: `token-kind-zst.md`. `NonBracketTokenKind` variants carry a ZST; matching yields proof passed into `parse_*`.
