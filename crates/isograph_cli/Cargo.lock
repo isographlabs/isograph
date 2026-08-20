@@ -165,7 +165,7 @@ checksum = "da7c62ceae207dd37ea5b845da6a0696c799f85e97da1ab5b7910be3c1c80223"
 [[package]]
 name = "freddie_cli"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=270594ab956c7605ad84ae592443e3a460ae01be#270594ab956c7605ad84ae592443e3a460ae01be"
+source = "git+https://github.com/freddiehg/freddie?rev=fa4bf6c1f1f53a1854a23dbaaefcc286d2ab1ce2#fa4bf6c1f1f53a1854a23dbaaefcc286d2ab1ce2"
 dependencies = [
  "clap",
  "freddie_single_instance",
@@ -179,7 +179,7 @@ dependencies = [
 [[package]]
 name = "freddie_single_instance"
 version = "0.0.1"
-source = "git+https://github.com/freddiehg/freddie?rev=270594ab956c7605ad84ae592443e3a460ae01be#270594ab956c7605ad84ae592443e3a460ae01be"
+source = "git+https://github.com/freddiehg/freddie?rev=fa4bf6c1f1f53a1854a23dbaaefcc286d2ab1ce2#fa4bf6c1f1f53a1854a23dbaaefcc286d2ab1ce2"
 
 [[package]]
 name = "getrandom"

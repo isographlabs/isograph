@@ -14,7 +14,7 @@ path = "src/main.rs"
 
 [dependencies]
 clap = { version = "4.5.18", features = ["derive"] }
-freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "270594ab956c7605ad84ae592443e3a460ae01be" }
+freddie_cli = { git = "https://github.com/freddiehg/freddie", rev = "fa4bf6c1f1f53a1854a23dbaaefcc286d2ab1ce2" }
 prelude = { path = "../prelude" }
 tracing = "0.1.41"
 
