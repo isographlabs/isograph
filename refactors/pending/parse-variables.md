@@ -24,7 +24,7 @@ A default value is a `NonConstantValue`. `$` is a variable use, including nested
 
 ## Change 1: `require_variable_name`
 
-peek-then-parse.md's `parse_variable_name` takes a `CursorPeek`. A declaration did not peek. This function peeks; a `$` is `parse_variable_name(peek)`, anything else is `missing_dollar`. No AST type, path alias, or `IsographResolutionNode` variant changes.
+peek-then-parse.md's `parse_variable_name` requires the identifier after `$` is already committed. A declaration did not peek. This function requires `$` then calls `parse_variable_name`. No AST type, path alias, or `IsographResolutionNode` variant changes.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
@@ -32,17 +32,10 @@ pub(crate) fn require_variable_name(
     cursor: &mut ItemCursor<'_>,
     missing_dollar: Expectation,
 ) -> Result<WithSpan<VariableNameWrapper>, WithSpan<ParseError>> {
-    match cursor.peek() {
-        Some(peek)
-            if matches!(
-                peek.view().item.reference(),
-                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar))
-            ) =>
-        {
-            parse_variable_name(peek)
-        }
-        _ => cursor.expected(missing_dollar).wrap_err(),
-    }
+    cursor
+        .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
+        .map_err(|()| cursor.expected(missing_dollar))?;
+    parse_variable_name(cursor)
 }
 ```
 

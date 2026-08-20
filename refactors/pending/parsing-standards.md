@@ -94,10 +94,7 @@ impl<'a> ItemCursor<'a> {
 
 impl<'c, 'a> CursorPeek<'c, 'a> {
     pub(crate) fn view(&self) -> &'a WithSpan<ChunkContentItem>;
-    pub(crate) fn commit(
-        self,
-        token: SemanticToken,
-    ) -> (&'c mut ItemCursor<'a>, &'a WithSpan<ChunkContentItem>);
+    pub(crate) fn commit(self, token: SemanticToken) -> &'a WithSpan<ChunkContentItem>;
 }
 ```
 
@@ -266,7 +263,7 @@ A type that contains a group stores `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - `consume_*`: `ItemCursor` method. Match: `commit` and `Some`. Else: `None`. A group is: Match: `commit`, run `parse_inside` on the children, record close, `Some` of that result with the group's span. Else: `None`.
 - `expected`: `ItemCursor` method. Peek, no `commit`. Next item or `EndOfChunk` becomes `Expected(expected, found)`.
 - `require_*`: `consume_*` or `Err(())`. The caller maps `Err` with `expected`.
-- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`, or a `CursorPeek` when the caller already peeked. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list takes the cursor.
+- `parse_*`: implements a form made of several items. Parameter is `&mut ItemCursor`. First `Err` is returned. Shared iteration is `parse_each_chunk`, `parse_singleton`, or `spanning`. A nested list takes the cursor.
 - Diagnostic: `report_error` on the child cursor in `parse_one_chunk`; `errors.push` in `parse_singleton` and `parse_iso_literal`. Not stored on the tree.
 
 A group plus its interior is `consume_group_if` or `require_group` with a function that parses the inside:
@@ -295,7 +292,7 @@ A group plus its interior is `consume_group_if` or `require_group` with a functi
 
 ## Dispatch
 
-When the next item may start several forms, peek once and pass that peek to `parse_*`. The last arm is `expected`. If those arms are one value, the match is inside `spanning`. A form used without a peek (`require_variable_name`) peeks and calls the same `parse_*`, or `expected`.
+When the next item may start several forms, peek, `commit`, then parse with the cursor and the committed item. The last arm is `expected`. If those arms are one value, the match is inside `spanning`. A form used without a peek (`require_variable_name`) requires its first token then calls the same rest parse.
 
 `parse_non_constant_value`'s object arm is `{ ... }`. The same `name : value` list in `( ... )` is `consume_argument_list`, not a value.
 
@@ -305,33 +302,38 @@ pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
-        let Some(peek) = cursor.peek() else {
-            return cursor.expected(Expectation::Value).wrap_err();
-        };
-        match peek.view().item.reference() {
-            ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
-                return NonConstantValue::Variable(VariableUse(parse_variable_name(peek)?))
-                    .wrap_ok();
+        if let Some(peek) = cursor.peek() {
+            match peek.view().item.reference() {
+                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Dollar)) => {
+                    peek.commit(SemanticToken::Variable);
+                    return NonConstantValue::Variable(VariableUse(parse_variable_name(cursor)?))
+                        .wrap_ok();
+                }
+                ChunkContentItem::NonBracket(NonBracketToken(
+                    NonBracketTokenKind::StringLiteral,
+                )) => {
+                    let item = peek.commit(SemanticToken::String);
+                    return NonConstantValue::String(parse_string_literal(cursor, item)).wrap_ok();
+                }
+                ChunkContentItem::NonBracket(NonBracketToken(
+                    NonBracketTokenKind::IntegerLiteral,
+                )) => {
+                    let item = peek.commit(SemanticToken::Integer);
+                    return NonConstantValue::Integer(parse_integer_value(cursor, item)?).wrap_ok();
+                }
+                ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
+                    let item = peek.commit(SemanticToken::BooleanOrNull);
+                    return parse_boolean_or_null(cursor, item);
+                }
+                _ => {}
             }
-            ChunkContentItem::NonBracket(NonBracketToken(
-                NonBracketTokenKind::StringLiteral,
-            )) => {
-                return NonConstantValue::String(parse_string_literal(peek)).wrap_ok();
-            }
-            ChunkContentItem::NonBracket(NonBracketToken(
-                NonBracketTokenKind::IntegerLiteral,
-            )) => {
-                return NonConstantValue::Integer(parse_integer_value(peek)?).wrap_ok();
-            }
-            ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier)) => {
-                return parse_boolean_or_null(peek);
-            }
-            ChunkContentItem::Group(group)
-                if group.opening.item.0 == BracketKind::Brace =>
-            {
-                return NonConstantValue::Object(parse_object_literal(peek)?).wrap_ok();
-            }
-            _ => {}
+        }
+        if let Some(object) = cursor.consume_group_if(
+            BracketKind::Brace,
+            SemanticToken::Brace,
+            parse_object_literal,
+        ) {
+            return NonConstantValue::Object(object.item).wrap_ok();
         }
         cursor.expected(Expectation::Value).wrap_err()
     })
@@ -342,7 +344,7 @@ pub(crate) fn parse_non_constant_value(
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `text()` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` after `peek()` is `parse_variable_name(peek)`; without a peek it is `require_variable_name`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` after a committed `$` is `parse_variable_name(cursor)`; without a peek it is `require_variable_name`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
@@ -506,7 +508,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Nested list stream: `ItemCursor::stream_chunk`
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
-- `$ ident` after `peek()`: `parse_variable_name(peek)`; without a peek: `require_variable_name`
+- `$ ident` after `$` is committed: `parse_variable_name(cursor)`; without a peek: `require_variable_name`
 
 ## Shipping and amending
 
@@ -518,7 +520,7 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- peek-then-parse.md: peek once, pass `CursorPeek` to `parse_*`; `commit` returns the cursor
+- peek-then-parse.md: peek, `commit`, parse with the cursor and the item; `parse_variable_name` requires the identifier
 - parse-variables.md: `require_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `text` and `interned` on that value

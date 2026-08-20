@@ -199,7 +199,7 @@ Justified differences:
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `peek-then-parse.md`. `parse_non_constant_value` peeks once and passes that `CursorPeek` to `parse_*`. `parse_variable_name(peek)` commits `$` and requires the identifier.
+1. `peek-then-parse.md`. `parse_non_constant_value` peeks, `commit`s, then parses with the cursor and the item. `CursorPeek` is unchanged. `parse_variable_name` requires the identifier after `$` is committed.
 2. `parse-variables.md`. `require_variable_name`, variable-declaration lists, `$name: Type = default` with `NonConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
 3. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `text() == "to"`. Removes `UnsupportedDeclarationType`.
 4. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
