@@ -2,7 +2,7 @@
 
 `parse_name_colon_value` hardcodes the rhs as `parse_non_constant_value`. This doc splits out `:` + rhs and makes the name form take the rhs parser. parse-variables.md's `$name: Type` is `$` + identifier, then this `:` + rhs.
 
-A selection alias is `consume_token_if(Colon)`, not this form.
+No AST type, path alias, or `IsographResolutionNode` variant changes. A selection alias is `consume_token_if(Colon)`, not this form.
 
 ## Before
 

@@ -276,7 +276,7 @@ impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode
     VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
 ```
 
-`$name` after a `$` that the caller already took:
+`$name` after a `$` that the caller already took. These two functions do not change `VariableNameWrapper` or its parent enum.
 
 ```rust
 // from crates/isograph_parser/src/arguments.rs
