@@ -154,23 +154,32 @@ fn parse_iso_literal_item(
     }
 }
 
-fn parse_entrypoint(
+pub(crate) fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
-) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<N>), WithSpan<ParseError>> {
     let parent_type = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     cursor
         .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
-    let client_field_name = cursor
+    let name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    (
+        parent_type.interned().map(EntityNameWrapper),
+        name.interned(),
+    )
+        .wrap_ok()
+}
+
+fn parse_entrypoint(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<EntrypointDeclaration, WithSpan<ParseError>> {
+    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
     EntrypointDeclaration {
-        parent_type: parent_type.interned().map(EntityNameWrapper),
-        client_field_name: client_field_name
-            .interned()
-            .map(ClientScalarSelectableNameWrapper),
+        parent_type,
+        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
     }
     .wrap_ok()
 }
@@ -178,23 +187,13 @@ fn parse_entrypoint(
 fn parse_field(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<ClientFieldDeclaration, WithSpan<ParseError>> {
-    let parent_type = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-    cursor
-        .require_token(NonBracketTokenKind::Period, SemanticToken::Period)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Period)))?;
-    let client_field_name = cursor
-        .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
-        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let (parent_type, client_field_name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
     let description = consume_description(cursor);
     let selection_set = require_selection_set(cursor)?;
     ClientFieldDeclaration {
-        parent_type: parent_type.interned().map(EntityNameWrapper),
-        client_field_name: client_field_name
-            .interned()
-            .map(ClientScalarSelectableNameWrapper),
+        parent_type,
+        client_field_name: client_field_name.map(ClientScalarSelectableNameWrapper),
         variable_definitions,
         description,
         selection_set,
