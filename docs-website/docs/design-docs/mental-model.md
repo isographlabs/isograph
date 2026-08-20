@@ -8,6 +8,24 @@ Isograph takes upstream entities and selectables, for example from a GraphQL sch
 
 The building blocks are `Wrapper`, `Entity`, `EntityDeclaration`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
+## Type parameters
+
+The compiler is parameterized by three types. Method sets are TBD.
+
+```rust
+trait HostLanguage {}
+
+trait NetworkProtocol {}
+
+trait RuntimeFramework {}
+```
+
+`THostLanguage: HostLanguage` controls how iso literals are extracted and how artifacts are generated.
+
+`TNetworkProtocol: NetworkProtocol` controls communication with the upstream: send GraphQL, read from a local DB, and so on.
+
+`TRuntimeFramework: RuntimeFramework` encodes the runtime the generated artifacts target, for example that this is a React application.
+
 ## Wrapper
 
 A wrapper is a type former over an entity. Wrappers nest.
