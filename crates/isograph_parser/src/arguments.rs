@@ -12,7 +12,7 @@ use crate::{
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ArgumentListParent, resolved_node = IsographResolutionNode<'a>)]
 pub struct ArgumentList(
-    #[resolve_field] pub Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>,
+    #[resolve_field] pub Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
@@ -20,13 +20,12 @@ pub struct ArgumentList(
 pub struct ObjectLiteral(#[resolve_field] pub Vec<WithSpan<Slot<ObjectEntry, UnparsedChunkItems>>>);
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = NamedArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct NamedArgument {
+#[resolve_position(parent_type = SelectionFieldArgumentSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct SelectionFieldArgument {
     #[resolve_field]
-    #[parent_variant(NamedArgument)]
     pub name: WithSpan<FieldArgumentNameWrapper>,
     #[resolve_field]
-    #[parent_variant(NamedArgument)]
+    #[parent_variant(SelectionFieldArgument)]
     pub value: WithSpan<NonConstantValue>,
 }
 
@@ -34,8 +33,7 @@ pub struct NamedArgument {
 #[resolve_position(parent_type = ObjectEntrySlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct ObjectEntry {
     #[resolve_field]
-    #[parent_variant(ObjectEntry)]
-    pub name: WithSpan<FieldArgumentNameWrapper>,
+    pub name: WithSpan<ValueKeyNameWrapper>,
     #[resolve_field]
     #[parent_variant(ObjectEntry)]
     pub value: WithSpan<NonConstantValue>,
@@ -79,8 +77,15 @@ pub enum Boolean {
 pub struct NullValue;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = FieldArgumentNameWrapperParent<'a>, resolved_node = IsographResolutionNode<'a>)]
+#[resolve_position(
+    parent_type = SelectionFieldArgumentPath<'a>,
+    resolved_node = IsographResolutionNode<'a>
+)]
 pub struct FieldArgumentNameWrapper(common_lang_types::FieldArgumentName);
+
+#[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
+#[resolve_position(parent_type = ObjectEntryPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct ValueKeyNameWrapper(common_lang_types::ValueKeyName);
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = VariableUsePath<'a>, resolved_node = IsographResolutionNode<'a>)]
@@ -90,14 +95,8 @@ pub struct VariableNameWrapper(common_lang_types::VariableName);
 pub enum ArgumentListParent {}
 
 #[derive(Debug)]
-pub enum FieldArgumentNameWrapperParent<'a> {
-    NamedArgument(NamedArgumentPath<'a>),
-    ObjectEntry(ObjectEntryPath<'a>),
-}
-
-#[derive(Debug)]
 pub enum NonConstantValueParent<'a> {
-    NamedArgument(Box<NamedArgumentPath<'a>>),
+    SelectionFieldArgument(Box<SelectionFieldArgumentPath<'a>>),
     ObjectEntry(Box<ObjectEntryPath<'a>>),
 }
 
@@ -106,14 +105,16 @@ pub type ArgumentListPath<'a> = PositionResolutionPath<&'a ArgumentList, Argumen
 pub type ObjectLiteralPath<'a> =
     PositionResolutionPath<&'a ObjectLiteral, NonConstantValueParent<'a>>;
 
-pub type NamedArgumentSlotPath<'a> =
-    PositionResolutionPath<&'a Slot<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>>;
+pub type SelectionFieldArgumentSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<SelectionFieldArgument, UnparsedChunkItems>,
+    ArgumentListPath<'a>,
+>;
 
 pub type ObjectEntrySlotPath<'a> =
     PositionResolutionPath<&'a Slot<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>>;
 
-pub type NamedArgumentPath<'a> =
-    PositionResolutionPath<&'a NamedArgument, NamedArgumentSlotPath<'a>>;
+pub type SelectionFieldArgumentPath<'a> =
+    PositionResolutionPath<&'a SelectionFieldArgument, SelectionFieldArgumentSlotPath<'a>>;
 
 pub type ObjectEntryPath<'a> = PositionResolutionPath<&'a ObjectEntry, ObjectEntrySlotPath<'a>>;
 
@@ -131,14 +132,17 @@ pub type BooleanValuePath<'a> =
 pub type NullValuePath<'a> = PositionResolutionPath<&'a NullValue, NonConstantValueParent<'a>>;
 
 pub type FieldArgumentNameWrapperPath<'a> =
-    PositionResolutionPath<&'a FieldArgumentNameWrapper, FieldArgumentNameWrapperParent<'a>>;
+    PositionResolutionPath<&'a FieldArgumentNameWrapper, SelectionFieldArgumentPath<'a>>;
+
+pub type ValueKeyNameWrapperPath<'a> =
+    PositionResolutionPath<&'a ValueKeyNameWrapper, ObjectEntryPath<'a>>;
 
 pub type VariableNameWrapperPath<'a> =
     PositionResolutionPath<&'a VariableNameWrapper, VariableUsePath<'a>>;
 
-impl<'a> From<NamedArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
-        IsographResolutionNode::NamedArgumentSlot(path)
+impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {
+        IsographResolutionNode::SelectionFieldArgumentSlot(path)
     }
 }
 
@@ -149,39 +153,43 @@ impl<'a> From<ObjectEntrySlotPath<'a>> for IsographResolutionNode<'a> {
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
-fn parse_name_colon_value(
+fn parse_name_colon_value<N: From<intern::string_key::StringKey>>(
     cursor: &mut ItemCursor<'_>,
     name_token: SemanticToken,
     missing_name: Expectation,
-) -> Result<
-    (
-        WithSpan<FieldArgumentNameWrapper>,
-        WithSpan<NonConstantValue>,
-    ),
-    WithSpan<ParseError>,
-> {
+) -> Result<(WithSpan<N>, WithSpan<NonConstantValue>), WithSpan<ParseError>> {
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, name_token)
         .map_err(|()| cursor.expected(missing_name))?;
     cursor
         .require_token(NonBracketTokenKind::Colon, SemanticToken::Colon)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Colon)))?;
-    let value = parse_value(cursor)?;
-    (name.interned().map(FieldArgumentNameWrapper), value).wrap_ok()
+    let value = parse_non_constant_value(cursor)?;
+    (name.interned(), value).wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
-fn parse_argument(cursor: &mut ItemCursor<'_>) -> Result<NamedArgument, WithSpan<ParseError>> {
+fn parse_argument(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<SelectionFieldArgument, WithSpan<ParseError>> {
     let (name, value) =
         parse_name_colon_value(cursor, SemanticToken::Argument, Expectation::Argument)?;
-    NamedArgument { name, value }.wrap_ok()
+    SelectionFieldArgument {
+        name: name.map(FieldArgumentNameWrapper),
+        value,
+    }
+    .wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
 fn parse_object_entry(cursor: &mut ItemCursor<'_>) -> Result<ObjectEntry, WithSpan<ParseError>> {
     let (name, value) =
         parse_name_colon_value(cursor, SemanticToken::ObjectKey, Expectation::ObjectEntry)?;
-    ObjectEntry { name, value }.wrap_ok()
+    ObjectEntry {
+        name: name.map(ValueKeyNameWrapper),
+        value,
+    }
+    .wrap_ok()
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
@@ -200,7 +208,7 @@ pub(crate) fn consume_argument_list(cursor: &mut ItemCursor<'_>) -> Option<WithS
 }
 
 #[cfg_attr(not(test), expect(dead_code))]
-pub(crate) fn parse_value(
+pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
@@ -290,7 +298,7 @@ mod tests {
     );
 
     type ParsedPairs = (
-        Vec<WithSpan<Slot<NamedArgument, UnparsedChunkItems>>>,
+        Vec<WithSpan<Slot<SelectionFieldArgument, UnparsedChunkItems>>>,
         Vec<WithSpan<ParseError>>,
         Vec<WithSpan<SemanticToken>>,
     );
@@ -344,7 +352,9 @@ mod tests {
         (list, errors, tokens)
     }
 
-    fn as_argument(slot: &Slot<NamedArgument, UnparsedChunkItems>) -> &NamedArgument {
+    fn as_argument(
+        slot: &Slot<SelectionFieldArgument, UnparsedChunkItems>,
+    ) -> &SelectionFieldArgument {
         slot.item
             .as_ref()
             .map(|wrapped| wrapped.item.reference())

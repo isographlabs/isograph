@@ -32,42 +32,31 @@ pub enum IsoLiteralItem {
 #[resolve_position(parent_type = IsoLiteralSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
 pub struct EntrypointDeclaration {
     #[resolve_field]
-    pub parent_type: WithSpan<EntityName>,
+    pub parent_type: WithSpan<EntityNameWrapper>,
     #[resolve_field]
-    pub client_field_name: WithSpan<ClientFieldName>,
+    pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
 }
 
 /// The name of a schema type, `Query` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct EntityName(common_lang_types::EntityName);
-
-impl From<intern::string_key::StringKey> for EntityName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        EntityName(key.to())
-    }
-}
+pub struct EntityNameWrapper(common_lang_types::EntityName);
 
 /// The name of the client field an entrypoint targets, `foo` in `entrypoint Query.foo`.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = EntrypointDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct ClientFieldName(common_lang_types::SelectableName);
-
-impl From<intern::string_key::StringKey> for ClientFieldName {
-    fn from(key: intern::string_key::StringKey) -> Self {
-        ClientFieldName(key.to())
-    }
-}
+pub struct ClientScalarSelectableNameWrapper(common_lang_types::SelectableName);
 
 pub type EntrypointDeclarationPath<'a> =
     PositionResolutionPath<&'a EntrypointDeclaration, IsoLiteralSlotPath<'a>>;
 
 pub type ExtraChunksPath<'a> = PositionResolutionPath<&'a ExtraChunks, IsoLiteralParsePath<'a>>;
 
-pub type EntityNamePath<'a> = PositionResolutionPath<&'a EntityName, EntrypointDeclarationPath<'a>>;
+pub type EntityNameWrapperPath<'a> =
+    PositionResolutionPath<&'a EntityNameWrapper, EntrypointDeclarationPath<'a>>;
 
-pub type ClientFieldNamePath<'a> =
-    PositionResolutionPath<&'a ClientFieldName, EntrypointDeclarationPath<'a>>;
+pub type ClientScalarSelectableNameWrapperPath<'a> =
+    PositionResolutionPath<&'a ClientScalarSelectableNameWrapper, EntrypointDeclarationPath<'a>>;
 
 pub fn parse_iso_literal(
     text: &str,
@@ -125,8 +114,10 @@ fn parse_entrypoint(
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::FieldName)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
     EntrypointDeclaration {
-        parent_type: parent_type.interned(),
-        client_field_name: client_field_name.interned(),
+        parent_type: parent_type.interned().map(EntityNameWrapper),
+        client_field_name: client_field_name
+            .interned()
+            .map(ClientScalarSelectableNameWrapper),
     }
     .wrap_ok()
 }
@@ -241,8 +232,14 @@ mod tests {
         let text = "entrypoint Query.foo";
         let (parse, errors) = parsed(text);
         let declaration = as_entrypoint(parse.reference());
-        assert_eq!(declaration.parent_type.item, "Query".intern().to());
-        assert_eq!(declaration.client_field_name.item, "foo".intern().to());
+        assert_eq!(
+            declaration.parent_type.item,
+            EntityNameWrapper("Query".intern().to())
+        );
+        assert_eq!(
+            declaration.client_field_name.item,
+            ClientScalarSelectableNameWrapper("foo".intern().to())
+        );
         assert_eq!(declaration.parent_type.location, span_of(text, "Query"));
         assert_eq!(declaration.client_field_name.location, span_of(text, "foo"));
         assert_eq!(errors, vec![]);
@@ -581,7 +578,7 @@ mod tests {
         let text = "entrypoint Query.foo";
         let (parse, _) = parsed(text);
         match parse.resolve((), span_of(text, "Query")) {
-            IsographResolutionNode::EntityName(name) => {
+            IsographResolutionNode::EntityNameWrapper(name) => {
                 assert_eq!(
                     name.parent.inner.client_field_name.location,
                     span_of(text, "foo")
@@ -590,7 +587,7 @@ mod tests {
             node => panic!("expected the entity name leaf, got {node:?}"),
         }
         match parse.resolve((), span_of(text, "foo")) {
-            IsographResolutionNode::ClientFieldName(_) => {}
+            IsographResolutionNode::ClientScalarSelectableNameWrapper(_) => {}
             node => panic!("expected the client field name leaf, got {node:?}"),
         }
         for span in [

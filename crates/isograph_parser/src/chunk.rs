@@ -8,8 +8,9 @@ use span::{Span, WithSpan, WithSpanPostfix};
 use crate::{
     ArgumentListPath, BracketItem, Bracketed, CloseBracket, Expectation, ExtraChunksPath, Found,
     IsoLiteralItem, IsoLiteralParsePath, IsoLiteralSlotPath, IsographResolutionNode,
-    MatchedBrackets, NamedArgument, NamedArgumentSlotPath, NonBracketToken, NonBracketTokenKind,
-    ObjectEntry, ObjectEntrySlotPath, ObjectLiteralPath, OpenBracket, ParseError, SemanticToken,
+    MatchedBrackets, NonBracketToken, NonBracketTokenKind, ObjectEntry, ObjectEntrySlotPath,
+    ObjectLiteralPath, OpenBracket, ParseError, SelectionFieldArgument,
+    SelectionFieldArgumentSlotPath, SemanticToken,
     chunk_stream::{ChunkStream, ItemCursor},
 };
 
@@ -193,7 +194,7 @@ pub struct UnparsedChunkItems(
 #[derive(Debug)]
 pub enum UnparsedChunkItemsParent<'a> {
     IsoLiteralSlot(IsoLiteralSlotPath<'a>),
-    NamedArgumentSlot(NamedArgumentSlotPath<'a>),
+    SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
 }
 
@@ -206,9 +207,9 @@ impl<'a> From<IsoLiteralSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
     }
 }
 
-impl<'a> From<NamedArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
-    fn from(path: NamedArgumentSlotPath<'a>) -> Self {
-        UnparsedChunkItemsParent::NamedArgumentSlot(path)
+impl<'a> From<SelectionFieldArgumentSlotPath<'a>> for UnparsedChunkItemsParent<'a> {
+    fn from(path: SelectionFieldArgumentSlotPath<'a>) -> Self {
+        UnparsedChunkItemsParent::SelectionFieldArgumentSlot(path)
     }
 }
 
@@ -238,14 +239,14 @@ pub struct ExtraChunks(
 ///   into leftover's parent enum.
 /// - Position in the slot span but in neither field: `on_unmatched_span = from_path`
 ///   returns `self.path(parent).to()`. Each pin’s `From` builds that pin’s
-///   `ResolvedNode` variant (`IsoLiteralSlot`, `NamedArgumentSlot`, `ObjectEntrySlot`).
+///   `ResolvedNode` variant (`IsoLiteralSlot`, `SelectionFieldArgumentSlot`, `ObjectEntrySlot`).
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(
     resolved_node = IsographResolutionNode<'a>,
     on_unmatched_span = from_path,
     pins = [
         (<IsoLiteralItem, UnparsedChunkItems>, IsoLiteralParsePath<'a>),
-        (<NamedArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
+        (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
     ]
 )]
