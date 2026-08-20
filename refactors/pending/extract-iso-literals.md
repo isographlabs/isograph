@@ -98,37 +98,28 @@ The string's location in the file is `Slot.item`'s `WithSpan`, not a field on `I
 
 `IsoCall::FunctionCall` is `iso(\`...\`)`. `IsoCall::TaggedTemplate` is `iso\`...\``. `AssociatedJsFunction::Present` is the `(` the regex reads after the iso call, the start of the resolver argument.
 
-Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`. Delta:
-
-```
-struct IsoLiteralExtraction { const_export_name, iso_literal_text, iso_literal_start_index, has_associated_js_function, iso_function_called_with_paren }
--> IsoLiteralExtraction<THostLanguage> { iso_literal_text: &'a str, context: THostLanguage::LiteralContext }
-location is Slot.item.location
-return is Slot<IsoLiteralExtraction, Vec<WithSpan<IsoLiteralError>>> (item / extra)
-IsoLiteralError is Host(THostLanguage::Error) | Parse | Bracket | Comma
-TypeScriptLiteralContext holds const_export_name, call, associated_js_function
-has_associated_js_function: bool -> AssociatedJsFunction
-iso_function_called_with_paren: bool -> IsoCall
-```
-
-## Change 1: `Slot.extra_tokens` is `extra`
-
-`extra_tokens` names leftover parse tokens. `Slot` is also the return of `extract_iso_literals`, where the second Option is host errors. The field is `extra`, matching `Singleton.extra_chunks`.
+Origin of `IsoLiteralExtraction`: isograph `crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs`. Delta: host facts move to `TypeScriptLiteralContext`; location is `Slot.item.location`; return is `Slot` (`item` / `extra`); `IsoLiteralError` is `Host` / `Parse` / `Bracket` / `Comma`.
 
 ```rust
-// from crates/isograph_parser/src/chunk.rs
-pub struct Slot<T, E> {
-    #[resolve_field]
-    pub item: Option<WithSpan<T>>,
-    #[resolve_field]
-    #[parent_from]
-    pub extra: Option<WithSpan<E>>,
+// from crates/isograph_schema/src/validated_isograph_schema/isograph_literals.rs (upstream)
+pub struct IsoLiteralExtraction {
+    pub const_export_name: Option<String>,
+    pub iso_literal_text: String,
+    pub iso_literal_start_index: usize,
+    pub has_associated_js_function: bool,
+    pub iso_function_called_with_paren: bool,
 }
 ```
 
-Before: `extra_tokens`. Every `extra_tokens` in `crates/isograph_parser` (struct field, constructions, tests, `#[parent_from]` on that field) becomes `extra`. `UnparsedChunkItemsParent` and resolve pins stay. `parsing-standards.md` Slot listings become `extra`.
+```rust
+// from crates/isograph_parser/src/host_language.rs
+pub struct IsoLiteralExtraction<'a, THostLanguage: HostLanguage> {
+    pub iso_literal_text: &'a str,
+    pub context: THostLanguage::LiteralContext,
+}
+```
 
-## Change 2: `HostLanguage` in the parser
+## Change 1: `HostLanguage` in the parser
 
 New module `crates/isograph_parser/src/host_language.rs`. Parser `Cargo.toml` does not gain `regex`.
 
@@ -141,9 +132,9 @@ pub use host_language::*;
 
 `HostLanguage`, `IsoLiteralExtraction`, and `IsoLiteralError` as in Types. No TypeScript types, no regex.
 
-`BracketError` and `CommaWithoutItem` gain `Copy`, `Clone`, `Display`, and `std::error::Error` here (messages as in lsp-parse-diagnostics.md Change 1), so `IsoLiteralError` can wrap them. `SelectableNameWrapper` gains `Display` here so `TypeScriptHostError::MissingExport` can format the name.
+`BracketError` and `CommaWithoutItem` derive `thiserror::Error` here (messages as in lsp-parse-diagnostics.md Change 1), so `IsoLiteralError` can wrap them. `SelectableNameWrapper` gains `Display` here so `TypeScriptHostError::MissingExport` can format the name.
 
-## Change 3: `isograph_extract_typescript`
+## Change 2: `isograph_extract_typescript`
 
 New crate. The regex and `TypeScriptHostLanguage` live here. `isograph_parser` does not depend on this crate (that would cycle). Callers that want TypeScript take the feature `typescript`.
 
@@ -319,7 +310,7 @@ fn item_of(parse: &WithSpan<IsoLiteralParse>) -> Option<&IsoLiteralItem> {
 
 `item_of` is a private helper in the TypeScript crate: parentheses are a file fact; export and associated function depend on whether the contents parsed as `Selectable`. The parse tree is not `Slot.item`. `item` is the isograph string and host context. Grammar errors come from `parse_iso_literal(text)`.
 
-`Display` for `TypeScriptHostError` lands with Change 3. Change 4 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the host-error tests.
+`TypeScriptHostError` derives `thiserror::Error` in this crate. `SelectableNameWrapper`'s `Display` is Change 1.
 
 `TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
@@ -593,7 +584,7 @@ export const HomeRoute = iso(`
 
 `TypeScriptHostError` implements `Error` via `thiserror`. Origin of the three messages: isograph `process_iso_literal_extraction` and `expected_literal_to_be_exported_diagnostic`. Delta: typed errors; span is `Slot.item.location` (the contents), not `Span::todo_generated`. Parentheses apply to every literal. Export and associated function apply only to `IsoLiteralItem::Selectable`. Entrypoints and a failed parse (`parsed_item: None`) get the parentheses check only. Parse / bracket / comma errors from `parse_tree` go in `extra` as `IsoLiteralError::Parse` / `Bracket` / `Comma`, rebased with `with_offset(span.start)`.
 
-`MissingExport` writes `SelectableNameWrapper`. That `Display` lands in Change 2:
+`MissingExport` writes `SelectableNameWrapper`. That `Display` lands in Change 1:
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -606,7 +597,7 @@ impl fmt::Display for SelectableNameWrapper {
 
 Before: `SelectableNameWrapper` has no `Display`. `parse_iso_literal.rs` gains `use std::fmt;`.
 
-## Change 4: host-error tests
+## Change 3: host-error tests
 
 Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_literals`. Helper `extra_items` takes the inner vec of `Slot.extra`.
 
@@ -733,7 +724,6 @@ Same `tests` module. `extract_all` is `TypeScriptHostLanguage.extract_iso_litera
 
 ## Order
 
-1. Change 1; `Slot.extra_tokens` is `extra`.
-2. Change 2; `HostLanguage`, `IsoLiteralExtraction`, `IsoLiteralError` in `isograph_parser`. `Display` + `Error` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
-3. Change 3; `crates/isograph_extract_typescript`, `typescript` feature on callers, regex, extract tests.
-4. Change 4; host-error tests.
+1. Change 1; `HostLanguage`, `IsoLiteralExtraction`, `IsoLiteralError` in `isograph_parser`. `thiserror` on `BracketError` and `CommaWithoutItem`. `Display` on `SelectableNameWrapper`.
+2. Change 2; `crates/isograph_extract_typescript`, `typescript` feature on callers, regex, extract tests.
+3. Change 3; host-error tests.
