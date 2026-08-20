@@ -174,11 +174,13 @@ After, extra is the unread remainder. When the form fails after consuming every 
         }
 ```
 
-`entrypoint $ $` consumes `entrypoint`, fails at the first `$` without consuming it, extra is `$ $`. `entrypoint Query.` consumes every content item and then fails; remaining is `None`; extra is the whole contents.
+`entrypoint $ $` consumes `entrypoint`, fails at the first `$` without consuming it, extra is `$ $`. `entrypoint Foo.$ asdf` consumes `entrypoint` / `Foo` / `.`, fails at `$` without consuming it, extra is `$ asdf`. `entrypoint Query.` consumes every content item and then fails; remaining is `None`; extra is the whole contents.
 
 The failed arm does not fold `trailing_separator` into extra.
 
 ## Tests
+
+This change renames `a_failed_form_keeps_the_whole_chunk_as_remaining` to `a_failed_form_puts_unread_remainder_in_extra`. Extra is `$ asdf`, not the consumed prefix.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -245,6 +247,22 @@ The failed arm does not fold `trailing_separator` into extra.
             .as_ref()
             .expect("the whole contents are extra");
         assert_eq!(extra.location, span_of(text, "entrypoint Query."));
+    }
+
+    #[test]
+    fn a_failed_form_puts_unread_remainder_in_extra() {
+        let text = "entrypoint Foo.$ asdf";
+        let (parse, errors) = parsed(text);
+        assert!(parsed_item(parse.reference()).is_none());
+        let extra = first_slot(parse.reference())
+            .extra
+            .as_ref()
+            .expect("$ asdf is extra");
+        assert_eq!(extra.location, span_of(text, "$ asdf"));
+        assert!(errors.iter().any(|error| {
+            error.item == expected(token(Identifier), Found::Token(Dollar))
+                && error.location == span_of(text, "$")
+        }));
     }
 
     #[test]
