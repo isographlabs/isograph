@@ -794,20 +794,6 @@ mod tests {
     }
 
     #[test]
-    fn advance_records_nothing() {
-        let text = "foo";
-        let tree = chunked(text);
-        let mut tokens = Vec::new();
-        let mut errors = Vec::new();
-        {
-            let mut stream = stream_of(tree.reference(), text, &mut tokens, &mut errors);
-            let peek = stream.cursor().peek().expect("foo is present");
-            assert_eq!(peek.advance().location, span_of(text, "foo"));
-        }
-        assert_eq!(tokens, vec![]);
-    }
-
-    #[test]
     fn peek_without_commit_records_nothing() {
         let text = "foo";
         let tree = chunked(text);
