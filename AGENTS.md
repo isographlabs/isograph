@@ -111,6 +111,12 @@ When both arms produce the same type, write `expr.unwrap_or_else(|err| ...)`. Do
 
 Do not pass a value that is used only on one arm of the `Result` or `Option` the function returns, when the caller has that same arm. Return the success side; the caller fills the other arm. `require_token(kind, expected)` is `require_token(kind)` plus `map_err(|()| cursor.expected(expected))`. Same for `require_group`.
 
+## Errors
+
+Error types use `thiserror`. Derive `Error`; put the message on `#[error("...")]`. Do not write a manual `Display` or `std::error::Error` impl. Wrapping another error is `#[error("{0}")]` on that variant.
+
+A type that is not an error must not implement `std::error::Error`.
+
 ## Postfix wrappers
 
 Do not write prefix or constructor wrappers that `prelude::Postfix` or `span::WithSpanPostfix` already names. Write the method.
