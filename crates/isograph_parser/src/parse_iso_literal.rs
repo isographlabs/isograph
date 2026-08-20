@@ -1,3 +1,5 @@
+use std::fmt;
+
 use common_lang_types::SelectableName;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
@@ -84,6 +86,12 @@ pub struct EntityNameWrapper(pub common_lang_types::EntityName);
     resolved_node = IsographResolutionNode<'a>
 )]
 pub struct SelectableNameWrapper(pub common_lang_types::SelectableName);
+
+impl fmt::Display for SelectableNameWrapper {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
 
 /// The interned interior of a description, quotes excluded.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, ResolvePosition)]

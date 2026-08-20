@@ -1080,6 +1080,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "isograph_compiler"
+version = "0.5.3"
+dependencies = [
+ "isograph_parser",
+ "span",
+ "thiserror 1.0.69",
+]
+
+[[package]]
 name = "isograph_config"
 version = "0.5.3"
 dependencies = [
@@ -1092,6 +1101,20 @@ dependencies = [
  "serde",
  "serde_json",
  "tracing",
+]
+
+[[package]]
+name = "isograph_extract_typescript"
+version = "0.5.3"
+dependencies = [
+ "common_lang_types",
+ "intern",
+ "isograph_compiler",
+ "isograph_parser",
+ "prelude",
+ "regex",
+ "span",
+ "thiserror 1.0.69",
 ]
 
 [[package]]

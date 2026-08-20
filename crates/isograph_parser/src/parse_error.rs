@@ -16,7 +16,7 @@ pub enum AstError {
     IntegerDoesNotFitI64,
 }
 
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum ParseError {
     #[error("{0}")]
     Ast(#[from] AstError),

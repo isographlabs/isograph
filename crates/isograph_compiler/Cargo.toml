@@ -1,0 +1,13 @@
+[package]
+name = "isograph_compiler"
+version = { workspace = true }
+edition = { workspace = true }
+license = { workspace = true }
+
+[dependencies]
+isograph_parser = { path = "../isograph_parser" }
+span = { path = "../span" }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

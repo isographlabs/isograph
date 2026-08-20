@@ -44,7 +44,7 @@ pub struct CloseBracket(pub BracketKind);
 
 /// The matcher's errors, returned beside the tree, in source order. The tree cannot
 /// represent them: each cut its level at its position.
-#[derive(Debug, PartialEq, Eq, Error)]
+#[derive(Clone, Debug, PartialEq, Eq, Error)]
 pub enum BracketError {
     /// An open bracket whose close never came.
     #[error("Unclosed {}", .0.item.0)]
