@@ -2,9 +2,9 @@
 
 The schema is a graph. An entity is a node. A selectable is a named pointer from an entity to a wrapper of an entity.
 
-There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities. A GraphQL field and an iso `field` declaration are both field definitions. Each produces a selectable.
+There is one kind of entity and one kind of selectable. `User`, `String`, `Query`, and the result of `field User.Avatar` are all entities. A GraphQL field and an iso `field` declaration are both selectable declarations. Each produces a selectable.
 
-The building blocks are `Wrapper`, `Entity`, `Selectable`, `FieldDefinition`, `Selection`, `SelectionSet`, and `Entrypoint`.
+The building blocks are `Wrapper`, `Entity`, `Selectable`, `SelectableDeclaration`, `Selection`, `SelectionSet`, and `Entrypoint`.
 
 ## Wrapper
 
@@ -62,11 +62,11 @@ struct AnonymousEntity {
 
 A named entity has a name such as `User`, `Query`, or `String`.
 
-An anonymous entity is created by a field definition with no `to` clause, for example `field Foo.Bar`. It has exactly one incoming selectable: the selectable that field definition declares. It has no name, so no other field definition can point at it.
+An anonymous entity is created by a selectable declaration with no `to` clause, for example `field Foo.Bar`. It has exactly one incoming selectable: the selectable that declaration declares. It has no name, so no other selectable declaration can point at it.
 
 `defined_by` is that unique incoming selectable. The selectable itself lives on the parent entity.
 
-A field definition's parent is a named entity (`field User.Avatar`, `type User { name: String }`).
+A selectable declaration's parent is a named entity (`field User.Avatar`, `type User { name: String }`).
 
 ## Selectable
 
@@ -84,12 +84,12 @@ It is identified by `(parent, name)`: `User.name`, `User.friends`, `User.Avatar`
 
 Nested selections under a selection of this selectable are selections on the inner entity of `target`.
 
-## FieldDefinition
+## SelectableDeclaration
 
-A field definition declares a selectable. Every selectable comes from exactly one field definition. Every field definition produces exactly one selectable.
+A `SelectableDeclaration` produces a `Selectable`. Every selectable comes from exactly one declaration. Every declaration produces exactly one selectable. The iso keyword is `field`.
 
 ```rust
-struct FieldDefinition {
+struct SelectableDeclaration {
     parent: NamedEntity,
     name: SelectableName,
     to: Option<Wrapper>,
@@ -97,11 +97,11 @@ struct FieldDefinition {
 }
 ```
 
-If `to` is `None`, the definition creates an anonymous entity and a selectable whose `target` is that entity (identity wrapper). If `to` is `Some(w)`, the definition creates a selectable whose `target` is `w`. No new entity.
+If `to` is `None`, the declaration creates an anonymous entity and a selectable whose `target` is that entity (identity wrapper). If `to` is `Some(w)`, the declaration creates a selectable whose `target` is `w`. No new entity.
 
-The selection set, when present, selects selectables of `parent`. It is what the field reads. It does not declare selectables of the target.
+The selection set, when present, selects selectables of `parent`. It is what the declaration reads. It does not declare selectables of the target.
 
-A GraphQL field definition:
+A GraphQL selectable declaration:
 
 ```graphql
 type User {
@@ -110,9 +110,9 @@ type User {
 }
 ```
 
-`User.name` has `to: String`. `User.friends` has `to: [User]`. There is no selection set on these definitions.
+`User.name` has `to: String`. `User.friends` has `to: [User]`. There is no selection set on these declarations.
 
-An iso field definition with no `to`:
+An iso selectable declaration with no `to`:
 
 ```text
 field User.Avatar {
@@ -121,9 +121,9 @@ field User.Avatar {
 }
 ```
 
-This creates an anonymous entity and the selectable `User.Avatar` pointing at it. The selection set `{ name, avatarUrl }` selects `User.name` and `User.avatarUrl`. Those are inputs the field reads from `User`. The anonymous entity is the result of `Avatar`.
+This creates an anonymous entity and the selectable `User.Avatar` pointing at it. The selection set `{ name, avatarUrl }` selects `User.name` and `User.avatarUrl`. Those are inputs the declaration reads from `User`. The anonymous entity is the result of `Avatar`.
 
-An iso field definition with `to`:
+An iso selectable declaration with `to`:
 
 ```text
 field User.bestFriend to User {
@@ -133,7 +133,7 @@ field User.bestFriend to User {
 }
 ```
 
-This creates the selectable `User.bestFriend` whose target is the named entity `User`. The selection set selects selectables of the parent `User`. It is how the field computes which `User` to point at.
+This creates the selectable `User.bestFriend` whose target is the named entity `User`. The selection set selects selectables of the parent `User`. It is how the declaration computes which `User` to point at.
 
 ## Selection
 
@@ -158,7 +158,7 @@ struct SelectionSet {
 }
 ```
 
-A field definition may have a selection set on its parent entity. A selection may have a nested selection set on the inner entity of its selectable's target.
+A selectable declaration may have a selection set on its parent entity. A selection may have a nested selection set on the inner entity of its selectable's target.
 
 ## Entrypoint
 
@@ -180,7 +180,7 @@ entrypoint User.Avatar
 
 The entity does not have to be `Query`. `Query` is an ordinary named entity. Any entity that has the selectable can host an entrypoint.
 
-An entrypoint does not create a selectable. It marks one that a field definition already declared.
+An entrypoint does not create a selectable. It marks one that a selectable declaration already declared.
 
 ## Example
 
@@ -231,7 +231,7 @@ User.Avatar      ->  Avatar anonymous entity
 Query.HomePage   ->  HomePage anonymous entity
 ```
 
-Field definitions: the four GraphQL fields, plus the two iso fields.
+Selectable declarations: the four GraphQL fields, plus the two iso fields.
 
 Selections inside `User.Avatar`: `name`.
 
