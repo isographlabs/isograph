@@ -36,7 +36,7 @@ $ isograph --config /other/project/isograph.config.js status
 
 New module `crates/isograph_cli/src/discover.rs`. `App::Id` becomes the config flag. `App::DaemonArgs` can be `NoArgs` now that `Id` is not `NoArgs` (the clap group-name collision goes away).
 
-`crates/isograph_cli/Cargo.toml` gains `thiserror = "2"`.
+`crates/isograph_cli/Cargo.toml` gains `thiserror = "2"`. `[dev-dependencies]` gains `tempfile = "3"`.
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
@@ -181,7 +181,9 @@ The contents of the config file are not read.
 
 ## Tests
 
-Unit tests in `discover.rs`. Binary tests replace `Daemon` with `World`: one private HOME, any number of project directories, optional `--config`. Config files are `{}\n` so Change 3 does not break these tests. `World::isograph` uses `isograph_bin()` from cli-ci-build.md. The test job on each platform downloads the release artifact and runs `cargo test --tests` with `ISOGRAPH_BIN` set to it.
+Unit tests in `discover.rs`: walk-up, slug, `config_path`. They do not start a daemon.
+
+The existing e2e in `crates/ts_graphql_react_isograph_cli/tests/cli.rs` writes `{}\n` as `isograph.config.json` in the temp cwd and runs the binary there.
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
@@ -397,436 +399,27 @@ mod tests {
 ```
 
 ```rust
-// from crates/isograph_cli/tests/cli.rs
-//! Drive the built `isograph` binary. Every daemon's lock and log live under a private HOME.
-
-use std::path::{Path, PathBuf};
-use std::process::{Command, Output};
-use std::time::{Duration, Instant};
-
-use prelude::Postfix;
-
-const DEADLINE: Duration = Duration::from_secs(10);
-
-struct World {
-    dir: tempfile::TempDir,
-}
-
-struct Running<'a> {
-    world: &'a World,
-    cwd: PathBuf,
-    config: Option<PathBuf>,
-    start_stdout: String,
-}
-
-impl World {
-    fn new() -> Self {
+// from crates/ts_graphql_react_isograph_cli/tests/cli.rs
+    fn start() -> Self {
         let dir = tempfile::tempdir().expect("a test can create a temp directory");
-        Self { dir }
-    }
-
-    fn project(&self, name: &str) -> PathBuf {
-        let project = self.dir.path().join(name);
-        std::fs::create_dir_all(project.reference())
-            .expect("a test can create a project directory");
-        project
-    }
-
-    fn write_config(project: &Path, file_name: &str, contents: &str) -> PathBuf {
-        let path = project.join(file_name);
-        std::fs::write(path.reference(), contents).expect("a test can write a config file");
-        path
-    }
-
-    fn project_with_json(&self, name: &str) -> (PathBuf, PathBuf) {
-        let project = self.project(name);
-        let config = Self::write_config(project.reference(), "isograph.config.json", "{}\n");
-        (project, config)
-    }
-
-    fn isograph(
-        &self,
-        cwd: &Path,
-        config: Option<&Path>,
-        args: impl IntoIterator<Item = impl AsRef<std::ffi::OsStr>>,
-    ) -> Output {
-        let home = self.dir.path().join("home");
-        std::fs::create_dir_all(home.reference()).expect("a test can create its private HOME");
-        let mut command = Command::new(isograph_bin());
-        command.args(args);
-        if let Some(config) = config {
-            command.arg("--config").arg(config);
-        }
-        command
-            .current_dir(cwd)
-            .env("HOME", home.reference())
-            .env("XDG_STATE_HOME", home.join("state"))
-            .env("LOCALAPPDATA", home.join("appdata"))
-            .output()
-            .expect("the isograph binary runs")
-    }
-
-    fn start(&self, cwd: &Path, config: Option<&Path>) -> Running<'_> {
-        let output = self.isograph(cwd, config, ["start"]);
+        let config = dir.path().join("isograph.config.json");
+        std::fs::write(config.reference(), "{}\n").expect("a test can write a config file");
+        let daemon = Self { dir };
+        let output = daemon.isograph(["start"].reference());
         assert!(
             output.status.success(),
             "start failed: {}",
             String::from_utf8_lossy(output.stderr.reference())
         );
-        Running {
-            world: self,
-            cwd: cwd.to_owned(),
-            config: config.map(Path::to_owned),
-            start_stdout: stdout(output.reference()),
-        }
+        let text = stdout(output.reference());
+        let path = config.canonicalize().expect("the fixture exists");
+        assert!(text.contains("started"), "{text}");
+        assert!(text.contains(&path.display().to_string()), "{text}");
+        daemon
     }
-
-    fn log_paths(&self) -> Vec<PathBuf> {
-        let home = self.dir.path().join("home");
-        let mut paths = Vec::new();
-        let mut stack = home.wrap_vec();
-        while let Some(dir) = stack.pop() {
-            let Ok(entries) = std::fs::read_dir(dir.reference()) else {
-                continue;
-            };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    stack.push(path);
-                } else if path.extension().is_some_and(|e| e == "log") {
-                    paths.push(path);
-                }
-            }
-        }
-        paths
-    }
-}
-
-impl Drop for Running<'_> {
-    fn drop(&mut self) {
-        let _ = self.world.isograph(
-            self.cwd.reference(),
-            self.config.as_deref(),
-            ["stop", "--force"],
-        );
-    }
-}
-
-fn poll<T>(mut f: impl FnMut() -> Option<T>) -> T {
-    let start = Instant::now();
-    loop {
-        if let Some(value) = f() {
-            return value;
-        }
-        assert!(start.elapsed() < DEADLINE, "deadline passed");
-        std::thread::sleep(Duration::from_millis(50));
-    }
-}
-
-fn stdout(output: &Output) -> String {
-    String::from_utf8_lossy(output.stdout.reference()).into_owned()
-}
-
-fn stderr(output: &Output) -> String {
-    String::from_utf8_lossy(output.stderr.reference()).into_owned()
-}
-
-fn canonical(path: &Path) -> PathBuf {
-    path.canonicalize().expect("the fixture exists")
-}
-
-fn hashed_log_name(path: &Path) {
-    let name = path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .expect("log file names are utf-8");
-    let hex = name
-        .strip_prefix("isograph-")
-        .and_then(|s| s.strip_suffix(".log"))
-        .expect("the log file is isograph-<hash>.log");
-    assert_eq!(hex.len(), 16, "{name}");
-    assert!(
-        hex.chars().all(|c| matches!(c, '0'..='9' | 'a'..='f')),
-        "{name}"
-    );
-}
-
-fn pid_from(output: &Output) -> u32 {
-    let text = stdout(output.reference());
-    let rest = text
-        .split_once("pid ")
-        .expect("status names a pid")
-        .1;
-    rest.chars()
-        .take_while(|c| c.is_ascii_digit())
-        .collect::<String>()
-        .parse()
-        .expect("pid is digits")
-}
-
-#[test]
-fn start_then_status_reports_running_and_names_the_config() {
-    let world = World::new();
-    let (project, config) = world.project_with_json("app");
-    let running = world.start(project.reference(), None);
-    let path = canonical(config.reference()).display().to_string();
-    assert!(
-        running.start_stdout.contains("started"),
-        "{}",
-        running.start_stdout
-    );
-    assert!(
-        running.start_stdout.contains(path.reference()),
-        "{}",
-        running.start_stdout
-    );
-    let status = world.isograph(project.reference(), None, ["status"]);
-    assert!(status.status.success());
-    let text = stdout(status.reference());
-    assert!(text.contains("is running"), "{text}");
-    assert!(text.contains(path.reference()), "{text}");
-}
-
-#[test]
-fn start_in_a_subdirectory_finds_the_same_daemon() {
-    let world = World::new();
-    let (project, config) = world.project_with_json("app");
-    let nested = project.join("src/components");
-    std::fs::create_dir_all(nested.reference())
-        .expect("a test can create a nested directory");
-    let _running = world.start(nested.reference(), None);
-    let from_root = world.isograph(project.reference(), None, ["status"]);
-    let from_nested = world.isograph(nested.reference(), None, ["status"]);
-    assert!(from_root.status.success());
-    assert!(from_nested.status.success());
-    assert_eq!(pid_from(from_root.reference()), pid_from(from_nested.reference()));
-    let path = canonical(config.reference()).display().to_string();
-    assert!(stdout(from_root.reference()).contains(path.reference()));
-    assert!(stdout(from_nested.reference()).contains(path.reference()));
-}
-
-#[test]
-fn start_with_no_config_above_cwd_fails() {
-    let world = World::new();
-    let cwd = world.project("empty");
-    let output = world.isograph(cwd.reference(), None, ["start"]);
-    assert!(!output.status.success());
-    let err = stderr(output.reference());
-    assert!(err.contains("isograph.config.json"), "{err}");
-    assert!(err.contains("isograph.config.js"), "{err}");
-    assert!(err.contains("isograph.config.ts"), "{err}");
-    assert!(err.contains(&cwd.display().to_string()), "{err}");
-    assert!(err.contains("--config"), "{err}");
-}
-
-#[test]
-fn start_with_config_flag_pointing_at_a_missing_file_fails() {
-    let world = World::new();
-    let cwd = world.project("app");
-    let missing = cwd.join("nope.json");
-    let output = world.isograph(cwd.reference(), missing.as_path().wrap_some(), ["start"]);
-    assert!(!output.status.success());
-    let err = stderr(output.reference());
-    assert!(err.contains("could not resolve the config at"), "{err}");
-    assert!(err.contains(&missing.display().to_string()), "{err}");
-}
-
-#[test]
-fn start_with_config_flag_uses_that_file_not_walk_up() {
-    let world = World::new();
-    let project = world.project("app");
-    World::write_config(project.reference(), "isograph.config.json", "{}\n");
-    let js = World::write_config(
-        project.reference(),
-        "isograph.config.js",
-        "export default {};\n",
-    );
-    std::fs::write(
-        project.join("package.json").reference(),
-        "{\"type\":\"module\"}\n",
-    )
-    .expect("a test can write package.json");
-    let _running = world.start(project.reference(), js.as_path().wrap_some());
-    let via_flag = world.isograph(project.reference(), js.as_path().wrap_some(), ["status"]);
-    let via_walk = world.isograph(project.reference(), None, ["status"]);
-    assert!(via_flag.status.success());
-    assert!(!via_walk.status.success());
-    assert!(
-        stdout(via_flag.reference()).contains(&canonical(js.reference()).display().to_string()),
-        "{}",
-        stdout(via_flag.reference())
-    );
-}
-
-#[test]
-fn two_projects_are_two_daemons() {
-    let world = World::new();
-    let (a, a_config) = world.project_with_json("a");
-    let (b, b_config) = world.project_with_json("b");
-    let _da = world.start(a.reference(), None);
-    let _db = world.start(b.reference(), None);
-    let status_a = world.isograph(a.reference(), None, ["status"]);
-    let status_b = world.isograph(b.reference(), None, ["status"]);
-    assert!(status_a.status.success());
-    assert!(status_b.status.success());
-    assert_ne!(pid_from(status_a.reference()), pid_from(status_b.reference()));
-    assert!(
-        stdout(status_a.reference())
-            .contains(&canonical(a_config.reference()).display().to_string())
-    );
-    assert!(
-        stdout(status_b.reference())
-            .contains(&canonical(b_config.reference()).display().to_string())
-    );
-    let a_path = canonical(a_config.reference()).display().to_string();
-    let b_path = canonical(b_config.reference()).display().to_string();
-    let logs = poll(|| {
-        let paths = world.log_paths();
-        (paths.len() == 2).then_some(paths)
-    });
-    for path in logs.iter() {
-        hashed_log_name(path.reference());
-    }
-    let texts: Vec<String> = logs
-        .iter()
-        .map(|path| std::fs::read_to_string(path).expect("the log is readable"))
-        .collect();
-    assert_eq!(
-        texts.iter().filter(|text| text.contains(a_path.reference())).count(),
-        1
-    );
-    assert_eq!(
-        texts.iter().filter(|text| text.contains(b_path.reference())).count(),
-        1
-    );
-    assert!(!texts
-        .iter()
-        .any(|text| text.contains(a_path.reference()) && text.contains(b_path.reference())));
-}
-
-#[test]
-fn stop_in_one_project_leaves_the_other_running() {
-    let world = World::new();
-    let (a, _) = world.project_with_json("a");
-    let (b, _) = world.project_with_json("b");
-    let _da = world.start(a.reference(), None);
-    let _db = world.start(b.reference(), None);
-    let stopped = world.isograph(a.reference(), None, ["stop"]);
-    assert!(stopped.status.success());
-    poll(|| (!world.isograph(a.reference(), None, ["status"]).status.success()).then_some(()));
-    assert!(world.isograph(b.reference(), None, ["status"]).status.success());
-}
-
-#[test]
-fn the_log_is_named_for_the_config_hash_and_contains_the_canonical_path() {
-    let world = World::new();
-    let (project, config) = world.project_with_json("app");
-    let _running = world.start(project.reference(), None);
-    let path = canonical(config.reference()).display().to_string();
-    let logs = poll(|| {
-        let paths = world.log_paths();
-        let has = paths.iter().any(|log| {
-            std::fs::read_to_string(log)
-                .ok()
-                .is_some_and(|text| {
-                    text.contains("isograph daemon up") && text.contains(path.reference())
-                })
-        });
-        has.then_some(paths)
-    });
-    assert_eq!(logs.len(), 1);
-    hashed_log_name(logs[0].reference());
-}
-
-#[test]
-fn relative_and_absolute_config_flags_are_one_daemon() {
-    let world = World::new();
-    let (project, config) = world.project_with_json("app");
-    let absolute = canonical(config.reference());
-    let _running = world.start(project.reference(), Path::new("isograph.config.json").wrap_some());
-    let status = world.isograph(project.reference(), absolute.as_path().wrap_some(), ["status"]);
-    assert!(status.status.success());
-    assert_eq!(
-        pid_from(world.isograph(project.reference(), None, ["status"]).reference()),
-        pid_from(status.reference())
-    );
-}
-
-#[test]
-fn stop_then_status_reports_not_running() {
-    let world = World::new();
-    let (project, _) = world.project_with_json("app");
-    let _running = world.start(project.reference(), None);
-    assert!(world.isograph(project.reference(), None, ["status"]).status.success());
-    let stopped = world.isograph(project.reference(), None, ["stop"]);
-    assert!(stopped.status.success());
-    poll(|| {
-        (!world.isograph(project.reference(), None, ["status"]).status.success()).then_some(())
-    });
-}
-
-#[test]
-fn a_second_start_adopts_the_running_daemon() {
-    let world = World::new();
-    let (project, _) = world.project_with_json("app");
-    let _running = world.start(project.reference(), None);
-    let again = world.isograph(project.reference(), None, ["start"]);
-    assert!(again.status.success());
-    assert!(
-        stdout(again.reference()).contains("already running"),
-        "{}",
-        stdout(again.reference())
-    );
-    assert!(world.isograph(project.reference(), None, ["status"]).status.success());
-}
-
-#[test]
-fn start_in_a_js_only_project_names_the_js_config() {
-    let world = World::new();
-    let project = world.project("app");
-    let config = World::write_config(
-        project.reference(),
-        "isograph.config.js",
-        "export default {};\n",
-    );
-    std::fs::write(
-        project.join("package.json").reference(),
-        "{\"type\":\"module\"}\n",
-    )
-    .expect("a test can write package.json");
-    let _running = world.start(project.reference(), None);
-    let status = world.isograph(project.reference(), None, ["status"]);
-    assert!(status.status.success());
-    assert!(
-        stdout(status.reference())
-            .contains(&canonical(config.reference()).display().to_string()),
-        "{}",
-        stdout(status.reference())
-    );
-}
-
-#[cfg(unix)]
-#[test]
-fn symlink_and_real_path_are_one_daemon() {
-    let world = World::new();
-    let project = world.project("app");
-    let real = World::write_config(project.reference(), "isograph.config.json", "{}\n");
-    let link = project.join("link.config.json");
-    std::os::unix::fs::symlink(real.reference(), link.reference())
-        .expect("a test can create a symlink");
-    let _running = world.start(project.reference(), real.as_path().wrap_some());
-    let status = world.isograph(project.reference(), link.as_path().wrap_some(), ["status"]);
-    assert!(status.status.success());
-    assert_eq!(
-        pid_from(
-            world
-                .isograph(project.reference(), real.as_path().wrap_some(), ["status"])
-                .reference()
-        ),
-        pid_from(status.reference())
-    );
-}
 ```
+
+`the_log_contains_hello_from_isograph` becomes `the_log_contains_the_config_path`: the log has `isograph daemon up` and the canonical config path. `start_then_status_reports_running` still reports running; status stdout contains that path.
 
 ## Change 2: JS and TS configs become JSON
 
@@ -1294,7 +887,7 @@ A config that is not JSON (or whose JS/TS export is not JSON-serializable) fails
 
 ### Tests
 
-Added to the `discover.rs` tests module, plus two binary tests on `World`.
+Unit tests in `discover.rs`.
 
 ```rust
 // from crates/isograph_cli/src/discover.rs
@@ -1363,38 +956,4 @@ Added to the `discover.rs` tests module, plus two binary tests on `World`.
         };
         assert_eq!(inner.path, path);
     }
-```
-
-```rust
-// from crates/isograph_cli/tests/cli.rs
-#[test]
-fn start_with_unparseable_config_fails() {
-    let world = World::new();
-    let project = world.project("app");
-    let config = World::write_config(project.reference(), "isograph.config.json", "{");
-    let output = world.isograph(project.reference(), None, ["start"]);
-    assert!(!output.status.success());
-    let err = stderr(output.reference());
-    assert!(err.contains("could not parse"), "{err}");
-    assert!(
-        err.contains(&canonical(config.reference()).display().to_string())
-            || err.contains(&config.display().to_string()),
-        "{err}"
-    );
-}
-
-#[test]
-fn start_with_empty_object_succeeds() {
-    let world = World::new();
-    let (project, config) = world.project_with_json("app");
-    let _running = world.start(project.reference(), None);
-    let status = world.isograph(project.reference(), None, ["status"]);
-    assert!(status.status.success());
-    assert!(
-        stdout(status.reference())
-            .contains(&canonical(config.reference()).display().to_string()),
-        "{}",
-        stdout(status.reference())
-    );
-}
 ```
