@@ -1,8 +1,8 @@
 # Extract iso literals
 
-Iso literals exist in files. Finding them in a file, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. What is common to every host: the backtick contents and that slice's span in the file. What is not: how the literals are found, and the facts beside them (exported name, call form, associated function, and the checks those facts imply). Those facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
+Iso literals exist in files: an isograph source string occupies a span in a file. Finding that string, and checking that the host-language embedding is valid, is `THostLanguage: HostLanguage`. How the host finds the string is not common. Host facts live on `THostLanguage::LiteralContext`, not on `SelectableDeclaration`.
 
-The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source.
+The first implementor is `TypeScriptHostLanguage`: the same regex isograph uses on JavaScript and TypeScript source. It finds `iso(\`...\`)` and `iso\`...\`` and sets `iso_literal_text` / `span` to the interior of the backticks.
 
 ## Types
 
@@ -66,7 +66,7 @@ pub enum TypeScriptHostError {
 
 Derives: `TypeScriptHostLanguage` is `Copy, Clone, Debug, Default, PartialEq, Eq`. `IsoLiteralExtraction` is `Copy, Clone, Debug, PartialEq, Eq` when `LiteralContext` is. `TypeScriptLiteralContext`, `IsoCall`, `AssociatedJsFunction`, `TypeScriptHostError` are `Copy, Clone, Debug, PartialEq, Eq`.
 
-`iso_literal_text` is the text inside the backticks, not including them. `span` is that slice's range in `source`. Invariant: `&source[extraction.span.as_usize_range()] == extraction.iso_literal_text`.
+`iso_literal_text` is the isograph source. `span` is where that string sits in the file. For `TypeScriptHostLanguage`, both are the interior of the backticks, and `&source[extraction.span.as_usize_range()] == extraction.iso_literal_text`.
 
 `IsoCall::FunctionCall` is `iso(\`...\`)`. `IsoCall::TaggedTemplate` is `iso\`...\``. `AssociatedJsFunction::Present` is the `(` the regex reads after the iso call, the start of the resolver argument.
 
@@ -227,7 +227,7 @@ impl HostLanguage for TypeScriptHostLanguage {
 
 The `validate` body and `Display` for `TypeScriptHostError` land with Change 1 so the impl is complete. Change 2 is `Display` for `SelectableNameWrapper` (used by `MissingExport`) and the validate tests.
 
-Empty backticks (`iso(\`\`)`) do not match: `[^`]+` needs at least one character. A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
+`TypeScriptHostLanguage`: empty backticks (`iso(\`\`)`) do not match (`[^`]+` needs at least one character). A missing `literal` group skips the match. `close_paren` is in the pattern so the associated `(` can match; it is not a field.
 
 Origin of `extract`: `extract_iso_literals_from_file_content` in isograph's `isograph_literals.rs`. Delta: method on `TypeScriptHostLanguage`; named groups; `filter_map`; interned `ConstExportName`; `Span`; the two enums; host facts on `context`.
 
