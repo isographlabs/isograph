@@ -302,16 +302,16 @@ pub(crate) fn parse_non_constant_value(
     cursor: &mut ItemCursor<'_>,
 ) -> Result<WithSpan<NonConstantValue>, WithSpan<ParseError>> {
     cursor.spanning(|cursor| {
-        if cursor
-            .consume_token_if(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-            .is_some()
-        {
-            let name = cursor
-                .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
-                .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
-            return NonConstantValue::Variable(VariableUse(
-                name.interned().map(VariableNameWrapper),
-            ))
+        if matches!(
+            cursor.peek().map(|peek| peek.view().item.reference()),
+            Some(ChunkContentItem::NonBracket(NonBracketToken(
+                NonBracketTokenKind::Dollar
+            )))
+        ) {
+            return NonConstantValue::Variable(VariableUse(parse_variable_name(
+                cursor,
+                Expectation::Token(NonBracketTokenKind::Dollar),
+            )?))
             .wrap_ok();
         }
         if let Some(span) =
@@ -369,7 +369,7 @@ pub(crate) fn parse_non_constant_value(
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
-One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is `consume_token_if(Dollar, SemanticToken::Variable)` then `require_token(Identifier, SemanticToken::Variable)`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
+One optional item is `consume_*`. Two optional kinds in one position is two `consume_token_if` calls. The optional `!` after a type name is `consume_token_if(Exclamation, SemanticToken::GraphQLTypeName)`: the next item may be the caller's `=`. `$name` is a peek for `$`, then `parse_variable_name`. After `require_token` on an identifier, `consume_token_if(Colon, SemanticToken::Colon)` is the alias; both arms use the identifier.
 
 ```rust
     let first = cursor
@@ -533,7 +533,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Nested list stream: `ItemCursor::stream_chunk`
 - Group interior: `require_group` / `consume_group_if` with a function that parses the inside; close is recorded when that function returns.
 - lhs, colon, rhs: `parse_name_colon(cursor, parse_lhs, parse_rhs)` → `(L, R)`
-- `$ ident`: `consume_variable_name` → `Result<Option<WithSpan<VariableNameWrapper>>, _>` (`Ok(None)` if the next item is not `$`); `require_variable_name` takes the missing-`$` expectation
+- `$ ident`: peek, then `parse_variable_name` (missing-`$` expectation is the caller's)
 
 ## Shipping and amending
 
@@ -545,7 +545,7 @@ Each grammar feature lands on this surface.
 - parse-selection-sets.md: selections, selection sets, arguments on selections
 - parse-fields.md: `field Type.name { ... }` via `require_selection_set`
 - parse-name-colon.md: `parse_name_colon(parse_lhs, parse_rhs)`
-- parse-variables.md: `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `consume_variable_name` / `require_variable_name`, `Box<T>` delegation in `resolve_position`
+- parse-variables.md: `parse_variable_name`, `parse_type_annotation`, `parse_singleton` on `[...]`, `NonConstantValueParent::VariableDefault`, `Box<T>` delegation in `resolve_position`
 - parse-descriptions.md: description via two `consume_token_if`
 - token-text.md: `TokenText` from `consume_token_if` / `require_token`; `token_text` and `interned` on that value
 - parse-pointers.md: `to` via `require_token(Identifier)` and `token_text`
