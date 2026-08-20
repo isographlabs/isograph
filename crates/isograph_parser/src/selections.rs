@@ -55,6 +55,7 @@ impl<'a> From<SelectionSlotPath<'a>> for IsographResolutionNode<'a> {
 
 pub(crate) fn require_selection_set(
     cursor: &mut ItemCursor<'_>,
+    missing: Expectation,
 ) -> Result<WithSpan<SelectionSet>, WithSpan<ParseError>> {
     cursor
         .require_group(
@@ -68,7 +69,7 @@ pub(crate) fn require_selection_set(
                 ))
             },
         )
-        .map_err(|()| cursor.expected(Expectation::SelectionSet))
+        .map_err(|()| cursor.expected(missing))
 }
 
 fn consume_selection_set(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<SelectionSet>> {

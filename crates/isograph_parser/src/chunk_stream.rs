@@ -219,7 +219,6 @@ impl<'a> ItemCursor<'a> {
         )
     }
 
-    #[cfg_attr(not(test), expect(dead_code))]
     pub(crate) fn text(&self) -> &'a str {
         self.text
     }

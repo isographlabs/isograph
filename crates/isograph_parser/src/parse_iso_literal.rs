@@ -1,3 +1,4 @@
+use common_lang_types::SelectableName;
 use prelude::Postfix;
 use resolve_position::PositionResolutionPath;
 use resolve_position_macros::ResolvePosition;
@@ -5,10 +6,11 @@ use span::{WithSpan, WithSpanPostfix};
 
 use crate::chunk_stream::ItemCursor;
 use crate::{
-    ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode, NamedTypeAnnotationPath,
-    NonBracketTokenKind, ParseError, SelectionSet, SemanticToken, Singleton, Slot,
-    UnparsedChunkItems, VariableDeclarationOrUsageList, consume_variable_declaration_list,
-    parse_singleton, require_selection_set,
+    ChunkContentItem, ChunkedLevel, Expectation, ExtraChunks, Found, IsographResolutionNode,
+    NamedTypeAnnotationPath, NonBracketToken, NonBracketTokenKind, ParseError, SelectionSet,
+    SemanticToken, Singleton, Slot, TypeAnnotation, UnparsedChunkItems,
+    VariableDeclarationOrUsageList, consume_variable_declaration_list, parse_singleton,
+    parse_type_annotation, require_selection_set,
 };
 
 pub type IsoLiteralParse = Singleton<Slot<IsoLiteralItem, UnparsedChunkItems>, ExtraChunks>;
@@ -53,6 +55,9 @@ pub struct FieldDeclaration {
     pub name: WithSpan<SelectableNameWrapper>,
     #[resolve_field]
     pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
+    #[resolve_field]
+    #[parent_variant(FieldDeclaration)]
+    pub target_type: Option<WithSpan<TypeAnnotation>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]
@@ -139,9 +144,6 @@ fn parse_iso_literal_item(
     match keyword.text() {
         "entrypoint" => IsoLiteralItem::Entrypoint(parse_entrypoint(cursor)?).wrap_ok(),
         "field" => IsoLiteralItem::Field(parse_field(cursor)?).wrap_ok(),
-        "pointer" => ParseError::UnsupportedDeclarationType
-            .with_span(keyword.location)
-            .wrap_err(),
         _ => ParseError::expected(
             Expectation::DeclarationKeyword,
             Found::Token(NonBracketTokenKind::Identifier),
@@ -151,9 +153,9 @@ fn parse_iso_literal_item(
     }
 }
 
-pub(crate) fn parse_type_dot_name<N: From<intern::string_key::StringKey>>(
+fn parse_type_dot_name(
     cursor: &mut ItemCursor<'_>,
-) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<N>), WithSpan<ParseError>> {
+) -> Result<(WithSpan<EntityNameWrapper>, WithSpan<SelectableName>), WithSpan<ParseError>> {
     let parent_type = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Type)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
@@ -184,16 +186,41 @@ fn parse_entrypoint(
 fn parse_field(cursor: &mut ItemCursor<'_>) -> Result<FieldDeclaration, WithSpan<ParseError>> {
     let (parent_type, name) = parse_type_dot_name(cursor)?;
     let variable_definitions = consume_variable_declaration_list(cursor);
+    let target_type = consume_to_target(cursor)?;
     let description = consume_description(cursor);
-    let selection_set = require_selection_set(cursor)?;
+    let selection_set = require_selection_set(cursor, Expectation::ToOrDescriptionOrSelectionSet)?;
     FieldDeclaration {
         parent_type,
         name: name.map(SelectableNameWrapper),
         variable_definitions,
+        target_type,
         description,
         selection_set,
     }
     .wrap_ok()
+}
+
+fn consume_to_target(
+    cursor: &mut ItemCursor<'_>,
+) -> Result<Option<WithSpan<TypeAnnotation>>, WithSpan<ParseError>> {
+    let peek = cursor.peek();
+    let Some(peek) = peek else {
+        return None.wrap_ok();
+    };
+    let item = peek.view();
+    let is_identifier = matches!(
+        item.item.reference(),
+        ChunkContentItem::NonBracket(NonBracketToken(NonBracketTokenKind::Identifier))
+    );
+    let location = item.location;
+    if !is_identifier || &cursor.text()[location.as_usize_range()] != "to" {
+        return None.wrap_ok();
+    }
+    cursor
+        .require_token(NonBracketTokenKind::Identifier, SemanticToken::Keyword)
+        .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
+    let target_type = parse_type_annotation(cursor)?;
+    target_type.wrap_some().wrap_ok()
 }
 
 pub(crate) fn consume_description(cursor: &mut ItemCursor<'_>) -> Option<WithSpan<Description>> {
@@ -584,12 +611,12 @@ mod tests {
     }
 
     #[test]
-    fn field_and_pointer_declarations_do_not_parse_yet() {
-        let pointer = "pointer Query.foo to Bar { id }";
+    fn a_pointer_keyword_is_not_a_declaration() {
+        let text = "pointer Pet.BestFriend to Owner { id }";
         assert_no_declaration(
-            pointer,
-            ParseError::UnsupportedDeclarationType,
-            span_of(pointer, "pointer"),
+            text,
+            expected(DeclarationKeyword, Found::Token(Identifier)),
+            span_of(text, "pointer"),
         );
     }
 
@@ -911,7 +938,10 @@ mod tests {
         let end = span_of(text, "Foo").end;
         assert_no_declaration(
             text,
-            expected(Expectation::SelectionSet, Found::EndOfChunk),
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::EndOfChunk,
+            ),
             Span::new(end, end),
         );
     }
@@ -922,7 +952,10 @@ mod tests {
         let end = span_of(text, "Foo").end;
         assert_no_declaration(
             text,
-            expected(Expectation::SelectionSet, Found::EndOfChunk),
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::EndOfChunk,
+            ),
             Span::new(end, end),
         );
     }
@@ -1034,9 +1067,229 @@ mod tests {
         let end = span_of(text, "\"the home route\"").end;
         assert_no_declaration(
             text,
-            expected(Expectation::SelectionSet, Found::EndOfChunk),
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::EndOfChunk,
+            ),
             Span::new(end, end),
         );
+    }
+
+    #[test]
+    fn a_field_without_to_has_no_target_type() {
+        let text = "field Query.Foo { bar }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        assert_eq!(as_field(parse.reference()).target_type, None);
+    }
+
+    #[test]
+    fn a_field_with_to_parses_the_target_type() {
+        let text = "field Pet.BestFriend to Owner { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declaration = as_field(parse.reference());
+        assert_eq!(
+            declaration.name.item,
+            SelectableNameWrapper("BestFriend".intern().to())
+        );
+        assert_eq!(declaration.name.location, span_of(text, "BestFriend"));
+        let target = declaration
+            .target_type
+            .as_ref()
+            .expect("the fixture writes to Owner");
+        assert_eq!(target.location, span_of(text, "Owner"));
+        match target.item.reference() {
+            TypeAnnotation::Named(named) => {
+                assert_eq!(named.name.location, span_of(text, "Owner"));
+            }
+            annotation => panic!("expected a named target, got {annotation:?}"),
+        }
+        assert_eq!(selections(declaration.selection_set.reference()).len(), 1);
+    }
+
+    #[test]
+    fn a_full_field_parses_in_order() {
+        let text = "field Pet.Owner($limit: Int) to Person! \"the owner\" { name }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let declaration = as_field(parse.reference());
+        assert!(declaration.variable_definitions.is_some());
+        assert_eq!(
+            declaration
+                .target_type
+                .as_ref()
+                .expect("the fixture writes to Person!")
+                .location,
+            span_of(text, "Person!")
+        );
+        assert!(declaration.description.is_some());
+    }
+
+    #[test]
+    fn a_to_target_accepts_every_type_annotation_form() {
+        for (text, target) in [
+            ("field Query.Foo to Pet { id }", "Pet"),
+            ("field Query.Foo to Pet! { id }", "Pet!"),
+            ("field Query.Foo to [Pet] { id }", "[Pet]"),
+            ("field Query.Foo to [Pet!]! { id }", "[Pet!]!"),
+            ("field Query.Foo to [[Pet]] { id }", "[[Pet]]"),
+        ] {
+            let (parse, errors) = parsed(text);
+            assert_eq!(errors, vec![], "for literal {text:?}");
+            assert_eq!(
+                as_field(parse.reference())
+                    .target_type
+                    .as_ref()
+                    .expect("the fixture writes a target")
+                    .location,
+                span_of(text, target),
+                "for literal {text:?}",
+            );
+        }
+    }
+
+    #[test]
+    fn a_bracketed_target_is_a_list_annotation() {
+        let text = "field Query.Friends to [Pet!]! { id }";
+        let (parse, errors) = parsed(text);
+        assert_eq!(errors, vec![]);
+        let target = as_field(parse.reference())
+            .target_type
+            .as_ref()
+            .expect("the fixture writes a list target");
+        assert_eq!(target.location, span_of(text, "[Pet!]!"));
+        match target.item.reference() {
+            TypeAnnotation::List(list) => {
+                let inner = list.inner.as_ref().expect("the list holds a type");
+                match inner.item.reference() {
+                    TypeAnnotation::Named(named) => {
+                        assert_eq!(named.name.location, span_of(text, "Pet"));
+                    }
+                    annotation => panic!("expected a named inner type, got {annotation:?}"),
+                }
+            }
+            annotation => panic!("expected a list target, got {annotation:?}"),
+        }
+    }
+
+    #[test]
+    fn an_empty_list_target_fails_as_a_type() {
+        let text = "field Query.Foo to [] { id }";
+        let interior = span_of(text, "[]").start + 1;
+        assert_no_declaration(
+            text,
+            expected(Expectation::TypeAnnotation, Found::EndOfChunk),
+            Span::new(interior, interior),
+        );
+    }
+
+    #[test]
+    fn a_non_to_identifier_is_not_consumed_as_to() {
+        let text = "field Query.Foo Owner { id }";
+        assert_no_declaration(
+            text,
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::Token(Identifier),
+            ),
+            span_of(text, "Owner"),
+        );
+    }
+
+    #[test]
+    fn a_missing_target_type_reports_after_to() {
+        let text = "field Pet.BestFriend to { id }";
+        assert_no_declaration(
+            text,
+            expected(
+                Expectation::TypeAnnotation,
+                Found::Group(BracketKind::Brace),
+            ),
+            span_of(text, "{ id }"),
+        );
+    }
+
+    #[test]
+    fn a_to_at_the_end_of_the_chunk_expects_a_type() {
+        let text = "field Pet.BestFriend to";
+        let end = span_of(text, "to").end;
+        assert_no_declaration(
+            text,
+            expected(Expectation::TypeAnnotation, Found::EndOfChunk),
+            Span::new(end, end),
+        );
+    }
+
+    #[test]
+    fn a_to_after_the_description_is_not_a_target() {
+        let text = "field Query.Foo \"x\" to Owner { id }";
+        assert_no_declaration(
+            text,
+            expected(
+                Expectation::ToOrDescriptionOrSelectionSet,
+                Found::Token(Identifier),
+            ),
+            span_of(text, "to"),
+        );
+    }
+
+    #[test]
+    fn a_final_comma_after_a_field_with_to_is_an_error() {
+        let text = "field Pet.BestFriend to Owner { id },";
+        let (parse, errors) = parsed(text);
+        as_field(parse.reference());
+        assert_eq!(
+            errors,
+            expected(Expectation::EndOfDeclaration, Found::Token(Comma))
+                .with_span(span_of(text, ","))
+                .wrap_vec(),
+        );
+    }
+
+    #[test]
+    fn to_and_the_target_resolve_with_their_ancestry() {
+        let text = "field Pet.BestFriend to Owner { id }";
+        let (parse, _) = parsed(text);
+        match parse.resolve((), span_of(text, "to")) {
+            IsographResolutionNode::FieldDeclaration(_) => {}
+            node => panic!("expected the declaration at `to`, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "BestFriend")) {
+            IsographResolutionNode::SelectableNameWrapper(name) => match name.parent {
+                SelectableNameWrapperParent::FieldDeclaration(declaration) => {
+                    assert_eq!(
+                        declaration
+                            .inner
+                            .target_type
+                            .as_ref()
+                            .map(|target| target.location),
+                        span_of(text, "Owner").wrap_some(),
+                    );
+                }
+                parent => panic!("expected a field parent, got {parent:?}"),
+            },
+            node => panic!("expected the field name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "Owner")) {
+            IsographResolutionNode::EntityNameWrapper(name) => match name.parent {
+                EntityNameWrapperParent::NamedTypeAnnotation(named) => match named.parent {
+                    TypeAnnotationParent::FieldDeclaration(_) => {}
+                    parent => panic!("expected the field as type parent, got {parent:?}"),
+                },
+                parent => panic!("expected a named type annotation, got {parent:?}"),
+            },
+            node => panic!("expected the type name leaf, got {node:?}"),
+        }
+        match parse.resolve((), span_of(text, "id")) {
+            IsographResolutionNode::SelectionNameWrapper(name) => {
+                match name.parent.parent.parent.parent {
+                    SelectionSetParent::FieldDeclaration(_) => {}
+                    parent => panic!("expected the field at the top, got {parent:?}"),
+                }
+            }
+            node => panic!("expected the selection name leaf, got {node:?}"),
+        }
     }
 
     #[test]

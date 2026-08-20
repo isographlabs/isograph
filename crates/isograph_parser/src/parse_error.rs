@@ -12,8 +12,6 @@ pub enum ParseError {
     EmptyLiteral,
     #[error("Expected nothing after the declaration. Each literal holds exactly one declaration.")]
     MultipleDeclarations,
-    #[error("This declaration type is not supported yet.")]
-    UnsupportedDeclarationType,
     #[error("This integer does not fit in a 64-bit signed integer.")]
     IntegerDoesNotFitI64,
 }
@@ -34,7 +32,7 @@ impl fmt::Display for ExpectedFound {
 pub enum Expectation {
     #[error("{0}")]
     Token(NonBracketTokenKind),
-    #[error("one of `entrypoint`, `field`, or `pointer`")]
+    #[error("one of `entrypoint` or `field`")]
     DeclarationKeyword,
     #[error("the end of the declaration")]
     EndOfDeclaration,
@@ -48,6 +46,8 @@ pub enum Expectation {
     ObjectEntry,
     #[error("a selection set, like '{{ id, name }}'")]
     SelectionSet,
+    #[error("the keyword `to`, a description, or a selection set, like '{{ id, name }}'")]
+    ToOrDescriptionOrSelectionSet,
     #[error("a field selection")]
     Selection,
     #[error("a variable declaration, like '$id: ID!'")]
@@ -100,7 +100,11 @@ mod tests {
     fn expectation_unit_variants_use_their_messages() {
         assert_eq!(
             Expectation::DeclarationKeyword.to_string(),
-            "one of `entrypoint`, `field`, or `pointer`",
+            "one of `entrypoint` or `field`",
+        );
+        assert_eq!(
+            Expectation::ToOrDescriptionOrSelectionSet.to_string(),
+            "the keyword `to`, a description, or a selection set, like '{ id, name }'",
         );
         assert_eq!(
             Expectation::EndOfDeclaration.to_string(),

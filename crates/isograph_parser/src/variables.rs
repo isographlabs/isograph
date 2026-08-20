@@ -61,6 +61,7 @@ pub struct ListTypeAnnotation {
 pub enum TypeAnnotationParent<'a> {
     Variable(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
+    FieldDeclaration(FieldDeclarationPath<'a>),
 }
 
 pub type VariableDeclarationOrUsageListPath<'a> =
