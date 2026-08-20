@@ -55,9 +55,11 @@ A boundary is a chunk's trailing separator run. Line breaks are swallowed by wha
 
 2. No trailing separator is ever required: `{ bar }` on one line parses. Trailing commas in lists parse. A comma at the root, inside `[...]`, before a list's first item, or doubled is an error.
 
-3. Directives are deferred. An `@` is an ordinary unexpected token.
+3. Directives land in parse-directives.md. Until that doc lands, `@` is leftover.
 
 4. An integer literal whose value does not fit in `i64` is `IntegerDoesNotFitI64`.
+
+5. A selection that starts with `.` is `Expected(Selection, Token(Period))`. Upstream emits a fragment-spread diagnostic for `...`.
 
 ## The error model
 
@@ -158,9 +160,31 @@ impl BracketKind {
 
 `IsographResolutionNode` is the leaves of the newest tree. Parsed regions resolve to grammar-stage leaves. Chunk-stage variants remain because leftover and failed items hold chunk-stage data. A name is a newtype over an interned key. A position on `.`, `$`, `!`, `:`, or `to` answers the containing node. There is no keyword-marker type.
 
+## Names relative to isograph
+
+Where a type or function exists in both, i2 uses the isograph name. Wrappers that exist only so a lang type can carry `ResolvePosition` take the wrappee's name plus `Wrapper` (`EntityNameWrapper`, `VariableNameWrapper`, `FieldArgumentNameWrapper`, `ValueKeyNameWrapper`, `SelectableNameWrapper`, `SelectableAliasWrapper`, `StringLiteralValueWrapper`, `IsographDirectiveNameWrapper`, `ClientScalarSelectableNameWrapper`, `ClientObjectSelectableNameWrapper`).
+
+Justified differences:
+
+- Slots, `UnparsedChunkItems`, `Singleton`, `ArgumentList`, `VariableDeclarationList`, `IsographFieldDirectiveList`, `ListLiteralValue`: no isograph equivalent.
+- `IsographResolutionNode` (not `IsographResolvedNode`): isograph-resolution-node.md; the enum does not rename per stage.
+- `consume_*` / `require_*` (not `parse_optional_*`): parsing-standards.md.
+- `ObjectEntry` (not `NameValuePair`): two slot `T`s, one per list parent.
+- `VariableUse`, `IntegerValue`, `BooleanValue`, `NullValue`: resolve-position leaves; isograph inlines `i64` / `bool` / unit.
+- `TypeAnnotation` as `Named` / `List` with `!` on the span (not `TypeAnnotationDeclaration` as `Scalar` / `Union` / `Plural`): i2 stores the written form; isograph converts from `GraphQLTypeAnnotation`.
+- `Selection` as an enum (not `SelectionType<ScalarSelection, ObjectSelection>`).
+- Parent enums drop the `Type` suffix (`SelectionSetParent`, not `SelectionSetParentType`).
+- `IsoLiteralItem` (not `IsoLiteralExtractionResult`): extraction is a different stage.
+- `directive_set` on pointer declarations (upstream field name is `directives`).
+- Raw `IsographFieldDirectiveList` (not immediate serde into typed `*DirectiveSet`).
+- `Description` stores quotes included (upstream unquotes and dedents).
+- Empty optional lists are `None` (upstream empty `Vec` with a generated span).
+- `parse_nested_singleton` (isograph has no chunk singleton).
+
 ## What later stages own
 
-- Directives, when they return.
+- Typed directive sets (`from_isograph_field_directives`, `EntrypointDirectiveSet`, `ScalarSelectionDirectiveSet`, …).
+- Description unquote and block-string dedent.
 - Semantic tokens: semantic-tokens.md.
 - Extraction context (`const_export_name`, definition path, export check).
 - Diagnostics rendering.
@@ -172,10 +196,12 @@ impl BracketKind {
 
 parsing-standards.md governs how every implementation below is written. Each doc is independently shippable and lands with its tests before the next begins.
 
-1. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
-2. `parse-fields.md`. `field Type.name { ... }` via `require_selection_set`. Resolve-from-the-declaration tests.
-3. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_singleton`), and the `Box` delegation impl.
-4. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
-5. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+1. `align-parser-names.md`. Rename landed wrappers and pairs to the isograph names. Split object-entry keys onto `ValueKeyNameWrapper`.
+2. `parse-selection-sets.md`. Scalar selections, `alias: name`, object selections, argument lists on those selections. Tests feed a list interior to `parse_each_chunk`.
+3. `parse-fields.md`. `field Type.name { ... }` via `require_token` + `require_selection_set`. Resolve-from-the-declaration tests.
+4. `parse-variables.md`. Variable-declaration lists, `$name: Type = default` with `ConstantValue` defaults, type annotations (named, `!`, and `[...]` via `parse_nested_singleton`), and the `Box` delegation impl.
+5. `parse-descriptions.md`. The optional description a field declaration carries before its selection set, via two `consume_token_if` calls.
+6. `parse-pointers.md`. `pointer Type.name to Type { ... }` via `require_token(Identifier, Keyword)` and `token_text == "to"`. Removes `UnsupportedDeclarationType`.
+7. `parse-directives.md`. `@name` and `@name(args)` on entrypoints, fields, pointers, and selections. Raw `IsographFieldDirectiveList`; typed sets are a later stage.
 
-Later: `parse-arrays.md`. `[ ... ]` list values. `parse-variables.md` uses them for defaults. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.
+Later: `parse-arrays.md`. `[ ... ]` list values. `constant-value.md`. One value type instead of `ConstantValue` beside `NonConstantValue`.

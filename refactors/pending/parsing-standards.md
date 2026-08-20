@@ -358,7 +358,7 @@ pub(crate) fn parse_value(
 }
 ```
 
-`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name is `SelectionName` / `SelectionNameWrapper`, not `SelectableName`. A field or pointer declaration's name wraps `SelectableName`.
+`VariableUse` stores the interned name. A position on `$` answers `VariableUse`. There is no `Dollar` field. `string_key_newtype!` implements `From<StringKey>` for the inner lang types. Parser wrappers do not add a second `From`. Construction is `name.interned().map(VariableNameWrapper)`. A selection's name is `SelectableName` / `SelectableNameWrapper`. A field declaration's name is `ClientScalarSelectableNameWrapper`. A pointer declaration's name is `ClientObjectSelectableNameWrapper`.
 
 Keyword text after `require_token(Identifier, token)` or `consume_token_if(Identifier, token)`: `match` on `token_text` (`"entrypoint"` / `"field"` / `"pointer"`; `"true"` / `"false"` / `"null"`; `"to"`).
 
@@ -377,11 +377,11 @@ One optional item is `consume_*`. Two optional kinds in one position is two `con
                     cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier))
                 })?;
             (
-                first.interned().map(SelectionAliasWrapper).wrap_some(),
-                name.interned().map(SelectionNameWrapper),
+                first.interned().map(SelectableAliasWrapper).wrap_some(),
+                name.interned().map(SelectableNameWrapper),
             )
         }
-        None => (None, first.interned().map(SelectionNameWrapper)),
+        None => (None, first.interned().map(SelectableNameWrapper)),
     };
 ```
 
@@ -516,7 +516,7 @@ One pass by reference. The output copies spans and `Copy` tokens. Leftover and f
 - Multi-form position: `consume_*` ladder, last arm `expected`
 - Keyword / boolean / null text: `token.token_text()` after an identifier
 - Integer conversion: `token.token_text().parse()` on an `IntegerLiteral` token
-- Interned name: `token.interned().map(FieldArgumentNameWrapper)` (the inner lang type implements `From<StringKey>`; the wrapper does not)
+- Interned name: `token.interned().map(SelectableNameWrapper)` (the inner lang type implements `From<StringKey>`; the wrapper does not)
 - Composite span: `ItemCursor::spanning`
 - List of items: `ChunkedLevel::parse_each_chunk` → `Vec<WithSpan<Slot<P, UnparsedChunkItems>>>`
 - One-item context: `parse_singleton` → `Singleton<Slot<T, UnparsedChunkItems>, ExtraChunks>`
