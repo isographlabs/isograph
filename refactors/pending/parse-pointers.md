@@ -73,7 +73,7 @@ pub struct ClientPointerDeclaration {
     pub client_pointer_name: WithSpan<ClientObjectSelectableNameWrapper>,
     #[resolve_field]
     #[parent_variant(ClientPointerDeclaration)]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     #[parent_variant(PointerTarget)]
     pub target_type: WithSpan<TypeAnnotation>,
@@ -148,21 +148,21 @@ fn parse_pointer(
 1. `EntityNameWrapperParent` gains `ClientPointerDeclaration(ClientPointerDeclarationPath<'a>)`.
 2. `SelectionSetParent` gains `ClientPointerDeclaration(ClientPointerDeclarationPath<'a>)`.
 3. `TypeAnnotationParent` gains `PointerTarget(ClientPointerDeclarationPath<'a>)`.
-4. `VariableDeclarationList` and `Description` parents become enums:
+4. `VariableDeclarationOrUsageList` and `Description` parents become enums:
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
 #[derive(Debug)]
-pub enum VariableDeclarationListParent<'a> {
+pub enum VariableDeclarationOrUsageListParent<'a> {
     ClientFieldDeclaration(ClientFieldDeclarationPath<'a>),
     ClientPointerDeclaration(ClientPointerDeclarationPath<'a>),
 }
 
-pub type VariableDeclarationListPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationList, VariableDeclarationListParent<'a>>;
+pub type VariableDeclarationOrUsageListPath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationOrUsageList, VariableDeclarationOrUsageListParent<'a>>;
 ```
 
-Origin: `VariableDeclarationParentType` in isograph. The i2 enum is on the list wrapper, not on each `VariableDeclaration`.
+Origin: `VariableDeclarationParentType` in isograph. The i2 enum is on the list wrapper, not on each `VariableDeclarationOrUsage`.
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
@@ -177,7 +177,7 @@ pub type DescriptionPath<'a> = PositionResolutionPath<&'a Description, Descripti
 
 Origin: `DescriptionParent` in `string_key_wrappers.rs`. Variant names match.
 
-`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field]` + `#[parent_variant(ClientFieldDeclaration)]`. `VariableDeclarationList`'s `parent_type` becomes `VariableDeclarationListParent`. `Description`'s `parent_type` becomes `DescriptionParent`.
+`ClientFieldDeclaration`'s `variable_definitions` and `description` fields respell to `#[resolve_field]` + `#[parent_variant(ClientFieldDeclaration)]`. `VariableDeclarationOrUsageList`'s `parent_type` becomes `VariableDeclarationOrUsageListParent`. `Description`'s `parent_type` becomes `DescriptionParent`.
 
 ## The resolution surface
 

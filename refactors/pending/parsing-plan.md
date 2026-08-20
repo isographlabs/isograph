@@ -111,7 +111,7 @@ pub enum Expectation {
     #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
     #[error("a variable declaration, like '$id: ID!'")]
-    VariableDeclaration,
+    VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
     #[error("a constant value; variables are not allowed here")]
@@ -166,7 +166,8 @@ Where a type or function exists in both, i2 uses the isograph name. Wrappers tha
 
 Justified differences:
 
-- Slots, `UnparsedChunkItems`, `Singleton`, `ArgumentList`, `VariableDeclarationList`, `IsographFieldDirectiveList`, `ListLiteralValue`: no isograph equivalent.
+- Slots, `UnparsedChunkItems`, `Singleton`, `ArgumentList`, `VariableDeclarationOrUsageList`, `IsographFieldDirectiveList`, `ListLiteralValue`: no isograph equivalent.
+- `VariableDeclarationOrUsage` (not `VariableDeclaration`).
 - `IsographResolutionNode` (not `IsographResolvedNode`): isograph-resolution-node.md; the enum does not rename per stage.
 - `consume_*` / `require_*` (not `parse_optional_*`): parsing-standards.md.
 - `ObjectEntry` (not `NameValuePair`): two slot `T`s, one per list parent.

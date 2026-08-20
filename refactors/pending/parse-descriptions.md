@@ -38,7 +38,7 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
@@ -57,7 +57,7 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     pub description: Option<WithSpan<Description>>,
     #[resolve_field]

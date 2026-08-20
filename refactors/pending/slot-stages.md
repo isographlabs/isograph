@@ -32,7 +32,7 @@ pub fn require_complete_literal(
 
 Empty (`parse_iso_literal` returned `None`) is not artifact-ready. A parsed first slot with no extra is `&IsoLiteralItem`.
 
-A type that contains a group maps `require_complete` over its slots. Feature docs that introduce a group write that map: `SelectionSet`, `ArgumentList`, `ObjectLiteral`, `VariableDeclarationList`, `ListTypeAnnotation`. Nested lists convert inner first.
+A type that contains a group maps `require_complete` over its slots. Feature docs that introduce a group write that map: `SelectionSet`, `ArgumentList`, `ObjectLiteral`, `VariableDeclarationOrUsageList`, `ListTypeAnnotation`. Nested lists convert inner first.
 
 ## Stage
 

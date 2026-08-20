@@ -47,7 +47,7 @@ impl<T: ResolvePosition> ResolvePosition for Box<T> {
 ```rust
 // from crates/isograph_parser/src/parse_error.rs
     #[error("a variable declaration, like '$id: ID!'")]
-    VariableDeclaration,
+    VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
     #[error("a constant value; variables are not allowed here")]
@@ -87,7 +87,7 @@ impl<'a> ItemCursor<'a> {
 
 ## New module: variables.rs
 
-Origin for the declaration: `crates/isograph_lang_types/src/declarations/variable_declaration.rs` (`VariableDeclaration`, field `type_`, `default_value`). Origin for the annotation shape written here: GraphQL named / list / `!`, not isograph's post-conversion `TypeAnnotationDeclaration` (`Scalar` / `Union` / `Plural`). Delta: each declaration sits in a `Slot`; `VariableDeclarationList` wraps the vec (isograph stores `Vec<VariableDeclaration>` on the field); `!` is not a `NonNull` variant; leftover inside `[...]` is stored on `ListTypeAnnotation` (see below).
+Origin for the declaration: `crates/isograph_lang_types/src/declarations/variable_declaration.rs` (`VariableDeclaration`, field `type_`, `default_value`). Origin for the annotation shape written here: GraphQL named / list / `!`, not isograph's post-conversion `TypeAnnotationDeclaration` (`Scalar` / `Union` / `Plural`). Delta: i2 names the type `VariableDeclarationOrUsage`; each declaration sits in a `Slot`; `VariableDeclarationOrUsageList` wraps the vec (isograph stores `Vec<VariableDeclaration>` on the field); `!` is not a `NonNull` variant; leftover inside `[...]` is stored on `ListTypeAnnotation` (see below).
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
@@ -106,13 +106,13 @@ use crate::{
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
 #[resolve_position(parent_type = ClientFieldDeclarationPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableDeclarationList(
-    #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclaration, UnparsedChunkItems>>>,
+pub struct VariableDeclarationOrUsageList(
+    #[resolve_field] pub Vec<WithSpan<Slot<VariableDeclarationOrUsage, UnparsedChunkItems>>>,
 );
 
 #[derive(Debug, PartialEq, Eq, ResolvePosition)]
-#[resolve_position(parent_type = VariableDeclarationSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
-pub struct VariableDeclaration {
+#[resolve_position(parent_type = VariableDeclarationOrUsageSlotPath<'a>, resolved_node = IsographResolutionNode<'a>)]
+pub struct VariableDeclarationOrUsage {
     #[resolve_field]
     #[parent_variant(Declaration)]
     pub name: WithSpan<VariableNameWrapper>,
@@ -152,20 +152,20 @@ pub struct ListTypeAnnotation {
 
 #[derive(Debug)]
 pub enum TypeAnnotationParent<'a> {
-    Variable(VariableDeclarationPath<'a>),
+    Variable(VariableDeclarationOrUsagePath<'a>),
     List(Box<ListTypeAnnotationPath<'a>>),
 }
 
-pub type VariableDeclarationListPath<'a> =
-    PositionResolutionPath<&'a VariableDeclarationList, ClientFieldDeclarationPath<'a>>;
+pub type VariableDeclarationOrUsageListPath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationOrUsageList, ClientFieldDeclarationPath<'a>>;
 
-pub type VariableDeclarationSlotPath<'a> = PositionResolutionPath<
-    &'a Slot<VariableDeclaration, UnparsedChunkItems>,
-    VariableDeclarationListPath<'a>,
+pub type VariableDeclarationOrUsageSlotPath<'a> = PositionResolutionPath<
+    &'a Slot<VariableDeclarationOrUsage, UnparsedChunkItems>,
+    VariableDeclarationOrUsageListPath<'a>,
 >;
 
-pub type VariableDeclarationPath<'a> =
-    PositionResolutionPath<&'a VariableDeclaration, VariableDeclarationSlotPath<'a>>;
+pub type VariableDeclarationOrUsagePath<'a> =
+    PositionResolutionPath<&'a VariableDeclarationOrUsage, VariableDeclarationOrUsageSlotPath<'a>>;
 
 pub type NamedTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a NamedTypeAnnotation, TypeAnnotationParent<'a>>;
@@ -174,9 +174,9 @@ pub type ListTypeAnnotationPath<'a> =
     PositionResolutionPath<&'a ListTypeAnnotation, TypeAnnotationParent<'a>>;
 ```
 
-A position on `$` answers `VariableDeclaration`. `parse_type_annotation`'s `spanning` covers a trailing `!`. A position on `!` answers `NamedTypeAnnotation` or `ListTypeAnnotation`. There is no `Exclamation` field and no `NonNull` variant.
+A position on `$` answers `VariableDeclarationOrUsage`. `parse_type_annotation`'s `spanning` covers a trailing `!`. A position on `!` answers `NamedTypeAnnotation` or `ListTypeAnnotation`. There is no `Exclamation` field and no `NonNull` variant.
 
-`TypeAnnotation` is a field of `VariableDeclaration` and of `ListTypeAnnotation`. A vanilla `Slot<T, E>` pin's `T::Parent` is the slot path, so `TypeAnnotation` cannot be that `T` while also having `TypeAnnotationParent`. `ListTypeAnnotation` stores the singleton's `item` and `extra_tokens` as its own fields. `inner: None` is an empty or failed `[...]`. Extra chunks after the first are `EndOfType` diagnostics from `parse_nested_singleton`; they are not stored.
+`TypeAnnotation` is a field of `VariableDeclarationOrUsage` and of `ListTypeAnnotation`. A vanilla `Slot<T, E>` pin's `T::Parent` is the slot path, so `TypeAnnotation` cannot be that `T` while also having `TypeAnnotationParent`. `ListTypeAnnotation` stores the singleton's `item` and `extra_tokens` as its own fields. `inner: None` is an empty or failed `[...]`. Extra chunks after the first are `EndOfType` diagnostics from `parse_nested_singleton`; they are not stored.
 
 `TypeAnnotationParent::List` is boxed to break the cycle.
 
@@ -206,7 +206,7 @@ After. Origin: `VariableNameWrapperParentType` in isograph has only the declarat
 #[derive(Debug)]
 pub enum VariableNameWrapperParent<'a> {
     Use(VariableUsePath<'a>),
-    Declaration(VariableDeclarationPath<'a>),
+    Declaration(VariableDeclarationOrUsagePath<'a>),
 }
 
 pub type VariableNameWrapperPath<'a> =
@@ -222,7 +222,7 @@ pub type VariableNameWrapperPath<'a> =
         (<SelectionFieldArgument, UnparsedChunkItems>, ArgumentListPath<'a>),
         (<ObjectEntry, UnparsedChunkItems>, ObjectLiteralPath<'a>),
         (<Selection, UnparsedChunkItems>, SelectionSetPath<'a>),
-        (<VariableDeclaration, UnparsedChunkItems>, VariableDeclarationListPath<'a>),
+        (<VariableDeclarationOrUsage, UnparsedChunkItems>, VariableDeclarationOrUsageListPath<'a>),
     ]
 ```
 
@@ -233,25 +233,25 @@ pub enum UnparsedChunkItemsParent<'a> {
     SelectionFieldArgumentSlot(SelectionFieldArgumentSlotPath<'a>),
     ObjectEntrySlot(ObjectEntrySlotPath<'a>),
     SelectionSlot(SelectionSlotPath<'a>),
-    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
+    VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
 }
 ```
 
-`From<VariableDeclarationSlotPath>` and `From<ListTypeAnnotationPath>` into `UnparsedChunkItemsParent`.
+`From<VariableDeclarationOrUsageSlotPath>` and `From<ListTypeAnnotationPath>` into `UnparsedChunkItemsParent`.
 
 ```rust
 // from crates/isograph_parser/src/variables.rs
-impl<'a> From<VariableDeclarationSlotPath<'a>> for IsographResolutionNode<'a> {
-    fn from(path: VariableDeclarationSlotPath<'a>) -> Self {
-        IsographResolutionNode::VariableDeclarationSlot(path)
+impl<'a> From<VariableDeclarationOrUsageSlotPath<'a>> for IsographResolutionNode<'a> {
+    fn from(path: VariableDeclarationOrUsageSlotPath<'a>) -> Self {
+        IsographResolutionNode::VariableDeclarationOrUsageSlot(path)
     }
 }
 ```
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
-    VariableDeclarationSlot(VariableDeclarationSlotPath<'a>),
+    VariableDeclarationOrUsageSlot(VariableDeclarationOrUsageSlotPath<'a>),
 ```
 
 `ConstantValue` and `parse_constant_value` land in arguments.rs. The constant-value ladder is the value ladder without the `$` arm; `$` is `expected(Expectation::ConstantValue)`.
@@ -286,7 +286,7 @@ pub struct ConstantObjectEntry {
 
 #[derive(Debug)]
 pub enum ConstantValueParent<'a> {
-    VariableDefault(VariableDeclarationPath<'a>),
+    VariableDefault(VariableDeclarationOrUsagePath<'a>),
     ConstantObjectEntry(Box<ConstantObjectEntryPath<'a>>),
 }
 ```
@@ -329,12 +329,12 @@ constant-value.md deletes this second tree.
 // from crates/isograph_parser/src/variables.rs
 pub(crate) fn consume_variable_declaration_list(
     cursor: &mut ItemCursor<'_>,
-) -> Option<WithSpan<VariableDeclarationList>> {
+) -> Option<WithSpan<VariableDeclarationOrUsageList>> {
     cursor.consume_group_if(
         BracketKind::Parenthesis,
         SemanticToken::Parenthesis,
         |cursor, children| {
-            VariableDeclarationList(children.item.parse_each_chunk(
+            VariableDeclarationOrUsageList(children.item.parse_each_chunk(
                 cursor,
                 Expectation::Separator(BracketKind::Parenthesis),
                 parse_variable_declaration,
@@ -345,10 +345,10 @@ pub(crate) fn consume_variable_declaration_list(
 
 fn parse_variable_declaration(
     cursor: &mut ItemCursor<'_>,
-) -> Result<VariableDeclaration, WithSpan<ParseError>> {
+) -> Result<VariableDeclarationOrUsage, WithSpan<ParseError>> {
     cursor
         .require_token(NonBracketTokenKind::Dollar, SemanticToken::Variable)
-        .map_err(|()| cursor.expected(Expectation::VariableDeclaration))?;
+        .map_err(|()| cursor.expected(Expectation::VariableDeclarationOrUsage))?;
     let name = cursor
         .require_token(NonBracketTokenKind::Identifier, SemanticToken::Variable)
         .map_err(|()| cursor.expected(Expectation::Token(NonBracketTokenKind::Identifier)))?;
@@ -361,7 +361,7 @@ fn parse_variable_declaration(
         Some(_) => parse_constant_value(cursor)?.wrap_some(),
         None => None,
     };
-    VariableDeclaration {
+    VariableDeclarationOrUsage {
         name: name.interned().map(VariableNameWrapper),
         type_,
         default_value,
@@ -442,7 +442,7 @@ fn parse_bracket_interior_type(
 }
 ```
 
-`parse_type_annotation` on empty `[]` returns `Err`, so the enclosing `VariableDeclaration` is `item: None`.
+`parse_type_annotation` on empty `[]` returns `Err`, so the enclosing `VariableDeclarationOrUsage` is `item: None`.
 
 `[Pet,]` is one chunk plus a boundary comma: `inner: Some(Pet)` plus `Expected(EndOfType, Token(Comma))` at the comma, from `parse_singleton`. The variable declaration parses.
 
@@ -483,7 +483,7 @@ pub struct ClientFieldDeclaration {
     #[parent_variant(ClientFieldDeclaration)]
     pub client_field_name: WithSpan<ClientScalarSelectableNameWrapper>,
     #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub selection_set: WithSpan<SelectionSet>,
@@ -504,28 +504,28 @@ pub struct ClientFieldDeclaration {
 
 ```rust
 // from crates/isograph_parser/src/isograph_resolution_node.rs
-    VariableDeclarationList(VariableDeclarationListPath<'a>),
-    VariableDeclaration(VariableDeclarationPath<'a>),
+    VariableDeclarationOrUsageList(VariableDeclarationOrUsageListPath<'a>),
+    VariableDeclarationOrUsage(VariableDeclarationOrUsagePath<'a>),
     NamedTypeAnnotation(NamedTypeAnnotationPath<'a>),
     ListTypeAnnotation(ListTypeAnnotationPath<'a>),
 ```
 
 `EntityNameWrapper` already has a resolution-node variant. A type name answers that variant with `EntityNameWrapperParent::NamedTypeAnnotation`.
 
-The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationList` expands like `SelectionSet`. `VariableDeclaration` like `SelectionFieldArgument`. `TypeAnnotation` like `NonConstantValue`.
+The boxed recursive field uses the `Box<T>` blanket. `VariableDeclarationOrUsageList` expands like `SelectionSet`. `VariableDeclarationOrUsage` like `SelectionFieldArgument`. `TypeAnnotation` like `NonConstantValue`.
 
 ## Tests
 
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
-    fn variables_of(parse: &WithSpan<IsoLiteralParse>) -> &WithSpan<VariableDeclarationList> {
+    fn variables_of(parse: &WithSpan<IsoLiteralParse>) -> &WithSpan<VariableDeclarationOrUsageList> {
         as_field(parse)
             .variable_definitions
             .as_ref()
             .expect("the fixture's declaration carries variable definitions")
     }
 
-    fn as_declared(slot: &Slot<VariableDeclaration, UnparsedChunkItems>) -> &VariableDeclaration {
+    fn as_declared(slot: &Slot<VariableDeclarationOrUsage, UnparsedChunkItems>) -> &VariableDeclarationOrUsage {
         slot.item
             .as_ref()
             .map(|wrapped| wrapped.item.reference())

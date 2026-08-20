@@ -444,7 +444,7 @@ pub enum Expectation {
     #[error("an object entry, like 'id: 4'")]
     ObjectEntry,
     #[error("a variable declaration, like '$id: ID!'")]
-    VariableDeclaration,
+    VariableDeclarationOrUsage,
     #[error("a type, like 'String', 'String!', or '[String]'")]
     TypeAnnotation,
     #[error("a constant value; variables are not allowed here")]
@@ -487,7 +487,7 @@ impl BracketKind {
 }
 ```
 
-One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclaration`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
+One global `Expectation`. The listing above is the eventual enum. Variants land with the feature that first constructs them. parse-arguments.md adds `Argument`, `Value`, `ObjectEntry`, `IntegerDoesNotFitI64`, and `Separator(BracketKind)`. parse-selection-sets.md adds `SelectionSet` and `Selection`. parse-variables.md adds `VariableDeclarationOrUsage`, `TypeAnnotation`, `ConstantValue`, and `EndOfType`. parse-pointers.md adds `ToKeyword` and removes `UnsupportedDeclarationType`.
 
 An error is `WithSpan<ParseError>`. The span is the offending item, or empty at `end_span` where the missing item would go. `IntegerDoesNotFitI64` is the `parse::<i64>()` `Err` on an `IntegerLiteral` token.
 

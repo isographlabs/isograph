@@ -187,7 +187,7 @@ Field. Origin field name: `directive_set`.
 ```rust
 // from crates/isograph_parser/src/parse_iso_literal.rs
     #[resolve_field]
-    pub variable_definitions: Option<WithSpan<VariableDeclarationList>>,
+    pub variable_definitions: Option<WithSpan<VariableDeclarationOrUsageList>>,
     #[resolve_field]
     #[parent_variant(ClientFieldDeclaration)]
     pub directive_set: Option<WithSpan<IsographFieldDirectiveList>>,
